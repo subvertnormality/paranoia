@@ -330,12 +330,19 @@ def test_none_citations():
 # --- regions ----------------------------------------------------------------
 
 
-def region(path, anchor, *, commit="c0", eof=1000, context=3):
-    return arb.to_region(Citation(path, anchor), commit=commit, eof=eof, context=context)
+def region(path, anchor, *, commit="c0", blob=None, eof=1000, context=3):
+    """`blob` defaults to a per-path stand-in: region identity is (path, blob), so
+    two regions of the same path and content are the same region regardless of which
+    revision they were cited at."""
+    return arb.to_region(
+        Citation(path, anchor), commit=commit,
+        blob=blob if blob is not None else f"blob-{path}",
+        eof=eof, context=context,
+    )
 
 
 def test_region_clamps_at_file_bounds():
-    r = arb.to_region(Citation("a.py", 2), commit="c0", eof=4, context=3)
+    r = arb.to_region(Citation("a.py", 2), commit="c0", blob="b", eof=4, context=3)
     assert (r.lo, r.hi) == (1, 4)
 
 
@@ -349,14 +356,26 @@ def test_distant_anchors_are_different_regions():
     assert not arb.same_region(region("a.py", 100), region("a.py", 200))
 
 
-def test_same_line_at_different_commits_are_different_regions():
-    assert not arb.same_region(region("a.py", 10, commit="c1"), region("a.py", 10, commit="c2"))
+def test_same_bytes_at_different_commits_are_ONE_region():
+    """Round-3 blocker: every run wraps HEAD, so a bare citation and a HEAD@ citation
+    of the same unchanged file are byte-identical. Keying on the commit made them
+    two regions, so both vendors 'gained' evidence and round 2 ran on the same bytes
+    carried twice."""
+    a = region("a.py", 10, commit="wrapper", blob="same")
+    b = region("a.py", 10, commit="parent", blob="same")
+    assert arb.same_region(a, b)
+
+
+def test_same_path_with_different_content_are_different_regions():
+    a = region("a.py", 10, commit="c1", blob="before")
+    b = region("a.py", 10, commit="c2", blob="after")
+    assert not arb.same_region(a, b)
 
 
 def test_anchor_within_is_point_in_interval_not_intersection():
     """Round-10 MAJOR: carried [104,110] and a fresh anchor at 113 have overlapping
     windows, but 113 was never carried."""
-    carried = Region(commit="c0", path="a.py", lo=104, hi=110, anchor=107)
+    carried = Region(commit="c0", path="a.py", lo=104, hi=110, anchor=107, blob="blob-a.py")
     fresh = region("a.py", 113)
     assert arb.same_region(fresh, carried)  # windows overlap
     assert not arb.anchor_within(fresh, carried)  # but the anchor was not carried
@@ -422,7 +441,9 @@ def _resolver(eof=1000, missing=()):
     def resolve(c: Citation):
         if c.path in missing:
             return None
-        return arb.to_region(c, commit=c.commit or "snap", eof=eof)
+        return arb.to_region(
+            c, commit=c.commit or "snap", blob=f"blob-{c.path}", eof=eof
+        )
 
     return resolve
 
@@ -439,7 +460,7 @@ def test_a_citation_that_does_not_resolve_does_not_substantiate():
 
 
 def test_round_two_requires_the_decisive_anchor_inside_a_carried_novel_region():
-    carried = {"codex": [Region("snap", "b.py", 17, 23, 20)]}
+    carried = {"codex": [Region("snap", "b.py", 17, 23, 20, "blob-b.py")]}
     good = [vote("codex", "opt-a", decisive=Citation("b.py", 20))]
     bad = [vote("codex", "opt-a", decisive=Citation("a.py", 10))]
     assert arb.substantiation(good, resolve=_resolver(), carried=carried) == {"codex": True}
@@ -449,7 +470,7 @@ def test_round_two_requires_the_decisive_anchor_inside_a_carried_novel_region():
 def test_round_two_supporting_citations_never_substantiate():
     """Round-10 FATAL: a decider could keep its own prior region as its real reason
     and merely append the other vendor's novel region."""
-    carried = {"codex": [Region("snap", "b.py", 17, 23, 20)]}
+    carried = {"codex": [Region("snap", "b.py", 17, 23, 20, "blob-b.py")]}
     votes = [
         vote(
             "codex",

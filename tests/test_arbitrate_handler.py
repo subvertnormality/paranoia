@@ -785,3 +785,21 @@ def test_two_spellings_of_one_commit_do_not_manufacture_novelty(repo: Path, tmp_
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
     assert trailer_field(report, "ROUNDS") == "1"
     assert "withheld" in report
+
+
+def test_wrapper_and_parent_citations_do_not_manufacture_novelty(repo: Path, tmp_path: Path):
+    """The normal shape of the round-3 blocker, end to end: one vendor cites bare,
+    the other cites HEAD@, same unchanged file. Round 2 must be withheld."""
+    head = git(["rev-parse", "HEAD"], repo).strip()
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda e, r: picks.get((e, r), "opt-float"),
+        extra={
+            ("codex", 1): {"decisive": "app.py:4"},
+            ("claude", 1): {"decisive": f"{head}@app.py:4"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert trailer_field(report, "ROUNDS") == "1"
+    assert "withheld" in report

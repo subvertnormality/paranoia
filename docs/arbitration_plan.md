@@ -273,8 +273,8 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   read. The commit identity is part of the region key, the carried evidence, and
   the audit record.
 - Normalized: `./` stripped, resolved relative to repo root, canonicalized.
-- **Canonicalized through the snapshot's symlink graph** before anything else
-  (see below).
+- The revision is resolved to its **full commit id**, and the path is
+  **canonicalized through that commit's symlink graph**, before anything else.
 - Must resolve in the snapshot (`git cat-file -e`) with `1 ≤ line ≤ EOF`.
   A citation that fails resolution is dropped and the drop is recorded.
 
@@ -309,7 +309,14 @@ Every anchor is therefore expanded to the **interval actually carried** —
 cap. Two distinct predicates operate on those intervals, and conflating them is a
 defect:
 
-- **`same_region`** — same `(commit, path)` and intervals that intersect *at all*.
+- **`same_region`** — same `(path, blob)` and intervals that intersect *at all*.
+  Identity is the canonical path plus git's **content id**, not the revision:
+  every run wraps `HEAD`, so a bare citation (resolving to the wrapper) and a
+  `HEAD@…` citation of the same unchanged file are byte-identical and must be one
+  region. Keying on the commit made them two, so both vendors appeared to gain
+  evidence and round 2 ran on the same bytes carried twice. The commit is retained
+  as provenance. Cited revisions are also canonicalized to full object ids first,
+  so two spellings of one commit cannot split a region either.
   Used for the §2.11 novelty gate. Deliberately generous: an overlap counts as
   sameness even when anchors differ, so the gate errs toward `UNRESOLVED` rather
   than toward running an evidence-thin round 2.

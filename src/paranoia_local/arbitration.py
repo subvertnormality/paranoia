@@ -329,11 +329,21 @@ def parse_citations(field: str, *, limit: int = MAX_CITATIONS) -> tuple[Citation
 
 @dataclass(frozen=True)
 class Region:
-    """The interval a citation actually carries, keyed by (commit, path).
+    """The interval a citation actually carries.
 
-    Keyed on the resolved commit as well as the path so the same line at two
-    revisions is two regions, and canonicalized through the symlink map so two
-    aliases for one file are one region.
+    Identity is `(path, blob)` — the canonical path and git's content id for the
+    file at the cited revision. `commit` is retained as provenance only.
+
+    Keying on the *commit* instead was a defect, and the normal case exposed it:
+    every run wraps `HEAD` in a snapshot commit, so a bare citation (which resolves
+    to the wrapper) and a `HEAD@…` citation of the same unchanged file are
+    byte-identical yet would key apart. Both vendors then appear to gain evidence,
+    round 2 carries the same bytes twice, and each can substantiate by quoting the
+    other's revision. Git already content-addresses this: identical content shares a
+    blob id, so the blob is the right identity and no per-line digest is needed.
+
+    Paths are canonicalized through the snapshot's symlink map before construction,
+    so two aliases for one file are also one region.
     """
 
     commit: str
@@ -341,23 +351,35 @@ class Region:
     lo: int
     hi: int
     anchor: int
+    blob: str = ""
 
     @property
     def key(self) -> tuple[str, str]:
-        return (self.commit, self.path)
+        return (self.path, self.blob)
 
 
-def to_region(citation: Citation, *, commit: str, eof: int, context: int = CONTEXT_LINES) -> Region:
+def to_region(
+    citation: Citation,
+    *,
+    commit: str,
+    blob: str,
+    eof: int,
+    context: int = CONTEXT_LINES,
+) -> Region:
     lo = max(1, citation.line - context)
     hi = min(eof, citation.line + context)
-    return Region(commit=commit, path=citation.path, lo=lo, hi=hi, anchor=citation.line)
+    return Region(
+        commit=commit, path=citation.path, lo=lo, hi=hi, anchor=citation.line, blob=blob
+    )
 
 
 def same_region(a: Region, b: Region) -> bool:
-    """Sameness for the novelty gate: any overlap counts.
+    """Sameness for the novelty gate: same path, same file content, and any overlap.
 
-    Deliberately generous — two anchors a line apart carry near-identical windows,
-    so treating them as distinct would let an evidence-free round 2 run.
+    Deliberately generous on the interval — two anchors a line apart carry
+    near-identical windows, so treating them as distinct would let an evidence-free
+    round 2 run — and content-based rather than revision-based, so the same
+    unchanged file cited at two revisions is one region (see `Region`).
     """
     return a.key == b.key and a.lo <= b.hi and b.lo <= a.hi
 
@@ -374,7 +396,7 @@ def anchor_within(anchor_region: Region, carried: Region) -> bool:
 
 
 def merge_regions(regions: Iterable[Region]) -> tuple[Region, ...]:
-    """Merge overlapping intervals per (commit, path). The merged interval keeps the
+    """Merge overlapping intervals per `(path, blob)`. The merged interval keeps the
     first anchor; anchors matter only on unmerged citation regions."""
     by_key: dict[tuple[str, str], list[Region]] = {}
     for r in regions:
@@ -404,7 +426,12 @@ def region_union(per_engine: Mapping[str, Sequence[Region]]) -> tuple[Region, ..
     """
     merged = merge_regions([r for regions in per_engine.values() for r in regions])
     return tuple(
-        sorted(merged, key=lambda r: hashlib.sha256(f"{r.commit}|{r.path}|{r.lo}|{r.hi}".encode()).hexdigest())
+        sorted(
+            merged,
+            key=lambda r: hashlib.sha256(
+                f"{r.path}|{r.blob}|{r.lo}|{r.hi}".encode()
+            ).hexdigest(),
+        )
     )
 
 

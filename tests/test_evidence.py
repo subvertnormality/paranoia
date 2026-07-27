@@ -375,3 +375,37 @@ def test_unresolvable_revision_drops(repo: Path):
         repo, Citation("app.py", 1, commit="0123456"), snapshot=commit,
         links=evidence.LinkResolver(repo, commit), context=1,
     ) is None
+
+
+def test_unchanged_file_at_wrapper_and_parent_is_one_region(repo: Path):
+    """Round-3 blocker, the normal case: every run wraps HEAD, so a bare citation
+    resolves to the wrapper commit while `HEAD@…` resolves to its parent. Same bytes,
+    so it must be one region — otherwise both vendors 'gain' evidence and round 2
+    carries identical bytes twice."""
+    head = orientation.resolve_head(repo)
+    commit = snapshot(repo)
+    assert commit != head  # the wrapper really is a different commit
+    resolver = evidence.LinkResolver(repo, commit)
+    bare, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
+    )
+    parent, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
+    )
+    assert bare.commit != parent.commit  # provenance is preserved
+    assert bare.key == parent.key  # but identity is the content
+    assert evidence.blob_id(repo, commit, "app.py") == bare.blob
+
+
+def test_a_changed_file_at_two_commits_is_two_regions(repo: Path):
+    head = orientation.resolve_head(repo)
+    (repo / "app.py").write_text("# rewritten entirely\n" * 6)
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    now, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
+    )
+    before, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
+    )
+    assert now.key != before.key
