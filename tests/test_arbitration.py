@@ -84,8 +84,11 @@ def test_duplicate_ids_rejected():
 
 
 def test_reserved_and_colliding_ids_rejected():
+    """`decision`/`context`/`hints`/`stakes` are the attestation's own fidelity field
+    names: an option called `decision` would emit two `[decision]` sections and let
+    one verdict satisfy both."""
     label = arb.LABEL_PREFIX + "a" * 16
-    for bad in ("none", "NONE", "SELECTED", label):
+    for bad in ("none", "NONE", "SELECTED", label, "decision", "context", "hints", "stakes"):
         with pytest.raises(ArbitrationError):
             arb.validate_options([{"id": bad, "statement": "x"}, {"id": "ok", "statement": "y"}])
 
@@ -239,12 +242,29 @@ def test_parse_verdict_maps_label_to_caller_id():
     assert v.decisive == Citation("app.py", 4)
 
 
-def test_a_quoted_format_earlier_in_the_reply_is_ignored():
-    """The trailer is the CLOSING block, so a model explaining the format first does
-    not confuse the parser."""
+def test_a_trailer_field_before_the_block_is_rejected():
+    """Round-10 blocker: reading only the closing lines silently discarded an earlier
+    field, so a reply could state `SELECTED-RISK: [MAJOR] …` and then close with
+    `NONE`, dropping the blocking objection. Failing costs a retry; a discarded
+    blocker costs a wrong CONVERGED."""
+    p = _pres()
+    label = p.items[0][0]
+    text = "SELECTED-RISK: [MAJOR] this actually breaks the writer\n\n" + trailer(label)
+    with pytest.raises(ArbitrationError, match="before its final trailer block"):
+        arb.parse_verdict(text, p)
+
+
+def test_an_earlier_decisive_citation_is_rejected():
+    p = _pres()
+    text = "DECISIVE-CITATION: own.py:10\n\n" + trailer(p.items[0][0], decisive="novel.py:20")
+    with pytest.raises(ArbitrationError, match="before its final trailer block"):
+        arb.parse_verdict(text, p)
+
+
+def test_ordinary_reasoning_before_the_block_is_fine():
     p = _pres()
     label = p.items[1][0]
-    text = "Here is the format I will use:\nSELECTED: <label>\n\n" + trailer(label)
+    text = "I read the writer and the tests. The exactness matters here.\n\n" + trailer(label)
     assert arb.parse_verdict(text, p).selected == p.label_to_id[label]
 
 
@@ -264,7 +284,7 @@ def test_text_after_the_trailer_breaks_the_block():
     rather than silently dropping it."""
     p = _pres()
     text = trailer(p.items[0][0]) + "\nHope that helps!\n"
-    with pytest.raises(ArbitrationError, match="missing trailer field"):
+    with pytest.raises(ArbitrationError):
         arb.parse_verdict(text, p)
 
 

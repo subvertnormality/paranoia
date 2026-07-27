@@ -688,9 +688,17 @@ context, recorded and carried but never sufficient.
 `DECISIVE-CITATION` does not resolve cannot produce `CONVERGED`.
 
 **The trailer is the closing block of the reply**, exactly these fields, each
-appearing once. Reasoning — including quoting the format — may precede it, but a
-repeated field or text after the block is a parse failure, not something to
-resolve by preferring one occurrence.
+appearing once, and none of these field names may appear anywhere earlier in it.
+Reading only the closing lines was not enough: an earlier `SELECTED-RISK: [MAJOR] …`
+or a first `DECISIVE-CITATION` sat outside the slice and was silently discarded,
+dropping a blocking objection or the vote's real reason. A duplicated, early, or
+post-block field line therefore fails the reply — cheap and visible, against a
+discarded blocker that is neither. Ordinary prose reasoning before the block is
+fine; the decider prompt says not to restate the format.
+
+Caller option ids may not be `decision`, `context`, `hints`, or `stakes`: those are
+the attestation's own fidelity field names, and an option called `decision` would
+emit two `[decision]` sections and let one verdict satisfy both.
 
 **`DECISIVE-CITATION` is all-or-nothing.** Exactly `NONE`, or exactly one citation:
 two comma-separated values, or one with trailing commentary, substantiate nothing.

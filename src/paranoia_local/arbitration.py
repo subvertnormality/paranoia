@@ -48,9 +48,11 @@ LABEL_PREFIX = "OPTION-"
 LABEL_HEX = 16
 _LABEL_RE = re.compile(rf"^{LABEL_PREFIX}[0-9a-f]{{{LABEL_HEX}}}$")
 
-# A caller id may not collide with these: `none` is a reserved trailer value and
-# the field names are what the trailer parser keys on.
-RESERVED_IDS = frozenset({"none"})
+# A caller id may not collide with these: `none` is a reserved trailer value, and
+# `decision`/`context`/`hints` are the attestation's own fidelity field names — an
+# option called `decision` would emit two `[decision]` sections and let one verdict
+# satisfy both, so a semantic change to either could be stamped `attested`.
+RESERVED_IDS = frozenset({"none", "decision", "context", "hints", "stakes"})
 TRAILER_FIELDS = (
     "SELECTED",
     "SELECTED-RISK",
@@ -602,7 +604,7 @@ def _trailer_values(text: str) -> dict[str, str]:
     is not the last lines — while making a duplicate a parse failure.
     """
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    block = lines[-len(TRAILER_FIELDS):]
+    block, before = lines[-len(TRAILER_FIELDS):], lines[: -len(TRAILER_FIELDS)]
     found: dict[str, str] = {}
     for line in block:
         for field in TRAILER_FIELDS:
@@ -612,6 +614,19 @@ def _trailer_values(text: str) -> dict[str, str]:
                     raise ArbitrationError(f"reply repeats the {field} trailer field")
                 found[field] = line[len(prefix):].strip()
                 break
+    # A field line BEFORE the block is rejected too. Reading only the last lines was
+    # not enough: an earlier `SELECTED-RISK: [MAJOR] …` or a first
+    # `DECISIVE-CITATION` sits outside the slice and would be silently discarded,
+    # dropping a blocking objection or the vote's real reason. The cost is that a
+    # reply quoting the field names outside the block fails — cheap and visible,
+    # against a discarded blocker that is neither.
+    for line in before:
+        for field in TRAILER_FIELDS:
+            if line.upper().startswith(f"{field}:"):
+                raise ArbitrationError(
+                    f"reply has a {field} line before its final trailer block; "
+                    "these fields may appear only in the closing block"
+                )
     return found
 
 
