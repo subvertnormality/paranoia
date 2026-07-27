@@ -19,6 +19,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    # Mutation testing for the arbitration protocol's pure core, where a surviving
+    # mutant means a control that does not actually hold.
+    "mutmut>=3.0",
 ]
 
 [project.scripts]

@@ -42,6 +42,14 @@ class Review:
 class Engine(ABC):
     name: str
     default_model: str
+    # argv[0] — needed on its own so a preflight can check the CLI is installed
+    # without building a whole command line.
+    binary: str
+
+    # Capability profile for roles that must not investigate a repository (the
+    # arbitration cleaner and attester). Enforced where the engine layer can
+    # enforce it; see the subclass notes.
+    text_only: bool = False
 
     @abstractmethod
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
@@ -138,6 +146,7 @@ class Engine(ABC):
 class CodexEngine(Engine):
     name = "codex"
     default_model = "gpt-5.6-sol"
+    binary = "codex"
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         argv = [
@@ -253,8 +262,14 @@ CLAUDE_DENY_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"]
 class ClaudeEngine(Engine):
     name = "claude"
     default_model = "claude-fable-5"
+    binary = "claude"
 
     def _allowed(self, web_search: bool) -> str:
+        # text_only: an EMPTY allowlist. In `-p` mode a tool that needs permission
+        # and isn't allowlisted is auto-denied, so this is a real capability
+        # boundary for the cleaner/attester roles, not just an instruction.
+        if self.text_only:
+            return ""
         tools = list(CLAUDE_RO_TOOLS)
         if web_search:
             tools += CLAUDE_WEB_TOOLS
@@ -317,11 +332,32 @@ _ENGINES: dict[str, type[Engine]] = {
     "claude": ClaudeEngine,
 }
 
+# Arbitration roles pin their models explicitly rather than inheriting
+# `default_model`: the cleaner must be Opus, and resolving it through the engine
+# default would silently give it Fable instead.
+CLEANER_ENGINE = "claude"
+CLEANER_MODEL = "claude-opus-5"
+ATTESTER_ENGINE = "codex"
+ATTESTER_MODEL = "gpt-5.6-sol"
 
-def get_engine(name: str) -> Engine:
+
+def get_engine(name: str, *, text_only: bool = False) -> Engine:
     try:
-        return _ENGINES[name]()
+        engine = _ENGINES[name]()
     except KeyError:
         raise ValueError(
             f"unknown engine {name!r}; choose one of {sorted(_ENGINES)}"
         ) from None
+    if text_only:
+        engine.text_only = True
+    return engine
+
+
+def all_engines() -> tuple[Engine, ...]:
+    """Every registered engine, in registry order.
+
+    Arbitration fans out to all of them and requires unanimity. Note that vendor
+    *ordering* here must never decide which decider sees which option order — that
+    comes from the recorded seed (see `arbitration.forward_engine`).
+    """
+    return tuple(cls() for cls in _ENGINES.values())

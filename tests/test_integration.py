@@ -100,3 +100,113 @@ class TestDispatchEndToEnd:
         debug = fake_bins.read_text()
         assert "ARGS: exec resume fake-thread-1" in debug
         assert "unreachable" in debug
+
+
+# Fake CLIs that speak the arbitration protocol: the cleaner and attester are
+# recognised by their instruction text, and a decider echoes back the FIRST label
+# it was shown. Both deciders picking their own first label means they pick
+# DIFFERENT options (the orders are counterbalanced), which is the divergence path.
+_ARB_SCRIPT = r"""
+prompt="$(cat)"
+{ echo "ARGS: $@"; echo "PWD: $(pwd)"; echo "PROMPT<<"; echo "$prompt"; } >> "$PARANOIA_FAKE_OUT"
+if printf '%s' "$prompt" | grep -q 'You are a NEUTRALIZER'; then
+  body=$(printf '=== DECISION ===\nPick one.\n\n=== OPTIONS ===\nopt-a: Alpha approach.\nopt-b: Bravo approach.\n\n=== CONTEXT ===\nNone.\n\n=== HINTS ===\nNone.\n')
+elif printf '%s' "$prompt" | grep -q 'You are a TEXT AUDITOR'; then
+  body=$(printf 'FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; opt-a PRESERVED; opt-b PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE')
+else
+  label=$(printf '%s' "$prompt" | grep -o 'OPTION-[0-9a-f]\{16\}' | head -1)
+  body=$(printf 'Reasoning.\n\nSELECTED: %s\nSELECTED-RISK: NONE\nAUTHORITY: technical\nNEW-OPTION: NONE\nCONSTRAINT: A fact.\nDECISIVE-CITATION: app.py:4\nCITATIONS: NONE' "$label")
+fi
+"""
+
+FAKE_CODEX_ARB = "#!/bin/bash\n" + _ARB_SCRIPT + """
+python3 -c "
+import json,sys
+print(json.dumps({'type':'thread.started','thread_id':'t'}))
+print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':sys.argv[1]}}))
+print(json.dumps({'type':'turn.completed','usage':{}}))
+" "$body"
+"""
+
+FAKE_CLAUDE_ARB = "#!/bin/bash\n" + _ARB_SCRIPT + """
+python3 -c "
+import json,sys
+print(json.dumps({'type':'result','subtype':'success','is_error':False,'result':sys.argv[1],'session_id':'s'}))
+" "$body"
+"""
+
+
+@pytest.fixture
+def fake_arb_bins(tmp_path: Path, monkeypatch):
+    bindir = tmp_path / "arbbin"
+    bindir.mkdir()
+    out = tmp_path / "arb_out.txt"
+    out.write_text("")
+    for name, body in (("codex", FAKE_CODEX_ARB), ("claude", FAKE_CLAUDE_ARB)):
+        p = bindir / name
+        p.write_text(body)
+        p.chmod(p.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    monkeypatch.setenv("PATH", f"{bindir}:{os.environ['PATH']}")
+    monkeypatch.setenv("PARANOIA_FAKE_OUT", str(out))
+    return out
+
+
+class TestArbitrateEndToEnd:
+    """`arbitrate` through the production boundary: two real subprocesses in
+    parallel, per-decider worktrees, and the trailer the caller parses."""
+
+    def _args(self, repo: Path) -> dict:
+        return {
+            "repo_path": str(repo),
+            "decision": "Pick an approach.",
+            "options": [
+                {"id": "opt-a", "statement": "Alpha approach."},
+                {"id": "opt-b", "statement": "Bravo approach."},
+            ],
+            "stakes": "Local CLI, trusted input.",
+        }
+
+    def test_drives_both_vendors_in_their_own_worktrees(self, repo, tmp_path, fake_arb_bins):
+        out = server.dispatch(
+            "arbitrate", self._args(repo),
+            default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
+        )
+        debug = fake_arb_bins.read_text()
+        # cleaner (claude, text-only), attester (codex, text-only), then two deciders
+        assert "You are a NEUTRALIZER" in debug
+        assert "You are a TEXT AUDITOR" in debug
+        assert debug.count("paranoia-wt-") >= 2  # a worktree each
+        # both engines were actually invoked as deciders
+        assert "-s read-only" in debug          # codex
+        assert "--output-format json" in debug  # claude
+        assert "ARBITRATION: " in out
+
+    def test_deciders_run_read_only_and_cleaner_runs_text_only(self, repo, tmp_path, fake_arb_bins):
+        server.dispatch(
+            "arbitrate", self._args(repo),
+            default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
+        )
+        debug = fake_arb_bins.read_text()
+        assert "--allowedTools ," not in debug  # the text-only claude call has an empty list
+        assert "--disallowedTools" in debug
+
+    def test_no_worktree_is_left_registered(self, repo, tmp_path, fake_arb_bins):
+        import subprocess
+
+        server.dispatch(
+            "arbitrate", self._args(repo),
+            default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
+        )
+        listing = subprocess.run(
+            ["git", "worktree", "list"], cwd=repo, capture_output=True, text=True
+        ).stdout
+        assert "paranoia-wt-" not in listing
+
+    def test_a_missing_binary_fails_preflight_without_spending(self, repo, tmp_path, monkeypatch):
+        monkeypatch.setenv("PATH", "/nonexistent")
+        out = server.dispatch(
+            "arbitrate", self._args(repo),
+            default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
+        )
+        assert "ARBITRATION: FAILED" in out
+        assert "needs both CLIs" in out

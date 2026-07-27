@@ -46,8 +46,86 @@ agent reviewer is:
 | `critique_plan` | Adversarial review of a plan or design doc. With `repo_path`, the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind. |
 | `query` | A quick double-check of a single fact or point. Not a full review — lower reasoning effort, a direct answer with citations and a stated confidence level. |
 | `rebut` | Dispute a specific finding. Resumes the **same** reviewer session with your counter-evidence; it concedes or holds with fresh citations. Cheaper and higher-resolution than a cold re-round. |
+| `arbitrate` | Decide between 2–4 options. **Both** engines choose independently and cold over one pinned snapshot; Python computes the verdict. See below. |
 
 Every review returns a `session_ref` in its footer — pass it to `rebut`.
+
+## `arbitrate` — deciding, not reviewing
+
+The other four tools get you a second opinion. `arbitrate` gets you a *decision*:
+you hand it 2–4 options and it returns `CONVERGED` only when both frontier
+vendors, judging independently, picked the same one for reasons they could each
+cite.
+
+```json
+{
+  "name": "arbitrate",
+  "arguments": {
+    "repo_path": "/Users/you/Work/my-project",
+    "decision": "Choose the numeric type for the position-size threshold.",
+    "options": [
+      {"id": "opt-float",   "statement": "Store it as a float."},
+      {"id": "opt-decimal", "statement": "Store it as a Decimal."}
+    ],
+    "stakes": "Internal CLI, single team, threshold used only in a log line.",
+    "files": [{"path": "scripts/lib/registry.py", "reason": "the writer"}]
+  }
+}
+```
+
+What happens, and why each step is there — a decision tool is only worth the
+independence behind it, so most of the machinery exists to stop the two vendors
+agreeing for a reason other than the evidence:
+
+1. **One snapshot.** The working tree is pinned to a commit and each decider gets
+   its own worktree of it. Both search freely; both search the same bytes.
+2. **The framing is neutralized** by an Opus agent — advocacy stripped, options
+   equalized in detail — and then **attested by the other vendor**, field by
+   field, before any decider sees it. `stakes` is never rewritten.
+3. **Counterbalanced presentation.** One decider sees the options in canonical
+   order, the other reversed, under **opaque per-decider labels** so nothing about
+   your ordering or ids leaks. Neither is told the other exists.
+4. **Python computes the verdict.** No model adjudicates the adjudication.
+5. **On divergence**, one reconciliation round carries only `path:line` citations
+   and the bytes the server itself read — never the other model's prose — and
+   only when there is genuinely novel evidence for both.
+
+### Outcomes
+
+| Outcome | Meaning |
+|---|---|
+| `CONVERGED` | Unanimous, unblocked, and each vote substantiated by a resolved citation. |
+| `BLOCKED` | They agree on an option and one of them tags it `[MAJOR]`/`[FATAL]`. |
+| `REFRAME_REQUIRED` | A decider surfaced a better unlisted option. Give it an id and re-run. |
+| `UNRESOLVED` | Still split, or agreement nobody could substantiate, or divergence with nothing new to reconcile. |
+| `FAILED` | Preflight, cleaning, parsing, or the repo's refs moved mid-run. |
+
+The reply ends with a machine-readable trailer whose fields are always present:
+`ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`,
+`SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`.
+
+### Things to know before you rely on it
+
+- **Both CLIs must be installed.** Unlike the review tools, `arbitrate` drives
+  `codex` *and* `claude` whichever one you installed the server into. There is no
+  single-vendor mode: two rounds against one vendor is not arbitration.
+- **`ADVISORY` does not block.** Each decider reports whether it thinks a human
+  owner should be authorizing the decision at all. That is reported, never gated
+  — a `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing it
+  is your policy, not the tool's.
+- **It only decides things the repository can settle.** A converging vote must
+  cite a line. A decision that does not turn on repo-verifiable grounds will
+  never return `CONVERGED` here.
+- **Cost:** 4 agent turns typically, 8 at worst, across both subscriptions.
+- **Bias is reduced, not eliminated.** Order counterbalancing equalizes mean rank
+  but not higher moments for 3–4 options; attestation is a model's judgement, not
+  a proof; and a file-hint list that only points at evidence favouring one option
+  biases both deciders identically. `docs/arbitration_plan.md` §2 names every
+  residual.
+- `SNAPSHOT` is provenance, not a replay handle — the snapshot commit is
+  unreferenced and `git gc` reclaims it. The audit log holds both prompts, both
+  replies, and the carried evidence. Pass `retain_snapshot: true` to pin it behind
+  a ref; that is the only mode that writes one.
 
 ### Convergence loop
 

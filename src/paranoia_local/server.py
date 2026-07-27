@@ -17,7 +17,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from . import handlers
+from . import arbitrate_handler, handlers
 from .engines import get_engine
 from .logs import DEFAULT_LOG_DIR
 
@@ -80,6 +80,16 @@ _ROUND = {
         "the lever to STOP a loop instead of chasing marginal/hardening findings across many "
         "rounds. Start at 1 and raise as the design stabilises; omit to report at all severities "
         "(round-1 behaviour)."
+    ),
+}
+
+_STAKES_REQUIRED = {
+    **_STAKES,
+    "description": (
+        "REQUIRED. " + _STAKES["description"] + " For arbitrate it is passed to the deciders "
+        "VERBATIM (never rewritten by the cleaner) because it is the highest-leverage input to "
+        "the severity tag, and severity is the one axis that blocks. Pass 'unstated' to accept a "
+        "fixed default reading rather than omitting it."
     ),
 }
 
@@ -175,6 +185,75 @@ TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="arbitrate",
+        description=(
+            "Decide between 2-4 options by independent two-vendor adjudication. An Opus agent "
+            "neutralizes the framing (cross-vendor attested), then BOTH frontier engines choose "
+            "cold and unaware of each other, over one pinned snapshot, each seeing a "
+            "counterbalanced option order under its own opaque labels. Python computes the "
+            "verdict: CONVERGED only on a unanimous, unblocked, evidence-substantiated choice. "
+            "On divergence it runs one fact-only reconciliation round, and only when there is "
+            "novel evidence to carry. Up to 8 agent turns across both subscriptions."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "repo_path": {
+                    "type": "string",
+                    "description": "Absolute path to the git repo. Required: every decisive citation must be repo-verifiable.",
+                },
+                "decision": {
+                    "type": "string",
+                    "description": "What is being decided, and every property that bears on it. State it neutrally; your own recommendation will be stripped, and including it only wastes a cleaning round.",
+                },
+                "options": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 4,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "description": "Stable id — the vocabulary of the record. Never shown to a decider."},
+                            "statement": {"type": "string", "description": "What this option is. Self-contained: never reference another option by id, since the two deciders see different orders."},
+                        },
+                        "required": ["id", "statement"],
+                    },
+                    "description": "2-4 mutually exclusive options, each with a caller-stable id. Array order is irrelevant — canonical order is derived by sorting ids.",
+                },
+                "stakes": _STAKES_REQUIRED,
+                "context": {"type": "string", "description": "Background the deciders need. Neutralized before they see it."},
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["path"],
+                    },
+                    "description": "Starting-point hints. Each must be a repo-relative path present in the snapshot. Both deciders see the same list, so a one-sided hint list biases both.",
+                },
+                "subject": {"type": "string", "description": "Short label for the paste-ready record block."},
+                "clean": {
+                    "type": "boolean",
+                    "description": "Run the Opus cleaner and its cross-vendor attestation (default true). False passes your framing through verbatim and is reported as CLEANING: skipped.",
+                },
+                "models": {
+                    "type": "object",
+                    "properties": {"codex": {"type": "string"}, "claude": {"type": "string"}},
+                    "description": "Per-vendor model overrides. There is no single `engine`/`model` override: arbitration needs both vendors.",
+                },
+                "cleaner_model": {"type": "string", "description": "Override the cleaner model (default claude-opus-5)."},
+                "order_seed": {"type": "string", "description": "Replay a previous run's ORDER-SEED to reproduce its labels and option ordering."},
+                "retain_snapshot": {
+                    "type": "boolean",
+                    "description": "Create refs/paranoia/arbitrate/<stamp> so the evidence survives git gc (default false — the only mode that writes a ref).",
+                },
+                "effort": _COMMON["effort"],
+                "web_search": _COMMON["web_search"],
+            },
+            "required": ["repo_path", "decision", "options", "stakes"],
+        },
+    ),
+    Tool(
         name="rebut",
         description=(
             "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
@@ -200,6 +279,13 @@ _HANDLERS: dict[str, Callable[..., str]] = {
     "rebut": handlers.rebut,
 }
 
+# `arbitrate` drives BOTH vendors, so it cannot come through the single-engine
+# resolution below — that would either degrade it to one vendor or send one
+# vendor's model name to the other CLI. It resolves its own engines instead.
+_MULTI_ENGINE_HANDLERS: dict[str, Callable[..., str]] = {
+    "arbitrate": arbitrate_handler.arbitrate,
+}
+
 
 def dispatch(
     name: str,
@@ -211,12 +297,20 @@ def dispatch(
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
     try:
+        multi = _MULTI_ENGINE_HANDLERS.get(name)
+        if multi is not None:
+            kwargs: dict[str, Any] = {"log_dir": log_dir}
+            if now is not None:
+                kwargs["now"] = now
+            if on_progress is not None:
+                kwargs["on_progress"] = on_progress
+            return multi(arguments, **kwargs)
         handler = _HANDLERS.get(name)
         if handler is None:
             raise ValueError(f"unknown tool: {name}")
         engine_name = arguments.get("engine") or default_engine_name
         engine = get_engine(engine_name)
-        kwargs: dict[str, Any] = {"engine": engine, "log_dir": log_dir}
+        kwargs = {"engine": engine, "log_dir": log_dir}
         if now is not None:
             kwargs["now"] = now
         if on_progress is not None:
