@@ -254,6 +254,18 @@ def test_a_trailer_field_before_the_block_is_rejected():
         arb.parse_verdict(text, p)
 
 
+def test_an_inline_field_mention_before_the_block_is_rejected():
+    """Round-11 blocker: a column-zero check missed
+    "The option has SELECTED-RISK: [MAJOR] …" while the closing NONE was accepted."""
+    p = _pres()
+    text = (
+        "The option has SELECTED-RISK: [MAJOR] it breaks the writer.\n\n"
+        + trailer(p.items[0][0])
+    )
+    with pytest.raises(ArbitrationError, match="before its final trailer block"):
+        arb.parse_verdict(text, p)
+
+
 def test_an_earlier_decisive_citation_is_rejected():
     p = _pres()
     text = "DECISIVE-CITATION: own.py:10\n\n" + trailer(p.items[0][0], decisive="novel.py:20")
@@ -345,8 +357,13 @@ def test_citations_parse_from_the_field_only():
     assert v.citations == ()
 
 
-def test_dot_slash_normalizes_identically():
-    assert arb.parse_citations("./foo.py:7") == arb.parse_citations("foo.py:7")
+def test_paths_are_used_verbatim_so_no_spelling_can_fold_onto_another_file():
+    """The class-level closure: no rewriting at all, so a citation either names a
+    literal tree entry or drops. Enumerating rejected spellings could not close this
+    — `..`, backslashes, absolute paths and `./` were each found separately."""
+    for spelling in ("./foo.py", "a/../b.py", "policy\\choice.py", "/etc/policy.py"):
+        (c,) = arb.parse_citations(f"{spelling}:7")
+        assert c.path == spelling  # unchanged; tree membership decides
 
 
 def test_revision_aware_citations():
@@ -361,7 +378,7 @@ def test_revision_aware_citations():
 def test_citation_limit_and_unparseable_are_dropped():
     cites = arb.parse_citations("a.py:1, b.py:2, c.py:3, d.py:4")
     assert len(cites) == arb.MAX_CITATIONS
-    assert arb.parse_citations("nonsense, a.py:0, ../escape.py:3") == ()
+    assert arb.parse_citations("nonsense, a.py:0") == ()
 
 
 def test_none_citations():
@@ -681,40 +698,13 @@ def test_regions_from_one_commit_still_merge():
     assert len(merged[0].line_digests) == 18
 
 
-@pytest.mark.parametrize(
-    "path",
-    ["../escape.py", "a/../b.py", "alias/../f.py", "pkg/sub/../../x.py"],
-)
-def test_citations_containing_dotdot_are_dropped(path):
-    """Round-6 finding: collapsing `..` lexically disagrees with the filesystem
-    whenever a directory symlink is involved — `alias/../f.py` reads `sub/f.py` in
-    the worktree but normalized to root `f.py`, so the server would substantiate
-    against a different file than the decider read."""
-    assert arb.parse_citations(f"{path}:4") == ()
 
 
-def test_dot_segments_are_still_stripped():
-    (c,) = arb.parse_citations("./pkg/./mod.py:4")
-    assert c.path == "pkg/mod.py"
 
-
-@pytest.mark.parametrize(
-    "path",
-    ["/etc/policy.py", "//host/share/x.py", "policy\\choice.py", "C:\\repo\\x.py"],
-)
-def test_absolute_and_backslash_paths_are_dropped(path):
-    """Round-7 blocker, the same class as `..`: rewriting a backslash to '/' maps
-    `policy\\choice.py` — a legal, distinct POSIX file — onto `policy/choice.py`, and
-    stripping a leading '/' maps `/etc/policy.py` onto tracked `etc/policy.py`. Either
-    lets a decider read one file while the server validates another."""
-    assert arb.parse_citations(f"{path}:4") == ()
-
-
-def test_two_distinct_spellings_cannot_resolve_to_one_region():
-    slashed = arb.parse_citations("policy/choice.py:4")
-    backslashed = arb.parse_citations("policy\\choice.py:4")
-    assert len(slashed) == 1
-    assert backslashed == ()  # dropped, never folded onto the other file
+def test_two_distinct_spellings_never_resolve_to_one_path():
+    (slashed,) = arb.parse_citations("policy/choice.py:4")
+    (backslashed,) = arb.parse_citations("policy\\choice.py:4")
+    assert slashed.path != backslashed.path
 
 
 # --- DECISIVE-CITATION is all-or-nothing ------------------------------------

@@ -95,8 +95,22 @@ def symlink_map(repo: Path, commit: str) -> dict[str, str]:
         meta, _, path = line.partition("\t")
         parts = meta.split()
         if len(parts) >= 2 and parts[0] == SYMLINK_MODE:
-            links[path] = _git(["show", f"{commit}:{path}"], repo).strip()
+            links[path] = _symlink_target(repo, commit, path)
     return links
+
+
+def _symlink_target(repo: Path, commit: str, path: str) -> str:
+    """A symlink's target, VERBATIM.
+
+    A git symlink blob is exactly the target with no trailing newline, so stripping
+    it only ever removes real characters. With `alias.py -> " real.py "` and both
+    `" real.py "` and `real.py` tracked, a stripped target resolves the citation to
+    the wrong file — the decider reads one and substantiation checks the other.
+    """
+    r = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=repo, capture_output=True)
+    if r.returncode != 0:
+        return ""
+    return r.stdout.decode("utf-8", errors="surrogateescape")
 
 
 def _resolve_link(path: str, target: str) -> str | None:
@@ -220,6 +234,7 @@ class LinkResolver:
     def __init__(self, repo: Path, snapshot: str, snapshot_links: dict[str, str] | None = None):
         self._repo = repo
         self._links: dict[str, dict[str, str]] = {}
+        self._paths: dict[str, frozenset[str]] = {}
         self._oids: dict[str, str | None] = {}
         self._snapshot = snapshot
         if snapshot_links is not None:
@@ -235,6 +250,14 @@ class LinkResolver:
             out = r.stdout.decode("utf-8", errors="replace").strip()
             self._oids[rev] = out if r.returncode == 0 and out else None
         return self._oids[rev]
+
+    def paths(self, commit: str) -> frozenset[str]:
+        if commit not in self._paths:
+            try:
+                self._paths[commit] = tree_paths(self._repo, commit)
+            except RuntimeError:
+                self._paths[commit] = frozenset()
+        return self._paths[commit]
 
     def for_commit(self, commit: str) -> dict[str, str]:
         if commit not in self._links:
@@ -267,7 +290,11 @@ def resolve_citation(
     if commit is None:
         return None
     path = canonical_path(citation.path, resolver.for_commit(commit))
-    if path is None:
+    # The path must be a LITERAL entry in the tree. Since nothing normalizes it
+    # (see `arbitration._normalize_path`), this is what guarantees one citation
+    # names one real file: git accepts `./f.py` as a lookup, but `./f.py` and
+    # `f.py` are different strings and would key as different regions.
+    if path is None or path not in resolver.paths(commit):
         return None
     text = _blob(repo, commit, path)
     if text is None:

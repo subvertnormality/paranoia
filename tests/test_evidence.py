@@ -242,6 +242,30 @@ def test_unreachable_commit_prefix_drops(repo: Path):
 # --- hints ------------------------------------------------------------------
 
 
+def test_a_dot_slash_citation_drops_rather_than_keying_a_second_region(repo: Path):
+    """git accepts `./f.py` as a lookup, but the string differs from `f.py` and would
+    key as a separate region. Literal tree membership drops it."""
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    assert evidence.resolve_citation(
+        repo, Citation("./app.py", 4), snapshot=commit, links=resolver, context=1
+    ) is None
+    assert evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
+    ) is not None
+
+
+def test_symlink_target_is_read_verbatim(repo: Path):
+    """Round-11 blocker: `.strip()` on a target resolves `alias -> ' real.py '` to a
+    different tracked file than the decider read."""
+    (repo / " spaced.py ").write_text("SPACED\n" * 4)
+    (repo / "alias.py").symlink_to(" spaced.py ")
+    commit_all(repo, "spaced target")
+    commit = snapshot(repo)
+    links = evidence.symlink_map(repo, commit)
+    assert links["alias.py"] == " spaced.py "
+
+
 def test_valid_hint_normalizes(repo: Path):
     commit = snapshot(repo)
     assert evidence.validate_hints(repo, commit, [{"path": "./app.py", "reason": "the writer"}]) == [
@@ -449,7 +473,14 @@ def test_directory_symlink_with_dotdot_cannot_substitute_evidence(repo: Path):
 
     # what the worktree would resolve
     assert (repo / "alias" / ".." / "f.py").resolve() == (repo / "sub" / "f.py").resolve()
-    # and the citation never reaches a region at all
-    from paranoia_local.arbitration import parse_citations
-
-    assert parse_citations("alias/../f.py:2") == ()
+    # but the citation is used verbatim, is not a literal tree entry, and drops
+    assert evidence.resolve_citation(
+        repo, Citation("alias/../f.py", 2), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=1,
+    ) is None
+    # the root file is still citable on its own terms
+    got = evidence.resolve_citation(
+        repo, Citation("f.py", 2), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=1,
+    )
+    assert got and "ROOT VERSION" in got[1]

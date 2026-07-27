@@ -272,15 +272,13 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   substantiating a vote, and carrying into round 2, evidence the decider never
   read. The commit identity is part of the region key, the carried evidence, and
   the audit record.
-- Normalized: `./` stripped only. A citation must be a repo-relative git tree
-  path: absolute, UNC, drive-qualified and backslash-containing paths are
-  **rejected**, because rewriting them maps one tracked file onto another —
-  `policy\choice.py` is a legal POSIX file distinct from `policy/choice.py`, and
-  `/etc/policy.py` would fold onto tracked `etc/policy.py`. A `..` segment is
-  likewise **rejected**, never collapsed: with a directory symlink `alias -> sub/dir`, the
-  worktree reads `alias/../f.py` as `sub/f.py` while lexical collapsing yields root
-  `f.py`, so the server would carry and substantiate against a different file than
-  the decider read.
+- **Not normalized at all.** The path is used exactly as written and must be a
+  literal entry in the cited commit's tree. Rewriting it — stripping `./`,
+  collapsing `..`, folding backslashes, dropping a leading `/` — can map the path
+  the decider read onto a *different* tracked file, and each such rewrite was found
+  as a separate defect across several review rounds. Enumerating rejected spellings
+  cannot close that class; not rewriting does. A noncanonical path drops, costing
+  one `UNRESOLVED`.
 - The revision is resolved to its **full commit id**, and the path is
   **canonicalized through that commit's symlink graph**, before anything else.
 - Must resolve in the snapshot (`git cat-file -e`) with `1 ≤ line ≤ EOF`.

@@ -282,42 +282,28 @@ _CITATION_RE = re.compile(
 
 
 def _normalize_path(path: str) -> str:
-    """Strip `./` and collapse separators. A `..` segment is REJECTED, not resolved.
+    """No normalization at all — the path is used exactly as written.
 
-    Collapsing `..` lexically disagrees with how the filesystem resolves it whenever
-    a directory symlink is involved: with `alias -> sub/dir`, the decider's worktree
-    reads `alias/../f.py` as `sub/f.py`, while `parts.pop()` would normalize it to
-    root `f.py`. The server would then carry, and substantiate against, a different
-    file than the decider actually read. A citation names a file; it has no reason to
-    navigate, so rejecting is both simpler and safer than a component-wise
-    symlink-aware walk.
+    This function used to rewrite: strip `./`, collapse `..`, fold backslashes to
+    `/`, drop a leading `/`. Every one of those rewrites was a defect of the same
+    kind, found one spelling at a time across several review rounds, because a
+    rewrite can map the path the decider read onto a *different* tracked file, and
+    then the server carries and substantiates against bytes nobody cited:
+
+    - `alias/../f.py` is `sub/f.py` through a directory symlink, but `f.py` lexically;
+    - `policy\\choice.py` is a legal POSIX filename distinct from `policy/choice.py`;
+    - `/etc/policy.py` would fold onto tracked `etc/policy.py`.
+
+    Enumerating rejections cannot close that class — there is always another
+    spelling. Not rewriting does: the path must be a literal entry in the cited
+    commit's tree (enforced downstream by the object-type check in
+    `evidence._blob`), so a citation either names exactly one real tracked file or it
+    drops. A model that writes `./f.py` gets a dropped citation, which costs one
+    `UNRESOLVED` — the cheap, self-announcing outcome.
     """
-    if path.startswith("/"):
-        raise ArbitrationError(
-            f"citation path must be repo-relative, not absolute: {path!r}"
-        )
-    if "\\" in path:
-        # Git tree paths always use '/', so a backslash is a literal character in a
-        # filename. Rewriting it to '/' would map `policy\choice.py` — a legal and
-        # distinct POSIX file — onto `policy/choice.py`, letting a decider read one
-        # file while the server validated another.
-        raise ArbitrationError(
-            f"citation path must not contain a backslash: {path!r}"
-        )
-    if ":" in path:
-        raise ArbitrationError(f"citation path must not contain a colon: {path!r}")
-    parts: list[str] = []
-    for seg in path.split("/"):
-        if seg in ("", "."):
-            continue
-        if seg == "..":
-            raise ArbitrationError(
-                f"citation path must not contain '..': {path!r} — cite the file directly"
-            )
-        parts.append(seg)
-    if not parts:
+    if not path.strip():
         raise ArbitrationError(f"citation path is empty: {path!r}")
-    return "/".join(parts)
+    return path
 
 
 def parse_citations(field: str, *, limit: int = MAX_CITATIONS) -> tuple[Citation, ...]:
@@ -621,10 +607,15 @@ def _trailer_values(text: str) -> dict[str, str]:
     # reply quoting the field names outside the block fails — cheap and visible,
     # against a discarded blocker that is neither.
     for line in before:
+        upper = line.upper()
         for field in TRAILER_FIELDS:
-            if line.upper().startswith(f"{field}:"):
+            # Anywhere in the line, not just at its start: an inline qualification
+            # like "The option has SELECTED-RISK: [MAJOR] breaks the writer" slips a
+            # column-zero check while the closing `SELECTED-RISK: NONE` is accepted,
+            # discarding the blocker.
+            if f"{field}:" in upper:
                 raise ArbitrationError(
-                    f"reply has a {field} line before its final trailer block; "
+                    f"reply mentions {field}: before its final trailer block; "
                     "these fields may appear only in the closing block"
                 )
     return found
