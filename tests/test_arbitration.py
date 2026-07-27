@@ -239,11 +239,33 @@ def test_parse_verdict_maps_label_to_caller_id():
     assert v.decisive == Citation("app.py", 4)
 
 
-def test_parse_verdict_takes_the_last_trailer_occurrence():
+def test_a_quoted_format_earlier_in_the_reply_is_ignored():
+    """The trailer is the CLOSING block, so a model explaining the format first does
+    not confuse the parser."""
     p = _pres()
-    first, second = p.items[0][0], p.items[1][0]
-    text = trailer(first) + "\n" + trailer(second)
-    assert arb.parse_verdict(text, p).selected == p.label_to_id[second]
+    label = p.items[1][0]
+    text = "Here is the format I will use:\nSELECTED: <label>\n\n" + trailer(label)
+    assert arb.parse_verdict(text, p).selected == p.label_to_id[label]
+
+
+def test_a_repeated_trailer_field_is_rejected():
+    """Round-9 blocker: keeping the last occurrence of each field meant a reply could
+    emit `DECISIVE-CITATION: own.py:10` then `DECISIVE-CITATION: novel.py:20`, and the
+    all-or-nothing rule never saw the pair."""
+    p = _pres()
+    label = p.items[0][0]
+    text = trailer(label).rstrip("\n") + "\nDECISIVE-CITATION: novel.py:20\n"
+    with pytest.raises(ArbitrationError, match="repeats"):
+        arb.parse_verdict(text, p)
+
+
+def test_text_after_the_trailer_breaks_the_block():
+    """A trailing sentence pushes a field out of the closing block, which fails
+    rather than silently dropping it."""
+    p = _pres()
+    text = trailer(p.items[0][0]) + "\nHope that helps!\n"
+    with pytest.raises(ArbitrationError, match="missing trailer field"):
+        arb.parse_verdict(text, p)
 
 
 @pytest.mark.parametrize(

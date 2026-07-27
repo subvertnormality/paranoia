@@ -592,15 +592,26 @@ class Vote:
 
 
 def _trailer_values(text: str) -> dict[str, str]:
-    """Take the LAST occurrence of each field: the contract is a trailer, and a
-    model may quote the format earlier while explaining itself."""
+    """The trailer is the FINAL block of exactly the expected fields, each once.
+
+    Scanning the whole reply and keeping the last occurrence of each field was
+    lenient in a way that defeated `parse_decisive_citation`: a reply could emit
+    `DECISIVE-CITATION: own.py:10` and then `DECISIVE-CITATION: novel.py:20`, and the
+    all-or-nothing rule would never see the pair. Reading only the closing block
+    still lets a model quote the format earlier while explaining itself — that text
+    is not the last lines — while making a duplicate a parse failure.
+    """
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    block = lines[-len(TRAILER_FIELDS):]
     found: dict[str, str] = {}
-    for raw in (text or "").splitlines():
-        line = raw.strip()
+    for line in block:
         for field in TRAILER_FIELDS:
             prefix = f"{field}:"
             if line.upper().startswith(prefix):
+                if field in found:
+                    raise ArbitrationError(f"reply repeats the {field} trailer field")
                 found[field] = line[len(prefix):].strip()
+                break
     return found
 
 

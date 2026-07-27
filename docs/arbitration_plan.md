@@ -635,7 +635,9 @@ NEUTRALITY: PASS | FAIL <which option the packet favours, and the words that do 
 STAKES-ADVOCACY: NONE | PRESENT <the advocating words>
 ```
 
-Verdicts are matched **exactly**: `PASS` and `NONE` must be the whole value, and
+The attestation must contain **only** its three verdict lines, each once: a
+contradicting sentence beside `NEUTRALITY: PASS` would otherwise be ignored and the
+packet stamped `attested`. Verdicts are matched **exactly**: `PASS` and `NONE` must be the whole value, and
 `FAIL`/`PRESENT` must carry a note. A prefix match accepted
 `NEUTRALITY: PASS but the wording favors option A` as a clean bill of health and
 stamped a biased packet `attested` — sending that same bias to both deciders.
@@ -684,6 +686,11 @@ context, recorded and carried but never sufficient.
 
 `NONE` parses in both fields, but it is not free: a converging vote whose
 `DECISIVE-CITATION` does not resolve cannot produce `CONVERGED`.
+
+**The trailer is the closing block of the reply**, exactly these fields, each
+appearing once. Reasoning — including quoting the format — may precede it, but a
+repeated field or text after the block is a parse failure, not something to
+resolve by preferring one occurrence.
 
 **`DECISIVE-CITATION` is all-or-nothing.** Exactly `NONE`, or exactly one citation:
 two comma-separated values, or one with trailing commentary, substantiate nothing.

@@ -905,3 +905,24 @@ def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: 
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "The cleaned wording still favors option A.",
+        "Note: I could not compare the hints.",
+    ],
+)
+def test_commentary_in_the_attestation_is_rejected(repo: Path, tmp_path: Path, extra: str):
+    """Round-9 blocker: unrecognized lines were ignored, so `NEUTRALITY: PASS`
+    followed by a contradicting sentence was accepted as clean."""
+    agent = Agent(lambda e, r: "opt-float", attest=ATTEST_OK + extra + "\n")
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert all(c["cwd"] is None for c in agent.calls)
+
+
+def test_duplicate_attestation_verdicts_are_rejected(repo: Path, tmp_path: Path):
+    agent = Agent(lambda e, r: "opt-float", attest=ATTEST_OK + "NEUTRALITY: PASS\n")
+    assert trailer_field(run(repo, agent, tmp_path), "ARBITRATION") == "FAILED"

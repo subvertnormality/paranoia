@@ -242,7 +242,16 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
     stakes_seen = False
     for raw in (text or "").splitlines():
         line = raw.strip()
+        if not line:
+            continue
         upper = line.upper()
+        if not upper.startswith(("FIDELITY:", "NEUTRALITY:", "STAKES-ADVOCACY:")):
+            # No commentary. `NEUTRALITY: PASS` followed by "The cleaned wording still
+            # favors option A." was otherwise accepted as clean, and the biased packet
+            # went to both deciders stamped `attested`.
+            raise ArbitrationError(
+                f"attestation contains text outside its three verdict lines: {line!r}"
+            )
         if upper.startswith("FIDELITY:"):
             for part in line[len("FIDELITY:"):].split(";"):
                 field, _, verdict = part.strip().rpartition(" ")
@@ -275,6 +284,8 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
                     f"NEUTRALITY must be exactly PASS, or FAIL with a note, got {body!r}"
                 )
         elif upper.startswith("STAKES-ADVOCACY:"):
+            if stakes_seen:
+                raise ArbitrationError("attestation gave two STAKES-ADVOCACY verdicts")
             stakes_seen = True
             body = line[len("STAKES-ADVOCACY:"):].strip()
             # Same reasoning: "NONE despite recommending A" is not NONE.
