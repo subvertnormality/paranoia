@@ -830,3 +830,42 @@ def test_retain_snapshot_ref_is_not_mistaken_for_operator_movement(repo: Path, t
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
     assert trailer_field(report, "REFS-MOVED") == "no"
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+
+
+def test_no_ref_window_between_the_snapshot_check_and_the_baseline(repo: Path, tmp_path: Path, monkeypatch):
+    """Round-5 finding: re-reading the digest after the post-snapshot comparison
+    reopened the window it had just closed."""
+    calls = {"n": 0}
+    real = evidence.refs_digest
+
+    def counting(r):
+        calls["n"] += 1
+        return real(r)
+
+    monkeypatch.setattr(ah.evidence, "refs_digest", counting)
+    run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
+    # exactly three reads: before the snapshot, after it (reused as the baseline),
+    # and once at the end
+    assert calls["n"] == 3
+
+
+def test_retain_ref_is_created_only_after_the_final_check(repo: Path, tmp_path: Path):
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
+    assert trailer_field(report, "REFS-MOVED") == "no"
+    assert "refs/paranoia/arbitrate/" in git(["for-each-ref", "--format=%(refname)"], repo)
+
+
+def test_retain_ref_is_not_created_when_refs_moved(repo: Path, tmp_path: Path):
+    """A failed run leaves no trace in the audited repo."""
+
+    class Moving(Agent):
+        def __call__(self, **kw):
+            out = super().__call__(**kw)
+            if kw["cwd"] is not None and len(self.calls) == 3:
+                (repo / "landed.py").write_text("x = 1\n")
+                commit_all(repo, "landed mid-run")
+            return out
+
+    report = run(repo, Moving(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "refs/paranoia" not in git(["for-each-ref", "--format=%(refname)"], repo)

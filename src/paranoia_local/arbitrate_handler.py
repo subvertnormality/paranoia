@@ -488,18 +488,16 @@ def _arbitrate(
     # REFS-MOVED: no against an older SNAPSHOT.
     refs_at_start = evidence.refs_digest(repo)
     snapshot = _snapshot(repo)
-    if evidence.refs_digest(repo) != refs_at_start:
+    refs_before = evidence.refs_digest(repo)
+    if refs_before != refs_at_start:
         raise ArbitrationError(
             "repository refs moved while the snapshot was being taken, so the "
             "snapshot cannot describe what the deciders would read"
         )
-    if retain:
-        # The ONE mode that writes a ref. Off by default: `wrap_commit` deliberately
-        # creates none, and the README promises as much, so durable evidence replay
-        # is opt-in rather than a promise quietly broken for everyone. Created before
-        # the baseline digest so our own ref is not mistaken for operator movement.
-        evidence.retain_snapshot(repo, snapshot, now())
-    refs_before = evidence.refs_digest(repo)
+    # The post-snapshot digest IS the baseline — re-reading it would reopen the very
+    # window just closed, letting a commit that landed in between become accepted
+    # history. The opt-in retain ref is therefore created after the final check, at
+    # the end of the run, so our own write never masks operator movement either.
 
     links = evidence.symlink_map(repo, snapshot)
     # A revision-prefixed citation resolves in its OWN commit, so it needs that
@@ -619,6 +617,11 @@ def _arbitrate(
             )
 
     refs_moved = evidence.refs_digest(repo) != refs_before
+    if retain and not refs_moved:
+        # The ONE mode that writes a ref, and only once the run is known clean:
+        # `wrap_commit` deliberately creates none and the README promises as much,
+        # so durable evidence replay is opt-in rather than a promise quietly broken.
+        evidence.retain_snapshot(repo, snapshot, now())
     final_votes = list(per_round[-1].values())
     if refs_moved:
         outcome = arb.compute_outcome(

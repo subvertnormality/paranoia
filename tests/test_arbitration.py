@@ -611,3 +611,29 @@ def test_merged_region_bounds_are_wider_than_either_anchor_window():
     assert (merged[0].lo, merged[0].hi) == (7, 19)
     # anchor 18 is inside the merged span but outside either 7-line window
     assert arb.anchor_within(region("a.py", 18), merged[0])
+
+
+def test_regions_from_different_commits_are_not_merged():
+    """Round-5 blocker: merging across revisions spliced the other commit's tail
+    digests onto this commit's body, so a citation into that tail passed
+    substantiation against bytes that were never sent."""
+    body = [f"L{i}" for i in range(1, 41)]
+    tail_differs = list(body)
+    tail_differs[19] = "DIFFERENT TAIL"
+    a = region("f.py", 10, commit="c1", lines=body, eof=40, context=5)   # [5,15]
+    b = region("f.py", 17, commit="c2", lines=tail_differs, eof=40, context=5)  # [12,22]
+    merged = arb.merge_regions([a, b])
+    assert len(merged) == 2
+    assert {r.commit for r in merged} == {"c1", "c2"}
+    for r in merged:
+        assert len(r.line_digests) == r.hi - r.lo + 1
+
+
+def test_regions_from_one_commit_still_merge():
+    body = [f"L{i}" for i in range(1, 41)]
+    a = region("f.py", 10, commit="c1", lines=body, eof=40, context=5)
+    b = region("f.py", 17, commit="c1", lines=body, eof=40, context=5)
+    merged = arb.merge_regions([a, b])
+    assert len(merged) == 1
+    assert (merged[0].lo, merged[0].hi) == (5, 22)
+    assert len(merged[0].line_digests) == 18

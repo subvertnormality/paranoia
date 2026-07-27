@@ -451,13 +451,21 @@ def merge_regions(regions: Iterable[Region]) -> tuple[Region, ...]:
     stay distinct. The merged interval keeps the first anchor; anchors matter only
     on unmerged citation regions.
     """
-    by_path: dict[str, list[Region]] = {}
+    by_key: dict[tuple[str, str], list[Region]] = {}
     for r in regions:
-        by_path.setdefault(r.path, []).append(r)
+        # Grouped by (commit, path), so a merged region always describes ONE
+        # revision. Merging across revisions spliced the other commit's tail
+        # digests onto this commit's body: `read_region` reads the whole merged
+        # interval from `current.commit`, so a round-2 citation into the other
+        # revision's tail would pass `anchor_within` against bytes never sent.
+        # Cross-revision duplicates still count as the same evidence for the
+        # novelty gate (`same_region` is content-based); they are simply carried
+        # separately.
+        by_key.setdefault((r.commit, r.path), []).append(r)
     out: list[Region] = []
-    for path in sorted(by_path):
+    for key in sorted(by_key):
         current: Region | None = None
-        for r in sorted(by_path[path], key=lambda x: (x.lo, x.hi)):
+        for r in sorted(by_key[key], key=lambda x: (x.lo, x.hi)):
             if current is None:
                 current = r
             elif r.lo <= current.hi and same_region(current, r):
@@ -471,7 +479,12 @@ def merge_regions(regions: Iterable[Region]) -> tuple[Region, ...]:
 
 
 def _extend(current: Region, other: Region) -> Region:
-    """Widen `current` to cover `other`, keeping per-line digests aligned to `lo`."""
+    """Widen `current` to cover `other`, keeping per-line digests aligned to `lo`.
+
+    Only ever called for two regions of the SAME commit and path (see
+    `merge_regions`), so the appended digests describe the same bytes the widened
+    interval will be read from.
+    """
     if other.hi <= current.hi:
         return current
     digests = list(current.line_digests)
