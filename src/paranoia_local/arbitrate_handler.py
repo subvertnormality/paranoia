@@ -907,6 +907,14 @@ def _clean_and_attest(
             parsed = parse_cleaned_packet(
                 cleaned_raw, list(originals), caller_gave_context=bool(context)
             )
+            if context and not parsed["context"]:
+                # Dropping a supplied context is invisible downstream: rendered back to
+                # the attester as "None." it matches a caller context that also reads
+                # "None.", so fidelity passes while the deciders receive nothing.
+                raise ArbitrationError(
+                    "the cleaner dropped the supplied context block; it may neutralize "
+                    "the context but not remove it"
+                )
             if parsed["context"] and not context:
                 # A context the caller never wrote is the cleaner adding facts, which
                 # it is forbidden to do — and it cannot be attested against anything.
@@ -1021,7 +1029,7 @@ def _attest_body(
     # to score empty→anything as a fidelity change, and the run then failed naming a
     # field the caller had no control over (issue #8, fix 4).
     if context:
-        pairs.append(f"[context]\nORIGINAL: {context}\nCLEANED:  {parsed['context'] or 'None.'}")
+        pairs.append(f"[context]\nORIGINAL: {context}\nCLEANED:  {parsed['context']}")
     if original_hints:
         # The real originals, not a placeholder: an auditor shown "(as given)"
         # cannot compare anything, so hint reasons went unchecked.

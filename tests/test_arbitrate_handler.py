@@ -1141,3 +1141,84 @@ def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):
                           {"id": "B", "statement": "y" * 900}])
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "not equalized" in report
+
+
+def test_a_cleaner_that_omits_a_supplied_context_block_fails(repo: Path, tmp_path: Path):
+    """Round-2 review blocker: omitting the block entirely was invisible. Rendered back
+    to the attester as `None.` it matched a caller context that also reads `None.`, so
+    fidelity passed while the deciders received nothing."""
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ))
+    report = run(repo, agent, tmp_path, context="None.")
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "dropped the supplied context" in report
+
+
+def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, tmp_path: Path):
+    """Round-2 review: the parser's expected set became dynamic while the prompt still
+    hardcoded `context` and `hints`. An attester obeying the prompt verbatim was then
+    rejected for covering unknown fields — reproducing the production false failure this
+    branch exists to remove. The prompt and the parser must agree."""
+    from paranoia_local import prompts
+
+    assert "context PRESERVED|CHANGED; hints PRESERVED|CHANGED" not in prompts.ATTEST_INSTRUCTIONS
+    assert "EVERY field that appears in the FIELD BY FIELD section" in prompts.ATTEST_INSTRUCTIONS
+
+    seen: dict[str, str] = {}
+
+    class Recorder(Agent):
+        def __call__(self, **kw):
+            if "TEXT AUDITOR" in kw["instructions"]:
+                seen["body"] = kw["body"]
+                # answer with exactly the fields the body carries, as instructed
+                fields = [
+                    line[1:-1] for line in kw["body"].splitlines()
+                    if line.startswith("[") and line.endswith("]")
+                ]
+                self.attest = (
+                    "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
+                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                )
+            return super().__call__(**kw)
+
+    report = run(repo, Recorder(lambda e, r: "opt-float"), tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert "[context]" not in seen["body"] and "[hints]" not in seen["body"]
+
+
+def test_the_attester_template_covers_context_and_hints_when_supplied(repo: Path, tmp_path: Path):
+    """The other half: when the caller DOES supply them, they must be in the body and
+    the parser must expect them."""
+    seen: dict[str, str] = {}
+
+    class Recorder(Agent):
+        def __call__(self, **kw):
+            if "TEXT AUDITOR" in kw["instructions"]:
+                seen["body"] = kw["body"]
+                fields = [
+                    line[1:-1] for line in kw["body"].splitlines()
+                    if line.startswith("[") and line.endswith("]")
+                ]
+                self.attest = (
+                    "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
+                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                )
+            if "NEUTRALIZER" in kw["instructions"]:
+                opts = "\n".join(f"{k}: {v}" for k, v in self.statements.items())
+                return (
+                    "=== DECISION ===\nd\n\n"
+                    f"=== OPTIONS ===\n{opts}\n\n"
+                    "=== CONTEXT ===\nThe threshold is written to a log line.\n\n"
+                    "=== HINTS ===\n- app.py: the module\n"
+                )
+            return super().__call__(**kw)
+
+    report = run(repo, Recorder(lambda e, r: "opt-float"), tmp_path,
+                 context="The threshold is written to a log line.",
+                 files=[{"path": "app.py", "reason": "the module"}])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert "[context]" in seen["body"] and "[hints]" in seen["body"]

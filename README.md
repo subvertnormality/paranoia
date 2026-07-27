@@ -149,7 +149,9 @@ raised before the cleaner runs.
 - **A vendor that never changed its mind is not asked to cite the other's evidence.**
   In round 2 the carried-evidence requirement applies only to a vendor whose selection
   *moved* — that is what it is for, since capitulation is a change. A vendor that held
-  its round-1 position needs only a citation that resolves.
+  its round-1 position needs only a citation that resolves, **provided its round-1
+  decisive citation resolved too**; a holder that was never substantiated in the first
+  place must ground in gained evidence like a mover.
 - **It only decides things the repository can settle.** A converging vote must
   cite a line. A decision that does not turn on repo-verifiable grounds will
   never return `CONVERGED` here.
