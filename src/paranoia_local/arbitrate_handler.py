@@ -593,7 +593,8 @@ def _arbitrate(
     if escaping:
         raise ArbitrationError(
             "snapshot contains symlink(s) whose target escapes the repository, so the "
-            f"deciders could read unrecorded bytes: {', '.join(escaping)}"
+            "deciders could read unrecorded bytes: "
+            + ", ".join(evidence.printable(e) for e in escaping)
         )
     hints = evidence.validate_hints(repo, snapshot, list(arguments.get("files") or []))
 

@@ -592,3 +592,46 @@ def test_a_citation_to_a_path_git_would_quote_still_resolves(repo: Path):
         )
         assert got, f"{path} should resolve"
         assert want in got[1], f"{path} resolved to the wrong file's bytes"
+
+
+def test_a_hint_path_is_not_stripped(repo: Path):
+    """Round-4 blocker: `.strip()` folded one tracked file onto another. The repo
+    already tracks space-delimited filenames, so this was the same substitution class
+    the rest of the module refuses."""
+    (repo / " spaced.py ").write_text("PADDED\n" * 5)
+    (repo / "spaced.py").write_text("BARE\n" * 5)
+    commit_all(repo, "both spellings")
+    commit = snapshot(repo)
+    assert evidence.validate_hints(repo, commit, [{"path": " spaced.py "}]) == [
+        {"path": " spaced.py ", "reason": ""}
+    ]
+    assert evidence.validate_hints(repo, commit, [{"path": "spaced.py"}]) == [
+        {"path": "spaced.py", "reason": ""}
+    ]
+
+
+def test_tree_paths_do_not_collapse_on_undecodable_bytes(repo: Path):
+    """Round-4: `errors='replace'` mapped every undecodable byte to U+FFFD, so two
+    distinct filenames collapsed to one string and the membership set stopped
+    describing the tree."""
+    import os
+    (repo / os.fsdecode(b"caf\xe9.py")).write_bytes(b"LATIN1\n" * 5)
+    (repo / os.fsdecode(b"caf\xff.py")).write_bytes(b"OTHER\n" * 5)
+    commit_all(repo, "undecodable names")
+    paths = evidence.tree_paths(repo, snapshot(repo))
+    assert os.fsdecode(b"caf\xe9.py") in paths
+    assert os.fsdecode(b"caf\xff.py") in paths
+    assert "caf�.py" not in paths, "distinct names must not collapse"
+
+
+def test_an_escaping_symlink_with_an_undecodable_name_is_reportable(repo: Path):
+    """`surrogateescape` means a path can hold lone surrogates, and encoding one to
+    UTF-8 raises — an error message must never be the thing that crashes the run."""
+    import os
+    name = os.fsdecode(b"esc\xff")
+    (repo / name).symlink_to("../outside.py")
+    commit_all(repo, "undecodable escaping link")
+    escaping = evidence.escaping_symlinks(repo, snapshot(repo))
+    assert escaping
+    rendered = ", ".join(evidence.printable(e) for e in escaping)
+    rendered.encode("utf-8")  # must not raise

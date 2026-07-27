@@ -31,7 +31,18 @@ _MAX_SYMLINK_HOPS = 8
 SNAPSHOT_REF_PREFIX = "refs/paranoia/arbitrate"
 
 
-def _git(args: list[str], cwd: Path, *, check: bool = True) -> str:
+def _git(args: list[str], cwd: Path, *, check: bool = True, raw: bool = False) -> str:
+    """`raw=True` decodes with `surrogateescape` instead of `replace`.
+
+    For the NUL-delimited tree reads this is the difference between a faithful path set
+    and a lossy one: `replace` maps every undecodable byte to U+FFFD, so two distinct
+    filenames can collapse to one string and the set no longer describes the tree.
+    Since citation and hint paths are matched against that set literally, a collapsed
+    entry silently makes a real file unciteable. `surrogateescape` is round-trippable
+    and is already this repository's convention for filesystem bytes
+    (`orientation.py`). No caller- or model-supplied string can contain a lone
+    surrogate, so such a path simply never matches rather than matching the wrong file.
+    """
     r = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
     if r.returncode != 0:
         if not check:
@@ -39,7 +50,14 @@ def _git(args: list[str], cwd: Path, *, check: bool = True) -> str:
         raise RuntimeError(
             f"git {' '.join(args)} failed: {r.stderr.decode('utf-8', errors='replace').strip()}"
         )
-    return r.stdout.decode("utf-8", errors="replace")
+    return r.stdout.decode("utf-8", errors="surrogateescape" if raw else "replace")
+
+
+def printable(text: str) -> str:
+    """Surrogate-safe rendering for a path that reaches user-visible text — encoding a
+    lone surrogate to UTF-8 raises, and an error message must never be the thing that
+    crashes the run."""
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
 # --- ref movement -----------------------------------------------------------
@@ -86,7 +104,7 @@ def tree_paths(repo: Path, commit: str) -> frozenset[str]:
     match exists to avoid rather than cause. It also splits on NUL, so a path
     containing a newline cannot forge two entries.
     """
-    out = _git(["ls-tree", "-r", "--name-only", "-z", commit], repo)
+    out = _git(["ls-tree", "-r", "--name-only", "-z", commit], repo, raw=True)
     return frozenset(part for part in out.split("\0") if part)
 
 
@@ -101,7 +119,7 @@ def symlink_map(repo: Path, commit: str) -> dict[str, str]:
     # `-z` for the same reason as `tree_paths`: a quoted key would never match the
     # verbatim path a citation carries, so an aliased file would silently stop being
     # canonicalized.
-    out = _git(["ls-tree", "-r", "-z", commit], repo)
+    out = _git(["ls-tree", "-r", "-z", commit], repo, raw=True)
     links: dict[str, str] = {}
     for line in out.split("\0"):
         if not line:
@@ -384,8 +402,11 @@ def validate_hints(repo: Path, commit: str, hints: list[dict]) -> list[dict]:
     present = tree_paths(repo, commit)
     out: list[dict] = []
     for hint in hints:
-        raw = str(hint.get("path", "")).strip()
-        if not raw:
+        # NOT stripped: " spaced.py " and "spaced.py" are two tracked files, and
+        # trimming one onto the other is the same substitution the rest of this module
+        # refuses to make.
+        raw = str(hint.get("path", ""))
+        if not raw.strip():
             raise ArbitrationError("a file hint has no path")
         if raw.startswith("/") or ".." in raw.split("/"):
             raise ArbitrationError(
