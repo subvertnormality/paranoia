@@ -484,3 +484,57 @@ def test_directory_symlink_with_dotdot_cannot_substitute_evidence(repo: Path):
         links=evidence.LinkResolver(repo, commit), context=1,
     )
     assert got and "ROOT VERSION" in got[1]
+
+
+def test_dotdot_inside_a_symlink_target_fails_closed(repo: Path):
+    """Round-12 blocker, and the last boundary of the path-substitution class: the
+    string comes from repository data rather than a model, but the same lexical
+    collapsing diverges from the worktree as soon as an earlier component is itself
+    a symlink."""
+    (repo / "sub").mkdir()
+    (repo / "sub" / "dir").mkdir()
+    (repo / "sub" / "f.py").write_text("SUB VERSION\n" * 5)
+    (repo / "f.py").write_text("ROOT VERSION\n" * 5)
+    (repo / "linkdir").symlink_to("sub/dir")
+    (repo / "alias").symlink_to("linkdir/../f.py")
+    commit_all(repo, "symlink through symlink")
+
+    # the worktree reads sub/f.py, NOT root f.py
+    assert (repo / "alias").resolve() == (repo / "sub" / "f.py").resolve()
+
+    commit = snapshot(repo)
+    links = evidence.symlink_map(repo, commit)
+    # so we decline to resolve it rather than substituting root f.py
+    assert evidence.canonical_path("alias", links) is None
+    assert evidence.resolve_citation(
+        repo, Citation("alias", 2), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit, links), context=1,
+    ) is None
+    # both real files remain citable on their own terms
+    got = evidence.resolve_citation(
+        repo, Citation("sub/f.py", 2), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit, links), context=1,
+    )
+    assert got and "SUB VERSION" in got[1]
+
+
+def test_a_plain_relative_symlink_target_still_resolves(repo: Path):
+    """Only `..` fails closed; ordinary in-tree targets are unaffected."""
+    (repo / "pkg").mkdir()
+    (repo / "pkg" / "mod.py").write_text("MOD\n" * 5)
+    (repo / "pkg" / "link.py").symlink_to("mod.py")
+    commit_all(repo, "plain link")
+    commit = snapshot(repo)
+    links = evidence.symlink_map(repo, commit)
+    assert evidence.canonical_path("pkg/link.py", links) == "pkg/mod.py"
+
+
+def test_a_dotdot_target_does_not_reject_the_whole_run(repo: Path):
+    """The escape gate keeps its lexical reading: a `..` target that stays inside the
+    repo is not an escape, so a repository using them is still arbitrable."""
+    (repo / "shared").mkdir()
+    (repo / "shared" / "x.py").write_text("X\n")
+    (repo / "pkg").mkdir()
+    (repo / "pkg" / "link.py").symlink_to("../shared/x.py")
+    commit_all(repo, "upward but inside")
+    assert evidence.escaping_symlinks(repo, snapshot(repo)) == []

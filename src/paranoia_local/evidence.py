@@ -114,7 +114,14 @@ def _symlink_target(repo: Path, commit: str, path: str) -> str:
 
 
 def _resolve_link(path: str, target: str) -> str | None:
-    """Resolve a symlink target relative to its own directory. None if it escapes."""
+    """Resolve a symlink target relative to its own directory. None if it escapes.
+
+    Lexical, and used ONLY by the escape gate — `canonical_path` refuses targets
+    containing `..` rather than trusting this. For escape detection the lexical
+    reading is the conservative one: it treats a symlink component as a single
+    level where the filesystem may expand it to several, so it can over-report an
+    escape but not miss one.
+    """
     if target.startswith("/"):
         return None
     base = path.rsplit("/", 1)[0] if "/" in path else ""
@@ -143,7 +150,23 @@ def escaping_symlinks(repo: Path, commit: str, links: dict[str, str] | None = No
 
 
 def canonical_path(path: str, links: dict[str, str]) -> str | None:
-    """Follow the snapshot's symlink graph to the referent. None if it escapes or loops."""
+    """Follow the snapshot's symlink graph to the referent. None if it cannot be
+    resolved EXACTLY as the decider's worktree would.
+
+    A target containing `..` fails closed. `_resolve_link` interprets components
+    lexically, which diverges from the filesystem as soon as an earlier component is
+    itself a symlink: with `alias -> linkdir/../f.py` and `linkdir -> sub/dir`, the
+    worktree reads `sub/f.py` while lexical popping yields root `f.py`. Both are
+    tracked, so the wrong one would pass membership and be substantiated against —
+    the same substitution class that removing path normalization closed, surviving
+    at the one boundary where the string comes from repository data instead of a
+    model.
+
+    Reproducing filesystem semantics exactly would need component-by-component
+    resolution that expands each symlink before interpreting the next `..`.
+    Declining to resolve is simpler, provably right, and costs one `UNRESOLVED` on
+    an uncommon shape — the same trade taken everywhere else here.
+    """
     seen: set[str] = set()
     current = path
     for _ in range(_MAX_SYMLINK_HOPS):
@@ -152,7 +175,10 @@ def canonical_path(path: str, links: dict[str, str]) -> str | None:
         if current in seen:
             return None
         seen.add(current)
-        nxt = _resolve_link(current, links[current])
+        target = links[current]
+        if any(seg == ".." for seg in target.split("/")):
+            return None
+        nxt = _resolve_link(current, target)
         if nxt is None:
             return None
         current = nxt

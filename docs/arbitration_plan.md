@@ -279,6 +279,13 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   as a separate defect across several review rounds. Enumerating rejected spellings
   cannot close that class; not rewriting does. A noncanonical path drops, costing
   one `UNRESOLVED`.
+- The same rule reaches the one boundary where the string is repository data rather
+  than model output: a **symlink target containing `..` fails closed**. Interpreting
+  it lexically diverges from the worktree as soon as an earlier component is itself
+  a symlink — with `alias -> linkdir/../f.py` and `linkdir -> sub/dir` the decider
+  reads `sub/f.py` while lexical popping yields root `f.py`, and both are tracked.
+  The escape gate keeps its lexical reading, which over-reports rather than misses,
+  so a repository with ordinary `../shared/x.py` links is still arbitrable.
 - The revision is resolved to its **full commit id**, and the path is
   **canonicalized through that commit's symlink graph**, before anything else.
 - Must resolve in the snapshot (`git cat-file -e`) with `1 ≤ line ≤ EOF`.
