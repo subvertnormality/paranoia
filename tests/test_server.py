@@ -34,9 +34,23 @@ def spy_get_engine(monkeypatch):
 
 
 class TestToolListing:
-    def test_all_four_tools_present(self) -> None:
+    def test_all_five_tools_present(self) -> None:
         names = {t.name for t in server.TOOLS}
-        assert names == {"critique_branch", "critique_plan", "query", "rebut"}
+        assert names == {"critique_branch", "critique_plan", "query", "rebut", "arbitrate"}
+
+    def test_arbitrate_requires_its_four_inputs(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "arbitrate")
+        assert set(tool.inputSchema["required"]) == {
+            "repo_path", "decision", "options", "stakes"
+        }
+
+    def test_arbitrate_exposes_no_single_engine_override(self) -> None:
+        """A single engine/model override would degrade arbitration to one vendor, or
+        send one vendor's model name to the other CLI."""
+        tool = next(t for t in server.TOOLS if t.name == "arbitrate")
+        props = tool.inputSchema["properties"]
+        assert "engine" not in props and "model" not in props
+        assert set(props["models"]["properties"]) == {"codex", "claude"}
 
     def test_critique_branch_requires_repo_path(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
