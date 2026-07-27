@@ -226,11 +226,10 @@ def test_commit_prefixed_citation_reads_that_revision(repo: Path):
     region, body = got
     assert region.commit == old
     assert "def greet(name):" in body
-    # and the same path:line in the snapshot is a DIFFERENT region
-    snap = evidence.resolve_citation(
-        repo, Citation("app.py", 1), snapshot=commit, links={}, context=1
-    )
-    assert snap[0].key != region.key
+    # the rewritten snapshot is only one line long, so line 4 no longer exists there
+    assert evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links={}, context=1
+    ) is None
 
 
 def test_unreachable_commit_prefix_drops(repo: Path):
@@ -345,7 +344,7 @@ def test_equivalent_commit_spellings_are_one_region(repo: Path):
     commit = snapshot(repo)
     resolver = evidence.LinkResolver(repo, commit)
     short, _ = evidence.resolve_citation(
-        repo, Citation("app.py", 4, commit=old[:7]), snapshot=commit, links=resolver, context=1
+        repo, Citation("app.py", 4, commit=old[:8]), snapshot=commit, links=resolver, context=1
     )
     longer, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old[:12]), snapshot=commit, links=resolver, context=1
@@ -353,8 +352,7 @@ def test_equivalent_commit_spellings_are_one_region(repo: Path):
     full, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old), snapshot=commit, links=resolver, context=1
     )
-    assert short.key == longer.key == full.key
-    assert short.commit == old
+    assert short.commit == longer.commit == full.commit == old
 
 
 def test_bare_and_explicitly_prefixed_snapshot_citations_are_one_region(repo: Path):
@@ -366,7 +364,7 @@ def test_bare_and_explicitly_prefixed_snapshot_citations_are_one_region(repo: Pa
     prefixed, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=commit[:8]), snapshot=commit, links=resolver, context=1
     )
-    assert bare.key == prefixed.key
+    assert bare.commit == prefixed.commit
 
 
 def test_unresolvable_revision_drops(repo: Path):
@@ -392,12 +390,15 @@ def test_unchanged_file_at_wrapper_and_parent_is_one_region(repo: Path):
     parent, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
     )
+    from paranoia_local.arbitration import same_region
+
     assert bare.commit != parent.commit  # provenance is preserved
-    assert bare.key == parent.key  # but identity is the content
-    assert evidence.blob_id(repo, commit, "app.py") == bare.blob
+    assert same_region(bare, parent)  # but identity is the carried content
 
 
-def test_a_changed_file_at_two_commits_is_two_regions(repo: Path):
+def test_a_changed_cited_window_at_two_commits_is_two_regions(repo: Path):
+    from paranoia_local.arbitration import same_region
+
     head = orientation.resolve_head(repo)
     (repo / "app.py").write_text("# rewritten entirely\n" * 6)
     commit = snapshot(repo)
@@ -408,4 +409,28 @@ def test_a_changed_file_at_two_commits_is_two_regions(repo: Path):
     before, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
     )
-    assert now.key != before.key
+    assert not same_region(now, before)
+
+
+def test_a_change_outside_the_cited_window_is_still_one_region(repo: Path):
+    """Round-4 blocker: keying on git's blob id split a region whose transported
+    lines were identical, because the blob covers the whole file."""
+    from paranoia_local.arbitration import same_region
+
+    (repo / "long.py").write_text("".join(f"L{i}\n" for i in range(1, 41)))
+    commit_all(repo, "long")
+    head = orientation.resolve_head(repo)
+    # edit line 40, far outside a context-3 window around line 10
+    text = (repo / "long.py").read_text().splitlines()
+    text[39] = "UNRELATED"
+    (repo / "long.py").write_text("\n".join(text) + "\n")
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    now, _ = evidence.resolve_citation(
+        repo, Citation("long.py", 10), snapshot=commit, links=resolver, context=3
+    )
+    before, _ = evidence.resolve_citation(
+        repo, Citation("long.py", 10, commit=head), snapshot=commit, links=resolver, context=3
+    )
+    assert now.commit != before.commit
+    assert same_region(now, before)

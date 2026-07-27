@@ -11,7 +11,7 @@ Four jobs:
   path resolves to; a tracked symlink can point at live external bytes.
 - `scan_for_tokens` — prove the derived option labels appear nowhere the deciders
   can read them.
-- `read_lines` / `blob_eof` — the bounded citation reads that round 2 carries.
+- `resolve_citation` / `read_region` — the bounded citation reads round 2 carries.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import hashlib
 import subprocess
 from pathlib import Path
 
-from .arbitration import ArbitrationError, Citation, Region
+from .arbitration import ArbitrationError, Citation, Region, digest_lines
 
 # Modes are the only way to tell a symlink from a file in a tree listing;
 # `ChangeEntry` in orientation.py carries no mode, which is why the escape hole
@@ -184,17 +184,6 @@ def scan_for_tokens(repo: Path, commit: str, tokens: list[str]) -> list[str]:
 # --- citation reads ---------------------------------------------------------
 
 
-def blob_id(repo: Path, commit: str, path: str) -> str | None:
-    """Git's content id for `path` at `commit` — the identity a Region keys on, so
-    the same unchanged file cited at two revisions is one region."""
-    r = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", f"{commit}:{path}"],
-        cwd=repo, capture_output=True,
-    )
-    out = r.stdout.decode("utf-8", errors="replace").strip()
-    return out if r.returncode == 0 and out else None
-
-
 def _blob(repo: Path, commit: str, path: str) -> str | None:
     """The file's contents, or None unless `path` is a regular blob at `commit`.
 
@@ -283,16 +272,17 @@ def resolve_citation(
     text = _blob(repo, commit, path)
     if text is None:
         return None
-    eof = len(text.splitlines())
+    lines = text.splitlines()
+    eof = len(lines)
     if eof == 0 or not (1 <= citation.line <= eof):
-        return None
-    blob = blob_id(repo, commit, path)
-    if blob is None:
         return None
     lo = max(1, citation.line - context)
     hi = min(eof, citation.line + context)
     region = Region(
-        commit=commit, path=path, lo=lo, hi=hi, anchor=citation.line, blob=blob
+        commit=commit, path=path, lo=lo, hi=hi, anchor=citation.line,
+        # Digests of the lines actually transported, so region identity tracks what
+        # round 2 sends rather than the whole file or the revision it came from.
+        line_digests=digest_lines(lines[lo - 1 : hi]),
     )
     return region, read_region(repo, region) or ""
 

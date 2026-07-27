@@ -803,3 +803,30 @@ def test_wrapper_and_parent_citations_do_not_manufacture_novelty(repo: Path, tmp
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
     assert trailer_field(report, "ROUNDS") == "1"
     assert "withheld" in report
+
+
+def test_a_commit_landing_during_the_snapshot_fails(repo: Path, tmp_path: Path, monkeypatch):
+    """Round-4 blocker: the baseline digest was taken AFTER the snapshot, so a commit
+    landing in that window became part of the baseline — visible to both deciders
+    through `git log --all` while the run reported REFS-MOVED: no."""
+    real = ah._snapshot
+
+    def landing(r):
+        commit = real(r)
+        (r / "landed.py").write_text("x = 1\n")
+        commit_all(r, "landed during setup")
+        return commit
+
+    monkeypatch.setattr(ah, "_snapshot", landing)
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "while the snapshot was being taken" in report
+    assert agent.calls == []  # nothing spent
+
+
+def test_retain_snapshot_ref_is_not_mistaken_for_operator_movement(repo: Path, tmp_path: Path):
+    """Our own ref is created before the baseline digest, so it must not read as drift."""
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
+    assert trailer_field(report, "REFS-MOVED") == "no"
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"

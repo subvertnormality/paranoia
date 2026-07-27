@@ -482,11 +482,22 @@ def _arbitrate(
     _preflight(deciders)
 
     progress("snapshotting the working tree")
+    # Digest BEFORE the snapshot, and again after it: a commit landing while the
+    # snapshot is being built would otherwise become part of the baseline, so both
+    # deciders could read it through `git log --all` and the run would still report
+    # REFS-MOVED: no against an older SNAPSHOT.
+    refs_at_start = evidence.refs_digest(repo)
     snapshot = _snapshot(repo)
+    if evidence.refs_digest(repo) != refs_at_start:
+        raise ArbitrationError(
+            "repository refs moved while the snapshot was being taken, so the "
+            "snapshot cannot describe what the deciders would read"
+        )
     if retain:
         # The ONE mode that writes a ref. Off by default: `wrap_commit` deliberately
         # creates none, and the README promises as much, so durable evidence replay
-        # is opt-in rather than a promise quietly broken for everyone.
+        # is opt-in rather than a promise quietly broken for everyone. Created before
+        # the baseline digest so our own ref is not mistaken for operator movement.
         evidence.retain_snapshot(repo, snapshot, now())
     refs_before = evidence.refs_digest(repo)
 

@@ -309,14 +309,17 @@ Every anchor is therefore expanded to the **interval actually carried** —
 cap. Two distinct predicates operate on those intervals, and conflating them is a
 defect:
 
-- **`same_region`** — same `(path, blob)` and intervals that intersect *at all*.
-  Identity is the canonical path plus git's **content id**, not the revision:
-  every run wraps `HEAD`, so a bare citation (resolving to the wrapper) and a
-  `HEAD@…` citation of the same unchanged file are byte-identical and must be one
-  region. Keying on the commit made them two, so both vendors appeared to gain
-  evidence and round 2 ran on the same bytes carried twice. The commit is retained
-  as provenance. Cited revisions are also canonicalized to full object ids first,
-  so two spellings of one commit cannot split a region either.
+- **`same_region`** — same path, intervals that intersect *at all*, and the
+  **overlapping lines identical**. Identity is the content actually transported,
+  because that is what round 2 transmits. Two weaker identities were tried and both
+  manufactured novelty: `(commit, path)` split a bare citation from a `HEAD@…`
+  citation of the same unchanged file (every run wraps `HEAD`, so they are different
+  commits), and `(path, blob)` split two revisions differing anywhere *outside* the
+  cited window, since a blob is the whole file. In each case both vendors appeared
+  to gain evidence and round 2 ran as a fresh sample. Regions therefore carry a
+  digest per transported line; the commit is retained as provenance only, and cited
+  revisions are canonicalized to full object ids so two spellings cannot split a
+  region either.
   Used for the §2.11 novelty gate. Deliberately generous: an overlap counts as
   sameness even when anchors differ, so the gate errs toward `UNRESOLVED` rather
   than toward running an evidence-thin round 2.
@@ -521,8 +524,10 @@ which is false for history, and a `CONVERGED` reached partly on post-snapshot
 commits while the record reports the old `SNAPSHOT` is precisely the audit
 laundering this design exists to prevent.
 
-The server therefore digests `git for-each-ref` **and `git reflog --all`** at
-snapshot time and again after the last decider returns. If either changed, the
+The server therefore digests `git for-each-ref` **and `git reflog --all`** before
+the snapshot, again immediately after it (a commit landing during snapshot setup
+would otherwise become part of the baseline, leaving it invisible), and once more
+after the last decider returns. If either changed, the
 trailer carries `REFS-MOVED: yes` and the outcome is `FAILED`. The reflog is
 included because comparing ref tips alone is defeated by an advance-and-restore
 cycle — a rebase that lands and then resets a branch inside the window leaves both

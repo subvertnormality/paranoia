@@ -329,21 +329,27 @@ def parse_citations(field: str, *, limit: int = MAX_CITATIONS) -> tuple[Citation
 
 @dataclass(frozen=True)
 class Region:
-    """The interval a citation actually carries.
+    """The interval a citation actually carries, plus a digest per carried line.
 
-    Identity is `(path, blob)` — the canonical path and git's content id for the
-    file at the cited revision. `commit` is retained as provenance only.
+    Identity is the canonical **path** and the **content of the lines transported**,
+    compared over whatever span two regions share. `commit` is provenance only.
 
-    Keying on the *commit* instead was a defect, and the normal case exposed it:
-    every run wraps `HEAD` in a snapshot commit, so a bare citation (which resolves
-    to the wrapper) and a `HEAD@…` citation of the same unchanged file are
-    byte-identical yet would key apart. Both vendors then appear to gain evidence,
-    round 2 carries the same bytes twice, and each can substantiate by quoting the
-    other's revision. Git already content-addresses this: identical content shares a
-    blob id, so the blob is the right identity and no per-line digest is needed.
+    Two weaker identities were tried and both manufactured false novelty:
 
-    Paths are canonicalized through the snapshot's symlink map before construction,
-    so two aliases for one file are also one region.
+    - `(commit, path)` — every run wraps `HEAD`, so a bare citation (resolving to
+      the wrapper) and a `HEAD@…` citation of the same unchanged file keyed apart
+      although they are byte-identical.
+    - `(path, blob)` — git's blob id is the whole *file*, so two revisions that
+      differ anywhere outside the cited window keyed apart although the carried
+      lines are identical.
+
+    In both cases both vendors appear to gain evidence, round 2 runs as a fresh
+    sample over the same bytes, and each vendor can substantiate by citing the
+    other's revision. Comparing the transported lines themselves is the only
+    identity that tracks what round 2 actually transmits.
+
+    Paths are canonicalized through the cited commit's symlink map before
+    construction, so two aliases for one file are also one region.
     """
 
     commit: str
@@ -351,70 +357,130 @@ class Region:
     lo: int
     hi: int
     anchor: int
-    blob: str = ""
+    # sha256 per line, index 0 == line `lo`. Bounded: regions are context-capped.
+    line_digests: tuple[str, ...] = ()
 
     @property
-    def key(self) -> tuple[str, str]:
-        return (self.path, self.blob)
+    def key(self) -> str:
+        """Grouping key only — content equality is decided by `line_digests`."""
+        return self.path
+
+    def digest_at(self, line: int) -> str | None:
+        idx = line - self.lo
+        if 0 <= idx < len(self.line_digests):
+            return self.line_digests[idx]
+        return None
+
+
+def digest_lines(lines: Iterable[str]) -> tuple[str, ...]:
+    return tuple(hashlib.sha256(line.encode("utf-8", "replace")).hexdigest()[:16] for line in lines)
 
 
 def to_region(
     citation: Citation,
     *,
     commit: str,
-    blob: str,
     eof: int,
+    lines: Sequence[str] = (),
     context: int = CONTEXT_LINES,
 ) -> Region:
+    """`lines` is the full file's lines; the region keeps digests for `lo..hi` only."""
     lo = max(1, citation.line - context)
     hi = min(eof, citation.line + context)
     return Region(
-        commit=commit, path=citation.path, lo=lo, hi=hi, anchor=citation.line, blob=blob
+        commit=commit,
+        path=citation.path,
+        lo=lo,
+        hi=hi,
+        anchor=citation.line,
+        line_digests=digest_lines(lines[lo - 1 : hi]) if lines else (),
     )
 
 
+def _overlap(a: Region, b: Region) -> tuple[int, int] | None:
+    lo, hi = max(a.lo, b.lo), min(a.hi, b.hi)
+    return (lo, hi) if lo <= hi else None
+
+
 def same_region(a: Region, b: Region) -> bool:
-    """Sameness for the novelty gate: same path, same file content, and any overlap.
+    """Sameness for the novelty gate: same path, overlapping intervals, and the
+    overlapping lines identical.
 
     Deliberately generous on the interval — two anchors a line apart carry
     near-identical windows, so treating them as distinct would let an evidence-free
-    round 2 run — and content-based rather than revision-based, so the same
-    unchanged file cited at two revisions is one region (see `Region`).
+    round 2 run. And decided on the transported lines, not the revision or the whole
+    file, so neither a snapshot wrapper nor an unrelated edit elsewhere in the file
+    can split one piece of evidence into two (see `Region`).
     """
-    return a.key == b.key and a.lo <= b.hi and b.lo <= a.hi
+    if a.path != b.path:
+        return False
+    span = _overlap(a, b)
+    if span is None:
+        return False
+    if not a.line_digests or not b.line_digests:
+        return True  # no content available to distinguish them; treat as the same
+    return all(a.digest_at(n) == b.digest_at(n) for n in range(span[0], span[1] + 1))
 
 
 def anchor_within(anchor_region: Region, carried: Region) -> bool:
-    """Substantiation: the anchor LINE must sit inside the carried interval.
+    """Substantiation: the anchor LINE must sit inside the carried interval, and be
+    the same line that was carried.
 
     Strictly point-in-interval, not intersection. At context 3 a carried region
     [104,110] and a fresh anchor at 113 expand to overlapping windows, but line 113
     was never carried — accepting it would count independent discovery as
-    reconciliation.
+    reconciliation. The digest check additionally rules out citing the same line
+    number at a revision whose content differs.
     """
-    return anchor_region.key == carried.key and carried.lo <= anchor_region.anchor <= carried.hi
+    if anchor_region.path != carried.path:
+        return False
+    if not (carried.lo <= anchor_region.anchor <= carried.hi):
+        return False
+    mine = anchor_region.digest_at(anchor_region.anchor)
+    theirs = carried.digest_at(anchor_region.anchor)
+    if mine is None or theirs is None:
+        return True
+    return mine == theirs
 
 
 def merge_regions(regions: Iterable[Region]) -> tuple[Region, ...]:
-    """Merge overlapping intervals per `(path, blob)`. The merged interval keeps the
-    first anchor; anchors matter only on unmerged citation regions."""
-    by_key: dict[tuple[str, str], list[Region]] = {}
+    """Merge overlapping same-content intervals per path.
+
+    Two regions of one path merge only when they overlap AND agree on the shared
+    lines — otherwise they are different content at the same coordinates and must
+    stay distinct. The merged interval keeps the first anchor; anchors matter only
+    on unmerged citation regions.
+    """
+    by_path: dict[str, list[Region]] = {}
     for r in regions:
-        by_key.setdefault(r.key, []).append(r)
+        by_path.setdefault(r.path, []).append(r)
     out: list[Region] = []
-    for key in sorted(by_key):
+    for path in sorted(by_path):
         current: Region | None = None
-        for r in sorted(by_key[key], key=lambda x: (x.lo, x.hi)):
+        for r in sorted(by_path[path], key=lambda x: (x.lo, x.hi)):
             if current is None:
                 current = r
-            elif r.lo <= current.hi:
-                current = replace(current, hi=max(current.hi, r.hi))
+            elif r.lo <= current.hi and same_region(current, r):
+                current = _extend(current, r)
             else:
                 out.append(current)
                 current = r
         if current is not None:
             out.append(current)
     return tuple(out)
+
+
+def _extend(current: Region, other: Region) -> Region:
+    """Widen `current` to cover `other`, keeping per-line digests aligned to `lo`."""
+    if other.hi <= current.hi:
+        return current
+    digests = list(current.line_digests)
+    if digests and other.line_digests:
+        # append only the lines beyond current.hi, keeping index 0 == current.lo
+        digests.extend(other.line_digests[current.hi - other.lo + 1 :])
+    elif not current.line_digests:
+        digests = []
+    return replace(current, hi=other.hi, line_digests=tuple(digests))
 
 
 def region_union(per_engine: Mapping[str, Sequence[Region]]) -> tuple[Region, ...]:
@@ -429,7 +495,7 @@ def region_union(per_engine: Mapping[str, Sequence[Region]]) -> tuple[Region, ..
         sorted(
             merged,
             key=lambda r: hashlib.sha256(
-                f"{r.path}|{r.blob}|{r.lo}|{r.hi}".encode()
+                f"{r.path}|{r.lo}|{r.hi}|{''.join(r.line_digests)}".encode()
             ).hexdigest(),
         )
     )
