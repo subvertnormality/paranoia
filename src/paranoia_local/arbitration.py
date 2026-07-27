@@ -17,8 +17,9 @@ that was not reached:
 - **Regions, not anchors.** A citation is the interval actually carried; sameness
   is interval intersection, substantiation is strict point-in-interval (§2.5).
 - **Substantiation.** Agreement counts only when each converging vote's decisive
-  citation resolves, and in round 2 lands inside a region novel to its own vendor
-  (§3.5).
+  citation resolves, and in round 2 additionally lands inside a region novel to its
+  own vendor — for any vendor that CHANGED selection, or whose round-1 vote was
+  itself unsubstantiated (§3.5).
 
 Everything here is deterministic and free of I/O: the git reads it needs are
 injected by the caller.
@@ -161,7 +162,7 @@ _HOIST_REMEDY = (
 
 
 def preflight_framing(
-    *, decision: str, context: str, options: Sequence[Option]
+    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True
 ) -> None:
     """Reject framing defects visible in the caller's own input, before spending a
     cleaner call on them.
@@ -176,6 +177,12 @@ def preflight_framing(
     and no amount of re-cleaning fixes it. Telling the caller up front, with the
     remedy, is the only useful response.
     """
+    # The ratio is a BIAS bound — asymmetric detail is an argument regardless of
+    # wording — so it holds whether or not a cleaner runs. The character caps are
+    # CLEANER-CAPACITY bounds, justified by what can be round-tripped through the
+    # cleaner without the attester scoring a fidelity change, so `clean: false` (which
+    # sends the caller's statements verbatim and never invokes a cleaner) is not
+    # subject to them.
     lengths = {o.id: max(1, len(o.statement)) for o in options}
     if lengths:
         longest = max(lengths, key=lengths.__getitem__)
@@ -187,6 +194,8 @@ def preflight_framing(
                 f"{lengths[shortest]} (ratio must be <= {OPTION_RATIO_MAX}). "
                 + _HOIST_REMEDY
             )
+    if not cleaned:
+        return
     for oid, n in lengths.items():
         if n > MAX_OPTION_CHARS:
             raise ArbitrationError(

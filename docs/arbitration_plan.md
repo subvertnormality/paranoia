@@ -797,7 +797,15 @@ the round; it says nothing about **use** within it.
   — computed server-side, since the round-2 session is cold and does not know what its
   own vendor cited before.
 
-**Why only a vendor that moved.** The carried-grounding rule is anti-*capitulation*:
+**Two vendors owe carried grounding: any that moved, and any whose round-1 vote was
+unsubstantiated.** The second clause is what makes the first sound — waiving the rule
+for a holder rests on that holder already having been substantiated in round 1, and a
+vendor that reached round 2 with no resolving decisive citation has no such standing.
+Without it, a vote that was never substantiated at all could ride to `CONVERGED` on a
+fresh citation that merely resolves, while the other vendor moved onto its supporting
+region.
+
+**Why a vendor that moved.** The carried-grounding rule is anti-*capitulation*:
 it proves a changed mind was changed by evidence rather than by the bare fact of
 disagreement. Capitulation is by definition a change, so a vendor that held its
 round-1 selection has nothing to disprove, and its position was already substantiated
@@ -953,7 +961,7 @@ own reading. That is what a function removes.
 | Reading prose to judge agreement | Python compares mapped `SELECTED` against an exact label set. |
 | Composing the round-2 packet | Mechanical: repository bytes only, no prose, no provenance (§3.6). |
 | A round 2 that reconciles nothing | The per-decider interval gate (§2.11). |
-| Agreement reached without using any evidence | Substantiation: every converging vote must resolve a citation, and in round 2 one novel to its own vendor (§3.5). |
+| Agreement reached without using any evidence | Substantiation: every converging vote must resolve a citation, and in round 2 one novel to its own vendor — required of any vendor that changed selection, or whose round-1 vote was itself unsubstantiated (§3.5). |
 | A cold round-2 decider losing its own evidence | Both receive the full region union (§2.6). |
 | Local labels colliding with framing or repository text | Seed-derived labels, absence verified against framing and snapshot, disjoint per decider so any echo fails membership (§2.4). |
 | The caller's view entering the framing | Cleaner + measured bands + field-by-field attestation. |
@@ -1162,10 +1170,12 @@ caller's input; the cleaner model default is `claude-opus-5` and is *not*
 inherited from `ClaudeEngine.default_model`.
 
 *Substantiation (§3.5).* Round-1 agreement with `DECISIVE-CITATION: NONE` from
-either decider yields `UNRESOLVED`; round-2 agreement where a converging vote's
+either decider yields `UNRESOLVED`; round-2 agreement where a MOVING vote's
 decisive anchor is its own prior region — even with the other vendor's novel region
 appended to supporting `CITATIONS` — yields `UNRESOLVED`, since only the decisive
-field gates; round-2 agreement where each decisive anchor lies within a carried
+field gates; a vendor that HELD a round-1 selection which was itself substantiated
+needs only a decisive citation that resolves, while one that held an unsubstantiated
+round-1 selection must ground in gained evidence like a mover; round-2 agreement where each decisive anchor lies within a carried
 region novel to its own vendor yields `CONVERGED`; a decisive anchor that merely
 *abuts* a carried interval (anchor 113 against carried `[104,110]` at `k=3`) does
 **not** substantiate, because `anchor_within` is point-in-interval and not

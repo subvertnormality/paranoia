@@ -1071,3 +1071,73 @@ def test_the_cleaner_may_not_worsen_the_length_asymmetry(repo: Path, tmp_path: P
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "equaliz" in report.lower()
+
+
+def test_a_held_vote_that_was_never_substantiated_must_still_ground(repo: Path, tmp_path: Path):
+    """Round-1 review blocker. Waiving carried grounding for a holder rests on that
+    holder already being substantiated. A vendor that reached round 2 with no resolving
+    decisive citation has no such standing, and must not ride to CONVERGED on a fresh
+    citation that merely resolves while the other vendor moves onto its supporting
+    region."""
+    (repo / "elsewhere.py").write_text("e\n" * 40)
+    (repo / "third.py").write_text("t\n" * 40)
+    commit_all(repo, "elsewhere and third")
+    agent = Agent(
+        lambda engine, rnd: "opt-float" if (engine == "codex" and rnd == 1) else "opt-decimal",
+        extra={
+            # claude picks decimal in round 1 with NO decisive citation, but supplies a
+            # supporting region so reconciliation is still permitted
+            ("claude", 1): {"decisive": "NONE", "citations": "app.py:4"},
+            ("codex", 1): {"decisive": "elsewhere.py:20"},
+            # codex flips onto claude's supporting region
+            ("codex", 2): {"decisive": "app.py:4"},
+            # claude holds, on a citation that resolves but was NEVER carried to it
+            ("claude", 2): {"decisive": "third.py:20"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert "claude" in report
+
+
+def test_a_caller_context_that_reads_None_is_not_swallowed(repo: Path, tmp_path: Path):
+    """Round-1 review blocker: `None.` is a sentinel only when the caller supplied no
+    context. As a real datum — the observed output of the thing being adjudicated — it
+    must reach the deciders verbatim."""
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== CONTEXT ===\nNone.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ), attest=(
+        "FIDELITY: decision PRESERVED; context PRESERVED; opt-float PRESERVED; "
+        "opt-decimal PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path, context="None.")
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    for call in agent.calls:
+        if call["cwd"] is None:
+            continue
+        assert "None." in call["body"], "the caller's context must reach the deciders"
+
+
+def test_clean_false_is_not_subject_to_cleaner_capacity_bounds(repo: Path, tmp_path: Path):
+    """Round-1 review: the char caps are justified by cleaner round-trip capacity, and
+    `clean: false` never invokes a cleaner. The equalization ratio is a bias bound and
+    still applies."""
+    long_a = "a" * 2000
+    long_b = "b" * 2000
+    report = run(repo, Agent(lambda e, r: "A", statements={"A": long_a, "B": long_b}),
+                 tmp_path, clean=False,
+                 options=[{"id": "A", "statement": long_a}, {"id": "B", "statement": long_b}])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "CLEANING") == "skipped"
+
+
+def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):
+    report = run(repo, Agent(lambda e, r: "A"), tmp_path, clean=False,
+                 options=[{"id": "A", "statement": "x" * 300},
+                          {"id": "B", "statement": "y" * 900}])
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "not equalized" in report

@@ -108,7 +108,9 @@ def _snapshot(repo: Path) -> str:
 _BLOCK_RE = re.compile(r"^===\s*(?P<name>[A-Z]+)\s*===\s*$")
 
 
-def parse_cleaned_packet(text: str, ids: Sequence[str]) -> dict[str, Any]:
+def parse_cleaned_packet(
+    text: str, ids: Sequence[str], *, caller_gave_context: bool = False
+) -> dict[str, Any]:
     """Parse the cleaner's blocks and enforce fidelity mechanically.
 
     The id set must round-trip 1:1. A "neutralizer" that quietly drops or merges an
@@ -155,17 +157,26 @@ def parse_cleaned_packet(text: str, ids: Sequence[str]) -> dict[str, Any]:
 
     return {
         "decision": "\n".join(blocks["DECISION"]).strip(),
-        "context": _none_as_empty("\n".join(blocks.get("CONTEXT", [])).strip()),
+        "context": _cleaned_context(blocks.get("CONTEXT", []), caller_gave_context),
         "hints": parse_cleaned_hints(blocks.get("HINTS", [])),
         "statements": statements,
     }
 
 
-def _none_as_empty(text: str) -> str:
+def _cleaned_context(lines: Sequence[str], caller_gave_context: bool) -> str:
     """`CONTEXT: None.` is how the cleaner spells "the caller gave me none" — the same
-    sentinel the HINTS block uses. Treating it as content would make an absent field
-    look populated, which is exactly the confusion fix 4 removes."""
-    return "" if text.strip().rstrip(".").strip().lower() in ("", "none", "n/a") else text
+    sentinel the HINTS block uses, and treating it as content would make an absent
+    field look populated.
+
+    But it is only a sentinel when the caller supplied nothing. A caller whose context
+    legitimately *is* `None.` — the observed output of the thing being adjudicated, say
+    — must have it reach the deciders verbatim, so when context was supplied the block
+    is passed through untouched.
+    """
+    text = "\n".join(lines).strip()
+    if caller_gave_context:
+        return text
+    return "" if text.rstrip(".").strip().lower() in ("", "none", "n/a") else text
 
 
 def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
@@ -550,7 +561,9 @@ def _arbitrate(
     # Input-only defects, checked before a single agent call: three of the first four
     # production invocations died after two Opus attempts each on exactly these
     # measurements (issue #8, fix 5).
-    arb.preflight_framing(decision=decision, context=context, options=canonical)
+    arb.preflight_framing(
+        decision=decision, context=context, options=canonical, cleaned=do_clean
+    )
 
     _preflight(deciders)
 
@@ -680,6 +693,13 @@ def _arbitrate(
             # whose selection actually moved (issue #8).
             first = {v.engine: v.selected for v in round1}
             moved = {v.engine for v in round2 if first.get(v.engine) != v.selected}
+            # Waiving carried grounding rests on the held position ALREADY being
+            # substantiated in round 1. A vendor that reached round 2 without a
+            # resolving decisive citation has no such standing, so it must ground in
+            # gained evidence like a mover: otherwise a vote that was never
+            # substantiated at all rides to CONVERGED on a citation that merely
+            # resolves, while the other vendor moves onto its supporting region.
+            moved |= {v.engine for v in round2 if not sub1.get(v.engine, False)}
             sub2 = arb.substantiation(
                 round2,
                 resolve=resolve_region,
@@ -884,7 +904,9 @@ def _clean_and_attest(
             timeout=CLEAN_TIMEOUT_SEC, text_only=True,
         )
         try:
-            parsed = parse_cleaned_packet(cleaned_raw, list(originals))
+            parsed = parse_cleaned_packet(
+                cleaned_raw, list(originals), caller_gave_context=bool(context)
+            )
             if parsed["context"] and not context:
                 # A context the caller never wrote is the cleaner adding facts, which
                 # it is forbidden to do — and it cannot be attested against anything.
