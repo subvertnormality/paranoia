@@ -8,6 +8,10 @@ Install it into Claude Code and reviews are performed by Codex (GPT‑5.6). Inst
 it into Codex and reviews are performed by Claude Code (Fable 5). The MCP server
 is just the channel between them.
 
+One tool is a different shape: [`arbitrate`](#arbitrate--deciding-not-reviewing)
+does not review, it **decides** — it runs *both* vendors against each other on a
+choice you hand it and computes the verdict itself.
+
 ```
 ┌──────────────┐   "paranoia: critique this branch"   ┌──────────────┐
 │  Claude Code │ ───────────────────────────────────► │ paranoia-local│
@@ -78,7 +82,10 @@ independence behind it, so most of the machinery exists to stop the two vendors
 agreeing for a reason other than the evidence:
 
 1. **One snapshot.** The working tree is pinned to a commit and each decider gets
-   its own worktree of it. Both search freely; both search the same bytes.
+   its own worktree of it, so both search freely over the same pinned tree. Git
+   *history* is still live — the worktrees attach to your real repo — so the server
+   digests every ref and the reflog before and after the run and returns `FAILED` if
+   anything moved, rather than reporting agreement it cannot describe.
 2. **The framing is neutralized** by an Opus agent — advocacy stripped, options
    equalized in detail — and then **attested by the other vendor**, field by
    field, before any decider sees it. `stakes` is never rewritten.
@@ -187,6 +194,9 @@ gather step, but treat the magnitude as pending that measurement.)
   - [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) signed in
     with a ChatGPT plan, **or**
   - [Claude Code](https://code.claude.com) (`claude`) signed in with a Claude plan.
+- **`arbitrate` needs BOTH**, whichever one you install the server into — it drives
+  the two vendors against each other, so there is no single-vendor mode. The four
+  review tools need only the other agent's CLI, as above.
 
 ### Install the server
 
@@ -292,7 +302,7 @@ stakes = "Internal booking API, single team, authenticated first-party callers, 
 
 ## Common arguments
 
-All tools accept:
+The four review tools accept:
 
 - `engine` — override which engine reviews for this one call (`codex` | `claude`).
 - `model` — override the reviewer model (defaults to the engine's strongest:
@@ -301,6 +311,11 @@ All tools accept:
   defaults to `medium`.
 - `web_search` — allow the reviewer to cross-check external methodology/library
   claims on the web (default `true`).
+
+**`arbitrate` deliberately has no `engine` or `model`.** It runs both vendors, so a
+single override could only degrade it to one of them or send one vendor's model
+name to the other CLI. It takes `models: {codex?, claude?}` for per-vendor
+overrides, plus `cleaner_model`, and honours `effort` and `web_search`.
 
 ## Safety model
 
@@ -330,11 +345,16 @@ All tools accept:
   `~/.paranoia/logs/` (provenance + the session ref for `rebut`). In `converge`
   mode (below) it additionally creates a short-lived git worktree and a few
   **unreferenced** git objects (the reviewed snapshot) in the target repo. On a
-  clean exit both are cleaned up (best-effort) and no ref is ever created. A hard
+  clean exit both are cleaned up (best-effort) and no ref is created. A hard
   crash mid-review — or a rare teardown failure —
   can leave the worktree registration (and, while it exists, the snapshot objects
   it checks out) until the next `git worktree prune`/`git gc` — run either to
   reclaim them. Your working tree and index are never touched.
+
+  **One opt-in exception:** `arbitrate` with `retain_snapshot: true` creates
+  `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It defaults
+  to **off** precisely to keep the promise above, and it is the only mode in the
+  whole server that writes a ref. Remove one with `git update-ref -d <ref>`.
 
 ## Rate limits
 
@@ -342,6 +362,11 @@ Reviews draw on your subscription's agentic-usage pool. A heavy convergence loop
 is many agent turns — on smaller plans you can hit the 5-hour window. Use `query`
 (lower effort) for quick checks, and reserve full multi-round `critique_branch`
 loops for changes that warrant them.
+
+`arbitrate` is the expensive one, and it is the only tool that spends from **both**
+subscriptions in a single call: 4 agent turns typically, 8 at worst (a cleaning
+retry plus a reconciliation round). Its cleaner and attester are short text-only
+turns; the decider turns are the real cost.
 
 ## Development
 
