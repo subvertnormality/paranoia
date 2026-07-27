@@ -316,6 +316,16 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   as a separate defect across several review rounds. Enumerating rejected spellings
   cannot close that class; not rewriting does. A noncanonical path drops, costing
   one `UNRESOLVED`.
+- Hint paths are not normalized either. `validate_hints` folded `\` to `/` and stripped
+  `./`, and git tracks `policy\choice.py` distinctly from `policy/choice.py`, so a
+  caller hinting the former sent BOTH deciders to a different file's bytes — invisibly,
+  because the attester is shown the path the server resolved, not the one the caller
+  wrote. Literal membership here too.
+- Snapshot path reads use `git ls-tree -z`. Without it `--name-only` quotes any path
+  containing a backslash, a quote, or a non-ASCII byte, and `core.quotePath=false` does
+  not suppress it — so the membership set held `"policy\\choice.py"` while a citation
+  carries the raw name, making every legitimate reference to such a file unresolvable.
+  That was a latent break in the closure below rather than a new one.
 - The same rule reaches the one boundary where the string is repository data rather
   than model output: a **symlink target containing `..` fails closed**. Interpreting
   it lexically diverges from the worktree as soon as an earlier component is itself

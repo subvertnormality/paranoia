@@ -266,11 +266,36 @@ def test_symlink_target_is_read_verbatim(repo: Path):
     assert links["alias.py"] == " spaced.py "
 
 
-def test_valid_hint_normalizes(repo: Path):
+def test_a_hint_path_is_used_verbatim(repo: Path):
     commit = snapshot(repo)
-    assert evidence.validate_hints(repo, commit, [{"path": "./app.py", "reason": "the writer"}]) == [
+    assert evidence.validate_hints(repo, commit, [{"path": "app.py", "reason": "the writer"}]) == [
         {"path": "app.py", "reason": "the writer"}
     ]
+
+
+def test_a_hint_path_is_not_normalized(repo: Path):
+    """Round-3 blocker, and the same class as citation paths: every rewrite can map one
+    tracked file onto another. `./app.py` now errors rather than being folded."""
+    commit = snapshot(repo)
+    with pytest.raises(ArbitrationError, match="as spelled"):
+        evidence.validate_hints(repo, commit, [{"path": "./app.py"}])
+
+
+def test_a_backslash_hint_does_not_fold_onto_a_different_tracked_file(repo: Path):
+    """The concrete swap: git tracks both spellings as distinct files with different
+    bytes, and the attester is shown the path the SERVER resolved, so folding the
+    separator would steer both deciders invisibly."""
+    (repo / "policy").mkdir()
+    (repo / "policy" / "choice.py").write_text("FORWARD\n")
+    (repo / "policy\\choice.py").write_text("BACKSLASH\n")
+    commit_all(repo, "both spellings")
+    commit = snapshot(repo)
+    assert evidence.validate_hints(
+        repo, commit, [{"path": "policy\\choice.py"}]
+    ) == [{"path": "policy\\choice.py", "reason": ""}]
+    assert evidence.validate_hints(
+        repo, commit, [{"path": "policy/choice.py"}]
+    ) == [{"path": "policy/choice.py", "reason": ""}]
 
 
 @pytest.mark.parametrize("bad", ["/etc/hostname", "../outside.py", "missing.py"])
@@ -538,3 +563,32 @@ def test_a_dotdot_target_does_not_reject_the_whole_run(repo: Path):
     (repo / "pkg" / "link.py").symlink_to("../shared/x.py")
     commit_all(repo, "upward but inside")
     assert evidence.escaping_symlinks(repo, snapshot(repo)) == []
+
+
+def test_a_citation_to_a_path_git_would_quote_still_resolves(repo: Path):
+    """Latent break in the round-12 literal-membership closure, exposed by round 3:
+    `ls-tree --name-only` QUOTES paths containing a backslash or non-ASCII byte, so the
+    membership set held `"policy\\\\choice.py"` while a citation carries the raw name.
+    Every legitimate reference to such a file was therefore unresolvable — the opposite
+    of what the literal match is for. `-z` makes the read byte-faithful."""
+    (repo / "policy").mkdir()
+    (repo / "policy" / "choice.py").write_text("FORWARD\n" * 10)
+    (repo / "policy\\choice.py").write_text("BACKSLASH\n" * 10)
+    (repo / "café.py").write_text("UNICODE\n" * 10)
+    commit_all(repo, "paths git quotes")
+    commit = snapshot(repo)
+
+    paths = evidence.tree_paths(repo, commit)
+    assert "policy\\choice.py" in paths and "policy/choice.py" in paths
+    assert "café.py" in paths
+    assert not any(p.startswith('"') for p in paths), "no path may come back quoted"
+
+    links = evidence.LinkResolver(repo, commit, evidence.symlink_map(repo, commit))
+    for path, want in (("policy\\choice.py", "BACKSLASH"),
+                       ("policy/choice.py", "FORWARD"),
+                       ("café.py", "UNICODE")):
+        got = evidence.resolve_citation(
+            repo, Citation(path, 3), snapshot=commit, links=links, context=1
+        )
+        assert got, f"{path} should resolve"
+        assert want in got[1], f"{path} resolved to the wrong file's bytes"
