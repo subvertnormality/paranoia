@@ -290,8 +290,22 @@ def _normalize_path(path: str) -> str:
     navigate, so rejecting is both simpler and safer than a component-wise
     symlink-aware walk.
     """
+    if path.startswith("/"):
+        raise ArbitrationError(
+            f"citation path must be repo-relative, not absolute: {path!r}"
+        )
+    if "\\" in path:
+        # Git tree paths always use '/', so a backslash is a literal character in a
+        # filename. Rewriting it to '/' would map `policy\choice.py` — a legal and
+        # distinct POSIX file — onto `policy/choice.py`, letting a decider read one
+        # file while the server validated another.
+        raise ArbitrationError(
+            f"citation path must not contain a backslash: {path!r}"
+        )
+    if ":" in path:
+        raise ArbitrationError(f"citation path must not contain a colon: {path!r}")
     parts: list[str] = []
-    for seg in path.replace("\\", "/").split("/"):
+    for seg in path.split("/"):
         if seg in ("", "."):
             continue
         if seg == "..":

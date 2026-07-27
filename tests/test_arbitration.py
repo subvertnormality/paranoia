@@ -654,3 +654,22 @@ def test_citations_containing_dotdot_are_dropped(path):
 def test_dot_segments_are_still_stripped():
     (c,) = arb.parse_citations("./pkg/./mod.py:4")
     assert c.path == "pkg/mod.py"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/etc/policy.py", "//host/share/x.py", "policy\\choice.py", "C:\\repo\\x.py"],
+)
+def test_absolute_and_backslash_paths_are_dropped(path):
+    """Round-7 blocker, the same class as `..`: rewriting a backslash to '/' maps
+    `policy\\choice.py` — a legal, distinct POSIX file — onto `policy/choice.py`, and
+    stripping a leading '/' maps `/etc/policy.py` onto tracked `etc/policy.py`. Either
+    lets a decider read one file while the server validates another."""
+    assert arb.parse_citations(f"{path}:4") == ()
+
+
+def test_two_distinct_spellings_cannot_resolve_to_one_region():
+    slashed = arb.parse_citations("policy/choice.py:4")
+    backslashed = arb.parse_citations("policy\\choice.py:4")
+    assert len(slashed) == 1
+    assert backslashed == ()  # dropped, never folded onto the other file

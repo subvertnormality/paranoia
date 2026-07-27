@@ -272,8 +272,12 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   substantiating a vote, and carrying into round 2, evidence the decider never
   read. The commit identity is part of the region key, the carried evidence, and
   the audit record.
-- Normalized: `./` stripped, resolved relative to repo root. A `..` segment is
-  **rejected**, never collapsed: with a directory symlink `alias -> sub/dir`, the
+- Normalized: `./` stripped only. A citation must be a repo-relative git tree
+  path: absolute, UNC, drive-qualified and backslash-containing paths are
+  **rejected**, because rewriting them maps one tracked file onto another —
+  `policy\choice.py` is a legal POSIX file distinct from `policy/choice.py`, and
+  `/etc/policy.py` would fold onto tracked `etc/policy.py`. A `..` segment is
+  likewise **rejected**, never collapsed: with a directory symlink `alias -> sub/dir`, the
   worktree reads `alias/../f.py` as `sub/f.py` while lexical collapsing yields root
   `f.py`, so the server would carry and substantiate against a different file than
   the decider read.
