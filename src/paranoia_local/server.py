@@ -193,7 +193,13 @@ TOOLS: list[Tool] = [
             "counterbalanced option order under its own opaque labels. Python computes the "
             "verdict: CONVERGED only on a unanimous, unblocked, evidence-substantiated choice. "
             "On divergence it runs one fact-only reconciliation round, and only when there is "
-            "novel evidence to carry. Up to 8 agent turns across both subscriptions."
+            "novel evidence to carry. Up to 8 agent turns across both subscriptions. "
+            "SHAPE THE INPUT LIKE THIS: put every shared fact and the FULL specification of "
+            "whatever only one option adopts into `context`, prefaced as 'the rules under "
+            "consideration, if adopted'; leave each option statement to say only how much of it "
+            "is adopted and what follows. Options then describe scope-of-adoption rather than "
+            "one describing mechanism and the other its absence, so they equalize naturally "
+            "(~800 chars each is typical). Framing bounds are checked before anything is spent."
         ),
         inputSchema={
             "type": "object",
@@ -204,7 +210,7 @@ TOOLS: list[Tool] = [
                 },
                 "decision": {
                     "type": "string",
-                    "description": "What is being decided, and every property that bears on it. State it neutrally; your own recommendation will be stripped, and including it only wastes a cleaning round.",
+                    "description": "What is being decided, and the properties that bear on it — NOT the evidence for it, which belongs in `context` (max 2500 chars). State it neutrally; your own recommendation will be stripped, and including it only wastes a cleaning round.",
                 },
                 "options": {
                     "type": "array",
@@ -214,14 +220,14 @@ TOOLS: list[Tool] = [
                         "type": "object",
                         "properties": {
                             "id": {"type": "string", "description": "Stable id — the vocabulary of the record. Never shown to a decider."},
-                            "statement": {"type": "string", "description": "What this option is. Self-contained: never reference another option by id, since the two deciders see different orders."},
+                            "statement": {"type": "string", "description": "What this option is (max 1200 chars, and no option may be more than 2x the length of the shortest — asymmetric detail is an argument regardless of wording). Say only what this option adopts and what follows; hoist the shared mechanism into `context`. Self-contained: never reference another option by id, since the two deciders see different orders."},
                         },
                         "required": ["id", "statement"],
                     },
                     "description": "2-4 mutually exclusive options, each with a caller-stable id. Array order is irrelevant — canonical order is derived by sorting ids.",
                 },
                 "stakes": _STAKES_REQUIRED,
-                "context": {"type": "string", "description": "Background the deciders need. Neutralized before they see it."},
+                "context": {"type": "string", "description": "Background the deciders need, and the designated home for detail: the shared facts, and the full specification of whatever only one option adopts (max 20000 chars). Not per-option, so its length cannot be a vote between options. Neutralized before they see it.",},
                 "files": {
                     "type": "array",
                     "items": {

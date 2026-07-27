@@ -737,3 +737,130 @@ def test_a_single_decisive_citation_parses():
 def test_decisive_none_parses_as_no_citation():
     p = _pres()
     assert arb.parse_verdict(trailer(p.items[0][0], decisive="NONE"), p).decisive is None
+
+
+# --- field-report fixes (issue #8) -------------------------------------------
+
+
+def test_a_vendor_that_held_its_selection_substantiates_on_its_own_evidence():
+    """Issue #8, top bug. The round-2 carried-grounding rule is anti-CAPITULATION,
+    so it belongs only to a vendor whose selection CHANGED. Applied to one that held
+    its round-1 position, the only region it could ground in was the other vendor's
+    argument for the option it rejected — so a unanimous, correctly-cited verdict
+    came back UNRESOLVED."""
+    held = vote("claude", "B", decisive=Citation("scripts/lib/writer.py", 184))
+    moved = vote("codex", "B", decisive=Citation("data/manifest.json", 436))
+    carried = {
+        # what each vendor gained from the other
+        "claude": [region("tests/test_writer.py", 929)],
+        "codex": [region("data/manifest.json", 436)],
+    }
+    sub = arb.substantiation(
+        [held, moved],
+        resolve=lambda c: region(c.path, c.line),
+        carried=carried,
+        moved={"codex"},
+    )
+    assert sub == {"claude": True, "codex": True}
+
+
+def test_a_vendor_that_flipped_still_needs_carried_grounding():
+    """The purpose survives intact: a flip onto evidence nobody carried is exactly
+    the unsubstantiated capitulation the gate exists to catch."""
+    flipped = vote("codex", "B", decisive=Citation("unrelated.py", 7))
+    held = vote("claude", "B", decisive=Citation("own.py", 3))
+    sub = arb.substantiation(
+        [flipped, held],
+        resolve=lambda c: region(c.path, c.line),
+        carried={"codex": [region("data/manifest.json", 436)], "claude": []},
+        moved={"codex"},
+    )
+    assert sub == {"codex": False, "claude": True}
+
+
+def test_both_vendors_swapping_positions_both_need_carried_grounding():
+    a = vote("codex", "B", decisive=Citation("carried_a.py", 5))
+    b = vote("claude", "A", decisive=Citation("nowhere.py", 5))
+    sub = arb.substantiation(
+        [a, b],
+        resolve=lambda c: region(c.path, c.line),
+        carried={"codex": [region("carried_a.py", 5)], "claude": [region("carried_b.py", 5)]},
+        moved={"codex", "claude"},
+    )
+    assert sub == {"codex": True, "claude": False}
+
+
+def test_a_held_selection_still_needs_a_citation_that_resolves():
+    """Relaxing the rule must not relax it to nothing."""
+    held = vote("claude", "B", decisive=Citation("gone.py", 4))
+    sub = arb.substantiation(
+        [held], resolve=lambda c: None, carried={"claude": []}, moved=set()
+    )
+    assert sub == {"claude": False}
+
+
+def test_preflight_rejects_unequal_option_lengths_before_spending_a_cleaner_call():
+    """Issue #8 fix 5: three of four field invocations burned two Opus attempts each
+    on defects visible in the input alone."""
+    with pytest.raises(arb.ArbitrationError) as exc:
+        arb.preflight_framing(
+            decision="d",
+            context="",
+            options=(Option("A_only", "x" * 400), Option("B_plus", "y" * 1300)),
+        )
+    msg = str(exc.value)
+    assert "not equalized" in msg and "1300" in msg and "400" in msg
+    # and it must teach the remedy, not just the bound
+    assert "context" in msg.lower()
+
+
+def test_preflight_rejects_an_over_long_option_statement():
+    with pytest.raises(arb.ArbitrationError) as exc:
+        arb.preflight_framing(
+            decision="d", context="",
+            options=(Option("A", "x" * 3000), Option("B", "y" * 3000)),
+        )
+    assert "option statement" in str(exc.value)
+    assert str(arb.MAX_OPTION_CHARS) in str(exc.value)
+
+
+def test_preflight_rejects_an_over_long_decision():
+    with pytest.raises(arb.ArbitrationError) as exc:
+        arb.preflight_framing(
+            decision="d" * 5000, context="",
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+        )
+    assert "decision" in str(exc.value) and str(arb.MAX_DECISION_CHARS) in str(exc.value)
+
+
+def test_preflight_accepts_the_hoisted_shape_that_worked_in_the_field():
+    """The shape the field report converged on: shared mechanism in context, each
+    option stating only scope-of-adoption. ~780 vs ~810 chars."""
+    arb.preflight_framing(
+        decision="How far should the fix go?" * 3,
+        context="The rules under consideration, if adopted: " + "spec. " * 800,
+        options=(Option("A_only", "x" * 780), Option("B_plus", "y" * 810)),
+    )
+
+
+def test_preflight_allows_a_long_context_because_it_is_the_hoist_target():
+    arb.preflight_framing(
+        decision="d", context="c" * (arb.MAX_CONTEXT_CHARS - 1),
+        options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+    )
+    with pytest.raises(arb.ArbitrationError) as exc:
+        arb.preflight_framing(
+            decision="d", context="c" * (arb.MAX_CONTEXT_CHARS + 1),
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+        )
+    assert "context" in str(exc.value)
+
+
+def test_option_objects_reject_unknown_keys():
+    """Issue #8 fix 8: a stray "x" key was silently accepted and ignored."""
+    with pytest.raises(arb.ArbitrationError) as exc:
+        arb.validate_options([
+            {"id": "A", "statement": "a", "x": "typo"},
+            {"id": "B", "statement": "b"},
+        ])
+    assert "x" in str(exc.value)
