@@ -767,3 +767,21 @@ def test_no_scratch_directories_are_leaked(repo: Path, tmp_path: Path):
     run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
     after = set(glob.glob(str(Path(tempfile.gettempdir()) / "paranoia-txt-*")))
     assert after == before
+
+
+def test_two_spellings_of_one_commit_do_not_manufacture_novelty(repo: Path, tmp_path: Path):
+    """The gate must see one region, so round 2 is withheld rather than run on
+    identical bytes carried twice."""
+    head = git(["rev-parse", "HEAD"], repo).strip()
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda e, r: picks.get((e, r), "opt-float"),
+        extra={
+            ("codex", 1): {"decisive": f"{head[:7]}@app.py:4"},
+            ("claude", 1): {"decisive": f"{head[:12]}@app.py:4"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert trailer_field(report, "ROUNDS") == "1"
+    assert "withheld" in report

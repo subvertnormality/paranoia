@@ -335,3 +335,43 @@ def test_link_resolver_caches_per_commit(repo: Path):
     resolver = evidence.LinkResolver(repo, commit, {"x": "y"})
     assert resolver.for_commit(commit) == {"x": "y"}
     assert resolver.for_commit("deadbeef") == {}  # unreachable commit degrades to empty
+
+
+def test_equivalent_commit_spellings_are_one_region(repo: Path):
+    """Round-2 blocker: keying on the supplied spelling made `abc1234@f:1` and
+    `abc1234def@f:1` two regions, so each vendor 'gained' the other's spelling and
+    round 2 carried identical bytes twice."""
+    old = orientation.resolve_head(repo)
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    short, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=old[:7]), snapshot=commit, links=resolver, context=1
+    )
+    longer, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=old[:12]), snapshot=commit, links=resolver, context=1
+    )
+    full, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=old), snapshot=commit, links=resolver, context=1
+    )
+    assert short.key == longer.key == full.key
+    assert short.commit == old
+
+
+def test_bare_and_explicitly_prefixed_snapshot_citations_are_one_region(repo: Path):
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    bare, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
+    )
+    prefixed, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=commit[:8]), snapshot=commit, links=resolver, context=1
+    )
+    assert bare.key == prefixed.key
+
+
+def test_unresolvable_revision_drops(repo: Path):
+    commit = snapshot(repo)
+    assert evidence.resolve_citation(
+        repo, Citation("app.py", 1, commit="0123456"), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=1,
+    ) is None

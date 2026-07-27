@@ -202,27 +202,47 @@ def _blob(repo: Path, commit: str, path: str) -> str | None:
 
 
 class LinkResolver:
-    """Symlink maps per commit, built lazily and cached.
+    """Per-commit lookups a citation needs, resolved once and cached: the full
+    object id of whatever revision it named, and that commit's symlink map.
 
-    A revision-prefixed citation resolves in ITS OWN commit, so it needs that
-    commit's symlink map — using the snapshot's (or skipping canonicalization, as
-    an earlier version did) would carry a symlink's target string as though it were
-    source and key an alias separately from its referent.
+    Both matter for *region identity*, which is what the round-2 novelty gate and
+    substantiation key on.
+
+    - **Full oid.** A revision is spelled many ways — `8a8877f`, `8a8877f1f4a8`, or
+      omitted entirely for the snapshot. Keying on the string as supplied makes two
+      spellings of one commit two regions, so each vendor "gains" the other's
+      spelling, round 2 carries identical bytes twice, and quoting the alternate
+      spelling substantiates a vote that reconciled nothing.
+    - **Symlink map.** A revision-prefixed citation resolves in ITS OWN commit, so
+      it needs that commit's map; the snapshot's would not describe it.
     """
 
     def __init__(self, repo: Path, snapshot: str, snapshot_links: dict[str, str] | None = None):
         self._repo = repo
-        self._cache: dict[str, dict[str, str]] = {}
+        self._links: dict[str, dict[str, str]] = {}
+        self._oids: dict[str, str | None] = {}
+        self._snapshot = snapshot
         if snapshot_links is not None:
-            self._cache[snapshot] = snapshot_links
+            self._links[snapshot] = snapshot_links
+
+    def oid(self, rev: str) -> str | None:
+        """`rev` as its full commit id, or None if it does not resolve."""
+        if rev not in self._oids:
+            r = subprocess.run(
+                ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
+                cwd=self._repo, capture_output=True,
+            )
+            out = r.stdout.decode("utf-8", errors="replace").strip()
+            self._oids[rev] = out if r.returncode == 0 and out else None
+        return self._oids[rev]
 
     def for_commit(self, commit: str) -> dict[str, str]:
-        if commit not in self._cache:
+        if commit not in self._links:
             try:
-                self._cache[commit] = symlink_map(self._repo, commit)
+                self._links[commit] = symlink_map(self._repo, commit)
             except RuntimeError:
-                self._cache[commit] = {}
-        return self._cache[commit]
+                self._links[commit] = {}
+        return self._links[commit]
 
 
 def resolve_citation(
@@ -239,8 +259,13 @@ def resolve_citation(
     then read. Doing it the other way keys aliases as distinct regions and carries
     a symlink's target string as though it were source.
     """
-    commit = citation.commit or snapshot
     resolver = links if isinstance(links, LinkResolver) else LinkResolver(repo, snapshot, links)
+    # Canonicalize the REVISION before anything else, so two spellings of one commit
+    # — and a bare citation versus an explicitly snapshot-prefixed one — are one
+    # region rather than two.
+    commit = resolver.oid(citation.commit or snapshot)
+    if commit is None:
+        return None
     path = canonical_path(citation.path, resolver.for_commit(commit))
     if path is None:
         return None
