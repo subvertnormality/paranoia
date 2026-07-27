@@ -272,7 +272,11 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   substantiating a vote, and carrying into round 2, evidence the decider never
   read. The commit identity is part of the region key, the carried evidence, and
   the audit record.
-- Normalized: `./` stripped, resolved relative to repo root, canonicalized.
+- Normalized: `./` stripped, resolved relative to repo root. A `..` segment is
+  **rejected**, never collapsed: with a directory symlink `alias -> sub/dir`, the
+  worktree reads `alias/../f.py` as `sub/f.py` while lexical collapsing yields root
+  `f.py`, so the server would carry and substantiate against a different file than
+  the decider read.
 - The revision is resolved to its **full commit id**, and the path is
   **canonicalized through that commit's symlink graph**, before anything else.
 - Must resolve in the snapshot (`git cat-file -e`) with `1 ≤ line ≤ EOF`.

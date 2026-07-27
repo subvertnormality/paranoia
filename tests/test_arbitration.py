@@ -637,3 +637,20 @@ def test_regions_from_one_commit_still_merge():
     assert len(merged) == 1
     assert (merged[0].lo, merged[0].hi) == (5, 22)
     assert len(merged[0].line_digests) == 18
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["../escape.py", "a/../b.py", "alias/../f.py", "pkg/sub/../../x.py"],
+)
+def test_citations_containing_dotdot_are_dropped(path):
+    """Round-6 finding: collapsing `..` lexically disagrees with the filesystem
+    whenever a directory symlink is involved — `alias/../f.py` reads `sub/f.py` in
+    the worktree but normalized to root `f.py`, so the server would substantiate
+    against a different file than the decider read."""
+    assert arb.parse_citations(f"{path}:4") == ()
+
+
+def test_dot_segments_are_still_stripped():
+    (c,) = arb.parse_citations("./pkg/./mod.py:4")
+    assert c.path == "pkg/mod.py"

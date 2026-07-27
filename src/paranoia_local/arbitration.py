@@ -280,15 +280,24 @@ _CITATION_RE = re.compile(
 
 
 def _normalize_path(path: str) -> str:
+    """Strip `./` and collapse separators. A `..` segment is REJECTED, not resolved.
+
+    Collapsing `..` lexically disagrees with how the filesystem resolves it whenever
+    a directory symlink is involved: with `alias -> sub/dir`, the decider's worktree
+    reads `alias/../f.py` as `sub/f.py`, while `parts.pop()` would normalize it to
+    root `f.py`. The server would then carry, and substantiate against, a different
+    file than the decider actually read. A citation names a file; it has no reason to
+    navigate, so rejecting is both simpler and safer than a component-wise
+    symlink-aware walk.
+    """
     parts: list[str] = []
     for seg in path.replace("\\", "/").split("/"):
         if seg in ("", "."):
             continue
         if seg == "..":
-            if not parts:
-                raise ArbitrationError(f"citation path escapes the repository: {path!r}")
-            parts.pop()
-            continue
+            raise ArbitrationError(
+                f"citation path must not contain '..': {path!r} — cite the file directly"
+            )
         parts.append(seg)
     if not parts:
         raise ArbitrationError(f"citation path is empty: {path!r}")

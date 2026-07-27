@@ -434,3 +434,22 @@ def test_a_change_outside_the_cited_window_is_still_one_region(repo: Path):
     )
     assert now.commit != before.commit
     assert same_region(now, before)
+
+
+def test_directory_symlink_with_dotdot_cannot_substitute_evidence(repo: Path):
+    """Round-6 finding, end to end: `alias/../f.py` resolves to `sub/f.py` in the
+    worktree but would normalize to root `f.py`. The citation is dropped instead."""
+    (repo / "sub").mkdir()
+    (repo / "sub" / "dir").mkdir()
+    (repo / "sub" / "f.py").write_text("SUBDIR VERSION\n" * 5)
+    (repo / "f.py").write_text("ROOT VERSION\n" * 5)
+    (repo / "alias").symlink_to("sub/dir")
+    commit_all(repo, "dir symlink")
+    commit = snapshot(repo)
+
+    # what the worktree would resolve
+    assert (repo / "alias" / ".." / "f.py").resolve() == (repo / "sub" / "f.py").resolve()
+    # and the citation never reaches a region at all
+    from paranoia_local.arbitration import parse_citations
+
+    assert parse_citations("alias/../f.py:2") == ()
