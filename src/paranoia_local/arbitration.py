@@ -350,6 +350,24 @@ def parse_citations(field: str, *, limit: int = MAX_CITATIONS) -> tuple[Citation
     return tuple(out)
 
 
+def parse_decisive_citation(field: str) -> tuple[Citation, ...]:
+    """Exactly `NONE`, or exactly ONE citation. Anything else substantiates nothing.
+
+    Reusing the list parser with `limit=1` silently took the first entry, so
+    `DECISIVE-CITATION: novel.py:20, own.py:10` parsed as `novel.py:20` alone. In
+    round 2 a decider could put the carried novel region first and its own prior
+    reason second, satisfy `anchor_within`, and have an ambiguous vote reported as
+    reconciled. This field is the one thing substantiation rests on, so it is
+    all-or-nothing.
+    """
+    text = (field or "").strip()
+    if not text or text.upper() == "NONE":
+        return ()
+    if "," in text or len(text.split()) != 1:
+        return ()
+    return parse_citations(text, limit=1)
+
+
 @dataclass(frozen=True)
 class Region:
     """The interval a citation actually carries, plus a digest per carried line.
@@ -618,7 +636,7 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
     new_option_raw = values["NEW-OPTION"].strip()
     new_option = None if new_option_raw.upper() == "NONE" or not new_option_raw else new_option_raw
 
-    decisive = parse_citations(values["DECISIVE-CITATION"], limit=1)
+    decisive = parse_decisive_citation(values["DECISIVE-CITATION"])
     return Vote(
         engine=presentation.engine,
         label=label,

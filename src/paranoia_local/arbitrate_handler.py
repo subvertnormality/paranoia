@@ -261,19 +261,32 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
             if neutrality is not None:
                 raise ArbitrationError("attestation gave two NEUTRALITY verdicts")
             body = line[len("NEUTRALITY:"):].strip()
-            if body.upper().startswith("PASS"):
+            # `PASS` must be the WHOLE value. A prefix match accepted
+            # "PASS but the wording favors option A" as a clean bill of health and
+            # stamped a demonstrably biased packet `attested`, sending that same
+            # bias to both deciders.
+            if body.upper() == "PASS":
                 neutrality = True
-            elif body.upper().startswith("FAIL"):
+            elif body.upper().startswith("FAIL") and body[len("FAIL"):].strip():
                 neutrality = False
                 note = body[len("FAIL"):].strip()
             else:
-                raise ArbitrationError(f"NEUTRALITY must be PASS or FAIL, got {body!r}")
+                raise ArbitrationError(
+                    f"NEUTRALITY must be exactly PASS, or FAIL with a note, got {body!r}"
+                )
         elif upper.startswith("STAKES-ADVOCACY:"):
             stakes_seen = True
             body = line[len("STAKES-ADVOCACY:"):].strip()
-            stakes = None if body.upper().startswith("NONE") else (
-                body[len("PRESENT"):].strip() or body
-            )
+            # Same reasoning: "NONE despite recommending A" is not NONE.
+            if body.upper() == "NONE":
+                stakes = None
+            elif body.upper().startswith("PRESENT") and body[len("PRESENT"):].strip():
+                stakes = body[len("PRESENT"):].strip()
+            else:
+                raise ArbitrationError(
+                    "STAKES-ADVOCACY must be exactly NONE, or PRESENT with the "
+                    f"advocating words, got {body!r}"
+                )
 
     missing = [f for f in expected if f not in fidelity]
     if missing:

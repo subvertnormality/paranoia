@@ -673,3 +673,35 @@ def test_two_distinct_spellings_cannot_resolve_to_one_region():
     backslashed = arb.parse_citations("policy\\choice.py:4")
     assert len(slashed) == 1
     assert backslashed == ()  # dropped, never folded onto the other file
+
+
+# --- DECISIVE-CITATION is all-or-nothing ------------------------------------
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "novel.py:20, own.py:10",       # two, the first would have been taken
+        "app.py:4 and also other.py:9",  # trailing commentary
+        "app.py:4,",                     # a stray comma
+        "not a citation",
+    ],
+)
+def test_multiple_or_malformed_decisive_citations_substantiate_nothing(field):
+    """Round-8 blocker: reusing the list parser with limit=1 silently took the first
+    entry, so a decider could put the carried novel region first and its own prior
+    reason second and have an ambiguous vote reported as reconciled."""
+    p = _pres()
+    v = arb.parse_verdict(trailer(p.items[0][0], decisive=field), p)
+    assert v.decisive is None
+
+
+def test_a_single_decisive_citation_parses():
+    p = _pres()
+    v = arb.parse_verdict(trailer(p.items[0][0], decisive="abc1234@pkg/mod.py:12"), p)
+    assert v.decisive == Citation("pkg/mod.py", 12, commit="abc1234")
+
+
+def test_decisive_none_parses_as_no_citation():
+    p = _pres()
+    assert arb.parse_verdict(trailer(p.items[0][0], decisive="NONE"), p).decisive is None

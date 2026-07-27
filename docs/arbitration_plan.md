@@ -635,6 +635,11 @@ NEUTRALITY: PASS | FAIL <which option the packet favours, and the words that do 
 STAKES-ADVOCACY: NONE | PRESENT <the advocating words>
 ```
 
+Verdicts are matched **exactly**: `PASS` and `NONE` must be the whole value, and
+`FAIL`/`PRESENT` must carry a note. A prefix match accepted
+`NEUTRALITY: PASS but the wording favors option A` as a clean bill of health and
+stamped a biased packet `attested` — sending that same bias to both deciders.
+
 Any `CHANGED` or `FAIL` → one cleaner retry with the attester's exact complaint;
 a second failure ends the run `FAILED` with complaint and packet returned.
 `STAKES-ADVOCACY: PRESENT` fails immediately to the caller — `stakes` is not the
@@ -679,6 +684,12 @@ context, recorded and carried but never sufficient.
 
 `NONE` parses in both fields, but it is not free: a converging vote whose
 `DECISIVE-CITATION` does not resolve cannot produce `CONVERGED`.
+
+**`DECISIVE-CITATION` is all-or-nothing.** Exactly `NONE`, or exactly one citation:
+two comma-separated values, or one with trailing commentary, substantiate nothing.
+Taking the first of several would let a round-2 decider list the carried novel
+region first and its own prior reason second and have an ambiguous vote reported as
+reconciled.
 
 `SELECTED-RISK` is each model's own severity tag against **its own pick**, so
 after agreement both have independently rated the winner. The blocker gate reads

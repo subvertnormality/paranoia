@@ -869,3 +869,39 @@ def test_retain_ref_is_not_created_when_refs_moved(repo: Path, tmp_path: Path):
     report = run(repo, Moving(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "refs/paranoia" not in git(["for-each-ref", "--format=%(refname)"], repo)
+
+
+@pytest.mark.parametrize(
+    "verdicts",
+    [
+        # a qualified PASS is not a pass
+        "NEUTRALITY: PASS but the wording favors option A\nSTAKES-ADVOCACY: NONE\n",
+        # a qualified NONE is not none
+        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE despite recommending A\n",
+        # FAIL with no note says nothing
+        "NEUTRALITY: FAIL\nSTAKES-ADVOCACY: NONE\n",
+        "NEUTRALITY: maybe\nSTAKES-ADVOCACY: NONE\n",
+    ],
+)
+def test_qualified_attestation_verdicts_are_not_accepted(repo: Path, tmp_path: Path, verdicts: str):
+    """Round-8 blocker: prefix matching let a demonstrably biased packet be stamped
+    `attested`, sending the same bias to both deciders."""
+    fidelity = (
+        "FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        "opt-float PRESERVED; opt-decimal PRESERVED\n"
+    )
+    agent = Agent(lambda e, r: "opt-float", attest=fidelity + verdicts)
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert all(c["cwd"] is None for c in agent.calls)  # never reached the deciders
+
+
+def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: Path, tmp_path: Path):
+    agent = Agent(
+        lambda e, r: "opt-float",
+        attest=("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+                "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
+                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"),
+    )
+    report = run(repo, agent, tmp_path)
+    assert "stakes text advocates" in report
