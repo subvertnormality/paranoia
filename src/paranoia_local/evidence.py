@@ -31,7 +31,18 @@ _MAX_SYMLINK_HOPS = 8
 SNAPSHOT_REF_PREFIX = "refs/paranoia/arbitrate"
 
 
-def _git(args: list[str], cwd: Path, *, check: bool = True) -> str:
+def _git(args: list[str], cwd: Path, *, check: bool = True, raw: bool = False) -> str:
+    """`raw=True` decodes with `surrogateescape` instead of `replace`.
+
+    For the NUL-delimited tree reads this is the difference between a faithful path set
+    and a lossy one: `replace` maps every undecodable byte to U+FFFD, so two distinct
+    filenames can collapse to one string and the set no longer describes the tree.
+    Since citation and hint paths are matched against that set literally, a collapsed
+    entry silently makes a real file unciteable. `surrogateescape` is round-trippable
+    and is already this repository's convention for filesystem bytes
+    (`orientation.py`). No caller- or model-supplied string can contain a lone
+    surrogate, so such a path simply never matches rather than matching the wrong file.
+    """
     r = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
     if r.returncode != 0:
         if not check:
@@ -39,7 +50,14 @@ def _git(args: list[str], cwd: Path, *, check: bool = True) -> str:
         raise RuntimeError(
             f"git {' '.join(args)} failed: {r.stderr.decode('utf-8', errors='replace').strip()}"
         )
-    return r.stdout.decode("utf-8", errors="replace")
+    return r.stdout.decode("utf-8", errors="surrogateescape" if raw else "replace")
+
+
+def printable(text: str) -> str:
+    """Surrogate-safe rendering for a path that reaches user-visible text — encoding a
+    lone surrogate to UTF-8 raises, and an error message must never be the thing that
+    crashes the run."""
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
 # --- ref movement -----------------------------------------------------------
@@ -75,8 +93,19 @@ def refs_digest(repo: Path) -> str:
 
 
 def tree_paths(repo: Path, commit: str) -> frozenset[str]:
-    out = _git(["ls-tree", "-r", "--name-only", commit], repo)
-    return frozenset(line for line in out.splitlines() if line)
+    """Every path in the snapshot, byte-faithfully.
+
+    `-z` is load-bearing, not a style choice. Without it `ls-tree --name-only` QUOTES
+    any path containing a backslash, a quote, or a non-ASCII byte —
+    `policy\\choice.py` comes back as `"policy\\\\choice.py"` — and `core.quotePath=false`
+    does not suppress it for this command. Since citation and hint paths are matched
+    against this set literally and never normalized, a quoted entry would make every
+    legitimate reference to such a file unresolvable, which is the failure the literal
+    match exists to avoid rather than cause. It also splits on NUL, so a path
+    containing a newline cannot forge two entries.
+    """
+    out = _git(["ls-tree", "-r", "--name-only", "-z", commit], repo, raw=True)
+    return frozenset(part for part in out.split("\0") if part)
 
 
 def symlink_map(repo: Path, commit: str) -> dict[str, str]:
@@ -87,9 +116,12 @@ def symlink_map(repo: Path, commit: str) -> dict[str, str]:
     contents, so an uncanonicalized alias citation would carry a filename as
     though it were source, and would key as a different region from its referent.
     """
-    out = _git(["ls-tree", "-r", commit], repo)
+    # `-z` for the same reason as `tree_paths`: a quoted key would never match the
+    # verbatim path a citation carries, so an aliased file would silently stop being
+    # canonicalized.
+    out = _git(["ls-tree", "-r", "-z", commit], repo, raw=True)
     links: dict[str, str] = {}
-    for line in out.splitlines():
+    for line in out.split("\0"):
         if not line:
             continue
         meta, _, path = line.partition("\t")
@@ -370,18 +402,29 @@ def validate_hints(repo: Path, commit: str, hints: list[dict]) -> list[dict]:
     present = tree_paths(repo, commit)
     out: list[dict] = []
     for hint in hints:
-        raw = str(hint.get("path", "")).strip()
-        if not raw:
+        # NOT stripped: " spaced.py " and "spaced.py" are two tracked files, and
+        # trimming one onto the other is the same substitution the rest of this module
+        # refuses to make.
+        raw = str(hint.get("path", ""))
+        if not raw.strip():
             raise ArbitrationError("a file hint has no path")
         if raw.startswith("/") or ".." in raw.split("/"):
             raise ArbitrationError(
                 f"file hint {raw!r} must be a repo-relative path inside the snapshot"
             )
-        norm = "/".join(seg for seg in raw.replace("\\", "/").split("/") if seg not in ("", "."))
-        if norm not in present:
+        # NOT normalized, for the same reason citation paths are not (see
+        # `arbitration._normalize_path`): every rewrite can map one tracked file onto
+        # another. `policy\\choice.py` is a legal POSIX filename that git tracks
+        # distinctly from `policy/choice.py`, so folding the separator would send BOTH
+        # deciders to a different file's bytes — and since the attester is shown the
+        # path the server resolved, not the one the caller wrote, the swap is invisible
+        # to it. Literal tree membership, and a caller using `./` or a backslash as an
+        # alias gets an error naming the exact path to write instead.
+        if raw not in present:
             raise ArbitrationError(
-                f"file hint {norm!r} is not in the snapshot "
-                "(ignored/untracked files are not captured)"
+                f"file hint {raw!r} is not in the snapshot as spelled "
+                "(paths are used verbatim and must match a tracked path exactly; "
+                "ignored/untracked files are not captured)"
             )
-        out.append({"path": norm, "reason": str(hint.get("reason", "")).strip()})
+        out.append({"path": raw, "reason": str(hint.get("reason", "")).strip()})
     return out

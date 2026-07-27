@@ -108,7 +108,9 @@ def _snapshot(repo: Path) -> str:
 _BLOCK_RE = re.compile(r"^===\s*(?P<name>[A-Z]+)\s*===\s*$")
 
 
-def parse_cleaned_packet(text: str, ids: Sequence[str]) -> dict[str, Any]:
+def parse_cleaned_packet(
+    text: str, ids: Sequence[str], *, caller_gave_context: bool = False
+) -> dict[str, Any]:
     """Parse the cleaner's blocks and enforce fidelity mechanically.
 
     The id set must round-trip 1:1. A "neutralizer" that quietly drops or merges an
@@ -155,10 +157,26 @@ def parse_cleaned_packet(text: str, ids: Sequence[str]) -> dict[str, Any]:
 
     return {
         "decision": "\n".join(blocks["DECISION"]).strip(),
-        "context": "\n".join(blocks.get("CONTEXT", [])).strip(),
+        "context": _cleaned_context(blocks.get("CONTEXT", []), caller_gave_context),
         "hints": parse_cleaned_hints(blocks.get("HINTS", [])),
         "statements": statements,
     }
+
+
+def _cleaned_context(lines: Sequence[str], caller_gave_context: bool) -> str:
+    """`CONTEXT: None.` is how the cleaner spells "the caller gave me none" — the same
+    sentinel the HINTS block uses, and treating it as content would make an absent
+    field look populated.
+
+    But it is only a sentinel when the caller supplied nothing. A caller whose context
+    legitimately *is* `None.` — the observed output of the thing being adjudicated, say
+    — must have it reach the deciders verbatim, so when context was supplied the block
+    is passed through untouched.
+    """
+    text = "\n".join(lines).strip()
+    if caller_gave_context:
+        return text
+    return "" if text.rstrip(".").strip().lower() in ("", "none", "n/a") else text
 
 
 def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
@@ -182,29 +200,46 @@ def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
 
 
 def check_length_bands(cleaned: Mapping[str, str], original: Mapping[str, str]) -> None:
-    """Both bands, numeric and symmetric.
+    """What the CLEANER is answerable for, which is not the same as what the caller is.
 
-    Across options `max/min <= 2.0`, because asymmetric detail is an argument
-    regardless of wording; per option `0.5 <= cleaned/original <= 2.0`, because a
-    statement that doubles or halves has probably changed substance. Stated
-    intention to equalize is not equalization.
+    The caller's own inter-option ratio is bounded at preflight
+    (`arb.preflight_framing`). What remains here is that the cleaner must not make the
+    asymmetry *worse* than the framing it was handed — equalized input coming back
+    skewed is the cleaner introducing a length vote.
+
+    There is deliberately **no lower bound** on how far a statement may compress.
+    Issue #8: an option whose text was largely consequence-narration ("Outcome under
+    this option: …") was cut to 0.09x and rejected, though the meaning was intact —
+    the cleaner had correctly identified restatement as compressible. A character
+    ratio cannot tell dropped substance from dropped padding; the cross-vendor
+    fidelity attestation can, and it checks exactly that, per option, by id. The floor
+    was a cheap proxy for a check that already exists in stronger form.
+
+    Growth keeps its ceiling: a statement that doubles has gained content from
+    somewhere, and the id-set check cannot see added prose inside a preserved id.
     """
-    lengths = {k: max(1, len(v)) for k, v in cleaned.items()}
-    if lengths and max(lengths.values()) / min(lengths.values()) > 2.0:
-        longest = max(lengths, key=lengths.get)
-        shortest = min(lengths, key=lengths.get)
-        raise ArbitrationError(
-            "cleaned options are not equalized: "
-            f"{longest} is {lengths[longest]} chars, {shortest} is {lengths[shortest]} "
-            "(ratio must be <= 2.0)"
-        )
-    for oid, text in cleaned.items():
-        before = max(1, len(original.get(oid, "")))
-        ratio = max(1, len(text)) / before
-        if not (0.5 <= ratio <= 2.0):
+    cleaned_lengths = {k: max(1, len(v)) for k, v in cleaned.items()}
+    orig_lengths = {k: max(1, len(v)) for k, v in original.items()}
+    if cleaned_lengths:
+        got = max(cleaned_lengths.values()) / min(cleaned_lengths.values())
+        allowed = arb.OPTION_RATIO_MAX
+        if orig_lengths:
+            allowed = max(allowed, max(orig_lengths.values()) / min(orig_lengths.values()))
+        if got > allowed:
+            longest = max(cleaned_lengths, key=cleaned_lengths.get)
+            shortest = min(cleaned_lengths, key=cleaned_lengths.get)
             raise ArbitrationError(
-                f"cleaned option {oid} is {ratio:.2f}x its original length "
-                "(must be between 0.5x and 2.0x)"
+                "the cleaner left the options less equalized than the framing it was "
+                f"given: {longest} is {cleaned_lengths[longest]} chars, {shortest} is "
+                f"{cleaned_lengths[shortest]} (ratio {got:.2f}, allowed {allowed:.2f})"
+            )
+    for oid, text in cleaned.items():
+        before = orig_lengths.get(oid, 1)
+        ratio = max(1, len(text)) / before
+        if ratio > 2.0:
+            raise ArbitrationError(
+                f"cleaned option {oid} is {ratio:.2f}x its original length — the "
+                "cleaner may compress, but not add (max 2.0x)"
             )
 
 
@@ -451,6 +486,26 @@ def arbitrate(
         # A failure still returns the full trailer. "Every field is always present"
         # must hold on the error path too, or a caller that parses `ARBITRATION:`
         # gets nothing and has to fall back to reading prose.
+        #
+        # It also still writes an audit record. The first production run rejected three
+        # framings and left nothing on disk, so gate churn could only be reconstructed
+        # from terminal scrollback (issue #8, fix 7). A rejection is the cheapest thing
+        # this tool produces and the most useful thing to count.
+        audit = logs.write_log(
+            log_dir,
+            tool="arbitrate",
+            record={
+                "outcome": arb.FAILED,
+                "reason": str(exc),
+                "gate": type(exc).__name__,
+                "rounds": [],
+                "raw_input": {
+                    k: arguments.get(k)
+                    for k in ("decision", "options", "context", "stakes", "files")
+                },
+            },
+            timestamp=now(),
+        )
         return "\n".join(
             [
                 "# Arbitration: FAILED",
@@ -464,7 +519,7 @@ def arbitrate(
                     snapshot="none",
                     seed=str(arguments.get("order_seed") or "none"),
                     refs_moved=False,
-                    audit="none",
+                    audit=str(audit) if audit else "none",
                     rounds=0,
                 ),
             ]
@@ -503,6 +558,13 @@ def _arbitrate(
     effort = resolve("effort", arguments.get("effort"), cfg, "medium")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
+    # Input-only defects, checked before a single agent call: three of the first four
+    # production invocations died after two Opus attempts each on exactly these
+    # measurements (issue #8, fix 5).
+    arb.preflight_framing(
+        decision=decision, context=context, options=canonical, cleaned=do_clean
+    )
+
     _preflight(deciders)
 
     progress("snapshotting the working tree")
@@ -531,7 +593,8 @@ def _arbitrate(
     if escaping:
         raise ArbitrationError(
             "snapshot contains symlink(s) whose target escapes the repository, so the "
-            f"deciders could read unrecorded bytes: {', '.join(escaping)}"
+            "deciders could read unrecorded bytes: "
+            + ", ".join(evidence.printable(e) for e in escaping)
         )
     hints = evidence.validate_hints(repo, snapshot, list(arguments.get("files") or []))
 
@@ -627,8 +690,22 @@ def _arbitrate(
             transcripts.append(casts2)
             per_round.append({v.engine: v for v in round2})
             gained = {e: arb.gains_for(e, sent, own[e]) for e in own}
+            # Carried grounding is anti-capitulation, so it is owed only by a vendor
+            # whose selection actually moved (issue #8).
+            first = {v.engine: v.selected for v in round1}
+            moved = {v.engine for v in round2 if first.get(v.engine) != v.selected}
+            # Waiving carried grounding rests on the held position ALREADY being
+            # substantiated in round 1. A vendor that reached round 2 without a
+            # resolving decisive citation has no such standing, so it must ground in
+            # gained evidence like a mover: otherwise a vote that was never
+            # substantiated at all rides to CONVERGED on a citation that merely
+            # resolves, while the other vendor moves onto its supporting region.
+            moved |= {v.engine for v in round2 if not sub1.get(v.engine, False)}
             sub2 = arb.substantiation(
-                round2, resolve=resolve_region, carried={e: list(g) for e, g in gained.items()}
+                round2,
+                resolve=resolve_region,
+                carried={e: list(g) for e, g in gained.items()},
+                moved=moved,
             )
             outcome = arb.compute_outcome(round2, substantiated=sub2)
             rounds = 2
@@ -804,6 +881,16 @@ def _clean_and_attest(
             "skipped",
         )
 
+    # Only fields the caller supplied are attestable. Naming `context` when none was
+    # passed produced `fidelity changed: ['context']` on the first production run —
+    # an error about a field the caller had no control over (issue #8, fix 4).
+    attest_fields = ["decision"]
+    if context:
+        attest_fields.append("context")
+    if hints:
+        attest_fields.append("hints")
+    attest_fields.extend(originals)
+
     complaint = ""
     last_error: str | None = None
     # One retry only, and deliberately: a longer loop would hill-climb the framing
@@ -818,7 +905,24 @@ def _clean_and_attest(
             timeout=CLEAN_TIMEOUT_SEC, text_only=True,
         )
         try:
-            parsed = parse_cleaned_packet(cleaned_raw, list(originals))
+            parsed = parse_cleaned_packet(
+                cleaned_raw, list(originals), caller_gave_context=bool(context)
+            )
+            if context and not parsed["context"]:
+                # Dropping a supplied context is invisible downstream: rendered back to
+                # the attester as "None." it matches a caller context that also reads
+                # "None.", so fidelity passes while the deciders receive nothing.
+                raise ArbitrationError(
+                    "the cleaner dropped the supplied context block; it may neutralize "
+                    "the context but not remove it"
+                )
+            if parsed["context"] and not context:
+                # A context the caller never wrote is the cleaner adding facts, which
+                # it is forbidden to do — and it cannot be attested against anything.
+                raise ArbitrationError(
+                    "the cleaner invented a context block; no context was supplied, "
+                    "and the cleaner may not add facts to the framing"
+                )
             check_length_bands(parsed["statements"], originals)
             cleaned_hints = _merge_hints(hints, parsed["hints"])
             arb.reject_reserved_tokens(
@@ -844,9 +948,7 @@ def _clean_and_attest(
             timeout=CLEAN_TIMEOUT_SEC, text_only=True,
         )
         try:
-            attestation = parse_attestation(
-                attested_raw, ["decision", "context", "hints", *originals]
-            )
+            attestation = parse_attestation(attested_raw, attest_fields)
         except ArbitrationError as exc:
             last_error = f"attestation unusable: {exc}"
             complaint = f"An independent auditor's reply was unusable: {exc}\nRe-clean and try again."
@@ -923,13 +1025,19 @@ def _attest_body(
     originals: Mapping[str, str],
     parsed: Mapping[str, Any],
 ) -> str:
-    pairs = [
-        f"[decision]\nORIGINAL: {decision}\nCLEANED:  {parsed['decision']}",
-        f"[context]\nORIGINAL: {context or 'None.'}\nCLEANED:  {parsed['context'] or 'None.'}",
+    pairs = [f"[decision]\nORIGINAL: {decision}\nCLEANED:  {parsed['decision']}"]
+    # Only fields the caller supplied. Listing an empty `context` invited the attester
+    # to score empty→anything as a fidelity change, and the run then failed naming a
+    # field the caller had no control over (issue #8, fix 4).
+    if context:
+        pairs.append(f"[context]\nORIGINAL: {context}\nCLEANED:  {parsed['context']}")
+    if original_hints:
         # The real originals, not a placeholder: an auditor shown "(as given)"
         # cannot compare anything, so hint reasons went unchecked.
-        f"[hints]\nORIGINAL: {_render_hints(original_hints)}\nCLEANED:  {_render_hints(cleaned_hints)}",
-    ]
+        pairs.append(
+            f"[hints]\nORIGINAL: {_render_hints(original_hints)}\n"
+            f"CLEANED:  {_render_hints(cleaned_hints)}"
+        )
     for oid, original in originals.items():
         pairs.append(f"[{oid}]\nORIGINAL: {original}\nCLEANED:  {parsed['statements'][oid]}")
     return (

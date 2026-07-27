@@ -111,6 +111,32 @@ The reply ends with a machine-readable trailer whose fields are always present:
 `ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`,
 `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`.
 
+### Shaping the input
+
+The framing is checked against numeric bounds **before** anything is spent, and one
+shape passes them naturally:
+
+> Put every shared fact, and the **full specification of whatever only one option
+> adopts**, into `context` — prefaced as "the rules under consideration, if adopted".
+> Leave each option statement to say only how much of it is adopted, and what follows.
+
+The reason is structural. "Adopt X, with this precedence and this invariant" carries
+more mechanism to state than "don't", so a scope decision written the obvious way
+trips the equalization bound by construction, and no amount of re-cleaning fixes it —
+shortening the longer option just deletes the specification the deciders need. Hoisting
+the mechanism turns both options into statements of *scope-of-adoption*, and they
+equalize on their own (~800 chars each is typical).
+
+| Bound | Limit | Why |
+|---|---|---|
+| option statement | 1200 chars | dense options cannot be round-tripped through the cleaner without the attester scoring a fidelity change |
+| longest ÷ shortest option | 2.0 | asymmetric detail is an argument regardless of wording |
+| `decision` | 2500 chars | it states what is being chosen, not the evidence for it |
+| `context` | 20000 chars | the designated home for detail; not per-option, so its length cannot be a vote |
+
+Failures name the gate, the measurement, and the remedy, and cost nothing — they are
+raised before the cleaner runs.
+
 ### Things to know before you rely on it
 
 - **Both CLIs must be installed.** Unlike the review tools, `arbitrate` drives
@@ -120,6 +146,12 @@ The reply ends with a machine-readable trailer whose fields are always present:
   owner should be authorizing the decision at all. That is reported, never gated
   — a `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing it
   is your policy, not the tool's.
+- **A vendor that never changed its mind is not asked to cite the other's evidence.**
+  In round 2 the carried-evidence requirement applies only to a vendor whose selection
+  *moved* — that is what it is for, since capitulation is a change. A vendor that held
+  its round-1 position needs only a citation that resolves, **provided its round-1
+  decisive citation resolved too**; a holder that was never substantiated in the first
+  place must ground in gained evidence like a mover.
 - **It only decides things the repository can settle.** A converging vote must
   cite a line. A decision that does not turn on repo-verifiable grounds will
   never return `CONVERGED` here.

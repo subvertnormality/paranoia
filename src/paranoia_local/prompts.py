@@ -175,9 +175,11 @@ You are given, field by field, the ORIGINAL text and the CLEANED text. Judge two
 
 Separately, read the STAKES text, which was deliberately NOT cleaned. Does it advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary is not advocacy; steering the answer is.
 
-Output EXACTLY these three lines, verbatim, nothing before or after:
+Output EXACTLY these three lines, nothing before or after. The FIDELITY line must
+name EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —
+fields absent from it were never supplied and are not yours to judge:
 
-FIDELITY: decision PRESERVED|CHANGED; context PRESERVED|CHANGED; hints PRESERVED|CHANGED; <id> PRESERVED|CHANGED; <id> PRESERVED|CHANGED
+FIDELITY: <one "<field> PRESERVED" or "<field> CHANGED" per field, semicolon-separated>
 NEUTRALITY: PASS
 NEUTRALITY: FAIL <which option the packet favours, and the words that do it>
 STAKES-ADVOCACY: NONE

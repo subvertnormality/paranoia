@@ -84,17 +84,54 @@ independence the mechanism runs on."* Today that is enforced by the caller
 remembering it. Closed by the cleaner (§3.2), validated and cross-vendor attested
 field by field (§3.3). Raw framing reaches no decider.
 
+### 2.1a Framing bounds are checked before anything is spent
+
+Three of the first four production invocations died after two Opus cleaning attempts
+each, on defects visible in the caller's own input: an inter-option length ratio, an
+over-long option, an over-long decision (issue #8). The measurements were right and the
+diagnostics were excellent — they were simply taken after the spend.
+
+`preflight_framing` now runs them before the cleaner: option statements ≤ 1200 chars,
+longest ÷ shortest ≤ 2.0, `decision` ≤ 2500, `context` ≤ 20000. Same measurements, same
+message shapes, no agent turn. `context` is bounded far more loosely because it is the
+designated home for detail and is not per-option, so its length cannot be a vote
+between the options.
+
+The inter-option ratio belongs here rather than only after cleaning because it is
+**structural, not stylistic**: "adopt X, with this precedence and this invariant"
+carries more mechanism to state than "don't", so any scope decision trips it by
+construction and no amount of re-cleaning fixes it. The supported remedy is therefore
+a framing idiom, and the error states it: hoist the shared mechanism — including the
+full specification of what only one option adopts — into `context`, and leave each
+option statement to say only how much of it is adopted and what follows. Both options
+then describe scope-of-adoption, and equalize on their own. The field run landed at
+~780 vs ~810 chars this way, having failed at 483 vs 1262.
+
 ### 2.2 Length and detail asymmetry are a vote — closed
 
-A four-line option beside a six-word option is an argument. The cleaner equalizes;
-**the server measures**, with both bands numeric and symmetric:
+A four-line option beside a six-word option is an argument. The caller's own ratio is
+bounded at preflight (§2.1a); what this band adds is what the **cleaner** is answerable
+for, which is not the same thing:
 
-- across cleaned options: `max/min ≤ 2.0`;
-- each cleaned option against its own original: `0.5 ≤ ratio ≤ 2.0`.
+- across cleaned options: the ratio may not exceed `max(2.0, the caller's own ratio)` —
+  equalized framing coming back skewed is the cleaner introducing a length vote;
+- each cleaned option against its own original: `ratio ≤ 2.0`. Growth keeps a ceiling
+  because a statement that doubles has gained content from somewhere, and the id-set
+  check cannot see added prose inside a preserved id.
 
-Revision 2 specified the second band as "within a ratio bound" with no number,
-which two implementations could satisfy differently while passing every stated
-test. Outside either band → one cleaner retry with the measurement, then fail.
+Revision 2 specified the second band as "within a ratio bound" with no number, which
+two implementations could satisfy differently while passing every stated test.
+
+**There is deliberately no lower bound.** Revisions 2-4 set one at `0.5`, and the first
+production run showed it firing on the wrong signal (issue #8): an option whose text was
+largely consequence-narration ("Outcome under this option: …") was compressed to 0.09x
+and rejected, though its meaning was intact — the cleaner had correctly identified
+restatement as compressible, while the option describing *mechanism* survived verbatim.
+A character ratio cannot distinguish dropped substance from dropped padding. The
+cross-vendor fidelity attestation can, and checks exactly that, per option, by id
+(§3.2). The floor was a cheap proxy for a check that already exists in stronger form,
+and its only observed effect was to penalise a caller for explaining an option's
+outcome. Outside a surviving band → one cleaner retry with the measurement, then fail.
 
 ### 2.3 Presentation order tilts both deciders the same way — **reduced**
 
@@ -279,6 +316,16 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   as a separate defect across several review rounds. Enumerating rejected spellings
   cannot close that class; not rewriting does. A noncanonical path drops, costing
   one `UNRESOLVED`.
+- Hint paths are not normalized either. `validate_hints` folded `\` to `/` and stripped
+  `./`, and git tracks `policy\choice.py` distinctly from `policy/choice.py`, so a
+  caller hinting the former sent BOTH deciders to a different file's bytes — invisibly,
+  because the attester is shown the path the server resolved, not the one the caller
+  wrote. Literal membership here too.
+- Snapshot path reads use `git ls-tree -z`. Without it `--name-only` quotes any path
+  containing a backslash, a quote, or a non-ASCII byte, and `core.quotePath=false` does
+  not suppress it — so the membership set held `"policy\\choice.py"` while a citation
+  carries the raw name, making every legitimate reference to such a file unresolvable.
+  That was a latent break in the closure below rather than a new one.
 - The same rule reaches the one boundary where the string is repository data rather
   than model output: a **symlink target containing `..` fails closed**. Interpreting
   it lexically diverges from the worktree as soon as an earlier component is itself
@@ -754,10 +801,36 @@ nothing, or citing only regions their own vendor had already produced, after mer
 the round; it says nothing about **use** within it.
 
 - **Round 1:** every converging vote's `DECISIVE-CITATION` must resolve.
-- **Round 2:** every converging vote's `DECISIVE-CITATION` anchor must satisfy
-  `anchor_within` (§2.5) a region that was carried to it *and* was novel to its own
-  vendor — computed server-side, since the round-2 session is cold and does not know
-  what its own vendor cited before.
+- **Round 2:** every converging vote's `DECISIVE-CITATION` must resolve, and for a
+  vendor **whose selection changed between rounds** its anchor must additionally
+  satisfy `anchor_within` (§2.5) a region carried to it *and* novel to its own vendor
+  — computed server-side, since the round-2 session is cold and does not know what its
+  own vendor cited before.
+
+**Two vendors owe carried grounding: any that moved, and any whose round-1 vote was
+unsubstantiated.** The second clause is what makes the first sound — waiving the rule
+for a holder rests on that holder already having been substantiated in round 1, and a
+vendor that reached round 2 with no resolving decisive citation has no such standing.
+Without it, a vote that was never substantiated at all could ride to `CONVERGED` on a
+fresh citation that merely resolves, while the other vendor moved onto its supporting
+region.
+
+**Why a vendor that moved.** The carried-grounding rule is anti-*capitulation*:
+it proves a changed mind was changed by evidence rather than by the bare fact of
+disagreement. Capitulation is by definition a change, so a vendor that held its
+round-1 selection has nothing to disprove, and its position was already substantiated
+on its own resolved citation in round 1.
+
+Requiring it of every vendor produced a false negative on the very first production
+run (issue #8). Both vendors agreed; the vendor that flipped grounded correctly on the
+region the other had produced — the mechanism working exactly as designed — and the
+run still returned `UNRESOLVED`, because the vendor that had been right all along
+cited the *producer code* rather than re-citing the artifact it used in round 1. Its
+gains set held exactly one region: the other vendor's argument for the option it had
+rejected. The rule was demanding it cite the evidence against its own conclusion, and
+it penalised the deeper piece of work. This is the expensive failure mode — a correct
+convergence discarded silently, recoverable only by hand-verifying citations, and
+fatal to an autonomous caller, which simply halts.
 
 Supporting `CITATIONS` never substantiate. Otherwise `UNRESOLVED`. This is faithful to the protocol being mechanized, which
 already demands *"the single decisive constraint behind your selection, with a
@@ -898,7 +971,7 @@ own reading. That is what a function removes.
 | Reading prose to judge agreement | Python compares mapped `SELECTED` against an exact label set. |
 | Composing the round-2 packet | Mechanical: repository bytes only, no prose, no provenance (§3.6). |
 | A round 2 that reconciles nothing | The per-decider interval gate (§2.11). |
-| Agreement reached without using any evidence | Substantiation: every converging vote must resolve a citation, and in round 2 one novel to its own vendor (§3.5). |
+| Agreement reached without using any evidence | Substantiation: every converging vote must resolve a citation, and in round 2 one novel to its own vendor — required of any vendor that changed selection, or whose round-1 vote was itself unsubstantiated (§3.5). |
 | A cold round-2 decider losing its own evidence | Both receive the full region union (§2.6). |
 | Local labels colliding with framing or repository text | Seed-derived labels, absence verified against framing and snapshot, disjoint per decider so any echo fails membership (§2.4). |
 | The caller's view entering the framing | Cleaner + measured bands + field-by-field attestation. |
@@ -1107,10 +1180,12 @@ caller's input; the cleaner model default is `claude-opus-5` and is *not*
 inherited from `ClaudeEngine.default_model`.
 
 *Substantiation (§3.5).* Round-1 agreement with `DECISIVE-CITATION: NONE` from
-either decider yields `UNRESOLVED`; round-2 agreement where a converging vote's
+either decider yields `UNRESOLVED`; round-2 agreement where a MOVING vote's
 decisive anchor is its own prior region — even with the other vendor's novel region
 appended to supporting `CITATIONS` — yields `UNRESOLVED`, since only the decisive
-field gates; round-2 agreement where each decisive anchor lies within a carried
+field gates; a vendor that HELD a round-1 selection which was itself substantiated
+needs only a decisive citation that resolves, while one that held an unsubstantiated
+round-1 selection must ground in gained evidence like a mover; round-2 agreement where each decisive anchor lies within a carried
 region novel to its own vendor yields `CONVERGED`; a decisive anchor that merely
 *abuts* a carried interval (anchor 113 against carried `[104,110]` at `k=3`) does
 **not** substantiate, because `anchor_within` is point-in-interval and not

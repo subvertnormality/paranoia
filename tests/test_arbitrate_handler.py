@@ -59,7 +59,16 @@ def cleaner_reply(ids_to_statements: dict[str, str]) -> str:
 
 
 ATTEST_OK = (
-    "FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+    "FIDELITY: decision PRESERVED; "
+    "opt-float PRESERVED; opt-decimal PRESERVED\n"
+    "NEUTRALITY: PASS\n"
+    "STAKES-ADVOCACY: NONE\n"
+)
+
+
+# For callers that DO supply files, `hints` becomes an attestable field.
+ATTEST_OK_WITH_HINTS = (
+    "FIDELITY: decision PRESERVED; hints PRESERVED; "
     "opt-float PRESERVED; opt-decimal PRESERVED\n"
     "NEUTRALITY: PASS\n"
     "STAKES-ADVOCACY: NONE\n"
@@ -509,7 +518,9 @@ def test_unequal_cleaned_options_are_retried_then_fail(repo: Path, tmp_path: Pat
         }),
     )
     report = run(repo, agent, tmp_path)
-    assert "not equalized" in report
+    # Same behaviour, sharper claim: the caller's framing was equalized, so the skew
+    # is the cleaner's doing.
+    assert "less equalized" in report
     assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 2
 
 
@@ -518,7 +529,7 @@ def test_attestation_failure_retries_once_then_fails(repo: Path, tmp_path: Path)
     attester until it passed, which is optimization, not attestation."""
     agent = Agent(
         lambda e, r: "opt-float",
-        attest=("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        attest=("FIDELITY: decision PRESERVED; "
                 "opt-float CHANGED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
                 "STAKES-ADVOCACY: NONE\n"),
     )
@@ -531,7 +542,7 @@ def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
     """stakes is not the cleaner's to fix, so this goes back to the caller."""
     agent = Agent(
         lambda e, r: "opt-float",
-        attest=("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
                 "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"),
     )
@@ -625,7 +636,8 @@ def test_cleaned_hint_reason_reaches_the_deciders_not_the_original(repo: Path):
                 )
             return super().__call__(**kw)
 
-    agent = HintCleaner(lambda e, r: "opt-float")
+    # this caller DOES supply files, so `hints` is an attestable field for it
+    agent = HintCleaner(lambda e, r: "opt-float", attest=ATTEST_OK_WITH_HINTS)
     report = run(repo, agent, tmp_path=Path(repo.parent), files=[
         {"path": "app.py", "reason": "the APPROVED implementation, obviously"}
     ])
@@ -652,13 +664,13 @@ def test_attester_sees_the_real_original_hints(repo: Path, tmp_path: Path):
         # missing every field but one
         "FIDELITY: decision PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n",
         # a value that is neither PRESERVED nor CHANGED
-        ("FIDELITY: decision UNKNOWN; context PRESERVED; hints PRESERVED; "
+        ("FIDELITY: decision UNKNOWN; "
          "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"),
         # no neutrality verdict
-        ("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        ("FIDELITY: decision PRESERVED; "
          "opt-float PRESERVED; opt-decimal PRESERVED\nSTAKES-ADVOCACY: NONE\n"),
         # no stakes verdict
-        ("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        ("FIDELITY: decision PRESERVED; "
          "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"),
     ],
 )
@@ -887,7 +899,7 @@ def test_qualified_attestation_verdicts_are_not_accepted(repo: Path, tmp_path: P
     """Round-8 blocker: prefix matching let a demonstrably biased packet be stamped
     `attested`, sending the same bias to both deciders."""
     fidelity = (
-        "FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        "FIDELITY: decision PRESERVED; "
         "opt-float PRESERVED; opt-decimal PRESERVED\n"
     )
     agent = Agent(lambda e, r: "opt-float", attest=fidelity + verdicts)
@@ -899,7 +911,7 @@ def test_qualified_attestation_verdicts_are_not_accepted(repo: Path, tmp_path: P
 def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: Path, tmp_path: Path):
     agent = Agent(
         lambda e, r: "opt-float",
-        attest=("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+        attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
                 "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"),
     )
@@ -926,3 +938,287 @@ def test_commentary_in_the_attestation_is_rejected(repo: Path, tmp_path: Path, e
 def test_duplicate_attestation_verdicts_are_rejected(repo: Path, tmp_path: Path):
     agent = Agent(lambda e, r: "opt-float", attest=ATTEST_OK + "NEUTRALITY: PASS\n")
     assert trailer_field(run(repo, agent, tmp_path), "ARBITRATION") == "FAILED"
+
+
+# --- field-report fixes (issue #8) -------------------------------------------
+
+
+def test_the_field_scenario_now_converges(repo: Path, tmp_path: Path):
+    """Issue #8's actual run: round 1 diverges, codex flips onto claude's carried
+    region, claude holds and cites the producer code instead of the artifact. That
+    is a unanimous verdict on accurate citations and must not be UNRESOLVED."""
+    (repo / "writer.py").write_text("w\n" * 40)
+    (repo / "manifest.json").write_text("m\n" * 40)
+    (repo / "test_writer.py").write_text("t\n" * 40)
+    commit_all(repo, "field shapes")
+    agent = Agent(
+        lambda engine, rnd: "opt-float" if (engine == "codex" and rnd == 1) else "opt-decimal",
+        extra={
+            ("codex", 1): {"decisive": "test_writer.py:20"},
+            ("claude", 1): {"decisive": "manifest.json:20"},
+            # codex flips onto the region claude produced -> carried grounding
+            ("codex", 2): {"decisive": "manifest.json:20", "authority": "human-owner"},
+            # claude holds, and goes deeper: the producer code, never carried
+            ("claude", 2): {"decisive": "writer.py:20"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "SELECTED") == "opt-decimal"
+    assert trailer_field(report, "ROUNDS") == "2"
+    assert trailer_field(report, "ADVISORY") == "human-owner (flagged by: codex)"
+
+
+def test_a_flip_onto_uncarried_evidence_is_still_unsubstantiated(repo: Path, tmp_path: Path):
+    """The anti-capitulation purpose end to end."""
+    (repo / "elsewhere.py").write_text("e\n" * 40)
+    commit_all(repo, "elsewhere")
+    agent = Agent(
+        lambda engine, rnd: "opt-float" if (engine == "codex" and rnd == 1) else "opt-decimal",
+        extra={("codex", 2): {"decisive": "elsewhere.py:20"}},
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert "codex" in report
+
+
+def test_attestation_does_not_cover_fields_the_caller_never_supplied(repo: Path, tmp_path: Path):
+    """Issue #8 fix 4: call 1 failed on `fidelity changed: ['context']` for a field
+    the caller had no control over."""
+    agent = Agent(lambda e, r: "opt-float", attest=(
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    attest_bodies = [c["body"] for c in agent.calls if "TEXT AUDITOR" in c["instructions"]]
+    assert attest_bodies and "context" not in attest_bodies[0].lower().split("=== stakes")[0]
+
+
+def test_a_cleaner_invented_context_is_rejected(repo: Path, tmp_path: Path):
+    """The other half of fix 4: if the caller supplied no context, a populated one is
+    the cleaner ADDING facts, which it is forbidden to do."""
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== CONTEXT ===\nThe system already uses floats everywhere.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ))
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "context" in report.lower()
+
+
+def test_a_failed_run_writes_an_audit_record(repo: Path, tmp_path: Path):
+    """Issue #8 fix 7: the three field rejections left nothing on disk, so gate churn
+    was unmeasurable after the fact."""
+    log_dir = tmp_path / "logs"
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path,
+                 options=[{"id": "A", "statement": "x" * 400},
+                          {"id": "B", "statement": "y" * 1300}])
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "AUDIT") != "none"
+    written = list(log_dir.glob("*arbitrate*"))
+    assert written, "a FAILED run must still write an audit record"
+    import json
+    rec = json.loads(written[0].read_text())
+    assert rec["outcome"] == "FAILED"
+    assert "not equalized" in rec["reason"]
+    assert rec["raw_input"]["options"]
+
+
+def test_preflight_runs_before_any_cleaner_call(repo: Path, tmp_path: Path):
+    """Fix 5: the whole point is not spending Opus on input-only defects."""
+    agent = Agent(lambda e, r: "opt-float")
+    run(repo, agent, tmp_path,
+        options=[{"id": "A", "statement": "x" * 400}, {"id": "B", "statement": "y" * 1300}])
+    assert agent.calls == [], "no agent should have been invoked"
+
+
+def test_the_cleaner_may_compress_narration_without_tripping_the_floor(repo: Path, tmp_path: Path):
+    """Fix 3: option A's text was mostly consequence-narration and the cleaner cut it
+    to 0.09x. Meaning-preservation is the attester's job, not a char ratio's."""
+    long_a = "Ship the core only. " + "Outcome under this option: the manifest still fails. " * 12
+    long_b = "Ship the core plus both rules. " + "Outcome under this option: the manifest verifies. " * 12
+    agent = Agent(
+        lambda e, r: "A",
+        # label lookup matches on what the deciders actually see: the CLEANED text
+        statements={"A": "a" * 90, "B": "b" * 120},
+        cleaner=(
+            "=== DECISION ===\nd\n\n"
+            f"=== OPTIONS ===\nA: {'a' * 90}\nB: {'b' * 120}\n\n"
+            "=== HINTS ===\nNone.\n"
+        ),
+        attest=("FIDELITY: decision PRESERVED; A PRESERVED; B PRESERVED\n"
+                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"),
+    )
+    report = run(repo, agent, tmp_path,
+                 options=[{"id": "A", "statement": long_a}, {"id": "B", "statement": long_b}])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+
+
+def test_the_cleaner_may_not_worsen_the_length_asymmetry(repo: Path, tmp_path: Path):
+    """The gate that survives: equalized input must not come back skewed."""
+    agent = Agent(
+        lambda e, r: "opt-float",
+        cleaner=(
+            "=== DECISION ===\nd\n\n"
+            f"=== OPTIONS ===\nopt-float: {'a' * 40}\nopt-decimal: {'b' * 600}\n\n"
+            "=== HINTS ===\nNone.\n"
+        ),
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "equaliz" in report.lower()
+
+
+def test_a_held_vote_that_was_never_substantiated_must_still_ground(repo: Path, tmp_path: Path):
+    """Round-1 review blocker. Waiving carried grounding for a holder rests on that
+    holder already being substantiated. A vendor that reached round 2 with no resolving
+    decisive citation has no such standing, and must not ride to CONVERGED on a fresh
+    citation that merely resolves while the other vendor moves onto its supporting
+    region."""
+    (repo / "elsewhere.py").write_text("e\n" * 40)
+    (repo / "third.py").write_text("t\n" * 40)
+    commit_all(repo, "elsewhere and third")
+    agent = Agent(
+        lambda engine, rnd: "opt-float" if (engine == "codex" and rnd == 1) else "opt-decimal",
+        extra={
+            # claude picks decimal in round 1 with NO decisive citation, but supplies a
+            # supporting region so reconciliation is still permitted
+            ("claude", 1): {"decisive": "NONE", "citations": "app.py:4"},
+            ("codex", 1): {"decisive": "elsewhere.py:20"},
+            # codex flips onto claude's supporting region
+            ("codex", 2): {"decisive": "app.py:4"},
+            # claude holds, on a citation that resolves but was NEVER carried to it
+            ("claude", 2): {"decisive": "third.py:20"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert "claude" in report
+
+
+def test_a_caller_context_that_reads_None_is_not_swallowed(repo: Path, tmp_path: Path):
+    """Round-1 review blocker: `None.` is a sentinel only when the caller supplied no
+    context. As a real datum — the observed output of the thing being adjudicated — it
+    must reach the deciders verbatim."""
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== CONTEXT ===\nNone.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ), attest=(
+        "FIDELITY: decision PRESERVED; context PRESERVED; opt-float PRESERVED; "
+        "opt-decimal PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path, context="None.")
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    for call in agent.calls:
+        if call["cwd"] is None:
+            continue
+        assert "None." in call["body"], "the caller's context must reach the deciders"
+
+
+def test_clean_false_is_not_subject_to_cleaner_capacity_bounds(repo: Path, tmp_path: Path):
+    """Round-1 review: the char caps are justified by cleaner round-trip capacity, and
+    `clean: false` never invokes a cleaner. The equalization ratio is a bias bound and
+    still applies."""
+    long_a = "a" * 2000
+    long_b = "b" * 2000
+    report = run(repo, Agent(lambda e, r: "A", statements={"A": long_a, "B": long_b}),
+                 tmp_path, clean=False,
+                 options=[{"id": "A", "statement": long_a}, {"id": "B", "statement": long_b}])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "CLEANING") == "skipped"
+
+
+def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):
+    report = run(repo, Agent(lambda e, r: "A"), tmp_path, clean=False,
+                 options=[{"id": "A", "statement": "x" * 300},
+                          {"id": "B", "statement": "y" * 900}])
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "not equalized" in report
+
+
+def test_a_cleaner_that_omits_a_supplied_context_block_fails(repo: Path, tmp_path: Path):
+    """Round-2 review blocker: omitting the block entirely was invisible. Rendered back
+    to the attester as `None.` it matched a caller context that also reads `None.`, so
+    fidelity passed while the deciders received nothing."""
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ))
+    report = run(repo, agent, tmp_path, context="None.")
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "dropped the supplied context" in report
+
+
+def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, tmp_path: Path):
+    """Round-2 review: the parser's expected set became dynamic while the prompt still
+    hardcoded `context` and `hints`. An attester obeying the prompt verbatim was then
+    rejected for covering unknown fields — reproducing the production false failure this
+    branch exists to remove. The prompt and the parser must agree."""
+    from paranoia_local import prompts
+
+    assert "context PRESERVED|CHANGED; hints PRESERVED|CHANGED" not in prompts.ATTEST_INSTRUCTIONS
+    assert "EVERY field that appears in the FIELD BY FIELD section" in prompts.ATTEST_INSTRUCTIONS
+
+    seen: dict[str, str] = {}
+
+    class Recorder(Agent):
+        def __call__(self, **kw):
+            if "TEXT AUDITOR" in kw["instructions"]:
+                seen["body"] = kw["body"]
+                # answer with exactly the fields the body carries, as instructed
+                fields = [
+                    line[1:-1] for line in kw["body"].splitlines()
+                    if line.startswith("[") and line.endswith("]")
+                ]
+                self.attest = (
+                    "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
+                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                )
+            return super().__call__(**kw)
+
+    report = run(repo, Recorder(lambda e, r: "opt-float"), tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert "[context]" not in seen["body"] and "[hints]" not in seen["body"]
+
+
+def test_the_attester_template_covers_context_and_hints_when_supplied(repo: Path, tmp_path: Path):
+    """The other half: when the caller DOES supply them, they must be in the body and
+    the parser must expect them."""
+    seen: dict[str, str] = {}
+
+    class Recorder(Agent):
+        def __call__(self, **kw):
+            if "TEXT AUDITOR" in kw["instructions"]:
+                seen["body"] = kw["body"]
+                fields = [
+                    line[1:-1] for line in kw["body"].splitlines()
+                    if line.startswith("[") and line.endswith("]")
+                ]
+                self.attest = (
+                    "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
+                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                )
+            if "NEUTRALIZER" in kw["instructions"]:
+                opts = "\n".join(f"{k}: {v}" for k, v in self.statements.items())
+                return (
+                    "=== DECISION ===\nd\n\n"
+                    f"=== OPTIONS ===\n{opts}\n\n"
+                    "=== CONTEXT ===\nThe threshold is written to a log line.\n\n"
+                    "=== HINTS ===\n- app.py: the module\n"
+                )
+            return super().__call__(**kw)
+
+    report = run(repo, Recorder(lambda e, r: "opt-float"), tmp_path,
+                 context="The threshold is written to a log line.",
+                 files=[{"path": "app.py", "reason": "the module"}])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert "[context]" in seen["body"] and "[hints]" in seen["body"]

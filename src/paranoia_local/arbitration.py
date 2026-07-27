@@ -17,8 +17,9 @@ that was not reached:
 - **Regions, not anchors.** A citation is the interval actually carried; sameness
   is interval intersection, substantiation is strict point-in-interval (§2.5).
 - **Substantiation.** Agreement counts only when each converging vote's decisive
-  citation resolves, and in round 2 lands inside a region novel to its own vendor
-  (§3.5).
+  citation resolves, and in round 2 additionally lands inside a region novel to its
+  own vendor — for any vendor that CHANGED selection, or whose round-1 vote was
+  itself unsubstantiated (§3.5).
 
 Everything here is deterministic and free of I/O: the git reads it needs are
 injected by the caller.
@@ -29,7 +30,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, replace
-from typing import Callable, Iterable, Mapping, Sequence
+from typing import Callable, Collection, Iterable, Mapping, Sequence
 
 # --- shape limits -----------------------------------------------------------
 
@@ -52,6 +53,7 @@ _LABEL_RE = re.compile(rf"^{LABEL_PREFIX}[0-9a-f]{{{LABEL_HEX}}}$")
 # `decision`/`context`/`hints` are the attestation's own fidelity field names — an
 # option called `decision` would emit two `[decision]` sections and let one verdict
 # satisfy both, so a semantic change to either could be stamped `attested`.
+OPTION_KEYS = frozenset({"id", "statement"})
 RESERVED_IDS = frozenset({"none", "decision", "context", "hints", "stakes"})
 TRAILER_FIELDS = (
     "SELECTED",
@@ -109,6 +111,15 @@ def validate_options(raw: object) -> tuple[Option, ...]:
     for entry in raw:
         if not isinstance(entry, Mapping):
             raise ArbitrationError("each option must be an object with id and statement")
+        # Silently ignoring an unknown key hides a typo in the one field whose
+        # spelling the whole protocol keys on: `{"id": .., "statment": ..}` would
+        # arbitrate an empty option rather than telling the caller.
+        unknown = sorted(k for k in entry if k not in OPTION_KEYS)
+        if unknown:
+            raise ArbitrationError(
+                f"option object has unknown key(s): {', '.join(unknown)} "
+                f"(expected only {', '.join(sorted(OPTION_KEYS))})"
+            )
         oid = str(entry.get("id", "")).strip()
         statement = str(entry.get("statement", "")).strip()
         if not oid:
@@ -126,6 +137,81 @@ def validate_options(raw: object) -> tuple[Option, ...]:
         seen.add(oid)
         out.append(Option(id=oid, statement=statement))
     return tuple(out)
+
+
+# Framing bounds, enforced at preflight so an input-only defect never costs a
+# cleaner call. The numbers come from the first production run (issue #8): dense
+# ~1,800-char options and a ~4,500-char decision could not be round-tripped through
+# the cleaner without the cross-vendor attester scoring a fidelity change, while the
+# hoisted shape it converged on — shared mechanism in `context`, each option stating
+# only scope-of-adoption — landed at ~800 chars and passed first time.
+MAX_OPTION_CHARS = 1200
+MAX_DECISION_CHARS = 2500
+# `context` is the designated home for detail, and it is not per-option, so its
+# length cannot be a vote between the options. It gets a far looser bound.
+MAX_CONTEXT_CHARS = 20000
+OPTION_RATIO_MAX = 2.0
+
+_HOIST_REMEDY = (
+    "Hoist the shared mechanism into `context` — including the full specification "
+    "of what only one option adopts — and leave each option statement to say only "
+    "which of it is adopted, and what follows. Options then describe "
+    "scope-of-adoption rather than one describing mechanism and the other its "
+    "absence, and they equalize naturally."
+)
+
+
+def preflight_framing(
+    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True
+) -> None:
+    """Reject framing defects visible in the caller's own input, before spending a
+    cleaner call on them.
+
+    Three of the first four production invocations died after two Opus attempts each
+    on exactly these arithmetic checks (issue #8). Same measurements, same message
+    shapes — just moved ahead of the spend.
+
+    The inter-option ratio is checked HERE rather than only after cleaning because
+    it is structural: "adopt X, with this precedence and this invariant" carries more
+    mechanism to state than "don't", so any scope decision trips it by construction
+    and no amount of re-cleaning fixes it. Telling the caller up front, with the
+    remedy, is the only useful response.
+    """
+    # The ratio is a BIAS bound — asymmetric detail is an argument regardless of
+    # wording — so it holds whether or not a cleaner runs. The character caps are
+    # CLEANER-CAPACITY bounds, justified by what can be round-tripped through the
+    # cleaner without the attester scoring a fidelity change, so `clean: false` (which
+    # sends the caller's statements verbatim and never invokes a cleaner) is not
+    # subject to them.
+    lengths = {o.id: max(1, len(o.statement)) for o in options}
+    if lengths:
+        longest = max(lengths, key=lengths.__getitem__)
+        shortest = min(lengths, key=lengths.__getitem__)
+        if lengths[longest] / lengths[shortest] > OPTION_RATIO_MAX:
+            raise ArbitrationError(
+                "options are not equalized: "
+                f"{longest} is {lengths[longest]} chars, {shortest} is "
+                f"{lengths[shortest]} (ratio must be <= {OPTION_RATIO_MAX}). "
+                + _HOIST_REMEDY
+            )
+    if not cleaned:
+        return
+    for oid, n in lengths.items():
+        if n > MAX_OPTION_CHARS:
+            raise ArbitrationError(
+                f"option statement {oid} is {n} chars (max {MAX_OPTION_CHARS}). "
+                + _HOIST_REMEDY
+            )
+    if len(decision) > MAX_DECISION_CHARS:
+        raise ArbitrationError(
+            f"decision is {len(decision)} chars (max {MAX_DECISION_CHARS}). "
+            "Move the supporting facts into `context`; the decision field states "
+            "what is being chosen, not the evidence for it."
+        )
+    if len(context) > MAX_CONTEXT_CHARS:
+        raise ArbitrationError(
+            f"context is {len(context)} chars (max {MAX_CONTEXT_CHARS})"
+        )
 
 
 def canonical_order(options: Iterable[Option]) -> tuple[Option, ...]:
@@ -766,14 +852,29 @@ def substantiation(
     *,
     resolve: Callable[[Citation], Region | None],
     carried: Mapping[str, Sequence[Region]] | None = None,
+    moved: Collection[str] | None = None,
 ) -> dict[str, bool]:
     """Per-engine substantiation.
 
-    Round 1 (`carried` None): the decisive citation must resolve. Round 2: its
-    anchor must land inside a region carried to that engine — the gate proved
-    evidence was *available*, and this is what proves it was *used*. Supporting
-    `CITATIONS` never substantiate: otherwise a decider could keep its own prior
-    region as its real reason and merely append the novel one.
+    Round 1 (`carried` None): the decisive citation must resolve.
+
+    Round 2: the carried-grounding rule is **anti-capitulation** — it proves a vendor
+    that changed its mind was moved by evidence rather than by the mere fact of
+    disagreement. So it applies only to vendors in `moved`. A vendor that held its
+    round-1 selection has no capitulation to disprove and its position was already
+    substantiated on its own resolved citation, so it needs only a citation that
+    resolves.
+
+    Applying it to every vendor produced a false negative on the first production run
+    (issue #8): both vendors agreed, the flipping vendor grounded correctly on carried
+    bytes, and the run still returned UNRESOLVED because the vendor that had been
+    right all along cited the producer code instead of the artifact. The only region
+    it could have grounded in was the other vendor's argument for the option it had
+    rejected — so the rule demanded it cite the evidence against its own conclusion.
+
+    `moved=None` means "treat every vendor as moved", the conservative reading.
+    Supporting `CITATIONS` never substantiate: otherwise a decider could keep its own
+    prior region as its real reason and merely append the novel one.
     """
     out: dict[str, bool] = {}
     for vote in votes:
@@ -785,6 +886,9 @@ def substantiation(
             out[vote.engine] = False
             continue
         if carried is None:
+            out[vote.engine] = True
+            continue
+        if moved is not None and vote.engine not in moved:
             out[vote.engine] = True
             continue
         out[vote.engine] = any(
