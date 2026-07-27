@@ -266,3 +266,72 @@ def test_ignored_untracked_hint_is_rejected(repo: Path):
     commit = snapshot(repo)
     with pytest.raises(ArbitrationError, match="not in the snapshot"):
         evidence.validate_hints(repo, commit, [{"path": "secret.py"}])
+
+
+# --- merged-region carry and historical aliases (implementation review) -----
+
+
+def test_read_region_carries_exactly_lo_to_hi(repo: Path):
+    """A merged region spans wider than either anchor's window, so reading from the
+    anchor would under-carry while substantiation used the merged bounds."""
+    (repo / "wide.py").write_text("".join(f"L{i}\n" for i in range(1, 31)))
+    commit_all(repo, "wide")
+    commit = snapshot(repo)
+    from paranoia_local.arbitration import Region
+
+    body = evidence.read_region(repo, Region(commit, "wide.py", 7, 19, 10))
+    assert "L7" in body and "L19" in body
+    assert "L6" not in body and "L20" not in body
+    assert body.count("\n") == 12  # 13 lines
+
+
+def test_read_region_clamps_and_drops_out_of_range(repo: Path):
+    from paranoia_local.arbitration import Region
+
+    commit = snapshot(repo)
+    assert evidence.read_region(repo, Region(commit, "app.py", 1, 9999, 1))
+    assert evidence.read_region(repo, Region(commit, "app.py", 900, 999, 900)) is None
+    assert evidence.read_region(repo, Region(commit, "missing.py", 1, 3, 1)) is None
+
+
+def test_historical_alias_citation_is_canonicalized_in_its_own_commit(repo: Path):
+    """A revision-prefixed citation resolves in ITS commit, so it needs that
+    commit's symlink map — the snapshot's would not describe it."""
+    (repo / "alias.py").symlink_to("app.py")
+    commit_all(repo, "alias")
+    old = orientation.resolve_head(repo)
+    (repo / "alias.py").unlink()
+    (repo / "alias.py").write_text("# no longer a link\n")
+    commit_all(repo, "de-alias")
+    commit = snapshot(repo)
+
+    got = evidence.resolve_citation(
+        repo, Citation("alias.py", 4, commit=old),
+        snapshot=commit, links=evidence.symlink_map(repo, commit), context=1,
+    )
+    assert got is not None
+    region, body = got
+    assert region.path == "app.py"  # canonicalized in the OLD commit
+    assert "def greet(name):" in body
+
+
+def test_historical_alias_and_target_collapse_to_one_region(repo: Path):
+    (repo / "alias.py").symlink_to("app.py")
+    commit_all(repo, "alias")
+    old = orientation.resolve_head(repo)
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit)
+    a, _ = evidence.resolve_citation(
+        repo, Citation("app.py", 4, commit=old), snapshot=commit, links=resolver, context=3
+    )
+    b, _ = evidence.resolve_citation(
+        repo, Citation("alias.py", 4, commit=old), snapshot=commit, links=resolver, context=3
+    )
+    assert a.key == b.key
+
+
+def test_link_resolver_caches_per_commit(repo: Path):
+    commit = snapshot(repo)
+    resolver = evidence.LinkResolver(repo, commit, {"x": "y"})
+    assert resolver.for_commit(commit) == {"x": "y"}
+    assert resolver.for_commit("deadbeef") == {}  # unreachable commit degrades to empty

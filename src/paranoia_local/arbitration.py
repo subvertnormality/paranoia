@@ -470,7 +470,10 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
     if missing:
         raise ArbitrationError(f"reply is missing trailer field(s): {', '.join(missing)}")
 
-    label = values["SELECTED"].split()[0] if values["SELECTED"] else ""
+    # Full-string match, not the first token: `SELECTED: <label> (the safe one)`
+    # must fail rather than quietly discarding the trailing commentary, which could
+    # be where the decider actually qualified its answer.
+    label = values["SELECTED"].strip()
     if label not in presentation.label_to_id:
         raise ArbitrationError(
             f"SELECTED {label!r} is not a label issued to {presentation.engine}"
@@ -502,13 +505,20 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
 
 
 def _parse_severity(raw: str) -> tuple[str, str]:
+    """`NONE` exactly, or `[SEV] <reason>`.
+
+    `NONE` must be the WHOLE value: a prefix match would read
+    `SELECTED-RISK: NONE [MAJOR] unsafe` as no risk at all and let a blocking
+    objection become a `CONVERGED`.
+    """
     text = (raw or "").strip()
-    if text.upper().startswith("NONE"):
+    if text.upper() == "NONE":
         return "NONE", ""
-    m = re.match(r"^\[(MINOR|MAJOR|FATAL)\]\s*(.*)$", text, re.IGNORECASE)
+    m = re.fullmatch(r"\[(MINOR|MAJOR|FATAL)\]\s*(\S.*)", text, re.IGNORECASE | re.DOTALL)
     if not m:
         raise ArbitrationError(
-            f"SELECTED-RISK must be NONE or [MINOR]/[MAJOR]/[FATAL] with a reason, got {text!r}"
+            f"SELECTED-RISK must be exactly NONE, or [MINOR]/[MAJOR]/[FATAL] "
+            f"followed by a reason, got {text!r}"
         )
     return m.group(1).upper(), m.group(2).strip()
 

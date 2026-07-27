@@ -201,12 +201,36 @@ def _blob(repo: Path, commit: str, path: str) -> str | None:
     return r.stdout.decode("utf-8", errors="replace")
 
 
+class LinkResolver:
+    """Symlink maps per commit, built lazily and cached.
+
+    A revision-prefixed citation resolves in ITS OWN commit, so it needs that
+    commit's symlink map — using the snapshot's (or skipping canonicalization, as
+    an earlier version did) would carry a symlink's target string as though it were
+    source and key an alias separately from its referent.
+    """
+
+    def __init__(self, repo: Path, snapshot: str, snapshot_links: dict[str, str] | None = None):
+        self._repo = repo
+        self._cache: dict[str, dict[str, str]] = {}
+        if snapshot_links is not None:
+            self._cache[snapshot] = snapshot_links
+
+    def for_commit(self, commit: str) -> dict[str, str]:
+        if commit not in self._cache:
+            try:
+                self._cache[commit] = symlink_map(self._repo, commit)
+            except RuntimeError:
+                self._cache[commit] = {}
+        return self._cache[commit]
+
+
 def resolve_citation(
     repo: Path,
     citation: Citation,
     *,
     snapshot: str,
-    links: dict[str, str],
+    links: dict[str, str] | LinkResolver,
     context: int,
 ) -> tuple[Region, str] | None:
     """A citation → its carried region and the lines themselves, or None if it drops.
@@ -216,20 +240,39 @@ def resolve_citation(
     a symlink's target string as though it were source.
     """
     commit = citation.commit or snapshot
-    path = canonical_path(citation.path, links) if commit == snapshot else citation.path
+    resolver = links if isinstance(links, LinkResolver) else LinkResolver(repo, snapshot, links)
+    path = canonical_path(citation.path, resolver.for_commit(commit))
     if path is None:
         return None
     text = _blob(repo, commit, path)
     if text is None:
         return None
-    lines = text.splitlines()
-    eof = len(lines)
+    eof = len(text.splitlines())
     if eof == 0 or not (1 <= citation.line <= eof):
         return None
     lo = max(1, citation.line - context)
     hi = min(eof, citation.line + context)
-    body = "\n".join(f"{n:>6}  {lines[n - 1]}" for n in range(lo, hi + 1))
-    return Region(commit=commit, path=path, lo=lo, hi=hi, anchor=citation.line), body
+    region = Region(commit=commit, path=path, lo=lo, hi=hi, anchor=citation.line)
+    return region, read_region(repo, region) or ""
+
+
+def read_region(repo: Path, region: Region) -> str | None:
+    """The bytes of EXACTLY `region.lo..region.hi`.
+
+    Reading from the anchor and re-expanding would under-carry a merged region —
+    two anchors merge to a wider interval than either expansion — while
+    substantiation is checked against the merged bounds, so a citation inside the
+    merged span but outside what was actually sent would count as carried evidence.
+    """
+    text = _blob(repo, region.commit, region.path)
+    if text is None:
+        return None
+    lines = text.splitlines()
+    lo = max(1, region.lo)
+    hi = min(len(lines), region.hi)
+    if lo > hi:
+        return None
+    return "\n".join(f"{n:>6}  {lines[n - 1]}" for n in range(lo, hi + 1))
 
 
 def validate_hints(repo: Path, commit: str, hints: list[dict]) -> list[dict]:

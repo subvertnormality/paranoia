@@ -47,6 +47,17 @@ def _default_clock() -> str:
     return datetime.now().strftime("%Y%m%dT%H%M%S")
 
 
+@dataclass(frozen=True)
+class Cast:
+    """One decider's turn: the vote, the exact prompt body it saw, and its raw
+    reply. The prompt and reply are kept so the audit can reconstruct the decision
+    after the snapshot commit is garbage-collected."""
+
+    vote: Vote
+    body: str
+    raw: str
+
+
 @dataclass
 class Packet:
     """The cleaned, attested framing every decider sees identically."""
@@ -145,9 +156,29 @@ def parse_cleaned_packet(text: str, ids: Sequence[str]) -> dict[str, Any]:
     return {
         "decision": "\n".join(blocks["DECISION"]).strip(),
         "context": "\n".join(blocks.get("CONTEXT", [])).strip(),
-        "hints_text": "\n".join(blocks.get("HINTS", [])).strip(),
+        "hints": parse_cleaned_hints(blocks.get("HINTS", [])),
         "statements": statements,
     }
+
+
+def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
+    """`{path: neutralized reason}` from the cleaner's HINTS block.
+
+    Parsed rather than kept as prose because the hint *reasons* are a steering
+    channel in their own right — "the approved implementation" reaching both
+    deciders unchanged would be exactly the shared anchoring the cleaner exists to
+    remove, while the run still reported `CLEANING: attested`.
+    """
+    out: dict[str, str] = {}
+    for raw in lines:
+        line = raw.strip().lstrip("-").strip()
+        if not line or line.upper().startswith("NONE"):
+            continue
+        path, _, reason = line.partition(":")
+        path = path.strip()
+        if path:
+            out[path] = reason.strip()
+    return out
 
 
 def check_length_bands(cleaned: Mapping[str, str], original: Mapping[str, str]) -> None:
@@ -194,31 +225,67 @@ class Attestation:
         return self.neutrality_pass and not self.changed and self.stakes_advocacy is None
 
 
-def parse_attestation(text: str) -> Attestation:
+def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
+    """Strict: every expected field exactly once, each `PRESERVED` or `CHANGED`,
+    exactly one neutrality verdict, and a stakes verdict.
+
+    A lenient parser made an *incomplete* attestation look like a passing one:
+    `FIDELITY: decision PRESERVED` alone, or a value of `UNKNOWN`, would satisfy
+    "nothing said CHANGED" and stamp a semantically altered packet `attested`.
+    An unparseable reply is cheap — it costs the one retry — whereas a falsely
+    attested packet steers both deciders silently.
+    """
     fidelity: dict[str, str] = {}
-    neutrality_pass = False
+    neutrality: bool | None = None
     note = ""
     stakes: str | None = None
-    seen_neutrality = False
+    stakes_seen = False
     for raw in (text or "").splitlines():
         line = raw.strip()
         upper = line.upper()
         if upper.startswith("FIDELITY:"):
             for part in line[len("FIDELITY:"):].split(";"):
                 field, _, verdict = part.strip().rpartition(" ")
-                if field and verdict:
-                    fidelity[field.strip()] = verdict.strip()
+                field, verdict = field.strip(), verdict.strip().upper()
+                if not field:
+                    continue
+                if verdict not in ("PRESERVED", "CHANGED"):
+                    raise ArbitrationError(
+                        f"attestation gave {field!r} the value {verdict!r}; "
+                        "only PRESERVED or CHANGED are meaningful"
+                    )
+                if field in fidelity:
+                    raise ArbitrationError(f"attestation reported {field!r} twice")
+                fidelity[field] = verdict
         elif upper.startswith("NEUTRALITY:"):
+            if neutrality is not None:
+                raise ArbitrationError("attestation gave two NEUTRALITY verdicts")
             body = line[len("NEUTRALITY:"):].strip()
-            seen_neutrality = True
-            neutrality_pass = body.upper().startswith("PASS")
-            note = "" if neutrality_pass else body[len("FAIL"):].strip()
+            if body.upper().startswith("PASS"):
+                neutrality = True
+            elif body.upper().startswith("FAIL"):
+                neutrality = False
+                note = body[len("FAIL"):].strip()
+            else:
+                raise ArbitrationError(f"NEUTRALITY must be PASS or FAIL, got {body!r}")
         elif upper.startswith("STAKES-ADVOCACY:"):
+            stakes_seen = True
             body = line[len("STAKES-ADVOCACY:"):].strip()
-            stakes = None if body.upper().startswith("NONE") else body[len("PRESENT"):].strip() or body
-    if not fidelity or not seen_neutrality:
-        raise ArbitrationError("attestation is missing FIDELITY or NEUTRALITY")
-    return Attestation(fidelity, neutrality_pass, note, stakes, (text or "").strip())
+            stakes = None if body.upper().startswith("NONE") else (
+                body[len("PRESENT"):].strip() or body
+            )
+
+    missing = [f for f in expected if f not in fidelity]
+    if missing:
+        raise ArbitrationError(f"attestation did not cover: {', '.join(missing)}")
+    unexpected = [f for f in fidelity if f not in expected]
+    if unexpected:
+        raise ArbitrationError(f"attestation covered unknown field(s): {', '.join(unexpected)}")
+    if neutrality is None:
+        raise ArbitrationError("attestation has no NEUTRALITY verdict")
+    if not stakes_seen:
+        raise ArbitrationError("attestation has no STAKES-ADVOCACY verdict")
+    return Attestation(fidelity, neutrality, note, stakes, (text or "").strip())
 
 
 # --- rendering --------------------------------------------------------------
@@ -357,7 +424,27 @@ def arbitrate(
     try:
         return _arbitrate(arguments, deciders, agent, log_dir, now, progress)
     except ArbitrationError as exc:
-        return f"[paranoia-local error] arbitrate: {exc}"
+        # A failure still returns the full trailer. "Every field is always present"
+        # must hold on the error path too, or a caller that parses `ARBITRATION:`
+        # gets nothing and has to fall back to reading prose.
+        return "\n".join(
+            [
+                "# Arbitration: FAILED",
+                "",
+                str(exc),
+                "",
+                render_trailer(
+                    arb.Outcome(arb.FAILED, None, str(exc)),
+                    advisory="none",
+                    cleaning="not reached",
+                    snapshot="none",
+                    seed=str(arguments.get("order_seed") or "none"),
+                    refs_moved=False,
+                    audit="none",
+                    rounds=0,
+                ),
+            ]
+        )
 
 
 def _arbitrate(
@@ -388,6 +475,7 @@ def _arbitrate(
     seed = str(arguments.get("order_seed") or uuid.uuid4().hex)
     retain = bool(arguments.get("retain_snapshot", False))
     models = dict(arguments.get("models") or {})
+    cleaner_model = str(arguments.get("cleaner_model") or eng.CLEANER_MODEL)
     effort = resolve("effort", arguments.get("effort"), cfg, "medium")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
@@ -403,6 +491,9 @@ def _arbitrate(
     refs_before = evidence.refs_digest(repo)
 
     links = evidence.symlink_map(repo, snapshot)
+    # A revision-prefixed citation resolves in its OWN commit, so it needs that
+    # commit's symlink map, not the snapshot's.
+    resolver = evidence.LinkResolver(repo, snapshot, links)
     escaping = evidence.escaping_symlinks(repo, snapshot, links)
     if escaping:
         raise ArbitrationError(
@@ -434,6 +525,7 @@ def _arbitrate(
         hints=hints,
         originals=originals,
         do_clean=do_clean,
+        cleaner_model=cleaner_model,
         progress=progress,
     )
 
@@ -458,20 +550,22 @@ def _arbitrate(
 
     engine_names = [p.engine for p in presentations]
     progress(f"round 1: {', '.join(engine_names)}")
-    round1 = _fan_out(
+    casts1 = _fan_out(
         agent=agent, repo=repo, snapshot=snapshot, deciders=deciders,
         presentations=presentations, packet=packet, carried={}, models=models,
         effort=effort, web_search=web_search,
     )
+    round1 = [c.vote for c in casts1]
 
     def resolve_region(citation: Citation) -> Region | None:
         got = evidence.resolve_citation(
-            repo, citation, snapshot=snapshot, links=links, context=arb.CONTEXT_LINES
+            repo, citation, snapshot=snapshot, links=resolver, context=arb.CONTEXT_LINES
         )
         return got[0] if got else None
 
-    votes1 = {v.engine: v for v in round1}
-    per_round: list[dict[str, Vote]] = [votes1]
+    per_round: list[dict[str, Vote]] = [{v.engine: v for v in round1}]
+    transcripts: list[list[Cast]] = [casts1]
+    carried_regions: list[tuple[Region, str]] = []
     sub1 = arb.substantiation(round1, resolve=resolve_region)
     outcome = arb.compute_outcome(round1, substantiated=sub1)
     rounds = 1
@@ -485,21 +579,28 @@ def _arbitrate(
         union = arb.region_union(own)
         if arb.round_two_permitted(union, own):
             progress("round 2: reconciling on carried evidence")
-            carried_bodies = _read_union(repo, snapshot, links, union)
+            carried_bodies = _read_union(repo, union)
+            # Substantiate against what was ACTUALLY carried, not the pre-transport
+            # union: a region whose bytes failed to read was never sent, so it
+            # cannot be the evidence a vote was reconciled by.
+            sent = [region for region, _ in carried_bodies]
             carried = {v.engine: carried_bodies for v in round1}
-            round2 = _fan_out(
+            casts2 = _fan_out(
                 agent=agent, repo=repo, snapshot=snapshot, deciders=deciders,
                 presentations=presentations, packet=packet, carried=carried,
                 models=models, effort=effort, web_search=web_search,
             )
+            round2 = [c.vote for c in casts2]
+            transcripts.append(casts2)
             per_round.append({v.engine: v for v in round2})
-            gained = {e: arb.gains_for(e, union, own[e]) for e in own}
+            gained = {e: arb.gains_for(e, sent, own[e]) for e in own}
             sub2 = arb.substantiation(
                 round2, resolve=resolve_region, carried={e: list(g) for e, g in gained.items()}
             )
             outcome = arb.compute_outcome(round2, substantiated=sub2)
             rounds = 2
-            carried_note = f"{len(union)} region(s) carried to both deciders"
+            carried_regions = carried_bodies
+            carried_note = f"{len(sent)} region(s) carried to both deciders"
         else:
             carried_note = (
                 "round 2 withheld: no novel snapshot-resolved evidence for both deciders, "
@@ -538,8 +639,27 @@ def _arbitrate(
                 "statements": packet.statements,
             },
             "label_maps": {p.engine: dict(p.label_to_id) for p in presentations},
+            # The prompts, the replies, and the bytes that crossed — everything the
+            # decision was actually made on. `SNAPSHOT` is provenance only (the
+            # wrapper commit is unreferenced and gc reclaims it), so if this record
+            # does not hold them, the run is unauditable once that happens.
             "rounds": [
-                {e: _vote_record(v) for e, v in votes.items()} for votes in per_round
+                {
+                    cast.vote.engine: {
+                        **_vote_record(cast.vote),
+                        "prompt": cast.body,
+                        "reply": cast.raw,
+                    }
+                    for cast in casts
+                }
+                for casts in transcripts
+            ],
+            "carried_evidence": [
+                {
+                    "commit": region.commit, "path": region.path,
+                    "lo": region.lo, "hi": region.hi, "body": body,
+                }
+                for region, body in carried_regions
             ],
             "outcome": outcome.outcome,
             "selected": outcome.selected,
@@ -580,18 +700,19 @@ def _vote_record(vote: Vote) -> dict[str, Any]:
     }
 
 
-def _read_union(
-    repo: Path, snapshot: str, links: dict[str, str], union: Sequence[Region]
-) -> list[tuple[Region, str]]:
+def _read_union(repo: Path, union: Sequence[Region]) -> list[tuple[Region, str]]:
+    """Read each merged region as EXACTLY `lo..hi`.
+
+    Re-deriving the window from the anchor would under-carry a merged region — two
+    anchors merge to a span wider than either expansion — while substantiation is
+    checked against the merged bounds. A round-2 citation inside the merged span
+    but outside what was actually sent would then count as carried evidence.
+    """
     out: list[tuple[Region, str]] = []
     for region in union:
-        got = evidence.resolve_citation(
-            repo,
-            Citation(region.path, region.anchor, commit=None if region.commit == snapshot else region.commit),
-            snapshot=snapshot, links=links, context=arb.CONTEXT_LINES,
-        )
-        if got:
-            out.append(got)
+        body = evidence.read_region(repo, region)
+        if body:
+            out.append((region, body))
     return out
 
 
@@ -632,6 +753,7 @@ def _clean_and_attest(
     hints: list[dict],
     originals: Mapping[str, str],
     do_clean: bool,
+    cleaner_model: str,
     progress: Callable[[str], None],
 ) -> tuple[Packet, str]:
     if not do_clean:
@@ -651,7 +773,7 @@ def _clean_and_attest(
     for attempt in range(2):
         progress("cleaning the framing" if attempt == 0 else "re-cleaning after attestation")
         cleaned_raw = agent(
-            engine_name=eng.CLEANER_ENGINE, model=eng.CLEANER_MODEL,
+            engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
             instructions=prompts.CLEANER_INSTRUCTIONS,
             body=_clean_body(decision, stakes, context, hints, originals, complaint),
             cwd=None, effort="medium", web_search=False,
@@ -660,11 +782,13 @@ def _clean_and_attest(
         try:
             parsed = parse_cleaned_packet(cleaned_raw, list(originals))
             check_length_bands(parsed["statements"], originals)
+            cleaned_hints = _merge_hints(hints, parsed["hints"])
             arb.reject_reserved_tokens(
                 {
                     "decision": parsed["decision"],
                     "context": parsed["context"],
                     **{f"statement[{k}]": v for k, v in parsed["statements"].items()},
+                    **{f"hint[{h['path']}]": h["reason"] for h in cleaned_hints},
                 },
                 list(originals),
             )
@@ -677,11 +801,18 @@ def _clean_and_attest(
         attested_raw = agent(
             engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
             instructions=prompts.ATTEST_INSTRUCTIONS,
-            body=_attest_body(decision, stakes, context, originals, parsed),
+            body=_attest_body(decision, stakes, context, hints, cleaned_hints, originals, parsed),
             cwd=None, effort="low", web_search=False,
             timeout=CLEAN_TIMEOUT_SEC, text_only=True,
         )
-        attestation = parse_attestation(attested_raw)
+        try:
+            attestation = parse_attestation(
+                attested_raw, ["decision", "context", "hints", *originals]
+            )
+        except ArbitrationError as exc:
+            last_error = f"attestation unusable: {exc}"
+            complaint = f"An independent auditor's reply was unusable: {exc}\nRe-clean and try again."
+            continue
         if attestation.stakes_advocacy:
             raise ArbitrationError(
                 "the stakes text advocates for an option, and stakes is not the "
@@ -691,7 +822,7 @@ def _clean_and_attest(
             return (
                 Packet(
                     decision=parsed["decision"], stakes=stakes, context=parsed["context"],
-                    hints=hints, statements=parsed["statements"],
+                    hints=cleaned_hints, statements=parsed["statements"],
                     cleaning="attested" if attempt == 0 else "attested-after-retry",
                     attestation=attestation.raw,
                 ),
@@ -724,8 +855,8 @@ def _clean_body(
     )
     parts.append("=== CONTEXT (neutralize) ===\n" + (context or "None."))
     parts.append(
-        "=== HINTS (neutralize the reasons, keep the paths) ===\n"
-        + ("\n".join(f"- {h['path']}: {h.get('reason', '')}" for h in hints) or "None.")
+        "=== HINTS (neutralize the reasons, keep the paths EXACTLY) ===\n"
+        + _render_hints(hints)
     )
     parts.append(
         "=== STAKES (REPRODUCE VERBATIM — do not alter one character) ===\n" + stakes
@@ -733,17 +864,33 @@ def _clean_body(
     return "\n\n".join(parts)
 
 
+def _merge_hints(originals: Sequence[dict], cleaned: Mapping[str, str]) -> list[dict]:
+    """Keep the caller's paths (already validated against the snapshot) and take the
+    cleaner's neutralized reasons for them. The cleaner may not add or drop a path;
+    a reason it fails to return falls back to empty rather than to the original,
+    because an un-neutralized reason is the steering channel we are removing."""
+    return [{"path": h["path"], "reason": cleaned.get(h["path"], "")} for h in originals]
+
+
+def _render_hints(hints: Sequence[Mapping[str, str]]) -> str:
+    return "\n".join(f"- {h['path']}: {h.get('reason', '')}" for h in hints) or "None."
+
+
 def _attest_body(
     decision: str,
     stakes: str,
     context: str,
+    original_hints: Sequence[dict],
+    cleaned_hints: Sequence[dict],
     originals: Mapping[str, str],
     parsed: Mapping[str, Any],
 ) -> str:
     pairs = [
         f"[decision]\nORIGINAL: {decision}\nCLEANED:  {parsed['decision']}",
         f"[context]\nORIGINAL: {context or 'None.'}\nCLEANED:  {parsed['context'] or 'None.'}",
-        f"[hints]\nORIGINAL: (paths and reasons as given)\nCLEANED:  {parsed['hints_text'] or 'None.'}",
+        # The real originals, not a placeholder: an auditor shown "(as given)"
+        # cannot compare anything, so hint reasons went unchecked.
+        f"[hints]\nORIGINAL: {_render_hints(original_hints)}\nCLEANED:  {_render_hints(cleaned_hints)}",
     ]
     for oid, original in originals.items():
         pairs.append(f"[{oid}]\nORIGINAL: {original}\nCLEANED:  {parsed['statements'][oid]}")
@@ -765,12 +912,12 @@ def _fan_out(
     models: Mapping[str, str],
     effort: str,
     web_search: bool,
-) -> list[Vote]:
+) -> list[Cast]:
     """Both deciders in parallel, each in its OWN worktree of the same snapshot:
     shared revision, independent search."""
     by_name = {p.engine: p for p in presentations}
 
-    def one(engine: eng.Engine) -> Vote:
+    def one(engine: eng.Engine) -> Cast:
         presentation = by_name[engine.name]
         body = render_decider_body(packet, presentation, tuple(carried.get(engine.name, ())))
         with worktree_at(repo, snapshot) as wt:
@@ -781,20 +928,20 @@ def _fan_out(
                 body=body, cwd=wt, effort=effort, web_search=web_search,
                 timeout=DECIDE_TIMEOUT_SEC, text_only=False,
             )
-        return arb.parse_verdict(text, presentation)
+        return Cast(vote=arb.parse_verdict(text, presentation), body=body, raw=text)
 
     with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
         futures = {engine.name: pool.submit(one, engine) for engine in deciders}
-    votes: list[Vote] = []
+    casts: list[Cast] = []
     errors: list[str] = []
     for name, future in futures.items():
         try:
-            votes.append(future.result())
+            casts.append(future.result())
         except Exception as exc:  # noqa: BLE001 — name the engine that failed
             errors.append(f"{name}: {type(exc).__name__}: {exc}")
     if errors:
         raise ArbitrationError("decider failure — " + "; ".join(errors))
-    return votes
+    return casts
 
 
 def _run_agent(
@@ -815,12 +962,23 @@ def _run_agent(
     # text_only roles get a fresh EMPTY directory: for Claude the empty allowlist is
     # the boundary; for Codex, whose read-only sandbox paranoia cannot narrow, an
     # empty cwd plus instruction is a bound, not a boundary.
-    where = Path(cwd) if cwd is not None else Path(tempfile.mkdtemp(prefix="paranoia-txt-"))
-    review = engine.run(
-        prompts.compose(instructions, body), where, model, effort, web_search, timeout=timeout
-    )
-    if review.error and not (review.text or "").strip():
-        raise ArbitrationError(f"{engine_name} failed (exit {review.returncode}): {review.text}")
+    scratch = tempfile.mkdtemp(prefix="paranoia-txt-") if cwd is None else None
+    where = Path(cwd) if cwd is not None else Path(scratch)
+    try:
+        review = engine.run(
+            prompts.compose(instructions, body), where, model, effort, web_search, timeout=timeout
+        )
+    finally:
+        if scratch:
+            shutil.rmtree(scratch, ignore_errors=True)
+    # Reject ANY errored run, even one that left parseable text. `_execute`
+    # deliberately preserves in-band error text (see tests/test_instrumentation.py),
+    # so accepting non-empty output here would let a failed process cast a vote.
+    if review.error:
+        raise ArbitrationError(
+            f"{engine_name} failed (exit {review.returncode}): "
+            f"{(review.text or '').strip()[:500]}"
+        )
     return review.text
 
 

@@ -600,3 +600,170 @@ def test_preflight_requires_both_binaries(monkeypatch):
 def test_preflight_passes_when_both_present(monkeypatch):
     monkeypatch.setattr(ah.shutil, "which", lambda b: "/usr/bin/" + b)
     _REAL_PREFLIGHT([FakeEngine("codex"), FakeEngine("claude")])
+
+
+# --- implementation-review regressions --------------------------------------
+
+
+def test_cleaned_hint_reason_reaches_the_deciders_not_the_original(repo: Path):
+    """A hint reason is a steering channel: "the approved implementation" reaching
+    both vendors unchanged is exactly the shared anchoring the cleaner removes, and
+    it did while the run reported CLEANING: attested."""
+
+    class HintCleaner(Agent):
+        def __call__(self, **kw):
+            if "NEUTRALIZER" in kw["instructions"]:
+                self.calls.append({**kw, "engine": kw["engine_name"], "body": kw["body"],
+                                   "cwd": kw["cwd"], "text_only": kw["text_only"],
+                                   "timeout": kw["timeout"], "instructions": kw["instructions"]})
+                opts = "\n".join(f"{k}: {v}" for k, v in self.statements.items())
+                return (
+                    "=== DECISION ===\nPick a numeric type.\n\n"
+                    f"=== OPTIONS ===\n{opts}\n\n"
+                    "=== CONTEXT ===\nNone.\n\n"
+                    "=== HINTS ===\n- app.py: the module under discussion\n"
+                )
+            return super().__call__(**kw)
+
+    agent = HintCleaner(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path=Path(repo.parent), files=[
+        {"path": "app.py", "reason": "the APPROVED implementation, obviously"}
+    ])
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    for call in agent.calls:
+        if call["cwd"] is None:
+            continue
+        assert "the module under discussion" in call["body"]
+        assert "APPROVED" not in call["body"]
+
+
+def test_attester_sees_the_real_original_hints(repo: Path, tmp_path: Path):
+    """An auditor shown "(paths and reasons as given)" cannot compare anything."""
+    agent = Agent(lambda e, r: "opt-float")
+    run(repo, agent, tmp_path, files=[{"path": "app.py", "reason": "MARKER-ORIGINAL-REASON"}])
+    attest_body = next(c["body"] for c in agent.calls if "TEXT AUDITOR" in c["instructions"])
+    assert "MARKER-ORIGINAL-REASON" in attest_body
+    assert "(paths and reasons as given)" not in attest_body
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        # missing every field but one
+        "FIDELITY: decision PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n",
+        # a value that is neither PRESERVED nor CHANGED
+        ("FIDELITY: decision UNKNOWN; context PRESERVED; hints PRESERVED; "
+         "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"),
+        # no neutrality verdict
+        ("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+         "opt-float PRESERVED; opt-decimal PRESERVED\nSTAKES-ADVOCACY: NONE\n"),
+        # no stakes verdict
+        ("FIDELITY: decision PRESERVED; context PRESERVED; hints PRESERVED; "
+         "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"),
+    ],
+)
+def test_incomplete_attestation_is_not_accepted_as_passing(repo: Path, tmp_path: Path, bad: str):
+    """A lenient parser made an incomplete attestation look like a passing one, so a
+    semantically altered packet could be stamped `attested`."""
+    agent = Agent(lambda e, r: "opt-float", attest=bad)
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert all(c["cwd"] is None for c in agent.calls)  # never reached the deciders
+
+
+def test_round_two_carries_the_whole_merged_region(repo: Path, tmp_path: Path):
+    """Two anchors merge to a span wider than either window; substantiation checks
+    the merged bounds, so the merged bounds are what must be sent."""
+    (repo / "wide.py").write_text("".join(f"L{i}\n" for i in range(1, 31)))
+    commit_all(repo, "wide")
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda e, r: picks.get((e, r), "opt-float"),
+        extra={
+            ("codex", 1): {"decisive": "app.py:4"},
+            # two nearby anchors from the same vendor merge to [7,19]
+            ("claude", 1): {"decisive": "wide.py:10", "citations": "wide.py:16"},
+        },
+    )
+    run(repo, agent, tmp_path)
+    round2 = [c["body"] for c in agent.calls if c["cwd"] is not None][2:]
+    assert round2, "round 2 should have run"
+    for body in round2:
+        assert "L7" in body and "L19" in body  # the whole merged span
+        assert "L6" not in body and "L20" not in body
+
+
+def test_engine_error_with_output_still_fails(monkeypatch):
+    """`_execute` preserves in-band error text (tests/test_instrumentation.py), so
+    accepting non-empty output would let a failed process cast a vote."""
+    from paranoia_local.engines import Review
+
+    class Failing:
+        name = "codex"
+        default_model = "m"
+        binary = "codex"
+        text_only = False
+
+        def run(self, *a, **k):
+            return Review(
+                text="SELECTED: whatever\n", session_ref=None, raw="",
+                returncode=1, error=True,
+            )
+
+    monkeypatch.setattr(ah.eng, "get_engine", lambda name, text_only=False: Failing())
+    with pytest.raises(Exception, match="failed"):
+        ah._run_agent(
+            engine_name="codex", model="m", instructions="i", body="b", cwd=None,
+            effort="low", web_search=False, timeout=5, text_only=True,
+        )
+
+
+def test_cleaner_model_override_is_honoured(repo: Path, tmp_path: Path):
+    agent = Agent(lambda e, r: "opt-float")
+    run(repo, agent, tmp_path, cleaner_model="claude-custom-9")
+    clean = next(c for c in agent.calls if "NEUTRALIZER" in c["instructions"])
+    assert clean["model"] == "claude-custom-9"
+
+
+def test_failure_still_returns_the_full_trailer(repo: Path, tmp_path: Path):
+    """Every field always present has to hold on the error path too."""
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path,
+                 files=[{"path": "/etc/hostname"}])
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    for field in ("SELECTED", "ADVISORY", "AUTHORITY-POLICY", "CLEANING",
+                  "SNAPSHOT", "ORDER-SEED", "REFS-MOVED", "AUDIT", "ROUNDS"):
+        assert trailer_field(report, field)
+
+
+def test_audit_holds_the_prompts_replies_and_carried_bytes(repo: Path, tmp_path: Path):
+    """SNAPSHOT is provenance only, so if the log does not hold these the run is
+    unauditable once gc reclaims the wrapper commit."""
+    import json
+
+    (repo / "other.py").write_text("A = 1\nB = 2\nC = 3\nD = 4\nE = 5\n")
+    commit_all(repo, "other")
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda e, r: picks.get((e, r), "opt-float"),
+        extra={("codex", 1): {"decisive": "app.py:4"}, ("claude", 1): {"decisive": "other.py:3"}},
+    )
+    report = run(repo, agent, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert len(record["rounds"]) == 2
+    for rnd in record["rounds"]:
+        for engine, entry in rnd.items():
+            assert "=== DECISION ===" in entry["prompt"]
+            assert "SELECTED:" in entry["reply"]
+    bodies = [c["body"] for c in record["carried_evidence"]]
+    assert any("C = 3" in b for b in bodies)
+    assert any("def greet(name):" in b for b in bodies)
+
+
+def test_no_scratch_directories_are_leaked(repo: Path, tmp_path: Path):
+    import glob
+    import tempfile
+
+    before = set(glob.glob(str(Path(tempfile.gettempdir()) / "paranoia-txt-*")))
+    run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
+    after = set(glob.glob(str(Path(tempfile.gettempdir()) / "paranoia-txt-*")))
+    assert after == before

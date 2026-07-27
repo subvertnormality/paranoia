@@ -535,3 +535,39 @@ def test_advisory_line_values():
     b = vote("claude", "opt-a", authority="human-owner")
     assert arb.advisory_line([a, a]) == "none"
     assert arb.advisory_line([a, b]) == "human-owner (flagged by: claude)"
+
+
+# --- trailer grammar strictness (implementation review, round 1) ------------
+
+
+def test_selected_must_be_the_whole_value_not_the_first_token():
+    """`SELECTED: <label> (the safe one)` must fail rather than silently discarding
+    the trailing text, which may be where the decider qualified its answer."""
+    p = _pres()
+    label = p.items[0][0]
+    with pytest.raises(ArbitrationError, match="not a label issued"):
+        arb.parse_verdict(trailer(f"{label} (the safe one)"), p)
+
+
+def test_none_prefixed_risk_is_rejected_not_read_as_none():
+    """`NONE [MAJOR] unsafe` read as NONE would turn a blocking objection into a
+    CONVERGED."""
+    p = _pres()
+    with pytest.raises(ArbitrationError, match="SELECTED-RISK"):
+        arb.parse_verdict(trailer(p.items[0][0], risk="NONE [MAJOR] unsafe"), p)
+
+
+def test_severity_without_a_reason_is_rejected():
+    p = _pres()
+    with pytest.raises(ArbitrationError, match="SELECTED-RISK"):
+        arb.parse_verdict(trailer(p.items[0][0], risk="[MAJOR]"), p)
+
+
+def test_merged_region_bounds_are_wider_than_either_anchor_window():
+    """The property that made under-carrying dangerous: substantiation is checked
+    against the merged span, so the merged span is what must be sent."""
+    merged = arb.merge_regions([region("a.py", 10), region("a.py", 16)])
+    assert len(merged) == 1
+    assert (merged[0].lo, merged[0].hi) == (7, 19)
+    # anchor 18 is inside the merged span but outside either 7-line window
+    assert arb.anchor_within(region("a.py", 18), merged[0])
