@@ -659,8 +659,12 @@ def make_grep(repo: Path, commit: str, *,
             return GrepResult(error=f"predicate timed out after {PER_CLASS_TIMEOUT}s")
         if code == 1:
             return GrepResult()               # no matches: closure, not failure
-        if code >= 2:
-            return GrepResult(error=_git_error(err))
+        if code != 0:
+            # Everything except 0 and 1 is a failure — INCLUDING negative codes, which is
+            # how Python reports a signal-terminated subprocess. A `-9` with empty output
+            # would otherwise read as "no matches" and falsely close the class: a predicate
+            # that never completed has not proved anything.
+            return GrepResult(error=_git_error(err) or f"git grep terminated with code {code}")
         paths = tuple(p for p in _decode(out).split("\0") if p)
 
         # Display pass. Its failure is not a verdict failure — the verdict already stands.
@@ -682,7 +686,7 @@ def _decode(raw: bytes) -> str:
 
 def _git_error(err: bytes) -> str:
     first = _decode(err).strip().splitlines()
-    return first[0] if first else "git grep failed"
+    return first[0] if first else ""
 
 
 def _strip_commit(paths: Sequence[str], commit: str) -> tuple[str, ...]:

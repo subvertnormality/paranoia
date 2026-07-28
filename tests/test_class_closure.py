@@ -458,6 +458,22 @@ class TestGitEdge:
         result = cc.make_grep(repo, head, runner=runner)("a[", ".")
         assert result.error and result.paths == ()
 
+    def test_a_signal_killed_grep_is_an_error_not_a_closure(self, repo: Path) -> None:
+        """Python reports a signal-terminated subprocess with a NEGATIVE return code. Only
+        0 and 1 are meaningful; anything else means the predicate never proved closure."""
+        head = commit(repo, {"a.py": "x = 1\n"})
+
+        def killed(argv: list[str], cwd: Path, timeout: int) -> tuple[int, bytes, bytes]:
+            return -9, b"", b""
+
+        result = cc.make_grep(repo, head, runner=killed)("anything", ".")
+        assert result.error and "-9" in result.error
+        assert result.paths == ()
+
+        lin = lineage_with(("inv", cc.MAJOR, "anything"))
+        cc.sweep(lin, lambda p, s: result)
+        assert lin.active()[0].status == cc.MALFORMED and lin.active()[0].blocking
+
     def test_a_non_utf8_path_parses_and_renders_safely(self, repo: Path) -> None:
         """Round 14's MAJOR: parsed with surrogateescape, then rendered verbatim, a lone
         surrogate crashes the prompt encoding or hangs stdin until the timeout."""
