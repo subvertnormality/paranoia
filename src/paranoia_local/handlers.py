@@ -486,7 +486,12 @@ class _ClassClosure:
         except cc.StateUnavailable as exc:
             self.unavailable = str(exc)
             return []
-        cc.open_latch(self.state_root, self.lineage_id)
+        try:
+            cc.open_latch(self.state_root, self.lineage_id)
+        except cc.StateUnavailable as exc:
+            # The review still runs and is still returned; it simply cannot be settled.
+            self.unavailable = str(exc)
+            return []
         self._latched = True
         self._apply_exemption_args()
         cc.sweep(self.lineage, self._grep(), budget=self.budget, clock=time.monotonic)

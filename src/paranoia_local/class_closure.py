@@ -386,13 +386,27 @@ def open_latch(root: Path, lineage_id: str) -> None:
     """Written before the engine call, cleared only once the round has finished writing.
     Without it a *failed* write leaves no marker and the next round starts empty."""
     _, pending = _paths(root, lineage_id)
-    pending.parent.mkdir(parents=True, exist_ok=True)
-    pending.write_text("pending\n", encoding="utf-8")
+    try:
+        pending.parent.mkdir(parents=True, exist_ok=True)
+        pending.write_text("pending\n", encoding="utf-8")
+    except OSError as exc:
+        # Same treatment as a failed lineage save: block, but never prevent the review
+        # from running or discard its text over a storage fault.
+        raise StateUnavailable(f"could not write the pending latch at {pending}: {exc}") from exc
 
 
 def clear_latch(root: Path, lineage_id: str) -> None:
+    """Best-effort by design, and the ONE place in this module where that is right.
+
+    A latch that cannot be removed leaves the next round `STATE-UNAVAILABLE`, which is
+    exactly the fail-closed outcome the latch exists to produce. Raising here instead would
+    destroy a completed, paid review over a file that could not be unlinked.
+    """
     _, pending = _paths(root, lineage_id)
-    pending.unlink(missing_ok=True)
+    try:
+        pending.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def save_lineage(root: Path, lineage: Lineage) -> None:

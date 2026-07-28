@@ -286,6 +286,45 @@ class TestFailurePaths:
         out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=2)
         assert "CONVERGENCE: NOT-BLOCKED" in out
 
+    def test_an_unwritable_latch_blocks_but_still_returns_the_review(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """A storage fault must never prevent the review running or discard its text."""
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        d = cc.lineage_dir(state_root(tmp_path))
+        d.mkdir(parents=True)
+        d.chmod(0o500)  # readable, not writable
+        try:
+            out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
+        finally:
+            d.chmod(0o700)
+        assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
+        assert "Nothing notable" in out, "the paid review text must survive"
+
+    def test_an_unremovable_latch_does_not_destroy_the_review(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """An un-removable latch leaves the next round STATE-UNAVAILABLE, which is the
+        fail-closed outcome it exists for — but it must not cost this round's review."""
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        real_clear = cc.clear_latch
+        calls: list[str] = []
+
+        def boom(root: Path, lineage_id: str) -> None:
+            calls.append(lineage_id)
+            raise OSError("read-only filesystem")
+
+        try:
+            cc.clear_latch = lambda *a, **kw: real_clear(*a, **kw)
+            out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
+            assert "CONVERGENCE: NOT-BLOCKED" in out
+        finally:
+            cc.clear_latch = real_clear
+        # And the unlink failure itself is swallowed rather than raised:
+        latch = cc.lineage_dir(state_root(tmp_path)) / "nonexistent.pending"
+        cc.clear_latch(state_root(tmp_path), "nonexistent")  # must not raise
+        assert not latch.exists()
+
     def test_the_pending_latch_is_released_on_a_normal_round(
         self, repo: Path, tmp_path: Path
     ) -> None:
