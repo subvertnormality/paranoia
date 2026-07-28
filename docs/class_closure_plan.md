@@ -1,10 +1,11 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 11. Ten codex plan-review rounds folded —
+Status: DRAFT for review, revision 12. Eleven codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR; round 10: 1 FATAL, no risks, no gaps. Every finding accepted.
+4 FATAL, 2 MAJOR; round 10: 1 FATAL; round 11: 1 MAJOR, no FATALs, no risks, no
+gaps. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -348,8 +349,18 @@ checkout needed.
 risk: revision 2 bounded each class but not the round, so a lineage of 36
 timed-out classes would delay every round by six minutes before the reviewer even
 starts* — a **60 s aggregate budget** across all classes. Classes not reached are
-recorded `unchecked`. Registration is refused beyond 100 tracked classes, with a
-message.
+recorded `unchecked`. Registration is refused beyond 100 **non-superseded**
+classes, with a message.
+
+*Round 11 [MAJOR]: counting every tracked class made the cap remove the recovery
+path at exactly the boundary it establishes — with 100 classes held, correcting a
+unique malformed or over-broad `MAJOR` predicate needs a 101st object and would
+be refused, leaving permanent `BLOCKED` unless the reviewer dishonestly
+downgraded the severity or the operator reached for the kill switch. That
+contradicts §1's named-escape guarantee.* Superseded classes are inert — never
+rechecked, never blocking — so they do not consume the budget the cap exists to
+protect, and `SUPERSEDE … WITH-PATTERN` applies atomically as one active class
+retired and one added: net zero, and therefore always available at the boundary.
 
 Under violation-only semantics many matches means many violations, so the cap is
 an output bound, not a verdict: the block text is truncated with a count. A regex
@@ -734,6 +745,10 @@ blocks** on the git result; a review that omits the recurrence prose entirely
 **also still blocks**, because the verdict never depended on the reviewer's text;
 `[RECURRENCE <id>]` appearing anywhere changes no parse outcome.
 
+**Cap boundary** (round 11): at exactly 100 non-superseded classes a new
+registration is refused, **but `SUPERSEDE … WITH-PATTERN` still succeeds**
+because it is net zero; superseded classes do not count toward the cap.
+
 **New-class evaluation** (round 10's FATAL): a review registering a new `MAJOR`
 class whose predicate still matches **cannot** emit `NOT-BLOCKED` in that same
 round; `SUPERSEDE … WITH-PATTERN` cannot emit `NOT-BLOCKED` before the
@@ -771,7 +786,7 @@ recheck sweep.
 timeout each → `malformed`; > 200 matches → `over-broad` with a truncated,
 counted block; aggregate budget exhaustion → `unchecked`; a path containing a
 newline and a non-UTF-8 byte parses correctly under `-z`; a pathspec beginning
-with `:` is rejected before any git call; registration beyond 100 classes is
+with `:` is rejected before any git call; registration beyond 100 non-superseded classes is
 refused.
 
 **Blocking policy:** `MAJOR` class blocks; `MINOR` and `OUT-OF-SCOPE` do not and
