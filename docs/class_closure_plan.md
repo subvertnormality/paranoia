@@ -1,11 +1,11 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 12. Eleven codex plan-review rounds folded —
+Status: DRAFT for review, revision 13. Twelve codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR; round 10: 1 FATAL; round 11: 1 MAJOR, no FATALs, no risks, no
-gaps. Every finding accepted.
+4 FATAL, 2 MAJOR; round 10: 1 FATAL; round 11: 1 MAJOR; round 12: 1 MAJOR, and
+nothing in any other section. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -424,13 +424,31 @@ exists precisely to review a branch that is not checked out — so reviewing
 detached checkout wrongly rejected a perfectly stable `head_ref`.*
 
 `lineage_id` = `sha256(resolved_repo_path, base_ref, head_symbolic_name)[:12]`,
-where `head_symbolic_name` is `git rev-parse --symbolic-full-name <head_ref>` on
-the **reviewed** ref. **Verified: for a commit sha this exits 0 and prints
-nothing** — so the test is empty output, not exit status. Empty means the
-reviewed ref is not a branch, and an explicit `lineage` argument is then
-required, the call erroring without one. Fail-closed beats silently minting a
-fresh lineage every round. Every trailer prints
-`LINEAGE: <id> (rounds recorded: N)` so an unintended split is visible.
+where `head_symbolic_name` comes from the **reviewed** ref by one of two commands:
+
+- **A named `head_ref`** → `git rev-parse --symbolic-full-name <head_ref>`.
+  **Verified: for a commit sha this exits 0 and prints nothing** — so the test is
+  empty output, not exit status. Empty means the reviewed ref is not a branch, an
+  explicit `lineage` argument is required, and the call errors without one.
+  Fail-closed beats silently minting a fresh lineage every round.
+- **The checkout itself** — a dirty target, or `head_ref` defaulted to `HEAD` →
+  `git symbolic-ref -q HEAD`.
+
+*Round 12 [MAJOR]: using `rev-parse --symbolic-full-name` for the checkout breaks
+the unborn-repository workflow this repo deliberately supports.
+`handlers._converge_branch_review` branches on `orientation.has_head(repo)` and
+falls back to `orientation.empty_tree`, and `tests/test_converge.py`'s
+`test_converge_on_unborn_repo` exercises exactly that path with
+`include_uncommitted: True` and no explicit lineage. With class closure on by
+default, that first-review workflow would have errored before the reviewer ran.
+Verified on a fresh `git init`: `rev-parse --symbolic-full-name HEAD` exits 128
+with `fatal: ambiguous argument 'HEAD'`, while `symbolic-ref -q HEAD` returns
+`refs/heads/master` and exit 0.* `symbolic-ref` reads the ref HEAD *points at*
+rather than resolving it to an object, which is why it works before the first
+commit — and an unborn branch is a perfectly good lineage key.
+
+Every trailer prints `LINEAGE: <id> (rounds recorded: N)` so an unintended split
+is visible.
 
 *Round 3 [MAJOR]: for dirty reviews that rule keys state to a branch the server
 is not reviewing. Verified: `orientation.resolve_target` returns `head_ref=None`
@@ -799,7 +817,10 @@ mechanized match counts from unmechanized awaiting-judgement; `NOT-BLOCKED` text
 does not contain the word *converged*; when blocked, the footer voids a reviewer
 `CONVERGED`.
 
-**Lineage:** a reviewed `head_ref` that is a branch but not checked out yields
+**Lineage:** **an unborn repository reviewed dirty with no explicit `lineage`
+succeeds and keys on `symbolic-ref -q HEAD`** — `test_converge_on_unborn_repo`
+must still pass with class closure at its default (round 12); a reviewed
+`head_ref` that is a branch but not checked out yields
 its own lineage, and two such branches off one base differ; a `head_ref` that is
 a sha (empty `--symbolic-full-name` output, exit 0) without `lineage` errors;
 **a dirty target uses the checkout's `HEAD` and rejects a supplied `head_ref`**
