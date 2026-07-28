@@ -1,10 +1,10 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 10. Nine codex plan-review rounds folded —
+Status: DRAFT for review, revision 11. Ten codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR. Every finding accepted.
+4 FATAL, 2 MAJOR; round 10: 1 FATAL, no risks, no gaps. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -378,6 +378,26 @@ exemptions (§2.8), and:
 permanent, so a later fix could reintroduce the defect while the trailer still
 reported nothing unclosed.* **A closed class reopens on any new match.**
 
+**The sweep runs twice: before the review, and again over whatever the register
+just minted.**
+
+*Round 10 [FATAL]: the sweep was specified only over classes the lineage already
+holds, and it runs before the engine call — but a class registered by **this**
+round's review does not exist until its register is parsed afterwards. So a brand
+new `MAJOR` class, or a `WITH-PATTERN` replacement whose predecessor was
+simultaneously marked non-blocking and never-rechecked, could be registered while
+the same round emitted `NOT-BLOCKED` — stopping the operator before the promised
+next-round check ever happened. Supersession made it worse than a one-round
+delay: the old blocker was retired in the same breath.*
+
+After a valid register is parsed, every **newly minted** mechanized predicate is
+evaluated against the same snapshot before the trailer is computed. A new class
+is `unchecked` until that pass runs it, and `unchecked` already blocks according
+to severity (§2.5, §2.9) — so the fail-safe direction holds even when the pass
+cannot run. The post-register pass draws on the same 60 s round budget; if the
+budget is exhausted the class stays `unchecked` and blocks per severity. A new
+unmechanized class starts `open` and blocks per severity with no pass needed.
+
 ### 2.7 Lineage state
 
 `~/.paranoia/lineages/<lineage_id>.json`, holding per class: `class_id`,
@@ -713,6 +733,13 @@ matches only in prose, with a register of `NONE`, **is well-formed and still
 blocks** on the git result; a review that omits the recurrence prose entirely
 **also still blocks**, because the verdict never depended on the reviewer's text;
 `[RECURRENCE <id>]` appearing anywhere changes no parse outcome.
+
+**New-class evaluation** (round 10's FATAL): a review registering a new `MAJOR`
+class whose predicate still matches **cannot** emit `NOT-BLOCKED` in that same
+round; `SUPERSEDE … WITH-PATTERN` cannot emit `NOT-BLOCKED` before the
+replacement predicate has been run and found closed; a new class the budget could
+not reach is `unchecked` and blocks per severity; a new `MINOR` class does not
+block whatever the pass finds.
 
 **Closure semantics:** zero matches → closed; any match → open with every match a
 recurrence; a closed class with a new match reopens; a superseded class is not
