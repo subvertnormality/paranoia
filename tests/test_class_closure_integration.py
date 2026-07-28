@@ -265,6 +265,9 @@ class TestFailurePaths:
             "a failed retry's parseable CLOSED must not be applied"
         )
         assert after.debt, "the round is register debt, not a silent success"
+        assert "supplied on retry" not in out, (
+            "a retry that was rejected must not be presented as what the round applied"
+        )
 
     def test_an_exception_after_prepare_does_not_strand_the_latch(
         self, repo: Path, tmp_path: Path
@@ -332,6 +335,16 @@ class TestFailurePaths:
 
 
 class TestArguments:
+    def test_the_legacy_non_converge_path_still_accepts_a_dirty_head_ref(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """Class closure never runs on the legacy path, so its argument rule must not
+        reach back and break a review that was valid before this feature existed."""
+        (repo / "dirty.py").write_text("x = 1\n")
+        out = run_round(repo, FakeEngine("## What works\nok"), tmp_path,
+                        converge=False, include_uncommitted=True, head_ref="feature")
+        assert "CONVERGENCE:" not in out
+
     def test_a_dirty_review_rejects_an_explicit_head_ref(self, repo: Path, tmp_path: Path) -> None:
         """resolve_target discards head_ref for a dirty review, so accepting it would key
         this round's classes to a branch that was never reviewed."""
@@ -378,7 +391,13 @@ class TestArguments:
             {"class_id": cid, "path": "a.py", "line": 1, "line_text": "NOT_IN_OPEN_SET here"},
         ])
         assert "CONVERGENCE: NOT-BLOCKED" in out
-        assert cc.EXEMPT_HEADER in engine.calls[0], "exemptions must be shown for challenge"
+        block = engine.calls[0]
+        assert cc.EXEMPT_HEADER in block, "exemptions must be shown for challenge"
+        # Once an exemption removes the last survivor the class closes and its unclosed
+        # block disappears, so this block is the ONLY place the reviewer can learn what the
+        # exempted line is alleged to violate. A bare path:line is unchallengeable.
+        assert "every open state must be in the v2 open set" in block
+        assert "NOT_IN_OPEN_SET" in block, "the predicate must travel with the exemption"
 
 
 class TestTrailerIntegration:

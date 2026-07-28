@@ -152,7 +152,8 @@ def critique_branch(
         resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
     )
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
-    if (closure_on and include_unc and arguments.get("head_ref") not in (None, "HEAD")
+    if (converge and closure_on and include_unc
+            and arguments.get("head_ref") not in (None, "HEAD")
             and not arguments.get("lineage")):
         # resolve_target discards head_ref for a dirty review and snapshots the checkout, so
         # accepting it would key this round's classes to a branch that was never reviewed.
@@ -470,6 +471,10 @@ class _ClassClosure:
         self.lineage: cc.Lineage | None = None
         self.unavailable: str | None = None
         self.budget = cc.Budget()
+        #: The retry text, held back until the round has actually applied AND persisted it.
+        #: A failed, malformed or transition-invalid retry must never be reported as what
+        #: the round applied while durable state says otherwise.
+        self._retry_candidate: str | None = None
         self.retry_register: str | None = None
         self._latched = False
         self._settled = False
@@ -527,6 +532,8 @@ class _ClassClosure:
             return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
                     "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
         self._settled = True
+        if lineage.debt is None:
+            self.retry_register = self._retry_candidate
         return cc.render_trailer(lineage, register_status=status, minted=minted)
 
     def abandon(self) -> None:
@@ -566,7 +573,7 @@ class _ClassClosure:
             retry = engine.resume(
                 review.session_ref, prompts.REGISTER_RETRY, repo, model, effort, web_search,
                 **_progress_kwargs(on_progress))
-            self.retry_register = retry.text
+            self._retry_candidate = retry.text
             if retry.error:
                 # A failed CLI still returns text, and that text can contain a parseable
                 # NONE or CLOSED block. Trusting it would let a broken retry mutate durable

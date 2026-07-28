@@ -776,11 +776,27 @@ def render_unmechanized(lineage: Lineage) -> str | None:
 
 
 def render_exempt(lineage: Lineage) -> str | None:
+    """Each exemption is shown WITH its class's invariant and predicate.
+
+    A bare `class 3f2a91c4: a.py:17` is unchallengeable: once an exemption removes a
+    class's last survivor the class closes, so its unclosed block disappears too, and the
+    cold reviewer is left with a path and a line number and no idea what they are supposed
+    to be violating. The challenge this block exists for needs the claim attached.
+    """
     if not lineage.exemptions:
         return None
-    out = [EXEMPT_HEADER]
+    out = [EXEMPT_HEADER,
+           "Each line below was declared a FALSE POSITIVE of its class's predicate. Read "
+           "the line and say so if it is in fact a genuine violation.", ""]
     for e in lineage.exemptions:
-        out.append(f"- class {e.class_id}: {display(e.path)}:{e.line}")
+        cls = lineage.classes.get(e.class_id)
+        out.append(f"- {display(e.path)}:{e.line} — exempted from class {e.class_id}")
+        if cls is not None:
+            out.append(f"    invariant: {display(cls.invariant)}")
+            what = (f"pattern /{display(cls.pattern or '')}/ over {display(cls.pathspec or '.')}"
+                    if cls.mechanized else f"procedure: {display(cls.procedure or '')}")
+            out.append(f"    {what}")
+            out.append(f"    class status: {cls.status}")
     return "\n".join(out)
 
 
