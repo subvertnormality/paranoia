@@ -194,9 +194,70 @@ maximum paranoia and manufactures marginal/hardening findings for 20+ rounds):
   instead of chasing diminishing findings. Start at 1; raise as the design stabilises.
 
 Operator recipe: set `stakes` in `.paranoia.toml`, then loop `already_raised` +
-`round` (1, 2, 3, …); stop when a round returns `CONVERGED` or only
-`[OUT-OF-SCOPE]`/`[MINOR]` items. Fold `[FATAL]`/in-scope-`[MAJOR]` findings;
-record `[OUT-OF-SCOPE]` ones separately rather than growing the design to fix them.
+`round` (1, 2, 3, …). **Stop when the computed `CONVERGENCE:` trailer says
+`NOT-BLOCKED` and the round returns `CONVERGED` or only
+`[OUT-OF-SCOPE]`/`[MINOR]` items** — the trailer governs, and when it says
+`BLOCKED` a reviewer's own `CONVERGED` is void (see *Class closure* below). Fold
+`[FATAL]`/in-scope-`[MAJOR]` findings; record `[OUT-OF-SCOPE]` ones separately
+rather than growing the design to fix them.
+
+**Two signals that the loop is going wrong, both learned the hard way:**
+
+- *The same defect keeps reappearing in a new spelling.* You are fixing instances,
+  not the class. That is what class closure exists to stop.
+- *Findings stop being about your diff and start being about imaginable inputs.*
+  The stakes are wrong, not the code. Tighten `stakes` and re-run that round
+  rather than folding what it raised.
+
+### Class closure (`class_closure`, **on by default** for `critique_branch`)
+
+A convergence loop that reports one instance of a defect per round can run for ten
+rounds while a single invariant stays violated — each round the operator fixes the
+site that was named, and the next round finds a sibling. The protocol had nowhere to
+put the *class*: findings are `file:line` shaped, `already_raised` tells the reviewer
+not to look there again, and the round-3 severity floor meters the leak to one
+instance per round.
+
+With class closure on, the reviewer ends its review with a **class register**: for
+each defect class, the invariant, a severity, and a **regex that matches violations
+only** (or a `PROCEDURE`, when no regex can express it). The server then:
+
+- **re-runs every registered predicate itself, every round**, against the reviewed
+  snapshot — `git grep -l -z` decides, so a violation inside a binary blob still counts;
+- **injects the surviving matches** into the next packet, *after* `already_raised` and
+  with explicit precedence over it, exempt from the severity floor;
+- **computes the verdict in Python** and appends it:
+
+```
+LINEAGE: 9f2c1a4b0e77 (rounds recorded: 8)
+CLASS-REGISTER: parsed 1
+CLASS-CLOSURE: 1 open, 2 closed, 3 surviving matches, 0 exempt, 1 unmechanized
+CONVERGENCE: BLOCKED — 1 class(es) unclosed:
+  3f2a91c4 every open state must be in the v2 open set (mechanized: 3 match(es))
+```
+
+A class closes when its predicate returns **zero matches**, and reopens the moment it
+matches again. Only `BLOCKER`/`MAJOR` classes block; `MINOR` and `OUT-OF-SCOPE` ones
+are tracked and advisory, so the mechanism can't trap you on a marginal finding.
+
+**What it does not do.** It guarantees durability for a class the reviewer
+*registers*. A reviewer that finds a class and doesn't register it is
+indistinguishable from one that never found it, and no parser over free text closes
+that gap — so nothing in the review's prose is parsed at all. `NOT-BLOCKED` therefore
+says only "no blocking class is unclosed", never that the change is correct.
+
+State lives in `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` + the
+reviewed branch (override with `lineage`; required when reviewing a detached HEAD).
+That location is **fixed and independent of `--log-dir`**, which is the audit-log
+directory only — deriving it from the log directory would mean an operator who moved
+their logs silently got an empty lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
+A false positive of a regex is dismissed with `exempt` — shown to every later reviewer
+for challenge, and revocable with `unexempt`. Unreadable or unwritable state **blocks**
+rather than starting a fresh lineage, because a storage fault must never read as an
+all-clear. Pass `class_closure: false` to restore the previous behaviour exactly.
+
+Full design, and the sixteen review rounds behind it:
+[`docs/class_closure_plan.md`](docs/class_closure_plan.md).
 
 ### Convergence packet mode (`converge`, **on by default**)
 

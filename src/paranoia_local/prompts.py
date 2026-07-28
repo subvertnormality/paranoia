@@ -33,6 +33,7 @@ The TASK INPUT may include a `=== REVIEW CALIBRATION ===` block with STAKES (the
 
 - STAKES bounds legitimate concern. A finding that assumes adversaries, scale, data volumes, multi-tenancy, concurrency, or failure modes BEYOND the stated stakes is out of scope: drop it, or if it is real-but-beyond-scope tag it [OUT-OF-SCOPE] — never as a blocker or a must-fix. Do NOT propose hardening, defensive code, or generality against threats the stakes do not include; that is over-engineering, itself a defect.
 - If NO stakes are stated, assume a MODEST single-team internal tool: trusted operators, no hostile input, ordinary scale. Do NOT default to the most adversarial, multi-tenant, or high-scale reading — that default is the main cause of review scope-creep.
+- The ROUND severity floor NEVER applies to a recurrence of a class listed in an `=== UNCLOSED CLASSES ===` block. Those were reported in an earlier round and are still open; report every one whatever its individual severity, and do NOT write `CONVERGED` while that block is non-empty — a computed trailer below your review will contradict you, and the trailer governs.
 - ROUND sets the severity floor. Round 1: report everything in scope. Round 3 or higher: the design has already survived earlier rounds — report ONLY in-scope findings of merge-blocking severity ([MAJOR] or higher for this review mode); withhold [MINOR] and anything [OUT-OF-SCOPE]. If no merge-blocking findings remain, write `CONVERGED — no blocking findings at this round` as the entire content of the "What doesn't work" section and set the other four sections to "Nothing notable." — this signals convergence WITHOUT breaking the five-section format. Late-round marginal, stylistic, or hardening findings are noise that prevents convergence — withhold them."""
 
 _SHARED_RULES = """### Rules across all sections
@@ -236,3 +237,78 @@ def compose(instructions: str, body: str) -> str:
     """Combine a system instruction block with the task body into the single
     prompt string the engines feed to the CLI over stdin."""
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
+
+
+# ── class closure ─────────────────────────────────────────────────────────────
+# The register is the ONLY channel by which a defect class becomes durable. Nothing in
+# the five prose sections is parsed: nine review rounds established that policing free
+# text for undeclared classes is unachievable, so the contract asks plainly instead and
+# `docs/class_closure_plan.md` §1 scopes the guarantee to a class you register.
+
+CLASS_REGISTER_INSTRUCTIONS = """## Register the defect CLASSES you found — mandatory terminal block
+
+A finding is a **class** when the reasoning that condemned this site would condemn
+another site if one existed: a violated invariant, not a one-off. A genuine off-by-one is
+not a class, and inventing class machinery for one is over-engineering.
+
+Registering a class is how it survives past this round. The server re-runs your predicate
+every future round, reports every surviving match as a recurrence, and refuses to report
+the loop unblocked while a BLOCKER or MAJOR class of yours is still open. A class you do
+not register is simply not tracked — nothing detects that, so it is on you.
+
+**A mechanized predicate matches VIOLATIONS ONLY.** Closure is defined as zero matches,
+so a pattern that also matches conforming code can never close and is worse than useless.
+If no line-level regex can express the violation, use PROCEDURE instead and say so — an
+honest unmechanized class is worth far more than a regex that quietly matches nothing.
+
+End your reply with EXACTLY this block, after everything else, records separated by blank
+lines. If you registered no class and changed no state, the whole body is `NONE`.
+
+=== CLASS REGISTER ===
+CLASS: <the invariant, one line, stated WITHOUT reference to any particular site>
+SEVERITY: BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE
+PATTERN: <POSIX-extended regex matching violations only>
+PATHSPEC: <git pathspec bounding the search, or . for the whole tree>
+
+For an invariant no regex can express, replace PATTERN and PATHSPEC with:
+PROCEDURE: <what a reviewer must do to find every violation>
+
+State changes against classes already shown to you, each its own record:
+CLOSED: <class-id>                 (unmechanized only — you judge it genuinely closed)
+REOPEN: <class-id>                 (unmechanized only — a closed one is violated again)
+RECLASSIFY: <class-id> <severity>  (correct a severity you judge wrong)
+SUPERSEDE: <old-id>
+BY: <existing-class-id>            (must be a different, live class)
+   — or —
+SUPERSEDE: <old-id>
+WITH-PATTERN: <corrected regex>
+PATHSPEC: <pathspec>
+CLASS: <restated invariant>        (optional)
+   — or —
+SUPERSEDE: <old-id>
+WITH-PROCEDURE: <procedure>        (the invariant turned out to be inexpressible)
+CLASS: <restated invariant>        (optional)
+
+Rules: one field per line; SEVERITY here is the class's ONLY severity; a pathspec may not
+begin with `:` (pathspec magic); an unknown class id is rejected. Do NOT list recurrences
+— the server computes those from your predicate and does not read your prose for them."""
+
+
+def register_retry(reason: str) -> str:
+    """Naming the actual fault matters: most retries are a typo'd class id or a repeated
+    transition, and a reviewer told only "unparseable" will resend the same block."""
+    return _REGISTER_RETRY.replace("<REASON>", reason)
+
+
+_REGISTER_RETRY = """Your reply's === CLASS REGISTER === block was not accepted.
+
+Reason: <REASON>
+
+Reply with ONLY that block and nothing else — no preamble, no review text. Records are
+separated by blank lines, one field per line. If you registered no class and are changing
+no state, the entire body is the single word NONE:
+
+=== CLASS REGISTER ===
+NONE"""
+
+REGISTER_RETRY = _REGISTER_RETRY.replace("<REASON>", "the block was absent or unparseable")
