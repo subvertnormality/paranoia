@@ -29,7 +29,10 @@ def main() -> None:
     parser.add_argument(
         "--log-dir",
         default=str(DEFAULT_LOG_DIR),
-        help=f"Audit-log directory (default {DEFAULT_LOG_DIR}).",
+        help=(f"Audit-log directory (default {DEFAULT_LOG_DIR}). Class-closure lineage "
+              "state does NOT follow this — it lives under ~/.paranoia/lineages "
+              "regardless, so moving your logs cannot silently reset a tracked lineage. "
+              "Set PARANOIA_STATE_ROOT to relocate that."),
     )
     args = parser.parse_args()
 

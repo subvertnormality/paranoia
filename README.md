@@ -246,17 +246,90 @@ indistinguishable from one that never found it, and no parser over free text clo
 that gap — so nothing in the review's prose is parsed at all. `NOT-BLOCKED` therefore
 says only "no blocking class is unclosed", never that the change is correct.
 
-State lives in `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` + the
-reviewed branch (override with `lineage`; required when reviewing a detached HEAD).
-That location is **fixed and independent of `--log-dir`**, which is the audit-log
-directory only — deriving it from the log directory would mean an operator who moved
-their logs silently got an empty lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
-A false positive of a regex is dismissed with `exempt` — shown to every later reviewer
-for challenge, and revocable with `unexempt`. Unreadable or unwritable state **blocks**
-rather than starting a fresh lineage, because a storage fault must never read as an
-all-clear. Pass `class_closure: false` to restore the previous behaviour exactly.
+#### Working the loop
 
-Full design, and the sixteen review rounds behind it:
+**You do nothing to turn this on.** Run `critique_branch` as before, incrementing
+`round`. The only new thing you must do is *read the trailer instead of the review's
+own `CONVERGED`* — when the two disagree, the trailer governs and says so.
+
+When a round comes back `BLOCKED`, you have exactly three legitimate moves:
+
+1. **Fix the remaining matches.** They are listed under the class, `path:line: text`.
+   This is the normal case and the whole point.
+2. **Exempt a false positive of the regex** — the predicate matched a line that does
+   not actually violate the invariant.
+3. **Ask the next reviewer to correct the class** — if the severity is wrong, the
+   predicate is wrong, or an unmechanized class is genuinely closed. You cannot do
+   this yourself; see *Corrections are the reviewer's* below.
+
+**Exempting a match.** Copy the three fields straight out of the block:
+
+```jsonc
+// the block said:  3f2a91c4  →  src/app.py:17:     legacy_open(state)
+{
+  "repo_path": "/path/to/repo", "round": 4,
+  "exempt": [{
+    "class_id": "3f2a91c4",
+    "path": "src/app.py",
+    "line": 17,
+    "line_text": "    legacy_open(state)"   // VERBATIM, including indentation
+  }]
+}
+```
+
+`line_text` must be byte-exact: the exemption is keyed on it and **goes void the
+moment that line changes at all**, so the match resurfaces and you re-exempt it
+deliberately. That is on purpose — it fails toward blocking, never toward a silent
+all-clear. Every exemption is shown to every later reviewer, with the invariant and
+predicate attached, so it can be challenged. `unexempt` takes the same
+`class_id`/`path`/`line` and revokes one.
+
+A match in a binary blob (`binary match (line not shown)`) **cannot be exempted** —
+there is no line or text to key on. Narrow the predicate's `PATHSPEC` instead.
+
+**Corrections are the reviewer's, not yours.** A mistaken severity, a too-broad or
+unrunnable predicate, and a closed-then-recurring unmechanized class are all fixed by
+the *next cold reviewer* emitting a register transition — `RECLASSIFY`, `SUPERSEDE`,
+`CLOSED`, `REOPEN`. That is deliberate: it keeps every escape a recorded adversarial
+judgement rather than an operator overriding a blocker on their own say-so. In
+practice you prompt for it, e.g. via `focus`:
+
+> "Class 3f2a91c4 is registered MAJOR but its effect is cosmetic — reclassify it if
+> you agree. Class 91b0e77d's pattern also matches conforming call-sites; supersede it
+> with a narrower one if you can write one."
+
+The reviewer is told the exact grammar; you do not need to quote it.
+
+**Other trailer lines you will meet.**
+
+| Line | What it means | What to do |
+|---|---|---|
+| `CLASS-CLOSURE-WARNING: … closed in the round it was registered` | The predicate matched nothing at birth — usually too narrow to catch what it describes | Ask the next reviewer to `SUPERSEDE` it, or confirm it was genuinely already fixed |
+| `BLOCKED — register debt from round N` | Two attempts at a parseable register failed | Nothing: the next round with a good register clears it |
+| `CLASS-REGISTER: NONE` vs `parsed 3` | No classes/transitions, vs three records accepted | Nothing — `NONE` is normal on a clean round |
+| `unmechanized: awaiting reviewer CLOSED or RECLASSIFY` | A semantic class no regex can check | It blocks until a reviewer judges it closed — prompt for that when you believe it is |
+| `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous round's write may not have completed | The message names the absolute path. Repair or delete that file, then re-run |
+
+`STATE-UNAVAILABLE` recovery is deliberately manual: auto-starting a fresh lineage
+would discard every tracked class and then report `NOT-BLOCKED`, turning a storage
+fault into a false all-clear.
+
+**Where state lives.** `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` +
+the reviewed branch. That location is **fixed and independent of `--log-dir`**, which
+is the audit-log directory only — deriving it from the log directory would mean an
+operator who moved their logs silently got an empty lineage. `PARANOIA_STATE_ROOT`
+relocates it. The trailer always prints `LINEAGE: <id> (rounds recorded: N)`, so if
+`N` is not what you expect, the loop has silently split — usually because `base_ref`
+or the branch changed mid-loop. Pass `lineage` to pin it explicitly; that is
+**required** when the reviewed ref is not a branch (a detached HEAD or a raw commit),
+where there is no stable key to derive.
+
+**Settings.** `class_closure` is a call argument and a `.paranoia.toml` key (default
+`true`); `lineage`, `exempt` and `unexempt` are call arguments only. `class_closure:
+false` restores the previous behaviour exactly — no trailer, no state written.
+
+Full design, the sixteen plan-review rounds behind it, and the eight code-review
+rounds against the implementation:
 [`docs/class_closure_plan.md`](docs/class_closure_plan.md).
 
 ### Convergence packet mode (`converge`, **on by default**)
