@@ -1,10 +1,10 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 13. Twelve codex plan-review rounds folded —
+Status: DRAFT for review, revision 14. Thirteen codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR; round 10: 1 FATAL; round 11: 1 MAJOR; round 12: 1 MAJOR, and
+4 FATAL, 2 MAJOR; round 10: 1 FATAL; rounds 11, 12 and 13: one MAJOR each and
 nothing in any other section. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
@@ -224,7 +224,22 @@ SUPERSEDE: <old-id>
 WITH-PATTERN: <regex>
 PATHSPEC: <pathspec>
 CLASS: <invariant>                  # optional
+
+SUPERSEDE: <old-id>
+WITH-PROCEDURE: <procedure>
+CLASS: <invariant>                  # optional
 ```
+
+*Round 13 [MAJOR]: supersession could only mint another **mechanized** class, so
+the one transition §2.1 predicts would be needed most was missing. §2.1 concedes
+that under violation-only semantics "more invariants are inexpressible and fall
+to `unmechanized`" — but a `MAJOR` class first registered with a malformed or
+over-broad regex, and then found to be inexpressible, had no way to become a
+`PROCEDURE`. At the 100-active-class boundary ordinary registration is refused
+and only the net-zero pattern replacement was guaranteed available, so such a
+class stayed permanently `BLOCKED` short of an inaccurate downgrade or the kill
+switch — again contradicting §1's named-escape guarantee.* `WITH-PROCEDURE` is
+the same atomic net-zero transition into an unmechanized replacement.
 
 *Round 6 [MAJOR]: a closed unmechanized class had no way back — `CLOSED` was
 listed but nothing reopened it, so a later reviewer finding it violated again
@@ -232,9 +247,10 @@ could say so only in prose while the state stayed closed and the trailer said
 `NOT-BLOCKED`.* `REOPEN` closes that, and is unmechanized-only because a
 mechanized class reopens automatically on any match (§2.6).
 
-`WITH-PATTERN` mints a **new** server-assigned id inheriting the old class's
-`severity` and `first_round`; the optional `CLASS:` line restates the invariant,
-and the old text carries over when it is omitted.
+`WITH-PATTERN` and `WITH-PROCEDURE` each mint a **new** server-assigned id
+inheriting the old class's `severity` and `first_round`; the optional `CLASS:`
+line restates the invariant, and the old text carries over when it is omitted.
+Both are net zero against the cap (§2.5).
 
 `BY` **requires a target that is distinct from the source, already registered in
 this lineage, and not itself superseded.** *Round 6 [FATAL]: requiring only that
@@ -764,8 +780,15 @@ blocks** on the git result; a review that omits the recurrence prose entirely
 `[RECURRENCE <id>]` appearing anywhere changes no parse outcome.
 
 **Cap boundary** (round 11): at exactly 100 non-superseded classes a new
-registration is refused, **but `SUPERSEDE … WITH-PATTERN` still succeeds**
-because it is net zero; superseded classes do not count toward the cap.
+registration is refused, **but `SUPERSEDE … WITH-PATTERN` and
+`SUPERSEDE … WITH-PROCEDURE` both still succeed** because each is net zero;
+superseded classes do not count toward the cap.
+
+**Mechanized → unmechanized recovery** (round 13): a `MAJOR` class whose regex is
+`malformed` or `over-broad` and whose invariant turns out to be inexpressible can
+be replaced by `SUPERSEDE`/`WITH-PROCEDURE`; the replacement is unmechanized,
+starts `open`, blocks per severity, and closes only on a later `CLOSED:` — and
+this works at the cap boundary too.
 
 **New-class evaluation** (round 10's FATAL): a review registering a new `MAJOR`
 class whose predicate still matches **cannot** emit `NOT-BLOCKED` in that same
