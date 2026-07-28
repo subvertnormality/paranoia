@@ -1,9 +1,9 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 7. Six codex plan-review rounds folded —
+Status: DRAFT for review, revision 8. Seven codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
-1 FATAL, 5 MAJOR. Every finding accepted.
+1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -118,29 +118,45 @@ to `unmechanized` (§2.10), which is materially weaker.** That trade is correct 
 a check that cannot be wrong about closure is worth more than a check with wider
 reach and an adjudication layer that can silently whitelist a live defect.
 
-### 2.2 Findings declare their scope and carry a reference
+### 2.2 Every finding declares its kind
 
-Every finding in "What doesn't work" and "Gaps" carries `SCOPE: isolated` or
-`SCOPE: class`. `SCOPE: class` means *the reasoning that condemned this site
-would condemn another site if one existed*. A genuine off-by-one is `isolated`;
-requiring class machinery for it is the over-engineering
-`prompts.CODE_REVIEW_INSTRUCTIONS` already calls a defect.
-
-A finding reporting a **new class** — an invariant the lineage does not yet hold
-— additionally opens with one machine-readable line:
+**Every** finding in "What doesn't work" and "Gaps" opens with exactly one
+machine-readable header line:
 
 ```
-CLASS-FINDING: ref=<short token unique in this review> severity=<BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE>
+FINDING: kind=isolated
+FINDING: kind=new-class ref=<short token unique in this review> severity=<BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE>
+FINDING: kind=recurrence class=<class-id>
 ```
+
+`new-class` means *the reasoning that condemned this site would condemn another
+site if one existed, and the lineage does not already hold that invariant*. A
+genuine off-by-one is `isolated`; requiring class machinery for it is the
+over-engineering `prompts.CODE_REVIEW_INSTRUCTIONS` already calls a defect.
 
 *Round 6 [MAJOR]: revision 6 asked the parser to associate a `CLASS-REF` with
 "its finding's severity tag", but `prompts._SECTION_BODIES` defines prose
 content, not machine-delimited finding records — there is no boundary to
 attribute a tag to, and the `arbitration` precedent only works because it slices
-a fixed terminal field count. Multiple findings, or a severity tag quoted inside
-one, made ownership ambiguous, and the register-only retry could not repair
-prose.* The header carries both fields itself, so no prose-boundary inference is
-needed anywhere.
+a fixed terminal field count.* The header carries every field it needs, so no
+prose-boundary inference is needed anywhere.
+
+*Round 7 [FATAL]: revision 7 headed only new-class findings, and then compared
+header refs against register refs — so a reviewer that omitted **both** the
+header and the record produced `∅ == ∅`, `NONE` parsed, no retry fired, and the
+class was never persisted. Round 2's durability FATAL, back in a spelling the
+parser could not see. It could not be fixed by rejecting headerless class-scoped
+findings, because recurrences are class-scoped too and deliberately carry
+nothing.* **A header on every finding is what makes omission observable**: a
+finding with no header is a malformed review, so there is no longer a way to
+report a class without declaring what kind of thing it is.
+
+The `kind=recurrence` form is the **minimal** discriminator round 7 requires — a
+class id and nothing else. No ref, no severity, no sites, no matches, and no
+register counterpart. It is validated only in that the id must name a class the
+lineage holds. This deliberately does not resurrect the grammar that broke in
+rounds 3, 5 and 6: omitting recurrence findings entirely cannot break the verdict,
+because the verdict comes from git regardless (§2.6).
 
 **Recurrences carry nothing.** *Round 3 [FATAL], round 5 [FATAL] and round 6
 [MAJOR] were all the same wound: a hand-authored recurrence grammar that had to
@@ -228,10 +244,11 @@ recurrence-specific bijection — which broke again at round 5 and again at roun
 6.*
 
 **There is now exactly one bijection, over new classes only.** The set of
-`CLASS-FINDING` header `ref=` values in the prose equals the set of `REF` values
-on new-class records, and each record's `SEVERITY` equals its header's
+`ref=` values on `kind=new-class` finding headers equals the set of `REF` values
+on register records, and each record's `SEVERITY` equals its header's
 `severity=`. Both sides of that comparison are single machine-readable tokens, so
-there is nothing left to infer.
+there is nothing left to infer — and because §2.2 requires a header on *every*
+finding, a class cannot be reported without appearing on one side of it.
 
 Recurrences are not in the register at all (§2.2) — the server computes them from
 git. `CLOSED`, `REOPEN`, `RECLASSIFY` and `SUPERSEDE` are state transitions, not
@@ -492,7 +509,7 @@ recorded one rather than an operator's silent assumption.
 
 *Round 3 [MAJOR]: revision 3 said they "cannot block mechanically", which
 conflated **nothing to run** with **not blocking**. Since `NOT-BLOCKED` is
-defined as "no unclosed class" and is the documented stop signal, an open
+the documented stop signal, an open
 unmechanized `MAJOR` would have let the trailer report `NOT-BLOCKED` with a known
 major class outstanding — and §4.6 deliberately routes every semantic invariant
 down this path, so that is the common case, not an edge one.* **An unmechanized
@@ -513,9 +530,16 @@ CONVERGENCE: BLOCKED — 2 class(es) unclosed:
   91b0e77d <invariant> (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)
 ```
 
-or `CONVERGENCE: NOT-BLOCKED — no unclosed class; reviewer findings still govern.`
+or `CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed; advisory classes
+may remain open. Reviewer findings still govern.`
 
-The second wording is deliberate and non-negotiable per §1: it is not a
+*Round 7 [MAJOR]: revision 7 mandated "no unclosed class", which is a false
+factual assertion whenever a `MINOR` or `OUT-OF-SCOPE` class is open — and those
+are tracked-but-advisory by §2.9, so the documented stop signal would routinely
+contradict the state in the same trailer.* The wording now says only what is
+true.
+
+That wording is otherwise deliberate and non-negotiable per §1: it is not a
 convergence verdict.
 
 *Round 1 [MAJOR] risk: `_CALIBRATION` still instructs the reviewer to print
@@ -550,6 +574,26 @@ Nothing in that instruction is parsed. The classes are already open and already
 blocking on the git result; the instruction exists so the review the operator
 reads addresses them, not so the parser can check that it did.
 
+A **second** reserved block lists every unmechanized class the lineage holds,
+**including closed ones**, with id and status:
+
+```
+=== UNMECHANIZED CLASSES — no predicate; you are the check ===
+[3f2a91c4, MAJOR, open, first raised round 7] <invariant>
+  procedure: <procedure>
+[91b0e77d, MAJOR, closed at round 9] <invariant>
+  procedure: <procedure>
+```
+
+*Round 7 [MAJOR] gap: §2.10 promised unmechanized classes are "always shown", but
+the only specified injection was `=== UNCLOSED CLASSES ===`, whose entries are by
+definition not closed. A closed unmechanized class was therefore invisible to
+every later reviewer, so the `REOPEN` added at round 6 was unreachable in
+practice — the defect could recur while the state stayed closed and the trailer
+said `NOT-BLOCKED`.* Closed entries are listed precisely so a later cold reviewer
+has the id it needs to emit `REOPEN`. Both blocks are reserved from the packet
+budget rather than trimmed.
+
 *Round 2 [MINOR] risk: `orientation.build_packet` appends `already_raised` last
 (`sections.append(reserved)` after the evidence and the truncation marker), so a
 recurrence block placed before it would leave the suppressive instruction nearest
@@ -578,7 +622,7 @@ It is the escape of last resort, not the escape of first resort — §2.3, §2.8
 
 ## 4. Residual risks, stated
 
-1. **A reviewer can tag everything `SCOPE: isolated`** and avoid the work. The
+1. **A reviewer can head every finding `kind=isolated`** and avoid the work. The
    prompt states the criterion; nothing enforces it. Largest residual, unclosed.
 2. **Violation-only regexes are hard to write**, so the `unmechanized` population
    will be larger than revision 1 implied — and unmechanized closure is a model's
@@ -605,7 +649,7 @@ class ids, status transitions, survivor computation, block rendering — with th
 git call and the clock injected, keeping the repository's pure-core/injected-edge
 split. `handlers.py` wires it and owns the one register retry via
 `engines.Engine.resume`; `prompts.py` carries the register grammar, the
-`SCOPE`/`CLASS-FINDING` rules and the `_CALIBRATION` amendments;
+the `FINDING:` header grammar and the `_CALIBRATION` amendments;
 `orientation.py` renders the injected blocks after `already_raised`; `server.py`
 exposes `lineage`, `exempt`, `unexempt`, `class_closure`; `logs.py` records
 `base_id`/`head_id` (§6). **`README.md` is in scope, not optional** — *round 1
@@ -618,8 +662,12 @@ TDD, RED first. Behavioural tests that must exist:
 **Register parsing and binding** (strictness matched to `arbitration.parse_*`,
 since this is a model-authored surface): two mechanized records parse; `NONE`
 parses as empty; absent → one retry, then `absent` + policy-dependent block;
-**a `CLASS-FINDING` header in prose with a `NONE` register is malformed** (round
-2's FATAL); header ref with no record, record with no header, duplicate ref, and
+**a `kind=new-class` header with a `NONE` register is malformed** (round 2's
+FATAL); **a finding with no `FINDING:` header at all is malformed, so a
+class-scoped finding that omits both its header and its record cannot pass as
+`∅ == ∅`** (round 7's FATAL); **`kind=recurrence` naming an unknown class id is
+malformed, while a review with recurrence headers and a `NONE` register is
+well-formed**; header ref with no record, record with no header, duplicate ref, and
 **severity disagreement between header `severity=` and record `SEVERITY`** are
 each malformed; duplicate field within a record rejected; missing required field
 rejected; a record after the block's end rejected; a field name in earlier prose
@@ -700,7 +748,10 @@ text changed is void and the match resurfaces; `unexempt` restores a match; both
 appear under `CLAIMED EXEMPT` and in the trailer.
 
 **Packet:** the unclosed-classes block is rendered after `already_raised` and
-survives budget trimming.
+survives budget trimming; **a closed unmechanized class still appears, with its
+id and `closed` status, in the unmechanized block of a later round's packet**
+(round 7 — without this, `REOPEN` is unreachable), and both reserved blocks
+survive trimming.
 
 **Kill switch:** `class_closure: false` reproduces today's behaviour exactly.
 
