@@ -1,10 +1,14 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 3. Two codex plan-review rounds folded — round
-1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR. Every finding
-accepted. Round 1's FATALs killed the candidate-enumeration design outright and
-it was replaced (§2.1); round 2's FATAL found that the replacement still had no
-link between a prose finding and a register record, which §2.3 now closes.
+Status: DRAFT for review, revision 4. Three codex plan-review rounds folded —
+round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
+1 FATAL, 3 MAJOR, no risks, no gaps. Every finding accepted. Round 1's FATALs
+killed the candidate-enumeration design outright and it was replaced (§2.1);
+round 2's FATAL found the replacement had no link between a prose finding and a
+register record (§2.3); round 3's FATAL found that the link, as specified, made
+every recurrence response malformed — the fix for one round's finding breaking
+the next round's path, which is the class of error this whole design exists to
+catch.
 
 ## 0. The defect this fixes
 
@@ -63,6 +67,14 @@ failure mode in a new costume.
 on a marginal or mistaken finding would reproduce the failure it exists to
 prevent, in a form the operator cannot escape. §2.9 bounds what may block, and
 every blocking state has a named escape that is not the kill switch.
+
+*Round 3 [MAJOR]: revision 3 asserted that flatly, but `STATE-UNAVAILABLE` had no
+escape at all.* The claim is now narrowed to what is true: every blocking state
+has a named escape, and for `STATE-UNAVAILABLE` alone that escape is an operator
+filesystem action — repairing or removing a named file — rather than an in-tool
+transition. It is deliberately not automatic: silently starting a fresh lineage
+on unreadable state would discard every tracked class and report `NOT-BLOCKED`,
+which is precisely the false clearance this design exists to prevent (§2.7).
 
 ## 2. Mechanism
 
@@ -131,12 +143,29 @@ containing `[MAJOR] … SCOPE: class` followed by `=== CLASS REGISTER === NONE`
 parsed, persisted nothing, and could return `NOT-BLOCKED` — the exact durability
 failure revision 2 claimed to close.*
 
-The parser now cross-checks: **the set of `CLASS-REF` tokens in the prose and the
-set of `REF` values in the register must be equal**, and each record's `SEVERITY`
-must equal its finding's severity tag. A prose class with no record, a record
-with no prose, a duplicate ref, or a severity disagreement is a malformed
-register. A review with genuinely no classes emits `=== CLASS REGISTER ===`
-followed by `NONE` and no `SCOPE: class` finding.
+*Round 3 [FATAL]: revision 3's single bijection then made **every recurrence
+response malformed**. A recurrence finding reports an existing class, so it has
+no new `REF` and no severity of its own, yet the rule demanded both — a surviving
+class would fail validation, burn the retry on the same contradictory grammar,
+and return malformed without recording the recurrence. The mechanism would have
+broken on exactly the path it exists to serve.*
+
+There are therefore **two bijections, one per kind of finding**:
+
+- **New classes.** The set of `CLASS-REF` tokens in the prose equals the set of
+  `REF` values on new-class records, and each record's `SEVERITY` equals its
+  finding's severity tag.
+- **Recurrences.** The set of `[RECURRENCE <class-id>]` markers in the prose
+  equals the set of `RECURRENCE: <class-id>` lines in the register. A recurrence
+  carries **no** `CLASS-REF` and **no** `SEVERITY` — the class id is the
+  reference, and the severity is the one the lineage already holds, changeable
+  only by `RECLASSIFY`.
+
+`CLOSED`, `RECLASSIFY` and `SUPERSEDED-BY` are state transitions, not findings,
+and bind to nothing in the prose. A prose class with no record, a record with no
+prose, a duplicate ref, an unknown class id, or a severity disagreement is a
+malformed register. A review with genuinely no classes and no recurrences emits
+`=== CLASS REGISTER ===` followed by `NONE`.
 
 Parsing is as strict as `arbitration.parse_*`: the block is terminal, every field
 required, duplicates and out-of-block records rejected.
@@ -260,6 +289,17 @@ required, the call erroring without one. Fail-closed beats silently minting a
 fresh lineage every round. Every trailer prints
 `LINEAGE: <id> (rounds recorded: N)` so an unintended split is visible.
 
+*Round 3 [MAJOR]: for dirty reviews that rule keys state to a branch the server
+is not reviewing. Verified: `orientation.resolve_target` returns `head_ref=None`
+and `is_dirty=True` whenever `include_uncommitted` is set, and
+`handlers._converge_branch_review` then snapshots the **checkout's** `HEAD` — but
+the caller's raw `head_ref` is still in scope. With
+`include_uncommitted=true, head_ref="feature"` the server would review the current
+checkout and write its classes into `feature`'s lineage.* **For a dirty target
+the lineage derives from the checkout's own symbolic `HEAD`, and an
+independently supplied `head_ref` is rejected with an error** — the server is not
+reviewing that ref, so accepting it can only contaminate a lineage.
+
 *Round 1 [MAJOR] risk: `logs.write_log` deliberately swallows every write failure,
 since a completed review is the expensive artifact.* **Lineage state must not
 follow that precedent** — a silently lost write plus a `NOT-BLOCKED` footer is
@@ -268,6 +308,15 @@ the engine call and written after a successful one, via temp file + `os.replace`
 in the same directory. A write failure, or existing state that will not parse,
 yields `CLASS-CLOSURE: STATE-UNAVAILABLE` and `CONVERGENCE: BLOCKED`. The review
 text is still returned.
+
+**The escape from `STATE-UNAVAILABLE` is an operator filesystem action, named in
+the block text** (§1). Unparseable state is moved aside to
+`<lineage_id>.corrupt-<timestamp>.json` rather than left in place or silently
+overwritten, and the message gives the absolute path of both files; a write
+failure names the directory and the errno. The operator repairs or removes the
+file and re-runs. **Recovery is deliberately not automatic:** auto-starting a
+fresh lineage would discard every tracked class and then report `NOT-BLOCKED`,
+turning a storage fault into a false all-clear.
 
 ### 2.8 Exemptions
 
@@ -325,10 +374,19 @@ well as lowered.
 Registered with `PROCEDURE:` instead of `PATTERN:`/`PATHSPEC:`, given a server id
 like any other class, carried forward as a reviewer obligation, always shown,
 never floor-suppressed, and marked `unmechanized` in the trailer so the weakness
-is visible. They cannot block mechanically — there is nothing to run — and they
-close only when a later reviewer names the id on a `CLOSED:` line: still a
-judgement, but an explicit, cold, recorded one rather than an operator's silent
-assumption.
+is visible. They close only when a later reviewer names the id on a `CLOSED:`
+line: still a judgement, but an explicit, cold, recorded one rather than an
+operator's silent assumption.
+
+*Round 3 [MAJOR]: revision 3 said they "cannot block mechanically", which
+conflated **nothing to run** with **not blocking**. Since `NOT-BLOCKED` is
+defined as "no unclosed class" and is the documented stop signal, an open
+unmechanized `MAJOR` would have let the trailer report `NOT-BLOCKED` with a known
+major class outstanding — and §4.6 deliberately routes every semantic invariant
+down this path, so that is the common case, not an edge one.* **An unmechanized
+class of severity `BLOCKER` or `MAJOR` blocks until `CLOSED` or `RECLASSIFY`.**
+What it lacks is a mechanical *check*, not the ability to block; the trailer
+names it as awaiting a reviewer judgement rather than a git result.
 
 ### 2.11 The computed trailer, and the `CONVERGED` collision
 
@@ -338,7 +396,9 @@ Appended by `handlers._footer`:
 LINEAGE: <id> (rounds recorded: N)
 CLASS-REGISTER: parsed 3 | NONE | absent | malformed: <reason>
 CLASS-CLOSURE: 2 open, 1 closed this round, 4 recurrences, 1 exempt, 1 unmechanized
-CONVERGENCE: BLOCKED — 2 class(es) unclosed: 3f2a91c4 <invariant>; 91b0e77d <invariant>
+CONVERGENCE: BLOCKED — 2 class(es) unclosed:
+  3f2a91c4 <invariant> (mechanized: 4 matches)
+  91b0e77d <invariant> (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)
 ```
 
 or `CONVERGENCE: NOT-BLOCKED — no unclosed class; reviewer findings still govern.`
@@ -446,6 +506,14 @@ confuse the parser; unmechanized record with `PROCEDURE` parses;
 `RECURRENCE`/`CLOSED`/`RECLASSIFY` naming an unknown id rejected; the retry path
 is taken exactly once and a successful retry parses.
 
+**Recurrence binding** (round 3's FATAL, which is the mechanism's own hot path):
+a review whose only class content is `[RECURRENCE <id>]` prose plus a matching
+`RECURRENCE: <id>` line **parses and is not malformed**; a recurrence carrying a
+`CLASS-REF` or a `SEVERITY` is rejected; a prose `[RECURRENCE <id>]` with no
+register line, and a register line with no prose marker, are each malformed; a
+review mixing one new class and one recurrence satisfies both bijections
+independently; `CLOSED`/`RECLASSIFY`/`SUPERSEDED-BY` require no prose binding.
+
 **Closure semantics:** zero matches → closed; any match → open with every match a
 recurrence; a closed class with a new match reopens; a superseded class is not
 rechecked; `first_round` survives supersession; **two records sharing a predicate
@@ -460,17 +528,23 @@ refused.
 
 **Blocking policy:** `MAJOR` class blocks; `MINOR` and `OUT-OF-SCOPE` do not and
 are reported advisory; **`malformed`/`over-broad`/`unchecked` on a `MINOR` class
-does not block** (round 2's severity-policy contradiction); `RECLASSIFY` to
-`MINOR` unblocks and to `MAJOR` re-blocks; `BLOCKED` names the ids;
-`NOT-BLOCKED` text does not contain the word *converged*; when blocked, the
-footer voids a reviewer `CONVERGED`.
+does not block** (round 2's severity-policy contradiction); **an open
+unmechanized `MAJOR` blocks, and `NOT-BLOCKED` is never emitted while one is
+open** (round 3); `CLOSED` on it unblocks, as does `RECLASSIFY` to `MINOR`;
+`RECLASSIFY` to `MAJOR` re-blocks; `BLOCKED` names the ids and distinguishes
+mechanized match counts from unmechanized awaiting-judgement; `NOT-BLOCKED` text
+does not contain the word *converged*; when blocked, the footer voids a reviewer
+`CONVERGED`.
 
 **Lineage:** a reviewed `head_ref` that is a branch but not checked out yields
 its own lineage, and two such branches off one base differ; a `head_ref` that is
 a sha (empty `--symbolic-full-name` output, exit 0) without `lineage` errors;
-unparseable state → `STATE-UNAVAILABLE` + `BLOCKED`, review text still returned;
-write failure → same; state replaced atomically; a failed engine call leaves
-state byte-identical.
+**a dirty target uses the checkout's `HEAD` and rejects a supplied `head_ref`**
+(round 3); unparseable state → `STATE-UNAVAILABLE` + `BLOCKED`, review text still
+returned, **and the corrupt file is quarantined to a named path rather than
+overwritten or silently replaced by a fresh lineage**; write failure → same
+outcome, message names directory and errno; state replaced atomically; a failed
+engine call leaves state byte-identical.
 
 **Exemptions:** an exempt match is subtracted; **a second, textually identical
 line in the same file is not** (round 2's collision); an exemption whose line
