@@ -441,7 +441,7 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
     was rejected — and once the debt was discharged the trailer could report `NOT-BLOCKED`
     on the strength of a transition from a register that never parsed.
     """
-    draft = _copy(lineage)
+    draft = copy_lineage(lineage)
     minted: list[str] = []
     seen_sources: set[str] = set()
     for t in register.transitions:
@@ -473,7 +473,7 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
     return minted
 
 
-def _copy(lineage: Lineage) -> Lineage:
+def copy_lineage(lineage: Lineage) -> Lineage:
     return Lineage(
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,

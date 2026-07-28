@@ -184,6 +184,43 @@ class TestRegisterHandling:
         record = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
         assert "NOT_IN_OPEN_SET" in (record.get("retry_register") or "")
 
+    def test_a_semantic_register_error_also_earns_the_retry(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """Round 7's MAJOR: only syntactic failures earned a retry, so an unknown class id
+        or a repeated transition — usually a reviewer typo — cost a whole extra round."""
+        commit(repo, {"a.py": "NOT_IN_OPEN_SET\n"}, "c")
+        engine = FakeEngine(
+            review_with("CLOSED: deadbeef\n"),   # semantically invalid: unknown id
+            review_with(MECHANIZED),              # the retry gets it right
+        )
+        out = run_round(repo, engine, tmp_path, round=1)
+        assert len(engine.resumed) == 1, "a semantic error must be retried, not banked as debt"
+        assert "unknown class id" in engine.resumed[0], (
+            "the retry must say what was actually wrong, or the reviewer resends the same block"
+        )
+        assert "parsed after retry" in out and "register debt" not in out
+
+    def test_a_semantic_error_applies_none_of_the_register_before_retrying(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        run_round(repo, FakeEngine(review_with(
+            "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
+        )), tmp_path, round=1)
+        lin_id = _only_lineage(tmp_path)
+        cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
+
+        # A valid CLOSED followed by an unknown id: the whole register is rejected, retried,
+        # and the retry's NONE must leave the class open.
+        engine = FakeEngine(
+            review_with(f"CLOSED: {cid}\n\nCLOSED: deadbeef\n"),
+            review_with("NONE"),
+        )
+        run_round(repo, engine, tmp_path, round=2)
+        after = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s")
+        assert after.classes[cid].status == cc.OPEN
+
     def test_no_session_ref_skips_the_retry_and_keeps_the_review(
         self, repo: Path, tmp_path: Path
     ) -> None:

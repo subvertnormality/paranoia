@@ -294,7 +294,15 @@ begin with `:` (pathspec magic); an unknown class id is rejected. Do NOT list re
 — the server computes those from your predicate and does not read your prose for them."""
 
 
-REGISTER_RETRY = """Your reply did not end with a parseable === CLASS REGISTER === block.
+def register_retry(reason: str) -> str:
+    """Naming the actual fault matters: most retries are a typo'd class id or a repeated
+    transition, and a reviewer told only "unparseable" will resend the same block."""
+    return _REGISTER_RETRY.replace("<REASON>", reason)
+
+
+_REGISTER_RETRY = """Your reply's === CLASS REGISTER === block was not accepted.
+
+Reason: <REASON>
 
 Reply with ONLY that block and nothing else — no preamble, no review text. Records are
 separated by blank lines, one field per line. If you registered no class and are changing
@@ -302,3 +310,5 @@ no state, the entire body is the single word NONE:
 
 === CLASS REGISTER ===
 NONE"""
+
+REGISTER_RETRY = _REGISTER_RETRY.replace("<REASON>", "the block was absent or unparseable")

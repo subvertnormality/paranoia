@@ -513,11 +513,10 @@ class _ClassClosure:
             return (f"CLASS-CLOSURE: not evaluated — the review failed "
                     f"(exit {review.returncode}); lineage state is unchanged.\n"
                     "CONVERGENCE: BLOCKED — no verdict can be computed from a failed review.")
-        status, minted = "parsed 0", []
+        status, minted = cc.NONE, []
         try:
-            register, status = self._register(review, engine, repo, model, effort,
-                                              web_search, on_progress)
-            minted = cc.apply_register(lineage, register, round_no=self.round_no)
+            minted, status = self._register(review, engine, repo, model, effort,
+                                            web_search, on_progress)
             # Round 10: a class registered by THIS review does not exist until now, so it
             # must be evaluated before the verdict — otherwise a new MAJOR class and
             # NOT-BLOCKED could ship in the same response.
@@ -564,10 +563,18 @@ class _ClassClosure:
         return cc.make_grep(self.repo, self.head_id, runner=_run_git)
 
     def _register(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
-                  web_search: bool, on_progress: Callable[[str], None] | None):
+                  web_search: bool, on_progress: Callable[[str], None] | None
+                  ) -> tuple[list[str], str]:
+        """Parse AND apply the register as one transaction, retried once as a whole.
+
+        Splitting them meant only *syntactic* failures earned the retry: an unknown class
+        id, a superseded source, two transitions against one class or a cap violation all
+        went straight to durable debt, costing the operator a whole extra review round for
+        what is usually a reviewer typo — the principal cost this feature has under these
+        stakes.
+        """
         try:
-            register = cc.parse_register(review.text)
-            return register, _count(register)
+            return self._attempt(review.text)
         except cc.RegisterError as first:
             if not review.session_ref or not hasattr(engine, "resume"):
                 # Claude's supported non-JSON fallback has no session to resume, and an
@@ -576,8 +583,8 @@ class _ClassClosure:
                 # an error — the one outcome this path must never produce.
                 raise first
             retry = engine.resume(
-                review.session_ref, prompts.REGISTER_RETRY, repo, model, effort, web_search,
-                **_progress_kwargs(on_progress))
+                review.session_ref, prompts.register_retry(str(first)), repo, model, effort,
+                web_search, **_progress_kwargs(on_progress))
             self._retry_candidate = retry.text
             if retry.error:
                 # A failed CLI still returns text, and that text can contain a parseable
@@ -586,8 +593,19 @@ class _ClassClosure:
                 raise cc.RegisterError(
                     f"the register retry itself failed (exit {retry.returncode})"
                 ) from first
-            register = cc.parse_register(retry.text)   # a second failure raises, and blocks
-            return register, f"parsed after retry: {_count(register)}"
+            minted, count = self._attempt(retry.text)   # a second failure raises, and blocks
+            return minted, f"parsed after retry: {count}"
+
+    def _attempt(self, text: str) -> tuple[list[str], str]:
+        """Apply `text`'s register to a draft, and adopt it only if the whole thing holds."""
+        assert self.lineage is not None
+        register = cc.parse_register(text)
+        draft = cc.copy_lineage(self.lineage)
+        minted = cc.apply_register(draft, register, round_no=self.round_no)
+        self.lineage.classes = draft.classes
+        self.lineage.next_seq = draft.next_seq
+        self.lineage.exemptions = draft.exemptions
+        return minted, _count(register)
 
     def _apply_exemption_args(self) -> None:
         assert self.lineage is not None
