@@ -1,9 +1,9 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 6. Five codex plan-review rounds folded —
+Status: DRAFT for review, revision 7. Six codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
-1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR. Every
-finding accepted.
+1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
+1 FATAL, 5 MAJOR. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -15,12 +15,19 @@ different spelling** (§2.4), and that the quarantine added for round 3 had
 *created* the fresh-lineage hole it was written to close (§2.7). Round 5 found
 the recurrence grammar contradictory again (§2.2) and a stale dedup test left
 standing in §5 that would have re-implemented the very collapse round 4 removed.
+Round 6 found the recurrence grammar broken a **third** time, and revision 7
+deletes it outright rather than repairing it once more (§2.2).
 
-**Six of the nine FATALs in this review were introduced by fixes to earlier
-findings, and two were the same defect recurring in a new spelling.** That is
-precisely the failure this brief exists to mechanize against, observed on the
-brief itself, under the very review protocol the brief says is inadequate to
-catch it. The design is the argument; the review history is the evidence.
+**Seven of the ten FATALs in this review were introduced by fixes to earlier
+findings, and the recurrence grammar alone accounted for three of them — the same
+defect in three spellings, exactly the pattern §0 describes.** That is the
+failure this brief exists to mechanize against, observed on the brief itself,
+under the very review protocol the brief argues is inadequate to catch it. The
+design is the argument; the review history is the evidence.
+
+The three fixes that finally held all **removed** mechanism rather than adding
+it: dedup deleted (§2.4), the recurrence grammar deleted (§2.2), the adjudication
+layer deleted (§2.1). Each had been introduced to satisfy an earlier finding.
 
 ## 0. The defect this fixes
 
@@ -119,23 +126,33 @@ would condemn another site if one existed*. A genuine off-by-one is `isolated`;
 requiring class machinery for it is the over-engineering
 `prompts.CODE_REVIEW_INSTRUCTIONS` already calls a defect.
 
-A `SCOPE: class` finding is one of two kinds, and **only the first carries a
-`CLASS-REF`**:
+A finding reporting a **new class** — an invariant the lineage does not yet hold
+— additionally opens with one machine-readable line:
 
-- **A new class** — an invariant the lineage does not yet hold. Carries
-  `CLASS-REF: <short token>`, unique within the review.
-- **A recurrence** — an instance of a class the lineage already holds. Carries
-  `[RECURRENCE <class-id>]` adjacent to its severity tag (§2.9) and **no
-  `CLASS-REF`**: the class id already identifies it, and it has no severity of
-  its own to agree with.
+```
+CLASS-FINDING: ref=<short token unique in this review> severity=<BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE>
+```
 
-*Round 5 [FATAL]: revision 5 said flatly that every `SCOPE: class` finding
-carries a `CLASS-REF` while §2.3 said a recurrence carries none and the tests
-required rejecting one that did. A reviewer obeying §2.2 produced prose the
-parser had to reject, and since the retry re-asks only for the register it could
-not repair the prose — so every surviving class would have looped on
-malformed-register blocks. The mechanism's hot path, contradictory for the second
-time in three revisions (cf. round 3).*
+*Round 6 [MAJOR]: revision 6 asked the parser to associate a `CLASS-REF` with
+"its finding's severity tag", but `prompts._SECTION_BODIES` defines prose
+content, not machine-delimited finding records — there is no boundary to
+attribute a tag to, and the `arbitration` precedent only works because it slices
+a fixed terminal field count. Multiple findings, or a severity tag quoted inside
+one, made ownership ambiguous, and the register-only retry could not repair
+prose.* The header carries both fields itself, so no prose-boundary inference is
+needed anywhere.
+
+**Recurrences carry nothing.** *Round 3 [FATAL], round 5 [FATAL] and round 6
+[MAJOR] were all the same wound: a hand-authored recurrence grammar that had to
+stay consistent with the prose rules, the register rules and the tests, and did
+not — three times, in three different spellings.* Revision 7 deletes it, taking
+round 6's own remedy: **for a mechanized class, a recurrence is whatever the
+server's `git grep` found**, and nothing the reviewer writes is parsed to confirm
+it. The server already ran the predicate; asking a model to restate the matches
+and then machine-auditing the restatement was ceremony that repeatedly broke the
+one path the mechanism exists to serve. The reviewer is still *shown* the
+surviving matches and still asked to report them (§2.12) — that text is for the
+operator to read, not for the parser to validate.
 
 ### 2.3 The class register, and its binding to the prose
 
@@ -156,23 +173,43 @@ Unmechanized records replace `PATTERN`/`PATHSPEC` with
 against classes the server already carries:
 
 ```
-RECURRENCE: <class-id>              # this round's finding is an instance of it
 CLOSED: <class-id>                  # unmechanized only; judged closed this round
+REOPEN: <class-id>                  # unmechanized only; found violated again
 RECLASSIFY: <class-id> <severity>   # a later cold reviewer corrects the severity
 SUPERSEDE: <old-id> BY: <existing-id>
-SUPERSEDE: <old-id> WITH-PATTERN: <regex> PATHSPEC: <pathspec>
+SUPERSEDE: <old-id> WITH-PATTERN: <regex> PATHSPEC: <pathspec> [CLASS: <invariant>]
 ```
 
+*Round 6 [MAJOR]: a closed unmechanized class had no way back. `CLOSED` was
+listed but nothing reopened it, so once a reviewer judged such a class closed, a
+later reviewer finding it violated again could report that only in prose while
+the state stayed closed and the trailer said `NOT-BLOCKED`.* `REOPEN` closes
+that. It is unmechanized-only because a mechanized class reopens automatically on
+any match (§2.6).
+
 *Round 5 [MAJOR]: the earlier `SUPERSEDED-BY: <class-id> | PATTERN: … PATHSPEC: …`
-form could not name both sides. One id left the server unable to tell the
+form could not name both sides — one id left the server unable to tell the
 superseded class from its replacement, and the pattern form named no class at
-all — so the recovery §2.4 promises for `malformed` and `over-broad` classes
-could not deterministically reach the intended one, and such a `MAJOR` class
-would block permanently.* Both forms now name the source explicitly.
-`WITH-PATTERN` mints a **new** server-assigned id which inherits the old class's
-`severity` and `first_round`, and its own invariant text unless the record
-restates it; `BY` requires the target id to already exist in this lineage. In
-both forms the old class is marked `superseded`: non-blocking, and never
+all.* Both forms now name the source explicitly.
+
+`WITH-PATTERN` mints a **new** server-assigned id inheriting the old class's
+`severity` and `first_round`. *Round 6 [MAJOR]: revision 6 said the replacement
+could restate its invariant but gave the form no field to do it in, forcing an
+implementation to either reject an undocumented field or carry stale invariant
+text that disagrees with the corrected predicate.* The optional `CLASS:` field is
+that form; omitted, the old invariant text carries over.
+
+`BY` **requires a target that is distinct from the source, already registered in
+this lineage, and not itself superseded.** *Round 6 [FATAL]: revision 6 required
+only that the target "exist", so `SUPERSEDE: A BY: A` — or supersession by an
+already-superseded class — parsed, marked the source non-blocking and
+never-rechecked, and left no active blocker at all. A model-authored transition
+could therefore manufacture a false `NOT-BLOCKED`.* The distinctness and
+liveness conditions also make cycles unreachable: `A BY B` marks A superseded, so
+a later `B BY A` fails on the liveness check. The target keeps its own
+`severity`; it inherits the **earlier** of the two `first_round` values.
+
+In both forms the old class is marked `superseded`: non-blocking, and never
 rechecked again (§2.6). This is the recovery transition `malformed` and
 `over-broad` classes need.
 
@@ -184,29 +221,24 @@ containing `[MAJOR] … SCOPE: class` followed by `=== CLASS REGISTER === NONE`
 parsed, persisted nothing, and could return `NOT-BLOCKED` — the exact durability
 failure revision 2 claimed to close.*
 
-*Round 3 [FATAL]: revision 3's single bijection then made **every recurrence
-response malformed**. A recurrence finding reports an existing class, so it has
-no new `REF` and no severity of its own, yet the rule demanded both — a surviving
-class would fail validation, burn the retry on the same contradictory grammar,
-and return malformed without recording the recurrence. The mechanism would have
-broken on exactly the path it exists to serve.*
+*Round 3 [FATAL]: revision 3's single bijection then made every **recurrence**
+response malformed, because a recurrence has no new `REF` and no severity of its
+own yet the rule demanded both. Revisions 4 and 5 answered that with a second,
+recurrence-specific bijection — which broke again at round 5 and again at round
+6.*
 
-There are therefore **two bijections, one per kind of finding**:
+**There is now exactly one bijection, over new classes only.** The set of
+`CLASS-FINDING` header `ref=` values in the prose equals the set of `REF` values
+on new-class records, and each record's `SEVERITY` equals its header's
+`severity=`. Both sides of that comparison are single machine-readable tokens, so
+there is nothing left to infer.
 
-- **New classes.** The set of `CLASS-REF` tokens in the prose equals the set of
-  `REF` values on new-class records, and each record's `SEVERITY` equals its
-  finding's severity tag.
-- **Recurrences.** The set of `[RECURRENCE <class-id>]` markers in the prose
-  equals the set of `RECURRENCE: <class-id>` lines in the register. A recurrence
-  carries **no** `CLASS-REF` and **no** `SEVERITY` — the class id is the
-  reference, and the severity is the one the lineage already holds, changeable
-  only by `RECLASSIFY`.
-
-`CLOSED`, `RECLASSIFY` and `SUPERSEDE` are state transitions, not findings,
-and bind to nothing in the prose. A prose class with no record, a record with no
-prose, a duplicate ref, an unknown class id, or a severity disagreement is a
-malformed register. A review with genuinely no classes and no recurrences emits
-`=== CLASS REGISTER ===` followed by `NONE`.
+Recurrences are not in the register at all (§2.2) — the server computes them from
+git. `CLOSED`, `REOPEN`, `RECLASSIFY` and `SUPERSEDE` are state transitions, not
+findings, and bind to nothing in the prose. A prose header with no record, a
+record with no header, a duplicate ref, an unknown class id, or a severity
+disagreement is a malformed register. A review with no new classes and no
+transitions emits `=== CLASS REGISTER ===` followed by `NONE`.
 
 Parsing is as strict as `arbitration.parse_*`: the block is terminal, every field
 required, duplicates and out-of-block records rejected.
@@ -263,7 +295,8 @@ compared the fold against §2.1's own recorded FATAL.
 The remedy removes a mechanism rather than adding one: no dedup, no conflict
 rule, no shared state. Duplicate registration is guarded by the prompt alone —
 open classes are shown to every subsequent reviewer with ids and invariants, with
-the instruction to emit `RECURRENCE: <id>` rather than register anew — and the
+the instruction to report an instance of one as a recurrence of that id rather
+than registering a new class (§2.12) — and the
 100-class cap (§2.5) bounds the cost of the residual duplicates that guard
 misses. A duplicate class is redundant work; a collapsed class is a silent
 clearance. The asymmetry decides it.
@@ -440,6 +473,11 @@ well as lowered.
 **not** a severity tag. It is a marker adjacent to one:
 `[MAJOR] [RECURRENCE 3f2a91c4] …`. The existing grammar is untouched.
 
+Since revision 7 the marker is **presentational only** — it makes the review
+readable and keeps the floor exemption expressible, but nothing parses or
+validates it, so it can no longer contradict the register (§2.2). The blocking
+decision comes from git, not from whether the reviewer remembered to type it.
+
 `_CALIBRATION` gains: *the ROUND severity floor never applies to a finding marked
 `[RECURRENCE]`.*
 
@@ -449,8 +487,8 @@ Registered with `PROCEDURE:` instead of `PATTERN:`/`PATHSPEC:`, given a server i
 like any other class, carried forward as a reviewer obligation, always shown,
 never floor-suppressed, and marked `unmechanized` in the trailer so the weakness
 is visible. They close only when a later reviewer names the id on a `CLOSED:`
-line: still a judgement, but an explicit, cold, recorded one rather than an
-operator's silent assumption.
+line, and reopen on a `REOPEN:` line: still a judgement, but an explicit, cold,
+recorded one rather than an operator's silent assumption.
 
 *Round 3 [MAJOR]: revision 3 said they "cannot block mechanically", which
 conflated **nothing to run** with **not blocking**. Since `NOT-BLOCKED` is
@@ -504,9 +542,13 @@ opposite instruction:
 
 with: *these were reported in an earlier round and are not closed. Report every
 surviving match, marked `[RECURRENCE <id>]`. The ROUND severity floor does not
-apply. If a new finding of yours is an instance of one of these, emit
-`RECURRENCE: <id>` in the register instead of registering a new class. **Where
-this block and the already-raised block conflict, this block governs.***
+apply. If a finding of yours is an instance of one of these, report it as a
+recurrence of that id — do NOT register it as a new class. **Where this block and
+the already-raised block conflict, this block governs.***
+
+Nothing in that instruction is parsed. The classes are already open and already
+blocking on the git result; the instruction exists so the review the operator
+reads addresses them, not so the parser can check that it did.
 
 *Round 2 [MINOR] risk: `orientation.build_packet` appends `already_raised` last
 (`sections.append(reserved)` after the evidence and the truncation marker), so a
@@ -563,7 +605,7 @@ class ids, status transitions, survivor computation, block rendering — with th
 git call and the clock injected, keeping the repository's pure-core/injected-edge
 split. `handlers.py` wires it and owns the one register retry via
 `engines.Engine.resume`; `prompts.py` carries the register grammar, the
-`SCOPE`/`CLASS-REF`/`[RECURRENCE]` rules and the `_CALIBRATION` amendments;
+`SCOPE`/`CLASS-FINDING` rules and the `_CALIBRATION` amendments;
 `orientation.py` renders the injected blocks after `already_raised`; `server.py`
 exposes `lineage`, `exempt`, `unexempt`, `class_closure`; `logs.py` records
 `base_id`/`head_id` (§6). **`README.md` is in scope, not optional** — *round 1
@@ -576,25 +618,26 @@ TDD, RED first. Behavioural tests that must exist:
 **Register parsing and binding** (strictness matched to `arbitration.parse_*`,
 since this is a model-authored surface): two mechanized records parse; `NONE`
 parses as empty; absent → one retry, then `absent` + policy-dependent block;
-**`SCOPE: class` in prose with a `NONE` register is malformed** (round 2's
-FATAL); prose ref with no record, record with no prose ref, duplicate ref, and
-**severity disagreement between finding tag and record** are each malformed;
-duplicate field within a record rejected; missing required field rejected; a
-record after the block's end rejected; a field name in earlier prose does not
-confuse the parser; unmechanized record with `PROCEDURE` parses;
-`RECURRENCE`/`CLOSED`/`RECLASSIFY` naming an unknown id rejected; the retry path
-is taken exactly once and a successful retry parses; **a `Review` with
+**a `CLASS-FINDING` header in prose with a `NONE` register is malformed** (round
+2's FATAL); header ref with no record, record with no header, duplicate ref, and
+**severity disagreement between header `severity=` and record `SEVERITY`** are
+each malformed; duplicate field within a record rejected; missing required field
+rejected; a record after the block's end rejected; a field name in earlier prose
+does not confuse the parser; unmechanized record with `PROCEDURE` parses;
+`CLOSED`/`REOPEN`/`RECLASSIFY`/`SUPERSEDE` naming an unknown id rejected; the
+retry path is taken exactly once and a successful retry parses; **a `Review` with
 `session_ref=None` skips the retry, returns its text unchanged, and blocks per
 policy** (round 4); **two new-class records sharing a pattern and pathspec get
 two distinct ids and two independent state objects** (round 4's dedup FATAL).
 
-**Recurrence binding** (round 3's FATAL, which is the mechanism's own hot path):
-a review whose only class content is `[RECURRENCE <id>]` prose plus a matching
-`RECURRENCE: <id>` line **parses and is not malformed**; a recurrence carrying a
-`CLASS-REF` or a `SEVERITY` is rejected; a prose `[RECURRENCE <id>]` with no
-register line, and a register line with no prose marker, are each malformed; a
-review mixing one new class and one recurrence satisfies both bijections
-independently; `CLOSED`/`RECLASSIFY`/`SUPERSEDE` require no prose binding.
+**Recurrences are not parsed** (rounds 3, 5 and 6 — the mechanism's own hot path,
+broken three times by a hand-authored grammar that revision 7 deletes): a review
+that reports surviving matches only in prose, with a register of `NONE`, **is
+well-formed and still blocks** on the git result; a review that omits the
+recurrence prose entirely **also still blocks**, because the verdict never
+depended on the reviewer's text; `[RECURRENCE <id>]` appearing anywhere in the
+prose changes no parse outcome; a review mixing a new class and recurrence prose
+satisfies the single bijection over the new class alone.
 
 **Closure semantics:** zero matches → closed; any match → open with every match a
 recurrence; a closed class with a new match reopens; a superseded class is not
@@ -606,10 +649,21 @@ untouched** (round 5: revision 5 removed dedup in §2.4 but left the old
 pass and implementing the stale one would have recreated the collapsed-identity
 FATAL).
 
-**Supersession:** `SUPERSEDE: <old> BY: <existing>` requires the target to exist
-and errors otherwise; `SUPERSEDE: <old> WITH-PATTERN: …` mints a new id
-inheriting `severity` and `first_round`; the old class becomes `superseded`,
-stops blocking, and is excluded from the recheck sweep.
+**Supersession:** `SUPERSEDE: <old> BY: <existing>` requires a target that
+exists, **is not the source itself, and is not already superseded** — each of
+those three is rejected, and the self-target and superseded-target cases are
+round 6's FATAL, since either would leave no active blocker; a cyclic
+`A BY B` then `B BY A` is rejected on the second by the liveness rule; the target
+keeps its own severity even when lower than the source's, and inherits the
+earlier `first_round`. `SUPERSEDE: <old> WITH-PATTERN: …` mints a new id
+inheriting `severity` and `first_round`, takes the optional `CLASS:` field as the
+new invariant, and carries the old text over when it is omitted. In every form
+the old class becomes `superseded`, stops blocking, and is excluded from the
+recheck sweep.
+
+**Unmechanized lifecycle:** `CLOSED` on an open unmechanized `MAJOR` unblocks;
+**`REOPEN` on it blocks again** (round 6's `CLOSED → REOPEN → open` gap);
+`REOPEN` against a mechanized class is rejected, since those reopen from git.
 
 **Git boundary:** exit 1 is closure, not failure; exit ≥ 2, invalid ERE, and
 timeout each → `malformed`; > 200 matches → `over-broad` with a truncated,
