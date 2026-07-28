@@ -1,11 +1,11 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 14. Thirteen codex plan-review rounds folded —
+Status: DRAFT for review, revision 15. Fourteen codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR; round 10: 1 FATAL; rounds 11, 12 and 13: one MAJOR each and
-nothing in any other section. Every finding accepted.
+4 FATAL, 2 MAJOR; round 10: 1 FATAL; rounds 11–14: one MAJOR each and nothing in
+any other section. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -353,6 +353,21 @@ checkout needed.
   so paths containing newlines or non-UTF-8 bytes parse unambiguously. Decode
   with `surrogateescape`, matching the `orientation`/`evidence` precedent.
   *(Round 1 [MINOR]: revision 1 omitted `-z`.)*
+
+  *Round 14 [MAJOR]: parsing safely is not enough — revision 14 then injected
+  `<path>:<line>: <text>` into the packet verbatim. `orientation.ChangeEntry`'s
+  docstring already warns that `surrogateescape`-decoded paths must "never render
+  them into the packet directly", which is why `orientation._display` exists and
+  is documented as INJECTIVE; and both runner paths write stdin in text mode
+  (`runner.py` `text=True`), where the streaming writer catches only
+  `BrokenPipeError`/`OSError`. A `UnicodeEncodeError` is a `ValueError`, so a lone
+  surrogate would either abort the review outright or leave the child waiting on
+  an unwritten stdin until the timeout — over a filename.* **Every path *and every
+  matched line* is rendered through the injective display helper before it reaches
+  the packet, the footer or the trailer**; `_display` is promoted out of
+  `orientation` into a shared helper for that. Injectivity matters as much as
+  safety: two distinct paths must not collapse onto one label in a block the
+  operator reads as an exhaustive match list.
 - Exit codes: `0` = matches, `1` = **no matches, which is success and means
   closed**, `≥2` = error. A malformed ERE exits `128` with
   `fatal: -e option, 'a[': Invalid regular expression`.
@@ -826,7 +841,10 @@ recheck sweep.
 **Git boundary:** exit 1 is closure, not failure; exit ≥ 2, invalid ERE, and
 timeout each → `malformed`; > 200 matches → `over-broad` with a truncated,
 counted block; aggregate budget exhaustion → `unchecked`; a path containing a
-newline and a non-UTF-8 byte parses correctly under `-z`; a pathspec beginning
+newline and a non-UTF-8 byte parses correctly under `-z`, **and the fully rendered
+packet, footer and trailer containing that match all encode as UTF-8** — asserted
+on the rendered output, not merely on the parsed grep result — **with two paths
+differing only in a non-UTF-8 byte rendering to distinct labels** (round 14); a pathspec beginning
 with `:` is rejected before any git call; registration beyond 100 non-superseded classes is
 refused.
 
