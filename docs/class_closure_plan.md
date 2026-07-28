@@ -1,14 +1,20 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 4. Three codex plan-review rounds folded —
+Status: DRAFT for review, revision 5. Four codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
-1 FATAL, 3 MAJOR, no risks, no gaps. Every finding accepted. Round 1's FATALs
-killed the candidate-enumeration design outright and it was replaced (§2.1);
-round 2's FATAL found the replacement had no link between a prose finding and a
-register record (§2.3); round 3's FATAL found that the link, as specified, made
-every recurrence response malformed — the fix for one round's finding breaking
-the next round's path, which is the class of error this whole design exists to
-catch.
+1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR. Every finding accepted.
+
+The chain is worth reading as evidence for the brief's own thesis. Round 1's
+FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
+replacement had no link between a prose finding and a register record (§2.3).
+Round 3's FATAL found that link, as specified, made every recurrence response
+malformed — one round's fix breaking the next round's path. Round 4 then found
+that the dedup rule added for round 2 had **re-committed round 1's exact FATAL in
+a different spelling** (§2.4), and that the quarantine added for round 3 had
+*created* the fresh-lineage hole it was written to close (§2.7). Four of the
+seven FATALs across this review were introduced by fixes to earlier findings.
+That is the failure this brief exists to mechanize against, observed on the brief
+itself.
 
 ## 0. The defect this fixes
 
@@ -182,6 +188,15 @@ is cheap because it does not re-run the review. If the retry also fails,
 quotes the exact expected grammar. **The review text is always returned in full**;
 a paid review is never discarded over a formatting miss.
 
+*Round 4 [MAJOR] gap: the retry is not always available. `Review.session_ref` is
+`str | None`, `Engine.resume` requires a `str`, and the Claude engine's supported
+non-JSON fallback returns `Review(text=…, session_ref=None)` — a contract
+`tests/test_engines.py` already pins. An unconditional retry on that path would
+raise and `dispatch` would replace the paid review with an error, which is the
+one outcome this section promises cannot happen.* **When `session_ref` is
+`None` the retry is skipped**, the original review is returned unchanged, and the
+malformed-register block is emitted directly.
+
 ### 2.4 Class identity is server-assigned
 
 *Round 1 [MAJOR]: revision 1 hashed the reviewer's regex into the id, so a
@@ -193,16 +208,30 @@ changes. Reviewer-authored text never determines identity, so it does not matter
 that round 7 called the class "escalations" and round 9 "unresolved starts" — a
 label match would never have connected them anyway.
 
-Duplicate registration of one class is guarded twice: open classes are shown to
-every subsequent reviewer with ids and invariants, with the instruction to emit
-`RECURRENCE: <id>` rather than register anew; and the server dedupes on identical
-normalized `(pattern, pathspec)`.
+**Every new-class record gets its own id. There is no deduplication.**
 
-*Round 2 [MAJOR]: revision 2 deduped without a conflict rule, so a `MINOR` and a
-`MAJOR` record sharing a predicate had an unspecified outcome — and discarding
-the latter would return `NOT-BLOCKED` for a registered major class.* **Dedup takes
-the maximum severity and retains both invariant texts.** Max severity fails
-toward blocking.
+*Round 2 [MAJOR] asked for a dedup conflict rule and revision 3 gave one — max
+severity, both invariant texts retained. Round 4 [FATAL] then showed that dedup
+is the round-1 FATAL wearing a new hat: `(pattern, pathspec)` is not an identity,
+so two genuinely distinct invariants expressible by one regex collapse into a
+single state object with one `severity`, one `status` and one `superseded_by`.
+`RECLASSIFY` or `SUPERSEDED-BY` against that shared id would then silently mutate
+an unrelated live class — retaining both invariant strings buys nothing, because
+identity and transitions are what collapsed, not the prose.*
+
+**This is worth naming rather than quietly patching: the design re-committed
+round 1's exact error, three revisions later, in a different spelling. That is
+the failure mode the whole brief exists to catch, occurring inside the brief.**
+It survived two intervening review rounds and was caught only because round 4
+compared the fold against §2.1's own recorded FATAL.
+
+The remedy removes a mechanism rather than adding one: no dedup, no conflict
+rule, no shared state. Duplicate registration is guarded by the prompt alone —
+open classes are shown to every subsequent reviewer with ids and invariants, with
+the instruction to emit `RECURRENCE: <id>` rather than register anew — and the
+100-class cap (§2.5) bounds the cost of the residual duplicates that guard
+misses. A duplicate class is redundant work; a collapsed class is a silent
+clearance. The asymmetry decides it.
 
 ### 2.5 The git invocation
 
@@ -311,12 +340,22 @@ text is still returned.
 
 **The escape from `STATE-UNAVAILABLE` is an operator filesystem action, named in
 the block text** (§1). Unparseable state is moved aside to
-`<lineage_id>.corrupt-<timestamp>.json` rather than left in place or silently
-overwritten, and the message gives the absolute path of both files; a write
-failure names the directory and the errno. The operator repairs or removes the
-file and re-runs. **Recovery is deliberately not automatic:** auto-starting a
-fresh lineage would discard every tracked class and then report `NOT-BLOCKED`,
-turning a storage fault into a false all-clear.
+`<lineage_id>.corrupt-<timestamp>.json`, and the message gives the absolute path
+of both files; a write failure names the directory and the errno.
+
+*Round 4 [FATAL]: quarantining alone **creates** the fresh-lineage path this
+section forbids. Once the canonical file is moved, the next invocation finds it
+absent, initializes an empty lineage, and reports `NOT-BLOCKED` — so merely
+re-running after a `STATE-UNAVAILABLE` discards every tracked class without the
+operator ever performing the named repair.* **A lineage therefore refuses to
+initialize fresh while any `<lineage_id>.corrupt-*.json` sibling exists**: it
+keeps returning `STATE-UNAVAILABLE` + `BLOCKED` until the operator repairs the
+canonical file or deletes the quarantined one. Quarantine is a latch, not a
+sweep.
+
+**Recovery is deliberately not automatic:** auto-starting a fresh lineage would
+discard every tracked class and then report `NOT-BLOCKED`, turning a storage
+fault into a false all-clear.
 
 ### 2.8 Exemptions
 
@@ -476,6 +515,11 @@ It is the escape of last resort, not the escape of first resort — §2.3, §2.8
 5. **Exemptions accumulate**, subject to the same pressure.
 6. **Semantic invariants** (cross-file dataflow, type-level) are not expressible
    as a line regex at all.
+7. **Duplicate classes are now possible**, since §2.4 removed dedup. Two
+   reviewers can register the same invariant under different ids, and both must
+   then be closed. Bounded by the prompt guard and the 100-class cap; accepted
+   deliberately, because a duplicate is redundant work while a collapsed class is
+   a silent clearance.
 
 ## 5. Implementation
 
@@ -504,7 +548,10 @@ duplicate field within a record rejected; missing required field rejected; a
 record after the block's end rejected; a field name in earlier prose does not
 confuse the parser; unmechanized record with `PROCEDURE` parses;
 `RECURRENCE`/`CLOSED`/`RECLASSIFY` naming an unknown id rejected; the retry path
-is taken exactly once and a successful retry parses.
+is taken exactly once and a successful retry parses; **a `Review` with
+`session_ref=None` skips the retry, returns its text unchanged, and blocks per
+policy** (round 4); **two new-class records sharing a pattern and pathspec get
+two distinct ids and two independent state objects** (round 4's dedup FATAL).
 
 **Recurrence binding** (round 3's FATAL, which is the mechanism's own hot path):
 a review whose only class content is `[RECURRENCE <id>]` prose plus a matching
@@ -542,9 +589,11 @@ a sha (empty `--symbolic-full-name` output, exit 0) without `lineage` errors;
 **a dirty target uses the checkout's `HEAD` and rejects a supplied `head_ref`**
 (round 3); unparseable state → `STATE-UNAVAILABLE` + `BLOCKED`, review text still
 returned, **and the corrupt file is quarantined to a named path rather than
-overwritten or silently replaced by a fresh lineage**; write failure → same
-outcome, message names directory and errno; state replaced atomically; a failed
-engine call leaves state byte-identical.
+overwritten or silently replaced by a fresh lineage**; **re-running after a
+quarantine does NOT start a fresh lineage — it blocks again until the quarantine
+sibling is gone** (round 4's latch FATAL); write failure → same outcome, message
+names directory and errno; state replaced atomically; a failed engine call leaves
+state byte-identical.
 
 **Exemptions:** an exempt match is subtracted; **a second, textually identical
 line in the same file is not** (round 2's collision); an exemption whose line
