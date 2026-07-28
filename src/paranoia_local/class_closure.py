@@ -415,7 +415,16 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
     """
     draft = _copy(lineage)
     minted: list[str] = []
+    seen_sources: set[str] = set()
     for t in register.transitions:
+        if t.class_id in seen_sources:
+            # Two state changes against one class in a register have no defined order, and
+            # two SUPERSEDE ... WITH-* records would mint two live replacements for one
+            # retired class — quietly breaking the net-zero guarantee at the cap.
+            raise RegisterError(
+                f"more than one transition against class {t.class_id} in a single register"
+            )
+        seen_sources.add(t.class_id)
         _apply_transition(draft, t, round_no=round_no, minted=minted)
     for nc in register.new_classes:
         if len(draft.active()) >= MAX_ACTIVE_CLASSES:
@@ -425,6 +434,11 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
             )
         minted.append(_add(draft, nc.invariant, nc.severity, round_no,
                            nc.pattern, nc.pathspec, nc.procedure))
+    if len(draft.active()) > MAX_ACTIVE_CLASSES:
+        raise RegisterError(
+            f"register would leave {len(draft.active())} non-superseded classes, over the "
+            f"{MAX_ACTIVE_CLASSES} cap"
+        )
     lineage.classes = draft.classes
     lineage.next_seq = draft.next_seq
     lineage.exemptions = draft.exemptions
@@ -456,6 +470,14 @@ def _apply_transition(lineage: Lineage, t: Transition, *, round_no: int, minted:
     cls = lineage.classes.get(t.class_id)
     if cls is None:
         raise RegisterError(f"{t.kind} names unknown class id {t.class_id!r}")
+    if cls.status == SUPERSEDED:
+        # A superseded class is inert and uncounted against the cap. Letting CLOSED/REOPEN
+        # move it back to an active status would resurrect it, and superseding it again
+        # would mint a second replacement for one retirement.
+        raise RegisterError(
+            f"{t.kind} names class {t.class_id}, which is already superseded by "
+            f"{cls.superseded_by}"
+        )
 
     if t.kind in ("CLOSED", "REOPEN"):
         if cls.mechanized:
@@ -509,16 +531,39 @@ class GrepResult:
 GitGrep = Callable[[str, str], GrepResult]
 
 
+@dataclass
+class Budget:
+    """The round's closure budget, measured in GREP time only.
+
+    Deliberately not a wall-clock deadline: one round's two sweeps straddle the reviewer
+    call, which routinely runs for minutes, so an absolute deadline opened before the
+    review would always be spent by the time the post-register sweep ran — and every
+    newly registered class would be `unchecked` instead of evaluated, defeating both
+    same-round evaluation and the same-round false-closure warning.
+
+    A class is only started while budget remains, and each class can then run its two
+    passes, so the real ceiling is `total + 2 * PER_CLASS_TIMEOUT`.
+    """
+
+    total: float = ROUND_BUDGET
+    spent: float = 0.0
+
+    def exhausted(self) -> bool:
+        return self.spent >= self.total
+
+    def charge(self, seconds: float) -> None:
+        self.spent += max(0.0, seconds)
+
+
 def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
-          deadline: float | None = None, clock: Callable[[], float] | None = None) -> None:
+          budget: Budget | None = None, clock: Callable[[], float] | None = None) -> None:
     """Re-run every non-superseded mechanized predicate and update its status in place.
 
     `closed` classes are swept too: a later fix can reintroduce a defect, and a class
     that never reopens would let the trailer report nothing unclosed while it lives.
 
-    `deadline` is an ABSOLUTE instant on `clock`, not a per-call budget, so the pre-review
-    and post-register sweeps of one round share the round's budget instead of each getting
-    a fresh one — two fresh 60s budgets is a 120s round.
+    Pass the SAME `Budget` to both of a round's sweeps so they share it rather than each
+    getting a fresh one.
     """
     ids = list(only) if only is not None else list(lineage.classes)
     now = clock or (lambda: 0.0)
@@ -526,14 +571,17 @@ def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
         cls = lineage.classes.get(cid)
         if cls is None or cls.status == SUPERSEDED or not cls.mechanized:
             continue
-        if deadline is not None and now() >= deadline:
+        if budget is not None and budget.exhausted():
             lineage.classes[cid] = replace(
                 cls, status=UNCHECKED, matches=(),
                 detail="round closure budget exhausted before this class ran",
             )
             continue
-        lineage.classes[cid] = _evaluate(cls, grep(cls.pattern or "", cls.pathspec or "."),
-                                         lineage.exemptions)
+        started = now()
+        result = grep(cls.pattern or "", cls.pathspec or ".")
+        if budget is not None:
+            budget.charge(now() - started)
+        lineage.classes[cid] = _evaluate(cls, result, lineage.exemptions)
 
 
 def _evaluate(cls: TrackedClass, result: GrepResult, exemptions: Sequence[Exemption]) -> TrackedClass:
@@ -557,14 +605,18 @@ def _evaluate(cls: TrackedClass, result: GrepResult, exemptions: Sequence[Exempt
         m for m in result.matches
         if (m["path"], m["line"], fingerprint(m["text"])) not in exempt
     ]
-    exempt_paths = {e.path for e in exemptions if e.class_id == cls.class_id}
-    displayed_paths = {m["path"] for m in result.matches}
-    surviving_paths = [p for p in result.paths if p not in exempt_paths]
     # A path the verdict pass found but the display pass could not read is a binary match:
     # it must still block, and must still be visible, with no line to quote.
+    #
+    # It can NEVER be exempted. An exemption's identity is (path, line, text-fingerprint),
+    # and none of those can be established for a match no pass could read — so falling back
+    # to path-only matching here would silently turn one exact exemption into a path-wide
+    # one the moment a file went binary or the display pass timed out, and close the class
+    # over a live violation.
+    displayed_paths = {m["path"] for m in result.matches}
     binary = [
         {"path": p, "line": 0, "text": "", "binary": True}
-        for p in surviving_paths if p not in displayed_paths
+        for p in result.paths if p not in displayed_paths
     ]
     survivors = tuple(shown + binary)
     if not survivors:

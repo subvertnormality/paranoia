@@ -225,6 +225,32 @@ class TestIdentityAndTransitions:
             transitions=(cc.Transition("REOPEN", cid),)), round_no=3)
         assert lin.classes[cid].blocking
 
+    def test_a_superseded_source_is_rejected(self) -> None:
+        """A superseded class is inert and uncounted against the cap; CLOSED or REOPEN
+        against it would resurrect it, and superseding it again would mint a second
+        replacement for one retirement."""
+        lin = lineage_with(("a", cc.MAJOR, None), ("b", cc.MAJOR, None))
+        a, b = [c.class_id for c in lin.active()]
+        cc.apply_register(lin, cc.Register(
+            transitions=(cc.Transition("SUPERSEDE", a, target=b),)), round_no=2)
+        for t in (cc.Transition("REOPEN", a), cc.Transition("CLOSED", a),
+                  cc.Transition("SUPERSEDE", a, procedure="again")):
+            with pytest.raises(cc.RegisterError, match="already superseded"):
+                cc.apply_register(lin, cc.Register(transitions=(t,)), round_no=3)
+        assert lin.classes[a].status == cc.SUPERSEDED
+
+    def test_two_transitions_against_one_class_in_a_register_are_rejected(self) -> None:
+        """Two SUPERSEDE ... WITH-* records for one source would mint two live replacements
+        for one retirement, quietly breaking the net-zero guarantee at the cap."""
+        lin = lineage_with(("a", cc.MAJOR, "X"))
+        cid = lin.active()[0].class_id
+        with pytest.raises(cc.RegisterError, match="more than one transition"):
+            cc.apply_register(lin, cc.Register(transitions=(
+                cc.Transition("SUPERSEDE", cid, pattern="Y", pathspec="."),
+                cc.Transition("SUPERSEDE", cid, pattern="Z", pathspec="."),
+            )), round_no=2)
+        assert len(lin.active()) == 1, "a rejected register applies none of its records"
+
     def test_transition_naming_an_unknown_id_is_rejected(self) -> None:
         with pytest.raises(cc.RegisterError, match="unknown class id"):
             cc.apply_register(cc.Lineage("t"), cc.Register(
@@ -313,22 +339,38 @@ class TestClosure:
 
     def test_budget_exhaustion_leaves_the_class_unchecked_and_blocking(self) -> None:
         lin = lineage_with(("inv", cc.MAJOR, "X"))
-        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=0.0, clock=lambda: 1.0)
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), budget=cc.Budget(total=0.0))
         cls = lin.active()[0]
         assert cls.status == cc.UNCHECKED and cls.blocking
 
-    def test_both_sweeps_of_a_round_share_one_deadline(self) -> None:
+    def test_both_sweeps_of_a_round_share_one_budget(self) -> None:
         """A per-call budget would give the pre-review and post-register sweeps a fresh
         60s each, making a 60s round budget a 120s one in practice."""
         lin = lineage_with(("first", cc.MAJOR, "X"))
         ticks = iter([0.0, 61.0])
         clock = lambda: next(ticks)  # noqa: E731
-        deadline = 60.0
-        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=deadline, clock=clock)
-        assert lin.active()[0].status == cc.CLOSED
-        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=deadline, clock=clock)
+        budget = cc.Budget(total=60.0)
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), budget=budget, clock=clock)
+        assert lin.active()[0].status == cc.CLOSED and budget.spent == 61.0
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), budget=budget, clock=clock)
         assert lin.active()[0].status == cc.UNCHECKED, (
             "the second sweep must inherit the round's spent budget, not restart it"
+        )
+
+    def test_the_budget_measures_grep_time_not_wall_clock(self) -> None:
+        """The two sweeps of a round straddle the reviewer call, which runs for minutes. A
+        wall-clock deadline opened before the review would always be spent by the time the
+        post-register sweep ran, so every newly registered class would be `unchecked`."""
+        lin = lineage_with(("inv", cc.MAJOR, "X"))
+        budget = cc.Budget(total=60.0)
+        # grep itself takes 1s; 600s of reviewer time elapses between the two readings.
+        ticks = iter([0.0, 1.0, 600.0, 601.0])
+        clock = lambda: next(ticks)  # noqa: E731
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), budget=budget, clock=clock)
+        assert budget.spent == 1.0, "only the grep call may be charged"
+        cc.sweep(lin, lambda p, s: cc.GrepResult(paths=("a.py",)), budget=budget, clock=clock)
+        assert lin.active()[0].status == cc.OPEN, (
+            "the reviewer's own runtime must not exhaust the closure budget"
         )
 
     def test_a_new_mechanized_class_starts_unchecked_and_blocking(self) -> None:
@@ -373,6 +415,25 @@ class TestBinaryMatches:
         cc.sweep(lin, lambda p, s: cc.GrepResult(paths=("blob.dat",), matches=()))
         assert lin.classes[cid].status == cc.OPEN
         assert lin.classes[cid].matches[0]["binary"] is True
+
+    def test_a_binary_match_cannot_be_exempted_away(self) -> None:
+        """Round 2's MAJOR: falling back to path-only matching for an undisplayable match
+        turns one exact exemption into a path-wide one the moment a file goes binary, and
+        closes the class over a live violation."""
+        lin = lineage_with(("inv", cc.MAJOR, "X"))
+        cid = lin.active()[0].class_id
+        lin.exemptions.append(cc.Exemption(cid, "blob.dat", 4, cc.fingerprint("X was here")))
+        cc.sweep(lin, lambda p, s: cc.GrepResult(paths=("blob.dat",), matches=()))
+        assert lin.classes[cid].status == cc.OPEN
+        assert lin.classes[cid].matches[0]["binary"] is True
+
+    def test_a_display_pass_timeout_does_not_let_an_exemption_close_the_class(self) -> None:
+        lin = lineage_with(("inv", cc.MAJOR, "X"))
+        cid = lin.active()[0].class_id
+        lin.exemptions.append(cc.Exemption(cid, "a.py", 1, cc.fingerprint("X")))
+        # verdict pass found it; display pass returned nothing (timeout)
+        cc.sweep(lin, lambda p, s: cc.GrepResult(paths=("a.py",), matches=()))
+        assert lin.classes[cid].status == cc.OPEN
 
     def test_the_binary_match_is_visible_in_the_block(self) -> None:
         lin = lineage_with(("inv", cc.MAJOR, "X"))

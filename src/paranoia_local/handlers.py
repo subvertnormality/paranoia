@@ -152,13 +152,16 @@ def critique_branch(
         resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
     )
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
-    if closure_on and include_unc and arguments.get("head_ref") not in (None, "HEAD"):
+    if (closure_on and include_unc and arguments.get("head_ref") not in (None, "HEAD")
+            and not arguments.get("lineage")):
         # resolve_target discards head_ref for a dirty review and snapshots the checkout, so
         # accepting it would key this round's classes to a branch that was never reviewed.
+        # An explicit `lineage` says the caller has chosen the key deliberately, so it is
+        # honoured rather than rejected — an error whose remedy it also refuses is no remedy.
         raise ValueError(
             "include_uncommitted reviews the current checkout, so head_ref="
             f"{arguments['head_ref']!r} would not be the reviewed ref. Drop head_ref, or pass "
-            "an explicit `lineage`, or `class_closure: false`."
+            "an explicit `lineage` to choose the key yourself, or `class_closure: false`."
         )
 
     target = orientation.resolve_target(repo, base_ref, head_ref, include_unc)
@@ -243,29 +246,35 @@ def _converge_branch_review(
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
 
-    packet = orientation.build_packet(
-        repo, base_id, head_id,
-        project_summary=project_summary, diff_intent=diff_intent, focus=focus,
-        already_raised=already, class_blocks=blocks, max_chars=max_packet_chars,
-    )
-    instructions = prompts.CODE_REVIEW_INSTRUCTIONS_PACKET
-    if closure:
-        instructions += "\n\n" + prompts.CLASS_REGISTER_INSTRUCTIONS
-    prompt = prompts.compose(instructions, _prepend(calibration, packet))
+    # EVERYTHING after prepare() is inside the latch's cleanup: packet building, worktree
+    # entry and the engine call can all raise, and a latch stranded there would make every
+    # later round STATE-UNAVAILABLE over a fault that already surfaced to the caller. A
+    # failed *write* is the one case that deliberately keeps the latch (see `release`).
+    try:
+        packet = orientation.build_packet(
+            repo, base_id, head_id,
+            project_summary=project_summary, diff_intent=diff_intent, focus=focus,
+            already_raised=already, class_blocks=blocks, max_chars=max_packet_chars,
+        )
+        instructions = prompts.CODE_REVIEW_INSTRUCTIONS_PACKET
+        if closure:
+            instructions += "\n\n" + prompts.CLASS_REGISTER_INSTRUCTIONS
+        prompt = prompts.compose(instructions, _prepend(calibration, packet))
 
-    with worktree_at(repo, head_id) as wt:
-        review = engine.run(prompt, wt, model, effort, web_search,
-                            **_progress_kwargs(on_progress))
-        # Settle inside the worktree: a register retry resumes the same session and must
-        # see the same materialized snapshot the review did.
-        try:
+        with worktree_at(repo, head_id) as wt:
+            review = engine.run(prompt, wt, model, effort, web_search,
+                                **_progress_kwargs(on_progress))
+            # Settle inside the worktree: a register retry resumes the same session and
+            # must see the same materialized snapshot the review did.
             trailer = closure.settle(review, engine, wt, model, effort, web_search,
                                      on_progress) if closure else None
-        finally:
-            # Whatever happened, the round must not strand its own pending latch and block
-            # every future round on a fault that has already been reported.
-            if closure:
-                closure.release()
+    except BaseException:
+        if closure:
+            closure.abandon()
+        raise
+    finally:
+        if closure:
+            closure.release()
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
@@ -454,7 +463,7 @@ class _ClassClosure:
         self.lineage_id = _lineage_id(repo, base_ref, head_ref, is_dirty, args.get("lineage"))
         self.lineage: cc.Lineage | None = None
         self.unavailable: str | None = None
-        self.deadline: float | None = None
+        self.budget = cc.Budget()
         self._latched = False
         self._settled = False
 
@@ -467,9 +476,8 @@ class _ClassClosure:
             return []
         cc.open_latch(self.state_root, self.lineage_id)
         self._latched = True
-        self.deadline = time.monotonic() + cc.ROUND_BUDGET
         self._apply_exemption_args()
-        cc.sweep(self.lineage, self._grep(), deadline=self.deadline, clock=time.monotonic)
+        cc.sweep(self.lineage, self._grep(), budget=self.budget, clock=time.monotonic)
         return [b for b in (cc.render_unclosed(self.lineage),
                             cc.render_unmechanized(self.lineage),
                             cc.render_exempt(self.lineage)) if b]
@@ -496,7 +504,7 @@ class _ClassClosure:
             # Round 10: a class registered by THIS review does not exist until now, so it
             # must be evaluated before the verdict — otherwise a new MAJOR class and
             # NOT-BLOCKED could ship in the same response.
-            cc.sweep(lineage, self._grep(), only=minted, deadline=self.deadline,
+            cc.sweep(lineage, self._grep(), only=minted, budget=self.budget,
                      clock=time.monotonic)
             lineage.debt = None
         except cc.RegisterError as exc:
@@ -514,12 +522,18 @@ class _ClassClosure:
         self._settled = True
         return cc.render_trailer(lineage, register_status=status, minted=minted)
 
+    def abandon(self) -> None:
+        """The round died before it could settle. Nothing was written, so the latch has
+        nothing to protect and must not outlive the exception that is already propagating."""
+        self._settled = True
+
     def release(self) -> None:
         """Clear the pending latch once the round is over WITHOUT an unresolved write.
 
-        Called from a `finally`, so a crash between `prepare()` and `settle()` cannot strand
-        the latch and block every later round on a fault that already surfaced. A failed
-        *write* does not release: that is the one case the latch exists for.
+        Called from a `finally` covering everything after `prepare()`, so no failure between
+        the two can strand the latch and block every later round on a fault the caller has
+        already been told about. A failed *write* does not release: that is the one
+        genuinely ambiguous case, and the one the latch exists for.
         """
         if self._latched and self._settled:
             cc.clear_latch(self.state_root, self.lineage_id)
@@ -533,7 +547,8 @@ class _ClassClosure:
     def _register(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
                   web_search: bool, on_progress: Callable[[str], None] | None):
         try:
-            return cc.parse_register(review.text), None or "parsed"
+            register = cc.parse_register(review.text)
+            return register, _count(register)
         except cc.RegisterError as first:
             if not review.session_ref or not hasattr(engine, "resume"):
                 # Claude's supported non-JSON fallback has no session to resume, and an
@@ -544,8 +559,15 @@ class _ClassClosure:
             retry = engine.resume(
                 review.session_ref, prompts.REGISTER_RETRY, repo, model, effort, web_search,
                 **_progress_kwargs(on_progress))
+            if retry.error:
+                # A failed CLI still returns text, and that text can contain a parseable
+                # NONE or CLOSED block. Trusting it would let a broken retry mutate durable
+                # state — the same reason `settle` refuses a failed review outright.
+                raise cc.RegisterError(
+                    f"the register retry itself failed (exit {retry.returncode})"
+                ) from first
             register = cc.parse_register(retry.text)   # a second failure raises, and blocks
-            return register, "parsed after retry"
+            return register, f"parsed after retry: {_count(register)}"
 
     def _apply_exemption_args(self) -> None:
         assert self.lineage is not None
@@ -595,3 +617,10 @@ def _run_git(argv: list[str], cwd: Path, timeout: int) -> tuple[int, bytes, byte
     except subprocess.TimeoutExpired as exc:
         raise TimeoutError(str(exc)) from exc
     return proc.returncode, proc.stdout, proc.stderr
+
+
+def _count(register: cc.Register) -> str:
+    """`NONE` and `parsed 0` are different facts about a review, and an operator reading
+    the trailer needs to tell an empty register from one whose records were all accepted."""
+    total = len(register.new_classes) + len(register.transitions)
+    return cc.NONE if total == 0 else f"parsed {total}"

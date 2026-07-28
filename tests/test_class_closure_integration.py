@@ -228,6 +228,50 @@ class TestFailurePaths:
         assert path.read_bytes() == before, "a failed review must not mutate durable state"
         assert "CONVERGENCE: BLOCKED" in out and "review failed" in out
 
+    def test_a_failed_retry_is_not_trusted_and_leaves_state_unchanged(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """Round 2's BLOCKER: a failed CLI still returns text, and that text can contain a
+        parseable NONE or CLOSED block."""
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        run_round(repo, FakeEngine(review_with(
+            "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
+        )), tmp_path, round=1)
+        lin_id = _only_lineage(tmp_path)
+        cid = cc.load_lineage(tmp_path, lin_id, stamp="s").active()[0].class_id
+
+        class FailingRetry(FakeEngine):
+            def resume(self, *a, **kw):
+                from paranoia_local.engines import Review
+                self.resumed.append("x")
+                return Review(text=f"=== CLASS REGISTER ===\nCLOSED: {cid}\n",
+                              session_ref="sess", raw="", returncode=1, error=True)
+
+        out = run_round(repo, FailingRetry("no register"), tmp_path, round=2)
+        assert "CONVERGENCE: BLOCKED" in out
+        after = cc.load_lineage(tmp_path, lin_id, stamp="s")
+        assert after.classes[cid].status == cc.OPEN, (
+            "a failed retry's parseable CLOSED must not be applied"
+        )
+        assert after.debt, "the round is register debt, not a silent success"
+
+    def test_an_exception_after_prepare_does_not_strand_the_latch(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """A stranded latch would make every later round STATE-UNAVAILABLE over a fault the
+        caller has already been told about."""
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+
+        class Exploding(FakeEngine):
+            def run(self, *a, **kw):
+                raise RuntimeError("engine blew up")
+
+        with pytest.raises(RuntimeError, match="engine blew up"):
+            run_round(repo, Exploding(), tmp_path, round=1)
+        assert not list(cc.lineage_dir(tmp_path).glob("*.pending"))
+        out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=2)
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+
     def test_the_pending_latch_is_released_on_a_normal_round(
         self, repo: Path, tmp_path: Path
     ) -> None:
@@ -325,6 +369,20 @@ class TestTrailerIntegration:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         out = run_round(repo, FakeEngine(review_with(MECHANIZED)), tmp_path, round=1)
         assert "CLASS-CLOSURE-WARNING" in out and "closed in the round it was registered" in out
+
+    def test_an_empty_register_reads_as_NONE_not_parsed_zero(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        assert "CLASS-REGISTER: NONE" in run_round(
+            repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
+
+    def test_an_accepted_register_reports_its_record_count(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        commit(repo, {"a.py": "x = 1\n"}, "c")
+        assert "CLASS-REGISTER: parsed 1" in run_round(
+            repo, FakeEngine(review_with(MECHANIZED)), tmp_path, round=1)
 
     def test_base_id_and_head_id_are_recorded_in_the_audit_log(
         self, repo: Path, tmp_path: Path
