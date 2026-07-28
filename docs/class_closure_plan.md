@@ -1,9 +1,10 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 8. Seven codex plan-review rounds folded —
+Status: DRAFT for review, revision 9. Eight codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
-1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR. Every finding accepted.
+1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR. Every
+finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
 FATALs killed the candidate-enumeration design (§2.1). Round 2's FATAL found the
@@ -118,10 +119,32 @@ to `unmechanized` (§2.10), which is materially weaker.** That trade is correct 
 a check that cannot be wrong about closure is worth more than a check with wider
 reach and an adjudication layer that can silently whitelist a live defect.
 
-### 2.2 Every finding declares its kind
+### 2.2 Every finding is a delimited record declaring its kind
 
-**Every** finding in "What doesn't work" and "Gaps" opens with exactly one
-machine-readable header line:
+*Round 8 [FATAL]: revision 8 asserted "a header on every finding is what makes
+omission observable" while §2.2 itself conceded there is no boundary between
+findings — `prompts._SECTION_BODIES` defines prose, with no bullet or record
+delimiter. One valid `kind=isolated` header followed by prose containing a
+second, headerless class finding is indistinguishable from one long isolated
+finding, so `NONE` still parsed and the class still vanished. The header was
+necessary and not sufficient.*
+
+**The four severity-tagged sections therefore become a record grammar, not
+prose.** Each of "What doesn't work", "Risks", "Gaps" and "Improvements" contains
+either the exact sentinel `Nothing notable.` or a sequence of records. A record
+begins with a `FINDING:` header at column 0 and runs to the next `FINDING:` or
+the next section heading. **Any text inside those sections that is not the
+sentinel and does not sit inside a record makes the review malformed** — which is
+what closes the FATAL: there is nowhere left for an undeclared finding to hide.
+
+*Round 8 [MAJOR]: revision 8 applied the grammar only to "What doesn't work" and
+"Gaps", but `prompts.CODE_REVIEW_INSTRUCTIONS` requires a severity tag on Risks
+and Improvements items too, and `_SECTION_BODIES` defines Risks as specific,
+testable failure modes — so a merge-blocking class could be reported under Risks
+with no header and no record at all.* All four are parsed; the "What works"
+section is prose and is not.
+
+Each record opens with exactly one machine-readable header line:
 
 ```
 FINDING: kind=isolated
@@ -147,9 +170,10 @@ header and the record produced `∅ == ∅`, `NONE` parsed, no retry fired, and 
 class was never persisted. Round 2's durability FATAL, back in a spelling the
 parser could not see. It could not be fixed by rejecting headerless class-scoped
 findings, because recurrences are class-scoped too and deliberately carry
-nothing.* **A header on every finding is what makes omission observable**: a
-finding with no header is a malformed review, so there is no longer a way to
-report a class without declaring what kind of thing it is.
+nothing.* **The record grammar above is what makes omission observable**: every
+finding is a delimited record, every record declares its kind, and unrecorded
+text is malformed — so there is no longer anywhere to report a class without
+declaring it.
 
 The `kind=recurrence` form is the **minimal** discriminator round 7 requires — a
 class id and nothing else. No ref, no severity, no sites, no matches, and no
@@ -423,6 +447,18 @@ in the same directory. A write failure, or existing state that will not parse,
 yields `CLASS-CLOSURE: STATE-UNAVAILABLE` and `CONVERGENCE: BLOCKED`. The review
 text is still returned.
 
+*Round 8 [FATAL]: the quarantine latch below covers a **parse** failure but not a
+**write** failure. If the very first registration fails to write — or an existing
+state fails to persist a new class — no `corrupt-*` sibling exists, so the next
+invocation reads nothing, initializes empty state, and reports `NOT-BLOCKED`. The
+false clearance this section forbids, reached by the one path the latch did not
+watch.* **A pending latch is therefore written before the engine call and cleared
+only after the round finishes with either a successful atomic state write or an
+explicit no-write outcome.** A latch present at read time is itself
+`STATE-UNAVAILABLE` + `BLOCKED`. It costs one small write per review and it makes
+the two failure modes symmetric: neither a corrupt read nor a failed write can
+silently become an empty lineage.
+
 **The escape from `STATE-UNAVAILABLE` is an operator filesystem action, named in
 the block text** (§1). Unparseable state is moved aside to
 `<lineage_id>.corrupt-<timestamp>.json`, and the message gives the absolute path
@@ -665,7 +701,14 @@ parses as empty; absent → one retry, then `absent` + policy-dependent block;
 **a `kind=new-class` header with a `NONE` register is malformed** (round 2's
 FATAL); **a finding with no `FINDING:` header at all is malformed, so a
 class-scoped finding that omits both its header and its record cannot pass as
-`∅ == ∅`** (round 7's FATAL); **`kind=recurrence` naming an unknown class id is
+`∅ == ∅`** (round 7's FATAL); **prose in a parsed section that is neither the
+exact `Nothing notable.` sentinel nor inside a record is malformed — including a
+second, headerless finding written as continuation prose under a valid
+`kind=isolated` record** (round 8's FATAL, the case a header alone could not
+catch); **a class reported under "Risks" or "Improvements" is subject to the same
+grammar**, and those sections parse exactly as "What doesn't work" does (round
+8's MAJOR), while "What works" is prose and is not parsed;
+**`kind=recurrence` naming an unknown class id is
 malformed, while a review with recurrence headers and a `NONE` register is
 well-formed**; header ref with no record, record with no header, duplicate ref, and
 **severity disagreement between header `severity=` and record `SEVERITY`** are
@@ -739,8 +782,12 @@ returned, **and the corrupt file is quarantined to a named path rather than
 overwritten or silently replaced by a fresh lineage**; **re-running after a
 quarantine does NOT start a fresh lineage — it blocks again until the quarantine
 sibling is gone** (round 4's latch FATAL); write failure → same outcome, message
-names directory and errno; state replaced atomically; a failed engine call leaves
-state byte-identical.
+names directory and errno; **a failed write leaves the pending latch in place, so
+the next invocation blocks instead of initializing empty state** (round 8's
+FATAL); **a pending latch found at read time blocks even with no state file and
+no quarantine sibling**; the latch is cleared after a successful write and after
+an explicit no-write outcome; state replaced atomically; a failed engine call
+leaves state byte-identical.
 
 **Exemptions:** an exempt match is subtracted; **a second, textually identical
 line in the same file is not** (round 2's collision); an exemption whose line
