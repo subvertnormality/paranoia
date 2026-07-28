@@ -1,10 +1,10 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 15. Fourteen codex plan-review rounds folded —
+Status: DRAFT for review, revision 16. Fifteen codex plan-review rounds folded —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
-4 FATAL, 2 MAJOR; round 10: 1 FATAL; rounds 11–14: one MAJOR each and nothing in
+4 FATAL, 2 MAJOR; round 10: 1 FATAL; rounds 11–15: one MAJOR each and nothing in
 any other section. Every finding accepted.
 
 The chain is worth reading as evidence for the brief's own thesis. Round 1's
@@ -338,8 +338,29 @@ clearance. The asymmetry decides it.
 The predicate is *data*, never an argv:
 
 ```
-git grep -I -z -n -E --no-color -e <pattern> <snapshot-commit> -- <pathspec>
+git grep -l -z    -E --no-color -e <pattern> <snapshot-commit> -- <pathspec>   # verdict
+git grep -I -z -n -E --no-color -e <pattern> <snapshot-commit> -- <pathspec>   # display
 ```
+
+**Two passes, and only the first decides.** *Round 15 [MAJOR]: a single `-I` pass
+cannot be the closure authority, because `-I` suppresses matches in files git
+classifies as binary — and this repository treats those as a supported case,
+`orientation.file_evidence` detecting any NUL-bearing blob and `tests/test_packet.py`
+pinning a late-NUL file. A registered predicate whose violation lives in such a
+blob returns exit 1, is recorded `closed`, and can emit `NOT-BLOCKED` in its own
+registration round while the violation survives.*
+
+Simply dropping `-I` does not work either. **Verified on a fresh repository:** with
+`-I` the binary match yields exit 1 and no output; without `-I` git emits the
+untyped English line `Binary file HEAD:blob.dat matches\n` — no NUL separators, not
+the `-z` record shape, and localizable. A parser fed that would mis-read it.
+
+So the **verdict** comes from `-l -z`, which lists matching paths NUL-separated and
+uniformly for text and binary alike (verified: `HEAD:blob.dat\0`), and the
+**display** list comes from the `-I -z -n` pass. A path present in the verdict pass
+but absent from the display pass is rendered `<path>: binary match (line not
+shown)`. The blocking decision therefore never depends on the richer, more fragile
+output — which is the same separation §2.2 reached for prose.
 
 `shell=False`, no pipes, no redirection, no reviewer-chosen binary or flags. This
 removes model-authored command execution from the design rather than sanitising
@@ -368,8 +389,8 @@ checkout needed.
   `orientation` into a shared helper for that. Injectivity matters as much as
   safety: two distinct paths must not collapse onto one label in a block the
   operator reads as an exhaustive match list.
-- Exit codes: `0` = matches, `1` = **no matches, which is success and means
-  closed**, `≥2` = error. A malformed ERE exits `128` with
+- Exit codes on the verdict pass: `0` = matches, `1` = **no matches, which is
+  success and means closed**, `≥2` = error. A malformed ERE exits `128` with
   `fatal: -e option, 'a[': Invalid regular expression`.
 - Pathspec magic is accepted and silently changes the result set:
   `git grep -E -e x main -- ':(exclude)src'` returned matches from outside `src`.
@@ -838,7 +859,11 @@ recheck sweep.
 **`REOPEN` on it blocks again** (round 6's `CLOSED → REOPEN → open` gap);
 `REOPEN` against a mechanized class is rejected, since those reopen from git.
 
-**Git boundary:** exit 1 is closure, not failure; exit ≥ 2, invalid ERE, and
+**Git boundary:** exit 1 **on the verdict pass** is closure, not failure; **a
+violation inside a binary-classified blob keeps the class open** and renders as
+`binary match (line not shown)` (round 15's MAJOR) — asserted with a late-NUL
+file like the one `tests/test_packet.py` already pins; a verdict-pass path absent
+from the display pass never silently disappears from the block; exit ≥ 2, invalid ERE, and
 timeout each → `malformed`; > 200 matches → `over-broad` with a truncated,
 counted block; aggregate budget exhaustion → `unchecked`; a path containing a
 newline and a non-UTF-8 byte parses correctly under `-z`, **and the fully rendered
