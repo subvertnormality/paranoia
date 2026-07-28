@@ -237,12 +237,10 @@ def _converge_branch_review(
         base_id = orientation.resolve_ref(repo, base_ref)
         head_id = orientation.resolve_ref(repo, head_ref or "HEAD")
 
-    # State root is derived from log_dir (~/.paranoia/logs -> ~/.paranoia) so an injected
-    # log_dir also isolates lineage state: tests must not write into the operator's home.
     closure = _ClassClosure(
         repo, head_id, args=closure_args or {}, round_no=review_round or 1,
         is_dirty=target.is_dirty, base_ref=base_ref, head_ref=head_ref,
-        state_root=state_root or Path(log_dir).parent, stamp=now(),
+        state_root=state_root or cc.default_state_root(), stamp=now(),
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
 
@@ -282,8 +280,16 @@ def _converge_branch_review(
           # Recorded so a future incident IS replayable: the plan's own acceptance
           # replay was impossible because these were never written down.
           "base_id": base_id, "head_id": head_id,
-          "lineage": closure.lineage_id if closure else None})
+          "lineage": closure.lineage_id if closure else None,
+          # The retry's register is what actually changed durable state, so it belongs in
+          # the audit record; the original review only carries the malformed attempt.
+          "retry_register": closure.retry_register if closure else None})
     body = _footer(review, engine)
+    if closure and closure.retry_register:
+        # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
+        # supplied would otherwise be invisible in everything they can see.
+        body += ("\n\n---\n_The register below was supplied on retry and is what this "
+                 f"round applied:_\n\n{closure.retry_register.strip()}")
     return f"{body}\n\n{trailer}" if trailer else body
 
 
@@ -464,6 +470,7 @@ class _ClassClosure:
         self.lineage: cc.Lineage | None = None
         self.unavailable: str | None = None
         self.budget = cc.Budget()
+        self.retry_register: str | None = None
         self._latched = False
         self._settled = False
 
@@ -559,6 +566,7 @@ class _ClassClosure:
             retry = engine.resume(
                 review.session_ref, prompts.REGISTER_RETRY, repo, model, effort, web_search,
                 **_progress_kwargs(on_progress))
+            self.retry_register = retry.text
             if retry.error:
                 # A failed CLI still returns text, and that text can contain a parseable
                 # NONE or CLOSED block. Trusting it would let a broken retry mutate durable

@@ -296,6 +296,20 @@ class StateUnavailable(RuntimeError):
     a storage fault must not become a false all-clear (plan §2.7)."""
 
 
+#: Where lineage state lives. Deliberately NOT derived from `log_dir`: `--log-dir` is
+#: documented as the audit-log directory, so a caller who moves their logs would silently
+#: get an empty state root and could be told NOT-BLOCKED with classes still open.
+DEFAULT_STATE_ROOT = Path.home() / ".paranoia"
+STATE_ROOT_ENV = "PARANOIA_STATE_ROOT"
+
+
+def default_state_root() -> Path:
+    """The env override exists so the test suite can isolate itself without every caller
+    threading a path — nothing may write lineages into the operator's real home."""
+    override = os.environ.get(STATE_ROOT_ENV)
+    return Path(override) if override else DEFAULT_STATE_ROOT
+
+
 def lineage_dir(root: Path) -> Path:
     return Path(root) / "lineages"
 

@@ -88,7 +88,9 @@ def run_round(repo: Path, engine: FakeEngine, tmp_path: Path, **extra) -> str:
 
 
 def state_root(tmp_path: Path) -> Path:
-    return tmp_path
+    """Matches the autouse isolation fixture in conftest: lineage state deliberately does
+    NOT follow log_dir, so tests must look where the env override actually points."""
+    return tmp_path / "state"
 
 
 # ── the known-positive this whole design exists to reproduce ──────────────────
@@ -143,7 +145,7 @@ class TestThreeSiteIncident:
 
 
 def _only_lineage(tmp_path: Path) -> str:
-    files = list(cc.lineage_dir(tmp_path).glob("*.json"))
+    files = list(cc.lineage_dir(state_root(tmp_path)).glob("*.json"))
     assert len(files) == 1, f"expected one lineage, got {files}"
     return files[0].stem
 
@@ -162,16 +164,25 @@ class TestRegisterHandling:
         assert "register debt from round 1" in out
 
         # Debt is durable: it survives into the next round's state, and clears on a good one.
-        lineage = cc.load_lineage(tmp_path, _only_lineage(tmp_path), stamp="s")
+        lineage = cc.load_lineage(state_root(tmp_path), _only_lineage(tmp_path), stamp="s")
         assert lineage.debt and lineage.debt["round"] == 1
         out2 = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=2)
         assert "NOT-BLOCKED" in out2 and "register debt" not in out2
 
-    def test_a_successful_retry_is_used(self, repo: Path, tmp_path: Path) -> None:
+    def test_a_successful_retry_is_used_and_is_visible_to_the_operator(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """The retry's register is what actually changed durable state; showing only the
+        malformed original would hide the transition that took effect."""
+        import json
+
         commit(repo, {"a.py": "x = 1\n"}, "c")
         engine = FakeEngine("no register", review_with(MECHANIZED))
         out = run_round(repo, engine, tmp_path, round=1)
         assert "parsed after retry" in out
+        assert "supplied on retry" in out and "NOT_IN_OPEN_SET" in out
+        record = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+        assert "NOT_IN_OPEN_SET" in (record.get("retry_register") or "")
 
     def test_no_session_ref_skips_the_retry_and_keeps_the_review(
         self, repo: Path, tmp_path: Path
@@ -194,14 +205,14 @@ class TestRegisterHandling:
             "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
         )), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
-        cid = cc.load_lineage(tmp_path, lin_id, stamp="s").active()[0].class_id
+        cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
 
         out = run_round(repo, FakeEngine(
             review_with(f"CLOSED: {cid}\n\nCLOSED: deadbeef\n"),
             review_with(f"CLOSED: {cid}\n\nCLOSED: deadbeef\n"),
         ), tmp_path, round=2)
         assert "CONVERGENCE: BLOCKED" in out
-        after = cc.load_lineage(tmp_path, lin_id, stamp="s")
+        after = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s")
         assert after.classes[cid].status == cc.OPEN, (
             "the valid CLOSED rode in on a register that was rejected"
         )
@@ -216,7 +227,7 @@ class TestFailurePaths:
     ) -> None:
         commit(repo, {"a.py": "NOT_IN_OPEN_SET\n"}, "c")
         run_round(repo, FakeEngine(review_with(MECHANIZED)), tmp_path, round=1)
-        path = cc.lineage_dir(tmp_path) / f"{_only_lineage(tmp_path)}.json"
+        path = cc.lineage_dir(state_root(tmp_path)) / f"{_only_lineage(tmp_path)}.json"
         before = path.read_bytes()
 
         class Failing(FakeEngine):
@@ -238,7 +249,7 @@ class TestFailurePaths:
             "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
         )), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
-        cid = cc.load_lineage(tmp_path, lin_id, stamp="s").active()[0].class_id
+        cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
 
         class FailingRetry(FakeEngine):
             def resume(self, *a, **kw):
@@ -249,7 +260,7 @@ class TestFailurePaths:
 
         out = run_round(repo, FailingRetry("no register"), tmp_path, round=2)
         assert "CONVERGENCE: BLOCKED" in out
-        after = cc.load_lineage(tmp_path, lin_id, stamp="s")
+        after = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s")
         assert after.classes[cid].status == cc.OPEN, (
             "a failed retry's parseable CLOSED must not be applied"
         )
@@ -268,7 +279,7 @@ class TestFailurePaths:
 
         with pytest.raises(RuntimeError, match="engine blew up"):
             run_round(repo, Exploding(), tmp_path, round=1)
-        assert not list(cc.lineage_dir(tmp_path).glob("*.pending"))
+        assert not list(cc.lineage_dir(state_root(tmp_path)).glob("*.pending"))
         out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=2)
         assert "CONVERGENCE: NOT-BLOCKED" in out
 
@@ -277,25 +288,44 @@ class TestFailurePaths:
     ) -> None:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
-        assert not list(cc.lineage_dir(tmp_path).glob("*.pending"))
+        assert not list(cc.lineage_dir(state_root(tmp_path)).glob("*.pending"))
 
     def test_a_stranded_latch_blocks_the_next_round_rather_than_starting_empty(
         self, repo: Path, tmp_path: Path
     ) -> None:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
-        cc.open_latch(tmp_path, _only_lineage(tmp_path))
+        cc.open_latch(state_root(tmp_path), _only_lineage(tmp_path))
         out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=2)
         assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
 
-    def test_state_is_written_under_the_injected_log_dir_not_the_real_home(
+    def test_state_is_written_under_the_state_root_not_the_real_home(
         self, repo: Path, tmp_path: Path
     ) -> None:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
-        assert list(cc.lineage_dir(tmp_path).glob("*.json")), (
+        assert list(cc.lineage_dir(state_root(tmp_path)).glob("*.json")), (
             "tests must not write lineages into the operator's ~/.paranoia"
         )
+
+    def test_moving_the_audit_log_dir_does_not_start_a_fresh_lineage(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
+        """`--log-dir` is documented as the AUDIT-LOG directory. Deriving state from it
+        meant an operator who moved their logs silently got an empty lineage and could be
+        told NOT-BLOCKED with classes still open."""
+        commit(repo, {"a.py": "NOT_IN_OPEN_SET\n"}, "c")
+        first = handlers.critique_branch(
+            {"repo_path": str(repo), "base_ref": "main", "converge": True, "round": 1},
+            engine=FakeEngine(review_with(MECHANIZED)), log_dir=tmp_path / "logs-a")
+        assert "CONVERGENCE: BLOCKED" in first
+        second = handlers.critique_branch(
+            {"repo_path": str(repo), "base_ref": "main", "converge": True, "round": 2},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs-b")
+        assert "CONVERGENCE: BLOCKED" in second, (
+            "the class must survive a change of audit-log directory"
+        )
+        assert len(list(cc.lineage_dir(state_root(tmp_path)).glob("*.json"))) == 1
 
 
 # ── argument handling ─────────────────────────────────────────────────────────
@@ -325,7 +355,7 @@ class TestArguments:
         git(["checkout", "-q", "-b", "other", "main"], repo)
         commit(repo, {"b.py": "y = 1\n"}, "on other")
         run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
-        assert len(list(cc.lineage_dir(tmp_path).glob("*.json"))) == 2
+        assert len(list(cc.lineage_dir(state_root(tmp_path)).glob("*.json"))) == 2
 
     def test_class_closure_false_emits_no_trailer_at_all(
         self, repo: Path, tmp_path: Path
@@ -333,7 +363,7 @@ class TestArguments:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         out = run_round(repo, FakeEngine("## What works\nok"), tmp_path, class_closure=False)
         assert "CONVERGENCE:" not in out and "LINEAGE:" not in out
-        assert not cc.lineage_dir(tmp_path).exists()
+        assert not cc.lineage_dir(state_root(tmp_path)).exists()
 
     def test_an_exemption_subtracts_a_match_and_is_shown_for_challenge(
         self, repo: Path, tmp_path: Path
@@ -341,7 +371,7 @@ class TestArguments:
         commit(repo, {"a.py": "NOT_IN_OPEN_SET here\n"}, "c")
         run_round(repo, FakeEngine(review_with(MECHANIZED)), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
-        cid = cc.load_lineage(tmp_path, lin_id, stamp="s").active()[0].class_id
+        cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
 
         engine = FakeEngine(review_with("NONE"))
         out = run_round(repo, engine, tmp_path, round=2, exempt=[

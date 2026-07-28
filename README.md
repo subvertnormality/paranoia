@@ -248,6 +248,9 @@ says only "no blocking class is unclosed", never that the change is correct.
 
 State lives in `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` + the
 reviewed branch (override with `lineage`; required when reviewing a detached HEAD).
+That location is **fixed and independent of `--log-dir`**, which is the audit-log
+directory only — deriving it from the log directory would mean an operator who moved
+their logs silently got an empty lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
 A false positive of a regex is dismissed with `exempt` — shown to every later reviewer
 for challenge, and revocable with `unexempt`. Unreadable or unwritable state **blocks**
 rather than starting a fresh lineage, because a storage fault must never read as an

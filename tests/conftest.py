@@ -3,6 +3,15 @@ from pathlib import Path
 
 import pytest
 
+from paranoia_local import class_closure as cc
+
+
+@pytest.fixture(autouse=True)
+def _isolate_class_closure_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Class closure is on by default, so without this every test that reviews a branch
+    would write a lineage into the operator's real ~/.paranoia."""
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+
 _GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",
     "GIT_AUTHOR_EMAIL": "test@example.com",
