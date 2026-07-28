@@ -24,7 +24,7 @@ from .config import load_repo_config, resolve
 from .engines import Engine, Review
 from .worktree import worktree_at
 
-CLASS_STATE_ROOT = logs.DEFAULT_LOG_DIR.parent  # ~/.paranoia
+
 
 Clock = Callable[[], str]
 
@@ -152,6 +152,14 @@ def critique_branch(
         resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
     )
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
+    if closure_on and include_unc and arguments.get("head_ref") not in (None, "HEAD"):
+        # resolve_target discards head_ref for a dirty review and snapshots the checkout, so
+        # accepting it would key this round's classes to a branch that was never reviewed.
+        raise ValueError(
+            "include_uncommitted reviews the current checkout, so head_ref="
+            f"{arguments['head_ref']!r} would not be the reviewed ref. Drop head_ref, or pass "
+            "an explicit `lineage`, or `class_closure: false`."
+        )
 
     target = orientation.resolve_target(repo, base_ref, head_ref, include_unc)
 
@@ -226,10 +234,12 @@ def _converge_branch_review(
         base_id = orientation.resolve_ref(repo, base_ref)
         head_id = orientation.resolve_ref(repo, head_ref or "HEAD")
 
+    # State root is derived from log_dir (~/.paranoia/logs -> ~/.paranoia) so an injected
+    # log_dir also isolates lineage state: tests must not write into the operator's home.
     closure = _ClassClosure(
         repo, head_id, args=closure_args or {}, round_no=review_round or 1,
         is_dirty=target.is_dirty, base_ref=base_ref, head_ref=head_ref,
-        state_root=state_root or CLASS_STATE_ROOT, stamp=now(),
+        state_root=state_root or Path(log_dir).parent, stamp=now(),
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
 
@@ -248,8 +258,14 @@ def _converge_branch_review(
                             **_progress_kwargs(on_progress))
         # Settle inside the worktree: a register retry resumes the same session and must
         # see the same materialized snapshot the review did.
-        trailer = closure.settle(review, engine, wt, model, effort, web_search,
-                                 on_progress) if closure else None
+        try:
+            trailer = closure.settle(review, engine, wt, model, effort, web_search,
+                                     on_progress) if closure else None
+        finally:
+            # Whatever happened, the round must not strand its own pending latch and block
+            # every future round on a fault that has already been reported.
+            if closure:
+                closure.release()
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
@@ -438,6 +454,9 @@ class _ClassClosure:
         self.lineage_id = _lineage_id(repo, base_ref, head_ref, is_dirty, args.get("lineage"))
         self.lineage: cc.Lineage | None = None
         self.unavailable: str | None = None
+        self.deadline: float | None = None
+        self._latched = False
+        self._settled = False
 
     def prepare(self) -> list[str]:
         """Load state, sweep what the lineage already holds, and render the reviewer blocks."""
@@ -447,8 +466,10 @@ class _ClassClosure:
             self.unavailable = str(exc)
             return []
         cc.open_latch(self.state_root, self.lineage_id)
+        self._latched = True
+        self.deadline = time.monotonic() + cc.ROUND_BUDGET
         self._apply_exemption_args()
-        cc.sweep(self.lineage, self._grep(), clock=time.monotonic)
+        cc.sweep(self.lineage, self._grep(), deadline=self.deadline, clock=time.monotonic)
         return [b for b in (cc.render_unclosed(self.lineage),
                             cc.render_unmechanized(self.lineage),
                             cc.render_exempt(self.lineage)) if b]
@@ -459,6 +480,14 @@ class _ClassClosure:
             return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {self.unavailable}\n"
                     "CONVERGENCE: BLOCKED — lineage state could not be used this round.")
         lineage = self.lineage
+        if review.error:
+            # A CLI failure or timeout is not a review. Recording debt or applying whatever
+            # text came back would let a broken run mutate durable state — and the plan
+            # requires a failed engine call to leave the lineage byte-identical.
+            self._settled = True
+            return (f"CLASS-CLOSURE: not evaluated — the review failed "
+                    f"(exit {review.returncode}); lineage state is unchanged.\n"
+                    "CONVERGENCE: BLOCKED — no verdict can be computed from a failed review.")
         status, minted = "parsed 0", []
         try:
             register, status = self._register(review, engine, repo, model, effort,
@@ -467,7 +496,8 @@ class _ClassClosure:
             # Round 10: a class registered by THIS review does not exist until now, so it
             # must be evaluated before the verdict — otherwise a new MAJOR class and
             # NOT-BLOCKED could ship in the same response.
-            cc.sweep(lineage, self._grep(), only=minted, clock=time.monotonic)
+            cc.sweep(lineage, self._grep(), only=minted, deadline=self.deadline,
+                     clock=time.monotonic)
             lineage.debt = None
         except cc.RegisterError as exc:
             lineage.debt = {"round": self.round_no, "reason": str(exc)}
@@ -477,11 +507,23 @@ class _ClassClosure:
         try:
             cc.save_lineage(self.state_root, lineage)
         except cc.StateUnavailable as exc:
-            # The latch stays: the next round blocks rather than starting empty.
+            # The latch deliberately STAYS: a write that may have half-happened must block
+            # the next round rather than let it start from an empty lineage.
             return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
                     "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
-        cc.clear_latch(self.state_root, self.lineage_id)
+        self._settled = True
         return cc.render_trailer(lineage, register_status=status, minted=minted)
+
+    def release(self) -> None:
+        """Clear the pending latch once the round is over WITHOUT an unresolved write.
+
+        Called from a `finally`, so a crash between `prepare()` and `settle()` cannot strand
+        the latch and block every later round on a fault that already surfaced. A failed
+        *write* does not release: that is the one case the latch exists for.
+        """
+        if self._latched and self._settled:
+            cc.clear_latch(self.state_root, self.lineage_id)
+            self._latched = False
 
     # ── internals ──
 

@@ -124,9 +124,13 @@ class Exemption:
 
 
 def fingerprint(text: str) -> str:
-    """Normalized-whitespace hash of a matched line. An exemption is void once the
-    line's text changes, which fails toward blocking rather than toward clearance."""
-    return hashlib.sha256(" ".join(text.split()).encode("utf-8", "surrogateescape")).hexdigest()[:16]
+    """Exact-bytes hash of a matched line. An exemption is void the moment the line's text
+    changes at all, which fails toward blocking rather than toward clearance.
+
+    Deliberately NOT whitespace-normalized: in indentation-sensitive code a line that keeps
+    its tokens but changes its indentation has moved scope, and a stale exemption would let
+    the class close over a live violation."""
+    return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()[:16]
 
 
 # ── register parsing ──────────────────────────────────────────────────────────
@@ -401,20 +405,37 @@ def mint_id(lineage_id: str, seq: int, invariant: str) -> str:
 
 
 def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> list[str]:
-    """Fold a parsed register into the lineage. Returns the ids of newly minted classes,
-    which the caller must then evaluate before computing a verdict (plan §2.6)."""
+    """Fold a parsed register into the lineage ATOMICALLY, returning the ids of newly minted
+    classes for the caller to evaluate before computing a verdict (plan §2.6).
+
+    A register is all-or-nothing. Applied record-by-record to the live lineage, a valid
+    `CLOSED: A` followed by an invalid record would leave A closed even though the register
+    was rejected — and once the debt was discharged the trailer could report `NOT-BLOCKED`
+    on the strength of a transition from a register that never parsed.
+    """
+    draft = _copy(lineage)
     minted: list[str] = []
     for t in register.transitions:
-        _apply_transition(lineage, t, round_no=round_no, minted=minted)
+        _apply_transition(draft, t, round_no=round_no, minted=minted)
     for nc in register.new_classes:
-        if len(lineage.active()) >= MAX_ACTIVE_CLASSES:
+        if len(draft.active()) >= MAX_ACTIVE_CLASSES:
             raise RegisterError(
                 f"registration refused: {MAX_ACTIVE_CLASSES} non-superseded classes already "
                 "tracked. Close or supersede one first."
             )
-        minted.append(_add(lineage, nc.invariant, nc.severity, round_no,
+        minted.append(_add(draft, nc.invariant, nc.severity, round_no,
                            nc.pattern, nc.pathspec, nc.procedure))
+    lineage.classes = draft.classes
+    lineage.next_seq = draft.next_seq
+    lineage.exemptions = draft.exemptions
     return minted
+
+
+def _copy(lineage: Lineage) -> Lineage:
+    return Lineage(
+        lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
+        classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
+    )
 
 
 def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
@@ -489,22 +510,26 @@ GitGrep = Callable[[str, str], GrepResult]
 
 
 def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
-          budget: float = ROUND_BUDGET, clock: Callable[[], float] | None = None) -> None:
+          deadline: float | None = None, clock: Callable[[], float] | None = None) -> None:
     """Re-run every non-superseded mechanized predicate and update its status in place.
 
     `closed` classes are swept too: a later fix can reintroduce a defect, and a class
     that never reopens would let the trailer report nothing unclosed while it lives.
+
+    `deadline` is an ABSOLUTE instant on `clock`, not a per-call budget, so the pre-review
+    and post-register sweeps of one round share the round's budget instead of each getting
+    a fresh one — two fresh 60s budgets is a 120s round.
     """
     ids = list(only) if only is not None else list(lineage.classes)
     now = clock or (lambda: 0.0)
-    started = now()
     for cid in ids:
         cls = lineage.classes.get(cid)
         if cls is None or cls.status == SUPERSEDED or not cls.mechanized:
             continue
-        if budget is not None and now() - started >= budget:
+        if deadline is not None and now() >= deadline:
             lineage.classes[cid] = replace(
-                cls, status=UNCHECKED, detail="round closure budget exhausted before this class ran"
+                cls, status=UNCHECKED, matches=(),
+                detail="round closure budget exhausted before this class ran",
             )
             continue
         lineage.classes[cid] = _evaluate(cls, grep(cls.pattern or "", cls.pathspec or "."),
@@ -516,11 +541,15 @@ def _evaluate(cls: TrackedClass, result: GrepResult, exemptions: Sequence[Exempt
         # A predicate that cannot run has not proved closure — but for an advisory class
         # that is no reason to stop the loop, so blocking still follows severity.
         return replace(cls, status=MALFORMED, detail=result.error, matches=())
-    if len(result.paths) > MAX_MATCHES:
+    # `-l` returns FILES, so counting it alone lets one file with thousands of violating
+    # lines pass as an ordinary open class and then be silently truncated in the block.
+    total = max(len(result.paths), len(result.matches))
+    if total > MAX_MATCHES:
+        unit = "matching lines" if len(result.matches) >= len(result.paths) else "matching files"
         return replace(
             cls, status=OVER_BROAD, matches=(),
-            detail=f"{len(result.paths)} matching paths exceeds the {MAX_MATCHES} cap — narrow "
-                   "the predicate with SUPERSEDE ... WITH-PATTERN",
+            detail=f"{total} {unit} exceeds the {MAX_MATCHES} cap — narrow the predicate "
+                   "with SUPERSEDE ... WITH-PATTERN",
         )
 
     exempt = {(e.path, e.line, e.fingerprint) for e in exemptions if e.class_id == cls.class_id}
@@ -596,19 +625,31 @@ def _strip_commit(paths: Sequence[str], commit: str) -> tuple[str, ...]:
 
 
 def _parse_matches(out: str) -> tuple[dict[str, Any], ...]:
-    """`-z -n` emits `<commit>:<path>\0<line>\0<text>\n` — paths are NUL-terminated, so a
-    path containing a newline or non-UTF-8 bytes still parses unambiguously."""
+    """`-z -n` emits `<commit>:<path>\0<line>\0<text>\n`.
+
+    Scanned NUL-first, never split on newlines first: git prints pathnames verbatim and
+    terminates them with NUL precisely so a path MAY contain a newline. Splitting on `\n`
+    would tear such a record in two and mint a wrong path — and therefore a wrong exemption
+    identity. The matched text itself is a single line, so its terminating `\n` is the only
+    newline that ends a record.
+    """
     found: list[dict[str, Any]] = []
-    for record in out.split("\n"):
-        if not record:
-            continue
-        parts = record.split("\0")
-        if len(parts) < 3:
-            continue
-        path, line, text = parts[0], parts[1], "\0".join(parts[2:])
+    pos = 0
+    while pos < len(out):
+        nul1 = out.find("\0", pos)
+        if nul1 < 0:
+            break
+        nul2 = out.find("\0", nul1 + 1)
+        if nul2 < 0:
+            break
+        path, raw_line = out[pos:nul1], out[nul1 + 1:nul2]
+        end = out.find("\n", nul2 + 1)
+        end = len(out) if end < 0 else end
+        text = out[nul2 + 1:end]
+        pos = end + 1
         path = path.split(":", 1)[1] if ":" in path else path
         try:
-            found.append({"path": path, "line": int(line), "text": text})
+            found.append({"path": path, "line": int(raw_line), "text": text})
         except ValueError:
             continue
     return tuple(found)
@@ -644,6 +685,9 @@ def render_unclosed(lineage: Lineage) -> str | None:
                 out.append(f"  {display(m['path'])}: binary match (line not shown)")
             else:
                 out.append(f"  {display(m['path'])}:{m['line']}: {display(m['text'])}")
+        if len(c.matches) > MAX_MATCHES:
+            # Never truncate silently: an operator reads this block as the match list.
+            out.append(f"  … {len(c.matches) - MAX_MATCHES} further match(es) not shown")
     return "\n".join(out)
 
 
@@ -694,6 +738,22 @@ def render_trailer(lineage: Lineage, *, register_status: str,
         f"CLASS-REGISTER: {register_status}",
         f"CLASS-CLOSURE: {counts}",
     ]
+    # A predicate can be wrong in the SAFE direction — too narrow, matching none of the
+    # violations it was written for, and closing in the very round it was registered. The
+    # mechanism cannot detect that, so it says so rather than presenting an ordinary close.
+    born_closed = [
+        lineage.classes[c] for c in minted
+        if c in lineage.classes and lineage.classes[c].status == CLOSED
+        and lineage.classes[c].mechanized
+    ]
+    if born_closed:
+        lines.append(
+            "CLASS-CLOSURE-WARNING: " + "; ".join(
+                f"{c.class_id} closed in the round it was registered — verify its predicate "
+                f"actually matches the violation it describes ({display(c.invariant)})"
+                for c in born_closed
+            )
+        )
     if lineage.debt:
         lines.append(
             f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}: "

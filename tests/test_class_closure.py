@@ -313,9 +313,23 @@ class TestClosure:
 
     def test_budget_exhaustion_leaves_the_class_unchecked_and_blocking(self) -> None:
         lin = lineage_with(("inv", cc.MAJOR, "X"))
-        cc.sweep(lin, lambda p, s: cc.GrepResult(), budget=0, clock=lambda: 1.0)
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=0.0, clock=lambda: 1.0)
         cls = lin.active()[0]
         assert cls.status == cc.UNCHECKED and cls.blocking
+
+    def test_both_sweeps_of_a_round_share_one_deadline(self) -> None:
+        """A per-call budget would give the pre-review and post-register sweeps a fresh
+        60s each, making a 60s round budget a 120s one in practice."""
+        lin = lineage_with(("first", cc.MAJOR, "X"))
+        ticks = iter([0.0, 61.0])
+        clock = lambda: next(ticks)  # noqa: E731
+        deadline = 60.0
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=deadline, clock=clock)
+        assert lin.active()[0].status == cc.CLOSED
+        cc.sweep(lin, lambda p, s: cc.GrepResult(), deadline=deadline, clock=clock)
+        assert lin.active()[0].status == cc.UNCHECKED, (
+            "the second sweep must inherit the round's spent budget, not restart it"
+        )
 
     def test_a_new_mechanized_class_starts_unchecked_and_blocking(self) -> None:
         """Round 10's FATAL: a class registered this round was never evaluated in it."""
