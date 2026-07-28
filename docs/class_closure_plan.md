@@ -1,6 +1,13 @@
 # Brief: class closure — make a defect *class* a tracked object, not an operator inference
 
-Status: DRAFT for review, revision 16. Fifteen codex plan-review rounds folded —
+Status: **IMPLEMENTED**, revision 16. Fifteen codex plan-review rounds folded, then
+eight codex code-review rounds against the implementation (2 BLOCKER, 20 MAJOR, 6 MINOR,
+6 gaps; converged at round 8). Where the code and this brief differ, the code is now the
+authority — the implementation review changed real decisions, chiefly: the closure budget
+measures git-grep time rather than wall-clock (a deadline spanning the reviewer call left
+every newly registered class unchecked); an undisplayable match can never be exempted;
+lineage state is keyed to a fixed root rather than following `--log-dir`; and parse and
+apply are one retried transaction. Plan-review rounds —
 round 1: 3 FATAL, 15 MAJOR, 2 MINOR; round 2: 1 FATAL, 8 MAJOR, 2 MINOR; round 3:
 1 FATAL, 3 MAJOR; round 4: 2 FATAL, 1 MAJOR; round 5: 2 FATAL, 1 MAJOR; round 6:
 1 FATAL, 5 MAJOR; round 7: 1 FATAL, 3 MAJOR; round 8: 2 FATAL, 1 MAJOR; round 9:
