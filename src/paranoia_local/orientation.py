@@ -16,6 +16,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from .textsafe import display
+
 # Above this, we stop embedding the raw diff and tell the reviewer to run
 # `git diff` itself. The reviewer has repo access, so nothing is lost — this
 # only keeps the prompt from ballooning on large branches.
@@ -122,14 +124,9 @@ class ChangeEntry:
     old_path: str | None = None
 
 
-def _display(name: str) -> str:
-    """A display-safe, INJECTIVE rendering of a possibly `surrogateescape`-decoded path.
-    Valid Unicode (e.g. `café.py`) is kept; a literal backslash is doubled first so it can't
-    be confused with an escape introducer, then non-UTF-8 bytes carried as surrogates become
-    `\\u….` escapes. The result therefore can't (a) collide two distinct paths onto one label
-    (a real `a\\udcff` vs a `0xff`-byte path stay distinct), or (b) inject lone surrogates that
-    crash JSON/UTF-8 encoding of the packet or the reviewer prompt stdin."""
-    return name.replace("\\", "\\\\").encode("utf-8", "backslashreplace").decode("utf-8")
+#: Shared with `class_closure`, which renders grep matches into the same packet and must
+#: apply the identical injective escaping. See `textsafe.display` for the contract.
+_display = display
 
 
 def changed_files(repo: Path, from_ref: str, to_ref: str) -> list[ChangeEntry]:
@@ -390,6 +387,7 @@ def build_packet(
     diff_intent: str | None = None,
     focus: str | None = None,
     already_raised: list[str] | None = None,
+    class_blocks: list[str] | None = None,
     max_chars: int = MAX_PACKET_CHARS,
     max_file_chars: int = MAX_FILE_CHARS,
 ) -> str:
@@ -398,11 +396,16 @@ def build_packet(
 
     Layout: mandatory header (context/intent/focus/diffstat) + budgeted evidence (diff, then
     each touched file's content) + mandatory `already_raised` block. `max_chars` bounds the
-    packet whenever it exceeds the mandatory header + `already_raised`; those two are ALWAYS
-    included (the firewall list is never dropped) even if they alone exceed `max_chars`. When
+    packet whenever it exceeds the mandatory header + `already_raised` + `class_blocks`; those
+    are ALWAYS included (the firewall list is never dropped) even if they alone exceed
+    `max_chars`. `class_blocks` render AFTER `already_raised`, deliberately: the two carry
+    opposite instructions ("do NOT restate" vs "re-verify these"), and a reviewer obeying the
+    nearer one must land on the class blocks, which is why they also state their own
+    precedence. When
     evidence is trimmed a marker is emitted, and the marker's own size is reserved so the
     final packet stays within `max_chars` in the normal case."""
     already_raised = already_raised or []
+    class_blocks = class_blocks or []
     entries = changed_files(repo, base_id, head_id)
 
     head_parts = [
@@ -425,11 +428,14 @@ def build_packet(
         head_parts.append(f"=== DIFFSTAT ===\n{stat}")
     header = "\n\n".join(head_parts)
 
-    reserved = ""
+    reserved_parts: list[str] = []
     if already_raised:
-        reserved = "=== Already-raised — do NOT restate these; hunt for what they missed ===\n" + "\n".join(
-            f"- {c}" for c in already_raised
+        reserved_parts.append(
+            "=== Already-raised — do NOT restate these; hunt for what they missed ===\n"
+            + "\n".join(f"- {c}" for c in already_raised)
         )
+    reserved_parts.extend(class_blocks)
+    reserved = "\n\n".join(reserved_parts) if reserved_parts else ""
 
     evidence: list[str] = [
         f"=== DIFF (git diff {base_id[:12]}..{head_id[:12]}) ===\n{_safe_diff(repo, base_id, head_id)}"

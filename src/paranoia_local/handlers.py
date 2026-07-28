@@ -10,15 +10,21 @@ footer exposing the session reference for `rebut`.
 
 from __future__ import annotations
 
+import hashlib
+import subprocess
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from . import class_closure as cc
 from . import logs, orientation, prompts
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
 from .worktree import worktree_at
+
+CLASS_STATE_ROOT = logs.DEFAULT_LOG_DIR.parent  # ~/.paranoia
 
 Clock = Callable[[], str]
 
@@ -145,6 +151,7 @@ def critique_branch(
     calibration = _calibration(
         resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
     )
+    closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
 
     target = orientation.resolve_target(repo, base_ref, head_ref, include_unc)
 
@@ -155,6 +162,8 @@ def critique_branch(
             already=already, model=model, effort=effort, web_search=web_search,
             max_packet_chars=max_packet_chars, calibration=calibration,
             log_dir=log_dir, now=now, on_progress=on_progress,
+            closure_on=closure_on, closure_args=arguments,
+            review_round=arguments.get("round"), include_unc=include_unc,
         )
 
     packet = orientation.build_orientation(
@@ -194,6 +203,11 @@ def _converge_branch_review(
     log_dir: Path,
     now: Clock,
     on_progress: Callable[[str], None] | None,
+    closure_on: bool = False,
+    closure_args: dict[str, Any] | None = None,
+    review_round: int | None = None,
+    include_unc: bool = False,
+    state_root: Path | None = None,
 ) -> str:
     """Opt-in convergence path: pre-gather a deterministic packet so the reviewer skips
     the re-read/re-grep turns, and review it against an IMMUTABLE materialized worktree
@@ -212,21 +226,40 @@ def _converge_branch_review(
         base_id = orientation.resolve_ref(repo, base_ref)
         head_id = orientation.resolve_ref(repo, head_ref or "HEAD")
 
+    closure = _ClassClosure(
+        repo, head_id, args=closure_args or {}, round_no=review_round or 1,
+        is_dirty=target.is_dirty, base_ref=base_ref, head_ref=head_ref,
+        state_root=state_root or CLASS_STATE_ROOT, stamp=now(),
+    ) if closure_on else None
+    blocks = closure.prepare() if closure else []
+
     packet = orientation.build_packet(
         repo, base_id, head_id,
         project_summary=project_summary, diff_intent=diff_intent, focus=focus,
-        already_raised=already, max_chars=max_packet_chars,
+        already_raised=already, class_blocks=blocks, max_chars=max_packet_chars,
     )
-    prompt = prompts.compose(prompts.CODE_REVIEW_INSTRUCTIONS_PACKET, _prepend(calibration, packet))
+    instructions = prompts.CODE_REVIEW_INSTRUCTIONS_PACKET
+    if closure:
+        instructions += "\n\n" + prompts.CLASS_REGISTER_INSTRUCTIONS
+    prompt = prompts.compose(instructions, _prepend(calibration, packet))
 
     with worktree_at(repo, head_id) as wt:
         review = engine.run(prompt, wt, model, effort, web_search,
                             **_progress_kwargs(on_progress))
+        # Settle inside the worktree: a register retry resumes the same session and must
+        # see the same materialized snapshot the review did.
+        trailer = closure.settle(review, engine, wt, model, effort, web_search,
+                                 on_progress) if closure else None
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
-          "usage": review.usage, "duration_ms": review.duration_ms})
-    return _footer(review, engine)
+          "usage": review.usage, "duration_ms": review.duration_ms,
+          # Recorded so a future incident IS replayable: the plan's own acceptance
+          # replay was impossible because these were never written down.
+          "base_id": base_id, "head_id": head_id,
+          "lineage": closure.lineage_id if closure else None})
+    body = _footer(review, engine)
+    return f"{body}\n\n{trailer}" if trailer else body
 
 
 def _plan_body(
@@ -383,3 +416,140 @@ def rebut(
 
     _log(log_dir, "rebut", engine, review, now, {"session_ref": session_ref, "model": model})
     return _footer(review, engine)
+
+
+class _ClassClosure:
+    """Orchestration for one round of class closure: the impure half of `class_closure`.
+
+    Split from the pure core so the protocol stays testable without a repository, and
+    kept in one object so the round's two halves — the blocks handed to the reviewer,
+    and the verdict computed from its register — cannot drift apart.
+
+    Every failure path here BLOCKS and returns the review text. A paid review is never
+    discarded over a formatting miss, and a storage fault is never allowed to read as
+    an all-clear.
+    """
+
+    def __init__(self, repo: Path, head_id: str, *, args: dict[str, Any], round_no: int,
+                 is_dirty: bool, base_ref: str, head_ref: str | None,
+                 state_root: Path, stamp: str) -> None:
+        self.repo, self.head_id, self.round_no = repo, head_id, round_no
+        self.args, self.state_root, self.stamp = args, Path(state_root), stamp
+        self.lineage_id = _lineage_id(repo, base_ref, head_ref, is_dirty, args.get("lineage"))
+        self.lineage: cc.Lineage | None = None
+        self.unavailable: str | None = None
+
+    def prepare(self) -> list[str]:
+        """Load state, sweep what the lineage already holds, and render the reviewer blocks."""
+        try:
+            self.lineage = cc.load_lineage(self.state_root, self.lineage_id, stamp=self.stamp)
+        except cc.StateUnavailable as exc:
+            self.unavailable = str(exc)
+            return []
+        cc.open_latch(self.state_root, self.lineage_id)
+        self._apply_exemption_args()
+        cc.sweep(self.lineage, self._grep(), clock=time.monotonic)
+        return [b for b in (cc.render_unclosed(self.lineage),
+                            cc.render_unmechanized(self.lineage),
+                            cc.render_exempt(self.lineage)) if b]
+
+    def settle(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
+               web_search: bool, on_progress: Callable[[str], None] | None) -> str:
+        if self.unavailable or self.lineage is None:
+            return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {self.unavailable}\n"
+                    "CONVERGENCE: BLOCKED — lineage state could not be used this round.")
+        lineage = self.lineage
+        status, minted = "parsed 0", []
+        try:
+            register, status = self._register(review, engine, repo, model, effort,
+                                              web_search, on_progress)
+            minted = cc.apply_register(lineage, register, round_no=self.round_no)
+            # Round 10: a class registered by THIS review does not exist until now, so it
+            # must be evaluated before the verdict — otherwise a new MAJOR class and
+            # NOT-BLOCKED could ship in the same response.
+            cc.sweep(lineage, self._grep(), only=minted, clock=time.monotonic)
+            lineage.debt = None
+        except cc.RegisterError as exc:
+            lineage.debt = {"round": self.round_no, "reason": str(exc)}
+            status = f"malformed: {exc}"
+
+        lineage.rounds += 1
+        try:
+            cc.save_lineage(self.state_root, lineage)
+        except cc.StateUnavailable as exc:
+            # The latch stays: the next round blocks rather than starting empty.
+            return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+                    "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
+        cc.clear_latch(self.state_root, self.lineage_id)
+        return cc.render_trailer(lineage, register_status=status, minted=minted)
+
+    # ── internals ──
+
+    def _grep(self) -> cc.GitGrep:
+        return cc.make_grep(self.repo, self.head_id, runner=_run_git)
+
+    def _register(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
+                  web_search: bool, on_progress: Callable[[str], None] | None):
+        try:
+            return cc.parse_register(review.text), None or "parsed"
+        except cc.RegisterError as first:
+            if not review.session_ref or not hasattr(engine, "resume"):
+                # Claude's supported non-JSON fallback has no session to resume, and an
+                # injected engine may predate `resume` (the reason `_progress_kwargs`
+                # exists). Retrying either would raise and replace the paid review with
+                # an error — the one outcome this path must never produce.
+                raise first
+            retry = engine.resume(
+                review.session_ref, prompts.REGISTER_RETRY, repo, model, effort, web_search,
+                **_progress_kwargs(on_progress))
+            register = cc.parse_register(retry.text)   # a second failure raises, and blocks
+            return register, "parsed after retry"
+
+    def _apply_exemption_args(self) -> None:
+        assert self.lineage is not None
+        for e in self.args.get("exempt", []) or []:
+            self.lineage.exemptions.append(cc.Exemption(
+                class_id=e["class_id"], path=e["path"], line=int(e["line"]),
+                fingerprint=cc.fingerprint(e.get("line_text", "")),
+            ))
+        drop = {(e["class_id"], e["path"], int(e["line"]))
+                for e in (self.args.get("unexempt", []) or [])}
+        if drop:
+            self.lineage.exemptions = [
+                e for e in self.lineage.exemptions
+                if (e.class_id, e.path, e.line) not in drop
+            ]
+
+
+def _lineage_id(repo: Path, base_ref: str, head_ref: str | None, is_dirty: bool,
+                explicit: str | None) -> str:
+    if explicit:
+        return explicit
+    if is_dirty or not head_ref or head_ref == "HEAD":
+        # `symbolic-ref` reads the ref HEAD POINTS AT rather than resolving it to an
+        # object, so it works before the first commit — `rev-parse` exits 128 there and
+        # would break the supported unborn-repository first review.
+        name = _git_line(["git", "symbolic-ref", "-q", "HEAD"], repo)
+    else:
+        name = _git_line(["git", "rev-parse", "--symbolic-full-name", head_ref], repo)
+    if not name:
+        raise ValueError(
+            "class closure cannot derive a lineage: the reviewed ref is not a branch "
+            "(a detached HEAD or a raw commit). Pass `lineage` explicitly, or "
+            "`class_closure: false`."
+        )
+    key = "\0".join([str(repo.resolve()), base_ref, name])
+    return hashlib.sha256(key.encode()).hexdigest()[:12]
+
+
+def _git_line(argv: list[str], repo: Path) -> str:
+    proc = subprocess.run(argv, cwd=repo, capture_output=True, text=True)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _run_git(argv: list[str], cwd: Path, timeout: int) -> tuple[int, bytes, bytes]:
+    try:
+        proc = subprocess.run(argv, cwd=cwd, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError(str(exc)) from exc
+    return proc.returncode, proc.stdout, proc.stderr

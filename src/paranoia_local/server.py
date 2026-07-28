@@ -130,6 +130,57 @@ TOOLS: list[Tool] = [
                 "already_raised": _ALREADY_RAISED,
                 "stakes": _STAKES,
                 "round": _ROUND,
+                "class_closure": {
+                    "type": "boolean",
+                    "description": (
+                        "Track defect CLASSES across rounds (default true). The reviewer registers "
+                        "each class with a regex matching violations only; every later round re-runs "
+                        "it and a computed CONVERGENCE trailer reports BLOCKED while any BLOCKER/MAJOR "
+                        "class still matches. This is what stops a loop fixing one spelling of a "
+                        "defect per round. Set false to restore the pre-closure behaviour exactly."
+                    ),
+                },
+                "lineage": {
+                    "type": "string",
+                    "description": (
+                        "Explicit class-closure lineage key. Defaults to repo + base_ref + the "
+                        "reviewed branch. Required when the reviewed ref is not a branch (detached "
+                        "HEAD or a raw commit), where there is no stable key to derive."
+                    ),
+                },
+                "exempt": {
+                    "type": "array",
+                    "description": (
+                        "Mark specific matches as false positives of a class's regex. Each is shown "
+                        "to every later reviewer for challenge, and can be revoked with `unexempt`."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "class_id": {"type": "string"},
+                            "path": {"type": "string"},
+                            "line": {"type": "integer"},
+                            "line_text": {
+                                "type": "string",
+                                "description": "The matched line verbatim; the exemption is void once it changes.",
+                            },
+                        },
+                        "required": ["class_id", "path", "line", "line_text"],
+                    },
+                },
+                "unexempt": {
+                    "type": "array",
+                    "description": "Revoke exemptions previously granted (a successful challenge).",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "class_id": {"type": "string"},
+                            "path": {"type": "string"},
+                            "line": {"type": "integer"},
+                        },
+                        "required": ["class_id", "path", "line"],
+                    },
+                },
                 **_COMMON,
             },
             "required": ["repo_path"],
