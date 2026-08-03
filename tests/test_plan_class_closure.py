@@ -82,11 +82,6 @@ def run_round(engine: FakeEngine, tmp_path: Path, *, lineage: str = "proj-1-plan
                                   now=lambda: f"T{round_no:04d}")
 
 
-def _state(tmp_path: Path, lineage: str) -> dict:
-    root = cc.default_state_root()
-    return json.loads((cc.lineage_dir(root) / f"{lineage}.json").read_text())
-
-
 # ── the core loop ─────────────────────────────────────────────────────────────
 
 
@@ -336,7 +331,9 @@ class TestLineageIsRequiredAndNeverDerived:
                      "round.\n\n## Risks\n\nNothing notable.")
         for round_no, plan, body in (
             (2, "# Plan\n\nPhase 0 runs four native campaigns.", None),
-            (3, "# Plan\n\nSection 3 calls them exploratory pilots.", converged),
+            (3, "# Plan\n\nSection 3 calls them exploratory pilots.", None),
+            (4, "# Plan\n\nSection 4 omits the new script from the seam campaigns.",
+             converged),
         ):
             review = review_with("NONE", body) if body else review_with("NONE")
             out = run_round(FakeEngine(review), tmp_path, round_no=round_no, plan=plan)
@@ -453,12 +450,15 @@ class TestBranchPathUnchanged:
         assert "MINOR — advisory" in block
         assert "BLOCKING" not in block.split("\n\n")[0]
 
+    @pytest.mark.parametrize("converge", [True, False])
     def test_branch_audit_records_carry_the_round_and_the_suppression_list(
-        self, git_repo: Path, tmp_path: Path
+        self, git_repo: Path, tmp_path: Path, converge: bool
     ) -> None:
+        """Both branch paths: the legacy in-place review logs from a different call site."""
         handlers.critique_branch(
             {"repo_path": str(git_repo), "base_ref": "main", "round": 6,
-             "lineage": "audit-branch", "already_raised": ["a prior claim, x.py:1"]},
+             "lineage": "audit-branch", "already_raised": ["a prior claim, x.py:1"],
+             "converge": converge},
             engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
             now=lambda: "T3")
         files = sorted((tmp_path / "logs").glob("*critique_branch*.json"))
@@ -544,7 +544,8 @@ class TestPlanAuditRecord:
 class TestFailedReviewLeavesStateAlone:
     def test_a_failed_engine_call_does_not_mutate_the_lineage(self, tmp_path: Path) -> None:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
-        before = _state(tmp_path, "proj-1-plan")
+        path = cc.lineage_dir(cc.default_state_root()) / "proj-1-plan.json"
+        before = path.read_bytes()
 
         engine = FakeEngine(review_with(f"CLOSED: {_only_class_id(tmp_path)}"))
         original_run = engine.run
@@ -559,7 +560,9 @@ class TestFailedReviewLeavesStateAlone:
 
         assert "CONVERGENCE: BLOCKED" in out
         assert "lineage state is unchanged" in out
-        assert _state(tmp_path, "proj-1-plan") == before
+        # Bytes, not parsed values: the design says byte-identical, and a dict compare
+        # would pass a round that rewrote the file with equal contents.
+        assert path.read_bytes() == before
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
