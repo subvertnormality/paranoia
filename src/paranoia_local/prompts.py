@@ -33,7 +33,8 @@ The TASK INPUT may include a `=== REVIEW CALIBRATION ===` block with STAKES (the
 
 - STAKES bounds legitimate concern. A finding that assumes adversaries, scale, data volumes, multi-tenancy, concurrency, or failure modes BEYOND the stated stakes is out of scope: drop it, or if it is real-but-beyond-scope tag it [OUT-OF-SCOPE] — never as a blocker or a must-fix. Do NOT propose hardening, defensive code, or generality against threats the stakes do not include; that is over-engineering, itself a defect.
 - If NO stakes are stated, assume a MODEST single-team internal tool: trusted operators, no hostile input, ordinary scale. Do NOT default to the most adversarial, multi-tenant, or high-scale reading — that default is the main cause of review scope-creep.
-- The ROUND severity floor NEVER applies to a recurrence of a class listed in an `=== UNCLOSED CLASSES ===` block. Those were reported in an earlier round and are still open; report every one whatever its individual severity, and do NOT write `CONVERGED` while that block is non-empty — a computed trailer below your review will contradict you, and the trailer governs.
+- The ROUND severity floor NEVER applies to a class listed in an `=== UNCLOSED CLASSES ===` or `=== UNMECHANIZED CLASSES ===` block. Report every recurrence whatever its individual severity — including a recurrence of one marked `closed`, which you report by emitting `REOPEN`. These two rules are separate and you must not merge them: the floor exemption covers EVERY entry in those blocks, while the `CONVERGED` prohibition below covers only the ones still open.
+- Do NOT write `CONVERGED` while any entry marked `BLOCKING` is still open. Every row in both blocks is marked `BLOCKING` or `advisory`, and in `=== UNMECHANIZED CLASSES ===` also `open` or `closed` — the prohibition covers exactly the rows that are `BLOCKING` and not `closed`, in either block. A computed trailer below your review will contradict you, and the trailer governs. Entries marked `advisory`, and closed entries, do NOT prevent convergence: a mechanism that blocked on those could never be escaped.
 - ROUND sets the severity floor. Round 1: report everything in scope. Round 3 or higher: the design has already survived earlier rounds — report ONLY in-scope findings of merge-blocking severity ([MAJOR] or higher for this review mode); withhold [MINOR] and anything [OUT-OF-SCOPE]. If no merge-blocking findings remain, write `CONVERGED — no blocking findings at this round` as the entire content of the "What doesn't work" section and set the other four sections to "Nothing notable." — this signals convergence WITHOUT breaking the five-section format. Late-round marginal, stylistic, or hardening findings are noise that prevents convergence — withhold them."""
 
 _SHARED_RULES = """### Rules across all sections
@@ -292,6 +293,50 @@ CLASS: <restated invariant>        (optional)
 Rules: one field per line; SEVERITY here is the class's ONLY severity; a pathspec may not
 begin with `:` (pathspec magic); an unknown class id is rejected. Do NOT list recurrences
 — the server computes those from your predicate and does not read your prose for them."""
+
+
+PLAN_CLASS_REGISTER_INSTRUCTIONS = """## Register the defect CLASSES you found — mandatory terminal block
+
+A finding is a **class** when the reasoning that condemned this passage would condemn
+another passage if one existed: a violated invariant, not a one-off. A single wrong
+number is not a class, and inventing class machinery for one is over-engineering.
+
+Registering a class is how it survives past this round. Every future round is shown it
+and must re-verify it, and the loop cannot be reported unblocked while a FATAL or MAJOR
+class of yours is still open. A class you do not register is simply not tracked —
+nothing detects that, so it is on you.
+
+**There are no regex predicates here, deliberately.** On a code review the server
+re-runs a pattern each round; over a PLAN it would close the moment the wording changed,
+and a rewrite that keeps the defect is exactly what this exists to catch. So a plan class
+carries a PROCEDURE — what a reviewer must DO to decide whether it is still violated —
+and closes only when a later cold reviewer reads it, checks it, and says so explicitly.
+
+Only **open** classes of severity FATAL or MAJOR hold the loop. MINOR and OUT-OF-SCOPE
+classes are tracked and advisory and never block, so do not inflate a severity to make a
+point — and a closed class does not block either, though you must still re-verify it.
+
+End your reply with EXACTLY this block, after everything else, records separated by blank
+lines. If you registered no class and changed no state, the whole body is `NONE`.
+
+=== CLASS REGISTER ===
+CLASS: <the invariant, one line, stated WITHOUT reference to any particular section>
+SEVERITY: FATAL|MAJOR|MINOR|OUT-OF-SCOPE
+PROCEDURE: <what a reviewer must do to find every violation of it in this plan>
+
+State changes against classes already shown to you, each its own record:
+CLOSED: <class-id>                 (you judge it genuinely closed)
+REOPEN: <class-id>                 (a closed one is violated again)
+RECLASSIFY: <class-id> <severity>  (correct a severity you judge wrong)
+SUPERSEDE: <old-id>
+BY: <existing-class-id>            (must be a different, live class)
+   — or —
+SUPERSEDE: <old-id>
+WITH-PROCEDURE: <procedure>        (the procedure turned out to be unusable)
+CLASS: <restated invariant>        (optional)
+
+Rules: one field per line; SEVERITY here is the class's ONLY severity; an unknown class
+id is rejected; PATTERN and PATHSPEC are NOT accepted for a plan review."""
 
 
 def register_retry(reason: str) -> str:

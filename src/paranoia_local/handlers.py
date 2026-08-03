@@ -192,7 +192,8 @@ def critique_branch(
                                 **_progress_kwargs(on_progress))
 
     _log(log_dir, "critique_branch", engine, review, now,
-         {"target": target.description, "model": model})
+         {"target": target.description, "model": model,
+          "round": arguments.get("round"), "already_raised": already})
     return _footer(review, engine)
 
 
@@ -277,6 +278,9 @@ def _converge_branch_review(
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
+          # Which suppression list and which round produced this prompt: without them an
+          # incident cannot be replayed even with the snapshot ids below.
+          "round": review_round, "already_raised": already,
           "usage": review.usage, "duration_ms": review.duration_ms,
           # Recorded so a future incident IS replayable: the plan's own acceptance
           # replay was impossible because these were never written down.
@@ -300,6 +304,7 @@ def _plan_body(
     focus: str | None,
     already: list[str],
     repo_grounded: bool,
+    class_blocks: list[str] | None = None,
 ) -> str:
     parts: list[str] = []
     if repo_grounded:
@@ -318,6 +323,9 @@ def _plan_body(
         parts.append(
             "=== Already-raised — do NOT restate; hunt for what they missed ===\n" + rendered
         )
+    # AFTER already_raised, never before: the class blocks carry explicit precedence over
+    # it, and a reviewer reading in order obeys the closer instruction (plan §2.12).
+    parts.extend(class_blocks or [])
     return "\n\n".join(parts)
 
 
@@ -356,13 +364,66 @@ def critique_plan(
     calibration = _calibration(
         resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
     )
-    body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo))
-    prompt = prompts.compose(prompts.PLAN_REVIEW_INSTRUCTIONS, _prepend(calibration, body))
-    review = engine.run(prompt, cwd, model, effort, web_search,
-                        **_progress_kwargs(on_progress))
+    # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A project that
+    # set `class_closure = true` for its branch reviews would otherwise turn plan closure
+    # on and hard-error every plan call that has no `lineage`; and a per-project setting
+    # could never suffice anyway, since the lineage is inherently per-seam.
+    closure_on = bool(arguments.get("class_closure", False))
+    lineage_id = arguments.get("lineage")
+    if closure_on and not lineage_id:
+        raise ValueError(
+            "class_closure for a plan review needs an explicit `lineage`: a plan has no "
+            "branch to key state to, and deriving one from the plan's text or path would "
+            "mint a fresh empty lineage whenever either changed — reporting NOT-BLOCKED "
+            "with every tracked class silently dropped. Pass a globally unique, "
+            "mode-qualified key (e.g. 'myproject-42-plan'), or class_closure: false."
+        )
 
-    _log(log_dir, "critique_plan", engine, review, now, {"grounded": bool(repo), "model": model})
-    return _footer(review, engine)
+    closure = _PlanClassClosure(
+        lineage_id, round_no=arguments.get("round") or 1,
+        state_root=cc.default_state_root(), stamp=now(),
+    ) if closure_on else None
+    blocks = closure.prepare() if closure else []
+
+    try:
+        body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
+                          class_blocks=blocks)
+        instructions = prompts.PLAN_REVIEW_INSTRUCTIONS
+        if closure:
+            instructions += "\n\n" + prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS
+        prompt = prompts.compose(instructions, _prepend(calibration, body))
+        review = engine.run(prompt, cwd, model, effort, web_search,
+                            **_progress_kwargs(on_progress))
+        trailer = closure.settle(review, engine, cwd, model, effort, web_search,
+                                 on_progress) if closure else None
+    except BaseException:
+        if closure:
+            closure.abandon()
+        raise
+    finally:
+        if closure:
+            closure.release()
+
+    _log(log_dir, "critique_plan", engine, review, now, {
+        "grounded": bool(repo), "model": model,
+        # None of this was recorded before, so a plan seam was not reconstructible at
+        # all — neither what was suppressed nor which plan was reviewed.
+        "round": arguments.get("round"),
+        "already_raised": already,
+        "plan_digest": hashlib.sha256(plan_text.encode("utf-8", "surrogateescape")).hexdigest()[:16],
+        "plan_path": plan_path,
+        "class_closure": closure_on,
+        "lineage": lineage_id if closure else None,
+        "register_status": closure.register_status if closure else None,
+        # The retry's register is what actually changed durable state, so the original
+        # (rejected) block alone would misreport the round.
+        "retry_register": closure.retry_register if closure else None,
+    })
+    body_text = _footer(review, engine)
+    if closure and closure.retry_register:
+        body_text += ("\n\n---\n_The register below was supplied on retry and is what this "
+                      f"round applied:_\n\n{closure.retry_register.strip()}")
+    return f"{body_text}\n\n{trailer}" if trailer else body_text
 
 
 def _query_body(
@@ -450,7 +511,7 @@ def rebut(
     return _footer(review, engine)
 
 
-class _ClassClosure:
+class _ClosureRound:
     """Orchestration for one round of class closure: the impure half of `class_closure`.
 
     Split from the pure core so the protocol stays testable without a repository, and
@@ -460,29 +521,40 @@ class _ClassClosure:
     Every failure path here BLOCKS and returns the review text. A paid review is never
     discarded over a formatting miss, and a storage fault is never allowed to read as
     an all-clear.
+
+    Two subclasses: `_ClassClosure` (branch — mechanized predicates swept against a git
+    snapshot) and `_PlanClassClosure` (plan — unmechanized only, no repository). The
+    settle/latch/retry half is identical for both and lives here; everything that
+    touches git is a hook the plan subclass turns off.
     """
 
-    def __init__(self, repo: Path, head_id: str, *, args: dict[str, Any], round_no: int,
-                 is_dirty: bool, base_ref: str, head_ref: str | None,
-                 state_root: Path, stamp: str) -> None:
-        self.repo, self.head_id, self.round_no = repo, head_id, round_no
-        self.args, self.state_root, self.stamp = args, Path(state_root), stamp
-        self.lineage_id = _lineage_id(repo, base_ref, head_ref, is_dirty, args.get("lineage"))
+    #: Which lineage mode this round may open. A plan round loading branch state would
+    #: have to sweep predicates it has no snapshot for, or carry a stale `closed`.
+    mode = cc.BRANCH_MODE
+    #: Plan registers may not carry PATTERN/PATHSPEC — a regex over prose closes on a
+    #: rewording (see `cc.parse_register`).
+    allow_mechanized = True
+
+    def __init__(self, lineage_id: str, *, round_no: int, state_root: Path,
+                 stamp: str) -> None:
+        self.lineage_id, self.round_no = lineage_id, round_no
+        self.state_root, self.stamp = Path(state_root), stamp
         self.lineage: cc.Lineage | None = None
         self.unavailable: str | None = None
-        self.budget = cc.Budget()
         #: The retry text, held back until the round has actually applied AND persisted it.
         #: A failed, malformed or transition-invalid retry must never be reported as what
         #: the round applied while durable state says otherwise.
         self._retry_candidate: str | None = None
         self.retry_register: str | None = None
+        self.register_status: str | None = None
         self._latched = False
         self._settled = False
 
     def prepare(self) -> list[str]:
-        """Load state, sweep what the lineage already holds, and render the reviewer blocks."""
+        """Load state, re-check what the lineage already holds, and render the blocks."""
         try:
-            self.lineage = cc.load_lineage(self.state_root, self.lineage_id, stamp=self.stamp)
+            self.lineage = cc.load_lineage(self.state_root, self.lineage_id,
+                                           stamp=self.stamp, mode=self.mode)
         except cc.StateUnavailable as exc:
             self.unavailable = str(exc)
             return []
@@ -493,11 +565,21 @@ class _ClassClosure:
             self.unavailable = str(exc)
             return []
         self._latched = True
-        self._apply_exemption_args()
-        cc.sweep(self.lineage, self._grep(), budget=self.budget, clock=time.monotonic)
-        return [b for b in (cc.render_unclosed(self.lineage),
-                            cc.render_unmechanized(self.lineage),
-                            cc.render_exempt(self.lineage)) if b]
+        self._before_sweep()
+        self._sweep()
+        return self._blocks()
+
+    # ── hooks the plan subclass turns off ──
+
+    def _before_sweep(self) -> None:
+        """Branch-only: fold `exempt`/`unexempt` arguments in before the sweep."""
+
+    def _sweep(self, only: list[str] | None = None) -> None:
+        """Branch-only: re-run every mechanized predicate. A plan lineage holds none."""
+
+    def _blocks(self) -> list[str]:
+        assert self.lineage is not None
+        return [b for b in (cc.render_unmechanized(self.lineage),) if b]
 
     def settle(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
                web_search: bool, on_progress: Callable[[str], None] | None) -> str:
@@ -520,8 +602,7 @@ class _ClassClosure:
             # Round 10: a class registered by THIS review does not exist until now, so it
             # must be evaluated before the verdict — otherwise a new MAJOR class and
             # NOT-BLOCKED could ship in the same response.
-            cc.sweep(lineage, self._grep(), only=minted, budget=self.budget,
-                     clock=time.monotonic)
+            self._sweep(only=minted)
             lineage.debt = None
         except cc.RegisterError as exc:
             lineage.debt = {"round": self.round_no, "reason": str(exc)}
@@ -536,6 +617,7 @@ class _ClassClosure:
             return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
                     "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
         self._settled = True
+        self.register_status = status
         if lineage.debt is None:
             self.retry_register = self._retry_candidate
         return cc.render_trailer(lineage, register_status=status, minted=minted)
@@ -558,9 +640,6 @@ class _ClassClosure:
             self._latched = False
 
     # ── internals ──
-
-    def _grep(self) -> cc.GitGrep:
-        return cc.make_grep(self.repo, self.head_id, runner=_run_git)
 
     def _register(self, review: Review, engine: Engine, repo: Path, model: str, effort: str,
                   web_search: bool, on_progress: Callable[[str], None] | None
@@ -599,13 +678,44 @@ class _ClassClosure:
     def _attempt(self, text: str) -> tuple[list[str], str]:
         """Apply `text`'s register to a draft, and adopt it only if the whole thing holds."""
         assert self.lineage is not None
-        register = cc.parse_register(text)
+        register = cc.parse_register(text, allow_mechanized=self.allow_mechanized)
         draft = cc.copy_lineage(self.lineage)
         minted = cc.apply_register(draft, register, round_no=self.round_no)
         self.lineage.classes = draft.classes
         self.lineage.next_seq = draft.next_seq
         self.lineage.exemptions = draft.exemptions
         return minted, _count(register)
+
+
+class _ClassClosure(_ClosureRound):
+    """Branch mode: mechanized predicates re-run against one immutable git snapshot."""
+
+    def __init__(self, repo: Path, head_id: str, *, args: dict[str, Any], round_no: int,
+                 is_dirty: bool, base_ref: str, head_ref: str | None,
+                 state_root: Path, stamp: str) -> None:
+        super().__init__(
+            _lineage_id(repo, base_ref, head_ref, is_dirty, args.get("lineage")),
+            round_no=round_no, state_root=state_root, stamp=stamp,
+        )
+        self.repo, self.head_id, self.args = repo, head_id, args
+        self.budget = cc.Budget()
+
+    def _before_sweep(self) -> None:
+        self._apply_exemption_args()
+
+    def _sweep(self, only: list[str] | None = None) -> None:
+        assert self.lineage is not None
+        cc.sweep(self.lineage, self._grep(), only=only, budget=self.budget,
+                 clock=time.monotonic)
+
+    def _blocks(self) -> list[str]:
+        assert self.lineage is not None
+        return [b for b in (cc.render_unclosed(self.lineage),
+                            cc.render_unmechanized(self.lineage),
+                            cc.render_exempt(self.lineage)) if b]
+
+    def _grep(self) -> cc.GitGrep:
+        return cc.make_grep(self.repo, self.head_id, runner=_run_git)
 
     def _apply_exemption_args(self) -> None:
         assert self.lineage is not None
@@ -621,6 +731,18 @@ class _ClassClosure:
                 e for e in self.lineage.exemptions
                 if (e.class_id, e.path, e.line) not in drop
             ]
+
+
+class _PlanClassClosure(_ClosureRound):
+    """Plan mode: unmechanized classes only, no repository, and no `git grep` ever.
+
+    Inherits the whole settle/latch/retry half unchanged. The base's `_sweep` is a no-op
+    and is NOT overridden here — that is the contract: plan mode must never construct a
+    grep, because a predicate over plan prose closes the moment the wording changes.
+    """
+
+    mode = cc.PLAN_MODE
+    allow_mechanized = False
 
 
 def _lineage_id(repo: Path, base_ref: str, head_ref: str | None, is_dirty: bool,
