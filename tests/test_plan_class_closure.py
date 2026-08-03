@@ -184,11 +184,20 @@ class TestAdvisoryClassesNeverBlock:
     """Round 2 [FATAL]: the plan register prompt said no class may leave the loop
     unblocked, which contradicts BLOCKING_SEVERITIES and traps a valid plan."""
 
-    def test_an_open_minor_class_leaves_the_round_not_blocked(self, tmp_path: Path) -> None:
+    def test_an_open_minor_class_permits_prose_converged_and_a_clear_trailer(
+        self, tmp_path: Path
+    ) -> None:
+        """Both halves together: the reviewer declares convergence at round >=3 AND the
+        trailer agrees. A mechanism that blocked here could never be escaped."""
         minor = ("CLASS: wording is inconsistent\nSEVERITY: MINOR\n"
                  "PROCEDURE: reread the section headings")
-        out = run_round(FakeEngine(review_with(minor)), tmp_path, round_no=3)
+        run_round(FakeEngine(review_with(minor)), tmp_path, round_no=1)
+        converged = ("## What doesn't work\n\nCONVERGED — no blocking findings at this "
+                     "round.\n\n## Risks\n\nNothing notable.")
+        out = run_round(FakeEngine(review_with("NONE", converged)), tmp_path, round_no=3)
+        assert "CONVERGED — no blocking findings" in out
         assert "CONVERGENCE: NOT-BLOCKED" in out
+        assert "is VOID" not in out
 
     def test_an_open_minor_class_is_still_shown_and_marked_advisory(
         self, tmp_path: Path
@@ -323,11 +332,19 @@ class TestLineageIsRequiredAndNeverDerived:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1,
                   plan="# Plan\n\nSU5 runs a campaign before the seam.")
         cid = _only_class_id(tmp_path)
-        for round_no, plan in ((2, "# Plan\n\nPhase 0 runs four native campaigns."),
-                               (3, "# Plan\n\nSection 3 calls them exploratory pilots.")):
-            out = run_round(FakeEngine(review_with("NONE")), tmp_path, round_no=round_no,
-                            plan=plan)
+        converged = ("## What doesn't work\n\nCONVERGED — no blocking findings at this "
+                     "round.\n\n## Risks\n\nNothing notable.")
+        for round_no, plan, body in (
+            (2, "# Plan\n\nPhase 0 runs four native campaigns.", None),
+            (3, "# Plan\n\nSection 3 calls them exploratory pilots.", converged),
+        ):
+            review = review_with("NONE", body) if body else review_with("NONE")
+            out = run_round(FakeEngine(review), tmp_path, round_no=round_no, plan=plan)
             assert "CONVERGENCE: BLOCKED" in out and cid in out
+        # The round that DECLARED convergence is the one that matters: a reviewer's own
+        # word must not end the loop while its predecessor's class is open.
+        assert "CONVERGED" in out
+        assert "Any `CONVERGED` in the review text above is VOID" in out
 
 
 class TestCrossModeLineages:
@@ -347,13 +364,38 @@ class TestCrossModeLineages:
         with pytest.raises(cc.StateUnavailable, match="created by a plan review"):
             cc.load_lineage(root, "shared-key", stamp="T", mode=cc.BRANCH_MODE)
 
-    def test_mode_qualified_keys_do_not_collide(self, tmp_path: Path) -> None:
+    def test_the_real_card_lifecycle_plan_then_branch_on_qualified_keys(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        """Driven through both handlers, not by hand-saving state: this is the shape a
+        Parallax card actually runs, and the one revision 3 would have collided."""
+        plan_out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path,
+                             lineage="card-7-plan")
+        branch_out = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+             "lineage": "card-7-branch"},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
+            now=lambda: "T0001")
+
+        assert "CONVERGENCE: BLOCKED" in plan_out
+        assert "STATE-UNAVAILABLE" not in plan_out
+        assert "STATE-UNAVAILABLE" not in branch_out
+        assert "CONVERGENCE: NOT-BLOCKED" in branch_out
         root = cc.default_state_root()
-        cc.save_lineage(root, cc.Lineage("card-7-branch", mode=cc.BRANCH_MODE))
-        out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path,
-                        lineage="card-7-plan")
-        assert "STATE-UNAVAILABLE" not in out
+        assert cc.load_lineage(root, "card-7-plan", stamp="T", mode=cc.PLAN_MODE).classes
         assert cc.load_lineage(root, "card-7-branch", stamp="T").mode == cc.BRANCH_MODE
+
+    def test_the_same_key_for_both_seams_is_refused(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, lineage="card-7")
+        branch_out = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+             "lineage": "card-7"},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
+            now=lambda: "T0002")
+        assert "STATE-UNAVAILABLE" in branch_out and "CONVERGENCE: BLOCKED" in branch_out
+        assert "card-7-branch" in branch_out
 
     def test_pre_existing_state_without_a_mode_reads_as_branch(self, tmp_path: Path) -> None:
         """No migration: every lineage written before plan mode existed is a branch one."""
@@ -382,6 +424,47 @@ class TestPlanModeNeverGreps:
     def test_a_plan_review_needs_no_repository_at_all(self, tmp_path: Path) -> None:
         out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path)
         assert "CONVERGENCE: BLOCKED" in out
+
+
+class TestBranchPathUnchanged:
+    """The refactor split `_ClassClosure` into a base plus two subclasses. These pin the
+    branch behaviours the split could have silently altered."""
+
+    def test_a_mechanized_advisory_class_is_marked_advisory_not_blocking(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        """`render_unclosed` has no severity filter, so without the marker the prompt
+        would forbid CONVERGED while the trailer said NOT-BLOCKED — a false refusal."""
+        minor = ("CLASS: stray debug print\nSEVERITY: MINOR\n"
+                 "PATTERN: DEBUGME\nPATHSPEC: .")
+        first = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+             "lineage": "adv-branch"},
+            engine=FakeEngine(review_with(minor)), log_dir=tmp_path / "logs",
+            now=lambda: "T1")
+        assert "CONVERGENCE: NOT-BLOCKED" in first
+
+        engine = FakeEngine(review_with("NONE"))
+        handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 3,
+             "lineage": "adv-branch"},
+            engine=engine, log_dir=tmp_path / "logs", now=lambda: "T2")
+        block = engine.calls[0].split(cc.UNCLOSED_HEADER)[1]
+        assert "MINOR — advisory" in block
+        assert "BLOCKING" not in block.split("\n\n")[0]
+
+    def test_branch_audit_records_carry_the_round_and_the_suppression_list(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 6,
+             "lineage": "audit-branch", "already_raised": ["a prior claim, x.py:1"]},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
+            now=lambda: "T3")
+        files = sorted((tmp_path / "logs").glob("*critique_branch*.json"))
+        record = json.loads(files[-1].read_text())
+        assert record["round"] == 6
+        assert record["already_raised"] == ["a prior claim, x.py:1"]
 
 
 # ── the off switch, and the audit record ──────────────────────────────────────
@@ -480,6 +563,29 @@ class TestFailedReviewLeavesStateAlone:
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def git_repo(tmp_path: Path) -> Path:
+    """A real repo with a `feature` branch, for the branch half of the lifecycle."""
+    import subprocess
+
+    r = tmp_path / "repo"
+    r.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(["git", *args], cwd=r, check=True, capture_output=True)
+    (r / "seed.py").write_text("seed = 1\n")
+    subprocess.run(["git", "add", "-A"], cwd=r, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=r, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=r, check=True,
+                   capture_output=True)
+    # Carries a line a test predicate can actually match, so a registered class stays
+    # open rather than being born closed and vanishing from the unclosed block.
+    (r / "app.py").write_text("value = 2\nprint('DEBUGME')\n")
+    subprocess.run(["git", "add", "-A"], cwd=r, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "work"], cwd=r, check=True, capture_output=True)
+    return r
 
 
 def _only_class_id(tmp_path: Path) -> str:

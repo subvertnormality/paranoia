@@ -222,8 +222,11 @@ With class closure on, the reviewer ends its review with a **class register**: f
 each defect class, the invariant, a severity, and a **regex that matches violations
 only** (or a `PROCEDURE`, when no regex can express it). The server then:
 
-- **re-runs every registered predicate itself, every round**, against the reviewed
-  snapshot — `git grep -l -z` decides, so a violation inside a binary blob still counts;
+- **re-runs every registered MECHANIZED predicate itself, every round**, against the
+  reviewed snapshot — `git grep -l -z` decides, so a violation inside a binary blob still
+  counts. A `PROCEDURE` class has no predicate and **nothing re-runs it**: it is carried
+  forward as a reviewer obligation and closes only on an explicit `CLOSED` (and every
+  plan class is one of these — see below);
 - **injects the surviving matches** into the next packet, *after* `already_raised` and
   with explicit precedence over it, exempt from the severity floor;
 - **computes the verdict in Python** and appends it:

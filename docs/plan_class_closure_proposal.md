@@ -788,6 +788,9 @@ null placeholders or implement part of §2.1 out of order.* Split it:
 
 7. **The next real plan seam in Parallax**, run with it on. The only honest
    end-to-end test; the fixtures exist so failure is caught before spending it.
+   **OUTSTANDING at the time of the implementation commit** — every other item above
+   is landed and green, this one is an operator action that has not happened, and the
+   implementation review raised it as a gap rather than letting it pass silently.
 
 **Existing suite is green at this baseline:** 490 passed, 22.7s, at `f0e670c`.
 

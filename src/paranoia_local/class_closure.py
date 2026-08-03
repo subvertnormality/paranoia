@@ -815,8 +815,9 @@ def render_unclosed(lineage: Lineage) -> str | None:
         return None
     out = [UNCLOSED_HEADER, _UNCLOSED_INSTRUCTION, ""]
     for c in sorted(rows, key=lambda c: (c.first_round, c.class_id)):
-        out.append(f"[class {c.class_id}, first raised round {c.first_round}, {c.severity}] "
-                   f"{display(c.invariant)}")
+        blocks = "BLOCKING" if c.severity in BLOCKING_SEVERITIES else "advisory"
+        out.append(f"[class {c.class_id}, first raised round {c.first_round}, {c.severity}"
+                   f" — {blocks}] {display(c.invariant)}")
         if c.detail:
             out.append(f"  status {c.status}: {display(c.detail)}")
         for m in c.matches[:MAX_MATCHES]:
@@ -849,9 +850,10 @@ def render_unmechanized(lineage: Lineage) -> str | None:
     round floor and precedence over `already_raised`, for *all* of these classes —
     `docs/class_closure_plan.md` §2.10's "always shown, never floor-suppressed", which
     is what makes `REOPEN` reachable at round 3+. The SECOND — which of them forbid a
-    `CONVERGED` — is `open_blocking` below, a strictly narrower set: gating on this
-    block instead would forbid convergence forever, because closed entries are listed
-    here deliberately and never leave.
+    `CONVERGED` — is the strictly narrower "open AND blocking-severity" set, which each
+    row carries as an explicit `BLOCKING`/`advisory` marker for the prompt to gate on.
+    Gating on the block itself would forbid convergence forever, because closed entries
+    are listed here deliberately and never leave.
     """
     rows = [c for c in lineage.active() if not c.mechanized]
     if not rows:
@@ -865,11 +867,6 @@ def render_unmechanized(lineage: Lineage) -> str | None:
         out.append(f"  procedure: {display(c.procedure or '')}")
     return "\n".join(out)
 
-
-def open_blocking(lineage: Lineage) -> list[TrackedClass]:
-    """The classes that forbid a `CONVERGED` — open AND blocking-severity, mechanized or
-    not. Deliberately not "everything rendered": see `render_unmechanized`."""
-    return lineage.blocking()
 
 
 def render_exempt(lineage: Lineage) -> str | None:

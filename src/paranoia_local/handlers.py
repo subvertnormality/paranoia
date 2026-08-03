@@ -192,7 +192,8 @@ def critique_branch(
                                 **_progress_kwargs(on_progress))
 
     _log(log_dir, "critique_branch", engine, review, now,
-         {"target": target.description, "model": model})
+         {"target": target.description, "model": model,
+          "round": arguments.get("round"), "already_raised": already})
     return _footer(review, engine)
 
 
@@ -277,6 +278,9 @@ def _converge_branch_review(
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
+          # Which suppression list and which round produced this prompt: without them an
+          # incident cannot be replayed even with the snapshot ids below.
+          "round": review_round, "already_raised": already,
           "usage": review.usage, "duration_ms": review.duration_ms,
           # Recorded so a future incident IS replayable: the plan's own acceptance
           # replay was impossible because these were never written down.
