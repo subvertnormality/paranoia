@@ -209,7 +209,7 @@ rather than growing the design to fix them.
   The stakes are wrong, not the code. Tighten `stakes` and re-run that round
   rather than folding what it raised.
 
-### Class closure (`class_closure`, **on by default** for `critique_branch`)
+### Class closure (`class_closure`, **on by default** for `critique_branch`; opt-in and weaker for `critique_plan`)
 
 A convergence loop that reports one instance of a defect per round can run for ten
 rounds while a single invariant stays violated — each round the operator fixes the
@@ -248,7 +248,9 @@ says only "no blocking class is unclosed", never that the change is correct.
 
 #### Working the loop
 
-**You do nothing to turn this on.** Run `critique_branch` as before, incrementing
+**You do nothing to turn this on for `critique_branch`.** (For `critique_plan` it is
+opt-in and needs an explicit `lineage` — see *Class closure for `critique_plan`*
+below.) Run `critique_branch` as before, incrementing
 `round`. The only new thing you must do is *read the trailer instead of the review's
 own `CONVERGED`* — when the two disagree, the trailer governs and says so.
 
@@ -313,6 +315,54 @@ The reviewer is told the exact grammar; you do not need to quote it.
 `STATE-UNAVAILABLE` recovery is deliberately manual: auto-starting a fresh lineage
 would discard every tracked class and then report `NOT-BLOCKED`, turning a storage
 fault into a false all-clear.
+
+#### Class closure for `critique_plan` — opt-in, and a weaker guarantee
+
+`critique_plan` takes `class_closure` too, but it is **off by default** and it is a
+**different, weaker mechanism**. Read this before relying on it.
+
+There are **no regex predicates for a plan**, deliberately. Over source, editing the
+code until the pattern stops matching *is* the fix. Over a plan, editing the prose
+until the pattern stops matching is the *failure mode* — a rewrite that keeps the
+defect is exactly what a convergence loop needs to catch, and a predicate would close
+on it. So a plan class carries a `PROCEDURE` and **nothing re-runs**.
+
+What you get is **non-forgetting plus explicit closure**, not recurrence detection:
+
+- every later round is shown the class, its procedure and its id, after
+  `already_raised` and with precedence over it;
+- closed classes are shown too, exempt from the round floor, with an explicit
+  instruction to re-verify and emit `REOPEN` — that is the only thing standing between
+  a recurrence and a cleared trailer;
+- the computed trailer reports `BLOCKED` until a cold reviewer emits `CLOSED: <id>`,
+  and voids the reviewer's own `CONVERGED` while it does.
+
+Only **open** `FATAL`/`MAJOR` classes block. `MINOR`/`OUT-OF-SCOPE` ones are advisory,
+and closed ones never block, so the mechanism cannot trap you.
+
+```jsonc
+{
+  "plan_text": "…", "repo_path": "/path/to/repo", "round": 3,
+  "class_closure": true,
+  "lineage": "myproject-42-plan"   // REQUIRED, and mode-qualified
+}
+```
+
+**`lineage` is required and nothing is derived.** A plan has no branch to key state to,
+and deriving a key from the plan's text or path would mint a fresh empty lineage the
+moment either changed — reporting `NOT-BLOCKED` with every tracked class silently
+dropped. The key is used verbatim as the state filename with no namespacing, so make it
+globally unique **and** mode-qualified: `…-plan` for the plan seam, `…-branch` for the
+branch seam of the same work. A key already used by a `critique_branch` seam is refused
+rather than merged — plan and branch classes mean different things, and one of them is
+swept against git while the other is not.
+
+`class_closure` and `lineage` are **call arguments only** here; `.paranoia.toml` is not
+consulted, so a project that set `class_closure = true` for its branch reviews does not
+silently turn plan closure on.
+
+Full design, and the three plan-review rounds behind it:
+[`docs/plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md).
 
 **Where state lives.** `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` +
 the reviewed branch. That location is **fixed and independent of `--log-dir`**, which

@@ -204,6 +204,34 @@ TOOLS: list[Tool] = [
                 "already_raised": _ALREADY_RAISED,
                 "stakes": _STAKES,
                 "round": _ROUND,
+                "class_closure": {
+                    "type": "boolean",
+                    "description": (
+                        "Track defect CLASSES across plan rounds (default FALSE — opt in, "
+                        "unlike critique_branch). Requires `lineage`. The reviewer registers "
+                        "each class with a PROCEDURE (never a regex: over prose a predicate "
+                        "would close the moment the wording changed, which is what a rewrite "
+                        "that keeps the defect looks like). Every later round is shown the "
+                        "class and must re-verify it, and a computed CONVERGENCE trailer "
+                        "reports BLOCKED until a reviewer explicitly emits `CLOSED`. The "
+                        "guarantee is non-forgetting plus explicit closure — NOT the "
+                        "git-backed recurrence detection critique_branch gets. This is a "
+                        "call argument only; .paranoia.toml is not consulted for it."
+                    ),
+                },
+                "lineage": {
+                    "type": "string",
+                    "description": (
+                        "REQUIRED when class_closure is true. A plan has no branch to key "
+                        "state to, and nothing is derived from the plan's text or path — "
+                        "either would mint a fresh empty lineage whenever it changed and "
+                        "report NOT-BLOCKED with every tracked class silently dropped. The "
+                        "key is used VERBATIM as the state filename with no namespacing, so "
+                        "pass a globally unique, MODE-QUALIFIED key ('myproject-42-plan'); a "
+                        "key already used by a critique_branch seam is refused, because plan "
+                        "and branch classes mean different things."
+                    ),
+                },
                 **_COMMON,
             },
         },

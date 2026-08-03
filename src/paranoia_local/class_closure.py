@@ -28,11 +28,17 @@ from .textsafe import display
 # ── severities and statuses ───────────────────────────────────────────────────
 
 BLOCKER, MAJOR, MINOR, OUT_OF_SCOPE = "BLOCKER", "MAJOR", "MINOR", "OUT-OF-SCOPE"
-SEVERITIES = (BLOCKER, MAJOR, MINOR, OUT_OF_SCOPE)
-#: Only these two ever block. MINOR/OUT-OF-SCOPE classes are tracked and advisory —
+#: `FATAL` is the PLAN reviewer's top severity (`prompts.PLAN_REVIEW_INSTRUCTIONS`), and
+#: `BLOCKER` the code reviewer's. The vocabulary is a union rather than per-mode: both
+#: mean "blocks", and refusing a reviewer's own documented tag buys a wasted retry turn
+#: and, with no session to resume, durable register debt — a gate refusing a correct
+#: review (plan proposal §2.4).
+FATAL = "FATAL"
+SEVERITIES = (FATAL, BLOCKER, MAJOR, MINOR, OUT_OF_SCOPE)
+#: Only these ever block. MINOR/OUT-OF-SCOPE classes are tracked and advisory —
 #: a mechanism that can block forever on a marginal finding reproduces the very
 #: failure it exists to prevent (plan §2.9).
-BLOCKING_SEVERITIES = frozenset({BLOCKER, MAJOR})
+BLOCKING_SEVERITIES = frozenset({FATAL, BLOCKER, MAJOR})
 
 OPEN, CLOSED, OVER_BROAD, MALFORMED, UNCHECKED, SUPERSEDED = (
     "open", "closed", "over-broad", "malformed", "unchecked", "superseded",
@@ -142,13 +148,19 @@ _KNOWN_KEYS = _NEW_MECHANIZED | _NEW_UNMECHANIZED | {
 }
 
 
-def parse_register(text: str) -> Register:
+def parse_register(text: str, *, allow_mechanized: bool = True) -> Register:
     """Parse the terminal `=== CLASS REGISTER ===` block.
 
     Strict in the manner of `arbitration.parse_*`, because this is the one
     model-authored surface that is parsed at all: the block is terminal, records are
     blank-line separated, every field is required for its record kind, and duplicate
     or unknown keys are rejected. Nothing outside the block is examined.
+
+    `allow_mechanized=False` is PLAN mode: a predicate over plan prose closes on a
+    rewording, which is a false closure rather than a fix, so `PATTERN`/`PATHSPEC`/
+    `WITH-PATTERN` are refused outright. It is a BACKSTOP for a reviewer that ignored
+    `prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS`, never the routine path — a parser that
+    refuses what the prompt asked for is a gate that gets switched off.
     """
     idx = text.rfind(REGISTER_MARKER)
     if idx < 0:
@@ -167,6 +179,8 @@ def parse_register(text: str) -> Register:
     for block in [b for b in body.split("\n\n") if b.strip()]:
         fields = _parse_block(block)
         keys = set(fields)
+        if not allow_mechanized:
+            _reject_mechanized(keys)
         if "CLOSED" in keys or "REOPEN" in keys or "RECLASSIFY" in keys:
             transitions.append(_simple_transition(fields, keys))
         elif "SUPERSEDE" in keys:
@@ -176,6 +190,21 @@ def parse_register(text: str) -> Register:
         else:
             raise RegisterError(f"unrecognised record: {sorted(keys)}")
     return Register(tuple(new_classes), tuple(transitions))
+
+
+_MECHANIZED_KEYS = ("PATTERN", "PATHSPEC", "WITH-PATTERN")
+
+
+def _reject_mechanized(keys: set[str]) -> None:
+    """Named so the retry prompt can tell the reviewer WHAT to send instead. A bare
+    "unknown key" would have it resend the same record."""
+    offending = [k for k in _MECHANIZED_KEYS if k in keys]
+    if offending:
+        raise RegisterError(
+            f"{', '.join(offending)} is not accepted for a plan review: a regex over "
+            "plan prose closes as soon as the wording changes, which is a false "
+            "closure rather than a fix. Use PROCEDURE instead."
+        )
 
 
 def _parse_block(block: str) -> dict[str, str]:
@@ -275,6 +304,9 @@ def _reject_pathspec_magic(pathspec: str) -> None:
 # ── lineage state ─────────────────────────────────────────────────────────────
 
 
+BRANCH_MODE, PLAN_MODE = "branch", "plan"
+
+
 @dataclass
 class Lineage:
     lineage_id: str
@@ -283,6 +315,10 @@ class Lineage:
     classes: dict[str, TrackedClass] = field(default_factory=dict)
     exemptions: list[Exemption] = field(default_factory=list)
     debt: dict[str, Any] | None = None
+    #: Which tool created this lineage. A plan lineage holds only unmechanized classes
+    #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
+    #: one as the other is undefined, not merely surprising — see `load_lineage`.
+    mode: str = BRANCH_MODE
 
     def active(self) -> list[TrackedClass]:
         return [c for c in self.classes.values() if c.status != SUPERSEDED]
@@ -319,7 +355,14 @@ def _paths(root: Path, lineage_id: str) -> tuple[Path, Path]:
     return d / f"{lineage_id}.json", d / f"{lineage_id}.pending"
 
 
-def load_lineage(root: Path, lineage_id: str, *, stamp: str) -> Lineage:
+def load_lineage(root: Path, lineage_id: str, *, stamp: str,
+                 mode: str = BRANCH_MODE) -> Lineage:
+    """`mode` is the tool asking. Opening a lineage created by the other tool is
+    REFUSED, not merged: a plan round that loaded a branch lineage would either sweep
+    mechanized predicates with no reviewed snapshot, or skip the sweep and carry a
+    branch class's stale `closed` status into a `NOT-BLOCKED` trailer. An explicit
+    `lineage` is used verbatim as the filename, so the collision is one typo away, and
+    the remedy is a mode-qualified key (`…-plan` / `…-branch`)."""
     state_path, pending = _paths(root, lineage_id)
     quarantined = sorted(lineage_dir(root).glob(f"{lineage_id}.corrupt-*.json"))
     if quarantined:
@@ -333,10 +376,10 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str) -> Lineage:
             "may not have completed. Inspect and remove it to continue."
         )
     if not state_path.exists():
-        return Lineage(lineage_id)
+        return Lineage(lineage_id, mode=mode)
     try:
         raw = json.loads(state_path.read_text(encoding="utf-8"))
-        return _from_json(lineage_id, raw)
+        lineage = _from_json(lineage_id, raw)
     except Exception as exc:  # noqa: BLE001 — any unreadable state blocks, none is repaired silently
         dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
         try:
@@ -347,11 +390,21 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str) -> Lineage:
             f"lineage state at {state_path} did not parse ({exc}); quarantined to {dest}. "
             "Repair or delete it and re-run."
         ) from exc
+    if lineage.mode != mode:
+        raise StateUnavailable(
+            f"lineage {lineage_id} was created by a {lineage.mode} review and cannot be "
+            f"opened by a {mode} review — its classes mean different things to the two. "
+            f"Use a mode-qualified key, e.g. '{lineage_id}-{mode}'."
+        )
+    return lineage
 
 
 def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
     return Lineage(
         lineage_id=lineage_id,
+        # Absent means branch: every lineage that existed before plan mode was one, so
+        # this needs no migration and cannot mistake old state for plan state.
+        mode=raw.get("mode", BRANCH_MODE),
         rounds=int(raw.get("rounds", 0)),
         next_seq=int(raw.get("next_seq", 1)),
         classes={
@@ -371,6 +424,7 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
     return {
+        "mode": lineage.mode,
         "rounds": lineage.rounds,
         "next_seq": lineage.next_seq,
         "classes": [
@@ -477,6 +531,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
     return Lineage(
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
+        mode=lineage.mode,
     )
 
 
@@ -775,22 +830,46 @@ def render_unclosed(lineage: Lineage) -> str | None:
     return "\n".join(out)
 
 
+_UNMECHANIZED_INSTRUCTION = (
+    "No predicate can check these — you are the check. Re-verify EVERY entry by its "
+    "procedure, including the closed ones: a closed class is exactly what `REOPEN` "
+    "exists for. The ROUND severity floor does not apply to any entry here, and where "
+    "this block and the already-raised block conflict, THIS block governs. Emit "
+    "`CLOSED: <id>` when one is genuinely closed, or `REOPEN: <id>` when a closed one "
+    "is violated again — report a closed one's recurrence whatever its individual "
+    "severity, because nothing else will notice it."
+)
+
+
 def render_unmechanized(lineage: Lineage) -> str | None:
-    """Closed entries are listed too — without their ids a later cold reviewer has no way
-    to emit REOPEN, and the class could recur while the state stayed closed."""
+    """Every unmechanized class, open and closed alike.
+
+    Two independent properties, and welding them together produced a false clearance
+    in review (plan proposal §4). This block carries the FIRST: exemption from the
+    round floor and precedence over `already_raised`, for *all* of these classes —
+    `docs/class_closure_plan.md` §2.10's "always shown, never floor-suppressed", which
+    is what makes `REOPEN` reachable at round 3+. The SECOND — which of them forbid a
+    `CONVERGED` — is `open_blocking` below, a strictly narrower set: gating on this
+    block instead would forbid convergence forever, because closed entries are listed
+    here deliberately and never leave.
+    """
     rows = [c for c in lineage.active() if not c.mechanized]
     if not rows:
         return None
-    out = [UNMECHANIZED_HEADER,
-           "No predicate can check these. Re-verify each by its procedure. Emit "
-           "`CLOSED: <id>` when one is genuinely closed, or `REOPEN: <id>` when a closed "
-           "one is violated again.", ""]
+    out = [UNMECHANIZED_HEADER, _UNMECHANIZED_INSTRUCTION, ""]
     for c in sorted(rows, key=lambda c: (c.first_round, c.class_id)):
-        state = f"closed" if c.status == CLOSED else c.status
-        out.append(f"[{c.class_id}, {c.severity}, {state}, first raised round {c.first_round}] "
-                   f"{display(c.invariant)}")
+        state = "closed" if c.status == CLOSED else c.status
+        blocks = " — BLOCKING" if c.severity in BLOCKING_SEVERITIES else " — advisory"
+        out.append(f"[{c.class_id}, {c.severity}, {state}{blocks}, first raised round "
+                   f"{c.first_round}] {display(c.invariant)}")
         out.append(f"  procedure: {display(c.procedure or '')}")
     return "\n".join(out)
+
+
+def open_blocking(lineage: Lineage) -> list[TrackedClass]:
+    """The classes that forbid a `CONVERGED` — open AND blocking-severity, mechanized or
+    not. Deliberately not "everything rendered": see `render_unmechanized`."""
+    return lineage.blocking()
 
 
 def render_exempt(lineage: Lineage) -> str | None:
