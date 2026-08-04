@@ -120,7 +120,7 @@ TOOLS: list[Tool] = [
                 },
                 "converge": {
                     "type": "boolean",
-                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false to fall back to the legacy in-place review.",
+                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false (with class_closure: false) to fall back to the legacy in-place review. Class closure runs ONLY on this path, so `converge: false` is REFUSED unless you also pass `class_closure: false` — otherwise the review would look gated and emit no CONVERGENCE trailer.",
                 },
                 "max_packet_chars": {
                     "type": "integer",

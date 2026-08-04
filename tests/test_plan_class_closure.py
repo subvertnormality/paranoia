@@ -426,7 +426,10 @@ class TestPlanModeNeverGreps:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
         run_round(FakeEngine(review_with("NONE")), tmp_path, round_no=2)
 
-    def test_a_plan_review_needs_no_repository_at_all(self, tmp_path: Path) -> None:
+    def test_a_plan_round_completes_without_git_being_reachable(self, tmp_path: Path) -> None:
+        """Renamed: it used to claim "needs no repository at all", which `run_round` had
+        stopped being true of — the helper supplies one, and `critique_plan` now requires
+        it. What it actually pins is that the round completes with no git work."""
         out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path)
         assert "CONVERGENCE: BLOCKED" in out
 
@@ -790,6 +793,31 @@ class TestThereIsExactlyOneEscape:
                 engine=FakeEngine(), log_dir=tmp_path / "logs")
         assert "converge: false" in str(exc.value)
         assert "class_closure: false" in str(exc.value)
+
+    def test_a_config_sourced_converge_false_is_refused_with_a_remedy_that_works(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        """`converge` resolves from .paranoia.toml too, so "drop `converge: false`" is no
+        remedy at all when the caller never passed it. The gap that let that ship was
+        testing only the call-argument shape."""
+        (git_repo / ".paranoia.toml").write_text("converge = false\n")
+        with pytest.raises(ValueError) as exc:
+            handlers.critique_branch(
+                {"repo_path": str(git_repo), "base_ref": "main", "round": 1},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+        assert "converge: true" in str(exc.value)
+        assert ".paranoia.toml" in str(exc.value)
+
+    def test_the_config_sourced_remedy_actually_resolves_the_refusal(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        (git_repo / ".paranoia.toml").write_text("converge = false\n")
+        out = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+             "converge": True, "lineage": "cfg-remedy-branch"},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
+            now=lambda: "T8")
+        assert "CONVERGENCE:" in out
 
     def test_the_legacy_path_is_still_reachable_through_the_one_shot_mode(
         self, git_repo: Path, tmp_path: Path

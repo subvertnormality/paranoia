@@ -414,8 +414,10 @@ rounds against the implementation:
 Each cold round otherwise re-gathers the same orientation — re-reading the touched
 files and re-running `git`, which measurements show dominates the per-round cost.
 `critique_branch` therefore runs in **convergence mode by default** (pass
-`converge: false`, or set it in `.paranoia.toml`, to fall back to the legacy in-place
-review). In convergence mode the server **pre-gathers a
+`converge: false` **together with** `class_closure: false`, or set both in
+`.paranoia.toml`, to fall back to the legacy in-place review — closure runs only on
+the converge path, so asking for one without the other is refused rather than
+silently ungating the review). In convergence mode the server **pre-gathers a
 deterministic evidence packet** (the contents of every touched file in the reviewed
 snapshot — binary/large files are marked rather than embedded — plus the diff) and
 hands it to the reviewer with a packet-aware prompt, so it verifies rather than
@@ -521,10 +523,15 @@ The agent calls:
     "repo_path": "/Users/you/Work/my-project",
     "base_ref": "main",
     "head_ref": "HEAD",
+    "round": 1,
     "diff_intent": "Add overdraft protection to withdraw()."
   }
 }
 ```
+
+`round` is required — class closure is on by default, and a loop without a round
+never reaches the severity floor that lets it stop. Pass `class_closure: false`
+for a genuine one-shot review, which is the one escape and drops the requirement.
 
 ## Per-repo defaults — `.paranoia.toml`
 

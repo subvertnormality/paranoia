@@ -86,8 +86,10 @@ def _require_converge(converge: bool, closure_on: bool) -> None:
     if closure_on and not converge:
         raise ValueError(
             "class closure runs only on the converge path, so `converge: false` would "
-            "silently disable it and return no CONVERGENCE trailer. Drop `converge: false` "
-            f"to keep the gate, or {ONE_SHOT_HINT} to review without one."
+            "silently disable it and return no CONVERGENCE trailer. Pass `converge: true` "
+            "to keep the gate — note `converge` also resolves from .paranoia.toml, so "
+            "removing a call argument may not be enough — or "
+            f"{ONE_SHOT_HINT} to review without one."
         )
 
 
@@ -97,16 +99,23 @@ def _require_round(review_round: Any, closure_on: bool, tool: str) -> None:
     no mechanical stopping pressure. Required whenever class closure is tracking a loop,
     and deliberately NOT required in the one-shot mode, which has no next round to floor.
     """
-    if not closure_on:
-        return
-    # `_calibration` renders ROUND only for an int >= 1, so 0, "3" and None are all the
-    # same thing to the reviewer — no floor — while only None looked like an omission.
+    if review_round is None:
+        # Omission is the one-shot mode's privilege: there is no next round to floor.
+        if not closure_on:
+            return
+    # A SUPPLIED round is checked in BOTH modes. `_calibration` renders ROUND only for an
+    # int >= 1, so 0 and "3" are the same thing to the reviewer as omitting it — no floor —
+    # and silently ignoring one the caller took the trouble to pass is how a loop believes
+    # it has a floor it never had.
     if not isinstance(review_round, int) or isinstance(review_round, bool) or review_round < 1:
+        # Only suggest the escape when it is not already taken — an error whose remedy the
+        # caller has already applied reads as a bug in the tool.
+        escape = f", or {ONE_SHOT_HINT}" if closure_on else ""
         raise ValueError(
             f"{tool} needs `round` as an integer >= 1 (incremented each cold round), got "
             f"{review_round!r}: any other value produces no ROUND line, so the reviewer "
             "never reaches the round-3 severity floor and the loop has no terminating "
-            f"pressure. Pass round: 1 for a first round, or {ONE_SHOT_HINT}."
+            f"pressure. Pass round: 1 for a first round{escape}."
         )
 
 

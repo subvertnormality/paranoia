@@ -313,7 +313,7 @@ rather than firing on the prescribed convention, which is what a fail-closed che
 is for. This is a documentation obligation and an acceptance fixture, not a
 mechanism.
 
-**This is also why plan closure must default OFF (§2.2)**, and the reason is now
+**This is also why plan closure defaulted OFF (§2.2 — superseded 2026-08-04; it now defaults ON and refuses a call with no lineage)**, and the reason is now
 stronger than revision 1's: with no derivable key at all, defaulting on would
 hard-error *every* existing plan call, not merely the `plan_text` ones. The
 dominant consumer passes `plan_text` regardless — in the incident session's
@@ -768,8 +768,8 @@ null placeholders or implement part of §2.1 out of order.* Split it:
    trailer rather than an exception; `FATAL` registering, blocking, and being
    `RECLASSIFY`-ed down to `MINOR` into `NOT-BLOCKED`; an open `MINOR` class at
    round ≥3 permitting prose `CONVERGED` **and** trailer `NOT-BLOCKED` together
-   (§2.3's second FATAL); `CLOSED` then `REOPEN`; `class_closure` default-off
-   writing no state at all; `.paranoia.toml` carrying `class_closure = true` having
+   (§2.3's second FATAL); `CLOSED` then `REOPEN`; `class_closure: false` (the one-shot mode,
+   superseding the default-off contract) writing no state at all, and needing no `round`; `.paranoia.toml` carrying `class_closure = true` having
    **no** effect on `critique_plan` (§2.2); a failed review leaving the lineage
    byte-identical (the branch rule at `handlers.py:509-515`); both directions of the
    §2.7 cross-mode refusal; and the never-reaches-`make_grep` contract from item 1.

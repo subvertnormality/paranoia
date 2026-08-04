@@ -109,19 +109,21 @@ class TestCritiqueBranch:
         )
         assert "CFGSTAKES" in eng.calls[0]["prompt"]
 
-    def test_round_below_one_is_ignored(self, repo_with_branch: Path, tmp_path: Path) -> None:
-        # dogfood finding: schema is 1-based; a non-positive round must not emit a ROUND
-        # line. While closure tracks a loop such a round is now REFUSED outright (a value
-        # that renders no floor is the same as omitting it); this pins the one-shot mode,
-        # where there is no next round to floor and the value is merely inert.
-        eng = FakeEngine()
-        handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
-             "round": 0, "class_closure": False},
-            engine=eng, log_dir=tmp_path, now=fixed_clock,
-        )
-        body = eng.calls[0]["prompt"].split("===== TASK INPUT =====", 1)[1]
-        assert "ROUND:" not in body
+    def test_round_below_one_is_refused_in_both_modes(
+        self, repo_with_branch: Path, tmp_path: Path
+    ) -> None:
+        # dogfood finding: the schema is 1-based and a non-positive round emits no ROUND
+        # line. It used to be silently ignored; silently ignoring a round the caller took
+        # the trouble to pass is how a loop believes it has a floor it never had. A
+        # SUPPLIED round is now checked in both modes — only OMITTING it is the one-shot
+        # mode's privilege.
+        for extra in ({}, {"class_closure": False}):
+            with pytest.raises(ValueError, match="integer >= 1"):
+                handlers.critique_branch(
+                    {"repo_path": str(repo_with_branch), "base_ref": "main",
+                     "head_ref": "feature", "round": 0, **extra},
+                    engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
+                )
 
     def test_no_calibration_block_in_body_when_absent(self, repo_with_branch: Path, tmp_path: Path) -> None:
         # The instructions always DESCRIBE the calibration block; assert it isn't
