@@ -820,13 +820,18 @@ the §5 over-claim this proposal exists to prevent. The README section and the
 `critique_plan` schema descriptions in `server.py` are deliverables of this change,
 not documentation debt after it.
 
-**The consumer's operator rules.** *Round 1 [MAJOR] gap: because closure defaults
-off (§2.2), nothing makes a later seam turn it on — and
-`COMPLEX_DELIVERY_RUNBOOK.md:889-896` still tells the operator that on
-`critique_plan` the stop condition is "the triage half alone, since it has no
-trailer".* Shipping without changing that sentence ships a mechanism the documented
-procedure tells its only user to ignore. The runbook and `CLAUDE.md` must be
-updated in the same rollout to prescribe `class_closure: true`; one explicit
+**The consumer's operator rules.** *Round 1 [MAJOR] gap: `COMPLEX_DELIVERY_RUNBOOK.md:889-896`
+still tells the operator that on `critique_plan` the stop condition is "the triage half
+alone, since it has no trailer".* Shipping without changing that sentence ships a
+mechanism the documented procedure tells its only user to ignore.
+
+*Superseded in one respect 2026-08-04: this gap originally read "because closure
+defaults off, nothing makes a later seam turn it on". Closure now defaults ON, so
+nothing needs to turn it on — but the runbook edit is MORE urgent, not less, because a
+seam that omits `lineage` or `round` is now REFUSED rather than quietly ungated. The
+fourth recurrence of this documentation class was this very sentence.* The runbook and
+`CLAUDE.md` must be updated in the same rollout to state that plan closure is on by
+default and that a seam must supply `repo_path`, `round`, and one explicit
 `lineage` held across both vendor stages, named by the **mode-qualified** extension
 of the globally-unique convention the runbook already mandates
 (`parallax-<issue>-<card>-plan`, against the frozen seam's

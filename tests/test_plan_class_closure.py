@@ -1,4 +1,11 @@
-"""Class closure for `critique_plan`: unmechanized classes, no repository, no git.
+"""Class closure for `critique_plan`: unmechanized classes, no git.
+
+Two claims that are easy to conflate and are NOT the same: the closure COORDINATOR
+needs no repository and runs no git subprocess (`TestPlanModeNeverGreps`), while the
+`critique_plan` HANDLER requires one, because an ungrounded plan review cannot test the
+plan's premises against the code (`TestPlanReviewsMustBeGrounded`). This module's
+helper therefore always supplies a repository, and any test claiming to omit one is
+lying.
 
 Design contract: `docs/plan_class_closure_proposal.md`. Each block names the plan-review
 round whose finding it pins, so a later change that re-opens one fails with the history
