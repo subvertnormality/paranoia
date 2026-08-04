@@ -731,8 +731,16 @@ converge is the default path, it already resolves an explicit snapshot id, and i
 is where the packet block is rendered. Extending to the legacy path is deferred,
 not impossible.
 
-**Out:** `critique_plan` (a plan has no code sites to enumerate), `query`,
+**Out:** `query`,
 `rebut`, and legacy non-converge `critique_branch`.
+
+*Superseded 2026-08-04: `critique_plan` is no longer out of scope. It gained
+UNMECHANIZED-ONLY class closure, on by default, with an explicit `lineage` — a regex
+over plan prose closes the moment the wording changes, which is a false closure rather
+than a fix, so the mechanized half deliberately did NOT transfer. Design:
+[`plan_class_closure_proposal.md`](plan_class_closure_proposal.md). The reason given
+here — "a plan has no code sites to enumerate" — was right about predicates and wrong
+about the register.*
 
 **Kill switch:** `class_closure` call arg / `.paranoia.toml` key, default `true`.
 It is the escape of last resort, not the escape of first resort — §2.3, §2.8 and

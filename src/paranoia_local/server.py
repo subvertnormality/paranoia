@@ -191,7 +191,7 @@ TOOLS: list[Tool] = [
     Tool(
         name="critique_plan",
         description=(
-            "Adversarially review a plan or design doc. With repo_path the reviewer reads the actual "
+            "Adversarially review a plan or design doc. The reviewer reads the actual "
             "code to test the plan's premises about current behaviour — a plan built on an inverted "
             "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags."
         ),

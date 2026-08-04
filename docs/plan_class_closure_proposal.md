@@ -46,8 +46,11 @@ left a stale sentence in §2.7 asserting a derived plan key that §1.4 had just
 deleted.*
 
 **The short answer.** The unmechanized half of `class_closure` transfers to
-`critique_plan` essentially intact, and I verified it runs with no repository and
-no `git` call at all. The mechanized half must **not** transfer, and the argument
+`critique_plan` essentially intact, and I verified the mechanism itself needs no
+repository and makes no `git` call at all. *(Superseded 2026-08-04 in one respect:
+`critique_plan` now REQUIRES `repo_path` — not because closure needs it, but because
+an ungrounded plan review cannot test the plan's premises against the code, which is
+the reviewer's highest-value job. The closure mechanism remains repository-free.)* The mechanized half must **not** transfer, and the argument
 against it is not "a regex over prose false-positives" — it is worse than that: a
 predicate over plan prose **closes on a rewording**, and a rewording is precisely
 the failure mode this mechanism exists to catch. Evidence in §1.1.

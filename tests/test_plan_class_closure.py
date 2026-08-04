@@ -426,11 +426,19 @@ class TestPlanModeNeverGreps:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
         run_round(FakeEngine(review_with("NONE")), tmp_path, round_no=2)
 
-    def test_a_plan_round_completes_without_git_being_reachable(self, tmp_path: Path) -> None:
-        """Renamed: it used to claim "needs no repository at all", which `run_round` had
-        stopped being true of — the helper supplies one, and `critique_plan` now requires
-        it. What it actually pins is that the round completes with no git work."""
-        out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path)
+    def test_a_plan_round_runs_no_git_subprocess(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The sibling test proves no grep is CONSTRUCTED; this proves none is RUN. It
+        used to claim "needs no repository at all" and prove nothing, because the helper
+        builds one with `git init` — so the stub goes in after the fixture exists."""
+        repo = _bare_repo(tmp_path)
+
+        def explode(*a, **k):
+            raise AssertionError("plan mode ran a git subprocess")
+
+        monkeypatch.setattr(handlers, "_run_git", explode)
+        out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, repo=repo)
         assert "CONVERGENCE: BLOCKED" in out
 
 

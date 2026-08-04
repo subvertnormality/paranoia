@@ -47,7 +47,7 @@ agent reviewer is:
 | Tool | What it does |
 |---|---|
 | `critique_branch` | Adversarial review of a git branch/diff or the dirty working tree. Five-section critique (What works / doesn't / Risks / Gaps / Improvements) with `[BLOCKER]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]` tags. |
-| `critique_plan` | Adversarial review of a plan or design doc. With `repo_path`, the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind. |
+| `critique_plan` | Adversarial review of a plan or design doc. `repo_path` is **required**: the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind, and an ungrounded review cannot catch one. |
 | `query` | A quick double-check of a single fact or point. Not a full review — lower reasoning effort, a direct answer with citations and a stated confidence level. |
 | `rebut` | Dispute a specific finding. Resumes the **same** reviewer session with your counter-evidence; it concedes or holds with fresh citations. Cheaper and higher-resolution than a cold re-round. |
 | `arbitrate` | Decide between 2–4 options. **Both** engines choose independently and cold over one pinned snapshot; Python computes the verdict. See below. |
