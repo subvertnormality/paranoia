@@ -83,7 +83,7 @@ MECHANIZED = (
 
 
 def run_round(repo: Path, engine: FakeEngine, tmp_path: Path, **extra) -> str:
-    args = {"repo_path": str(repo), "base_ref": "main", "converge": True, **extra}
+    args = {"repo_path": str(repo), "base_ref": "main", "converge": True, **extra, "round": 1}
     return handlers.critique_branch(args, engine=engine, log_dir=tmp_path / "logs")
 
 

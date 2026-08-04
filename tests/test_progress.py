@@ -192,34 +192,37 @@ class TestHandlerAndDispatchPlumbing:
             self.received_on_progress = on_progress
             return Review(text="R", session_ref=session_ref, raw="")
 
-    def test_critique_plan_threads_on_progress(self, tmp_path: Path) -> None:
+    def test_critique_plan_threads_on_progress(self, repo: Path, tmp_path: Path) -> None:
         spy = self.SpyEngine()
         seen: list[str] = []
         critique_plan(
-            {"plan_text": "# plan"}, engine=spy, log_dir=tmp_path,
+            {"plan_text": "# plan", "repo_path": str(repo), "class_closure": False},
+            engine=spy, log_dir=tmp_path,
             now=lambda: "t", on_progress=seen.append,
         )
         assert spy.received_on_progress is not None
         assert spy.received_on_progress != "UNSET"
         assert "engine says hi" in seen
 
-    def test_dispatch_forwards_on_progress(self, tmp_path: Path, monkeypatch) -> None:
+    def test_dispatch_forwards_on_progress(self, repo: Path, tmp_path: Path, monkeypatch) -> None:
         spy = self.SpyEngine()
         monkeypatch.setattr(server, "get_engine", lambda name: spy)
         seen: list[str] = []
         out = server.dispatch(
-            "critique_plan", {"plan_text": "# plan"},
+            "critique_plan", {"plan_text": "# plan", "repo_path": str(repo),
+                              "class_closure": False},
             default_engine_name="codex", log_dir=tmp_path, now=lambda: "t",
             on_progress=seen.append,
         )
         assert "R" in out
         assert "engine says hi" in seen
 
-    def test_dispatch_without_on_progress_unchanged(self, tmp_path: Path, monkeypatch) -> None:
+    def test_dispatch_without_on_progress_unchanged(self, repo: Path, tmp_path: Path, monkeypatch) -> None:
         spy = self.SpyEngine()
         monkeypatch.setattr(server, "get_engine", lambda name: spy)
         out = server.dispatch(
-            "critique_plan", {"plan_text": "# plan"},
+            "critique_plan", {"plan_text": "# plan", "repo_path": str(repo),
+                              "class_closure": False},
             default_engine_name="codex", log_dir=tmp_path, now=lambda: "t",
         )
         assert "R" in out

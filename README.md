@@ -187,7 +187,16 @@ maximum paranoia and manufactures marginal/hardening findings for 20+ rounds):
   internal tool*, not a hostile/high-scale service. Set it **once per project in
   `.paranoia.toml`**; override per-call to tighten. This is the single highest-
   leverage lever against hardening scope-creep.
-- **`round`** — the 1-based loop round. **Increment it each cold round.** At
+
+  It stays **optional and never blocks** — the fallback is the safe reading, so a
+  gate here would refuse valid work to prevent a miscalibration you can simply be
+  shown. Instead, a review that resolved no stakes from either the call or
+  `.paranoia.toml` ends with a `STAKES: unstated` line. Pass `stakes: "unstated"`
+  to accept that reading deliberately, which calibrates the reviewer to one fixed
+  sentence and silences the line.
+- **`round`** — the 1-based loop round. **Required** whenever class closure is
+  tracking a loop, i.e. by default; the one escape is `class_closure: false`,
+  which is the explicit one-shot mode. **Increment it each cold round.** At
   `round >= 3` the reviewer reports only merge-blocking in-scope findings
   (`[MAJOR]` or higher for the review mode) and says `CONVERGED` — inside the
   five-section format — when none remain, which is how you *stop* the loop
@@ -319,10 +328,10 @@ The reviewer is told the exact grammar; you do not need to quote it.
 would discard every tracked class and then report `NOT-BLOCKED`, turning a storage
 fault into a false all-clear.
 
-#### Class closure for `critique_plan` — opt-in, and a weaker guarantee
+#### Class closure for `critique_plan` — on by default, and a weaker guarantee
 
-`critique_plan` takes `class_closure` too, but it is **off by default** and it is a
-**different, weaker mechanism**. Read this before relying on it.
+`critique_plan` takes `class_closure` too, **on by default** as for `critique_branch`,
+but it is a **different, weaker mechanism**. Read this before relying on it.
 
 There are **no regex predicates for a plan**, deliberately. Over source, editing the
 code until the pattern stops matching *is* the fix. Over a plan, editing the prose
@@ -345,10 +354,20 @@ and closed ones never block, so the mechanism cannot trap you.
 
 ```jsonc
 {
-  "plan_text": "…", "repo_path": "/path/to/repo", "round": 3,
-  "class_closure": true,
-  "lineage": "myproject-42-plan"   // REQUIRED, and mode-qualified
+  "plan_text": "…",
+  "repo_path": "/path/to/repo",     // REQUIRED — an ungrounded plan review
+                                    // cannot test the plan's premises
+  "round": 3,                       // REQUIRED while closure tracks the loop
+  "lineage": "myproject-42-plan"    // REQUIRED, and mode-qualified
 }
+```
+
+**One-shot reviews.** A design sketch with no convergence loop behind it takes
+`class_closure: false`. That is the single explicit escape, and it also drops the
+`round` requirement — there is no next round to apply a severity floor to:
+
+```jsonc
+{ "plan_text": "…", "repo_path": "/path/to/repo", "class_closure": false }
 ```
 
 **`lineage` is required and nothing is derived.** A plan has no branch to key state to,

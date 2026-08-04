@@ -72,8 +72,10 @@ PROCEDURE_CLASS = (
 
 def run_round(engine: FakeEngine, tmp_path: Path, *, lineage: str = "proj-1-plan",
               round_no: int = 1, plan: str = "# Plan\n\nDo the thing.",
-              already: list[str] | None = None, closure: bool = True) -> str:
-    args = {"plan_text": plan, "round": round_no, "class_closure": closure}
+              already: list[str] | None = None, closure: bool = True,
+              repo: Path | None = None) -> str:
+    args = {"plan_text": plan, "round": round_no, "class_closure": closure,
+            "repo_path": str(repo or _bare_repo(tmp_path))}
     if lineage:
         args["lineage"] = lineage
     if already:
@@ -304,19 +306,25 @@ class TestLineageIsRequiredAndNeverDerived:
             plan.write_text("# Plan")
             args = {"plan_path": str(plan)}
         with pytest.raises(ValueError, match="needs an explicit `lineage`"):
-            handlers.critique_plan({**args, "class_closure": True},
-                                   engine=FakeEngine(), log_dir=tmp_path / "logs")
+            handlers.critique_plan(
+                {**args, "class_closure": True, "round": 1,
+                 "repo_path": str(_bare_repo(tmp_path))},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
 
     def test_the_refusal_mints_no_lineage(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError):
-            handlers.critique_plan({"plan_text": "# Plan", "class_closure": True},
-                                   engine=FakeEngine(), log_dir=tmp_path / "logs")
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "class_closure": True, "round": 1,
+                 "repo_path": str(_bare_repo(tmp_path))},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
         assert not list(cc.lineage_dir(cc.default_state_root()).glob("*.json"))
 
     def test_the_error_names_both_remedies(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError) as exc:
-            handlers.critique_plan({"plan_text": "# Plan", "class_closure": True},
-                                   engine=FakeEngine(), log_dir=tmp_path / "logs")
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "class_closure": True, "round": 1,
+                 "repo_path": str(_bare_repo(tmp_path))},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
         assert "mode-qualified" in str(exc.value) and "class_closure: false" in str(exc.value)
 
     def test_the_same_lineage_survives_a_completely_rewritten_plan(
@@ -470,30 +478,53 @@ class TestBranchPathUnchanged:
 # ── the off switch, and the audit record ──────────────────────────────────────
 
 
-class TestDefaultOff:
-    def test_closure_is_off_unless_asked_for(self, tmp_path: Path) -> None:
+class TestDefaultOnAndTheOneShotEscape:
+    """Closure is ON by default; `class_closure: false` is the ONE explicit one-shot mode,
+    and it is also what drops the `round` requirement — one rule, not two."""
+
+    def test_closure_is_on_without_being_asked_for(self, tmp_path: Path) -> None:
+        out = handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "round": 1, "lineage": "default-on-plan"},
+            engine=FakeEngine(review_with(PROCEDURE_CLASS)), log_dir=tmp_path / "logs")
+        assert "CONVERGENCE: BLOCKED" in out
+
+    def test_the_default_refuses_a_call_with_no_lineage_and_names_the_one_shot_escape(
+        self, tmp_path: Path
+    ) -> None:
+        with pytest.raises(ValueError, match="class_closure: false"):
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)), "round": 1},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+
+    def test_the_one_shot_mode_needs_neither_lineage_nor_round(self, tmp_path: Path) -> None:
         engine = FakeEngine(review_with(PROCEDURE_CLASS))
-        out = handlers.critique_plan({"plan_text": "# Plan"}, engine=engine,
-                                     log_dir=tmp_path / "logs")
+        out = handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "class_closure": False},
+            engine=engine, log_dir=tmp_path / "logs")
         assert "CONVERGENCE:" not in out
         assert cc.UNMECHANIZED_HEADER not in engine.calls[0]
 
-    def test_off_writes_no_state_at_all(self, tmp_path: Path) -> None:
-        handlers.critique_plan({"plan_text": "# Plan"}, engine=FakeEngine(review_with("NONE")),
-                               log_dir=tmp_path / "logs")
+    def test_the_one_shot_mode_writes_no_state_at_all(self, tmp_path: Path) -> None:
+        handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "class_closure": False},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
         assert not cc.lineage_dir(cc.default_state_root()).exists() or \
             not list(cc.lineage_dir(cc.default_state_root()).iterdir())
 
-    def test_paranoia_toml_cannot_turn_plan_closure_on(self, tmp_path: Path) -> None:
-        """Sharing the branch key would flip plan closure on for any project that set it,
-        and then hard-error every plan call that has no lineage."""
-        repo = tmp_path / "repo"
-        (repo / ".git").mkdir(parents=True)
-        (repo / ".paranoia.toml").write_text("class_closure = true\n")
-        engine = FakeEngine(review_with(PROCEDURE_CLASS))
-        out = handlers.critique_plan({"plan_text": "# Plan", "repo_path": str(repo)},
-                                     engine=engine, log_dir=tmp_path / "logs")
-        assert "CONVERGENCE:" not in out
+    def test_paranoia_toml_cannot_turn_plan_closure_off(self, tmp_path: Path) -> None:
+        """The branch key must not reach across tools in EITHER direction: a project that
+        set `class_closure = false` for its branch reviews must not silently disable the
+        plan gate."""
+        repo = _bare_repo(tmp_path)
+        (repo / ".paranoia.toml").write_text("class_closure = false\n")
+        out = handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(repo), "round": 1,
+             "lineage": "toml-plan"},
+            engine=FakeEngine(review_with(PROCEDURE_CLASS)), log_dir=tmp_path / "logs")
+        assert "CONVERGENCE: BLOCKED" in out
 
 
 class TestPlanAuditRecord:
@@ -515,7 +546,8 @@ class TestPlanAuditRecord:
         plan = tmp_path / "plan.md"
         plan.write_text("# Plan\n\nfrom a file")
         handlers.critique_plan(
-            {"plan_path": str(plan), "class_closure": True, "lineage": "p-plan"},
+            {"plan_path": str(plan), "class_closure": True, "lineage": "p-plan",
+             "round": 1, "repo_path": str(_bare_repo(tmp_path))},
             engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
         record = _log_record(tmp_path)
         assert record["plan_path"] == str(plan)
@@ -534,9 +566,11 @@ class TestPlanAuditRecord:
         assert "PROCEDURE:" in record["retry_register"]
         assert "PATTERN:" not in record["retry_register"]
 
-    def test_an_uninstrumented_plan_review_still_logs(self, tmp_path: Path) -> None:
-        handlers.critique_plan({"plan_text": "# Plan"}, engine=FakeEngine(review_with("NONE")),
-                               log_dir=tmp_path / "logs")
+    def test_a_one_shot_plan_review_still_logs(self, tmp_path: Path) -> None:
+        handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "class_closure": False},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
         record = _log_record(tmp_path)
         assert record["class_closure"] is False and record["lineage"] is None
 
@@ -566,6 +600,18 @@ class TestFailedReviewLeavesStateAlone:
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _bare_repo(tmp_path: Path) -> Path:
+    """`critique_plan` now requires a repo to ground against; these tests do not care
+    which, so one empty repo per tmp_path serves every call."""
+    import subprocess
+
+    r = tmp_path / "plan-repo"
+    if not r.exists():
+        r.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=r, check=True, capture_output=True)
+    return r
 
 
 @pytest.fixture
@@ -602,3 +648,108 @@ def _only_class_id(tmp_path: Path) -> str:
 def _log_record(tmp_path: Path) -> dict:
     files = sorted((tmp_path / "logs").glob("*critique_plan*.json"))
     return json.loads(files[-1].read_text())
+
+
+# ── the mandatory contract ────────────────────────────────────────────────────
+
+
+class TestRoundIsRequiredWhileAClosureLoopRuns:
+    """`round` is the only thing that makes a loop terminate: `_CALIBRATION`'s severity
+    floor starts at round 3, so a loop driven without it reports at round-1 severity
+    forever. Required whenever closure is tracking a loop, and deliberately not in the
+    one-shot mode, which has no next round to floor."""
+
+    def test_a_plan_closure_call_without_round_is_refused(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="needs `round`"):
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+                 "lineage": "no-round-plan"},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+
+    def test_a_branch_call_without_round_is_refused(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        with pytest.raises(ValueError, match="needs `round`"):
+            handlers.critique_branch(
+                {"repo_path": str(git_repo), "base_ref": "main"},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+
+    def test_the_refusal_names_the_one_shot_escape(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError) as exc:
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+                 "lineage": "no-round-plan"},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+        assert "class_closure: false" in str(exc.value)
+
+    @pytest.mark.parametrize("tool", ["plan", "branch"])
+    def test_the_one_shot_mode_needs_no_round_on_either_tool(
+        self, tool: str, git_repo: Path, tmp_path: Path
+    ) -> None:
+        if tool == "plan":
+            out = handlers.critique_plan(
+                {"plan_text": "# Plan", "repo_path": str(git_repo),
+                 "class_closure": False},
+                engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
+        else:
+            out = handlers.critique_branch(
+                {"repo_path": str(git_repo), "base_ref": "main", "class_closure": False},
+                engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
+        assert "CONVERGENCE:" not in out
+
+
+class TestPlanReviewsMustBeGrounded:
+    def test_a_plan_review_without_a_repo_is_refused(self, tmp_path: Path) -> None:
+        """225 of 225 logged plan reviews passed one, so this refuses nothing real — and
+        an ungrounded review cannot do the job the prompt calls its most valuable."""
+        with pytest.raises(ValueError, match="repo_path is required"):
+            handlers.critique_plan(
+                {"plan_text": "# Plan", "class_closure": False},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+
+    def test_the_schema_says_so_too(self) -> None:
+        from paranoia_local import server
+
+        schema = [t for t in server.TOOLS if t.name == "critique_plan"][0].inputSchema
+        assert schema["required"] == ["repo_path"]
+
+    def test_the_schema_encodes_plan_text_xor_plan_path(self) -> None:
+        """The handler has always enforced it; a client could not see it before spending."""
+        from paranoia_local import server
+
+        schema = [t for t in server.TOOLS if t.name == "critique_plan"][0].inputSchema
+        assert schema["oneOf"] == [{"required": ["plan_text"]}, {"required": ["plan_path"]}]
+
+
+class TestUnstatedStakesAreSurfacedNotBlocked:
+    """Absent stakes is the largest cause of review scope-creep, but its fallback is the
+    SAFE reading — so this shows, and never refuses."""
+
+    def test_a_review_with_no_stakes_anywhere_says_so(self, tmp_path: Path) -> None:
+        out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path)
+        assert handlers.STAKES_NOTICE in out
+
+    def test_stated_stakes_silence_the_notice(self, tmp_path: Path) -> None:
+        out = handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "class_closure": False, "stakes": "a real deployment boundary"},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
+        assert handlers.STAKES_NOTICE not in out
+
+    def test_the_literal_unstated_is_an_explicit_acceptance_not_an_omission(
+        self, tmp_path: Path
+    ) -> None:
+        """`arbitrate`'s trick: saying `unstated` calibrates the reviewer to one fixed
+        reading AND records that the caller chose it, so it must not be nagged."""
+        engine = FakeEngine(review_with("NONE"))
+        out = handlers.critique_plan(
+            {"plan_text": "# Plan", "repo_path": str(_bare_repo(tmp_path)),
+             "class_closure": False, "stakes": "unstated"},
+            engine=engine, log_dir=tmp_path / "logs")
+        assert handlers.STAKES_NOTICE not in out
+        assert "modest single-team internal tool" in engine.calls[0]
+
+    def test_the_notice_never_blocks_the_review(self, tmp_path: Path) -> None:
+        out = run_round(FakeEngine(review_with("NONE")), tmp_path)
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+        assert handlers.STAKES_NOTICE in out

@@ -39,7 +39,7 @@ class TestCritiqueBranch:
         eng = FakeEngine()
         out = handlers.critique_branch(
             {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
-             "diff_intent": "friendlier greeting"},
+             "diff_intent": "friendlier greeting", "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "REVIEW BODY" in out
@@ -53,7 +53,7 @@ class TestCritiqueBranch:
 
     def test_footer_exposes_session_for_rebut(self, repo_with_branch: Path, tmp_path: Path) -> None:
         out = handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature", "round": 1},
             engine=FakeEngine(session_ref="abc-999"), log_dir=tmp_path, now=fixed_clock,
         )
         assert "abc-999" in out
@@ -64,7 +64,7 @@ class TestCritiqueBranch:
         (repo / "app.py").write_text("# uncommitted edit\n")
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo), "include_uncommitted": True, "converge": False},
+            {"repo_path": str(repo), "include_uncommitted": True, "converge": False, "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert eng.calls[0]["cwd"] == repo
@@ -75,7 +75,7 @@ class TestCritiqueBranch:
         eng = FakeEngine()
         handlers.critique_branch(
             {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
-             "isolate": False, "converge": False},
+             "isolate": False, "converge": False, "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert eng.calls[0]["cwd"] == repo_with_branch
@@ -84,7 +84,7 @@ class TestCritiqueBranch:
         eng = FakeEngine()
         handlers.critique_branch(
             {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
-             "already_raised": ["app.py:5 — greeting not escaped"]},
+             "already_raised": ["app.py:5 — greeting not escaped"], "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "greeting not escaped" in eng.calls[0]["prompt"]
@@ -104,7 +104,7 @@ class TestCritiqueBranch:
         (repo_with_branch / ".paranoia.toml").write_text('stakes = "CFGSTAKES"\n')
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature", "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "CFGSTAKES" in eng.calls[0]["prompt"]
@@ -122,9 +122,12 @@ class TestCritiqueBranch:
     def test_no_calibration_block_in_body_when_absent(self, repo_with_branch: Path, tmp_path: Path) -> None:
         # The instructions always DESCRIBE the calibration block; assert it isn't
         # INJECTED into the task-input body when neither stakes nor round is given.
+        # `round` is required once class closure is tracking a loop, so the only shape
+        # with neither is the explicit one-shot mode.
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
+             "class_closure": False},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         body = eng.calls[0]["prompt"].split("===== TASK INPUT =====", 1)[1]
@@ -132,7 +135,7 @@ class TestCritiqueBranch:
 
     def test_writes_audit_log(self, repo_with_branch: Path, tmp_path: Path) -> None:
         handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature", "round": 1},
             engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
         )
         logs = list(tmp_path.glob("*.json"))
@@ -145,7 +148,7 @@ class TestCritiqueBranch:
         git(["add", "-A"], repo_with_branch)
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "head_ref": "feature", "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         # a diff was computed against main (feature's change is visible)
@@ -163,37 +166,41 @@ class TestCritiquePlan:
     def test_rejects_both_text_and_path(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="not both"):
             handlers.critique_plan(
-                {"plan_text": "x", "plan_path": "/tmp/y.md"},
+                {"plan_text": "x", "plan_path": "/tmp/y.md", "repo_path": str(tmp_path)},
                 engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
             )
 
     def test_rejects_neither(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="plan_text or plan_path"):
             handlers.critique_plan(
-                {}, engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
+                {"repo_path": str(tmp_path)}, engine=FakeEngine(), log_dir=tmp_path,
+                now=fixed_clock,
             )
 
-    def test_plan_text_reaches_reviewer(self, tmp_path: Path) -> None:
+    def test_plan_text_reaches_reviewer(self, repo: Path, tmp_path: Path) -> None:
         eng = FakeEngine()
         handlers.critique_plan(
-            {"plan_text": "Step 1: rewrite the auth layer."},
+            {"plan_text": "Step 1: rewrite the auth layer.", "repo_path": str(repo),
+             "class_closure": False},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "rewrite the auth layer" in eng.calls[0]["prompt"]
 
-    def test_plan_path_is_read(self, tmp_path: Path) -> None:
+    def test_plan_path_is_read(self, repo: Path, tmp_path: Path) -> None:
         plan = tmp_path / "plan.md"
         plan.write_text("# Plan\nDo the risky thing.\n")
         eng = FakeEngine()
         handlers.critique_plan(
-            {"plan_path": str(plan)}, engine=eng, log_dir=tmp_path, now=fixed_clock,
+            {"plan_path": str(plan), "repo_path": str(repo), "class_closure": False},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "risky thing" in eng.calls[0]["prompt"]
 
-    def test_stakes_and_round_reach_plan_reviewer(self, tmp_path: Path) -> None:
+    def test_stakes_and_round_reach_plan_reviewer(self, repo: Path, tmp_path: Path) -> None:
         eng = FakeEngine()
         handlers.critique_plan(
-            {"plan_text": "do a thing", "stakes": "PLANSTAKESMARK", "round": 5},
+            {"plan_text": "do a thing", "stakes": "PLANSTAKESMARK", "round": 5,
+             "repo_path": str(repo), "class_closure": False},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         p = eng.calls[0]["prompt"]
@@ -203,7 +210,7 @@ class TestCritiquePlan:
     def test_repo_grounding_runs_in_repo(self, repo: Path, tmp_path: Path) -> None:
         eng = FakeEngine()
         handlers.critique_plan(
-            {"plan_text": "change greet()", "repo_path": str(repo)},
+            {"plan_text": "change greet()", "repo_path": str(repo), "class_closure": False},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert eng.calls[0]["cwd"] == repo
@@ -232,7 +239,7 @@ class TestRebut:
         eng = FakeEngine()
         out = handlers.rebut(
             {"repo_path": str(repo), "session_ref": "sess-1",
-             "rebuttal": "That line is unreachable because X."},
+             "rebuttal": "That line is unreachable because X.", "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert "REBUTTAL VERDICT" in out
@@ -244,6 +251,6 @@ class TestRebut:
     def test_requires_session_and_rebuttal(self, repo: Path, tmp_path: Path) -> None:
         with pytest.raises(ValueError):
             handlers.rebut(
-                {"repo_path": str(repo), "rebuttal": "x"},
+                {"repo_path": str(repo), "rebuttal": "x", "round": 1},
                 engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
             )
