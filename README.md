@@ -1,449 +1,45 @@
 # paranoia-local
 
-A local MCP server that gets a **cold, adversarial second opinion** on your code
-changes and plans — from the *other* frontier coding agent, running on its own
-subscription, with **full read access to your repository**.
+Get a cold, adversarial review of your code, your plans, and your decisions from
+the *other* frontier coding agent — running locally, on its own subscription, with
+full read access to your repository.
 
-Install it into Claude Code and reviews are performed by Codex (GPT‑5.6). Install
-it into Codex and reviews are performed by Claude Code (Fable 5). The MCP server
-is just the channel between them.
-
-One tool is a different shape: [`arbitrate`](#arbitrate--deciding-not-reviewing)
-does not review, it **decides** — it runs *both* vendors against each other on a
-choice you hand it and computes the verdict itself.
+Install it into Claude Code and reviews are performed by Codex. Install it into
+Codex and reviews are performed by Claude Code. paranoia-local is the MCP server
+between them: it builds the prompt, runs the other agent read-only, and returns a
+structured critique.
 
 ```
-┌──────────────┐   "paranoia: critique this branch"   ┌──────────────┐
+┌──────────────┐   "paranoia: critique this branch"   ┌───────────────┐
 │  Claude Code │ ───────────────────────────────────► │ paranoia-local│
-│  (your work) │                                       │   (MCP, local)│
-└──────────────┘                                       └──────┬───────┘
-                                                              │ codex exec (read-only, your repo)
-                                                       ┌──────▼───────┐
-                                                       │ Codex / GPT-5.6│  ← reads the whole repo,
-                                                       │  cold reviewer │    decides what to open
-                                                       └──────────────┘
+│  (your work) │                                      │  (MCP, local) │
+└──────────────┘                                      └───────┬───────┘
+                                                              │ codex exec (read-only)
+                                                      ┌───────▼────────┐
+                                                      │  Codex / GPT-5 │ ← reads the repo,
+                                                      │  cold reviewer │   decides what to open
+                                                      └────────────────┘
 ```
 
-## Why
+**Contents** · [Quickstart](#quickstart) · [The five tools](#the-five-tools) ·
+[How reviews work: the convergence loop](#how-reviews-work-the-convergence-loop) ·
+[Tool reference](#tool-reference) · [Output reference](#output-reference) ·
+[Configuration](#configuration) · [Safety model](#safety-model) ·
+[Development](#development)
 
-Claude (or Codex) can review its own work, but it reviews with the same biases it
-wrote with. A *different* model with a *fresh* context is a genuine second opinion.
-This tool packages that into one MCP call.
+---
 
-Compared to an API-key reviewer that only sees a hand-assembled payload, a local
-agent reviewer is:
+## Quickstart
 
-- **More powerful** — it has the *entire* repository and git history and decides
-  what to read. It opens call-sites, follows the blast radius, checks tests and
-  configs, and reads git history — the things a diff-only reviewer can't.
-- **Cheaper** — it runs on your existing ChatGPT / Claude **subscription**, not
-  metered API tokens.
-- **Safer** — the reviewer runs read-only (OS sandbox for Codex; a read-only tool
-  allowlist for Claude) inside a throwaway git worktree, so it can't touch your
-  work.
+**1. Prerequisites**
 
-## Tools
+- Python 3.11+ and `git` on `PATH`
+- The reviewing agent's CLI, installed and signed in on a subscription:
+  [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
+  [Claude Code](https://code.claude.com) (`claude`)
+- `arbitrate` needs **both** CLIs; the four review tools need only the other one
 
-| Tool | What it does |
-|---|---|
-| `critique_branch` | Adversarial review of a git branch/diff or the dirty working tree. Five-section critique (What works / doesn't / Risks / Gaps / Improvements) with `[BLOCKER]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]` tags. |
-| `critique_plan` | Adversarial review of a plan or design doc. `repo_path` is **required**: the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind, and an ungrounded review cannot catch one. |
-| `query` | A quick double-check of a single fact or point. Not a full review — lower reasoning effort, a direct answer with citations and a stated confidence level. |
-| `rebut` | Dispute a specific finding. Resumes the **same** reviewer session with your counter-evidence; it concedes or holds with fresh citations. Cheaper and higher-resolution than a cold re-round. |
-| `arbitrate` | Decide between 2–4 options. **Both** engines choose independently and cold over one pinned snapshot; Python computes the verdict. See below. |
-
-Every review returns a `session_ref` in its footer — pass it to `rebut`.
-
-## `arbitrate` — deciding, not reviewing
-
-The other four tools get you a second opinion. `arbitrate` gets you a *decision*:
-you hand it 2–4 options and it returns `CONVERGED` only when both frontier
-vendors, judging independently, picked the same one for reasons they could each
-cite.
-
-```json
-{
-  "name": "arbitrate",
-  "arguments": {
-    "repo_path": "/Users/you/Work/my-project",
-    "decision": "Choose the numeric type for the position-size threshold.",
-    "options": [
-      {"id": "opt-float",   "statement": "Store it as a float."},
-      {"id": "opt-decimal", "statement": "Store it as a Decimal."}
-    ],
-    "stakes": "Internal CLI, single team, threshold used only in a log line.",
-    "files": [{"path": "scripts/lib/registry.py", "reason": "the writer"}]
-  }
-}
-```
-
-What happens, and why each step is there — a decision tool is only worth the
-independence behind it, so most of the machinery exists to stop the two vendors
-agreeing for a reason other than the evidence:
-
-1. **One snapshot.** The working tree is pinned to a commit and each decider gets
-   its own worktree of it, so both search freely over the same pinned tree. Git
-   *history* is still live — the worktrees attach to your real repo — so the server
-   digests every ref and the reflog before and after the run and returns `FAILED` if
-   anything moved, rather than reporting agreement it cannot describe.
-2. **The framing is neutralized** by an Opus agent — advocacy stripped, options
-   equalized in detail — and then **attested by the other vendor**, field by
-   field, before any decider sees it. `stakes` is never rewritten.
-3. **Counterbalanced presentation.** One decider sees the options in canonical
-   order, the other reversed, under **opaque per-decider labels** so nothing about
-   your ordering or ids leaks. Neither is told the other exists.
-4. **Python computes the verdict.** No model adjudicates the adjudication.
-5. **On divergence**, one reconciliation round carries only `path:line` citations
-   and the bytes the server itself read — never the other model's prose — and
-   only when there is genuinely novel evidence for both.
-
-### Outcomes
-
-| Outcome | Meaning |
-|---|---|
-| `CONVERGED` | Unanimous, unblocked, and each vote substantiated by a resolved citation. |
-| `BLOCKED` | They agree on an option and one of them tags it `[MAJOR]`/`[FATAL]`. |
-| `REFRAME_REQUIRED` | A decider surfaced a better unlisted option. Give it an id and re-run. |
-| `UNRESOLVED` | Still split, or agreement nobody could substantiate, or divergence with nothing new to reconcile. |
-| `FAILED` | Preflight, cleaning, parsing, or the repo's refs moved mid-run. |
-
-The reply ends with a machine-readable trailer whose fields are always present:
-`ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`,
-`SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`.
-
-### Shaping the input
-
-The framing is checked against numeric bounds **before** anything is spent, and one
-shape passes them naturally:
-
-> Put every shared fact, and the **full specification of whatever only one option
-> adopts**, into `context` — prefaced as "the rules under consideration, if adopted".
-> Leave each option statement to say only how much of it is adopted, and what follows.
-
-The reason is structural. "Adopt X, with this precedence and this invariant" carries
-more mechanism to state than "don't", so a scope decision written the obvious way
-trips the equalization bound by construction, and no amount of re-cleaning fixes it —
-shortening the longer option just deletes the specification the deciders need. Hoisting
-the mechanism turns both options into statements of *scope-of-adoption*, and they
-equalize on their own (~800 chars each is typical).
-
-| Bound | Limit | Why |
-|---|---|---|
-| option statement | 1200 chars | dense options cannot be round-tripped through the cleaner without the attester scoring a fidelity change |
-| longest ÷ shortest option | 2.0 | asymmetric detail is an argument regardless of wording |
-| `decision` | 2500 chars | it states what is being chosen, not the evidence for it |
-| `context` | 20000 chars | the designated home for detail; not per-option, so its length cannot be a vote |
-
-Failures name the gate, the measurement, and the remedy, and cost nothing — they are
-raised before the cleaner runs.
-
-### Things to know before you rely on it
-
-- **Both CLIs must be installed.** Unlike the review tools, `arbitrate` drives
-  `codex` *and* `claude` whichever one you installed the server into. There is no
-  single-vendor mode: two rounds against one vendor is not arbitration.
-- **`ADVISORY` does not block.** Each decider reports whether it thinks a human
-  owner should be authorizing the decision at all. That is reported, never gated
-  — a `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing it
-  is your policy, not the tool's.
-- **A vendor that never changed its mind is not asked to cite the other's evidence.**
-  In round 2 the carried-evidence requirement applies only to a vendor whose selection
-  *moved* — that is what it is for, since capitulation is a change. A vendor that held
-  its round-1 position needs only a citation that resolves, **provided its round-1
-  decisive citation resolved too**; a holder that was never substantiated in the first
-  place must ground in gained evidence like a mover.
-- **It only decides things the repository can settle.** A converging vote must
-  cite a line. A decision that does not turn on repo-verifiable grounds will
-  never return `CONVERGED` here.
-- **Cost:** 4 agent turns typically, 8 at worst, across both subscriptions.
-- **Bias is reduced, not eliminated.** Order counterbalancing equalizes mean rank
-  but not higher moments for 3–4 options; attestation is a model's judgement, not
-  a proof; and a file-hint list that only points at evidence favouring one option
-  biases both deciders identically. `docs/arbitration_plan.md` §2 names every
-  residual.
-- `SNAPSHOT` is provenance, not a replay handle — the snapshot commit is
-  unreferenced and `git gc` reclaims it. The audit log holds both prompts, both
-  replies, and the carried evidence. Pass `retain_snapshot: true` to pin it behind
-  a ref; that is the only mode that writes one.
-
-### Convergence loop
-
-`critique_branch` and `critique_plan` take an `already_raised` array: one-line,
-`file:line`-cited claims already accepted from prior rounds. The reviewer is told
-not to restate them and to hunt for what they missed. Drive the loop from the
-caller — spawn a fresh review each round feeding the growing `already_raised`
-list — until findings converge or drop to noise. (Never paste prior reviewers'
-prose; just the deduplicated claim + citation.)
-
-**Two calibration levers keep the loop proportionate and terminating** — tune
-them per round (they exist because an uncalibrated cold reviewer defaults to
-maximum paranoia and manufactures marginal/hardening findings for 20+ rounds):
-
-- **`stakes`** — the real deployment context / threat model / scale (e.g.
-  `"single-user local CLI, trusted input, no multi-tenancy"`). The reviewer
-  treats it as the **boundary of legitimate concern**: findings that assume
-  adversaries, scale, or failure modes beyond it are dropped or tagged
-  `[OUT-OF-SCOPE]`, never must-fix. Omit it and the reviewer assumes a *modest
-  internal tool*, not a hostile/high-scale service. Set it **once per project in
-  `.paranoia.toml`**; override per-call to tighten. This is the single highest-
-  leverage lever against hardening scope-creep.
-
-  It stays **optional and never blocks** — the fallback is the safe reading, so a
-  gate here would refuse valid work to prevent a miscalibration you can simply be
-  shown. Instead, a review that resolved no stakes from either the call or
-  `.paranoia.toml` ends with a `STAKES: unstated` line. Pass `stakes: "unstated"`
-  to accept that reading deliberately, which calibrates the reviewer to one fixed
-  sentence and silences the line.
-- **`round`** — the 1-based loop round. **Required** whenever class closure is
-  tracking a loop, i.e. by default; the one escape is `class_closure: false`,
-  which is the explicit one-shot mode. **Increment it each cold round.** At
-  `round >= 3` the reviewer reports only merge-blocking in-scope findings
-  (`[MAJOR]` or higher for the review mode) and says `CONVERGED` — inside the
-  five-section format — when none remain, which is how you *stop* the loop
-  instead of chasing diminishing findings. Start at 1; raise as the design stabilises.
-
-Operator recipe: set `stakes` in `.paranoia.toml`, then loop `already_raised` +
-`round` (1, 2, 3, …). **Stop when the computed `CONVERGENCE:` trailer says
-`NOT-BLOCKED` and the round returns `CONVERGED` or only
-`[OUT-OF-SCOPE]`/`[MINOR]` items** — the trailer governs, and when it says
-`BLOCKED` a reviewer's own `CONVERGED` is void (see *Class closure* below). Fold
-`[FATAL]`/in-scope-`[MAJOR]` findings; record `[OUT-OF-SCOPE]` ones separately
-rather than growing the design to fix them.
-
-**Two signals that the loop is going wrong, both learned the hard way:**
-
-- *The same defect keeps reappearing in a new spelling.* You are fixing instances,
-  not the class. That is what class closure exists to stop.
-- *Findings stop being about your diff and start being about imaginable inputs.*
-  The stakes are wrong, not the code. Tighten `stakes` and re-run that round
-  rather than folding what it raised.
-
-### Class closure (`class_closure`, **on by default** for both critiques; weaker for `critique_plan`)
-
-A convergence loop that reports one instance of a defect per round can run for ten
-rounds while a single invariant stays violated — each round the operator fixes the
-site that was named, and the next round finds a sibling. The protocol had nowhere to
-put the *class*: findings are `file:line` shaped, `already_raised` tells the reviewer
-not to look there again, and the round-3 severity floor meters the leak to one
-instance per round.
-
-With class closure on, the reviewer ends its review with a **class register**: for
-each defect class, the invariant, a severity, and a **regex that matches violations
-only** (or a `PROCEDURE`, when no regex can express it). The server then:
-
-- **re-runs every registered MECHANIZED predicate itself, every round**, against the
-  reviewed snapshot — `git grep -l -z` decides, so a violation inside a binary blob still
-  counts. A `PROCEDURE` class has no predicate and **nothing re-runs it**: it is carried
-  forward as a reviewer obligation and closes only on an explicit `CLOSED` (and every
-  plan class is one of these — see below);
-- **injects the surviving matches** into the next packet, *after* `already_raised` and
-  with explicit precedence over it, exempt from the severity floor;
-- **computes the verdict in Python** and appends it:
-
-```
-LINEAGE: 9f2c1a4b0e77 (rounds recorded: 8)
-CLASS-REGISTER: parsed 1
-CLASS-CLOSURE: 1 open, 2 closed, 3 surviving matches, 0 exempt, 1 unmechanized
-CONVERGENCE: BLOCKED — 1 class(es) unclosed:
-  3f2a91c4 every open state must be in the v2 open set (mechanized: 3 match(es))
-```
-
-A class closes when its predicate returns **zero matches**, and reopens the moment it
-matches again. Only `BLOCKER`/`MAJOR` classes block; `MINOR` and `OUT-OF-SCOPE` ones
-are tracked and advisory, so the mechanism can't trap you on a marginal finding.
-
-**What it does not do.** It guarantees durability for a class the reviewer
-*registers*. A reviewer that finds a class and doesn't register it is
-indistinguishable from one that never found it, and no parser over free text closes
-that gap — so nothing in the review's prose is parsed at all. `NOT-BLOCKED` therefore
-says only "no blocking class is unclosed", never that the change is correct.
-
-#### Working the loop
-
-**You do nothing to turn this on** — on either critique. What you must supply is
-`round` (1-based, incremented each cold round) and, for `critique_plan`, an explicit
-`lineage`; both are refused rather than defaulted, because a loop without a round has
-no severity floor and a plan without a lineage has no state to carry. The one escape
-is `class_closure: false`, the explicit one-shot mode, which also drops the `round`
-requirement. `converge: false` is NOT an escape: closure only runs on the converge
-path, so asking for both is refused rather than silently ungating the review. Run
-`critique_branch` as before, incrementing
-`round`. The only new thing you must do is *read the trailer instead of the review's
-own `CONVERGED`* — when the two disagree, the trailer governs and says so.
-
-When a round comes back `BLOCKED`, you have exactly three legitimate moves:
-
-1. **Fix the remaining matches.** They are listed under the class, `path:line: text`.
-   This is the normal case and the whole point.
-2. **Exempt a false positive of the regex** — the predicate matched a line that does
-   not actually violate the invariant.
-3. **Ask the next reviewer to correct the class** — if the severity is wrong, the
-   predicate is wrong, or an unmechanized class is genuinely closed. You cannot do
-   this yourself; see *Corrections are the reviewer's* below.
-
-**Exempting a match.** Copy the three fields straight out of the block:
-
-```jsonc
-// the block said:  3f2a91c4  →  src/app.py:17:     legacy_open(state)
-{
-  "repo_path": "/path/to/repo", "round": 4,
-  "exempt": [{
-    "class_id": "3f2a91c4",
-    "path": "src/app.py",
-    "line": 17,
-    "line_text": "    legacy_open(state)"   // VERBATIM, including indentation
-  }]
-}
-```
-
-`line_text` must be byte-exact: the exemption is keyed on it and **goes void the
-moment that line changes at all**, so the match resurfaces and you re-exempt it
-deliberately. That is on purpose — it fails toward blocking, never toward a silent
-all-clear. Every exemption is shown to every later reviewer, with the invariant and
-predicate attached, so it can be challenged. `unexempt` takes the same
-`class_id`/`path`/`line` and revokes one.
-
-A match in a binary blob (`binary match (line not shown)`) **cannot be exempted** —
-there is no line or text to key on. Narrow the predicate's `PATHSPEC` instead.
-
-**Corrections are the reviewer's, not yours.** A mistaken severity, a too-broad or
-unrunnable predicate, and a closed-then-recurring unmechanized class are all fixed by
-the *next cold reviewer* emitting a register transition — `RECLASSIFY`, `SUPERSEDE`,
-`CLOSED`, `REOPEN`. That is deliberate: it keeps every escape a recorded adversarial
-judgement rather than an operator overriding a blocker on their own say-so. In
-practice you prompt for it, e.g. via `focus`:
-
-> "Class 3f2a91c4 is registered MAJOR but its effect is cosmetic — reclassify it if
-> you agree. Class 91b0e77d's pattern also matches conforming call-sites; supersede it
-> with a narrower one if you can write one."
-
-The reviewer is told the exact grammar; you do not need to quote it.
-
-**Other trailer lines you will meet.**
-
-| Line | What it means | What to do |
-|---|---|---|
-| `CLASS-CLOSURE-WARNING: … closed in the round it was registered` | The predicate matched nothing at birth — usually too narrow to catch what it describes | Ask the next reviewer to `SUPERSEDE` it, or confirm it was genuinely already fixed |
-| `BLOCKED — register debt from round N` | Two attempts at a parseable register failed | Nothing: the next round with a good register clears it |
-| `CLASS-REGISTER: NONE` vs `parsed 3` | No classes/transitions, vs three records accepted | Nothing — `NONE` is normal on a clean round |
-| `unmechanized: awaiting reviewer CLOSED or RECLASSIFY` | A semantic class no regex can check | It blocks until a reviewer judges it closed — prompt for that when you believe it is |
-| `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous round's write may not have completed | The message names the absolute path. Repair or delete that file, then re-run |
-
-`STATE-UNAVAILABLE` recovery is deliberately manual: auto-starting a fresh lineage
-would discard every tracked class and then report `NOT-BLOCKED`, turning a storage
-fault into a false all-clear.
-
-#### Class closure for `critique_plan` — on by default, and a weaker guarantee
-
-`critique_plan` takes `class_closure` too, **on by default** as for `critique_branch`,
-but it is a **different, weaker mechanism**. Read this before relying on it.
-
-There are **no regex predicates for a plan**, deliberately. Over source, editing the
-code until the pattern stops matching *is* the fix. Over a plan, editing the prose
-until the pattern stops matching is the *failure mode* — a rewrite that keeps the
-defect is exactly what a convergence loop needs to catch, and a predicate would close
-on it. So a plan class carries a `PROCEDURE` and **nothing re-runs**.
-
-What you get is **non-forgetting plus explicit closure**, not recurrence detection:
-
-- every later round is shown the class, its procedure and its id, after
-  `already_raised` and with precedence over it;
-- closed classes are shown too, exempt from the round floor, with an explicit
-  instruction to re-verify and emit `REOPEN` — that is the only thing standing between
-  a recurrence and a cleared trailer;
-- the computed trailer reports `BLOCKED` until a cold reviewer emits `CLOSED: <id>`,
-  and voids the reviewer's own `CONVERGED` while it does.
-
-Only **open** `FATAL`/`MAJOR` classes block. `MINOR`/`OUT-OF-SCOPE` ones are advisory,
-and closed ones never block, so the mechanism cannot trap you.
-
-```jsonc
-{
-  "plan_text": "…",
-  "repo_path": "/path/to/repo",     // REQUIRED — an ungrounded plan review
-                                    // cannot test the plan's premises
-  "round": 3,                       // REQUIRED while closure tracks the loop
-  "lineage": "myproject-42-plan"    // REQUIRED, and mode-qualified
-}
-```
-
-**One-shot reviews.** A design sketch with no convergence loop behind it takes
-`class_closure: false`. That is the single explicit escape, and it also drops the
-`round` requirement — there is no next round to apply a severity floor to:
-
-```jsonc
-{ "plan_text": "…", "repo_path": "/path/to/repo", "class_closure": false }
-```
-
-**`lineage` is required and nothing is derived.** A plan has no branch to key state to,
-and deriving a key from the plan's text or path would mint a fresh empty lineage the
-moment either changed — reporting `NOT-BLOCKED` with every tracked class silently
-dropped. The key is used verbatim as the state filename with no namespacing, so make it
-globally unique **and** mode-qualified: `…-plan` for the plan seam, `…-branch` for the
-branch seam of the same work. A key already used by a `critique_branch` seam is refused
-rather than merged — plan and branch classes mean different things, and one of them is
-swept against git while the other is not.
-
-`class_closure` and `lineage` are **call arguments only** here; `.paranoia.toml` is not
-consulted, so a project that set `class_closure = true` for its branch reviews does not
-silently turn plan closure on.
-
-Full design, and the three plan-review rounds behind it:
-[`docs/plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md).
-
-**Where state lives.** `~/.paranoia/lineages/<id>.json`, keyed by repo + `base_ref` +
-the reviewed branch. That location is **fixed and independent of `--log-dir`**, which
-is the audit-log directory only — deriving it from the log directory would mean an
-operator who moved their logs silently got an empty lineage. `PARANOIA_STATE_ROOT`
-relocates it. The trailer always prints `LINEAGE: <id> (rounds recorded: N)`, so if
-`N` is not what you expect, the loop has silently split — usually because `base_ref`
-or the branch changed mid-loop. Pass `lineage` to pin it explicitly; that is
-**required** when the reviewed ref is not a branch (a detached HEAD or a raw commit),
-where there is no stable key to derive.
-
-**Settings.** `class_closure` is a call argument and a `.paranoia.toml` key (default
-`true`); `lineage`, `exempt` and `unexempt` are call arguments only. `class_closure:
-false` restores the previous behaviour exactly — no trailer, no state written.
-
-Full design, the sixteen plan-review rounds behind it, and the eight code-review
-rounds against the implementation:
-[`docs/class_closure_plan.md`](docs/class_closure_plan.md).
-
-### Convergence packet mode (`converge`, **on by default**)
-
-Each cold round otherwise re-gathers the same orientation — re-reading the touched
-files and re-running `git`, which measurements show dominates the per-round cost.
-`critique_branch` therefore runs in **convergence mode by default** (pass
-`converge: false` **together with** `class_closure: false`, or set both in
-`.paranoia.toml`, to fall back to the legacy in-place review — closure runs only on
-the converge path, so asking for one without the other is refused rather than
-silently ungating the review). In convergence mode the server **pre-gathers a
-deterministic evidence packet** (the contents of every touched file in the reviewed
-snapshot — binary/large files are marked rather than embedded — plus the diff) and
-hands it to the reviewer with a packet-aware prompt, so it verifies rather than
-re-collects. The review runs against a **materialized worktree** of the snapshot
-captured at request time, so evidence is a consistent point-in-time view that later
-live edits can't perturb, and `already_raised` is always preserved under the packet
-budget (`max_packet_chars`, default 400k). Deterministic and per-request — no
-persistent session or handle; independent of the reviewer engine. (The end-to-end
-saving is the subject of the plan's acceptance benchmark; the mechanism removes the
-gather step, but treat the magnitude as pending that measurement.)
-
-## Install
-
-### Prerequisites
-
-- Python 3.11+
-- `git` on `PATH`
-- The reviewing agent's CLI installed and signed in on a subscription:
-  - [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) signed in
-    with a ChatGPT plan, **or**
-  - [Claude Code](https://code.claude.com) (`claude`) signed in with a Claude plan.
-- **`arbitrate` needs BOTH**, whichever one you install the server into — it drives
-  the two vendors against each other, so there is no single-vendor mode. The four
-  review tools need only the other agent's CLI, as above.
-
-### Install the server
+**2. Install**
 
 ```bash
 git clone https://github.com/subvertnormality/paranoia-local
@@ -451,70 +47,45 @@ cd paranoia-local
 pip install -e .
 ```
 
-This puts a `paranoia-local` executable on your `PATH` — the command both the
-Claude Code and Codex MCP entries below launch.
+**3. Wire it into your agent.** `--engine` names the agent that *performs* reviews,
+which is the opposite one from the caller.
 
-### Wire into Claude Code (reviews performed by Codex)
+<details open>
+<summary><strong>Into Claude Code</strong> (reviews performed by Codex)</summary>
 
 ```bash
 claude mcp add paranoia -- paranoia-local --engine codex
 ```
+</details>
 
-Add to your `~/.claude/CLAUDE.md` so it's only used on request:
-
-```
-Never call the paranoia MCP server unless I explicitly ask for adversarial review,
-critique, or a second opinion.
-```
-
-### Wire into Codex (reviews performed by Claude Code)
-
-Register the server (this writes the `[mcp_servers.paranoia]` table to
-`~/.codex/config.toml`):
+<details>
+<summary><strong>Into Codex</strong> (reviews performed by Claude Code) — needs two extra keys</summary>
 
 ```bash
 codex mcp add paranoia -- paranoia-local --engine claude
 ```
 
-Then **you must add the timeout keys** — `codex mcp add` does not set them, and
-the defaults are far too low. Edit `~/.codex/config.toml` so the entry reads:
+Then edit `~/.codex/config.toml`. Codex defaults to a 60-second tool timeout and a
+10-second startup timeout; a review runs for minutes, so both must be raised or
+every call fails:
 
 ```toml
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-# REQUIRED: an agentic review is many turns of tool use and runs for minutes.
-# Codex's default MCP tool timeout is 60s and startup is 10s, which abort every
-# review. Give the tool an hour and startup 30s.
 tool_timeout_sec = 3600
 startup_timeout_sec = 30
 ```
 
-Verify it took:
+Verify with `codex mcp get paranoia`.
+</details>
 
-```bash
-codex mcp get paranoia
-#   tool_timeout_sec: 3600
-#   startup_timeout_sec: 30
-```
-
-> **Timeout gotcha.** A full review is many turns of tool use and can run for
-> several minutes. Claude Code's stdio MCP idle timeout (~30 min) is fine out of
-> the box; **Codex defaults to a 60-second tool timeout** (`tool_timeout_sec`)
-> and a 10-second startup timeout (`startup_timeout_sec`), and both must be
-> raised as shown above or every review fails. 3600s is a generous per-call
-> ceiling — a single review is minutes, and a multi-round convergence loop is
-> separate calls, each well under the limit. Raise it further for very large
-> repos at high effort.
-
-## Usage
-
-In Claude Code:
+**4. Ask for a review.**
 
 > "Use paranoia to critique this branch against main. Intent: add overdraft
 > protection to `withdraw()`."
 
-The agent calls:
+Your agent calls:
 
 ```json
 {
@@ -522,50 +93,493 @@ The agent calls:
   "arguments": {
     "repo_path": "/Users/you/Work/my-project",
     "base_ref": "main",
-    "head_ref": "HEAD",
     "round": 1,
     "diff_intent": "Add overdraft protection to withdraw()."
   }
 }
 ```
 
-`round` is required — class closure is on by default, and a loop without a round
-never reaches the severity floor that lets it stop. Pass `class_closure: false`
-for a genuine one-shot review, which is the one escape and drops the requirement.
+You get back a five-section critique with severity-tagged findings, and a computed
+`CONVERGENCE:` trailer telling you whether the loop may stop.
 
-## Per-repo defaults — `.paranoia.toml`
+---
 
-Drop a `.paranoia.toml` at the repo root so callers stop retyping context. Keys at
-the top level or under `[paranoia]`. Precedence: **call arg > `.paranoia.toml` >
+## The five tools
+
+| Tool | Use it to | Needs |
+|---|---|---|
+| [`critique_branch`](#critique_branch) | Review a git branch, a diff, or the dirty working tree | `repo_path` |
+| [`critique_plan`](#critique_plan) | Review a plan or design doc against the code it claims things about | `repo_path` + `plan_text` \| `plan_path` |
+| [`query`](#query) | Ask one question and get a cited answer — not a full review | `question` |
+| [`rebut`](#rebut) | Dispute a finding from a review you just got | `session_ref` from that review |
+| [`arbitrate`](#arbitrate) | Decide between 2–4 options using **both** vendors independently | `repo_path`, `decision`, `options`, `stakes` |
+
+Every review returns a `session_ref` in its footer. Pass it to `rebut` to reopen
+that exact reviewer session.
+
+---
+
+## How reviews work: the convergence loop
+
+A single review is rarely the end of it. You review, you fix, you review again.
+paranoia-local models that as a **convergence loop**, and gives you four controls
+over it plus one computed signal that tells you when to stop.
+
+### The loop
+
+```
+round 1 ──► review ──► fix ──► round 2 ──► review ──► fix ──► round 3 ──► CONVERGED
+             │                              │                              +
+             └── already_raised ────────────┴── already_raised ────► CONVERGENCE: NOT-BLOCKED
+```
+
+Each round is a **fresh, cold reviewer** — it has no memory of the last one. You
+carry state forward with the arguments below.
+
+### `round` — the severity floor
+
+The 1-based round number. **Increment it every round.** At `round >= 3` the
+reviewer reports only merge-blocking findings and withholds `[MINOR]` and
+`[OUT-OF-SCOPE]`, writing `CONVERGED` when none remain. This is the lever that
+makes a loop *stop* instead of grinding through diminishing findings.
+
+`round` is required on `critique_branch` and `critique_plan` unless you pass
+`class_closure: false`.
+
+### `stakes` — the scope boundary
+
+The real deployment context, threat model, and scale the work operates in:
+
+```json
+"stakes": "Internal booking API, single team, authenticated first-party callers, ~1k req/min."
+```
+
+The reviewer treats it as the **boundary of legitimate concern**. Findings that
+assume adversaries, scale, or failure modes beyond it are dropped or tagged
+`[OUT-OF-SCOPE]`, never must-fix. Omit it and the reviewer assumes a modest
+internal tool; a review with no stakes ends with a `STAKES: unstated` line. Pass
+`stakes: "unstated"` to accept that reading deliberately and silence the line.
+
+Set it once per project in [`.paranoia.toml`](#paranoiatoml); override per call to
+tighten it for a specific surface.
+
+### `already_raised` — what not to repeat
+
+One-line, `file:line`-cited claims you have already accepted from earlier rounds.
+The reviewer is told not to restate them and to hunt for what they missed. Pass
+the claim and its citation, never the previous reviewer's prose.
+
+```json
+"already_raised": [
+  "withdraw() ignores pending holds — accounts.py:88",
+  "the overdraft test asserts the fee, not the balance — test_accounts.py:210"
+]
+```
+
+### `class_closure` — tracking defect *classes* across rounds
+
+**On by default.** A finding is usually an instance of a class: one violated
+invariant, several sites. Class closure makes the class itself a tracked object
+that survives the round.
+
+The reviewer ends its review with a register block:
+
+```
+=== CLASS REGISTER ===
+CLASS: every public writer must validate its input before the first mutation
+SEVERITY: MAJOR
+PATTERN: def (create|update)_[a-z_]+\(.*\):\n(?!.*validate)
+PATHSPEC: src/
+```
+
+The server then, every round:
+
+- **re-runs each registered regex itself** against the reviewed snapshot
+  (`git grep`), and lists every surviving match to the next reviewer;
+- **refuses to report the loop unblocked** while any `BLOCKER`/`MAJOR`/`FATAL`
+  class still matches;
+- **computes the verdict in Python** and appends it as the `CONVERGENCE:` trailer.
+
+A class closes when its predicate returns zero matches and reopens the moment it
+matches again. `MINOR` and `OUT-OF-SCOPE` classes are tracked but advisory — they
+never block.
+
+Where no regex can express the invariant, the reviewer registers a `PROCEDURE:`
+instead. Those are **unmechanized**: nothing re-runs them, they are shown to every
+later reviewer, and they close only when a reviewer explicitly writes
+`CLOSED: <class-id>`.
+
+**On `critique_plan`, every class is unmechanized** — a regex over prose closes as
+soon as the wording changes, so predicates are not accepted there at all. Plan
+closure gives you *non-forgetting plus explicit closure*, not automatic recurrence
+detection.
+
+**Register transitions** a reviewer can emit, besides a new class:
+
+| Record | Effect |
+|---|---|
+| `CLOSED: <id>` | An unmechanized class is judged closed |
+| `REOPEN: <id>` | A closed unmechanized class is violated again |
+| `RECLASSIFY: <id> <severity>` | Correct a severity |
+| `SUPERSEDE: <id>` + `BY:` / `WITH-PATTERN:` / `WITH-PROCEDURE:` | Replace a class |
+
+You cannot emit these yourself — ask for them in `focus`, e.g. *"class 3f2a91c4 is
+registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
+
+### `lineage` — which loop this round belongs to
+
+Class state lives in `~/.paranoia/lineages/<lineage>.json`.
+
+- `critique_branch` derives the key from repo + `base_ref` + reviewed branch. Pass
+  `lineage` explicitly when the reviewed ref is **not** a branch (a detached HEAD
+  or a raw commit), where there is no stable key to derive.
+- `critique_plan` **always requires** an explicit `lineage` — a plan has no branch,
+  and nothing is derived from its text or path.
+
+The key is used verbatim as the state filename with no namespacing, so make it
+globally unique and mode-qualified: `myproject-42-plan` for a plan seam,
+`myproject-42-branch` for the branch seam of the same work. A key already used by
+the other tool is refused rather than merged.
+
+### When to stop
+
+The stop condition is **two-part**:
+
+1. the computed trailer reads `CONVERGENCE: NOT-BLOCKED`, **and**
+2. the round returns `CONVERGED`, or only `[MINOR]`/`[OUT-OF-SCOPE]` items.
+
+When the two disagree, **the trailer governs** — and says so in its own output.
+
+### One-shot reviews
+
+For a review with no loop behind it — a design sketch, a quick second opinion —
+pass `class_closure: false`. That is the single escape, and it also drops the
+`round` and `lineage` requirements.
+
+```json
+{ "repo_path": "/path/to/repo", "plan_text": "…", "class_closure": false }
+```
+
+### Handling a false positive
+
+When a registered regex matches a line that does not actually violate the
+invariant, exempt that exact line:
+
+```json
+"exempt": [{
+  "class_id": "3f2a91c4",
+  "path": "src/app.py",
+  "line": 17,
+  "line_text": "    legacy_open(state)"
+}]
+```
+
+`line_text` must be byte-exact including indentation. The exemption is keyed on it
+and goes void the moment that line changes, so the match resurfaces. Every
+exemption is shown to every later reviewer, with the invariant attached, so it can
+be challenged; `unexempt` takes the same `class_id`/`path`/`line` and revokes one.
+
+A match inside a binary blob cannot be exempted — narrow the class's `PATHSPEC`
+instead.
+
+---
+
+## Tool reference
+
+Arguments marked **required** are enforced; everything else has the default shown.
+
+### `critique_branch`
+
+Adversarial review of a git branch, a committed range, or the dirty working tree.
+Returns a [five-section critique](#review-output) plus a
+[`CONVERGENCE:` trailer](#class-closure-trailer).
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `repo_path` | string | **required** | Absolute path to the git repo |
+| `base_ref` | string | `main` | Base ref for the diff |
+| `head_ref` | string | `HEAD` | Head ref to review |
+| `round` | integer | **required** unless `class_closure: false` | 1-based round number; must be an integer ≥ 1 |
+| `include_uncommitted` | boolean | `false` | Review the dirty working tree vs HEAD instead of a committed range. Runs in the live repo, not a worktree |
+| `isolate` | boolean | `true` | Review inside a throwaway worktree of `head_ref`. Ignored for uncommitted reviews |
+| `converge` | boolean | `true` | Pre-gather a deterministic evidence packet (every touched file in full, plus the diff) and review it against an immutable materialized snapshot. Always materializes, overriding `isolate` |
+| `max_packet_chars` | integer | `400000` | Character budget for that packet. `already_raised` is always preserved; only file evidence is trimmed |
+| `class_closure` | boolean | `true` | Track defect classes across rounds. `false` is the one-shot mode |
+| `lineage` | string | derived | Explicit class-closure key. Required when the reviewed ref is not a branch |
+| `exempt` / `unexempt` | array | — | Mark or revoke false positives of a class's regex — see [above](#handling-a-false-positive) |
+| `stakes` | string | — | The scope boundary |
+| `already_raised` | array | `[]` | Claims already accepted from prior rounds |
+| `project_summary` | string | — | Neutral factual description of the project. The reviewer tests the diff against it |
+| `diff_intent` | string | — | What the diff is *supposed* to achieve. Treated as a claim to verify, never a fact to accept |
+| `focus` | string | — | Narrow the review to a specific concern |
+| `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+`converge: false` falls back to a legacy in-place review that has no class closure,
+so it must be paired with `class_closure: false`.
+
+### `critique_plan`
+
+Adversarial review of a plan or design document. The reviewer reads the real code
+to test every premise the plan makes about current behaviour. Returns the same
+five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `repo_path` | string | **required** | The repo the plan concerns |
+| `plan_text` | string | **one of these two** | The plan as markdown |
+| `plan_path` | string | **one of these two** | Absolute path to a markdown plan file |
+| `round` | integer | **required** unless `class_closure: false` | 1-based round number |
+| `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
+| `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
+| `context` | string | — | Background the reviewer needs to judge the plan fairly |
+| `focus` | string | — | Narrow the review to a specific concern |
+| `stakes` | string | — | The scope boundary |
+| `already_raised` | array | `[]` | Claims already accepted from prior rounds |
+| `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+`class_closure` and `lineage` are **call arguments only** here — `.paranoia.toml`
+is not consulted for either.
+
+### `query`
+
+One question, one answer. Not a full review: no five-section scaffold, lower
+reasoning effort by default. The reviewer reads the repo (when given one) and
+returns a direct answer, citations, and a stated confidence level.
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `question` | string | **required** | The specific question to double-check |
+| `repo_path` | string | — | Repo to ground the answer in |
+| `files` | array | `[]` | `{path, reason?}` hints to look at first — hints, not a payload; it can read anything |
+| `focus` | string | — | Extra framing for the question |
+| `engine`, `model`, `effort`, `web_search` | — | `effort` defaults to `medium` | |
+
+### `rebut`
+
+Dispute one finding from a review. Resumes **that same reviewer session** with your
+counter-evidence, so it is cheaper and higher-resolution than a fresh round. The
+reviewer replies `CONCEDE` or `HOLD` with fresh citations.
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `repo_path` | string | **required** | Same repo the review ran against |
+| `session_ref` | string | **required** | From the prior review's footer |
+| `rebuttal` | string | **required** | Your counter-evidence |
+| `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+### `arbitrate`
+
+Decides between 2–4 options. Both frontier vendors judge independently and cold
+over one pinned snapshot, and Python computes the verdict.
+
+```json
+{
+  "repo_path": "/Users/you/Work/my-project",
+  "decision": "Choose the numeric type for the position-size threshold.",
+  "options": [
+    {"id": "opt-float",   "statement": "Store it as a float."},
+    {"id": "opt-decimal", "statement": "Store it as a Decimal."}
+  ],
+  "stakes": "Internal CLI, single team, threshold used only in a log line.",
+  "files": [{"path": "scripts/lib/registry.py", "reason": "the writer"}]
+}
+```
+
+What it does, in order:
+
+1. **Pins one snapshot.** Each decider gets its own worktree of the same commit.
+   Git refs and the reflog are digested before and after; if anything moved, the
+   run returns `FAILED` rather than reporting agreement it cannot describe.
+2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
+   equalized in detail — then has the *other* vendor attest that field by field.
+   `stakes` is passed through verbatim, never rewritten.
+3. **Counterbalances presentation.** One decider sees canonical order, the other
+   reversed, under opaque per-decider labels. Neither is told the other exists.
+4. **Computes the verdict.** No model adjudicates the adjudication.
+5. **On divergence**, runs one reconciliation round carrying only `path:line`
+   citations and bytes the server itself read — never the other model's prose —
+   and only when there is genuinely novel evidence.
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `repo_path` | string | **required** | Every decisive citation must be repo-verifiable |
+| `decision` | string | **required** | What is being decided (max 2500 chars) — not the evidence for it |
+| `options` | array | **required** | 2–4 mutually exclusive `{id, statement}`. Array order is irrelevant; canonical order is derived by sorting ids |
+| `stakes` | string | **required** | Pass `"unstated"` to accept a fixed default reading |
+| `context` | string | — | Shared facts and the full specification of whatever only one option adopts (max 20000 chars) |
+| `files` | array | `[]` | `{path, reason?}` starting points. Both deciders see the same list |
+| `subject` | string | — | Short label for the paste-ready record block |
+| `clean` | boolean | `true` | Run the cleaner and its cross-vendor attestation |
+| `models` | object | — | `{codex?, claude?}` per-vendor overrides |
+| `cleaner_model` | string | `claude-opus-5` | Override the cleaner model |
+| `order_seed` | string | — | Replay a previous run's `ORDER-SEED` to reproduce its labels and ordering |
+| `retain_snapshot` | boolean | `false` | Create `refs/paranoia/arbitrate/<stamp>` so evidence survives `git gc` |
+| `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+**`arbitrate` has no `engine` or `model`** — it drives both vendors, so a single
+override could only degrade it to one of them or send one vendor's model name to
+the other CLI.
+
+**Input bounds**, checked before anything is spent:
+
+| Bound | Limit |
+|---|---|
+| option statement | 1200 chars |
+| longest ÷ shortest option | 2.0 |
+| `decision` | 2500 chars |
+| `context` | 20000 chars |
+
+The shape that passes these naturally: put every shared fact, and the full
+specification of whatever only one option adopts, into `context` — prefaced as
+"the rules under consideration, if adopted". Leave each option statement to say
+only how much of it is adopted and what follows. ~800 chars each is typical.
+
+**Behaviour worth knowing before you rely on it:**
+
+- **It only decides what the repository can settle.** A converging vote must cite a
+  line that resolves. A decision that does not turn on repo-verifiable grounds
+  will never return `CONVERGED`.
+- **`ADVISORY` does not block.** Each decider reports whether it judges that a
+  named human owner should be authorizing the decision. That is reported, never
+  gated: `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing
+  it is your policy.
+- **`SNAPSHOT` is provenance, not a replay handle.** The snapshot commit is
+  unreferenced and `git gc` reclaims it. The audit log holds both prompts, both
+  replies, and the carried evidence. `retain_snapshot: true` pins it behind a ref.
+- **On divergence, only a decider that *moved* must ground in the carried
+  evidence.** One that held its round-1 position needs only a citation that
+  resolves — provided its round-1 decisive citation resolved too. A holder that
+  was never substantiated must ground in gained evidence like a mover.
+- **Bias is reduced, not eliminated.** Order counterbalancing equalizes mean rank
+  but not higher moments for 3–4 options; attestation is a model's judgement, not
+  a proof; and a `files` list pointing only at evidence favouring one option biases
+  both deciders identically. `docs/arbitration_plan.md` §2 enumerates the residuals.
+
+### Common arguments
+
+Accepted by the four review tools:
+
+| Argument | Values | Default |
+|---|---|---|
+| `engine` | `codex` \| `claude` | the server's configured engine |
+| `model` | any model name | the engine's strongest: `gpt-5.6-sol` / `claude-fable-5` |
+| `effort` | `low` \| `medium` \| `high` | `high` (`query`: `medium`) |
+| `web_search` | boolean | `true` |
+
+---
+
+## Output reference
+
+### Review output
+
+Every review returns exactly five sections, in this order:
+
+| Section | Contains |
+|---|---|
+| `## What works` | Specific correct decisions, cited. "Nothing notable." when there are none |
+| `## What doesn't work` | Actual defects: quoted lines, failure mechanism, observable symptom. Worst first |
+| `## Risks` | Failure modes the author didn't consider that the code is exposed to |
+| `## Gaps` | What the change should do to reach its stated intent but doesn't |
+| `## Improvements` | Concrete changes that alter the outcome under the stated stakes |
+
+Every item in the last four sections carries exactly one severity tag:
+
+| Code review | Plan review | Meaning |
+|---|---|---|
+| `[BLOCKER]` | `[FATAL]` | Ships a bug / kills the plan as written |
+| `[MAJOR]` | `[MAJOR]` | Fix before merge / before execution |
+| `[MINOR]` | `[MINOR]` | Fix opportunistically |
+| `[OUT-OF-SCOPE]` | `[OUT-OF-SCOPE]` | Real, but beyond the stated stakes — file separately |
+
+A finding that recurs from a tracked class is marked `[RECURRENCE <class-id>]`
+next to its severity tag.
+
+The footer carries the `session_ref` for [`rebut`](#rebut).
+
+### Class-closure trailer
+
+Appended below the review whenever class closure ran:
+
+```
+LINEAGE: 9f2c1a4b0e77 (rounds recorded: 8)
+CLASS-REGISTER: parsed 1
+CLASS-CLOSURE: 1 open, 2 closed, 3 surviving matches, 0 exempt, 1 unmechanized
+CONVERGENCE: BLOCKED — 1 class(es) unclosed:
+  3f2a91c4 every public writer must validate before the first mutation (mechanized: 3 match(es))
+```
+
+| Line | Meaning |
+|---|---|
+| `CONVERGENCE: NOT-BLOCKED` | No blocking class is unclosed. Advisory classes may remain open |
+| `CONVERGENCE: BLOCKED` | Named classes are still open; any `CONVERGED` in the review above is void |
+| `CLASS-REGISTER: NONE` \| `parsed N` \| `malformed: …` | What the reviewer's register block contained |
+| `CLASS-CLOSURE-WARNING: … closed in the round it was registered` | The predicate matched nothing at birth — usually too narrow. Ask the next reviewer to `SUPERSEDE` it |
+| `BLOCKED — register debt from round N` | Two attempts at a parseable register failed. The next round with a good register clears it |
+| `unmechanized: awaiting reviewer CLOSED or RECLASSIFY` | A semantic class no regex can check |
+| `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
+
+`NOT-BLOCKED` asserts only that no blocking class is unclosed. It never asserts the
+change is correct — the reviewer's findings still govern that.
+
+### `arbitrate` outcomes
+
+| Outcome | Meaning |
+|---|---|
+| `CONVERGED` | Unanimous, unblocked, and each vote substantiated by a resolved citation |
+| `BLOCKED` | They agree on an option and one of them tags it `[MAJOR]`/`[FATAL]` |
+| `REFRAME_REQUIRED` | A decider surfaced a better unlisted option. Give it an id and re-run |
+| `UNRESOLVED` | Still split, or agreement nobody could substantiate |
+| `FAILED` | Preflight, cleaning, parsing, or the repo's refs moved mid-run |
+
+The reply ends with a machine-readable trailer whose fields are always present:
+`ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`,
+`ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`.
+
+---
+
+## Configuration
+
+### `.paranoia.toml`
+
+Drop one at the repo root so callers stop retyping context. Keys go at the top
+level or under `[paranoia]`. Precedence: **call argument > `.paranoia.toml` >
 built-in default**.
 
 ```toml
 project_summary = "A booking API. Python/FastAPI, Postgres. Auth via short-lived JWTs."
 base_ref = "develop"
-web_search = true      # allow external methodology/library cross-checks
-isolate = true         # review inside a throwaway worktree
-# stakes: the deployment reality the reviewer must stay proportionate to (see
-# "Convergence loop"). Set once here so every review is calibrated to the project.
 stakes = "Internal booking API, single team, authenticated first-party callers, ~1k req/min."
-# model / effort overrides also honoured
+web_search = true
+isolate = true
 ```
 
-## Common arguments
+Honoured keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
+`class_closure`, `max_packet_chars`, `model`, `effort`, `web_search`.
 
-The four review tools accept:
+`critique_plan`'s `class_closure` and `lineage` are **not** read from here.
 
-- `engine` — override which engine reviews for this one call (`codex` | `claude`).
-- `model` — override the reviewer model (defaults to the engine's strongest:
-  `gpt-5.6-sol` / `claude-fable-5`).
-- `effort` — `low` | `medium` | `high`. Reviews default to `high`; `query`
-  defaults to `medium`.
-- `web_search` — allow the reviewer to cross-check external methodology/library
-  claims on the web (default `true`).
+### Command line
 
-**`arbitrate` deliberately has no `engine` or `model`.** It runs both vendors, so a
-single override could only degrade it to one of them or send one vendor's model
-name to the other CLI. It takes `models: {codex?, claude?}` for per-vendor
-overrides, plus `cleaner_model`, and honours `effort` and `web_search`.
+```
+paranoia-local --engine {codex|claude} [--log-dir DIR]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--engine` | **required** | Which local engine performs reviews — the *other* agent from the caller |
+| `--log-dir` | `~/.paranoia/logs` | Audit-log directory |
+
+### State on disk
+
+| Path | Contents |
+|---|---|
+| `~/.paranoia/logs/` | One JSON audit record per call: engine, model, round, `already_raised`, session ref, timings, and the review text |
+| `~/.paranoia/lineages/` | Class-closure state, one file per lineage |
+
+Lineage state deliberately does **not** follow `--log-dir`, so moving your logs
+cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
+
+---
 
 ## Safety model
 
@@ -574,61 +588,57 @@ overrides, plus `cleaner_model`, and honours `effort` and `web_search`.
   reads, web search) and write tools explicitly denied. The reviewer cannot edit
   your code, run your test suite, or reach the network except for opt-in web
   search.
-- **Hermetic — the audited repo cannot widen the reviewer.** The Claude engine
-  is spawned with `--setting-sources ""`, so it loads **no** `.claude` settings
-  files. Without this, `claude -p` merges the reviewed repo's
-  `.claude/settings.local.json` and your global `~/.claude/settings.json` on top
-  of paranoia's allow-list — and those routinely grant `Bash(python3:*)`,
-  `Bash(git commit:*)`, `Bash(python -m pytest …)` etc., silently handing the
-  reviewer arbitrary code execution and write-capable git on the very repo it is
-  auditing. Loading zero settings sources makes paranoia's `--allowedTools` the
-  sole authority. This is a flag on the **spawned reviewer subprocess only** — it
-  does not read, write, or affect any of your interactive `claude` sessions or
-  settings files. (Codex is already covered here by its OS-level read-only
-  sandbox, which no repo setting can loosen.)
+- **The audited repo cannot widen the reviewer.** The Claude engine is spawned
+  with `--setting-sources ""`, so it loads no `.claude` settings files — otherwise
+  the reviewed repo's `.claude/settings.local.json` and your global settings would
+  merge on top of the allowlist, and those routinely grant `Bash(python3:*)` and
+  friends. This applies to the spawned reviewer subprocess only; it does not read,
+  write, or affect your interactive `claude` sessions. Codex is covered by its
+  OS-level sandbox, which no repo setting can loosen.
 - **Isolated.** Committed reviews run inside a throwaway `git worktree` of the
-  target ref, so they never collide with your working tree and can review a
-  branch that isn't checked out. (Dirty-working-tree reviews necessarily run in
-  the live repo, read-only.)
-- **No API keys, no telemetry, minimal state.** The server shells out to a CLI
-  you're already signed into. It writes a local audit record per review to
-  `~/.paranoia/logs/` (provenance + the session ref for `rebut`). In `converge`
-  mode (below) it additionally creates a short-lived git worktree and a few
-  **unreferenced** git objects (the reviewed snapshot) in the target repo. On a
-  clean exit both are cleaned up (best-effort) and no ref is created. A hard
-  crash mid-review — or a rare teardown failure —
-  can leave the worktree registration (and, while it exists, the snapshot objects
-  it checks out) until the next `git worktree prune`/`git gc` — run either to
-  reclaim them. Your working tree and index are never touched.
+  target ref, so they never collide with your working tree and can review a branch
+  that isn't checked out. Dirty-working-tree reviews necessarily run in the live
+  repo, read-only.
+- **No API keys, no telemetry.** The server shells out to a CLI you are already
+  signed into.
+- **Minimal footprint.** In `converge` mode the server creates a short-lived
+  worktree and a few unreferenced git objects in the target repo. Both are cleaned
+  up on exit and no ref is created. A hard crash can leave the worktree
+  registration until the next `git worktree prune` / `git gc`. Your working tree
+  and index are never touched.
 
   **One opt-in exception:** `arbitrate` with `retain_snapshot: true` creates
-  `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It defaults
-  to **off** precisely to keep the promise above, and it is the only mode in the
-  whole server that writes a ref. Remove one with `git update-ref -d <ref>`.
+  `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It is the
+  only mode in the server that writes a ref. Remove one with
+  `git update-ref -d <ref>`.
 
-## Rate limits
+### Rate limits
 
-Reviews draw on your subscription's agentic-usage pool. A heavy convergence loop
-is many agent turns — on smaller plans you can hit the 5-hour window. Use `query`
-(lower effort) for quick checks, and reserve full multi-round `critique_branch`
-loops for changes that warrant them.
+Reviews draw on your subscription's agentic-usage pool, and a convergence loop is
+many agent turns. Use `query` for quick checks and reserve multi-round
+`critique_branch` loops for changes that warrant them.
 
-`arbitrate` is the expensive one, and it is the only tool that spends from **both**
-subscriptions in a single call: 4 agent turns typically, 8 at worst (a cleaning
-retry plus a reconciliation round). Its cleaner and attester are short text-only
-turns; the decider turns are the real cost.
+`arbitrate` is the expensive one and the only tool that spends from **both**
+subscriptions in a single call: typically 4 agent turns, 8 at worst (a cleaning
+retry plus a reconciliation round).
+
+---
 
 ## Development
 
 ```bash
 pip install -e '.[dev]'
-python -m pytest        # unit + integration (integration uses fake CLIs; no quota)
+python -m pytest        # unit + integration; integration uses fake CLIs, no quota
 ```
 
-Every module is TDD'd. The engine subprocess boundary is dependency-injected, so
-the whole stack is unit-tested without spending subscription quota; a separate
-integration test drives the real subprocess runner against fake `codex`/`claude`
-binaries on `PATH`.
+The engine subprocess boundary is dependency-injected, so the whole stack is
+unit-tested without spending subscription quota. A separate integration test drives
+the real subprocess runner against fake `codex`/`claude` binaries on `PATH`.
+
+Design documents for the two non-obvious subsystems live in
+[`docs/`](docs/): [`class_closure_plan.md`](docs/class_closure_plan.md),
+[`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
+[`arbitration_plan.md`](docs/arbitration_plan.md).
 
 ## License
 
