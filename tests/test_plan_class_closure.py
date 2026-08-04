@@ -462,11 +462,13 @@ class TestBranchPathUnchanged:
     def test_branch_audit_records_carry_the_round_and_the_suppression_list(
         self, git_repo: Path, tmp_path: Path, converge: bool
     ) -> None:
-        """Both branch paths: the legacy in-place review logs from a different call site."""
+        """Both branch paths: the legacy in-place review logs from a different call site.
+        The legacy path is reachable only in the one-shot mode, since closure never ran
+        there — so `class_closure` tracks `converge` here."""
         handlers.critique_branch(
             {"repo_path": str(git_repo), "base_ref": "main", "round": 6,
              "lineage": "audit-branch", "already_raised": ["a prior claim, x.py:1"],
-             "converge": converge},
+             "converge": converge, "class_closure": converge},
             engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
             now=lambda: "T3")
         files = sorted((tmp_path / "logs").glob("*critique_branch*.json"))
@@ -753,3 +755,59 @@ class TestUnstatedStakesAreSurfacedNotBlocked:
         out = run_round(FakeEngine(review_with("NONE")), tmp_path)
         assert "CONVERGENCE: NOT-BLOCKED" in out
         assert handlers.STAKES_NOTICE in out
+
+
+class TestThereIsExactlyOneEscape:
+    """The gap round 1 named: nothing proved that an ACCEPTED branch call with closure
+    enabled actually emits a trailer. `converge: false` was a second, silent escape —
+    closure never runs on the legacy path, so the call demanded a round, looked gated,
+    and returned a review whose own `CONVERGED` nothing could contradict."""
+
+    @pytest.mark.parametrize("extra", [
+        {},
+        {"converge": True},
+        {"include_uncommitted": True},
+        {"isolate": False},
+        {"already_raised": ["a prior claim, x.py:1"]},
+    ])
+    def test_every_accepted_closure_enabled_branch_call_emits_a_trailer(
+        self, extra: dict, git_repo: Path, tmp_path: Path
+    ) -> None:
+        out = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+             "lineage": f"one-escape-{len(extra)}-branch", **extra},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs",
+            now=lambda: "T9")
+        assert "CONVERGENCE:" in out
+
+    def test_converge_false_with_closure_on_is_refused_naming_both_remedies(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        with pytest.raises(ValueError) as exc:
+            handlers.critique_branch(
+                {"repo_path": str(git_repo), "base_ref": "main", "round": 1,
+                 "converge": False},
+                engine=FakeEngine(), log_dir=tmp_path / "logs")
+        assert "converge: false" in str(exc.value)
+        assert "class_closure: false" in str(exc.value)
+
+    def test_the_legacy_path_is_still_reachable_through_the_one_shot_mode(
+        self, git_repo: Path, tmp_path: Path
+    ) -> None:
+        out = handlers.critique_branch(
+            {"repo_path": str(git_repo), "base_ref": "main", "converge": False,
+             "class_closure": False},
+            engine=FakeEngine(review_with("NONE")), log_dir=tmp_path / "logs")
+        assert "CONVERGENCE:" not in out
+
+    @pytest.mark.parametrize("bad", [0, -1, "3", 1.0, True, None])
+    def test_a_round_that_renders_no_floor_is_refused_not_silently_accepted(
+        self, bad: object, git_repo: Path, tmp_path: Path
+    ) -> None:
+        """`_calibration` renders ROUND only for an int >= 1, so 0 and "3" produce exactly
+        what omitting it produces — no floor — while only None ever looked like a mistake."""
+        args = {"repo_path": str(git_repo), "base_ref": "main", "lineage": "bad-round-branch"}
+        if bad is not None:
+            args["round"] = bad
+        with pytest.raises(ValueError, match="integer >= 1"):
+            handlers.critique_branch(args, engine=FakeEngine(), log_dir=tmp_path / "logs")

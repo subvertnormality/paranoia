@@ -346,9 +346,20 @@ byte-identical (`handlers.py:509-515`).
 
 ### 2.2 Default **off**, and a call argument only — `.paranoia.toml` is not consulted
 
+> **SUPERSEDED 2026-08-04 by operator decision.** `class_closure` now defaults **true**
+> on `critique_plan`, and `round` is required on both critiques while closure tracks a
+> loop. The reasoning below for *why default-off was defensible* still stands; what
+> changed is the operator's judgement of the trade — the friction of one extra argument
+> is preferred to a convergence gate nobody remembers to switch on. `class_closure:
+> false` is now the single explicit one-shot mode, and it is also what drops the `round`
+> requirement. The call-argument-only rule below is UNCHANGED and now runs in both
+> directions: `.paranoia.toml` can neither enable nor disable the plan gate.
+
 Justified narrowly: the branch default was earned by a derivable key, and plans
 have none at all (§1.4). `class_closure: true` without a `lineage` is an error,
 never a silent skip — a mode that degrades quietly is how a gate stops existing.
+*(That last sentence is why the supersession above is coherent rather than a
+reversal: the error was always the design, and only the default moved.)*
 
 *Round 2 [MAJOR] risk: revision 2 left the interaction with repo configuration
 undefined, and both readings are wrong. `resolve()` is explicit arg → repo config →

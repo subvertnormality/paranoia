@@ -77,17 +77,36 @@ def _progress_kwargs(on_progress: Callable[[str], None] | None) -> dict[str, Any
 ONE_SHOT_HINT = "pass `class_closure: false` for a one-shot review"
 
 
+def _require_converge(converge: bool, closure_on: bool) -> None:
+    """Class closure runs ONLY on the converge path (`class_closure_plan.md` §3), so
+    `converge: false` silently disabled it while `round` was still demanded — a call that
+    looked gated, emitted no trailer, and let a reviewer's own `CONVERGED` end a loop with
+    a blocking class live. There must be exactly ONE escape, and it must be explicit.
+    """
+    if closure_on and not converge:
+        raise ValueError(
+            "class closure runs only on the converge path, so `converge: false` would "
+            "silently disable it and return no CONVERGENCE trailer. Drop `converge: false` "
+            f"to keep the gate, or {ONE_SHOT_HINT} to review without one."
+        )
+
+
 def _require_round(review_round: Any, closure_on: bool, tool: str) -> None:
     """`round` is what makes a loop terminate: `_CALIBRATION`'s severity floor only exists
     from round 3, so a loop driven without it reports at round-1 severity forever and has
     no mechanical stopping pressure. Required whenever class closure is tracking a loop,
     and deliberately NOT required in the one-shot mode, which has no next round to floor.
     """
-    if closure_on and review_round is None:
+    if not closure_on:
+        return
+    # `_calibration` renders ROUND only for an int >= 1, so 0, "3" and None are all the
+    # same thing to the reviewer — no floor — while only None looked like an omission.
+    if not isinstance(review_round, int) or isinstance(review_round, bool) or review_round < 1:
         raise ValueError(
-            f"{tool} needs `round` (1-based, incremented each cold round): without it the "
-            "reviewer never reaches the round-3 severity floor, so the loop has no "
-            f"terminating pressure. Pass round: 1 for a first round, or {ONE_SHOT_HINT}."
+            f"{tool} needs `round` as an integer >= 1 (incremented each cold round), got "
+            f"{review_round!r}: any other value produces no ROUND line, so the reviewer "
+            "never reaches the round-3 severity floor and the loop has no terminating "
+            f"pressure. Pass round: 1 for a first round, or {ONE_SHOT_HINT}."
         )
 
 
@@ -128,7 +147,7 @@ def _calibration(stakes: str | None, review_round: int | None) -> str | None:
     lines: list[str] = []
     if stakes:
         lines.append(f"STAKES: {stakes}")
-    if review_round is not None and review_round >= 1:
+    if isinstance(review_round, int) and not isinstance(review_round, bool) and review_round >= 1:
         lines.append(f"ROUND: {review_round}")
     if not lines:
         return None
@@ -193,10 +212,11 @@ def critique_branch(
     )
     # Calibration: STAKES (project-level, so also honoured from .paranoia.toml) bounds
     # scope; ROUND (per-call, raised each convergence round) sets the severity floor.
+    closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
+    _require_converge(converge, closure_on)
+    _require_round(arguments.get("round"), closure_on, "critique_branch")
     stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
     calibration = _calibration(stakes, arguments.get("round"))
-    closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
-    _require_round(arguments.get("round"), closure_on, "critique_branch")
     if (converge and closure_on and include_unc
             and arguments.get("head_ref") not in (None, "HEAD")
             and not arguments.get("lineage")):
@@ -409,8 +429,6 @@ def critique_plan(
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
-    stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
-    calibration = _calibration(stakes, arguments.get("round"))
     # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A per-project
     # setting could never suffice anyway, since the lineage is inherently per-seam, and
     # sharing the branch key would give one name two meanings across two tools.
@@ -425,6 +443,8 @@ def critique_plan(
             f"mode-qualified key (e.g. 'myproject-42-plan'), or {ONE_SHOT_HINT}."
         )
     _require_round(arguments.get("round"), closure_on, "critique_plan")
+    stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
+    calibration = _calibration(stakes, arguments.get("round"))
 
     closure = _PlanClassClosure(
         lineage_id, round_no=arguments.get("round") or 1,

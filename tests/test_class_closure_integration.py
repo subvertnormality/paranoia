@@ -83,7 +83,7 @@ MECHANIZED = (
 
 
 def run_round(repo: Path, engine: FakeEngine, tmp_path: Path, **extra) -> str:
-    args = {"repo_path": str(repo), "base_ref": "main", "converge": True, **extra, "round": 1}
+    args = {"repo_path": str(repo), "base_ref": "main", "converge": True, "round": 1, **extra}
     return handlers.critique_branch(args, engine=engine, log_dir=tmp_path / "logs")
 
 
@@ -418,7 +418,7 @@ class TestArguments:
         reach back and break a review that was valid before this feature existed."""
         (repo / "dirty.py").write_text("x = 1\n")
         out = run_round(repo, FakeEngine("## What works\nok"), tmp_path,
-                        converge=False, include_uncommitted=True, head_ref="feature")
+                        converge=False, class_closure=False, include_uncommitted=True, head_ref="feature")
         assert "CONVERGENCE:" not in out
 
     def test_a_dirty_review_rejects_an_explicit_head_ref(self, repo: Path, tmp_path: Path) -> None:

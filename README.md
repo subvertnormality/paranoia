@@ -218,7 +218,7 @@ rather than growing the design to fix them.
   The stakes are wrong, not the code. Tighten `stakes` and re-run that round
   rather than folding what it raised.
 
-### Class closure (`class_closure`, **on by default** for `critique_branch`; opt-in and weaker for `critique_plan`)
+### Class closure (`class_closure`, **on by default** for both critiques; weaker for `critique_plan`)
 
 A convergence loop that reports one instance of a defect per round can run for ten
 rounds while a single invariant stays violated — each round the operator fixes the
@@ -260,9 +260,14 @@ says only "no blocking class is unclosed", never that the change is correct.
 
 #### Working the loop
 
-**You do nothing to turn this on for `critique_branch`.** (For `critique_plan` it is
-opt-in and needs an explicit `lineage` — see *Class closure for `critique_plan`*
-below.) Run `critique_branch` as before, incrementing
+**You do nothing to turn this on** — on either critique. What you must supply is
+`round` (1-based, incremented each cold round) and, for `critique_plan`, an explicit
+`lineage`; both are refused rather than defaulted, because a loop without a round has
+no severity floor and a plan without a lineage has no state to carry. The one escape
+is `class_closure: false`, the explicit one-shot mode, which also drops the `round`
+requirement. `converge: false` is NOT an escape: closure only runs on the converge
+path, so asking for both is refused rather than silently ungating the review. Run
+`critique_branch` as before, incrementing
 `round`. The only new thing you must do is *read the trailer instead of the review's
 own `CONVERGED`* — when the two disagree, the trailer governs and says so.
 

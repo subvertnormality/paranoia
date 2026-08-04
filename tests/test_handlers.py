@@ -64,7 +64,7 @@ class TestCritiqueBranch:
         (repo / "app.py").write_text("# uncommitted edit\n")
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo), "include_uncommitted": True, "converge": False, "round": 1},
+            {"repo_path": str(repo), "include_uncommitted": True, "converge": False, "class_closure": False, "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert eng.calls[0]["cwd"] == repo
@@ -75,7 +75,7 @@ class TestCritiqueBranch:
         eng = FakeEngine()
         handlers.critique_branch(
             {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
-             "isolate": False, "converge": False, "round": 1},
+             "isolate": False, "class_closure": False, "converge": False, "class_closure": False, "round": 1},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         assert eng.calls[0]["cwd"] == repo_with_branch
@@ -110,10 +110,14 @@ class TestCritiqueBranch:
         assert "CFGSTAKES" in eng.calls[0]["prompt"]
 
     def test_round_below_one_is_ignored(self, repo_with_branch: Path, tmp_path: Path) -> None:
-        # dogfood finding: schema is 1-based; a non-positive round must not emit a ROUND line.
+        # dogfood finding: schema is 1-based; a non-positive round must not emit a ROUND
+        # line. While closure tracks a loop such a round is now REFUSED outright (a value
+        # that renders no floor is the same as omitting it); this pins the one-shot mode,
+        # where there is no next round to floor and the value is merely inert.
         eng = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature", "round": 0},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
+             "round": 0, "class_closure": False},
             engine=eng, log_dir=tmp_path, now=fixed_clock,
         )
         body = eng.calls[0]["prompt"].split("===== TASK INPUT =====", 1)[1]
