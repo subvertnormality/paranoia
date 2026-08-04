@@ -80,7 +80,7 @@ class TestDispatchEndToEnd:
     def test_critique_branch_runs_in_worktree(self, repo_with_branch, tmp_path, fake_bins):
         out = server.dispatch(
             "critique_branch",
-            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature"},
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature", "round": 1},
             default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
         )
         assert "FAKE CODEX REVIEW" in out
@@ -93,7 +93,7 @@ class TestDispatchEndToEnd:
         out = server.dispatch(
             "rebut",
             {"repo_path": str(repo), "session_ref": "fake-thread-1",
-             "rebuttal": "that branch is unreachable"},
+             "rebuttal": "that branch is unreachable", "round": 1},
             default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
         )
         assert "FAKE CODEX REVIEW" in out

@@ -47,7 +47,7 @@ agent reviewer is:
 | Tool | What it does |
 |---|---|
 | `critique_branch` | Adversarial review of a git branch/diff or the dirty working tree. Five-section critique (What works / doesn't / Risks / Gaps / Improvements) with `[BLOCKER]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]` tags. |
-| `critique_plan` | Adversarial review of a plan or design doc. With `repo_path`, the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind. |
+| `critique_plan` | Adversarial review of a plan or design doc. `repo_path` is **required**: the reviewer reads the real code to test the plan's premises about current behaviour — a plan built on an inverted premise is the most dangerous kind, and an ungrounded review cannot catch one. |
 | `query` | A quick double-check of a single fact or point. Not a full review — lower reasoning effort, a direct answer with citations and a stated confidence level. |
 | `rebut` | Dispute a specific finding. Resumes the **same** reviewer session with your counter-evidence; it concedes or holds with fresh citations. Cheaper and higher-resolution than a cold re-round. |
 | `arbitrate` | Decide between 2–4 options. **Both** engines choose independently and cold over one pinned snapshot; Python computes the verdict. See below. |
@@ -187,7 +187,16 @@ maximum paranoia and manufactures marginal/hardening findings for 20+ rounds):
   internal tool*, not a hostile/high-scale service. Set it **once per project in
   `.paranoia.toml`**; override per-call to tighten. This is the single highest-
   leverage lever against hardening scope-creep.
-- **`round`** — the 1-based loop round. **Increment it each cold round.** At
+
+  It stays **optional and never blocks** — the fallback is the safe reading, so a
+  gate here would refuse valid work to prevent a miscalibration you can simply be
+  shown. Instead, a review that resolved no stakes from either the call or
+  `.paranoia.toml` ends with a `STAKES: unstated` line. Pass `stakes: "unstated"`
+  to accept that reading deliberately, which calibrates the reviewer to one fixed
+  sentence and silences the line.
+- **`round`** — the 1-based loop round. **Required** whenever class closure is
+  tracking a loop, i.e. by default; the one escape is `class_closure: false`,
+  which is the explicit one-shot mode. **Increment it each cold round.** At
   `round >= 3` the reviewer reports only merge-blocking in-scope findings
   (`[MAJOR]` or higher for the review mode) and says `CONVERGED` — inside the
   five-section format — when none remain, which is how you *stop* the loop
@@ -209,7 +218,7 @@ rather than growing the design to fix them.
   The stakes are wrong, not the code. Tighten `stakes` and re-run that round
   rather than folding what it raised.
 
-### Class closure (`class_closure`, **on by default** for `critique_branch`; opt-in and weaker for `critique_plan`)
+### Class closure (`class_closure`, **on by default** for both critiques; weaker for `critique_plan`)
 
 A convergence loop that reports one instance of a defect per round can run for ten
 rounds while a single invariant stays violated — each round the operator fixes the
@@ -251,9 +260,14 @@ says only "no blocking class is unclosed", never that the change is correct.
 
 #### Working the loop
 
-**You do nothing to turn this on for `critique_branch`.** (For `critique_plan` it is
-opt-in and needs an explicit `lineage` — see *Class closure for `critique_plan`*
-below.) Run `critique_branch` as before, incrementing
+**You do nothing to turn this on** — on either critique. What you must supply is
+`round` (1-based, incremented each cold round) and, for `critique_plan`, an explicit
+`lineage`; both are refused rather than defaulted, because a loop without a round has
+no severity floor and a plan without a lineage has no state to carry. The one escape
+is `class_closure: false`, the explicit one-shot mode, which also drops the `round`
+requirement. `converge: false` is NOT an escape: closure only runs on the converge
+path, so asking for both is refused rather than silently ungating the review. Run
+`critique_branch` as before, incrementing
 `round`. The only new thing you must do is *read the trailer instead of the review's
 own `CONVERGED`* — when the two disagree, the trailer governs and says so.
 
@@ -319,10 +333,10 @@ The reviewer is told the exact grammar; you do not need to quote it.
 would discard every tracked class and then report `NOT-BLOCKED`, turning a storage
 fault into a false all-clear.
 
-#### Class closure for `critique_plan` — opt-in, and a weaker guarantee
+#### Class closure for `critique_plan` — on by default, and a weaker guarantee
 
-`critique_plan` takes `class_closure` too, but it is **off by default** and it is a
-**different, weaker mechanism**. Read this before relying on it.
+`critique_plan` takes `class_closure` too, **on by default** as for `critique_branch`,
+but it is a **different, weaker mechanism**. Read this before relying on it.
 
 There are **no regex predicates for a plan**, deliberately. Over source, editing the
 code until the pattern stops matching *is* the fix. Over a plan, editing the prose
@@ -345,10 +359,20 @@ and closed ones never block, so the mechanism cannot trap you.
 
 ```jsonc
 {
-  "plan_text": "…", "repo_path": "/path/to/repo", "round": 3,
-  "class_closure": true,
-  "lineage": "myproject-42-plan"   // REQUIRED, and mode-qualified
+  "plan_text": "…",
+  "repo_path": "/path/to/repo",     // REQUIRED — an ungrounded plan review
+                                    // cannot test the plan's premises
+  "round": 3,                       // REQUIRED while closure tracks the loop
+  "lineage": "myproject-42-plan"    // REQUIRED, and mode-qualified
 }
+```
+
+**One-shot reviews.** A design sketch with no convergence loop behind it takes
+`class_closure: false`. That is the single explicit escape, and it also drops the
+`round` requirement — there is no next round to apply a severity floor to:
+
+```jsonc
+{ "plan_text": "…", "repo_path": "/path/to/repo", "class_closure": false }
 ```
 
 **`lineage` is required and nothing is derived.** A plan has no branch to key state to,
@@ -390,8 +414,10 @@ rounds against the implementation:
 Each cold round otherwise re-gathers the same orientation — re-reading the touched
 files and re-running `git`, which measurements show dominates the per-round cost.
 `critique_branch` therefore runs in **convergence mode by default** (pass
-`converge: false`, or set it in `.paranoia.toml`, to fall back to the legacy in-place
-review). In convergence mode the server **pre-gathers a
+`converge: false` **together with** `class_closure: false`, or set both in
+`.paranoia.toml`, to fall back to the legacy in-place review — closure runs only on
+the converge path, so asking for one without the other is refused rather than
+silently ungating the review). In convergence mode the server **pre-gathers a
 deterministic evidence packet** (the contents of every touched file in the reviewed
 snapshot — binary/large files are marked rather than embedded — plus the diff) and
 hands it to the reviewer with a packet-aware prompt, so it verifies rather than
@@ -497,10 +523,15 @@ The agent calls:
     "repo_path": "/Users/you/Work/my-project",
     "base_ref": "main",
     "head_ref": "HEAD",
+    "round": 1,
     "diff_intent": "Add overdraft protection to withdraw()."
   }
 }
 ```
+
+`round` is required — class closure is on by default, and a loop without a round
+never reaches the severity floor that lets it stop. Pass `class_closure: false`
+for a genuine one-shot review, which is the one escape and drops the requirement.
 
 ## Per-repo defaults — `.paranoia.toml`
 

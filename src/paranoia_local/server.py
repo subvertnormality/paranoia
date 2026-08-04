@@ -73,13 +73,15 @@ _ROUND = {
     "type": "integer",
     "minimum": 1,
     "description": (
+        "REQUIRED unless you pass class_closure: false (the one-shot mode). "
         "Convergence-loop round number (1-based). Increment it on each cold review round you run. "
         "At round >=3 the reviewer restricts itself to merge-blocking in-scope findings — MAJOR "
         "or higher ([BLOCKER]/[MAJOR] for code review, [FATAL]/[MAJOR] for plan review) — and "
         "withholds [MINOR] and [OUT-OF-SCOPE], declaring 'CONVERGED' when none remain. This is "
         "the lever to STOP a loop instead of chasing marginal/hardening findings across many "
-        "rounds. Start at 1 and raise as the design stabilises; omit to report at all severities "
-        "(round-1 behaviour)."
+        "rounds. Start at 1 and raise as the design stabilises. It is required while class "
+        "closure is tracking a loop because without it the reviewer never reaches the "
+        "round-3 floor, so the loop has no terminating pressure at all."
     ),
 }
 
@@ -118,7 +120,7 @@ TOOLS: list[Tool] = [
                 },
                 "converge": {
                     "type": "boolean",
-                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false to fall back to the legacy in-place review.",
+                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false (with class_closure: false) to fall back to the legacy in-place review. Class closure runs ONLY on this path, so `converge: false` is REFUSED unless you also pass `class_closure: false` — otherwise the review would look gated and emit no CONVERGENCE trailer.",
                 },
                 "max_packet_chars": {
                     "type": "integer",
@@ -189,17 +191,17 @@ TOOLS: list[Tool] = [
     Tool(
         name="critique_plan",
         description=(
-            "Adversarially review a plan or design doc. With repo_path the reviewer reads the actual "
+            "Adversarially review a plan or design doc. The reviewer reads the actual "
             "code to test the plan's premises about current behaviour — a plan built on an inverted "
             "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags."
         ),
         inputSchema={
             "type": "object",
             "properties": {
-                "plan_text": {"type": "string", "description": "The plan as markdown. Provide this OR plan_path."},
-                "plan_path": {"type": "string", "description": "Absolute path to a markdown plan file. Provide this OR plan_text."},
+                "plan_text": {"type": "string", "description": "The plan as markdown. Provide this OR plan_path, never both."},
+                "plan_path": {"type": "string", "description": "Absolute path to a markdown plan file. Provide this OR plan_text, never both."},
                 "context": {"type": "string", "description": "Background the reviewer needs to judge the plan fairly."},
-                "repo_path": {"type": "string", "description": "Repo the plan concerns — enables grounding the critique in real code (strongly recommended)."},
+                "repo_path": {"type": "string", "description": "REQUIRED. The repo the plan concerns. Testing the plan's premises against the real code is the reviewer's highest-value job — a plan that asserts 'X currently does Y' when the code shows otherwise is the most dangerous kind — and an ungrounded review cannot do it."},
                 "focus": {"type": "string", "description": "Narrow the review to a specific concern."},
                 "already_raised": _ALREADY_RAISED,
                 "stakes": _STAKES,
@@ -207,8 +209,11 @@ TOOLS: list[Tool] = [
                 "class_closure": {
                     "type": "boolean",
                     "description": (
-                        "Track defect CLASSES across plan rounds (default FALSE — opt in, "
-                        "unlike critique_branch). Requires `lineage`. The reviewer registers "
+                        "Track defect CLASSES across plan rounds (default TRUE, as for "
+                        "critique_branch). Requires `lineage` and `round`. Pass FALSE for a "
+                        "ONE-SHOT review — a design sketch with no convergence loop behind "
+                        "it — which is the single explicit escape and also drops the `round` "
+                        "requirement. The reviewer registers "
                         "each class with a PROCEDURE (never a regex: over prose a predicate "
                         "would close the moment the wording changed, which is what a rewrite "
                         "that keeps the defect looks like). Every later round is shown the "
@@ -218,13 +223,15 @@ TOOLS: list[Tool] = [
                         "OUT-OF-SCOPE ones are tracked, advisory, and never block. The "
                         "guarantee is non-forgetting plus explicit closure — NOT the "
                         "git-backed recurrence detection critique_branch gets. This is a "
-                        "call argument only; .paranoia.toml is not consulted for it."
+                        "call argument only; .paranoia.toml is not consulted for it, in "
+                        "either direction, so a project's branch-review setting can neither "
+                        "enable nor disable the plan gate."
                     ),
                 },
                 "lineage": {
                     "type": "string",
                     "description": (
-                        "REQUIRED when class_closure is true. A plan has no branch to key "
+                        "REQUIRED unless class_closure is false. A plan has no branch to key "
                         "state to, and nothing is derived from the plan's text or path — "
                         "either would mint a fresh empty lineage whenever it changed and "
                         "report NOT-BLOCKED with every tracked class silently dropped. The "
@@ -236,6 +243,10 @@ TOOLS: list[Tool] = [
                 },
                 **_COMMON,
             },
+            "required": ["repo_path"],
+            # The handler has always enforced exactly-one-of; the schema never said so, so
+            # a client could not catch it before spending a call.
+            "oneOf": [{"required": ["plan_text"]}, {"required": ["plan_path"]}],
         },
     ),
     Tool(

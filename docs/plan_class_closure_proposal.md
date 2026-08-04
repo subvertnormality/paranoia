@@ -46,8 +46,11 @@ left a stale sentence in §2.7 asserting a derived plan key that §1.4 had just
 deleted.*
 
 **The short answer.** The unmechanized half of `class_closure` transfers to
-`critique_plan` essentially intact, and I verified it runs with no repository and
-no `git` call at all. The mechanized half must **not** transfer, and the argument
+`critique_plan` essentially intact, and I verified the mechanism itself needs no
+repository and makes no `git` call at all. *(Superseded 2026-08-04 in one respect:
+`critique_plan` now REQUIRES `repo_path` — not because closure needs it, but because
+an ungrounded plan review cannot test the plan's premises against the code, which is
+the reviewer's highest-value job. The closure mechanism remains repository-free.)* The mechanized half must **not** transfer, and the argument
 against it is not "a regex over prose false-positives" — it is worse than that: a
 predicate over plan prose **closes on a rewording**, and a rewording is precisely
 the failure mode this mechanism exists to catch. Evidence in §1.1.
@@ -313,7 +316,7 @@ rather than firing on the prescribed convention, which is what a fail-closed che
 is for. This is a documentation obligation and an acceptance fixture, not a
 mechanism.
 
-**This is also why plan closure must default OFF (§2.2)**, and the reason is now
+**This is also why plan closure defaulted OFF (§2.2 — superseded 2026-08-04; it now defaults ON and refuses a call with no lineage)**, and the reason is now
 stronger than revision 1's: with no derivable key at all, defaulting on would
 hard-error *every* existing plan call, not merely the `plan_text` ones. The
 dominant consumer passes `plan_text` regardless — in the incident session's
@@ -346,9 +349,20 @@ byte-identical (`handlers.py:509-515`).
 
 ### 2.2 Default **off**, and a call argument only — `.paranoia.toml` is not consulted
 
+> **SUPERSEDED 2026-08-04 by operator decision.** `class_closure` now defaults **true**
+> on `critique_plan`, and `round` is required on both critiques while closure tracks a
+> loop. The reasoning below for *why default-off was defensible* still stands; what
+> changed is the operator's judgement of the trade — the friction of one extra argument
+> is preferred to a convergence gate nobody remembers to switch on. `class_closure:
+> false` is now the single explicit one-shot mode, and it is also what drops the `round`
+> requirement. The call-argument-only rule below is UNCHANGED and now runs in both
+> directions: `.paranoia.toml` can neither enable nor disable the plan gate.
+
 Justified narrowly: the branch default was earned by a derivable key, and plans
 have none at all (§1.4). `class_closure: true` without a `lineage` is an error,
 never a silent skip — a mode that degrades quietly is how a gate stops existing.
+*(That last sentence is why the supersession above is coherent rather than a
+reversal: the error was always the design, and only the default moved.)*
 
 *Round 2 [MAJOR] risk: revision 2 left the interaction with repo configuration
 undefined, and both readings are wrong. `resolve()` is explicit arg → repo config →
@@ -757,8 +771,8 @@ null placeholders or implement part of §2.1 out of order.* Split it:
    trailer rather than an exception; `FATAL` registering, blocking, and being
    `RECLASSIFY`-ed down to `MINOR` into `NOT-BLOCKED`; an open `MINOR` class at
    round ≥3 permitting prose `CONVERGED` **and** trailer `NOT-BLOCKED` together
-   (§2.3's second FATAL); `CLOSED` then `REOPEN`; `class_closure` default-off
-   writing no state at all; `.paranoia.toml` carrying `class_closure = true` having
+   (§2.3's second FATAL); `CLOSED` then `REOPEN`; `class_closure: false` (the one-shot mode,
+   superseding the default-off contract) writing no state at all, and needing no `round`; `.paranoia.toml` carrying `class_closure = true` having
    **no** effect on `critique_plan` (§2.2); a failed review leaving the lineage
    byte-identical (the branch rule at `handlers.py:509-515`); both directions of the
    §2.7 cross-mode refusal; and the never-reaches-`make_grep` contract from item 1.
@@ -806,13 +820,18 @@ the §5 over-claim this proposal exists to prevent. The README section and the
 `critique_plan` schema descriptions in `server.py` are deliverables of this change,
 not documentation debt after it.
 
-**The consumer's operator rules.** *Round 1 [MAJOR] gap: because closure defaults
-off (§2.2), nothing makes a later seam turn it on — and
-`COMPLEX_DELIVERY_RUNBOOK.md:889-896` still tells the operator that on
-`critique_plan` the stop condition is "the triage half alone, since it has no
-trailer".* Shipping without changing that sentence ships a mechanism the documented
-procedure tells its only user to ignore. The runbook and `CLAUDE.md` must be
-updated in the same rollout to prescribe `class_closure: true`; one explicit
+**The consumer's operator rules.** *Round 1 [MAJOR] gap: `COMPLEX_DELIVERY_RUNBOOK.md:889-896`
+still tells the operator that on `critique_plan` the stop condition is "the triage half
+alone, since it has no trailer".* Shipping without changing that sentence ships a
+mechanism the documented procedure tells its only user to ignore.
+
+*Superseded in one respect 2026-08-04: this gap originally read "because closure
+defaults off, nothing makes a later seam turn it on". Closure now defaults ON, so
+nothing needs to turn it on — but the runbook edit is MORE urgent, not less, because a
+seam that omits `lineage` or `round` is now REFUSED rather than quietly ungated. The
+fourth recurrence of this documentation class was this very sentence.* The runbook and
+`CLAUDE.md` must be updated in the same rollout to state that plan closure is on by
+default and that a seam must supply `repo_path`, `round`, and one explicit
 `lineage` held across both vendor stages, named by the **mode-qualified** extension
 of the globally-unique convention the runbook already mandates
 (`parallax-<issue>-<card>-plan`, against the frozen seam's

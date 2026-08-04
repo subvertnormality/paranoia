@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from . import class_closure as cc
+from . import arbitration, class_closure as cc
 from . import logs, orientation, prompts
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
@@ -74,6 +74,79 @@ def _progress_kwargs(on_progress: Callable[[str], None] | None) -> dict[str, Any
     return {"on_progress": on_progress} if on_progress is not None else {}
 
 
+ONE_SHOT_HINT = "pass `class_closure: false` for a one-shot review"
+
+
+def _require_converge(converge: bool, closure_on: bool) -> None:
+    """Class closure runs ONLY on the converge path (`class_closure_plan.md` §3), so
+    `converge: false` silently disabled it while `round` was still demanded — a call that
+    looked gated, emitted no trailer, and let a reviewer's own `CONVERGED` end a loop with
+    a blocking class live. There must be exactly ONE escape, and it must be explicit.
+    """
+    if closure_on and not converge:
+        raise ValueError(
+            "class closure runs only on the converge path, so `converge: false` would "
+            "silently disable it and return no CONVERGENCE trailer. Pass `converge: true` "
+            "to keep the gate — note `converge` also resolves from .paranoia.toml, so "
+            "removing a call argument may not be enough — or "
+            f"{ONE_SHOT_HINT} to review without one."
+        )
+
+
+def _require_round(review_round: Any, closure_on: bool, tool: str) -> None:
+    """`round` is what makes a loop terminate: `_CALIBRATION`'s severity floor only exists
+    from round 3, so a loop driven without it reports at round-1 severity forever and has
+    no mechanical stopping pressure. Required whenever class closure is tracking a loop,
+    and deliberately NOT required in the one-shot mode, which has no next round to floor.
+    """
+    if review_round is None:
+        # Omission is the one-shot mode's privilege: there is no next round to floor.
+        if not closure_on:
+            return
+    # A SUPPLIED round is checked in BOTH modes. `_calibration` renders ROUND only for an
+    # int >= 1, so 0 and "3" are the same thing to the reviewer as omitting it — no floor —
+    # and silently ignoring one the caller took the trouble to pass is how a loop believes
+    # it has a floor it never had.
+    if not isinstance(review_round, int) or isinstance(review_round, bool) or review_round < 1:
+        # Only suggest the escape when it is not already taken — an error whose remedy the
+        # caller has already applied reads as a bug in the tool.
+        escape = f", or {ONE_SHOT_HINT}" if closure_on else ""
+        raise ValueError(
+            f"{tool} needs `round` as an integer >= 1 (incremented each cold round), got "
+            f"{review_round!r}: any other value produces no ROUND line, so the reviewer "
+            "never reaches the round-3 severity floor and the loop has no terminating "
+            f"pressure. Pass round: 1 for a first round{escape}."
+        )
+
+
+STAKES_NOTICE = ("STAKES: unstated — the reviewer assumed a modest internal tool. Set "
+                 "`stakes` per call, or once for the project in .paranoia.toml; pass "
+                 "`stakes: \"unstated\"` to accept that reading deliberately and silence "
+                 "this line.")
+
+
+def _resolve_stakes(stakes: object) -> tuple[str | None, bool]:
+    """`arbitrate`'s trick, minus its requirement: the literal `unstated` is an EXPLICIT
+    acceptance of one fixed reading (`arbitration.STAKES_DEFAULT`, byte-identical on every
+    call) rather than an accidental omission, so it calibrates the reviewer AND silences
+    the notice. Returns (stakes_text, notice_needed).
+
+    Stakes stay optional here, unlike `arbitrate` where they gate a decision: the fallback
+    is the SAFE reading, so a gate would refuse valid work to prevent a miscalibration the
+    caller can simply be shown. Surfacing beats blocking (plan proposal §1.3).
+    """
+    text = str(stakes).strip() if stakes is not None else ""
+    if not text:
+        return None, True
+    if text.lower() == arbitration.STAKES_UNSTATED:
+        return arbitration.STAKES_DEFAULT, False
+    return text, False
+
+
+def _stakes_notice(needed: bool) -> str:
+    return f"\n\n{STAKES_NOTICE}" if needed else ""
+
+
 def _calibration(stakes: str | None, review_round: int | None) -> str | None:
     """Render the reviewer-calibration block. STAKES bounds legitimate concern
     (findings beyond it are out of scope); ROUND sets the severity floor across a
@@ -83,7 +156,7 @@ def _calibration(stakes: str | None, review_round: int | None) -> str | None:
     lines: list[str] = []
     if stakes:
         lines.append(f"STAKES: {stakes}")
-    if review_round is not None and review_round >= 1:
+    if isinstance(review_round, int) and not isinstance(review_round, bool) and review_round >= 1:
         lines.append(f"ROUND: {review_round}")
     if not lines:
         return None
@@ -148,10 +221,11 @@ def critique_branch(
     )
     # Calibration: STAKES (project-level, so also honoured from .paranoia.toml) bounds
     # scope; ROUND (per-call, raised each convergence round) sets the severity floor.
-    calibration = _calibration(
-        resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
-    )
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
+    _require_converge(converge, closure_on)
+    _require_round(arguments.get("round"), closure_on, "critique_branch")
+    stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
+    calibration = _calibration(stakes, arguments.get("round"))
     if (converge and closure_on and include_unc
             and arguments.get("head_ref") not in (None, "HEAD")
             and not arguments.get("lineage")):
@@ -176,7 +250,7 @@ def critique_branch(
             log_dir=log_dir, now=now, on_progress=on_progress,
             closure_on=closure_on, closure_args=arguments,
             review_round=arguments.get("round"), include_unc=include_unc,
-        )
+        ) + _stakes_notice(no_stakes)
 
     packet = orientation.build_orientation(
         repo, target, project_summary, diff_intent, focus, already
@@ -194,7 +268,7 @@ def critique_branch(
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model,
           "round": arguments.get("round"), "already_raised": already})
-    return _footer(review, engine)
+    return _footer(review, engine) + _stakes_notice(no_stakes)
 
 
 def _converge_branch_review(
@@ -352,23 +426,22 @@ def critique_plan(
     context = arguments.get("context")
     focus = arguments.get("focus")
     already = list(arguments.get("already_raised", []))
-    repo_path = arguments.get("repo_path")
-    repo = _require_repo(arguments) if repo_path else None
-    cwd = repo if repo else _no_repo_cwd()
-    cfg = load_repo_config(repo) if repo else {}
+    # Required, not "strongly recommended": PLAN_REVIEW_INSTRUCTIONS calls testing the
+    # plan's premises against the code the reviewer's single most valuable job, and an
+    # ungrounded plan review cannot do it. Every one of the 225 logged plan reviews
+    # passed a repo, so this refuses nothing anyone actually does.
+    repo = _require_repo(arguments)
+    cwd = repo
+    cfg = load_repo_config(repo)
 
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
-    calibration = _calibration(
-        resolve("stakes", arguments.get("stakes"), cfg, None), arguments.get("round")
-    )
-    # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A project that
-    # set `class_closure = true` for its branch reviews would otherwise turn plan closure
-    # on and hard-error every plan call that has no `lineage`; and a per-project setting
-    # could never suffice anyway, since the lineage is inherently per-seam.
-    closure_on = bool(arguments.get("class_closure", False))
+    # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A per-project
+    # setting could never suffice anyway, since the lineage is inherently per-seam, and
+    # sharing the branch key would give one name two meanings across two tools.
+    closure_on = bool(arguments.get("class_closure", True))
     lineage_id = arguments.get("lineage")
     if closure_on and not lineage_id:
         raise ValueError(
@@ -376,8 +449,11 @@ def critique_plan(
             "branch to key state to, and deriving one from the plan's text or path would "
             "mint a fresh empty lineage whenever either changed — reporting NOT-BLOCKED "
             "with every tracked class silently dropped. Pass a globally unique, "
-            "mode-qualified key (e.g. 'myproject-42-plan'), or class_closure: false."
+            f"mode-qualified key (e.g. 'myproject-42-plan'), or {ONE_SHOT_HINT}."
         )
+    _require_round(arguments.get("round"), closure_on, "critique_plan")
+    stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
+    calibration = _calibration(stakes, arguments.get("round"))
 
     closure = _PlanClassClosure(
         lineage_id, round_no=arguments.get("round") or 1,
@@ -419,7 +495,7 @@ def critique_plan(
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
     })
-    body_text = _footer(review, engine)
+    body_text = _footer(review, engine) + _stakes_notice(no_stakes)
     if closure and closure.retry_register:
         body_text += ("\n\n---\n_The register below was supplied on retry and is what this "
                       f"round applied:_\n\n{closure.retry_register.strip()}")

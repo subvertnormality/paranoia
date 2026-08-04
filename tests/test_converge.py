@@ -31,7 +31,7 @@ def _dirty(repo: Path) -> None:
 
 
 def _args(repo: Path, **extra) -> dict:
-    return {"repo_path": str(repo), "include_uncommitted": True, **extra}
+    return {"repo_path": str(repo), "include_uncommitted": True, "round": 1, **extra}
 
 
 class TestConvergeBranch:
@@ -75,7 +75,8 @@ class TestConvergeBranch:
     def test_explicit_converge_false_restores_live_repo(self, repo: Path, tmp_path: Path) -> None:
         _dirty(repo)
         fake = FakeEngine()
-        handlers.critique_branch(_args(repo, converge=False), engine=fake, log_dir=tmp_path)
+        handlers.critique_branch(_args(repo, converge=False, class_closure=False),
+                                 engine=fake, log_dir=tmp_path)
         assert fake.calls[0]["cwd"] == repo  # escape hatch: legacy in-place review
 
     def test_converge_on_unborn_repo(self, tmp_path: Path) -> None:
@@ -86,7 +87,7 @@ class TestConvergeBranch:
         (repo / "a.py").write_text("UNBORN_MARKER = 1\n")
         fake = FakeEngine()
         handlers.critique_branch(
-            {"repo_path": str(repo), "include_uncommitted": True, "converge": True},
+            {"repo_path": str(repo), "include_uncommitted": True, "converge": True, "round": 1},
             engine=fake, log_dir=tmp_path / "logs",
         )
         assert "UNBORN_MARKER = 1" in fake.calls[0]["prompt"]  # new file's content packaged
