@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import tempfile
+import copy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
@@ -315,6 +316,9 @@ class Lineage:
     classes: dict[str, TrackedClass] = field(default_factory=dict)
     exemptions: list[Exemption] = field(default_factory=list)
     debt: dict[str, Any] | None = None
+    #: Version-2 plan-only claim envelope. Branch lineages leave this ``None`` so their
+    #: persisted representation and renderer remain backwards compatible.
+    claim_state: dict[str, Any] | None = None
     #: Which tool created this lineage. A plan lineage holds only unmechanized classes
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
@@ -419,11 +423,12 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         },
         exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
         debt=raw.get("debt"),
+        claim_state=raw.get("claim_state"),
     )
 
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
-    return {
+    payload = {
         "mode": lineage.mode,
         "rounds": lineage.rounds,
         "next_seq": lineage.next_seq,
@@ -434,6 +439,10 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
     }
+    if lineage.mode == PLAN_MODE and lineage.claim_state is not None:
+        payload["schema_version"] = 2
+        payload["claim_state"] = lineage.claim_state
+    return payload
 
 
 def open_latch(root: Path, lineage_id: str) -> None:
@@ -531,7 +540,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
     return Lineage(
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
-        mode=lineage.mode,
+        mode=lineage.mode, claim_state=copy.deepcopy(lineage.claim_state),
     )
 
 

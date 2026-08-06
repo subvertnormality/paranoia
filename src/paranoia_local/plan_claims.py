@@ -1,0 +1,600 @@
+"""Pure claim-closure core for plan review.
+
+Only the terminal JSON registers are model-authored.  IDs, raw-byte anchors,
+evidence identity, transition authorization, and the blocking verdict are
+server-owned.  This module performs no I/O so the fail-closed rules can be
+tested directly and mutation-tested cheaply.
+"""
+
+from __future__ import annotations
+
+import copy
+import base64
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field
+from typing import Any, Iterable, Mapping, Sequence
+
+RESEARCH_ROLE = "research"
+VERIFIER_ROLE = "verifier"
+STRUCTURAL_ROLE = "structural"
+
+FACT, DECISION = "fact", "decision"
+ASSERTED, ASSUMPTION, ESTIMATE = "asserted", "assumption", "estimate"
+BLOCKING, ADVISORY = "blocking", "advisory"
+PROPOSED, CONFIRMED = "proposed", "confirmed"
+UNVERIFIED, VERIFIED, CONTRADICTED, DISPUTED, DEFERRED, STALE = (
+    "unverified", "verified", "contradicted", "disputed", "deferred", "stale"
+)
+MALFORMED, UNCHECKED, NOT_APPLICABLE, SUPERSEDED = (
+    "malformed", "unchecked", "not-applicable", "superseded"
+)
+
+RESEARCH_MARKER = "=== RESEARCH REGISTER ==="
+VERIFICATION_MARKER = "=== VERIFICATION REGISTER ==="
+PLAN_MARKER = "=== PLAN REGISTER ==="
+EVENTS_PREFIX = "EVENTS-JSON: "
+
+MAX_ACTIVE_CLAIMS = 50
+
+
+class ClaimRegisterError(ValueError):
+    """A model-authored register was absent, ambiguous, or malformed."""
+
+
+class ClaimTransitionError(ClaimRegisterError):
+    """A syntactically valid event was not authorized by current state."""
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+@dataclass(frozen=True)
+class PlanSpan:
+    span_id: str
+    start: int
+    end: int
+    sha256: str
+    display: str
+    raw: bytes = field(repr=False)
+
+
+@dataclass(frozen=True)
+class ResolvedAnchor:
+    first_span: str
+    last_span: str
+    start: int
+    end: int
+    sha256: str
+
+
+def segment_plan(raw: bytes, *, max_span_bytes: int = 1024) -> list[PlanSpan]:
+    """Mint ordered IDs over exact raw bytes while rendering bounded lossy text.
+
+    Newlines are retained.  Oversized physical lines are split into bounded chunks.
+    IDs encode order, not content, so identical/replacement-colliding displays remain
+    unambiguous to the server and to a model looking at the numbered packet.
+    """
+    if max_span_bytes < 1:
+        raise ValueError("max_span_bytes must be >= 1")
+    pieces: list[bytes] = []
+    for line in raw.splitlines(keepends=True):
+        pieces.extend(line[i:i + max_span_bytes] for i in range(0, len(line), max_span_bytes))
+    if not pieces and raw:
+        pieces = [raw[i:i + max_span_bytes] for i in range(0, len(raw), max_span_bytes)]
+    if not pieces:
+        pieces = [b""]
+    spans: list[PlanSpan] = []
+    offset = 0
+    for index, piece in enumerate(pieces, 1):
+        end = offset + len(piece)
+        spans.append(
+            PlanSpan(
+                span_id=f"p{index:06d}",
+                start=offset,
+                end=end,
+                sha256=sha256(piece),
+                display=piece.decode("utf-8", errors="replace"),
+                raw=piece,
+            )
+        )
+        offset = end
+    return spans
+
+
+def render_spans(spans: Sequence[PlanSpan]) -> str:
+    return "".join(f"[{s.span_id}] {s.display}" for s in spans)
+
+
+def resolve_anchor(raw: Mapping[str, Any], spans: Sequence[PlanSpan]) -> ResolvedAnchor:
+    if set(raw) != {"first_span", "last_span"}:
+        raise ClaimRegisterError("plan_anchor needs exactly first_span and last_span")
+    positions = {span.span_id: i for i, span in enumerate(spans)}
+    first, last = raw.get("first_span"), raw.get("last_span")
+    if not isinstance(first, str) or not isinstance(last, str):
+        raise ClaimRegisterError("plan anchor span IDs must be strings")
+    if first not in positions or last not in positions:
+        raise ClaimRegisterError("plan anchor references an unknown server span")
+    a, b = positions[first], positions[last]
+    if a > b:
+        raise ClaimRegisterError("plan anchor span range is reversed")
+    chosen = spans[a:b + 1]
+    # Segment construction is contiguous. Recheck rather than trusting callers that
+    # injected a hand-built span list into the pure API.
+    if any(left.end != right.start for left, right in zip(chosen, chosen[1:])):
+        raise ClaimRegisterError("plan anchor span range is noncontiguous")
+    range_hash = sha256(b"".join(span.raw for span in chosen))
+    return ResolvedAnchor(first, last, chosen[0].start, chosen[-1].end, range_hash)
+
+
+@dataclass(frozen=True)
+class Event:
+    op: str
+    data: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class VendorCheck:
+    vendor: str
+    model: str
+    event_digest: str
+    evidence_ids: tuple[str, ...]
+    accepted: bool
+    checked_at: str
+
+
+@dataclass
+class Claim:
+    claim_id: str
+    claim: str
+    kind: str
+    assertion_mode: str
+    plan_anchor: ResolvedAnchor
+    anchor_excerpt_b64: str
+    origin_role: str
+    first_round: int = 1
+    bearing: str = BLOCKING
+    kind_classification: str = PROPOSED
+    status: str = UNCHECKED
+    evidence_ids: list[str] = field(default_factory=list)
+    reason: str | None = None
+    deferral: dict[str, Any] | None = None
+    disputed_evidence_ids: list[str] = field(default_factory=list)
+    pending_replacement_id: str | None = None
+    superseded_by: str | None = None
+    independent_check: dict[str, Any] | None = None
+    pending_transition: dict[str, Any] | None = None
+
+
+@dataclass
+class ClaimState:
+    lineage_id: str
+    next_seq: int = 1
+    claims: dict[str, Claim] = field(default_factory=dict)
+    debt: dict[str, Any] | None = None
+    evidence_records: list[dict[str, Any]] = field(default_factory=list)
+    plan_sha256: str | None = None
+
+    def copy(self) -> "ClaimState":
+        return copy.deepcopy(self)
+
+
+_SCHEMAS: dict[str, frozenset[str]] = {
+    "ADD": frozenset({"op", "temp_id", "claim", "kind", "assertion_mode", "plan_anchor"}),
+    "VERIFY": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
+    "CONTRADICT": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
+    "DEFER": frozenset({"op", "claim_id", "verification_anchor", "dependent_anchors",
+                         "completion_evidence", "failure_condition", "stop_action"}),
+    "DISPUTE": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
+    "RESOLVE_DISPUTE": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
+    "SET_BEARING": frozenset({"op", "claim_id", "bearing", "evidence_ids", "reason"}),
+    "CONFIRM_KIND": frozenset({"op", "claim_id", "kind", "reason"}),
+    "SUPERSEDE": frozenset({"op", "claim_id", "replacement", "reason"}),
+}
+
+_ROLE_OPS = {
+    RESEARCH_ROLE: frozenset({"ADD"}),
+    STRUCTURAL_ROLE: frozenset({"ADD", "DISPUTE", "CONFIRM_KIND"}),
+    VERIFIER_ROLE: frozenset(_SCHEMAS) - {"ADD", "DISPUTE"},
+}
+
+
+def _no_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise ClaimRegisterError(f"duplicate JSON key {key!r}")
+        out[key] = value
+    return out
+
+
+def _marker_for(role: str) -> str:
+    if role == RESEARCH_ROLE:
+        return RESEARCH_MARKER
+    if role == VERIFIER_ROLE:
+        return VERIFICATION_MARKER
+    if role == STRUCTURAL_ROLE:
+        return PLAN_MARKER
+    raise ClaimRegisterError(f"unknown register role {role!r}")
+
+
+def parse_role_register(text: str, role: str) -> list[Event]:
+    marker = _marker_for(role)
+    if text.count(marker) != 1:
+        raise ClaimRegisterError(f"expected exactly one {marker} block")
+    tail = text.split(marker, 1)[1]
+    line, sep, rest = tail.lstrip("\n").partition("\n")
+    if not line.startswith(EVENTS_PREFIX):
+        raise ClaimRegisterError(f"{marker} must be followed by {EVENTS_PREFIX.strip()}")
+    # Research/verifier blocks own the tail. Structural parsing passes only the part
+    # before CLASS REGISTER, so any remaining text is always malformed.
+    if rest.strip():
+        raise ClaimRegisterError("claim register has trailing data")
+    payload = line[len(EVENTS_PREFIX):]
+    try:
+        raw = json.loads(payload, object_pairs_hook=_no_duplicate_pairs)
+    except ClaimRegisterError:
+        raise
+    except (json.JSONDecodeError, UnicodeError) as exc:
+        raise ClaimRegisterError(f"EVENTS-JSON is invalid: {exc}") from exc
+    if not isinstance(raw, list):
+        raise ClaimRegisterError("EVENTS-JSON must be an array")
+    events: list[Event] = []
+    for item in raw:
+        if not isinstance(item, dict) or not isinstance(item.get("op"), str):
+            raise ClaimRegisterError("each claim event must be an object with string op")
+        op = item["op"]
+        if op not in _SCHEMAS:
+            raise ClaimRegisterError(f"unknown claim event {op!r}")
+        if op not in _ROLE_OPS[role]:
+            raise ClaimRegisterError(f"role {role} may not emit {op}")
+        actual, expected = set(item), set(_SCHEMAS[op])
+        if actual != expected:
+            extra, missing = sorted(actual - expected), sorted(expected - actual)
+            detail = []
+            if extra:
+                detail.append(f"unknown fields {extra}")
+            if missing:
+                detail.append(f"missing fields {missing}")
+            raise ClaimRegisterError(f"{op} has " + "; ".join(detail))
+        _validate_scalars(op, item)
+        events.append(Event(op, item))
+    return events
+
+
+def parse_structural_register(text: str, class_marker: str) -> tuple[list[Event], str]:
+    if text.count(PLAN_MARKER) != 1 or text.count(class_marker) != 1:
+        raise ClaimRegisterError("structural reply needs exactly one PLAN and CLASS register")
+    if text.index(PLAN_MARKER) > text.index(class_marker):
+        raise ClaimRegisterError("PLAN REGISTER must precede CLASS REGISTER")
+    before, class_tail = text.split(class_marker, 1)
+    events = parse_role_register(before.rstrip(), STRUCTURAL_ROLE)
+    return events, class_marker + class_tail
+
+
+def _validate_scalars(op: str, item: Mapping[str, Any]) -> None:
+    for key, value in item.items():
+        if key in {"plan_anchor", "replacement", "dependent_anchors", "evidence_ids",
+                   "verification_anchor"}:
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise ClaimRegisterError(f"{op}.{key} must be a nonempty string")
+    if "evidence_ids" in item and (
+        not isinstance(item["evidence_ids"], list)
+        or any(not isinstance(v, str) or not v for v in item["evidence_ids"])
+    ):
+        raise ClaimRegisterError(f"{op}.evidence_ids must be a string array")
+
+
+def mint_claim_id(lineage_id: str, seq: int, proposition: str) -> str:
+    return hashlib.sha256(f"{lineage_id}\0{seq}\0{proposition}".encode()).hexdigest()[:10]
+
+
+def event_digest(event: Event) -> str:
+    canonical = json.dumps(event.data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return sha256(canonical.encode())
+
+
+def apply_events(
+    state: ClaimState,
+    events: Iterable[Event],
+    *,
+    role: str,
+    spans: Sequence[PlanSpan],
+    round_no: int = 1,
+    evidence_ids: set[str] | None = None,
+    independent_required: bool = False,
+    vendor_checks: Sequence[VendorCheck] = (),
+) -> dict[str, str]:
+    """Apply a role register to ``state``. Callers apply to a copied draft."""
+    available = evidence_ids or set()
+    minted: dict[str, str] = {}
+    seen_temp: set[str] = set()
+    for event in events:
+        if event.op not in _ROLE_OPS.get(role, ()):
+            raise ClaimTransitionError(f"role {role} may not emit {event.op}")
+        data = event.data
+        if event.op == "ADD":
+            _add_claim(state, data, role, spans, round_no, minted, seen_temp)
+            continue
+        claim_id = data.get("claim_id")
+        claim = state.claims.get(claim_id)
+        if claim is None or claim.status == SUPERSEDED:
+            raise ClaimTransitionError(f"unknown or superseded claim {claim_id!r}")
+        if event.op == "CONFIRM_KIND":
+            if claim.kind_classification != PROPOSED:
+                raise ClaimTransitionError("claim kind is already confirmed")
+            if claim.origin_role == role:
+                raise ClaimTransitionError("a role may not self-confirm its claim kind")
+            kind = data["kind"]
+            if kind not in {FACT, DECISION}:
+                raise ClaimTransitionError("kind must be fact or decision")
+            claim.kind, claim.kind_classification = kind, CONFIRMED
+            claim.reason = data["reason"]
+            claim.status = NOT_APPLICABLE if kind == DECISION else UNVERIFIED
+        elif event.op in {"VERIFY", "CONTRADICT", "RESOLVE_DISPUTE", "SET_BEARING"}:
+            ids = _validated_evidence(data, available)
+            if not _authorize_independent(
+                claim, event, ids, independent_required, vendor_checks
+            ):
+                claim.pending_transition = copy.deepcopy(event.data)
+                claim.reason = data["reason"]
+                continue
+            claim.pending_transition = None
+            if event.op == "VERIFY":
+                _require_fact(claim)
+                claim.status, claim.evidence_ids = VERIFIED, ids
+            elif event.op == "CONTRADICT":
+                _require_fact(claim)
+                claim.status, claim.evidence_ids = CONTRADICTED, ids
+            elif event.op == "RESOLVE_DISPUTE":
+                if claim.status != DISPUTED:
+                    raise ClaimTransitionError("only a disputed claim can resolve a dispute")
+                claim.status, claim.evidence_ids, claim.disputed_evidence_ids = VERIFIED, ids, []
+            else:
+                if data["bearing"] not in {BLOCKING, ADVISORY}:
+                    raise ClaimTransitionError("bearing must be blocking or advisory")
+                if data["bearing"] == ADVISORY and not ids:
+                    raise ClaimTransitionError("advisory bearing requires evidence")
+                claim.bearing, claim.evidence_ids = data["bearing"], ids
+            claim.reason = data["reason"]
+        elif event.op == "DISPUTE":
+            ids = _validated_evidence(data, available)
+            claim.status, claim.disputed_evidence_ids = DISPUTED, ids
+            claim.reason = data["reason"]
+        elif event.op == "DEFER":
+            _require_fact(claim)
+            verification = resolve_anchor(data["verification_anchor"], spans)
+            dependents_raw = data["dependent_anchors"]
+            if not isinstance(dependents_raw, list) or not dependents_raw:
+                raise ClaimTransitionError("DEFER needs dependent_anchors")
+            dependents = [resolve_anchor(anchor, spans) for anchor in dependents_raw]
+            if any(verification.end > anchor.start for anchor in dependents):
+                raise ClaimTransitionError("verification step must precede every dependency")
+            claim.status = DEFERRED
+            claim.deferral = {
+                "verification_anchor": asdict(verification),
+                "dependent_anchors": [asdict(a) for a in dependents],
+                "completion_evidence": data["completion_evidence"],
+                "failure_condition": data["failure_condition"],
+                "stop_action": data["stop_action"],
+                "plan_sha256": sha256(b"".join(span.raw for span in spans)),
+            }
+        elif event.op == "SUPERSEDE":
+            if role != VERIFIER_ROLE:
+                raise ClaimTransitionError("only verifier may propose supersession")
+            replacement = data["replacement"]
+            if not isinstance(replacement, dict):
+                raise ClaimTransitionError("SUPERSEDE replacement must be an ADD object")
+            replacement = {"op": "ADD", **replacement}
+            if set(replacement) != set(_SCHEMAS["ADD"]):
+                raise ClaimTransitionError("SUPERSEDE replacement must have ADD fields")
+            local: dict[str, str] = {}
+            _add_claim(state, replacement, role, spans, round_no, local, seen_temp)
+            replacement_id = next(iter(local.values()))
+            state.claims[replacement_id].bearing = BLOCKING
+            claim.pending_replacement_id = replacement_id
+            claim.reason = data["reason"]
+        else:  # pragma: no cover - schema and role tables make this unreachable
+            raise ClaimTransitionError(f"unhandled event {event.op}")
+    _complete_supersessions(state)
+    if len([c for c in state.claims.values() if c.status != SUPERSEDED]) > MAX_ACTIVE_CLAIMS:
+        raise ClaimTransitionError(f"active claim cap exceeds {MAX_ACTIVE_CLAIMS}")
+    return minted
+
+
+def _add_claim(state: ClaimState, data: Mapping[str, Any], role: str,
+               spans: Sequence[PlanSpan], round_no: int, minted: dict[str, str],
+               seen_temp: set[str]) -> None:
+    temp_id = data.get("temp_id")
+    if not isinstance(temp_id, str) or not temp_id or temp_id in seen_temp:
+        raise ClaimTransitionError("ADD temp_id must be nonempty and unique per register")
+    proposition = data.get("claim")
+    if not isinstance(proposition, str) or not proposition.strip():
+        raise ClaimTransitionError("ADD claim must be nonempty")
+    kind, assertion = data.get("kind"), data.get("assertion_mode")
+    if kind not in {FACT, DECISION}:
+        raise ClaimTransitionError("ADD kind must be fact or decision")
+    if assertion not in {ASSERTED, ASSUMPTION, ESTIMATE}:
+        raise ClaimTransitionError("invalid assertion_mode")
+    anchor = resolve_anchor(data.get("plan_anchor", {}), spans)
+    claim_id = mint_claim_id(state.lineage_id, state.next_seq, proposition)
+    state.next_seq += 1
+    state.claims[claim_id] = Claim(
+        claim_id=claim_id, claim=proposition.strip(), kind=kind,
+        assertion_mode=assertion, plan_anchor=anchor,
+        anchor_excerpt_b64=base64.b64encode(_anchor_bytes(anchor, spans)).decode("ascii"),
+        origin_role=role,
+        first_round=round_no,
+    )
+    minted[temp_id] = claim_id
+    seen_temp.add(temp_id)
+
+
+def _validated_evidence(data: Mapping[str, Any], available: set[str]) -> list[str]:
+    ids = list(dict.fromkeys(data.get("evidence_ids", [])))
+    if not ids or any(item not in available for item in ids):
+        raise ClaimTransitionError("transition references missing server evidence")
+    return ids
+
+
+def _require_fact(claim: Claim) -> None:
+    if claim.kind_classification != CONFIRMED or claim.kind != FACT:
+        raise ClaimTransitionError("truth transitions require a confirmed factual claim")
+
+
+def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
+                           required: bool, checks: Sequence[VendorCheck]) -> bool:
+    if not required:
+        claim.independent_check = {"required": False, "status": "not-required"}
+        return True
+    digest = event_digest(event)
+    matching = [
+        check for check in checks
+        if check.accepted and check.event_digest == digest
+        and tuple(evidence_ids) == check.evidence_ids
+    ]
+    vendors = {check.vendor for check in matching}
+    claim.independent_check = {
+        "required": True,
+        "status": "complete" if len(vendors) >= 2 else "pending",
+        "event_digest": digest,
+        "evidence_ids": evidence_ids,
+        "checks": [asdict(check) for check in matching],
+    }
+    return len(vendors) >= 2
+
+
+def _complete_supersessions(state: ClaimState) -> None:
+    for claim in state.claims.values():
+        target = state.claims.get(claim.pending_replacement_id or "")
+        if target and target.status in {VERIFIED, DEFERRED} and target.kind_classification == CONFIRMED:
+            claim.status, claim.superseded_by = SUPERSEDED, target.claim_id
+
+
+def _independent_valid(claim: Claim) -> bool:
+    info = claim.independent_check
+    if not info or not info.get("required"):
+        return True
+    if info.get("status") != "complete":
+        return False
+    digest, evidence = info.get("event_digest"), tuple(info.get("evidence_ids", []))
+    checks = info.get("checks", [])
+    vendors = {
+        item.get("vendor") for item in checks
+        if item.get("accepted") is True and item.get("event_digest") == digest
+        and tuple(item.get("evidence_ids", [])) == evidence
+    }
+    return None not in vendors and len(vendors) >= 2
+
+
+def claim_blocks(claim: Claim) -> bool:
+    if claim.status == SUPERSEDED:
+        return False
+    if claim.kind_classification != CONFIRMED:
+        return True
+    if not _independent_valid(claim):
+        return True
+    if claim.kind == DECISION:
+        return False
+    if claim.bearing == ADVISORY:
+        return False
+    return claim.status not in {VERIFIED, DEFERRED}
+
+
+def blocking_claims(state: ClaimState) -> list[Claim]:
+    return [claim for claim in state.claims.values() if claim_blocks(claim)]
+
+
+def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> None:
+    """Relocate exact claim excerpts; ambiguity or deletion invalidates safely."""
+    for claim in state.claims.values():
+        if claim.status == SUPERSEDED:
+            continue
+        try:
+            excerpt = base64.b64decode(claim.anchor_excerpt_b64, validate=True)
+        except (ValueError, TypeError):
+            claim.status = STALE
+            continue
+        offsets: list[int] = []
+        start = 0
+        while True:
+            found = raw.find(excerpt, start)
+            if found < 0:
+                break
+            offsets.append(found)
+            start = found + max(1, len(excerpt))
+            if len(offsets) > 1:
+                break
+        if len(offsets) != 1:
+            claim.status = STALE
+            continue
+        begin, end = offsets[0], offsets[0] + len(excerpt)
+        chosen = [span for span in spans if span.end > begin and span.start < end]
+        if not chosen:
+            claim.status = STALE
+            continue
+        claim.plan_anchor = ResolvedAnchor(
+            chosen[0].span_id, chosen[-1].span_id, begin, end, sha256(excerpt)
+        )
+        # Deferred dependencies have their own exact ordering contract. Until all of
+        # those excerpts are independently relocatable, any plan edit invalidates them.
+        if claim.status == DEFERRED and claim.deferral and claim.deferral.get("plan_sha256") != sha256(raw):
+            claim.status = STALE
+
+
+def _anchor_bytes(anchor: ResolvedAnchor, spans: Sequence[PlanSpan]) -> bytes:
+    positions = {span.span_id: i for i, span in enumerate(spans)}
+    return b"".join(
+        span.raw for span in spans[
+            positions[anchor.first_span]:positions[anchor.last_span] + 1
+        ]
+    )
+
+
+def state_to_json(state: ClaimState) -> dict[str, Any]:
+    return {
+        "next_seq": state.next_seq,
+        "claims": [
+            {
+                **asdict(claim),
+                "plan_anchor": asdict(claim.plan_anchor),
+            }
+            for claim in state.claims.values()
+        ],
+        "debt": state.debt,
+        "evidence_records": state.evidence_records,
+        "plan_sha256": state.plan_sha256,
+    }
+
+
+def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimState:
+    if not raw:
+        return ClaimState(lineage_id)
+    claims: dict[str, Claim] = {}
+    for item in raw.get("claims", []):
+        row = dict(item)
+        row["plan_anchor"] = ResolvedAnchor(**row["plan_anchor"])
+        claim = Claim(**row)
+        claims[claim.claim_id] = claim
+    return ClaimState(
+        lineage_id, int(raw.get("next_seq", 1)), claims, raw.get("debt"),
+        list(raw.get("evidence_records", [])), raw.get("plan_sha256"),
+    )
+
+
+def render_claim_summary(state: ClaimState) -> str:
+    lines = ["=== ACTIVE CLAIMS ==="]
+    for claim in state.claims.values():
+        if claim.status == SUPERSEDED:
+            continue
+        lines.append(
+            f"[{claim.claim_id}] {claim.claim} — kind={claim.kind}/"
+            f"{claim.kind_classification}, bearing={claim.bearing}, status={claim.status}"
+        )
+        if claim.evidence_ids:
+            lines.append("  evidence: " + ", ".join(claim.evidence_ids))
+    if len(lines) == 1:
+        lines.append("NONE")
+    return "\n".join(lines)

@@ -212,7 +212,8 @@ later reviewer, and they close only when a reviewer explicitly writes
 **On `critique_plan`, every class is unmechanized** — a regex over prose closes as
 soon as the wording changes, so predicates are not accepted there at all. Plan
 closure gives you *non-forgetting plus explicit closure*, not automatic recurrence
-detection.
+detection. Its final verdict is also gated by the distinct claim-verification system
+below.
 
 **Register transitions** a reviewer can emit, besides a new class:
 
@@ -226,9 +227,30 @@ detection.
 You cannot emit these yourself — ask for them in `focus`, e.g. *"class 3f2a91c4 is
 registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
+### Plan claim verification — closing load-bearing premises
+
+Closure-enabled `critique_plan` first runs fresh toolless roles that extract factual
+premises, request bounded server-owned repository/external evidence, and verify,
+contradict, defer, or abstain. Registered claims persist independently of defect classes;
+a later reviewer cannot make one disappear by omission.
+
+Every new claim starts unchecked and blocking. A different role must confirm whether it
+is a fact or decision. A blocking fact closes only with exact server evidence or a safe
+plan deferral whose verification step precedes every dependency, has falsifiable evidence,
+and stops on failure. Advisory bearing requires its own evidence-bearing verifier event.
+Model agreement and citations alone do not verify anything.
+
+Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
+bounded repository records, and no filesystem path. External passages only enter a
+command-incapable role; the structural reviewer receives their metadata, not remote bytes.
+Unavailable sources cause abstention and remain blocking. The full trust model, register
+grammar, evidence limits, caching, and recovery rules are in
+[`docs/claim_verification.md`](docs/claim_verification.md).
+
 ### `lineage` — which loop this round belongs to
 
-Class state lives in `~/.paranoia/lineages/<lineage>.json`.
+Closure state lives in `~/.paranoia/lineages/<lineage>.json`. Plan lineages use a
+versioned envelope containing both class and claim/evidence references.
 
 - `critique_branch` derives the key from repo + `base_ref` + reviewed branch. Pass
   `lineage` explicitly when the reviewed ref is **not** a branch (a detached HEAD
@@ -254,7 +276,8 @@ When the two disagree, **the trailer governs** — and says so in its own output
 
 For a review with no loop behind it — a design sketch, a quick second opinion —
 pass `class_closure: false`. That is the single escape, and it also drops the
-`round` and `lineage` requirements.
+`round` and `lineage` requirements. On `critique_plan` it also disables claim
+verification and is rejected if `claim_verification` is supplied explicitly.
 
 ```json
 { "repo_path": "/path/to/repo", "plan_text": "…", "class_closure": false }
@@ -319,9 +342,11 @@ so it must be paired with `class_closure: false`.
 
 ### `critique_plan`
 
-Adversarial review of a plan or design document. The reviewer reads the real code
-to test every premise the plan makes about current behaviour. Returns the same
-five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
+Integrated claim verification followed by adversarial review of a plan or design
+document. Exact plan bytes and one dirty-tree Git snapshot are pinned; toolless roles
+extract load-bearing claims, request bounded server evidence, and verify or abstain before
+a separate structural reviewer judges the design. Python combines claim closure and
+defect-class closure into one verdict. See [plan claim verification](docs/claim_verification.md).
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
@@ -331,6 +356,10 @@ five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
+| `claim_verification` | `blocking` | `blocking` when closure is on | Integrated claim gate. Rejected with `class_closure: false` |
+| `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking |
+| `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
+| `refresh_claims` | boolean | `false` | Bypass an otherwise valid zero-research cache hit for this round |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
 | `focus` | string | — | Narrow the review to a specific concern |
 | `stakes` | string | — | The scope boundary |
@@ -338,7 +367,9 @@ five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
 | `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
 
 `class_closure` and `lineage` are **call arguments only** here — `.paranoia.toml`
-is not consulted for either.
+is not consulted for either. The sole legacy one-shot escape is
+`class_closure: false`: it performs one ordinary review and emits no lineage state or
+`CONVERGENCE`. There is no closure-enabled off/shadow mode.
 
 ### `query`
 
@@ -496,30 +527,35 @@ next to its severity tag.
 
 The footer carries the `session_ref` for [`rebut`](#rebut).
 
-### Class-closure trailer
+### Closure trailer
 
-Appended below the review whenever class closure ran:
+Appended below a branch review whenever class closure ran. A closure-enabled plan review
+adds claim lines before the class lines and still emits exactly one convergence verdict:
 
 ```
 LINEAGE: 9f2c1a4b0e77 (rounds recorded: 8)
+CLAIM-REGISTER: parsed 2
+CLAIMS: verified=1, unverified=1
+CLAIM-CLOSURE: BLOCKED — 1 load-bearing claim(s) unresolved
 CLASS-REGISTER: parsed 1
-CLASS-CLOSURE: 1 open, 2 closed, 3 surviving matches, 0 exempt, 1 unmechanized
-CONVERGENCE: BLOCKED — 1 class(es) unclosed:
-  3f2a91c4 every public writer must validate before the first mutation (mechanized: 3 match(es))
+CLASS-CLOSURE: 1 open, 2 closed, 3 unmechanized
+CONVERGENCE: BLOCKED — 1 claim(s), 1 class(es)
 ```
 
 | Line | Meaning |
 |---|---|
-| `CONVERGENCE: NOT-BLOCKED` | No blocking class is unclosed. Advisory classes may remain open |
-| `CONVERGENCE: BLOCKED` | Named classes are still open; any `CONVERGED` in the review above is void |
+| `CONVERGENCE: NOT-BLOCKED` | No registered blocking claim or defect class is unclosed. Advisory state may remain |
+| `CONVERGENCE: BLOCKED` | Claims, classes, or register/state debt remain; any incompatible reviewer `CONVERGED` is void |
+| `CLAIM-CLOSURE: BLOCKED` | A registered load-bearing premise is unresolved, contradicted, stale, disputed, malformed, unchecked, or awaiting required independent authorization |
 | `CLASS-REGISTER: NONE` \| `parsed N` \| `malformed: …` | What the reviewer's register block contained |
 | `CLASS-CLOSURE-WARNING: … closed in the round it was registered` | The predicate matched nothing at birth — usually too narrow. Ask the next reviewer to `SUPERSEDE` it |
 | `BLOCKED — register debt from round N` | Two attempts at a parseable register failed. The next round with a good register clears it |
 | `unmechanized: awaiting reviewer CLOSED or RECLASSIFY` | A semantic class no regex can check |
 | `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
 
-`NOT-BLOCKED` asserts only that no blocking class is unclosed. It never asserts the
-change is correct — the reviewer's findings still govern that.
+`NOT-BLOCKED` asserts only that neither registered gate is blocking. It never proves
+extraction completeness or that the plan is correct — the reviewer's findings still
+govern that.
 
 ### `arbitrate` outcomes
 
@@ -551,10 +587,13 @@ base_ref = "develop"
 stakes = "Internal booking API, single team, authenticated first-party callers, ~1k req/min."
 web_search = true
 isolate = true
+# Optional server-owned external discovery for critique_plan claim verification.
+search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}"
 ```
 
 Honoured keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
-`class_closure`, `max_packet_chars`, `model`, `effort`, `web_search`.
+`class_closure`, `max_packet_chars`, `model`, `effort`, `web_search`, and
+`search_endpoint` (for the plan claim-verification fetch boundary).
 
 `critique_plan`'s `class_closure` and `lineage` are **not** read from here.
 
@@ -599,6 +638,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   target ref, so they never collide with your working tree and can review a branch
   that isn't checked out. Dirty-working-tree reviews necessarily run in the live
   repo, read-only.
+- **Plan evidence is server-mediated.** Closure-enabled `critique_plan` roles do not
+  receive a repository worktree. Claude uses an empty tool allowlist; Codex uses a
+  `bwrap` namespace with no shell or repository mounts. Native web is disabled. Exact
+  repository bytes and configured HTTPS sources are fetched only by bounded server code.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived
@@ -607,10 +650,13 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   registration until the next `git worktree prune` / `git gc`. Your working tree
   and index are never touched.
 
-  **One opt-in exception:** `arbitrate` with `retain_snapshot: true` creates
+  **Ref exceptions:** `arbitrate` with `retain_snapshot: true` creates
   `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It is the
-  only mode in the server that writes a ref. Remove one with
-  `git update-ref -d <ref>`.
+  persistent opt-in ref. Closure-enabled plan verification also creates temporary
+  `refs/paranoia/plan-snapshots/<run>/...` refs so concurrent `git gc` cannot reclaim
+  the dirty wrapper or initial history roots mid-round; the server deletes them after
+  evidence adoption or abort recovery. Remove an abandoned one only after confirming
+  its lineage/in-flight journal is no longer active, with `git update-ref -d <ref>`.
 
 ### Rate limits
 
@@ -618,9 +664,10 @@ Reviews draw on your subscription's agentic-usage pool, and a convergence loop i
 many agent turns. Use `query` for quick checks and reserve multi-round
 `critique_branch` loops for changes that warrant them.
 
-`arbitrate` is the expensive one and the only tool that spends from **both**
-subscriptions in a single call: typically 4 agent turns, 8 at worst (a cleaning
-retry plus a reconciliation round).
+`arbitrate` routinely spends from **both** subscriptions in one call: typically 4
+agent turns, 8 at worst (a cleaning retry plus a reconciliation round). A
+closure-enabled `critique_plan` also uses both when `independent_check: require` or
+an automatic high-stakes/dispute/bearing transition needs a distinct-vendor audit.
 
 ---
 
@@ -635,9 +682,10 @@ The engine subprocess boundary is dependency-injected, so the whole stack is
 unit-tested without spending subscription quota. A separate integration test drives
 the real subprocess runner against fake `codex`/`claude` binaries on `PATH`.
 
-Design documents for the two non-obvious subsystems live in
+Design documents for the non-obvious subsystems live in
 [`docs/`](docs/): [`class_closure_plan.md`](docs/class_closure_plan.md),
 [`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
+[`claim_verification.md`](docs/claim_verification.md), and
 [`arbitration_plan.md`](docs/arbitration_plan.md).
 
 ## License

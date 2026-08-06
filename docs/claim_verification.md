@@ -1,0 +1,155 @@
+# Plan claim verification
+
+`critique_plan` has two modes:
+
+- closure mode (the default): a blocking research-and-verify preflight followed by
+  structural critique, with one combined claim/class `CONVERGENCE` verdict;
+- one-shot mode (`class_closure: false`): one ordinary structural review, no research,
+  lineage state, terminal registers, or convergence trailer.
+
+There is no closure-enabled off or shadow setting. `claim_verification` may be omitted or
+set to `blocking`; any explicit claim mode with `class_closure: false` is rejected.
+
+## What the gate proves
+
+The gate proves a negative about the registered set: no active registered load-bearing
+fact is unresolved, contradicted, stale, disputed, malformed, or unchecked, and no
+blocking defect class is open. It does not prove that claim extraction was complete,
+that a source is true, that semantic entailment is mathematically correct, or that two
+models cannot share a misconception. `NOT-BLOCKED` is not an approval.
+
+## Round topology and trust boundary
+
+One closure round performs these stages:
+
+1. Read the exact plan bytes and expose ordered opaque span IDs beside bounded display
+   text. Models reference span IDs; the server owns byte offsets and hashes.
+2. Snapshot tracked and non-ignored untracked repository bytes with Git's private-index
+   machinery. Ignored untracked paths are disclosed but unavailable. A temporary
+   `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
+   against concurrent pruning.
+3. A fresh toolless research role registers load-bearing claims. The server parses its
+   strict JSON immediately into a non-durable draft and mints durable-style IDs before
+   later roles need to refer to them.
+4. A toolless evidence-planning role emits bounded structured requests. The server alone
+   executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
+5. A toolless verifier sees exact server evidence. Remote passages are framed as
+   untrusted data and never share a call with repository bytes.
+6. A fresh toolless structural reviewer sees the plan, repository evidence, external
+   metadata, active claims, and existing class procedures. It emits one atomic PLAN and
+   CLASS register.
+7. Python validates role permissions, applies both registers to drafts, roots exact
+   evidence bytes, atomically replaces lineage state, and computes one trailer.
+
+For Claude, toolless means bare settings, an empty allowlist, and an explicit deny list.
+For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
+empty working directory, auth, TLS/DNS files, and no shell, repository, common Git store,
+or sibling worktree. Native web is forced off for every claim-verification role. If that
+boundary cannot be constructed, the round fails closed and the lineage is unchanged.
+
+## Claim state
+
+Claims persist in schema-version 2 of the existing plan lineage envelope. Branch lineage
+JSON and branch output remain on their existing representation.
+
+The important orthogonal fields are:
+
+- kind: `fact | decision`;
+- assertion mode: `asserted | assumption | estimate`;
+- kind classification: `proposed | confirmed`;
+- bearing: `blocking | advisory`;
+- status: `unchecked | unverified | verified | contradicted | disputed | deferred |
+  stale | malformed | not-applicable | superseded`.
+
+Every new claim starts `proposed`, `blocking`, and `unchecked`, regardless of what the
+extractor proposed. A different role must confirm its kind. Advisory bearing is reachable
+only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
+Facts block until verified or safely deferred. Decisions become `not-applicable` only
+after cross-role kind confirmation. Omission never deletes a claim.
+
+Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
+ambiguous anchors become stale. Deferred claims additionally invalidate when their plan
+ordering snapshot changes.
+
+## Evidence
+
+Repository records contain the pinned commit, literal path/query, exact original bytes,
+source and passage hashes, byte bounds, and separately decoded display text. Lossy display
+text is never evidence identity.
+
+The initial empirical adapter set is deliberately narrow: `PYTHON_COMPILE` compiles up to
+20 pinned Python blobs without executing them and records the fixed recipe, interpreter
+version, input hashes, structured results, exit status, and falsifying result. It is
+invalidated by any runtime or input change. Arbitrary model-authored commands and shell
+strings are never accepted.
+
+External work requires a configured HTTPS JSON search endpoint in `.paranoia.toml`:
+
+```toml
+search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}"
+```
+
+The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
+rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
+different from the selected address, unsupported media/encodings, excessive redirects,
+deadlines, and compressed or decompressed byte caps. With no endpoint, external research
+explicitly abstains and an otherwise unresolved external premise blocks.
+
+Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
+lineage root manifests are GC roots. A global file lock serializes reservation, blob
+write, adoption, and sweep. Defaults are 100 MiB per lineage, 1 GiB globally, and a
+seven-day orphan TTL. Hash mismatch, missing content, malformed roots, or cap exhaustion
+fails closed.
+
+Callers may provide up to 20 `{claim, source, content}` records through
+`supplied_evidence`. `claim` must match exactly one registered proposition. These records
+are useful for bounded empirical output or inaccessible local artifacts: the server hashes
+their exact bytes, but they still pass through the verifier and are never self-authorizing.
+
+## Independence and authorization
+
+`independent_check` is `auto` (default) or `require`. Auto requires a distinct-vendor
+audit for high-stakes external claims, contradiction reversal, evidence-dispute
+resolution, and blocking-to-advisory changes. The proposed transition, evidence IDs,
+event digest, vendor/model identities, and audit results persist. Missing, duplicate,
+mismatched, or tampered provenance leaves the transition pending and the claim blocking
+after reload.
+
+## Budgets and caching
+
+Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
+claim, eight external fetches, 1 MiB per source, 5 MiB aggregate, 4 KiB display passages,
+and one correction retry per model register. Evidence is content-addressed and reusable;
+repository reuse is bound to exact object/query identities. Network evidence is audit
+material and must be refreshed under the configured freshness policy before it can
+authorize a later transition.
+
+## Output
+
+Closure mode preserves the five review sections and appends:
+
+```text
+LINEAGE: project-42-plan (rounds recorded: 3)
+CLAIM-REGISTER: parsed 2
+CLAIMS: verified=1, unverified=1
+CLAIM-CLOSURE: BLOCKED — 1 load-bearing claim(s) unresolved
+CLASS-REGISTER: NONE
+CLASS-CLOSURE: 0 open, 2 closed, 2 unmechanized
+CONVERGENCE: BLOCKED — 1 claim(s)
+```
+
+There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
+`NOT-BLOCKED`.
+
+## Migration and recovery
+
+This is an intentional behavior and cost change for existing callers that omitted
+`class_closure`: default-on plan closure now runs the integrated gate. Callers wanting the
+old inexpensive review must explicitly use `class_closure: false` and accept that the
+result has no persistent stop condition.
+
+A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
+unchanged and returns a blocked verdict. Malformed registers record debt; corrupt lineage
+state is quarantined by the existing class-closure machinery. Never repair state by
+deleting evidence roots first: preserve the last valid root until the lineage is repaired
+or explicitly abandoned.

@@ -1,9 +1,11 @@
 """Engine abstraction — each engine drives a local coding-agent CLI in a
 headless, read-only mode over the user's subscription.
 
-The CLI *is* the reviewer: it has full read access to the repo at `cwd` and
-decides what to open. This module only builds the argv, feeds the prompt on
-stdin, and parses the final message + a session reference (for `rebut`).
+For ordinary code/query work the CLI *is* the reviewer: it has full read access
+to the repo at `cwd` and decides what to open. Claim-verification roles instead
+use ``run_toolless``: an enforceable empty-tool/filesystem profile whose only
+inputs are server packets. This module builds both profiles, feeds stdin, and
+parses the final message + a session reference (for `rebut`).
 
 `build_argv` / `build_resume_argv` / `parse_output` are pure and unit-tested.
 The impure subprocess call is injected via `runner` (see runner.py).
@@ -12,6 +14,9 @@ The impure subprocess call is injected via `runner` (see runner.py).
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -23,6 +28,10 @@ Runner = Callable[[list[str], str, Path, int], RunResult]
 
 # Longest progress message forwarded to the client (spinner-line sized).
 _PROGRESS_MSG_MAX = 100
+
+
+class ToollessUnavailable(RuntimeError):
+    """The selected engine cannot enforce a command- and repository-free role."""
 
 
 @dataclass(frozen=True)
@@ -84,6 +93,28 @@ class Engine(ABC):
     ) -> Review:
         argv = self.build_argv(cwd, model, effort, web_search)
         return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        raise ToollessUnavailable(f"{self.name} has no enforceable toolless profile")
+
+    def run_toolless(
+        self,
+        prompt: str,
+        model: str,
+        effort: str,
+        runner: Runner | None = None,
+        timeout: int | None = None,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> Review:
+        """Run in a fresh empty directory with native web forcibly disabled.
+
+        Subclasses must make ``build_toolless_argv`` an actual capability boundary;
+        prompt instructions or the ordinary read-only repository sandbox do not qualify.
+        """
+        with tempfile.TemporaryDirectory(prefix=f"paranoia-{self.name}-tool-less-") as raw:
+            cwd = Path(raw)
+            argv = self.build_toolless_argv(cwd, model, effort)
+            return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
 
     def resume(
         self,
@@ -147,6 +178,65 @@ class CodexEngine(Engine):
     name = "codex"
     default_model = "gpt-5.6-sol"
     binary = "codex"
+
+    def _native_binary(self) -> Path:
+        launcher = shutil.which(self.binary)
+        if not launcher:
+            raise ToollessUnavailable("codex CLI is not installed")
+        path = Path(launcher).resolve()
+        if path.read_bytes()[:4] == b"\x7fELF":
+            return path
+        local = Path(launcher).resolve().parents[3] if len(Path(launcher).resolve().parents) >= 4 else None
+        candidates = []
+        # npm layout: ~/.local/bin/codex -> ../lib/node_modules/@openai/codex/bin/codex.js
+        prefix = Path(launcher).parent.parent
+        candidates.append(
+            prefix / "lib/node_modules/@openai/codex/node_modules/@openai/"
+            "codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+        )
+        if local:
+            candidates.append(local / "vendor/x86_64-unknown-linux-musl/bin/codex")
+        for candidate in candidates:
+            if candidate.is_file() and candidate.read_bytes()[:4] == b"\x7fELF":
+                return candidate
+        raise ToollessUnavailable("could not locate the native Codex binary for isolation")
+
+    def _auth_file(self) -> Path:
+        root = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+        return root / "auth.json"
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        bwrap = shutil.which("bwrap")
+        if not bwrap:
+            raise ToollessUnavailable("bwrap is required for Codex toolless roles")
+        native, auth = self._native_binary(), self._auth_file()
+        if not auth.is_file():
+            raise ToollessUnavailable("Codex auth file is unavailable for isolated role")
+        argv = [
+            bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net",
+            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+            "--dir", "/work", "--chdir", "/work",
+            "--dir", "/etc",
+            "--dir", "/home", "--dir", "/home/codex", "--dir", "/home/codex/.codex",
+            "--ro-bind", str(auth), "/home/codex/.codex/auth.json",
+            "--ro-bind", str(native), "/codex",
+            "--setenv", "HOME", "/home/codex",
+            "--setenv", "CODEX_HOME", "/home/codex/.codex",
+            "--setenv", "PATH", "/no-tools",
+        ]
+        for directory in ("/etc/ssl", "/etc/ssl/certs"):
+            if Path(directory).is_dir():
+                argv += ["--dir", directory]
+        for source in ("/etc/ssl/certs", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf"):
+            if Path(source).exists():
+                argv += ["--ro-bind", source, source]
+        argv += [
+            "--", "/codex", "exec", "--json", "--ephemeral", "--ignore-user-config",
+            "--skip-git-repo-check", "-s", "danger-full-access", "-C", "/work",
+            "-m", model, "-c", f'model_reasoning_effort="{effort}"',
+            "-c", "tools.web_search=false", "-",
+        ]
+        return argv
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         argv = [
@@ -263,6 +353,15 @@ class ClaudeEngine(Engine):
     name = "claude"
     default_model = "claude-fable-5"
     binary = "claude"
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        denied = list(dict.fromkeys([*CLAUDE_RO_TOOLS, *CLAUDE_WEB_TOOLS, *CLAUDE_DENY_TOOLS]))
+        return [
+            "claude", "-p", "--output-format", "json", "--model", model,
+            "--effort", effort, "--permission-mode", "default",
+            "--setting-sources", "", "--allowedTools", "",
+            "--disallowedTools", ",".join(denied),
+        ]
 
     def _allowed(self, web_search: bool) -> str:
         # text_only: an EMPTY allowlist. In `-p` mode a tool that needs permission

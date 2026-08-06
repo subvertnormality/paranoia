@@ -1,11 +1,9 @@
-"""Class closure for `critique_plan`: unmechanized classes, no git.
+"""Class closure for `critique_plan`: unmechanized classes beside pinned evidence.
 
-Two claims that are easy to conflate and are NOT the same: the closure COORDINATOR
-needs no repository and runs no git subprocess (`TestPlanModeNeverGreps`), while the
-`critique_plan` HANDLER requires one, because an ungrounded plan review cannot test the
-plan's premises against the code (`TestPlanReviewsMustBeGrounded`). This module's
-helper therefore always supplies a repository, and any test claiming to omit one is
-lying.
+Two claims that are easy to conflate and are NOT the same: the class-closure
+COORDINATOR still never constructs a grep (`TestPlanModeNeverGreps`), while the integrated
+`critique_plan` HANDLER snapshots Git and resolves bounded server evidence. This module's
+helper therefore always supplies a repository.
 
 Design contract: `docs/plan_class_closure_proposal.md`. Each block names the plan-review
 round whose finding it pins, so a later change that re-opens one fails with the history
@@ -49,6 +47,23 @@ class FakeEngine:
         self.calls.append(prompt)
         return _review(self._next(), self.session_ref)
 
+    def run_toolless(self, prompt: str, model: str, effort: str, **kw):
+        if "neutral claim extractor" in prompt:
+            return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: []", self.session_ref)
+        if "neutral evidence planner" in prompt:
+            return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []", self.session_ref)
+        if "preparing bounded repository context" in prompt:
+            return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []", self.session_ref)
+        if "neutral evidence verifier" in prompt:
+            return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []", self.session_ref)
+        self.calls.append(prompt)
+        if "CORRECTION REQUIRED" in prompt:
+            self.resumed.append(prompt)
+        text = self._next()
+        if text.startswith("=== CLASS REGISTER ==="):
+            text = "=== PLAN REGISTER ===\nEVENTS-JSON: []\n" + text
+        return _review(text, self.session_ref)
+
     def resume(self, ref: str, prompt: str, cwd: Path, model: str, effort: str,
                web: bool, **kw):
         self.resumed.append(prompt)
@@ -67,7 +82,10 @@ def _review(text: str, session_ref: str | None) -> _R:
 
 
 def review_with(register: str, body: str = "## What doesn't work\n\nSomething.") -> str:
-    return f"{body}\n\n=== CLASS REGISTER ===\n{register}"
+    return (
+        f"{body}\n\n=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
+        f"=== CLASS REGISTER ===\n{register}"
+    )
 
 
 PROCEDURE_CLASS = (
@@ -417,7 +435,7 @@ class TestCrossModeLineages:
         assert cc.load_lineage(cc.default_state_root(), "legacy", stamp="T").mode == "branch"
 
 
-# ── plan mode never touches git ───────────────────────────────────────────────
+# ── plan class predicates never grep ─────────────────────────────────────────
 
 
 class TestPlanModeNeverGreps:
@@ -433,20 +451,14 @@ class TestPlanModeNeverGreps:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
         run_round(FakeEngine(review_with("NONE")), tmp_path, round_no=2)
 
-    def test_a_plan_round_runs_no_git_subprocess(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    def test_plan_classes_remain_unmechanized_after_git_backed_evidence(
+        self, tmp_path: Path
     ) -> None:
-        """The sibling test proves no grep is CONSTRUCTED; this proves none is RUN. It
-        used to claim "needs no repository at all" and prove nothing, because the helper
-        builds one with `git init` — so the stub goes in after the fixture exists."""
-        repo = _bare_repo(tmp_path)
-
-        def explode(*a, **k):
-            raise AssertionError("plan mode ran a git subprocess")
-
-        monkeypatch.setattr(handlers, "_run_git", explode)
-        out = run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, repo=repo)
-        assert "CONVERGENCE: BLOCKED" in out
+        run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path)
+        lineage = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T", mode=cc.PLAN_MODE
+        )
+        assert all(not item.mechanized for item in lineage.classes.values())
 
 
 class TestBranchPathUnchanged:
@@ -602,14 +614,14 @@ class TestFailedReviewLeavesStateAlone:
         before = path.read_bytes()
 
         engine = FakeEngine(review_with(f"CLOSED: {_only_class_id(tmp_path)}"))
-        original_run = engine.run
+        original_run = engine.run_toolless
 
         def failing(*a, **k):
             r = original_run(*a, **k)
             r.error, r.returncode = True, 1
             return r
 
-        engine.run = failing  # type: ignore[method-assign]
+        engine.run_toolless = failing  # type: ignore[method-assign]
         out = run_round(engine, tmp_path, round_no=2)
 
         assert "CONVERGENCE: BLOCKED" in out

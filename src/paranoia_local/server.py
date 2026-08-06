@@ -191,9 +191,10 @@ TOOLS: list[Tool] = [
     Tool(
         name="critique_plan",
         description=(
-            "Adversarially review a plan or design doc. The reviewer reads the actual "
-            "code to test the plan's premises about current behaviour — a plan built on an inverted "
-            "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags."
+            "Research and verify a plan's registered load-bearing claims against one "
+            "pinned repository snapshot and bounded server evidence, then adversarially "
+            "review the plan. With closure enabled, Python combines claim closure and "
+            "defect-class closure into one CONVERGENCE verdict."
         ),
         inputSchema={
             "type": "object",
@@ -217,8 +218,9 @@ TOOLS: list[Tool] = [
                         "each class with a PROCEDURE (never a regex: over prose a predicate "
                         "would close the moment the wording changed, which is what a rewrite "
                         "that keeps the defect looks like). Every later round is shown the "
-                        "class and must re-verify it, and a computed CONVERGENCE trailer "
-                        "reports BLOCKED until a reviewer explicitly emits `CLOSED` — for "
+                        "class and must re-verify it. In plan mode the computed trailer "
+                        "combines this gate with blocking claim verification and reports "
+                        "BLOCKED until every required claim and class closes — for "
                         "OPEN classes of severity FATAL or MAJOR only; MINOR and "
                         "OUT-OF-SCOPE ones are tracked, advisory, and never block. The "
                         "guarantee is non-forgetting plus explicit closure — NOT the "
@@ -226,6 +228,54 @@ TOOLS: list[Tool] = [
                         "call argument only; .paranoia.toml is not consulted for it, in "
                         "either direction, so a project's branch-review setting can neither "
                         "enable nor disable the plan gate."
+                    ),
+                },
+                "claim_verification": {
+                    "type": "string",
+                    "enum": ["blocking"],
+                    "description": (
+                        "Integrated blocking claim verification. Omission resolves to "
+                        "'blocking' whenever class_closure is true. It is rejected when "
+                        "class_closure is false: that combination is the sole one-shot "
+                        "path and emits no closure state or CONVERGENCE trailer."
+                    ),
+                },
+                "independent_check": {
+                    "type": "string",
+                    "enum": ["auto", "require"],
+                    "default": "auto",
+                    "description": (
+                        "Require a distinct-vendor text-only evidence audit for every "
+                        "truth/bearing transition, or use auto for high-stakes external "
+                        "claims, contradiction reversal, dispute resolution, and bearing "
+                        "downgrades. Unavailability remains pending and blocks."
+                    ),
+                },
+                "supplied_evidence": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "claim": {"type": "string"},
+                            "source": {"type": "string"},
+                            "content": {"type": "string", "maxLength": 1048576},
+                        },
+                        "required": ["claim", "source", "content"],
+                        "additionalProperties": False,
+                    },
+                    "description": (
+                        "Optional bounded caller artifact text, bound by an exact unique "
+                        "registered claim proposition and hashed by the server. It is "
+                        "evidence input, not a verified status."
+                    ),
+                },
+                "refresh_claims": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Force fresh extraction/evidence planning even when the exact plan "
+                        "and all cached evidence remain valid."
                     ),
                 },
                 "lineage": {
