@@ -468,18 +468,13 @@ def open_latch(root: Path, lineage_id: str) -> None:
 
 
 def clear_latch(root: Path, lineage_id: str) -> None:
-    """Best-effort by design, and the ONE place in this module where that is right.
-
-    A latch that cannot be removed leaves the next round `STATE-UNAVAILABLE`, which is
-    exactly the fail-closed outcome the latch exists to produce. Raising here instead would
-    destroy a completed, paid review over a file that could not be unlinked.
-    """
+    """Durably clear the latch or report failure to the current invocation."""
     _, pending = _paths(root, lineage_id)
     try:
         pending.unlink(missing_ok=True)
         _fsync_dir(pending.parent)
-    except OSError:
-        pass
+    except OSError as exc:
+        raise StateUnavailable(f"could not durably clear pending latch at {pending}: {exc}") from exc
 
 
 def save_lineage(root: Path, lineage: Lineage) -> None:

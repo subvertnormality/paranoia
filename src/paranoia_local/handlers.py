@@ -927,7 +927,11 @@ def _critique_plan_verified(
             session_ref=None, raw="",
         )
     finally:
-        closure.release()
+        release_error = closure.release()
+
+    if release_error:
+        state.debt = {"round": round_no, "reason": release_error}
+        closure.lineage.debt = {"round": round_no, "reason": release_error}
 
     assert structural_review is not None
     trailer = _render_plan_convergence(
@@ -1473,7 +1477,7 @@ class _ClosureRound:
         nothing to protect and must not outlive the exception that is already propagating."""
         self._settled = True
 
-    def release(self) -> None:
+    def release(self) -> str | None:
         """Clear the pending latch once the round is over WITHOUT an unresolved write.
 
         Called from a `finally` covering everything after `prepare()`, so no failure between
@@ -1482,8 +1486,12 @@ class _ClosureRound:
         genuinely ambiguous case, and the one the latch exists for.
         """
         if self._latched and self._settled:
-            cc.clear_latch(self.state_root, self.lineage_id)
+            try:
+                cc.clear_latch(self.state_root, self.lineage_id)
+            except cc.StateUnavailable as exc:
+                return str(exc)
             self._latched = False
+        return None
 
     # ── internals ──
 

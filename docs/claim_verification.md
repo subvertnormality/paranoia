@@ -59,7 +59,8 @@ One closure round performs these stages:
    atomically exclusive per-lineage latch rejects concurrent rounds before either can
    construct a stale draft.
 
-For Claude, toolless means bare settings, an empty allowlist, and an explicit deny list.
+For Claude, toolless means bare settings, an empty allowlist, an explicit deny list, an
+empty `--tools` availability set, and strict empty MCP configuration.
 For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
 empty working directory, auth, TLS/DNS files, and no shell, repository, common Git store,
 or sibling worktree. Native web is forced off for every claim-verification role. If that
@@ -156,7 +157,8 @@ blocking-to-advisory changes. `RESOLVE_DISPUTE` names its exact target outcome (
 or `contradicted`) in the audited event. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
-after reload.
+after reload. The exact pending event is rendered to the next verifier for recovery; a
+different event cannot erase it.
 
 The second vendor receives the server-owned proposition, current kind/bearing/status,
 plan-anchor identity and spans, complete proposed event, and exact named evidence. Truth,
@@ -219,7 +221,9 @@ result has no persistent stop condition.
 
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
 unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
-fully validated and corrupt lineage state is quarantined before a latch is acquired.
+fully validated and corrupt lineage state is quarantined before a latch is acquired. Kind,
+classification, and status combinations must be transition-reachable, and anchor
+relocation treats overlapping occurrences as ambiguous.
 Register syntax and semantic transition validation share the same single correction
 attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
 or state transition is corrected before application. Malformed registers record debt. A

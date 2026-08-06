@@ -384,6 +384,43 @@ def test_inconsistent_persisted_supersession_is_rejected() -> None:
         pc.state_from_json("plan", pc.state_to_json(state))
 
 
+def test_unreachable_confirmed_decision_status_is_rejected() -> None:
+    state, claim_id, spans = _state_with_claim()
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "decision", "reason": "choice",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    state.claims[claim_id].status = pc.STALE
+    with pytest.raises(pc.ClaimRegisterError, match="unreachable status"):
+        pc.state_from_json("plan", pc.state_to_json(state))
+
+
+def test_overlapping_anchor_occurrences_are_ambiguous() -> None:
+    spans = pc.segment_plan(b"aaaa")
+    state = pc.ClaimState("overlap")
+    claim_id = pc.apply_events(
+        state, pc.parse_role_register(_research([_add()]), pc.RESEARCH_ROLE),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["new-1"]
+    pc.reconcile_plan(state, b"aaaaa", pc.segment_plan(b"aaaaa"))
+    assert state.claims[claim_id].status == pc.STALE
+
+
+def test_pending_transition_is_rendered_for_fresh_verifier_recovery() -> None:
+    state, claim_id, _spans = _state_with_confirmed_fact()
+    state.claims[claim_id].pending_transition = {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "retry me",
+    }
+    rendered = pc.render_claim_summary(
+        pc.state_from_json("plan", pc.state_to_json(state))
+    )
+    assert '"pending_transition":{"claim_id"' in rendered
+    assert '"reason":"retry me"' in rendered
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

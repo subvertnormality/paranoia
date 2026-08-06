@@ -647,7 +647,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   repo, read-only.
 - **Plan evidence is server-mediated.** Closure-enabled `critique_plan` roles do not
   receive a repository worktree. Claude uses an empty tool allowlist; Codex uses a
-  `bwrap` namespace with no shell or repository mounts. Native web is disabled. Exact
+  `bwrap` namespace with no shell or repository mounts. Native web is disabled. Claude
+  roles also receive an empty tool-availability set and strict empty MCP configuration. Exact
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call. Git

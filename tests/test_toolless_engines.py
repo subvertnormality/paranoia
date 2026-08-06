@@ -11,6 +11,9 @@ def test_claude_toolless_profile_has_empty_allowlist_and_forces_web_off(tmp_path
     argv = ClaudeEngine().build_toolless_argv(tmp_path, "claude", "high")
     allowed = argv[argv.index("--allowedTools") + 1]
     assert allowed == ""
+    assert argv[argv.index("--tools") + 1] == ""
+    assert "--strict-mcp-config" in argv
+    assert argv[argv.index("--mcp-config") + 1] == '{"mcpServers":{}}'
     denied = argv[argv.index("--disallowedTools") + 1]
     assert "WebSearch" in denied and "WebFetch" in denied
     assert "--setting-sources" in argv

@@ -360,6 +360,8 @@ class ClaudeEngine(Engine):
             "claude", "-p", "--output-format", "json", "--model", model,
             "--effort", effort, "--permission-mode", "default",
             "--setting-sources", "", "--allowedTools", "",
+            "--tools", "", "--strict-mcp-config",
+            "--mcp-config", '{"mcpServers":{}}',
             "--disallowedTools", ",".join(denied),
         ]
 

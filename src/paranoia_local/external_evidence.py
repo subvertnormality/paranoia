@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import ipaddress
 import json
+import multiprocessing
 import socket
 import ssl
 import string
@@ -69,6 +70,15 @@ class Transport(Protocol):
 Resolver = Callable[[str], Sequence[str]]
 
 
+def _resolver_worker(resolver: Resolver, host: str, connection: object) -> None:
+    try:
+        connection.send((True, list(resolver(host))))  # type: ignore[attr-defined]
+    except BaseException as exc:
+        connection.send((False, f"{type(exc).__name__}: {exc}"))  # type: ignore[attr-defined]
+    finally:
+        connection.close()  # type: ignore[attr-defined]
+
+
 def system_resolver(host: str) -> list[str]:
     try:
         return sorted({row[4][0] for row in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)})
@@ -90,6 +100,19 @@ def _public(address: str) -> bool:
 class HttpsTransport:
     """Connect to the selected IP while TLS authenticates the original hostname."""
 
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._active: socket.socket | None = None
+
+    def cancel(self) -> None:
+        with self._lock:
+            if self._active is not None:
+                try:
+                    self._active.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                self._active.close()
+
     def request(self, url: str, address: str, limits: FetchLimits,
                 deadline: float, on_bytes: Callable[[int], None] | None = None
                 ) -> TransportResponse:
@@ -107,6 +130,8 @@ class HttpsTransport:
             context = ssl.create_default_context()
             wrapped = context.wrap_socket(raw, server_hostname=host)
             raw = None
+            with self._lock:
+                self._active = wrapped
             wrapped.settimeout(min(limits.read_timeout, max(0.1, deadline - time.monotonic())))
             path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
             request = (
@@ -140,6 +165,8 @@ class HttpsTransport:
         except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
             raise NetworkEvidenceError(f"HTTPS request failed: {exc}") from exc
         finally:
+            with self._lock:
+                self._active = None
             if wrapped is not None:
                 wrapped.close()
             if raw is not None:
@@ -223,28 +250,31 @@ class SafeHttpClient:
         raise NetworkEvidenceError("redirect limit exceeded")
 
     def _resolve(self, host: str, deadline: float) -> Sequence[str]:
-        result: queue.Queue[tuple[bool, object]] = queue.Queue(maxsize=1)
-
-        def run() -> None:
-            try:
-                result.put((True, self.resolver(host)))
-            except BaseException as exc:  # transported to the owning request thread
-                result.put((False, exc))
-
-        worker = threading.Thread(target=run, daemon=True, name="paranoia-dns")
+        if "fork" not in multiprocessing.get_all_start_methods():
+            raise NetworkEvidenceError("cancellable DNS resolution requires fork support")
+        context = multiprocessing.get_context("fork")
+        parent, child = context.Pipe(duplex=False)
+        worker = context.Process(
+            target=_resolver_worker, args=(self.resolver, host, child), daemon=True,
+        )
         worker.start()
+        child.close()
         remaining = deadline - self.clock()
         if remaining <= 0:
+            worker.terminate()
+            worker.join()
             raise NetworkEvidenceError("external request total deadline expired")
-        try:
-            ok, value = result.get(timeout=remaining)
-        except queue.Empty as exc:
-            raise NetworkEvidenceError("external DNS resolution exceeded total deadline") from exc
+        if not parent.poll(remaining):
+            worker.terminate()
+            worker.join()
+            parent.close()
+            raise NetworkEvidenceError("external DNS resolution exceeded total deadline")
+        ok, value = parent.recv()
+        parent.close()
+        worker.join(timeout=1.0)
         if not ok:
-            if isinstance(value, NetworkEvidenceError):
-                raise value
             raise NetworkEvidenceError(f"DNS resolution failed for {host}: {value}")
-        return value  # type: ignore[return-value]
+        return value
 
     def _request_with_deadline(
         self, url: str, address: str, limits: FetchLimits, deadline: float,
@@ -260,13 +290,18 @@ class SafeHttpClient:
             except BaseException as exc:
                 result.put((False, exc))
 
-        threading.Thread(target=run, daemon=True, name="paranoia-https").start()
+        worker = threading.Thread(target=run, daemon=True, name="paranoia-https")
+        worker.start()
         remaining = deadline - self.clock()
         if remaining <= 0:
             raise NetworkEvidenceError("external request total deadline expired")
         try:
             ok, value = result.get(timeout=remaining)
         except queue.Empty as exc:
+            cancel = getattr(self.transport, "cancel", None)
+            if callable(cancel):
+                cancel()
+                worker.join(timeout=1.0)
             raise NetworkEvidenceError("external request exceeded total deadline") from exc
         if not ok:
             if isinstance(value, Exception):

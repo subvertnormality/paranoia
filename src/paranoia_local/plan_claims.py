@@ -595,7 +595,7 @@ def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> 
             if found < 0:
                 break
             offsets.append(found)
-            start = found + max(1, len(excerpt))
+            start = found + 1
             if len(offsets) > 1:
                 break
         if len(offsets) != 1:
@@ -708,6 +708,14 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
     ):
         raise ClaimRegisterError("claim authorization policy is malformed")
     for claim in claims.values():
+        if claim.kind_classification == PROPOSED and claim.status != UNCHECKED:
+            raise ClaimRegisterError("proposed persisted claim has unreachable status")
+        if claim.kind_classification == CONFIRMED and claim.kind == DECISION \
+                and claim.status not in {NOT_APPLICABLE, SUPERSEDED}:
+            raise ClaimRegisterError("confirmed persisted decision has unreachable status")
+        if claim.kind_classification == CONFIRMED and claim.kind == FACT \
+                and claim.status == NOT_APPLICABLE:
+            raise ClaimRegisterError("confirmed persisted fact has unreachable status")
         if claim.status == SUPERSEDED:
             target = claims.get(claim.superseded_by or "")
             if claim.pending_replacement_id != claim.superseded_by or target is None \
@@ -877,6 +885,7 @@ def render_claim_summary(state: ClaimState) -> str:
                     "bearing": claim.bearing,
                     "status": claim.status,
                     "evidence_ids": claim.evidence_ids,
+                    "pending_transition": claim.pending_transition,
                 },
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
