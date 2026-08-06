@@ -490,11 +490,15 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
                     key: value for key, value in os.environ.items()
                     if not key.startswith("GIT_")
                 }
-                proc = subprocess.run(
-                    ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
-                    cwd=repo, stdin=handle, capture_output=True,
-                    env={**ambient, **_GIT_ENV},
-                )
+                try:
+                    proc = subprocess.run(
+                        ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
+                        cwd=repo, stdin=handle, capture_output=True,
+                        timeout=GIT_TIMEOUT_SECONDS,
+                        env={**ambient, **_GIT_ENV},
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    raise SnapshotUnavailable("git hash-object exceeded hard deadline") from exc
             if proc.returncode:
                 raise SnapshotUnavailable(
                     "git hash-object failed: "
@@ -545,7 +549,13 @@ def _validate_object_boundary(repo: Path) -> None:
     for name in ("alternates", "http-alternates"):
         path = objects / "info" / name
         try:
-            if path.is_symlink() or (path.exists() and path.read_bytes().strip()):
+            if path.exists():
+                info = path.stat(follow_symlinks=False)
+                if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
+                    raise SnapshotUnavailable(
+                        f"repository object alternates metadata is unsafe: {path}"
+                    )
+            if path.exists() and path.read_bytes().strip():
                 raise SnapshotUnavailable(
                     f"repository object alternates are outside the approved snapshot boundary: {path}"
                 )

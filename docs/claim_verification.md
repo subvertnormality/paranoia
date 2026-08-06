@@ -87,7 +87,8 @@ extractor proposed. A different role must confirm its kind. Advisory bearing is 
 only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
 Facts block until verified or safely deferred. Decisions become `not-applicable` only
 after cross-role kind confirmation and block again if a plan edit or dispute makes them
-stale/disputed. Omission never deletes a claim.
+stale/disputed. Evidence disputes are accepted only for cross-role-confirmed factual
+claims. Omission never deletes a claim.
 
 Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
 ambiguous anchors become stale. Deferred claims additionally invalidate when their plan
@@ -191,7 +192,8 @@ snapshot, history-ref, operation, and canonical query-parameter identities. Lite
 charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
 Git output, debit it as it is read, and terminate at their record or byte cap instead of
 capturing an unbounded result. Every snapshot Git process and pipe read also has a hard
-deadline and is killed/reaped on expiry. Network evidence is audit
+deadline and is killed/reaped on expiry; directly read Git metadata must be small regular
+files rather than FIFOs or devices. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 Any cached record discarded during validation disables the zero-research cache for that

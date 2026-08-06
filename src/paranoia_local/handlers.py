@@ -742,6 +742,10 @@ def _critique_plan_verified(
                             pc.apply_events(
                                 preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
                                 round_no=round_no, evidence_ids=evidence_ids,
+                                independent_required=_independent_required(
+                                    event, preview, evidence_records,
+                                    independent_policy, high_stakes,
+                                ),
                             )
 
                     _, verifier_events, _ = _role_register_call(
@@ -916,8 +920,16 @@ def _critique_plan_verified(
                 lambda: cc.save_lineage(closure.state_root, closure.lineage),
             )
             closure._settled = True
-        except (EvidenceCommitAmbiguous, EvidenceStoreError, cc.StateUnavailable) as commit_error:
+        except EvidenceCommitAmbiguous as commit_error:
             exc = _RegisterStageFailure(f"{exc}; debt publication failed: {commit_error}")
+        except (EvidenceStoreError, cc.StateUnavailable) as commit_error:
+            try:
+                cc.save_lineage(closure.state_root, closure.lineage)
+                closure._settled = True
+                store.abort(run_id)
+            except (EvidenceStoreError, cc.StateUnavailable, OSError):
+                pass
+            exc = _RegisterStageFailure(f"{exc}; evidence adoption failed: {commit_error}")
         structural_review = Review(
             text=f"## What works\n\nNothing notable.\n\n## What doesn't work\n\n"
                  f"[FATAL] Claim register failed closed: {exc}\n\n## Risks\n\n"

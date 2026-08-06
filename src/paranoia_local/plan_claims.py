@@ -393,6 +393,7 @@ def apply_events(
                 _refresh_evidence_dependencies(claim)
             claim.reason = data["reason"]
         elif event.op == "DISPUTE":
+            _require_fact(claim)
             ids = _validated_evidence(data, available, claim.claim_id)
             claim.status, claim.disputed_evidence_ids = DISPUTED, ids
             claim.dispute_evidence_ids = ids

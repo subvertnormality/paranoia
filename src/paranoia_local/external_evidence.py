@@ -165,12 +165,12 @@ class HttpsTransport:
                     raise NetworkEvidenceError("external request total deadline expired")
                 wrapped.settimeout(min(limits.read_timeout, max(0.1, remaining)))
                 read_size = min(65536, limits.max_compressed_bytes - total + 1)
-                if on_bytes is not None:
-                    on_bytes(read_size)
                 chunk = response.read1(read_size)
                 if not chunk:
                     break
                 total += len(chunk)
+                if on_bytes is not None:
+                    on_bytes(len(chunk))
                 if total > limits.max_compressed_bytes:
                     raise NetworkEvidenceError("compressed response exceeds byte cap")
                 chunks.append(chunk)
@@ -314,6 +314,10 @@ class SafeHttpClient:
         worker.start()
         remaining = deadline - self.clock()
         if remaining <= 0:
+            callbacks_active.clear()
+            cancel = getattr(self.transport, "cancel", None)
+            if callable(cancel):
+                cancel()
             raise NetworkEvidenceError("external request total deadline expired")
         try:
             ok, value = result.get(timeout=remaining)
