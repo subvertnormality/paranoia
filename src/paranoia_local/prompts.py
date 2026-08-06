@@ -165,7 +165,7 @@ SET_BEARING, and SUPERSEDE. Exact objects:
 {"op":"VERIFY","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
 {"op":"CONTRADICT","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
 {"op":"DEFER","claim_id":"...","verification_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"},"dependent_anchors":[{"first_span":"pNNNNNN","last_span":"pNNNNNN"}],"completion_evidence":"...","failure_condition":"...","stop_action":"..."}
-{"op":"RESOLVE_DISPUTE","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
+{"op":"RESOLVE_DISPUTE","claim_id":"...","outcome":"verified|contradicted","evidence_ids":["e..."],"reason":"..."}
 {"op":"SET_BEARING","claim_id":"...","bearing":"blocking|advisory","evidence_ids":["e..."],"reason":"..."}
 {"op":"SUPERSEDE","claim_id":"...","replacement":{"temp_id":"...","claim":"...","kind":"fact|decision","assertion_mode":"asserted|assumption|estimate","plan_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"}},"reason":"..."}
 Every truth or bearing transition must name server evidence IDs. Use [] to abstain."""

@@ -200,7 +200,9 @@ _SCHEMAS: dict[str, frozenset[str]] = {
     "DEFER": frozenset({"op", "claim_id", "verification_anchor", "dependent_anchors",
                          "completion_evidence", "failure_condition", "stop_action"}),
     "DISPUTE": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
-    "RESOLVE_DISPUTE": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
+    "RESOLVE_DISPUTE": frozenset({
+        "op", "claim_id", "outcome", "evidence_ids", "reason",
+    }),
     "SET_BEARING": frozenset({"op", "claim_id", "bearing", "evidence_ids", "reason"}),
     "CONFIRM_KIND": frozenset({"op", "claim_id", "kind", "reason"}),
     "SUPERSEDE": frozenset({"op", "claim_id", "replacement", "reason"}),
@@ -371,7 +373,11 @@ def apply_events(
                 claim.status, claim.truth_evidence_ids = CONTRADICTED, ids
                 _refresh_evidence_dependencies(claim)
             elif event.op == "RESOLVE_DISPUTE":
-                claim.status = VERIFIED
+                if data["outcome"] not in {VERIFIED, CONTRADICTED}:
+                    raise ClaimTransitionError(
+                        "dispute outcome must be verified or contradicted"
+                    )
+                claim.status = data["outcome"]
                 claim.truth_evidence_ids = ids
                 claim.dispute_evidence_ids = ids
                 claim.disputed_evidence_ids = []
@@ -630,7 +636,7 @@ def state_to_json(state: ClaimState) -> dict[str, Any]:
 
 
 def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimState:
-    if not raw:
+    if raw is None:
         return ClaimState(lineage_id)
     if not isinstance(raw, Mapping):
         raise ClaimRegisterError("claim state must be an object")
@@ -771,6 +777,25 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         raise ClaimRegisterError("persisted truth transition has no evidence")
     if row.get("bearing") == ADVISORY and not row.get("bearing_evidence_ids"):
         raise ClaimRegisterError("persisted advisory claim has no evidence")
+    if row.get("status") in {VERIFIED, CONTRADICTED} \
+            and row.get("truth_authorization") is None:
+        raise ClaimRegisterError("persisted truth transition has no authorization")
+    if row.get("bearing") == ADVISORY and row.get("bearing_authorization") is None:
+        raise ClaimRegisterError("persisted advisory claim has no authorization")
+    if row.get("status") == DEFERRED and row.get("deferral_authorization") is None:
+        raise ClaimRegisterError("persisted deferral has no authorization")
+    retained = list(dict.fromkeys([
+        *row["truth_evidence_ids"], *row["bearing_evidence_ids"],
+        *row["dispute_evidence_ids"], *row["disputed_evidence_ids"],
+    ]))
+    if row.get("evidence_ids") != retained:
+        raise ClaimRegisterError("persisted claim evidence dependency union is inconsistent")
+    pending = row.get("pending_transition")
+    if pending is not None:
+        if not isinstance(pending.get("op"), str) or pending["op"] not in _SCHEMAS \
+                or set(pending) != set(_SCHEMAS[pending["op"]]):
+            raise ClaimRegisterError("persisted pending transition is malformed")
+        _validate_scalars(pending["op"], pending)
     for authorization_key in (
         "truth_authorization", "bearing_authorization", "dispute_authorization",
         "deferral_authorization",
@@ -782,24 +807,32 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         if not set(info).issubset(allowed) or not isinstance(info.get("required"), bool) \
                 or info.get("status") not in {"not-required", "pending", "complete"}:
             raise ClaimRegisterError("persisted independent authorization is malformed")
-        if info["required"]:
-            ids = info.get("evidence_ids", [])
-            checks = info.get("checks", [])
-            if not isinstance(ids, list) or any(not isinstance(item, str) or not item for item in ids) \
-                    or not isinstance(checks, list):
-                raise ClaimRegisterError("persisted independent authorization inputs are malformed")
-            for check in checks:
-                if not isinstance(check, dict) or set(check) != {
-                    "vendor", "model", "event_digest", "evidence_ids", "accepted", "checked_at"
-                }:
-                    raise ClaimRegisterError("persisted vendor check is malformed")
-                if any(not isinstance(check.get(key), str) or not check[key]
-                       for key in ("vendor", "model", "event_digest", "checked_at")) \
-                        or not _digest(check["event_digest"]) \
-                        or not isinstance(check.get("evidence_ids"), (list, tuple)) \
-                        or any(not isinstance(item, str) or not item for item in check["evidence_ids"]) \
-                        or not isinstance(check.get("accepted"), bool):
-                    raise ClaimRegisterError("persisted vendor check values are malformed")
+        if (info["required"] and info["status"] == "not-required") \
+                or (not info["required"] and info["status"] != "not-required") \
+                or ("reason" in info and not isinstance(info["reason"], str)):
+            raise ClaimRegisterError("persisted independent authorization state is inconsistent")
+        ids = info.get("evidence_ids", [])
+        checks = info.get("checks", [])
+        digest = info.get("event_digest")
+        if not isinstance(digest, str) or not _digest(digest) \
+                or not isinstance(ids, list) \
+                or any(not isinstance(item, str) or not item for item in ids) \
+                or not isinstance(checks, list):
+            raise ClaimRegisterError("persisted independent authorization inputs are malformed")
+        if not info["required"] and checks:
+            raise ClaimRegisterError("non-required authorization may not retain vendor checks")
+        for check in checks:
+            if not isinstance(check, dict) or set(check) != {
+                "vendor", "model", "event_digest", "evidence_ids", "accepted", "checked_at"
+            }:
+                raise ClaimRegisterError("persisted vendor check is malformed")
+            if any(not isinstance(check.get(key), str) or not check[key]
+                   for key in ("vendor", "model", "event_digest", "checked_at")) \
+                    or not _digest(check["event_digest"]) \
+                    or not isinstance(check.get("evidence_ids"), (list, tuple)) \
+                    or any(not isinstance(item, str) or not item for item in check["evidence_ids"]) \
+                    or not isinstance(check.get("accepted"), bool):
+                raise ClaimRegisterError("persisted vendor check values are malformed")
 
 
 def _persisted_anchor(anchor: Any) -> bool:

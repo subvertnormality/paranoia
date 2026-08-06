@@ -200,7 +200,9 @@ def collect_evidence(
         data = request.data
         claim_id = data["claim_id"]
         if request.op == "LIST_TREE":
-            paths = snapshot.list_tree(data["prefix"], limit=data["limit"])
+            paths = snapshot.list_tree(
+                data["prefix"], limit=data["limit"], debit_bytes=budget.debit_bytes
+            )
             body = json.dumps(paths, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
@@ -240,7 +242,10 @@ def collect_evidence(
                                    {"pattern": data["pattern"], "paths": data["paths"],
                                     "snapshot_commit": snapshot.commit_id}))
         elif request.op == "HISTORY":
-            rows = snapshot.history(data["ref"], data["path"], limit=data["limit"])
+            rows = snapshot.history(
+                data["ref"], data["path"], limit=data["limit"],
+                debit_bytes=budget.debit_bytes,
+            )
             body = json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode()
             budget.debit_bytes(len(body))
             records.append(_record(

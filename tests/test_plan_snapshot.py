@@ -137,6 +137,14 @@ def test_special_file_scan_prunes_ignored_regular_directories(repo: Path) -> Non
     ) == ()
 
 
+def test_git_tree_output_is_bounded_while_streaming(repo: Path) -> None:
+    with pytest.raises(SnapshotUnavailable, match="output exceeds byte cap"):
+        ps._run_bounded(
+            repo, ["ls-tree", "-r", "-z", "--name-only", "HEAD"],
+            max_bytes=2, stop_after_nuls=200,
+        )
+
+
 def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: Path) -> None:
     tree = subprocess.run(
         ["git", "rev-parse", "HEAD^{tree}"], cwd=repo, check=True,

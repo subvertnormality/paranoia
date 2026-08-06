@@ -305,6 +305,41 @@ def test_invalid_required_truth_transition_cannot_leave_a_decision_nonblocking()
     assert pc.claim_blocks(claim), "persisted pending state must block even for decisions"
 
 
+def test_dispute_resolution_names_and_applies_the_audited_outcome() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    pc.apply_events(
+        state,
+        [pc.Event("DISPUTE", {
+            "op": "DISPUTE", "claim_id": claim_id,
+            "evidence_ids": ["e1"], "reason": "conflict",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans, evidence_ids={"e1": claim_id},
+    )
+    event = pc.Event("RESOLVE_DISPUTE", {
+        "op": "RESOLVE_DISPUTE", "claim_id": claim_id,
+        "outcome": "verified", "evidence_ids": ["e2"], "reason": "resolved",
+    })
+    digest = pc.event_digest(event)
+    checks = [
+        pc.VendorCheck("one", "m1", digest, ("e2",), True, "t"),
+        pc.VendorCheck("two", "m2", digest, ("e2",), True, "t"),
+    ]
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e2": claim_id}, independent_required=True,
+        vendor_checks=checks,
+    )
+    claim = state.claims[claim_id]
+    assert claim.status == pc.VERIFIED and not pc.claim_blocks(claim)
+    assert claim.dispute_authorization["event_digest"] == digest
+
+
+@pytest.mark.parametrize("raw", [[], "", 0, False])
+def test_falsey_non_object_persisted_claim_state_is_rejected(raw: object) -> None:
+    with pytest.raises(pc.ClaimRegisterError, match="must be an object"):
+        pc.state_from_json("corrupt", raw)  # type: ignore[arg-type]
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

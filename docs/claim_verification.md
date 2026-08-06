@@ -144,8 +144,10 @@ their exact bytes, but they still pass through the verifier and are never self-a
 `independent_check` is `auto` (default) or `require`. Risk classification is explicit
 through `stakes_level = low | high`; when omitted, any nonempty stakes description is
 high. Natural-language stakes are never parsed for security-significant words. Auto
-requires a distinct-vendor audit for high-stakes external claims, contradiction reversal, evidence-dispute
-resolution, and blocking-to-advisory changes. The proposed transition, evidence IDs,
+requires a distinct-vendor audit for high-stakes external claims, every closure transition
+out of a contradicted or disputed state, truth reversal, evidence-dispute resolution, and
+blocking-to-advisory changes. `RESOLVE_DISPUTE` names its exact target outcome (`verified`
+or `contradicted`) in the audited event. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload.
@@ -170,7 +172,9 @@ claim, eight external HTTP attempts (debited before each hop, including failures
 and one correction retry per model register. Evidence is content-addressed and reusable;
 repository reuse recomputes every passage/identity field and is bound to exact blob,
 snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
-charges each inspected blob before reading it. Network evidence is audit
+charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
+Git output, debit it as it is read, and terminate at their record or byte cap instead of
+capturing an unbounded result. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 
@@ -188,6 +192,10 @@ CLASS-CLOSURE: 0 open, 2 closed, 2 unmechanized
 CONVERGENCE: BLOCKED — 1 claim(s)
 ```
 
+If a structural terminal register needs correction, the original five-section critique is
+preserved and the corrected register is displayed separately as the register actually
+applied.
+
 There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
 `NOT-BLOCKED`.
 
@@ -201,7 +209,10 @@ result has no persistent stop condition.
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
 unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
 fully validated and corrupt lineage state is quarantined before a latch is acquired.
-Malformed registers record debt. A failed snapshot-ref cleanup, ambiguous publication, or
+Register syntax and semantic transition validation share the same single correction
+attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
+or state transition is corrected before application. Malformed registers record debt. A
+failed snapshot-ref cleanup, ambiguous publication, or
 crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
 through to a stale writer. A register still malformed after its one correction attempt is
 published as durable blocking debt—even over an otherwise clear cache—and only a later

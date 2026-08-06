@@ -66,6 +66,43 @@ def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
     return result
 
 
+def _run_bounded(
+    repo: Path, args: list[str], *, max_bytes: int, stop_after_nuls: int,
+    debit_bytes: Callable[[int], None] | None = None,
+) -> bytes:
+    """Read bounded Git output and terminate once complete records reach the limit."""
+    ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    proc = subprocess.Popen(
+        ["git", *_GIT_CONFIG, *args], cwd=repo, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, env={**ambient, **_GIT_ENV},
+    )
+    output = bytearray()
+    try:
+        assert proc.stdout is not None
+        while output.count(b"\0") < stop_after_nuls:
+            remaining = max_bytes - len(output)
+            if remaining <= 0:
+                raise SnapshotUnavailable("bounded Git output exceeds byte cap")
+            chunk = proc.stdout.read(min(65536, remaining + 1))
+            if not chunk:
+                break
+            if debit_bytes is not None:
+                debit_bytes(len(chunk))
+            output.extend(chunk)
+            if len(output) > max_bytes:
+                raise SnapshotUnavailable("bounded Git output exceeds byte cap")
+        if output.count(b"\0") >= stop_after_nuls:
+            proc.terminate()
+        returncode = proc.wait(timeout=10)
+        if returncode not in {0, -15}:
+            raise SnapshotUnavailable("bounded Git command failed")
+        return bytes(output)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
 def _ref_token(run_id: str) -> str:
     safe = _SAFE.sub("-", run_id).strip(".-")[:48] or "run"
     digest = hashlib.sha256(run_id.encode()).hexdigest()[:12]
@@ -272,7 +309,10 @@ class PlanRepositorySnapshot:
                 proc.wait()
         return bytes(result)
 
-    def list_tree(self, prefix: str = "", *, limit: int = 200) -> list[str]:
+    def list_tree(
+        self, prefix: str = "", *, limit: int = 200,
+        debit_bytes: Callable[[int], None] | None = None,
+    ) -> list[str]:
         self._verify_wrapper()
         if limit < 1 or limit > 200:
             raise SnapshotUnavailable("tree result limit must be 1..200")
@@ -284,7 +324,10 @@ class PlanRepositorySnapshot:
             if pure.is_absolute() or ".." in pure.parts:
                 raise SnapshotUnavailable("tree prefix escapes snapshot")
             args += ["--", ":(literal)" + prefix]
-        rows = _run(self.repo, args).stdout.split(b"\0")
+        rows = _run_bounded(
+            self.repo, args, max_bytes=1 << 20, stop_after_nuls=limit,
+            debit_bytes=debit_bytes,
+        ).split(b"\0")
         return [r.decode("utf-8", errors="surrogateescape") for r in rows if r][:limit]
 
     def search_literal(self, pattern: str, *, paths: list[str] | None = None,
@@ -295,7 +338,7 @@ class PlanRepositorySnapshot:
                 or not (1 <= limit <= 50):
             raise SnapshotUnavailable("literal search exceeds bounds")
         results: list[dict[str, object]] = []
-        candidates = paths or self.list_tree(limit=200)
+        candidates = paths or self.list_tree(limit=200, debit_bytes=debit_bytes)
         if any(not isinstance(path, str) for path in candidates):
             raise SnapshotUnavailable("literal search paths must be strings")
         for path in candidates[:200]:
@@ -320,7 +363,10 @@ class PlanRepositorySnapshot:
                 break
         return results
 
-    def history(self, ref: str, path: str, *, limit: int = 20) -> list[dict[str, str]]:
+    def history(
+        self, ref: str, path: str, *, limit: int = 20,
+        debit_bytes: Callable[[int], None] | None = None,
+    ) -> list[dict[str, str]]:
         """Read only commits reachable from the initial pinned ref map."""
         self._verify_wrapper()
         if not (1 <= limit <= 50):
@@ -334,11 +380,13 @@ class PlanRepositorySnapshot:
         exists = _run(self.repo, ["cat-file", "-e", oid + "^{commit}"], check=False)
         if exists.returncode:
             raise SnapshotUnavailable("pinned history object is missing")
-        output = _run(
+        output = _run_bounded(
             self.repo,
             ["log", f"-{limit}", "--format=%H%x00%ct%x00%s%x00", oid, "--",
              ":(literal)" + path],
-        ).stdout
+            max_bytes=1 << 20, stop_after_nuls=limit * 3,
+            debit_bytes=debit_bytes,
+        )
         tokens = output.decode("utf-8", errors="replace").split("\0")
         rows: list[dict[str, str]] = []
         for index in range(0, len(tokens) - 2, 3):

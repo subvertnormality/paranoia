@@ -183,6 +183,156 @@ def test_stakes_risk_is_explicit_and_never_inferred_from_negated_words() -> None
     assert handlers._is_high_stakes(None, "high") is True
 
 
+@pytest.mark.parametrize("status,op", [
+    (pc.DISPUTED, "VERIFY"),
+    (pc.DISPUTED, "DEFER"),
+    (pc.CONTRADICTED, "VERIFY"),
+    (pc.CONTRADICTED, "DEFER"),
+    (pc.VERIFIED, "CONTRADICT"),
+])
+def test_protected_truth_states_require_independent_authorization(
+    status: str, op: str,
+) -> None:
+    spans = pc.segment_plan(b"Verify first.\nUse it.\n")
+    state = pc.ClaimState("protected")
+    claim_id = pc.apply_events(
+        state,
+        pc.parse_role_register(
+            "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([{
+                "op": "ADD", "temp_id": "one", "claim": "Protected premise",
+                "kind": "fact", "assertion_mode": "asserted",
+                "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+            }]),
+            pc.RESEARCH_ROLE,
+        ),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    claim = state.claims[claim_id]
+    claim.kind_classification = pc.CONFIRMED
+    claim.status = status
+    data = {"op": op, "claim_id": claim_id}
+    if op == "DEFER":
+        data.update({
+            "verification_anchor": {"first_span": "p000001", "last_span": "p000001"},
+            "dependent_anchors": [{"first_span": "p000002", "last_span": "p000002"}],
+            "completion_evidence": "success", "failure_condition": "failure",
+            "stop_action": "stop",
+        })
+    else:
+        data.update({"evidence_ids": ["e1"], "reason": "truth transition"})
+    assert handlers._independent_required(
+        pc.Event(op, data), state, [], "auto", False
+    )
+
+
+def test_semantic_structural_retry_preserves_original_five_sections(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class SemanticRetryEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "adversarial reviewer of plans" not in prompt:
+                return super().run_toolless(prompt, model, effort, **kwargs)
+            self.tool_less_prompts.append(prompt)
+            if "=== CORRECTION REQUIRED ===" in prompt:
+                return _review(
+                    "=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
+                    "=== CLASS REGISTER ===\nNONE"
+                )
+            invalid = {
+                "op": "ADD", "temp_id": "bad", "claim": "Bad anchor",
+                "kind": "fact", "assertion_mode": "asserted",
+                "plan_anchor": {"first_span": "p999999", "last_span": "p999999"},
+            }
+            return _review(
+                "## What works\n\nORIGINAL REVIEW SURVIVES.\n\n"
+                "## What doesn't work\n\nNothing notable.\n\n"
+                "## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n"
+                "## Improvements\n\nNothing notable.\n\n=== PLAN REGISTER ===\n"
+                "EVENTS-JSON: " + _json([invalid]) + "\n=== CLASS REGISTER ===\nNONE"
+            )
+
+    engine = SemanticRetryEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+            "lineage": "semantic-structural-retry", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "ORIGINAL REVIEW SURVIVES" in out
+    assert "composite register below was supplied on retry" in out
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    assert any("unknown server span" in prompt for prompt in engine.tool_less_prompts)
+
+
+@pytest.mark.parametrize("stage", ["research", "evidence", "verifier", "structural-evidence"])
+def test_semantic_register_failures_receive_one_correction_attempt(
+    repo: Path, tmp_path: Path, stage: str,
+) -> None:
+    class SemanticStageEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            selected = (
+                (stage == "research" and "neutral claim extractor" in prompt)
+                or (stage == "evidence" and "neutral evidence planner" in prompt)
+                or (stage == "verifier" and "neutral evidence verifier" in prompt)
+                or (
+                    stage == "structural-evidence"
+                    and "preparing bounded repository context" in prompt
+                )
+            )
+            if selected and "=== CORRECTION REQUIRED ===" not in prompt:
+                self.tool_less_prompts.append(prompt)
+                if stage == "research":
+                    event = {
+                        "op": "ADD", "temp_id": "bad", "claim": "Bad anchor",
+                        "kind": "fact", "assertion_mode": "asserted",
+                        "plan_anchor": {
+                            "first_span": "p999999", "last_span": "p999999",
+                        },
+                    }
+                    return _review(
+                        "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([event])
+                    )
+                if stage == "evidence":
+                    claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                    request = {
+                        "op": "READ_BLOB", "claim_id": claim_id, "path": 7,
+                        "offset": 0, "max_bytes": 1024,
+                    }
+                    return _review(
+                        "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request])
+                    )
+                if stage == "verifier":
+                    claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                    evidence = re.search(r'"evidence_id":"(e[0-9a-f]{12})"', prompt).group(1)
+                    event = {
+                        "op": "VERIFY", "claim_id": claim_id,
+                        "evidence_ids": [evidence], "reason": "premature",
+                    }
+                    return _review(
+                        "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
+                    )
+                request = {
+                    "op": "SEARCH_EXTERNAL", "claim_id": "__plan__",
+                    "query": "forbidden here", "limit": 1,
+                }
+                return _review(
+                    "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request])
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = SemanticStageEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+            "lineage": f"semantic-{stage}-retry", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    assert any("=== CORRECTION REQUIRED ===" in prompt for prompt in engine.tool_less_prompts)
+
+
 def test_structural_add_receives_real_span_vocabulary_and_remains_blocking(
     repo: Path, tmp_path: Path
 ) -> None:

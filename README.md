@@ -240,7 +240,10 @@ plan deferral whose verification step precedes every dependency, has falsifiable
 and stops on failure. Advisory bearing requires its own evidence-bearing verifier event.
 Evidence IDs are bound to one exact claim; another claim cannot reuse them. Truth, dispute,
 deferral, and bearing audits and evidence dependencies persist separately. Model agreement
-and citations alone do not verify anything.
+and citations alone do not verify anything. Transitions out of disputed or contradicted
+states require the independent audit, and dispute resolution states the exact audited
+outcome. Register correction covers semantic transition errors as well as JSON grammar;
+correcting a structural register preserves the original five-section critique.
 
 Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
 bounded repository records, and no filesystem path. External passages only enter a

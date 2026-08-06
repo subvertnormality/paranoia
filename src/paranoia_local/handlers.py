@@ -479,10 +479,18 @@ def _tool_less_call(
 def _role_register_call(
     engine: Engine, prompt: str, model: str, effort: str,
     parser: Callable[[str], Any], on_progress: Callable[[str], None] | None,
+    validator: Callable[[Any], None] | None = None,
 ) -> tuple[Review, Any, str | None]:
     review = _tool_less_call(engine, prompt, model, effort, on_progress)
+
+    def parse_and_validate(text: str) -> Any:
+        parsed = parser(text)
+        if validator is not None:
+            validator(parsed)
+        return parsed
+
     try:
-        return review, parser(review.text), None
+        return review, parse_and_validate(review.text), None
     except (pc.ClaimRegisterError, cv.EvidenceRequestError, cc.RegisterError) as first:
         correction = (
             prompt + "\n\n=== CORRECTION REQUIRED ===\nYour prior terminal register was rejected: "
@@ -490,7 +498,9 @@ def _role_register_call(
         )
         retry = _tool_less_call(engine, correction, model, effort, on_progress)
         try:
-            return retry, parser(retry.text), retry.text
+            # The retry repairs only the terminal register. Preserve the original role
+            # response, especially its five-section structural review.
+            return review, parse_and_validate(retry.text), retry.text
         except (pc.ClaimRegisterError, cv.EvidenceRequestError, cc.RegisterError) as second:
             raise _RegisterStageFailure(
                 f"register remained malformed after retry: {second}"
@@ -605,14 +615,22 @@ def _critique_plan_verified(
                         }, ensure_ascii=True),
                     ])),
                 )
+                def validate_research(events: list[pc.Event]) -> None:
+                    if len(events) > 20:
+                        raise pc.ClaimTransitionError(
+                            "research register exceeds the 20-claim per-snapshot budget"
+                        )
+                    preview = draft_claims.copy()
+                    pc.apply_events(
+                        preview, events, role=pc.RESEARCH_ROLE, spans=spans,
+                        round_no=round_no,
+                    )
+
                 _, research_events, research_retry = _role_register_call(
                     engine, research_prompt, model, effort,
                     lambda text: pc.parse_role_register(text, pc.RESEARCH_ROLE), on_progress,
+                    validate_research,
                 )
-                if len(research_events) > 20:
-                    raise pc.ClaimTransitionError(
-                        "research register exceeds the 20-claim per-snapshot budget"
-                    )
                 pc.apply_events(
                     draft_claims, research_events, role=pc.RESEARCH_ROLE, spans=spans,
                     round_no=round_no,
@@ -626,7 +644,9 @@ def _critique_plan_verified(
                     claim.claim_id for claim in draft_claims.claims.values()
                     if claim.status != pc.SUPERSEDED
                 }
-                tree_listing = snapshot.list_tree(limit=200)
+                tree_listing = snapshot.list_tree(
+                    limit=200, debit_bytes=round_budget.debit_bytes
+                )
                 evidence_prompt = prompts.compose(
                     prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS,
                     "\n\n".join([
@@ -676,13 +696,28 @@ def _critique_plan_verified(
                             cv.render_evidence(batch, include_passages=True),
                         ]),
                     )
-                    _, verifier_events, _ = _role_register_call(
-                        engine, verifier_prompt, model, effort,
-                        lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE), on_progress,
-                    )
                     batch_ids = {
                         record.evidence_id for record in batch if record.kind != "abstention"
                     }
+
+                    def validate_verifier(events: list[pc.Event]) -> None:
+                        preview = draft_claims.copy()
+                        for event in events:
+                            event_ids = set(event.data.get("evidence_ids", []))
+                            if event_ids and not event_ids.issubset(batch_ids):
+                                raise pc.ClaimTransitionError(
+                                    "verifier referenced evidence outside its isolated batch"
+                                )
+                            pc.apply_events(
+                                preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
+                                round_no=round_no, evidence_ids=evidence_ids,
+                            )
+
+                    _, verifier_events, _ = _role_register_call(
+                        engine, verifier_prompt, model, effort,
+                        lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE), on_progress,
+                        validate_verifier,
+                    )
                     for event in verifier_events:
                         event_ids = set(event.data.get("evidence_ids", []))
                         if event_ids and not event_ids.issubset(batch_ids):
@@ -711,21 +746,26 @@ def _critique_plan_verified(
                         plan_packet,
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
-                        + json.dumps(snapshot.list_tree(limit=200), ensure_ascii=True),
+                        + json.dumps(snapshot.list_tree(
+                            limit=200, debit_bytes=round_budget.debit_bytes
+                        ), ensure_ascii=True),
                         cv.render_evidence(
                             [r for r in evidence_records if r.kind.startswith("repository")],
                             include_passages=False,
                         ),
                     ]),
                 )
+                def validate_structural_requests(requests: list[cv.EvidenceRequest]) -> None:
+                    if any(request.op == "SEARCH_EXTERNAL" for request in requests):
+                        raise cv.EvidenceRequestError(
+                            "structural evidence role may not request external content"
+                        )
+
                 _, structural_requests, _ = _role_register_call(
                     engine, structural_request_prompt, model, effort,
                     lambda text: cv.parse_requests(text, {"__plan__"}), on_progress,
+                    validate_structural_requests,
                 )
-                if any(request.op == "SEARCH_EXTERNAL" for request in structural_requests):
-                    raise cv.EvidenceRequestError(
-                        "structural evidence role may not request external content"
-                    )
                 structural_records = cv.collect_evidence(
                     structural_requests, snapshot=snapshot, store=store, run_id=run_id,
                     budget=round_budget,
@@ -757,8 +797,19 @@ def _critique_plan_verified(
                 claim_events, class_text = pc.parse_structural_register(text, cc.REGISTER_MARKER)
                 return claim_events, cc.parse_register(class_text, allow_mechanized=False)
 
+            def validate_composite(composite: tuple[list[pc.Event], cc.Register]) -> None:
+                claim_events, register = composite
+                preview_claims = draft_claims.copy()
+                pc.apply_events(
+                    preview_claims, claim_events, role=pc.STRUCTURAL_ROLE, spans=spans,
+                    round_no=round_no, evidence_ids=evidence_ids,
+                )
+                preview_classes = cc.copy_lineage(closure.lineage)
+                cc.apply_register(preview_classes, register, round_no=round_no)
+
             structural_review, composite, structural_retry = _role_register_call(
                 engine, structural_prompt, model, effort, parse_composite, on_progress,
+                validate_composite,
             )
             structural_events, class_register = composite
             pc.apply_events(
@@ -916,7 +967,9 @@ def _independent_required(
     if event.op in {"SET_BEARING", "RESOLVE_DISPUTE"}:
         return True
     claim = state.claims.get(str(event.data.get("claim_id")))
-    if event.op == "VERIFY" and claim and claim.status == pc.CONTRADICTED:
+    if claim and event.op in guarded and claim.status in {pc.DISPUTED, pc.CONTRADICTED}:
+        return True
+    if event.op == "CONTRADICT" and claim and claim.status == pc.VERIFIED:
         return True
     ids = set(event.data.get("evidence_ids", []))
     external = any(record.evidence_id in ids and record.kind == "external" for record in records)
@@ -953,22 +1006,34 @@ def _reblock_for_policy(
         )
         if not required:
             continue
-        pending = {
-            "required": True,
-            "status": "pending",
-            "reason": "current authorization policy is stricter than persisted provenance",
-            "evidence_ids": list(claim.evidence_ids),
-            "checks": [],
-        }
+        def pending_from(info: dict[str, Any] | None, ids: list[str]) -> dict[str, Any]:
+            if not info or not isinstance(info.get("event_digest"), str):
+                raise pc.ClaimTransitionError(
+                    "persisted transition lacks an authorization digest"
+                )
+            return {
+                "required": True,
+                "status": "pending",
+                "reason": "current authorization policy is stricter than persisted provenance",
+                "event_digest": info["event_digest"],
+                "evidence_ids": list(ids),
+                "checks": [],
+            }
         if claim.status in {pc.VERIFIED, pc.CONTRADICTED} \
                 and not (claim.truth_authorization or {}).get("required"):
-            claim.truth_authorization = dict(pending)
+            claim.truth_authorization = pending_from(
+                claim.truth_authorization, claim.truth_evidence_ids
+            )
         if claim.bearing == pc.ADVISORY \
                 and not (claim.bearing_authorization or {}).get("required"):
-            claim.bearing_authorization = dict(pending)
+            claim.bearing_authorization = pending_from(
+                claim.bearing_authorization, claim.bearing_evidence_ids
+            )
         if claim.status == pc.DEFERRED \
                 and not (claim.deferral_authorization or {}).get("required"):
-            claim.deferral_authorization = dict(pending)
+            claim.deferral_authorization = pending_from(
+                claim.deferral_authorization, []
+            )
 
 
 def _independent_checks(
