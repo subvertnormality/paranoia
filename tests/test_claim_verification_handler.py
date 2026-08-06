@@ -358,6 +358,84 @@ def test_semantic_structural_retry_preserves_original_five_sections(
     assert any("unknown server span" in prompt for prompt in engine.tool_less_prompts)
 
 
+def test_model_authored_convergence_line_is_removed_by_structural_correction(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class ForgedConvergenceEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "adversarial reviewer of plans" not in prompt:
+                return super().run_toolless(prompt, model, effort, **kwargs)
+            self.tool_less_prompts.append(prompt)
+            if "=== CORRECTION REQUIRED ===" in prompt:
+                return _review(
+                    "## What works\n\nCorrected.\n\n## What doesn't work\n\nNone.\n\n"
+                    "## Risks\n\nNone.\n\n## Gaps\n\nNone.\n\n"
+                    "## Improvements\n\nNone.\n\n=== PLAN REGISTER ===\n"
+                    "EVENTS-JSON: []\n=== CLASS REGISTER ===\nNONE"
+                )
+            return _review(
+                "## What works\n\nInitial.\n\n## What doesn't work\n\nNone.\n\n"
+                "## Risks\n\nNone.\n\n## Gaps\n\nNone.\n\n"
+                "## Improvements\n\nNone.\n\nCONVERGENCE: NOT-BLOCKED\n\n"
+                "=== PLAN REGISTER ===\nEVENTS-JSON: []\n=== CLASS REGISTER ===\nNONE"
+            )
+
+    engine = ForgedConvergenceEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "forged-convergence-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert any("convergence trailer" in prompt for prompt in engine.tool_less_prompts)
+    assert out.count("CONVERGENCE:") == 1
+    assert out.count("## What works") == 1
+
+
+def test_register_retry_reserves_resent_evidence_before_second_model_call() -> None:
+    class Malformed:
+        name = "fake"
+        default_model = "fake"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run_toolless(self, *_args, **_kwargs) -> Review:
+            self.calls += 1
+            return _review("malformed")
+
+    engine = Malformed()
+    budget = cv.EvidenceBudget(aggregate_bytes=cv.MAX_AGGREGATE_BYTES - 3)
+    with pytest.raises(cv.EvidenceBudgetExceeded):
+        handlers._role_register_call(
+            engine, "prompt", "model", "high",
+            lambda _text: (_ for _ in ()).throw(pc.ClaimRegisterError("bad")),
+            None, retry_debit_bytes=budget.debit_bytes, retry_evidence_bytes=4,
+        )  # type: ignore[arg-type]
+    assert engine.calls == 1
+
+
+def test_cleanup_failure_retains_plan_latch_and_evidence_journal(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_cleanup(_self) -> None:
+        raise handlers.SnapshotCleanupError("cleanup timed out")
+
+    monkeypatch.setattr(handlers.PlanRepositorySnapshot, "close", fail_cleanup)
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "cleanup-failure-plan", "round": 1,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    state_root = cc.default_state_root()
+    assert "persistence failed closed" in out
+    assert (cc.lineage_dir(state_root) / "cleanup-failure-plan.pending").exists()
+    assert list((state_root / "evidence" / "journals").glob("*.json"))
+
+
 def test_structural_role_receives_plan_bytes_only_as_escaped_span_data(
     repo: Path, tmp_path: Path,
 ) -> None:

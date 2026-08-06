@@ -106,6 +106,9 @@ types and empirical input hashes. Before cache evaluation, every retained truth,
 dispute, deferral-authorization, or other claim dependency must resolve to one valid record
 bound to that exact claim. Missing, malformed, mismatched, or wrong-claim dependencies stale
 the claim and leave it blocking.
+`stale`, `disputed`, and `malformed` states override any earlier advisory-bearing
+authorization; invalidated evidence or plan bytes must be revalidated before the claim
+can become nonblocking again.
 
 The initial empirical adapter set is deliberately narrow: `PYTHON_COMPILE` compiles up to
 20 pinned Python blobs without executing them and records the fixed recipe, interpreter
@@ -198,7 +201,11 @@ and one correction retry per model register. Evidence is content-addressed and r
 the same budget begins before cache validation: retained CAS bytes are reserved before
 bounded no-follow reads, repository/history/adapter revalidation is charged as attempted,
 and evidence records are charged again when rendered into verifier or auditor prompts.
-repository reuse recomputes every passage/identity field and is bound to exact blob,
+If a register needs correction, the exact evidence portion resent in the correction prompt
+is debited a second time before the retry call; insufficient remaining budget blocks
+without transmitting it.
+
+Repository reuse recomputes every passage/identity field and is bound to exact blob,
 snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
 charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
 Git output, debit it as it is read, and terminate at their record or byte cap instead of
@@ -240,6 +247,8 @@ applied.
 There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
 `NOT-BLOCKED`. Preflight failures such as latch contention and quarantined state return a
 synthetic review with the same five ordered, nonempty sections before the blocked trailer.
+Structural prose containing a model-authored line beginning `CONVERGENCE:` is rejected and
+must be corrected; only the server-computed trailer is returned.
 
 ## Migration and recovery
 
@@ -250,9 +259,12 @@ result has no persistent stop condition.
 
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
 unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
-fully validated and corrupt lineage state is quarantined before a latch is acquired. Kind,
+fully validated and corrupt lineage state is quarantined before a latch is acquired. A
+present claim-state object must contain the exact complete serialized field set—missing
+fields never default to an empty claim collection. Kind,
 classification, and status combinations must be transition-reachable, and anchor
 relocation treats overlapping occurrences as ambiguous.
+
 Register syntax and semantic transition validation share the same single correction
 attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
 or state transition is corrected before application. Malformed registers record debt. A
@@ -265,3 +277,7 @@ inherit an undurable clear. A register still malformed after its one correction 
 published as durable blocking debt—even over an otherwise clear cache—and only a later
 valid replacement register clears it. Never repair state by deleting evidence roots first: preserve
 the last valid root until the lineage is repaired or explicitly abandoned.
+
+Every exception while verifying or deleting temporary snapshot refs—including command
+timeouts, decoding errors, nonzero exits, and filesystem failures—is normalized as
+ambiguous cleanup, so the journal and latch remain available for operator recovery.

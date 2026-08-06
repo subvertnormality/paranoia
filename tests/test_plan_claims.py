@@ -404,6 +404,32 @@ def test_stale_confirmed_decision_remains_blocking_after_reload() -> None:
     assert pc.claim_blocks(loaded.claims[claim_id])
 
 
+@pytest.mark.parametrize("invalid_status", [pc.STALE, pc.DISPUTED, pc.MALFORMED])
+def test_invalidated_advisory_claim_always_reblocks(invalid_status: str) -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    event = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": ["e1"], "reason": "not load bearing",
+    })
+    digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[
+            pc.VendorCheck("one", "m1", digest, ("e1",), True, "t1"),
+            pc.VendorCheck("two", "m2", digest, ("e1",), True, "t2"),
+        ],
+    )
+    assert not pc.claim_blocks(state.claims[claim_id])
+    state.claims[claim_id].status = invalid_status
+    assert pc.claim_blocks(state.claims[claim_id])
+
+
+def test_truncated_claim_state_cannot_default_to_no_claims() -> None:
+    with pytest.raises(pc.ClaimRegisterError, match="missing or unknown fields"):
+        pc.state_from_json("plan", {"next_seq": 1})
+
+
 def test_overlapping_anchor_occurrences_are_ambiguous() -> None:
     spans = pc.segment_plan(b"aaaa")
     state = pc.ClaimState("overlap")

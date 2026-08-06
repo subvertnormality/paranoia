@@ -444,7 +444,10 @@ def render_evidence(
 ) -> str:
     lines = ["=== SERVER EVIDENCE RECORDS ==="]
     if not records:
-        return lines[0] + "\nNONE — verification must abstain."
+        rendered = lines[0] + "\nNONE — verification must abstain."
+        if debit_bytes is not None:
+            debit_bytes(len(rendered.encode("utf-8")))
+        return rendered
     for record in records:
         record_lines = [
             "RECORD=" + json.dumps(
@@ -471,10 +474,11 @@ def render_evidence(
                 "  UNTRUSTED-DATA-JSON="
                 + json.dumps(record.display_passage, ensure_ascii=True)
             )
-        if debit_bytes is not None:
-            debit_bytes(len("\n".join(record_lines).encode("utf-8")))
         lines.extend(record_lines)
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    if debit_bytes is not None:
+        debit_bytes(len(rendered.encode("utf-8")))
+    return rendered
 
 
 def records_to_json(records: Sequence[EvidenceRecord]) -> list[dict[str, Any]]:

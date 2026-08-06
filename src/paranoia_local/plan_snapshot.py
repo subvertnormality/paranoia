@@ -270,23 +270,41 @@ class PlanRepositorySnapshot:
     def close(self) -> None:
         if self._closed:
             return
-        failures: list[str] = []
-        for name, oid in self._owned_refs:
-            current = _run(self.repo, ["rev-parse", "--verify", name], check=False)
-            if current.returncode:
-                continue
-            if current.stdout.decode("ascii").strip() != oid:
-                failures.append(f"{name} changed owner")
-                continue
-            result = _run(self.repo, ["update-ref", "-d", name, oid], check=False)
-            if result.returncode:
-                failures.append(
-                    f"{name}: " + result.stderr.decode("utf-8", errors="replace").strip()
+        try:
+            failures: list[str] = []
+            for name, oid in self._owned_refs:
+                current = _run(
+                    self.repo,
+                    ["for-each-ref", "--format=%(objectname)", name],
+                    check=False,
                 )
-        if failures:
+                if current.returncode:
+                    failures.append(
+                        f"{name}: could not verify ownership: "
+                        + current.stderr.decode("utf-8", errors="replace").strip()
+                    )
+                    continue
+                current_oid = current.stdout.decode("ascii").strip()
+                if not current_oid:
+                    continue
+                if current_oid != oid:
+                    failures.append(f"{name} changed owner")
+                    continue
+                result = _run(self.repo, ["update-ref", "-d", name, oid], check=False)
+                if result.returncode:
+                    failures.append(
+                        f"{name}: " + result.stderr.decode("utf-8", errors="replace").strip()
+                    )
+            if failures:
+                raise SnapshotCleanupError(
+                    "could not delete temporary snapshot refs: " + "; ".join(failures)
+                )
+        except SnapshotCleanupError:
+            raise
+        except Exception as exc:
             raise SnapshotCleanupError(
-                "could not delete temporary snapshot refs: " + "; ".join(failures)
-            )
+                f"temporary snapshot-ref cleanup failed ambiguously: {exc}"
+            ) from exc
         self._closed = True
 
     def _verify_wrapper(self) -> None:

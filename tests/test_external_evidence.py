@@ -302,3 +302,4 @@ def test_expired_truth_source_stales_claim_after_separate_bearing_evidence(
         )
     assert [record.evidence_id for record in valid] == [bearing.evidence_id]
     assert state.claims[claim_id].status == pc.STALE
+    assert pc.claim_blocks(state.claims[claim_id])

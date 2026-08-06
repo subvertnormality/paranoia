@@ -17,6 +17,7 @@ import re
 import subprocess
 import tempfile
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -505,6 +506,8 @@ def _role_register_call(
     engine: Engine, prompt: str, model: str, effort: str,
     parser: Callable[[str], Any], on_progress: Callable[[str], None] | None,
     validator: Callable[[Any], None] | None = None,
+    *, retry_debit_bytes: Callable[[int], None] | None = None,
+    retry_evidence_bytes: int = 0,
 ) -> tuple[Review, Any, str | None]:
     review = _tool_less_call(engine, prompt, model, effort, on_progress)
 
@@ -517,6 +520,8 @@ def _role_register_call(
     try:
         return review, parse_and_validate(review.text), None
     except (pc.ClaimRegisterError, cv.EvidenceRequestError, cc.RegisterError) as first:
+        if retry_debit_bytes is not None:
+            retry_debit_bytes(retry_evidence_bytes)
         correction = (
             prompt + "\n\n=== CORRECTION REQUIRED ===\nYour prior terminal register was rejected: "
             + str(first) + "\nReturn the complete required terminal register again."
@@ -541,6 +546,10 @@ def _validate_five_sections(text: str) -> None:
     if any(len(found) != 1 for found in matches):
         raise pc.ClaimRegisterError(
             "structural review must contain the five ordered review sections"
+        )
+    if re.search(r"(?m)^CONVERGENCE:", text):
+        raise pc.ClaimRegisterError(
+            "structural review prose may not contain a convergence trailer"
         )
     positions = [found[0].start() for found in matches]
     if positions != sorted(positions):
@@ -706,18 +715,21 @@ def _critique_plan_verified(
                     limit=200, debit_bytes=round_budget.debit_bytes,
                     remaining_bytes=lambda: round_budget.remaining_bytes,
                 )
+                tree_listing_json = json.dumps(tree_listing, ensure_ascii=True)
                 evidence_prompt = prompts.compose(
                     prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS,
                     "\n\n".join([
                         plan_packet,
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
-                        + json.dumps(tree_listing, ensure_ascii=True),
+                        + tree_listing_json,
                     ]),
                 )
                 _, requests, _ = _role_register_call(
                     engine, evidence_prompt, model, effort,
                     lambda text: cv.parse_requests(text, active_ids), on_progress,
+                    retry_debit_bytes=round_budget.debit_bytes,
+                    retry_evidence_bytes=len(tree_listing_json.encode("utf-8")),
                 )
                 endpoint = os.environ.get("PARANOIA_SEARCH_ENDPOINT") if web_search else None
                 http_client = SafeHttpClient() if endpoint else None
@@ -754,16 +766,17 @@ def _critique_plan_verified(
                 if supplied_only:
                     verifier_batches.append(("CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY", supplied_only))
                 for batch_label, batch in verifier_batches:
+                    rendered_batch = cv.render_evidence(
+                        batch, include_passages=True,
+                        debit_bytes=round_budget.debit_bytes,
+                    )
                     verifier_prompt = prompts.compose(
                         prompts.PLAN_VERIFIER_INSTRUCTIONS,
                         "\n\n".join([
                             plan_packet,
                             pc.render_claim_summary(draft_claims),
                             f"=== {batch_label} ===",
-                            cv.render_evidence(
-                                batch, include_passages=True,
-                                debit_bytes=round_budget.debit_bytes,
-                            ),
+                            rendered_batch,
                         ]),
                     )
                     batch_ids = {
@@ -791,6 +804,8 @@ def _critique_plan_verified(
                         engine, verifier_prompt, model, effort,
                         lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE), on_progress,
                         validate_verifier,
+                        retry_debit_bytes=round_budget.debit_bytes,
+                        retry_evidence_bytes=len(rendered_batch.encode("utf-8")),
                     )
                     for event in verifier_events:
                         event_ids = set(event.data.get("evidence_ids", []))
@@ -815,20 +830,22 @@ def _critique_plan_verified(
                         )
 
             if not cache_hit:
+                structural_tree_json = json.dumps(snapshot.list_tree(
+                    limit=200, debit_bytes=round_budget.debit_bytes,
+                    remaining_bytes=lambda: round_budget.remaining_bytes,
+                ), ensure_ascii=True)
+                structural_record_text = cv.render_evidence(
+                    [r for r in evidence_records if r.kind.startswith("repository")],
+                    include_passages=False, debit_bytes=round_budget.debit_bytes,
+                )
                 structural_request_prompt = prompts.compose(
                     prompts.PLAN_STRUCTURAL_EVIDENCE_INSTRUCTIONS,
                     "\n\n".join([
                         plan_packet,
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
-                        + json.dumps(snapshot.list_tree(
-                            limit=200, debit_bytes=round_budget.debit_bytes,
-                            remaining_bytes=lambda: round_budget.remaining_bytes,
-                        ), ensure_ascii=True),
-                        cv.render_evidence(
-                            [r for r in evidence_records if r.kind.startswith("repository")],
-                            include_passages=False, debit_bytes=round_budget.debit_bytes,
-                        ),
+                        + structural_tree_json,
+                        structural_record_text,
                     ]),
                 )
                 def validate_structural_requests(requests: list[cv.EvidenceRequest]) -> None:
@@ -842,6 +859,10 @@ def _critique_plan_verified(
                     engine, structural_request_prompt, model, effort,
                     lambda text: cv.parse_requests(text, {"__plan__"}), on_progress,
                     validate_structural_requests,
+                    retry_debit_bytes=round_budget.debit_bytes,
+                    retry_evidence_bytes=len(
+                        (structural_tree_json + structural_record_text).encode("utf-8")
+                    ),
                 )
                 structural_records = cv.collect_evidence(
                     structural_requests, snapshot=snapshot, store=store, run_id=run_id,
@@ -851,6 +872,14 @@ def _critique_plan_verified(
 
             repository_records = [r for r in evidence_records if r.kind.startswith("repository")]
             external_records = [r for r in evidence_records if r.kind in {"external", "abstention"}]
+            structural_repository_text = cv.render_evidence(
+                repository_records, include_passages=True,
+                debit_bytes=round_budget.debit_bytes,
+            )
+            structural_external_text = cv.render_evidence(
+                external_records, include_passages=False,
+                debit_bytes=round_budget.debit_bytes,
+            )
             structural_body = _plan_body(
                 "Plan bytes are supplied only as escaped PINNED PLAN SPANS below.",
                 context, focus, already, repo_grounded=False,
@@ -858,13 +887,9 @@ def _critique_plan_verified(
             )
             structural_body += "\n\n" + plan_packet
             structural_body += "\n\n" + pc.render_claim_summary(draft_claims)
-            structural_body += "\n\n" + cv.render_evidence(
-                repository_records, include_passages=True,
-                debit_bytes=round_budget.debit_bytes,
-            )
-            structural_body += "\n\n=== EXTERNAL EVIDENCE METADATA ONLY ===\n" + cv.render_evidence(
-                external_records, include_passages=False,
-                debit_bytes=round_budget.debit_bytes,
+            structural_body += "\n\n" + structural_repository_text
+            structural_body += (
+                "\n\n=== EXTERNAL EVIDENCE METADATA ONLY ===\n" + structural_external_text
             )
             structural_instructions = (
                 prompts.PLAN_REVIEW_INSTRUCTIONS + "\n\n"
@@ -876,12 +901,19 @@ def _critique_plan_verified(
             )
 
             structural_sections_valid = False
+            original_structural_sections_valid = False
+            structural_parse_attempt = 0
 
             def parse_composite(text: str) -> tuple[list[pc.Event], cc.Register]:
-                nonlocal structural_sections_valid
+                nonlocal structural_sections_valid, original_structural_sections_valid
+                nonlocal structural_parse_attempt
+                attempt = structural_parse_attempt
+                structural_parse_attempt += 1
                 if "## What works" in text:
                     _validate_five_sections(text)
                     structural_sections_valid = True
+                    if attempt == 0:
+                        original_structural_sections_valid = True
                 elif not structural_sections_valid:
                     _validate_five_sections(text)
                 claim_events, class_text = pc.parse_structural_register(text, cc.REGISTER_MARKER)
@@ -900,6 +932,16 @@ def _critique_plan_verified(
             structural_review, composite, structural_retry = _role_register_call(
                 engine, structural_prompt, model, effort, parse_composite, on_progress,
                 validate_composite,
+                retry_debit_bytes=round_budget.debit_bytes,
+                retry_evidence_bytes=len(
+                    (structural_repository_text + structural_external_text).encode("utf-8")
+                ),
+            )
+            if structural_retry is not None and not original_structural_sections_valid:
+                structural_review = replace(structural_review, text=structural_retry)
+            applied_structural_retry = (
+                structural_retry[structural_retry.index(pc.PLAN_MARKER):]
+                if structural_retry is not None else None
             )
             structural_events, class_register = composite
             pc.apply_events(
@@ -912,7 +954,7 @@ def _critique_plan_verified(
                 f"parsed after retry: {len(class_register.new_classes) + len(class_register.transitions)}"
                 if structural_retry else _count(class_register)
             )
-            closure.retry_register = structural_retry
+            closure.retry_register = applied_structural_retry
             draft_claims.evidence_records = cv.records_to_json(evidence_records)
             draft_claims.plan_sha256 = hashlib.sha256(raw_plan).hexdigest()
             draft_claims.authorization_policy = current_policy

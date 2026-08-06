@@ -665,8 +665,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   changes the current verdict to blocked. Caller-supplied artifacts have their own
   untrusted verifier batch and receive the high-stakes independent-audit policy used for
   fetched evidence. Cached CAS/repository reads and model-visible evidence rendering share
-  the round byte budget. Only symlinks in Git-resolvable object namespaces are rejected;
-  inert unrelated object-store names are ignored.
+  the round byte budget, including evidence resent for a register correction. Missing
+  claim-state fields are corruption rather than defaults, invalidated claims reblock even
+  if formerly advisory, and model-authored convergence lines are rejected so only one
+  server-computed trailer is returned. Every temporary-ref cleanup exception is treated as
+  ambiguous and retains recovery state. Only symlinks in Git-resolvable object namespaces
+  are rejected; inert unrelated object-store names are ignored.
   Network budgets charge each
   redirect hop and every response body, including rejected responses, while DNS and all
   later phases share one enforceable total deadline. Synthetic snapshot commits always

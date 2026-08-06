@@ -578,6 +578,10 @@ def claim_blocks(claim: Claim) -> bool:
         return False
     if claim.pending_transition is not None:
         return True
+    # Invalidation always wins over an earlier non-load-bearing authorization. That
+    # authorization described valid evidence/plan bytes and cannot survive their loss.
+    if claim.status in {STALE, DISPUTED, MALFORMED}:
+        return True
     if claim.kind_classification != CONFIRMED:
         return True
     if claim.kind == DECISION:
@@ -676,8 +680,8 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
         "next_seq", "claims", "debt", "evidence_records", "plan_sha256",
         "authorization_policy",
     }
-    if not set(raw).issubset(allowed):
-        raise ClaimRegisterError("claim state has unknown fields")
+    if set(raw) != allowed:
+        raise ClaimRegisterError("claim state has missing or unknown fields")
     next_seq = raw.get("next_seq", 1)
     if not isinstance(next_seq, int) or isinstance(next_seq, bool) or next_seq < 1:
         raise ClaimRegisterError("claim state next_seq must be a positive integer")

@@ -26,6 +26,42 @@ def test_snapshot_reads_dirty_and_nonignored_untracked_bytes_from_pinned_commit(
     ).returncode != 0
 
 
+def test_cleanup_timeout_is_normalized_as_ambiguous_cleanup_failure(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snap = PlanRepositorySnapshot.create(repo, run_id="cleanup-timeout")
+    original = ps._run
+
+    def timeout(*_args, **_kwargs):
+        raise SnapshotUnavailable("git rev-parse exceeded hard deadline")
+
+    monkeypatch.setattr(ps, "_run", timeout)
+    with pytest.raises(ps.SnapshotCleanupError, match="cleanup failed ambiguously"):
+        snap.close()
+    assert not snap._closed
+    monkeypatch.setattr(ps, "_run", original)
+    snap.close()
+
+
+def test_cleanup_verification_nonzero_is_not_mistaken_for_an_absent_ref(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snap = PlanRepositorySnapshot.create(repo, run_id="cleanup-verify-failure")
+    original = ps._run
+
+    def fail_verification(path, args, **kwargs):
+        if args[0] == "for-each-ref":
+            return subprocess.CompletedProcess(args, 1, b"", b"verification failed")
+        return original(path, args, **kwargs)
+
+    monkeypatch.setattr(ps, "_run", fail_verification)
+    with pytest.raises(ps.SnapshotCleanupError, match="could not verify ownership"):
+        snap.close()
+    assert not snap._closed
+    monkeypatch.setattr(ps, "_run", original)
+    snap.close()
+
+
 def test_ignored_files_are_disclosed_but_not_readable(repo: Path) -> None:
     (repo / ".gitignore").write_text("secret.txt\n")
     (repo / "secret.txt").write_text("token")
