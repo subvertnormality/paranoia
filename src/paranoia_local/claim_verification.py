@@ -60,6 +60,12 @@ class EvidenceBudget:
     aggregate_bytes: int = 0
     per_claim: dict[str, int] = field(default_factory=dict)
 
+    def copy(self) -> "EvidenceBudget":
+        return EvidenceBudget(
+            self.requests, self.fetch_attempts, self.aggregate_bytes,
+            dict(self.per_claim),
+        )
+
     def debit_requests(self, requests: Sequence[EvidenceRequest]) -> None:
         if self.requests + len(requests) > MAX_REQUESTS:
             raise EvidenceRequestError("review evidence request budget exceeded")
@@ -295,6 +301,7 @@ def collect_evidence(
                     limits=_fetch_limits(budget.remaining_bytes),
                     on_attempt=budget.debit_fetch,
                     on_bytes=budget.debit_bytes,
+                    remaining_bytes=lambda: budget.remaining_bytes,
                 )
             except NetworkEvidenceError as exc:
                 records.append(_abstention(claim_id, "external-search", data["query"], str(exc)))
@@ -305,6 +312,7 @@ def collect_evidence(
                         hit.url, _fetch_limits(budget.remaining_bytes),
                         on_attempt=budget.debit_fetch,
                         on_bytes=budget.debit_bytes,
+                        remaining_bytes=lambda: budget.remaining_bytes,
                     )
                 except NetworkEvidenceError as exc:
                     records.append(_abstention(claim_id, "external-fetch", hit.url, str(exc)))

@@ -9,6 +9,8 @@ import json
 import socket
 import ssl
 import string
+import queue
+import threading
 import time
 import urllib.parse
 import zlib
@@ -157,6 +159,7 @@ class SafeHttpClient:
         self, url: str, limits: FetchLimits | None = None, *,
         on_attempt: Callable[[], None] | None = None,
         on_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
     ) -> RawResponse:
         limits = limits or FetchLimits()
         requested = url
@@ -167,7 +170,9 @@ class SafeHttpClient:
             parsed = self._validate_url(current)
             if on_attempt is not None:
                 on_attempt()
-            addresses = list(dict.fromkeys(self.resolver(parsed.hostname or "")))
+            addresses = list(dict.fromkeys(
+                self._resolve(parsed.hostname or "", deadline)
+            ))
             if not addresses or any(not _public(address) for address in addresses):
                 raise NetworkEvidenceError("DNS returned an empty or non-public address set")
             selected = sorted(addresses, key=lambda item: ipaddress.ip_address(item).packed)[0]
@@ -191,8 +196,15 @@ class SafeHttpClient:
                 continue
             if not 200 <= response.status < 300:
                 raise NetworkEvidenceError(f"external source returned HTTP {response.status}")
+            decode_limits = limits
+            if remaining_bytes is not None:
+                decode_limits = FetchLimits(
+                    limits.connect_timeout, limits.read_timeout, limits.total_timeout,
+                    limits.max_redirects, limits.max_compressed_bytes,
+                    min(limits.max_decompressed_bytes, max(0, remaining_bytes())),
+                )
             body = self._decode(
-                compressed, headers.get("content-encoding", ""), limits,
+                compressed, headers.get("content-encoding", ""), decode_limits,
                 on_output=on_bytes,
             )
             media = headers.get("content-type", "text/plain").split(";", 1)[0].lower().strip()
@@ -210,6 +222,30 @@ class SafeHttpClient:
                 redirects=tuple(redirects),
             )
         raise NetworkEvidenceError("redirect limit exceeded")
+
+    def _resolve(self, host: str, deadline: float) -> Sequence[str]:
+        result: queue.Queue[tuple[bool, object]] = queue.Queue(maxsize=1)
+
+        def run() -> None:
+            try:
+                result.put((True, self.resolver(host)))
+            except BaseException as exc:  # transported to the owning request thread
+                result.put((False, exc))
+
+        worker = threading.Thread(target=run, daemon=True, name="paranoia-dns")
+        worker.start()
+        remaining = deadline - self.clock()
+        if remaining <= 0:
+            raise NetworkEvidenceError("external request total deadline expired")
+        try:
+            ok, value = result.get(timeout=remaining)
+        except queue.Empty as exc:
+            raise NetworkEvidenceError("external DNS resolution exceeded total deadline") from exc
+        if not ok:
+            if isinstance(value, NetworkEvidenceError):
+                raise value
+            raise NetworkEvidenceError(f"DNS resolution failed for {host}: {value}")
+        return value  # type: ignore[return-value]
 
     @staticmethod
     def _validate_url(url: str) -> urllib.parse.SplitResult:
@@ -298,7 +334,8 @@ class EndpointSearchProvider:
     def search(self, query: str, *, limit: int = 5,
                limits: FetchLimits | None = None,
                on_attempt: Callable[[], None] | None = None,
-               on_bytes: Callable[[int], None] | None = None) -> list[SearchHit]:
+               on_bytes: Callable[[int], None] | None = None,
+               remaining_bytes: Callable[[], int] | None = None) -> list[SearchHit]:
         self.last_response_size = 0
         if not query or len(query) > 500 or not (1 <= limit <= 10):
             raise NetworkEvidenceError("external search query exceeds bounds")
@@ -309,7 +346,8 @@ class EndpointSearchProvider:
         except (KeyError, IndexError, ValueError) as exc:
             raise NetworkEvidenceError(f"search endpoint formatting failed: {exc}") from exc
         response = self.client.fetch(
-            url, limits, on_attempt=on_attempt, on_bytes=on_bytes
+            url, limits, on_attempt=on_attempt, on_bytes=on_bytes,
+            remaining_bytes=remaining_bytes,
         )
         self.last_response_size = response.size
         if response.media_type not in {"application/json", "application/ld+json"}:

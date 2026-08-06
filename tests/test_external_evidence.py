@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,6 +44,18 @@ def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
     with pytest.raises(NetworkEvidenceError, match="non-public"):
         client.fetch("https://example.com/")
     assert not transport.calls
+
+
+def test_dns_resolution_obeys_the_shared_total_deadline() -> None:
+    def slow(_host: str) -> list[str]:
+        time.sleep(0.05)
+        return ["93.184.216.34"]
+
+    client = SafeHttpClient(resolver=slow, transport=FakeTransport())
+    started = time.monotonic()
+    with pytest.raises(NetworkEvidenceError, match="DNS resolution exceeded"):
+        client.fetch("https://example.com/", FetchLimits(total_timeout=0.01))
+    assert time.monotonic() - started < 0.04
 
 
 def test_connected_peer_must_equal_the_server_selected_public_address() -> None:

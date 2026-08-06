@@ -340,6 +340,16 @@ def test_falsey_non_object_persisted_claim_state_is_rejected(raw: object) -> Non
         pc.state_from_json("corrupt", raw)  # type: ignore[arg-type]
 
 
+def test_inconsistent_persisted_supersession_is_rejected() -> None:
+    state, claim_id, _spans = _state_with_confirmed_fact()
+    claim = state.claims[claim_id]
+    claim.status = pc.SUPERSEDED
+    claim.pending_replacement_id = "missing"
+    claim.superseded_by = "missing"
+    with pytest.raises(pc.ClaimRegisterError, match="supersession graph"):
+        pc.state_from_json("plan", pc.state_to_json(state))
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

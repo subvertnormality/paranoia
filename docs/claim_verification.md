@@ -28,6 +28,8 @@ One closure round performs these stages:
    no-follow semantics, hashing through `git hash-object --stdin` (never repository
    filters), and inserting explicit object IDs/modes into a private index. Hooks,
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
+   Synthetic commits explicitly disable signing, including repository-configured GPG
+   programs.
    Inherited Git environment is cleared, native linked-worktree object storage is the only
    approved object database, alternates and symlinked object-store components are rejected,
    and grafts/replacement objects are disabled for snapshot and history operations. Lazy
@@ -123,7 +125,9 @@ different from the selected address, unsupported media/encodings, excessive redi
 non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
 decompressed byte caps. Every redirect hop consumes a fetch attempt, and every response
 body is charged before redirect, status, media-type, or decoding acceptance; decompressed
-output is additionally charged as it is produced. With no endpoint, external research
+output is additionally capped by the aggregate bytes still available before inflation and
+charged as it is produced. DNS resolution, connect, TLS, headers, redirects, and body reads
+all share the same enforceable total deadline. With no endpoint, external research
 explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
@@ -177,6 +181,10 @@ Git output, debit it as it is read, and terminate at their record or byte cap in
 capturing an unbounded result. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
+Any cached record discarded during validation disables the zero-research cache for that
+round, even if no claim directly depended on that record. Persisted supersession is also
+validated as a bounded graph: the replacement must exist, be confirmed, and already be
+verified or safely deferred.
 
 ## Output
 

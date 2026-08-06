@@ -30,6 +30,7 @@ _GIT_CONFIG = [
     "-c", "core.hooksPath=/dev/null",
     "-c", "core.attributesFile=/dev/null",
     "-c", "core.alternateRefsCommand=false",
+    "-c", "commit.gpgSign=false",
     "--no-pager",
 ]
 _SNAPSHOT_IDENTITY = {
@@ -149,7 +150,7 @@ class PlanRepositorySnapshot:
         unavailable = tuple(dict.fromkeys([
             *unavailable, *_find_special_paths(repo, ignored_paths=ignored)
         ]))
-        commit_args = ["commit-tree", tree]
+        commit_args = ["commit-tree", "--no-gpg-sign", tree]
         if has_head:
             commit_args += ["-p", head]
         commit_args += ["-m", "paranoia-plan-snapshot"]

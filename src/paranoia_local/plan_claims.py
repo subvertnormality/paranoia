@@ -701,6 +701,16 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
         or not isinstance(policy.get("high_stakes"), bool)
     ):
         raise ClaimRegisterError("claim authorization policy is malformed")
+    for claim in claims.values():
+        if claim.status == SUPERSEDED:
+            target = claims.get(claim.superseded_by or "")
+            if claim.pending_replacement_id != claim.superseded_by or target is None \
+                    or target.claim_id == claim.claim_id \
+                    or target.kind_classification != CONFIRMED \
+                    or target.status not in {VERIFIED, DEFERRED}:
+                raise ClaimRegisterError("persisted supersession graph is inconsistent")
+        elif claim.superseded_by is not None:
+            raise ClaimRegisterError("active persisted claim has a superseded target")
     return ClaimState(
         lineage_id, next_seq, claims, debt,
         list(evidence_records), plan_sha, policy,

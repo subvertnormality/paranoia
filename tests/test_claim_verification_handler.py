@@ -140,6 +140,36 @@ def test_unchanged_valid_cache_round_spends_zero_research_or_fetch_calls(
     assert "CLAIM-REGISTER: cache-hit (zero research calls, zero fetches)" in out
 
 
+def test_discarding_an_unused_cached_record_forces_evidence_replanning(
+    repo: Path, tmp_path: Path,
+) -> None:
+    lineage_id = "discarded-unused-record"
+    args = {
+        "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+        "lineage": lineage_id, "round": 1,
+    }
+    handlers.critique_plan(
+        args, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE
+    )
+    state = pc.state_from_json(lineage_id, lineage.claim_state)
+    state.evidence_records.append(cv.records_to_json([
+        cv._abstention("__plan__", "external-search", "q", "temporary")
+    ])[0])
+    lineage.claim_state = pc.state_to_json(state)
+    cc.save_lineage(cc.default_state_root(), lineage)
+
+    second = ClaimEngine()
+    args["round"] = 2
+    out = handlers.critique_plan(
+        args, engine=second, log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "cache-hit" not in out
+    assert len(second.tool_less_prompts) > 1
+
+
 def test_tightening_independent_policy_invalidates_cache_and_reauthorizes(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

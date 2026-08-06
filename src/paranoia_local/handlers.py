@@ -557,6 +557,7 @@ def _critique_plan_verified(
     run_id = f"{lineage_id}-{round_no}-{now()}"
     store = EvidenceStore(cc.default_state_root() / "evidence")
     evidence_records = cv.records_from_json(state.evidence_records)
+    persisted_evidence_ids = tuple(record.evidence_id for record in evidence_records)
     structural_review: Review | None = None
     research_status = "not-run"
     class_status = cc.NONE
@@ -581,6 +582,10 @@ def _critique_plan_verified(
                 evidence_records, snapshot=snapshot, store=store, state=state,
                 high_stakes=high_stakes,
             )
+            evidence_cache_intact = (
+                tuple(record.evidence_id for record in evidence_records)
+                == persisted_evidence_ids
+            )
             persisted_policy = state.authorization_policy
             _reblock_for_policy(state, evidence_records, current_policy)
             state.authorization_policy = current_policy
@@ -595,7 +600,7 @@ def _critique_plan_verified(
                 state.plan_sha256 == hashlib.sha256(raw_plan).hexdigest()
                 and not pc.blocking_claims(state)
                 and not state.debt
-                and len(evidence_records) == len(state.evidence_records)
+                and evidence_cache_intact
                 and persisted_policy == current_policy
                 and not arguments.get("supplied_evidence")
                 and not bool(arguments.get("refresh_claims", False))
@@ -760,6 +765,7 @@ def _critique_plan_verified(
                         raise cv.EvidenceRequestError(
                             "structural evidence role may not request external content"
                         )
+                    round_budget.copy().debit_requests(requests)
 
                 _, structural_requests, _ = _role_register_call(
                     engine, structural_request_prompt, model, effort,

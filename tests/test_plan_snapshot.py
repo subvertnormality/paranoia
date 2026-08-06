@@ -95,6 +95,20 @@ def test_symlinked_object_store_root_is_rejected(repo: Path, tmp_path: Path) -> 
         PlanRepositorySnapshot.create(repo, run_id="symlinked-objects")
 
 
+def test_snapshot_commit_never_invokes_repository_gpg_program(
+    repo: Path, tmp_path: Path,
+) -> None:
+    marker = tmp_path / "gpg-ran"
+    program = tmp_path / "hostile-gpg"
+    program.write_text(f"#!/bin/sh\ntouch {marker}\nexit 1\n")
+    program.chmod(0o755)
+    subprocess.run(["git", "config", "commit.gpgSign", "true"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "gpg.program", str(program)], cwd=repo, check=True)
+    with PlanRepositorySnapshot.create(repo, run_id="unsigned-snapshot"):
+        pass
+    assert not marker.exists()
+
+
 def test_inherited_git_object_environment_is_cleared(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

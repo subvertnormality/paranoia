@@ -654,7 +654,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
   plan evidence. Persisted evidence uses strict per-kind schemas; every retained claim
   dependency must still resolve to a valid same-claim record. Network budgets charge each
-  redirect hop and every response body, including rejected responses.
+  redirect hop and every response body, including rejected responses, while DNS and all
+  later phases share one enforceable total deadline. Synthetic snapshot commits always
+  disable repository-configured signing programs.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived
