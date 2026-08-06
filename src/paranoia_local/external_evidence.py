@@ -277,7 +277,7 @@ class SafeHttpClient:
         if remaining <= 0:
             worker.kill()
             worker.join(timeout=0)
-            raise NetworkEvidenceError("external request total deadline expired")
+            raise NetworkEvidenceError("external DNS resolution exceeded total deadline")
         if not parent.poll(remaining):
             worker.kill()
             worker.join(timeout=0)

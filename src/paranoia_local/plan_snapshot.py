@@ -15,6 +15,9 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 MAX_PINNED_REFS = 1024
+MAX_DISCOVERED_REFS = 4096
+MAX_SNAPSHOT_PATHS = 100_000
+MAX_DISCOVERY_BYTES = 32 << 20
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 _GIT_ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -117,6 +120,25 @@ def _run_bounded(
             proc.wait()
 
 
+def _run_bounded_records(
+    repo: Path, args: list[str], *, max_records: int,
+    terminators_per_record: int = 1, max_bytes: int = MAX_DISCOVERY_BYTES,
+) -> bytes:
+    """Stream a NUL-framed enumeration and reject the first excess record."""
+    if max_records < 1 or terminators_per_record < 1:
+        raise SnapshotUnavailable("Git enumeration bounds must be positive")
+    output = _run_bounded(
+        repo, args, max_bytes=max_bytes,
+        stop_after_nuls=(max_records + 1) * terminators_per_record,
+    )
+    terminators = output.count(b"\0")
+    if terminators > max_records * terminators_per_record:
+        raise SnapshotUnavailable("Git enumeration exceeds record cap")
+    if terminators % terminators_per_record:
+        raise SnapshotUnavailable("Git enumeration returned a malformed record")
+    return output
+
+
 def _read_deadline(pipe: object, size: int, deadline: float) -> bytes:
     remaining = deadline - time.monotonic()
     if remaining <= 0 or not select.select([pipe], [], [], remaining)[0]:
@@ -209,9 +231,11 @@ class PlanRepositorySnapshot:
                 repo, ["hash-object", "-t", "tree", "--stdin"], input_bytes=b""
             ).stdout.decode("ascii").strip()
         )
-        ignored_raw = _run(
-            repo, ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"]
-        ).stdout
+        ignored_raw = _run_bounded_records(
+            repo,
+            ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"],
+            max_records=MAX_SNAPSHOT_PATHS,
+        )
         ignored = tuple(
             item.decode("utf-8", errors="surrogateescape")
             for item in ignored_raw.split(b"\0") if item
@@ -229,17 +253,21 @@ class PlanRepositorySnapshot:
         ).stdout.decode("ascii").strip()
         token = _ref_token(run_id)
         wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
-        raw_refs = _run(
-            repo, ["for-each-ref", "--format=%(refname)%00%(objectname)", "refs/"]
-        ).stdout.decode("utf-8", errors="surrogateescape")
+        raw_refs = _run_bounded_records(
+            repo,
+            ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
+            max_records=MAX_DISCOVERED_REFS, terminators_per_record=2,
+        )
         history: dict[str, str] = {}
         for line in raw_refs.splitlines():
-            if "\0" not in line:
-                continue
-            name, oid = line.split("\0", 1)
+            name_raw, separator, oid_raw = line.partition(b"\0")
+            if not separator or not oid_raw.endswith(b"\0"):
+                raise SnapshotUnavailable("Git ref enumeration returned a malformed record")
+            name = name_raw.decode("utf-8", errors="surrogateescape")
+            oid = oid_raw[:-1].decode("ascii", errors="strict")
             if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
                 continue
-            history[name] = oid.strip()
+            history[name] = oid
         if len(history) + 1 > MAX_PINNED_REFS:
             raise SnapshotUnavailable(
                 f"repository has {len(history)} refs; plan snapshot cap is {MAX_PINNED_REFS - 1}"
@@ -323,9 +351,10 @@ class PlanRepositorySnapshot:
         if not path or pure.is_absolute() or ".." in pure.parts or "\0" in path:
             raise SnapshotUnavailable("repository evidence path escapes the snapshot")
         literal = ":(literal)" + path
-        out = _run(
-            self.repo, ["ls-tree", "-z", self.commit_id, "--", literal]
-        ).stdout
+        out = _run_bounded_records(
+            self.repo, ["ls-tree", "-z", self.commit_id, "--", literal],
+            max_records=1, max_bytes=16384,
+        )
         rows = [row for row in out.split(b"\0") if row]
         if len(rows) != 1:
             raise SnapshotUnavailable(f"path {path!r} is not present uniquely in the snapshot")
@@ -513,7 +542,9 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
     into a private index with explicit modes/object IDs. Repository hooks, fsmonitor,
     attributes, filters, pagers, and aliases therefore cannot select an executable step.
     """
-    cached = _run(repo, ["ls-files", "-s", "-z"]).stdout
+    cached = _run_bounded_records(
+        repo, ["ls-files", "-s", "-z"], max_records=MAX_SNAPSHOT_PATHS,
+    )
     index_entries: dict[str, tuple[str, str]] = {}
     for row in [item for item in cached.split(b"\0") if item]:
         meta, sep, raw_path = row.partition(b"\t")
@@ -524,9 +555,10 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
         if stage == "0":
             index_entries[raw_path.decode("utf-8", errors="surrogateescape")] = (mode, oid)
 
-    candidates = _run(
-        repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]
-    ).stdout
+    candidates = _run_bounded_records(
+        repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        max_records=MAX_SNAPSHOT_PATHS,
+    )
     rows: list[tuple[str, str, str]] = []
     unavailable: list[str] = []
     for raw_path in [item for item in candidates.split(b"\0") if item]:
@@ -676,40 +708,72 @@ def _approved_common_dir(repo: Path) -> Path:
 def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -> None:
     if objects.is_symlink() or not objects.is_dir():
         raise SnapshotUnavailable("repository object-store root must be a real directory")
-    try:
-        root_entries = list(os.scandir(objects))
-    except OSError as exc:
-        raise SnapshotUnavailable(f"could not inspect repository object store: {exc}") from exc
-    # Git resolves objects only through loose-object fanout plus the pack/info
-    # namespaces. Unrelated names are inert and must not make an otherwise safe
-    # repository unavailable merely because they are symlinks.
-    pending: list[Path] = []
-    for entry in root_entries:
-        if entry.name not in {"pack", "info"} and not re.fullmatch(r"[0-9a-fA-F]{2}", entry.name):
-            continue
-        if entry.is_symlink():
-            raise SnapshotUnavailable(
-                f"repository object-store path may not be a symlink: {entry.path}"
-            )
-        if entry.is_dir(follow_symlinks=False):
-            pending.append(Path(entry.path))
     seen = 0
-    while pending:
-        directory = pending.pop()
+
+    def scan(directory: Path, relevant: Callable[[str], bool]) -> list[Path]:
+        nonlocal seen
+        directories: list[Path] = []
         try:
-            entries = list(os.scandir(directory))
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    seen += 1
+                    if seen > max_entries:
+                        raise SnapshotUnavailable(
+                            "repository object-store metadata scan exceeds safety cap"
+                        )
+                    if not relevant(entry.name):
+                        continue
+                    if entry.is_symlink():
+                        raise SnapshotUnavailable(
+                            f"repository object-store path may not be a symlink: {entry.path}"
+                        )
+                    if entry.is_dir(follow_symlinks=False):
+                        directories.append(Path(entry.path))
+        except SnapshotUnavailable:
+            raise
         except OSError as exc:
-            raise SnapshotUnavailable(f"could not inspect repository object store: {exc}") from exc
-        for entry in entries:
-            seen += 1
-            if seen > max_entries:
-                raise SnapshotUnavailable("repository object-store metadata scan exceeds safety cap")
-            if entry.is_symlink():
-                raise SnapshotUnavailable(
-                    f"repository object-store path may not be a symlink: {entry.path}"
-                )
-            if entry.is_dir(follow_symlinks=False):
-                pending.append(Path(entry.path))
+            raise SnapshotUnavailable(
+                f"could not inspect repository object store: {exc}"
+            ) from exc
+        return directories
+
+    # Git resolves only loose-object fanout and explicit pack/info names. Arbitrary
+    # nested directories in those namespaces are inert and cannot redirect lookup.
+    roots = scan(
+        objects,
+        lambda name: name in {"pack", "info"}
+        or bool(re.fullmatch(r"[0-9a-fA-F]{2}", name)),
+    )
+    loose_name = re.compile(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})$")
+    object_hex = r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})"
+    pack_name = re.compile(
+        rf"(?:pack-{object_hex}\.(?:pack|idx|rev|bitmap|promisor|mtimes)"
+        rf"|multi-pack-index(?:-{object_hex}\.bitmap)?|multi-pack-index\.d)$"
+    )
+    info_name = re.compile(r"(?:alternates|http-alternates|packs|commit-graph|commit-graphs)$")
+    for directory in roots:
+        if re.fullmatch(r"[0-9a-fA-F]{2}", directory.name):
+            scan(directory, lambda name: bool(loose_name.fullmatch(name)))
+        elif directory.name == "pack":
+            nested = scan(directory, lambda name: bool(pack_name.fullmatch(name)))
+            for child in nested:
+                if child.name == "multi-pack-index.d":
+                    scan(
+                        child,
+                        lambda name: name == "multi-pack-index-chain"
+                        or bool(re.fullmatch(
+                            rf"multi-pack-index-{object_hex}\.midx", name
+                        )),
+                    )
+        elif directory.name == "info":
+            nested = scan(directory, lambda name: bool(info_name.fullmatch(name)))
+            for child in nested:
+                if child.name == "commit-graphs":
+                    scan(
+                        child,
+                        lambda name: name == "commit-graph-chain"
+                        or bool(re.fullmatch(rf"graph-{object_hex}\.graph", name)),
+                    )
 
 
 def _find_special_paths(
@@ -723,24 +787,23 @@ def _find_special_paths(
     while pending:
         directory = pending.pop()
         try:
-            entries = list(os.scandir(directory))
+            entries = os.scandir(directory)
         except OSError as exc:
             raise SnapshotUnavailable(f"could not inspect repository entry types: {exc}") from exc
-        for entry in entries:
-            if directory == repo and entry.name == ".git":
-                continue
-            relative = Path(entry.path).relative_to(repo).as_posix()
-            if relative in ignored:
-                continue
-            seen += 1
-            if seen > max_entries:
-                raise SnapshotUnavailable("repository entry scan exceeds safety cap")
-            if entry.is_dir(follow_symlinks=False):
-                pending.append(Path(entry.path))
-                continue
-            mode = entry.stat(follow_symlinks=False).st_mode
-            if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
-                special.append(
-                    relative
-                )
+        with entries:
+            for entry in entries:
+                if directory == repo and entry.name == ".git":
+                    continue
+                relative = Path(entry.path).relative_to(repo).as_posix()
+                if relative in ignored:
+                    continue
+                seen += 1
+                if seen > max_entries:
+                    raise SnapshotUnavailable("repository entry scan exceeds safety cap")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(Path(entry.path))
+                    continue
+                mode = entry.stat(follow_symlinks=False).st_mode
+                if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
+                    special.append(relative)
     return tuple(sorted(special))

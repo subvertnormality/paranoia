@@ -168,6 +168,22 @@ def test_irrelevant_object_store_symlink_does_not_invalidate_snapshot(
         assert snap.read_blob("app.py").startswith(b'"""App module')
 
 
+def test_nested_inert_info_symlink_does_not_invalidate_snapshot(
+    repo: Path, tmp_path: Path,
+) -> None:
+    inert = repo / ".git" / "objects" / "info" / "paranoia-inert"
+    inert.mkdir()
+    (inert / "link").symlink_to(tmp_path, target_is_directory=True)
+    with PlanRepositorySnapshot.create(repo, run_id="inert-info-symlink") as snap:
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+
+
+def test_packed_object_names_remain_accepted(repo: Path) -> None:
+    subprocess.run(["git", "gc", "--prune=now"], cwd=repo, check=True)
+    with PlanRepositorySnapshot.create(repo, run_id="packed-objects") as snap:
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+
+
 def test_symlink_in_resolvable_object_namespace_is_rejected(
     repo: Path, tmp_path: Path,
 ) -> None:
@@ -240,6 +256,34 @@ def test_git_tree_output_is_bounded_while_streaming(repo: Path) -> None:
         ps._run_bounded(
             repo, ["ls-tree", "-r", "-z", "--name-only", "HEAD"],
             max_bytes=2, stop_after_nuls=200,
+        )
+
+
+def test_snapshot_path_enumerations_reject_the_first_excess_record(repo: Path) -> None:
+    for args in (
+        ["ls-files", "-s", "-z"],
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    ):
+        with pytest.raises(SnapshotUnavailable, match="record cap"):
+            ps._run_bounded_records(repo, args, max_records=1)
+
+
+def test_snapshot_ignored_and_ref_enumerations_are_record_bounded(repo: Path) -> None:
+    (repo / ".gitignore").write_text("ignored-*.txt\n")
+    (repo / "ignored-one.txt").write_text("x")
+    (repo / "ignored-two.txt").write_text("x")
+    with pytest.raises(SnapshotUnavailable, match="record cap"):
+        ps._run_bounded_records(
+            repo,
+            ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"],
+            max_records=1,
+        )
+    subprocess.run(["git", "branch", "second"], cwd=repo, check=True)
+    with pytest.raises(SnapshotUnavailable, match="record cap"):
+        ps._run_bounded_records(
+            repo,
+            ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
+            max_records=1, terminators_per_record=2,
         )
 
 

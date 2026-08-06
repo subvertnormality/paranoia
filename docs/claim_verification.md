@@ -213,13 +213,18 @@ snapshot, history-ref, operation, and canonical query-parameter identities. Lite
 charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
 Git output, debit it as it is read, and terminate at their record or byte cap instead of
 capturing an unbounded result. Each read is also sized to the shared budget remaining, so
-attempted pipe I/O cannot cross the aggregate cap before accounting rejects it. Every
-snapshot Git process and pipe read also has a hard
+attempted pipe I/O cannot cross the aggregate cap before accounting rejects it.
+Snapshot-discovery enumerations are likewise streamed before decoding or retention, with
+a 100,000-path/32-MiB cap and a separate 4,096-total-ref discovery cap before the smaller
+pinned-history limit is applied. Directory scans count entries while iterating instead of
+materializing an attacker-sized directory first. Every snapshot Git process and pipe read
+also has a hard
 deadline and is killed/reaped on expiry; directly read Git metadata must be small regular
 files opened with no-follow and nonblocking flags, then checked again by file identity and
 size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
-Within `.git/objects`, symlink rejection follows only Git-resolvable loose-object fanout,
-`pack`, and `info` namespaces; inert unrelated names do not invalidate a snapshot.
+Within `.git/objects`, symlink rejection follows only exact Git-resolvable loose-object,
+pack/multi-pack-index, alternates, and commit-graph names; inert nested names even beneath
+`pack` or `info` do not invalidate a snapshot.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.

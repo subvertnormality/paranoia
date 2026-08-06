@@ -676,7 +676,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   if formerly advisory, and model-authored convergence lines are rejected so only one
   server-computed trailer is returned. Every temporary-ref cleanup exception is treated as
   ambiguous and retains recovery state. Only symlinks in Git-resolvable object namespaces
-  are rejected; inert unrelated object-store names are ignored.
+  are rejected; inert unrelated object-store names are ignored, including inert nested
+  names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
+  and record caps before its output is retained or decoded.
   Network budgets charge each
   redirect hop and every response body, including rejected responses, while DNS and all
   later phases share one enforceable total deadline. Synthetic snapshot commits always
