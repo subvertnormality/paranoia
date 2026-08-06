@@ -63,7 +63,9 @@ For Claude, toolless means bare settings, an empty allowlist, an explicit deny l
 empty `--tools` availability set, and strict empty MCP configuration.
 For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
 empty working directory, auth, TLS/DNS files, and no shell, repository, common Git store,
-or sibling worktree. Native web is forced off for every claim-verification role. If that
+or sibling worktree. Shell, unified execution, multi-agent, apps, browser/computer, code,
+image, goals, and workspace-dependency feature schemas are explicitly disabled under
+strict configuration. Native web is forced off for every claim-verification role. If that
 boundary cannot be constructed, the round fails closed and the lineage is unchanged.
 
 ## Claim state
@@ -84,7 +86,8 @@ Every new claim starts `proposed`, `blocking`, and `unchecked`, regardless of wh
 extractor proposed. A different role must confirm its kind. Advisory bearing is reachable
 only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
 Facts block until verified or safely deferred. Decisions become `not-applicable` only
-after cross-role kind confirmation. Omission never deletes a claim.
+after cross-role kind confirmation and block again if a plan edit or dispute makes them
+stale/disputed. Omission never deletes a claim.
 
 Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
 ambiguous anchors become stale. Deferred claims additionally invalidate when their plan
@@ -164,7 +167,8 @@ The second vendor receives the server-owned proposition, current kind/bearing/st
 plan-anchor identity and spans, complete proposed event, and exact named evidence. Truth,
 dispute, deferral, and bearing authorizations persist in separate slots, so a later ordinary
 truth check cannot erase the mandatory audit that made a claim advisory. Their evidence
-dependencies also persist separately while a retained-ID union drives freshness invalidation.
+dependencies and exact event objects also persist separately while a retained-ID union
+drives freshness invalidation.
 
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A

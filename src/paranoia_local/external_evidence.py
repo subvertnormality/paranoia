@@ -126,7 +126,12 @@ class HttpsTransport:
         raw: socket.socket | None = None
         wrapped: ssl.SSLSocket | None = None
         try:
-            raw = socket.create_connection((address, port), timeout=timeout)
+            family = socket.AF_INET6 if ":" in address else socket.AF_INET
+            raw = socket.socket(family, socket.SOCK_STREAM)
+            raw.settimeout(timeout)
+            with self._lock:
+                self._active = raw
+            raw.connect((address, port))
             context = ssl.create_default_context()
             wrapped = context.wrap_socket(raw, server_hostname=host)
             raw = None
@@ -281,11 +286,17 @@ class SafeHttpClient:
         on_bytes: Callable[[int], None] | None,
     ) -> TransportResponse:
         result: queue.Queue[tuple[bool, object]] = queue.Queue(maxsize=1)
+        callbacks_active = threading.Event()
+        callbacks_active.set()
+
+        def bounded_bytes(size: int) -> None:
+            if callbacks_active.is_set() and on_bytes is not None:
+                on_bytes(size)
 
         def run() -> None:
             try:
                 result.put((True, self.transport.request(
-                    url, address, limits, deadline, on_bytes=on_bytes
+                    url, address, limits, deadline, on_bytes=bounded_bytes
                 )))
             except BaseException as exc:
                 result.put((False, exc))
@@ -298,10 +309,15 @@ class SafeHttpClient:
         try:
             ok, value = result.get(timeout=remaining)
         except queue.Empty as exc:
+            callbacks_active.clear()
             cancel = getattr(self.transport, "cancel", None)
             if callable(cancel):
                 cancel()
-                worker.join(timeout=1.0)
+            worker.join(timeout=1.0)
+            if worker.is_alive() and isinstance(self.transport, HttpsTransport):
+                raise NetworkEvidenceError(
+                    "external request cancellation did not terminate transport"
+                ) from exc
             raise NetworkEvidenceError("external request exceeded total deadline") from exc
         if not ok:
             if isinstance(value, Exception):

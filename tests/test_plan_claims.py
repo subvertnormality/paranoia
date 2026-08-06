@@ -384,7 +384,7 @@ def test_inconsistent_persisted_supersession_is_rejected() -> None:
         pc.state_from_json("plan", pc.state_to_json(state))
 
 
-def test_unreachable_confirmed_decision_status_is_rejected() -> None:
+def test_stale_confirmed_decision_remains_blocking_after_reload() -> None:
     state, claim_id, spans = _state_with_claim()
     pc.apply_events(
         state, [pc.Event("CONFIRM_KIND", {
@@ -393,8 +393,8 @@ def test_unreachable_confirmed_decision_status_is_rejected() -> None:
         })], role=pc.STRUCTURAL_ROLE, spans=spans,
     )
     state.claims[claim_id].status = pc.STALE
-    with pytest.raises(pc.ClaimRegisterError, match="unreachable status"):
-        pc.state_from_json("plan", pc.state_to_json(state))
+    loaded = pc.state_from_json("plan", pc.state_to_json(state))
+    assert pc.claim_blocks(loaded.claims[claim_id])
 
 
 def test_overlapping_anchor_occurrences_are_ambiguous() -> None:

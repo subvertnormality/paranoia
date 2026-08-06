@@ -1027,6 +1027,7 @@ def _reblock_for_policy(
                 "status": "pending",
                 "reason": "current authorization policy is stricter than persisted provenance",
                 "event_digest": info["event_digest"],
+                "event": info.get("event"),
                 "evidence_ids": list(ids),
                 "checks": [],
             }

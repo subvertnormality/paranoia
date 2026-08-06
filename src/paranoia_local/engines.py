@@ -232,9 +232,16 @@ class CodexEngine(Engine):
                 argv += ["--ro-bind", source, source]
         argv += [
             "--", "/codex", "exec", "--json", "--ephemeral", "--ignore-user-config",
+            "--strict-config",
             "--skip-git-repo-check", "-s", "danger-full-access", "-C", "/work",
             "-m", model, "-c", f'model_reasoning_effort="{effort}"',
-            "-c", "tools.web_search=false", "-",
+            "-c", "tools.web_search=false",
+            "--disable", "shell_tool", "--disable", "unified_exec",
+            "--disable", "multi_agent", "--disable", "multi_agent_v2",
+            "--disable", "apps", "--disable", "browser_use",
+            "--disable", "computer_use", "--disable", "code_mode",
+            "--disable", "code_mode_host", "--disable", "image_generation",
+            "--disable", "goals", "--disable", "workspace_dependencies", "-",
         ]
         return argv
 

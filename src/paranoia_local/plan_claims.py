@@ -500,7 +500,8 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
     if not required:
         setattr(claim, slot, {
             "required": False, "status": "not-required",
-            "event_digest": event_digest(event), "evidence_ids": evidence_ids, "checks": [],
+            "event_digest": event_digest(event), "event": copy.deepcopy(event.data),
+            "evidence_ids": evidence_ids, "checks": [],
         })
         return True
     digest = event_digest(event)
@@ -514,6 +515,7 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
         "required": True,
         "status": "complete" if len(vendors) >= 2 else "pending",
         "event_digest": digest,
+        "event": copy.deepcopy(event.data),
         "evidence_ids": evidence_ids,
         "checks": [asdict(check) for check in matching],
     }
@@ -555,7 +557,7 @@ def claim_blocks(claim: Claim) -> bool:
     if claim.kind_classification != CONFIRMED:
         return True
     if claim.kind == DECISION:
-        return False
+        return claim.status != NOT_APPLICABLE
     if claim.bearing == ADVISORY:
         return not _authorization_valid(claim.bearing_authorization, must_be_required=True)
     if claim.status == VERIFIED:
@@ -711,7 +713,7 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
         if claim.kind_classification == PROPOSED and claim.status != UNCHECKED:
             raise ClaimRegisterError("proposed persisted claim has unreachable status")
         if claim.kind_classification == CONFIRMED and claim.kind == DECISION \
-                and claim.status not in {NOT_APPLICABLE, SUPERSEDED}:
+                and claim.status not in {NOT_APPLICABLE, STALE, DISPUTED, SUPERSEDED}:
             raise ClaimRegisterError("confirmed persisted decision has unreachable status")
         if claim.kind_classification == CONFIRMED and claim.kind == FACT \
                 and claim.status == NOT_APPLICABLE:
@@ -827,7 +829,9 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         info = row.get(authorization_key)
         if info is None:
             continue
-        allowed = {"required", "status", "event_digest", "evidence_ids", "checks", "reason"}
+        allowed = {
+            "required", "status", "event_digest", "event", "evidence_ids", "checks", "reason",
+        }
         if not set(info).issubset(allowed) or not isinstance(info.get("required"), bool) \
                 or info.get("status") not in {"not-required", "pending", "complete"}:
             raise ClaimRegisterError("persisted independent authorization is malformed")
@@ -838,7 +842,12 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         ids = info.get("evidence_ids", [])
         checks = info.get("checks", [])
         digest = info.get("event_digest")
+        event = info.get("event")
         if not isinstance(digest, str) or not _digest(digest) \
+                or not isinstance(event, dict) \
+                or hashlib.sha256(json.dumps(
+                    event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode()).hexdigest() != digest \
                 or not isinstance(ids, list) \
                 or any(not isinstance(item, str) or not item for item in ids) \
                 or not isinstance(checks, list):
@@ -886,6 +895,14 @@ def render_claim_summary(state: ClaimState) -> str:
                     "status": claim.status,
                     "evidence_ids": claim.evidence_ids,
                     "pending_transition": claim.pending_transition,
+                    "pending_authorizations": {
+                        name: info.get("event") for name, info in {
+                            "truth": claim.truth_authorization,
+                            "bearing": claim.bearing_authorization,
+                            "dispute": claim.dispute_authorization,
+                            "deferral": claim.deferral_authorization,
+                        }.items() if info and info.get("status") == "pending"
+                    },
                 },
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
