@@ -50,8 +50,11 @@ class EvidenceStore:
 
     @contextmanager
     def locked(self) -> Iterator[None]:
-        self.root.mkdir(parents=True, exist_ok=True)
+        self._mkdir_durable(self.root)
+        lock_existed = self.lock_path.exists()
         fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        if not lock_existed:
+            self._fsync_dir(self.root)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
             yield
@@ -201,10 +204,7 @@ class EvidenceStore:
 
     @staticmethod
     def _atomic_bytes(path: Path, data: bytes) -> None:
-        parent_existed = path.parent.exists()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not parent_existed:
-            EvidenceStore._fsync_dir(path.parent.parent)
+        EvidenceStore._mkdir_durable(path.parent)
         fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as handle:
@@ -247,3 +247,16 @@ class EvidenceStore:
             os.fsync(fd)
         finally:
             os.close(fd)
+
+    @staticmethod
+    def _mkdir_durable(path: Path) -> None:
+        missing: list[Path] = []
+        cursor = path
+        while not cursor.exists():
+            missing.append(cursor)
+            if cursor.parent == cursor:
+                break
+            cursor = cursor.parent
+        path.mkdir(parents=True, exist_ok=True)
+        for created in reversed(missing):
+            EvidenceStore._fsync_dir(created.parent)

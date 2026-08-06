@@ -73,7 +73,10 @@ def test_compressed_and_decompressed_size_caps_are_both_enforced() -> None:
 
 @pytest.mark.parametrize(
     "url",
-    ["http://user:pass@example.com/", "file:///etc/passwd", "https://example.com/a\nFORGED"],
+    [
+        "http://user:pass@example.com/", "file:///etc/passwd",
+        "https://example.com/a\nFORGED", "https://example.com/é",
+    ],
 )
 def test_credentials_and_non_https_urls_are_rejected(url: str) -> None:
     client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())

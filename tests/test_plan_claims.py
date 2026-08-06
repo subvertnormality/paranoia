@@ -108,7 +108,7 @@ def test_advisory_bearing_requires_evidence_and_completed_independent_check() ->
                                      "reason": "no dependent step"})
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
-        evidence_ids={"e1"}, independent_required=True,
+        evidence_ids={"e1": claim_id}, independent_required=True,
     )
     assert state.claims[claim_id].bearing == pc.BLOCKING
     assert state.claims[claim_id].pending_transition == event.data
@@ -120,7 +120,7 @@ def test_advisory_bearing_requires_evidence_and_completed_independent_check() ->
     ]
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
-        evidence_ids={"e1"}, independent_required=True, vendor_checks=checks,
+        evidence_ids={"e1": claim_id}, independent_required=True, vendor_checks=checks,
     )
     assert state.claims[claim_id].bearing == pc.ADVISORY
     assert not pc.blocking_claims(state)
@@ -136,10 +136,72 @@ def test_verified_claim_reblocks_if_persisted_check_provenance_is_tampered() -> 
         pc.VendorCheck("anthropic", "claude", digest, ("e1",), True, "t2"),
     ]
     pc.apply_events(state, [event], role=pc.VERIFIER_ROLE, spans=spans,
-                    evidence_ids={"e1"}, independent_required=True, vendor_checks=checks)
+                    evidence_ids={"e1": claim_id}, independent_required=True,
+                    vendor_checks=checks)
     assert not pc.blocking_claims(state)
-    state.claims[claim_id].independent_check["checks"][1]["event_digest"] = "tampered"
+    state.claims[claim_id].truth_authorization["checks"][1]["event_digest"] = "tampered"
     assert pc.blocking_claims(state)
+
+
+@pytest.mark.parametrize("op", ["VERIFY", "CONTRADICT", "SET_BEARING", "DISPUTE", "RESOLVE_DISPUTE"])
+def test_evidence_from_another_claim_cannot_authorize_any_transition(op: str) -> None:
+    state, first_id, spans = _state_with_confirmed_fact()
+    minted = pc.apply_events(
+        state,
+        pc.parse_role_register(_research([_add(temp_id="second", claim="Second premise")]),
+                               pc.RESEARCH_ROLE),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )
+    second_id = minted["second"]
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": second_id,
+            "kind": "fact", "reason": "premise",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    data = {
+        "op": op, "claim_id": second_id, "evidence_ids": ["for-first"],
+        "reason": "wrong claim evidence",
+    }
+    if op == "SET_BEARING":
+        data["bearing"] = "advisory"
+    role = pc.STRUCTURAL_ROLE if op == "DISPUTE" else pc.VERIFIER_ROLE
+    with pytest.raises(pc.ClaimTransitionError, match="exact claim"):
+        pc.apply_events(
+            state, [pc.Event(op, data)], role=role, spans=spans,
+            evidence_ids={"for-first": first_id},
+        )
+
+
+def test_nonrequired_truth_check_does_not_erase_audited_advisory_authorization() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    bearing = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": ["e1"], "reason": "not load bearing",
+    })
+    digest = pc.event_digest(bearing)
+    checks = [
+        pc.VendorCheck("one", "m1", digest, ("e1",), True, "t"),
+        pc.VendorCheck("two", "m2", digest, ("e1",), True, "t"),
+    ]
+    pc.apply_events(
+        state, [bearing], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True, vendor_checks=checks,
+    )
+    verify = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id, "evidence_ids": ["e1"],
+        "reason": "locally true",
+    })
+    pc.apply_events(
+        state, [verify], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=False,
+    )
+    claim = state.claims[claim_id]
+    assert claim.bearing_authorization["status"] == "complete"
+    assert claim.truth_authorization["status"] == "not-required"
+    assert not pc.claim_blocks(claim)
 
 
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:

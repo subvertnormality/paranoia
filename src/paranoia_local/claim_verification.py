@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
 from .evidence_store import EvidenceStore, EvidenceStoreError
-from .external_evidence import EndpointSearchProvider, NetworkEvidenceError, SafeHttpClient
+from .external_evidence import (
+    EndpointSearchProvider, FetchLimits, NetworkEvidenceError, SafeHttpClient,
+)
 from .plan_snapshot import PlanRepositorySnapshot, SnapshotUnavailable
 from . import plan_claims as pc
 
@@ -81,10 +83,14 @@ class EvidenceBudget:
             raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
         self.aggregate_bytes += size
 
+    @property
+    def remaining_bytes(self) -> int:
+        return MAX_AGGREGATE_BYTES - self.aggregate_bytes
+
 
 _REQUEST_FIELDS = {
     "LIST_TREE": {"op", "claim_id", "prefix", "limit"},
-    "READ_BLOB": {"op", "claim_id", "path", "max_bytes"},
+    "READ_BLOB": {"op", "claim_id", "path", "offset", "max_bytes"},
     "SEARCH_LITERAL": {"op", "claim_id", "pattern", "paths", "limit"},
     "HISTORY": {"op", "claim_id", "ref", "path", "limit"},
     "RUN_ADAPTER": {"op", "claim_id", "adapter", "paths"},
@@ -148,6 +154,9 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
         size = item.get("max_bytes")
         if not isinstance(size, int) or isinstance(size, bool) or not 1 <= size <= 1 << 20:
             raise EvidenceRequestError("READ_BLOB.max_bytes is out of bounds")
+        offset = item.get("offset")
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise EvidenceRequestError("READ_BLOB.offset is out of bounds")
     if op == "SEARCH_LITERAL":
         if not isinstance(item.get("pattern"), str) or not item["pattern"] or len(item["pattern"]) > 256:
             raise EvidenceRequestError("SEARCH_LITERAL.pattern is out of bounds")
@@ -203,15 +212,21 @@ def collect_evidence(
                                    }))
         elif request.op == "READ_BLOB":
             try:
-                body = snapshot.read_blob(data["path"], max_bytes=data["max_bytes"])
+                allowed = min(data["max_bytes"], budget.remaining_bytes + 1)
+                body = snapshot.read_blob(
+                    data["path"], offset=data["offset"], max_bytes=allowed,
+                )
             except SnapshotUnavailable as exc:
                 if "gitlinks are unavailable" in str(exc):
                     continue
                 raise
             budget.debit_bytes(len(body))
+            blob_oid, whole_size = snapshot.blob_identity(data["path"])
             records.append(_record(store, run_id, claim_id, "repository-blob",
                                    data["path"], body,
-                                   {"snapshot_commit": snapshot.commit_id, "path": data["path"]}))
+                                   {"snapshot_commit": snapshot.commit_id, "path": data["path"],
+                                    "blob_oid": blob_oid, "whole_size": whole_size,
+                                    "offset": data["offset"], "length": len(body)}))
         elif request.op == "SEARCH_LITERAL":
             matches = snapshot.search_literal(data["pattern"], paths=data["paths"],
                                                limit=min(data["limit"], 50))
@@ -230,13 +245,20 @@ def collect_evidence(
             records.append(_record(
                 store, run_id, claim_id, "repository-history", data["ref"], body,
                 {"ref": data["ref"], "path": data["path"],
+                 "history_oid": snapshot.history_oid(data["ref"]), "limit": data["limit"],
                  "snapshot_commit": snapshot.commit_id},
             ))
         elif request.op == "RUN_ADAPTER":
             rows: list[dict[str, Any]] = []
             inputs: dict[str, str] = {}
             for path in data["paths"]:
-                source = snapshot.read_blob(path, max_bytes=1 << 20)
+                _oid, input_size = snapshot.blob_identity(path)
+                if input_size > 1 << 20:
+                    raise EvidenceRequestError("empirical adapter input exceeds 1 MiB")
+                source = snapshot.read_blob(
+                    path, max_bytes=min(1 << 20, budget.remaining_bytes + 1)
+                )
+                budget.debit_bytes(len(source))
                 inputs[path] = hashlib.sha256(source).hexdigest()
                 try:
                     compile(source, path, "exec")
@@ -263,7 +285,10 @@ def collect_evidence(
                 continue
             try:
                 budget.debit_fetch()
-                hits = search_provider.search(data["query"], limit=min(data["limit"], 2))
+                hits = search_provider.search(
+                    data["query"], limit=min(data["limit"], 2),
+                    limits=_fetch_limits(budget.remaining_bytes),
+                )
                 budget.debit_bytes(search_provider.last_response_size)
             except NetworkEvidenceError as exc:
                 if search_provider.last_response_size:
@@ -273,7 +298,7 @@ def collect_evidence(
             for hit in hits:
                 budget.debit_fetch()
                 try:
-                    response = http_client.fetch(hit.url)
+                    response = http_client.fetch(hit.url, _fetch_limits(budget.remaining_bytes))
                 except NetworkEvidenceError as exc:
                     records.append(_abstention(claim_id, "external-fetch", hit.url, str(exc)))
                     continue
@@ -297,6 +322,15 @@ def collect_evidence(
                     },
                 ))
     return records
+
+
+def _fetch_limits(remaining: int) -> FetchLimits:
+    if remaining < 1:
+        raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
+    return FetchLimits(
+        max_compressed_bytes=min(1 << 20, remaining),
+        max_decompressed_bytes=min(1 << 20, remaining),
+    )
 
 
 def collect_supplied_evidence(
@@ -334,11 +368,7 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
             body: bytes, metadata: dict[str, Any]) -> EvidenceRecord:
     digest = store.stage(run_id, body)
     passage = body[:MAX_PASSAGE_BYTES]
-    identity = hashlib.sha256(
-        (claim_id + "\0" + kind + "\0" + source + "\0" + digest).encode(
-            "utf-8", errors="surrogateescape"
-        )
-    ).hexdigest()[:12]
+    identity = _evidence_identity(claim_id, kind, source, digest)
     return EvidenceRecord(
         evidence_id="e" + identity,
         claim_id=claim_id,
@@ -353,6 +383,14 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
         display_passage=passage.decode("utf-8", errors="replace"),
         metadata=metadata,
     )
+
+
+def _evidence_identity(claim_id: str, kind: str, source: str, digest: str) -> str:
+    return hashlib.sha256(
+        (claim_id + "\0" + kind + "\0" + source + "\0" + digest).encode(
+            "utf-8", errors="surrogateescape"
+        )
+    ).hexdigest()[:12]
 
 
 def _abstention(claim_id: str, kind: str, source: str, reason: str) -> EvidenceRecord:
@@ -458,11 +496,48 @@ def validate_cached_records(
                 body = store.read(record.blob_digest)
                 if hashlib.sha256(body).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("cached evidence source hash mismatch")
+                passage = body[:MAX_PASSAGE_BYTES]
+                if (
+                    record.source_size != len(body)
+                    or record.passage_start != 0
+                    or record.passage_end != len(passage)
+                    or record.passage_sha256 != hashlib.sha256(passage).hexdigest()
+                    or record.display_passage != passage.decode("utf-8", errors="replace")
+                    or record.evidence_id != "e" + _evidence_identity(
+                        record.claim_id, record.kind, record.source, record.source_sha256
+                    )
+                ):
+                    raise EvidenceRequestError("cached evidence derived fields are inconsistent")
             if record.kind == "repository-blob":
-                path = str(record.metadata["path"])
-                current = snapshot.read_blob(path)
+                path = record.metadata["path"]
+                offset = record.metadata["offset"]
+                length = record.metadata["length"]
+                if path != record.source or not isinstance(offset, int) \
+                        or isinstance(offset, bool) or not isinstance(length, int) \
+                        or isinstance(length, bool) or length != record.source_size:
+                    raise EvidenceRequestError("repository blob cache metadata is malformed")
+                oid, whole_size = snapshot.blob_identity(path)
+                if oid != record.metadata.get("blob_oid") \
+                        or whole_size != record.metadata.get("whole_size"):
+                    raise EvidenceRequestError("repository blob object identity changed")
+                current = snapshot.read_blob(path, offset=offset, max_bytes=max(1, length))
                 if hashlib.sha256(current).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("repository evidence blob changed")
+            elif record.kind == "repository-history":
+                ref = record.metadata["ref"]
+                path = record.metadata["path"]
+                limit = record.metadata["limit"]
+                if not isinstance(ref, str) or not isinstance(path, str) \
+                        or not isinstance(limit, int) or isinstance(limit, bool) \
+                        or ref != record.source \
+                        or snapshot.history_oid(ref) != record.metadata["history_oid"]:
+                    raise EvidenceRequestError("repository history ref identity changed")
+                current = json.dumps(
+                    snapshot.history(ref, path, limit=limit),
+                    ensure_ascii=False, separators=(",", ":"),
+                ).encode()
+                if hashlib.sha256(current).hexdigest() != record.source_sha256:
+                    raise EvidenceRequestError("repository history result changed")
             elif record.kind.startswith("repository"):
                 if record.metadata.get("snapshot_commit", snapshot.commit_id) != snapshot.commit_id:
                     raise EvidenceRequestError("repository query scope changed")
@@ -470,7 +545,9 @@ def validate_cached_records(
                 if record.metadata.get("runtime") != sys.version:
                     raise EvidenceRequestError("empirical adapter runtime changed")
                 for path, expected in record.metadata.get("input_hashes", {}).items():
-                    if hashlib.sha256(snapshot.read_blob(path)).hexdigest() != expected:
+                    _oid, input_size = snapshot.blob_identity(path)
+                    if input_size > 1 << 20 \
+                            or hashlib.sha256(snapshot.read_blob(path)).hexdigest() != expected:
                         raise EvidenceRequestError("empirical adapter input changed")
             elif record.kind == "external":
                 stamp = datetime.fromisoformat(str(record.metadata["retrieved_at"]))
@@ -487,10 +564,13 @@ def validate_cached_records(
         for claim in state.claims.values():
             if invalid_ids.intersection(claim.evidence_ids):
                 claim.status = pc.STALE
-            info = claim.independent_check or {}
-            if invalid_ids.intersection(info.get("evidence_ids", [])):
-                info["status"] = "pending"
-                claim.independent_check = info
+            for field_name in (
+                "truth_authorization", "bearing_authorization", "dispute_authorization"
+            ):
+                info = getattr(claim, field_name) or {}
+                if invalid_ids.intersection(info.get("evidence_ids", [])):
+                    info["status"] = "pending"
+                    setattr(claim, field_name, info)
     return valid
 
 

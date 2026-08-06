@@ -169,7 +169,9 @@ class Claim:
     disputed_evidence_ids: list[str] = field(default_factory=list)
     pending_replacement_id: str | None = None
     superseded_by: str | None = None
-    independent_check: dict[str, Any] | None = None
+    truth_authorization: dict[str, Any] | None = None
+    bearing_authorization: dict[str, Any] | None = None
+    dispute_authorization: dict[str, Any] | None = None
     pending_transition: dict[str, Any] | None = None
 
 
@@ -310,12 +312,12 @@ def apply_events(
     role: str,
     spans: Sequence[PlanSpan],
     round_no: int = 1,
-    evidence_ids: set[str] | None = None,
+    evidence_ids: Mapping[str, str] | None = None,
     independent_required: bool = False,
     vendor_checks: Sequence[VendorCheck] = (),
 ) -> dict[str, str]:
     """Apply a role register to ``state``. Callers apply to a copied draft."""
-    available = evidence_ids or set()
+    available = evidence_ids or {}
     minted: dict[str, str] = {}
     seen_temp: set[str] = set()
     for event in events:
@@ -341,7 +343,7 @@ def apply_events(
             claim.reason = data["reason"]
             claim.status = NOT_APPLICABLE if kind == DECISION else UNVERIFIED
         elif event.op in {"VERIFY", "CONTRADICT", "RESOLVE_DISPUTE", "SET_BEARING"}:
-            ids = _validated_evidence(data, available)
+            ids = _validated_evidence(data, available, claim.claim_id)
             if not _authorize_independent(
                 claim, event, ids, independent_required, vendor_checks
             ):
@@ -367,7 +369,7 @@ def apply_events(
                 claim.bearing, claim.evidence_ids = data["bearing"], ids
             claim.reason = data["reason"]
         elif event.op == "DISPUTE":
-            ids = _validated_evidence(data, available)
+            ids = _validated_evidence(data, available, claim.claim_id)
             claim.status, claim.disputed_evidence_ids = DISPUTED, ids
             claim.reason = data["reason"]
         elif event.op == "DEFER":
@@ -439,10 +441,14 @@ def _add_claim(state: ClaimState, data: Mapping[str, Any], role: str,
     seen_temp.add(temp_id)
 
 
-def _validated_evidence(data: Mapping[str, Any], available: set[str]) -> list[str]:
+def _validated_evidence(
+    data: Mapping[str, Any], available: Mapping[str, str], claim_id: str
+) -> list[str]:
     ids = list(dict.fromkeys(data.get("evidence_ids", [])))
-    if not ids or any(item not in available for item in ids):
-        raise ClaimTransitionError("transition references missing server evidence")
+    if not ids or any(available.get(item) != claim_id for item in ids):
+        raise ClaimTransitionError(
+            "transition evidence must exist and be bound to the exact claim"
+        )
     return ids
 
 
@@ -453,8 +459,13 @@ def _require_fact(claim: Claim) -> None:
 
 def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
                            required: bool, checks: Sequence[VendorCheck]) -> bool:
+    slot = (
+        "bearing_authorization" if event.op == "SET_BEARING"
+        else "dispute_authorization" if event.op == "RESOLVE_DISPUTE"
+        else "truth_authorization"
+    )
     if not required:
-        claim.independent_check = {"required": False, "status": "not-required"}
+        setattr(claim, slot, {"required": False, "status": "not-required"})
         return True
     digest = event_digest(event)
     matching = [
@@ -463,13 +474,16 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
         and tuple(evidence_ids) == check.evidence_ids
     ]
     vendors = {check.vendor for check in matching}
-    claim.independent_check = {
+    authorization = {
         "required": True,
         "status": "complete" if len(vendors) >= 2 else "pending",
         "event_digest": digest,
         "evidence_ids": evidence_ids,
         "checks": [asdict(check) for check in matching],
     }
+    setattr(claim, slot, authorization)
+    if event.op == "RESOLVE_DISPUTE":
+        claim.truth_authorization = copy.deepcopy(authorization)
     return len(vendors) >= 2
 
 
@@ -480,10 +494,11 @@ def _complete_supersessions(state: ClaimState) -> None:
             claim.status, claim.superseded_by = SUPERSEDED, target.claim_id
 
 
-def _independent_valid(claim: Claim) -> bool:
-    info = claim.independent_check
-    if not info or not info.get("required"):
-        return True
+def _authorization_valid(info: dict[str, Any] | None, *, must_be_required: bool = False) -> bool:
+    if not info:
+        return not must_be_required
+    if not info.get("required"):
+        return not must_be_required
     if info.get("status") != "complete":
         return False
     digest, evidence = info.get("event_digest"), tuple(info.get("evidence_ids", []))
@@ -501,13 +516,13 @@ def claim_blocks(claim: Claim) -> bool:
         return False
     if claim.kind_classification != CONFIRMED:
         return True
-    if not _independent_valid(claim):
-        return True
     if claim.kind == DECISION:
         return False
     if claim.bearing == ADVISORY:
-        return False
-    return claim.status not in {VERIFIED, DEFERRED}
+        return not _authorization_valid(claim.bearing_authorization, must_be_required=True)
+    if claim.status == VERIFIED:
+        return not _authorization_valid(claim.truth_authorization)
+    return claim.status != DEFERRED
 
 
 def blocking_claims(state: ClaimState) -> list[Claim]:
@@ -687,7 +702,10 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         value = row.get(key)
         if value is not None and not isinstance(value, str):
             raise ClaimRegisterError(f"persisted {key} is malformed")
-    for key in ("deferral", "independent_check", "pending_transition"):
+    for key in (
+        "deferral", "truth_authorization", "bearing_authorization",
+        "dispute_authorization", "pending_transition",
+    ):
         value = row.get(key)
         if value is not None and not isinstance(value, dict):
             raise ClaimRegisterError(f"persisted {key} is malformed")
@@ -713,8 +731,12 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         raise ClaimRegisterError("persisted truth transition has no evidence")
     if row.get("bearing") == ADVISORY and not row.get("evidence_ids"):
         raise ClaimRegisterError("persisted advisory claim has no evidence")
-    info = row.get("independent_check")
-    if info is not None:
+    for authorization_key in (
+        "truth_authorization", "bearing_authorization", "dispute_authorization"
+    ):
+        info = row.get(authorization_key)
+        if info is None:
+            continue
         allowed = {"required", "status", "event_digest", "evidence_ids", "checks", "reason"}
         if not set(info).issubset(allowed) or not isinstance(info.get("required"), bool) \
                 or info.get("status") not in {"not-required", "pending", "complete"}:

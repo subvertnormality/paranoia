@@ -133,7 +133,7 @@ REQUESTS-JSON: <one-line JSON array>
 
 Allowed exact objects:
 {"op":"LIST_TREE","claim_id":"...","prefix":"","limit":200}
-{"op":"READ_BLOB","claim_id":"...","path":"literal/path","max_bytes":1048576}
+{"op":"READ_BLOB","claim_id":"...","path":"literal/path","offset":0,"max_bytes":4096}
 {"op":"SEARCH_LITERAL","claim_id":"...","pattern":"literal","paths":[],"limit":50}
 {"op":"HISTORY","claim_id":"...","ref":"SNAPSHOT|initial ref name","path":"literal/path","limit":20}
 {"op":"RUN_ADAPTER","claim_id":"...","adapter":"PYTHON_COMPILE","paths":["literal.py"]}

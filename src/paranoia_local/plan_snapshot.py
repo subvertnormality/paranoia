@@ -20,6 +20,8 @@ _GIT_ENV = {
     "GIT_OPTIONAL_LOCKS": "0",
     "GIT_PAGER": "cat",
     "PAGER": "cat",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_GRAFT_FILE": os.devnull,
 }
 _GIT_CONFIG = [
     "-c", "core.fsmonitor=false",
@@ -50,9 +52,10 @@ class SnapshotCleanupError(SnapshotUnavailable):
 def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
          check: bool = True,
          extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
+    ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     result = subprocess.run(
         ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes, capture_output=True,
-        env={**os.environ, **_GIT_ENV, **(extra_env or {})},
+        env={**ambient, **_GIT_ENV, **(extra_env or {})},
     )
     if check and result.returncode:
         raise SnapshotUnavailable(
@@ -86,6 +89,7 @@ class PlanRepositorySnapshot:
         before_pin: Callable[[list[tuple[str, str]]], None] | None = None,
     ) -> "PlanRepositorySnapshot":
         repo = Path(repo).resolve()
+        _validate_object_boundary(repo)
         head_result = _run(repo, ["rev-parse", "--verify", "--quiet", "HEAD"], check=False)
         has_head = head_result.returncode == 0
         head = (
@@ -120,7 +124,7 @@ class PlanRepositorySnapshot:
             if "\0" not in line:
                 continue
             name, oid = line.split("\0", 1)
-            if name.startswith("refs/paranoia/plan-snapshots/"):
+            if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
                 continue
             history[name] = oid.strip()
         if len(history) + 1 > MAX_PINNED_REFS:
@@ -170,6 +174,7 @@ class PlanRepositorySnapshot:
         self._closed = True
 
     def _verify_wrapper(self) -> None:
+        _validate_object_boundary(self.repo)
         result = _run(self.repo, ["rev-parse", "--verify", self.wrapper_ref + "^{commit}"],
                       check=False)
         actual = result.stdout.decode().strip() if result.returncode == 0 else ""
@@ -196,7 +201,7 @@ class PlanRepositorySnapshot:
             raise SnapshotUnavailable("literal tree membership check failed")
         return parts[0], parts[1], parts[2]
 
-    def read_blob(self, path: str, *, max_bytes: int = 1 << 20) -> bytes:
+    def blob_identity(self, path: str) -> tuple[str, int]:
         mode, kind, oid = self._entry(path)
         if mode == "120000":
             raise SnapshotUnavailable("symlink paths are not repository evidence blobs")
@@ -204,10 +209,60 @@ class PlanRepositorySnapshot:
             raise SnapshotUnavailable("gitlinks are unavailable without a supplied artifact")
         if kind != "blob":
             raise SnapshotUnavailable("repository evidence path is not a blob")
-        data = _run(self.repo, ["cat-file", "blob", oid]).stdout
-        if len(data) > max_bytes:
-            raise SnapshotUnavailable(f"repository blob exceeds {max_bytes} bytes")
-        return data
+        size_raw = _run(self.repo, ["cat-file", "-s", oid]).stdout.decode("ascii").strip()
+        try:
+            size = int(size_raw)
+        except ValueError as exc:
+            raise SnapshotUnavailable("repository blob size is malformed") from exc
+        return oid, size
+
+    def read_blob(self, path: str, *, offset: int = 0, max_bytes: int = 1 << 20) -> bytes:
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise SnapshotUnavailable("repository blob offset must be a nonnegative integer")
+        if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 1:
+            raise SnapshotUnavailable("repository blob byte limit must be positive")
+        oid, size = self.blob_identity(path)
+        if offset > size:
+            raise SnapshotUnavailable("repository blob offset exceeds source size")
+        wanted = min(max_bytes, size - offset)
+        ambient = {
+            key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        }
+        proc = subprocess.Popen(
+            ["git", *_GIT_CONFIG, "cat-file", "blob", oid], cwd=self.repo,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={**ambient, **_GIT_ENV},
+        )
+        assert proc.stdout is not None
+        result = bytearray()
+        skipped = 0
+        try:
+            while skipped < offset:
+                chunk = proc.stdout.read(min(65536, offset - skipped))
+                if not chunk:
+                    raise SnapshotUnavailable("repository blob ended before requested offset")
+                skipped += len(chunk)
+            while len(result) < wanted:
+                chunk = proc.stdout.read(min(65536, wanted - len(result)))
+                if not chunk:
+                    break
+                result.extend(chunk)
+            if offset + wanted == size:
+                returncode = proc.wait(timeout=10)
+                if returncode:
+                    stderr = proc.stderr.read() if proc.stderr else b""
+                    raise SnapshotUnavailable(
+                        "git cat-file failed: "
+                        + stderr.decode("utf-8", errors="replace").strip()
+                    )
+            else:
+                proc.terminate()
+                proc.wait(timeout=10)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        return bytes(result)
 
     def list_tree(self, prefix: str = "", *, limit: int = 200) -> list[str]:
         self._verify_wrapper()
@@ -256,12 +311,7 @@ class PlanRepositorySnapshot:
         self._verify_wrapper()
         if not (1 <= limit <= 50):
             raise SnapshotUnavailable("history result limit must be 1..50")
-        if ref == "SNAPSHOT":
-            oid = self.commit_id
-        else:
-            oid = self.history_refs.get(ref, "")
-            if not oid:
-                raise SnapshotUnavailable("history ref was not in the initial pinned map")
+        oid = self.history_oid(ref)
         if not isinstance(ref, str) or not isinstance(path, str):
             raise SnapshotUnavailable("history ref and path must be strings")
         pure = PurePosixPath(path)
@@ -283,6 +333,14 @@ class PlanRepositorySnapshot:
                 rows.append({"commit": commit.strip(), "timestamp": timestamp,
                              "subject": subject.strip()[:500]})
         return rows
+
+    def history_oid(self, ref: str) -> str:
+        if ref == "SNAPSHOT":
+            return self.commit_id
+        oid = self.history_refs.get(ref, "")
+        if not oid:
+            raise SnapshotUnavailable("history ref was not in the initial pinned map")
+        return oid
 
 
 
@@ -342,9 +400,14 @@ def _snapshot_tree_without_filters(repo: Path) -> str:
             if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
                 raise SnapshotUnavailable(f"snapshot path changed while opening: {path!r}")
             with os.fdopen(fd, "rb", closefd=False) as handle:
+                ambient = {
+                    key: value for key, value in os.environ.items()
+                    if not key.startswith("GIT_")
+                }
                 proc = subprocess.run(
                     ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
-                    cwd=repo, stdin=handle, capture_output=True, env={**os.environ, **_GIT_ENV},
+                    cwd=repo, stdin=handle, capture_output=True,
+                    env={**ambient, **_GIT_ENV},
                 )
             if proc.returncode:
                 raise SnapshotUnavailable(
@@ -376,3 +439,61 @@ def _snapshot_tree_without_filters(repo: Path) -> str:
     finally:
         import shutil
         shutil.rmtree(index_dir, ignore_errors=True)
+
+
+def _validate_object_boundary(repo: Path) -> None:
+    approved = _approved_common_dir(repo)
+    common_raw = _run(repo, ["rev-parse", "--git-common-dir"]).stdout.decode(
+        "utf-8", errors="surrogateescape"
+    ).strip()
+    common = Path(common_raw)
+    if not common.is_absolute():
+        common = (repo / common).resolve()
+    else:
+        common = common.resolve()
+    if common != approved:
+        raise SnapshotUnavailable("Git common directory is outside the approved repository boundary")
+    objects = common / "objects"
+    for name in ("alternates", "http-alternates"):
+        path = objects / "info" / name
+        try:
+            if path.is_symlink() or (path.exists() and path.read_bytes().strip()):
+                raise SnapshotUnavailable(
+                    f"repository object alternates are outside the approved snapshot boundary: {path}"
+                )
+        except OSError as exc:
+            raise SnapshotUnavailable(f"could not validate object alternates at {path}: {exc}") from exc
+
+
+def _approved_common_dir(repo: Path) -> Path:
+    dotgit = repo / ".git"
+    if dotgit.is_symlink():
+        raise SnapshotUnavailable("repository .git may not be a symlink")
+    if dotgit.is_dir():
+        return dotgit.resolve()
+    try:
+        marker = dotgit.read_text(encoding="utf-8", errors="strict").strip()
+    except (OSError, UnicodeError) as exc:
+        raise SnapshotUnavailable(f"repository gitfile is unavailable: {exc}") from exc
+    if len(marker) > 4096 or not marker.startswith("gitdir: "):
+        raise SnapshotUnavailable("repository gitfile is malformed")
+    git_dir = Path(marker[8:])
+    if not git_dir.is_absolute():
+        git_dir = (repo / git_dir).resolve()
+    else:
+        git_dir = git_dir.resolve()
+    try:
+        common_marker = (git_dir / "commondir").read_text(encoding="utf-8").strip()
+        backlink = (git_dir / "gitdir").read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise SnapshotUnavailable(f"linked-worktree metadata is unavailable: {exc}") from exc
+    common = (git_dir / common_marker).resolve()
+    backlink_path = Path(backlink)
+    if not backlink_path.is_absolute():
+        backlink_path = (git_dir / backlink_path).resolve()
+    else:
+        backlink_path = backlink_path.resolve()
+    if git_dir.parent.name != "worktrees" or git_dir.parent.parent != common \
+            or backlink_path != dotgit.resolve():
+        raise SnapshotUnavailable("gitfile is not a self-consistent native linked worktree")
+    return common

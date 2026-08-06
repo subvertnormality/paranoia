@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -69,3 +70,58 @@ def test_history_reads_only_the_initial_server_pinned_ref_map(repo: Path) -> Non
         assert rows and rows[0]["commit"]
         with pytest.raises(SnapshotUnavailable, match="initial pinned map"):
             snap.history("refs/heads/future", "app.py")
+
+
+def test_external_object_alternates_are_rejected(repo: Path, tmp_path: Path) -> None:
+    common = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    common_path = Path(common) if Path(common).is_absolute() else repo / common
+    info = common_path / "objects" / "info"
+    info.mkdir(parents=True, exist_ok=True)
+    (info / "alternates").write_text(str(tmp_path / "external-objects") + "\n")
+    with pytest.raises(SnapshotUnavailable, match="object alternates"):
+        PlanRepositorySnapshot.create(repo, run_id="alternate")
+
+
+def test_inherited_git_object_environment_is_cleared(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "/definitely/not/approved")
+    monkeypatch.setenv("GIT_REPLACE_REF_BASE", "refs/hostile-replacements/")
+    with PlanRepositorySnapshot.create(repo, run_id="clean-object-env") as snap:
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+
+
+def test_native_linked_worktree_common_store_is_explicitly_approved(
+    repo: Path, tmp_path: Path
+) -> None:
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(linked), "HEAD"],
+        cwd=repo, check=True, capture_output=True,
+    )
+    with PlanRepositorySnapshot.create(linked, run_id="linked-worktree") as snap:
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+
+
+def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: Path) -> None:
+    tree = subprocess.run(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    replacement = subprocess.run(
+        ["git", "commit-tree", tree, "-m", "FORGED REPLACEMENT"], cwd=repo, check=True,
+        capture_output=True, text=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.com",
+        },
+    ).stdout.strip()
+    subprocess.run(["git", "replace", "HEAD", replacement], cwd=repo, check=True)
+    with PlanRepositorySnapshot.create(repo, run_id="replace-disabled") as snap:
+        assert not any(name.startswith("refs/replace/") for name in snap.history_refs)
+        subjects = [row["subject"] for row in snap.history("refs/heads/main", "app.py")]
+        assert "FORGED REPLACEMENT" not in subjects

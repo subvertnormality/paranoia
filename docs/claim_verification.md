@@ -28,6 +28,9 @@ One closure round performs these stages:
    no-follow semantics, hashing through `git hash-object --stdin` (never repository
    filters), and inserting explicit object IDs/modes into a private index. Hooks,
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
+   Inherited Git environment is cleared, native linked-worktree object storage is the only
+   approved object database, alternates are rejected, and grafts/replacement objects are
+   disabled for snapshot and history operations.
    Ignored untracked paths are JSON-escaped, disclosed, and unavailable. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
@@ -36,7 +39,8 @@ One closure round performs these stages:
    later roles need to refer to them.
 4. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
-5. A toolless verifier sees exact server evidence. Every model-visible source, path,
+5. A toolless verifier sees exact server evidence bound to the exact claim ID that
+   requested it; evidence for one claim cannot authorize another. Every model-visible source, path,
    metadata object, and passage is injectively JSON escaped. Remote passages are framed
    as untrusted JSON data and never share a call with repository bytes.
 6. A fresh toolless structural reviewer sees the plan, repository evidence, external
@@ -79,7 +83,8 @@ ordering snapshot changes.
 
 ## Evidence
 
-Repository records contain the pinned commit, literal path/query, exact original bytes,
+Repository records contain the pinned commit, literal path/query or requested byte range,
+underlying blob/ref object identity, exact original bytes,
 source and passage hashes, byte bounds, and separately decoded display text. Lossy display
 text is never evidence identity.
 
@@ -88,6 +93,11 @@ The initial empirical adapter set is deliberately narrow: `PYTHON_COMPILE` compi
 version, input hashes, structured results, exit status, and falsifying result. It is
 invalidated by any runtime or input change. Arbitrary model-authored commands and shell
 strings are never accepted.
+
+`READ_BLOB` accepts a nonnegative byte offset and bounded length. An evidence planner can
+use a literal-search byte position to retrieve relevant code after the first display
+passage without widening the 1 MiB source cap or 5 MiB round cap. Fixed adapters charge
+every input byte they inspect, not only their small structured result.
 
 External work requires a configured HTTPS JSON search endpoint in `.paranoia.toml`:
 
@@ -98,7 +108,8 @@ search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}
 The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
 rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
 different from the selected address, unsupported media/encodings, excessive redirects,
-deadlines, and compressed or decompressed byte caps. With no endpoint, external research
+non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
+decompressed byte caps. With no endpoint, external research
 explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
@@ -125,6 +136,11 @@ event digest, vendor/model identities, and audit results persist. Missing, dupli
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload.
 
+The second vendor receives the server-owned proposition, current kind/bearing/status,
+plan-anchor identity, complete proposed event, and exact named evidence. Truth, dispute,
+and bearing authorizations persist in separate slots, so a later ordinary truth check
+cannot erase the mandatory audit that made a claim advisory.
+
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A
 stricter policy immediately reblocks an authorization whose persisted provenance is no
@@ -137,7 +153,8 @@ claim, eight external fetch attempts (debited before network I/O, including fail
 1 MiB per source, 5 MiB aggregate across claim, search, supplied, and structural phases,
 4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;
-repository reuse is bound to exact object/query identities. Network evidence is audit
+repository reuse recomputes every passage/identity field and is bound to exact blob,
+snapshot, history-ref, and query identities. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 
@@ -170,5 +187,7 @@ unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence 
 fully validated and corrupt lineage state is quarantined before a latch is acquired.
 Malformed registers record debt. A failed snapshot-ref cleanup, ambiguous publication, or
 crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
-through to a stale writer. Never repair state by deleting evidence roots first: preserve
+through to a stale writer. A register still malformed after its one correction attempt is
+published as durable blocking debt—even over an otherwise clear cache—and only a later
+valid replacement register clears it. Never repair state by deleting evidence roots first: preserve
 the last valid root until the lineage is repaired or explicitly abandoned.

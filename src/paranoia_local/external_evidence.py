@@ -116,9 +116,13 @@ class HttpsTransport:
             chunks: list[bytes] = []
             total = 0
             while True:
-                if time.monotonic() >= deadline:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     raise NetworkEvidenceError("external request total deadline expired")
-                chunk = response.read(min(65536, limits.max_compressed_bytes - total + 1))
+                wrapped.settimeout(min(limits.read_timeout, max(0.1, remaining)))
+                chunk = response.read1(
+                    min(65536, limits.max_compressed_bytes - total + 1)
+                )
                 if not chunk:
                     break
                 total += len(chunk)
@@ -193,8 +197,12 @@ class SafeHttpClient:
 
     @staticmethod
     def _validate_url(url: str) -> urllib.parse.SplitResult:
-        if not isinstance(url, str) or any(ord(char) < 0x20 or ord(char) == 0x7F for char in url):
-            raise NetworkEvidenceError("external evidence URL contains control characters")
+        if not isinstance(url, str) or any(
+            ord(char) < 0x20 or ord(char) == 0x7F or ord(char) > 0x7E for char in url
+        ):
+            raise NetworkEvidenceError(
+                "external evidence URL must contain printable ASCII with non-ASCII data percent-encoded"
+            )
         try:
             parsed = urllib.parse.urlsplit(url)
             _ = parsed.port

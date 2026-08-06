@@ -238,7 +238,8 @@ Every new claim starts unchecked and blocking. A different role must confirm whe
 is a fact or decision. A blocking fact closes only with exact server evidence or a safe
 plan deferral whose verification step precedes every dependency, has falsifiable evidence,
 and stops on failure. Advisory bearing requires its own evidence-bearing verifier event.
-Model agreement and citations alone do not verify anything.
+Evidence IDs are bound to one exact claim; another claim cannot reuse them. Truth, dispute,
+and bearing audits persist separately. Model agreement and citations alone do not verify anything.
 
 Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
 bounded repository records, and no filesystem path. External passages only enter a
@@ -643,7 +644,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   `bwrap` namespace with no shell or repository mounts. Native web is disabled. Exact
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
-  passages are JSON escaped; remote and repository bodies never share a role call.
+  passages are JSON escaped; remote and repository bodies never share a role call. Git
+  alternates are rejected, inherited object-database settings are cleared, and replacement
+  objects/grafts are disabled for plan evidence.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived

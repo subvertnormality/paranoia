@@ -450,10 +450,7 @@ def open_latch(root: Path, lineage_id: str) -> None:
     Without it a *failed* write leaves no marker and the next round starts empty."""
     _, pending = _paths(root, lineage_id)
     try:
-        parent_existed = pending.parent.exists()
-        pending.parent.mkdir(parents=True, exist_ok=True)
-        if not parent_existed:
-            _fsync_dir(pending.parent.parent)
+        _mkdir_durable(pending.parent)
         fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         with os.fdopen(fd, "wb") as handle:
             handle.write(b"pending\n")
@@ -487,10 +484,7 @@ def clear_latch(root: Path, lineage_id: str) -> None:
 
 def save_lineage(root: Path, lineage: Lineage) -> None:
     state_path, _ = _paths(root, lineage.lineage_id)
-    parent_existed = state_path.parent.exists()
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    if not parent_existed:
-        _fsync_dir(state_path.parent.parent)
+    _mkdir_durable(state_path.parent)
     try:
         fd, tmp = tempfile.mkstemp(dir=str(state_path.parent), suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -526,6 +520,19 @@ def _fsync_dir(path: Path) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+def _mkdir_durable(path: Path) -> None:
+    missing: list[Path] = []
+    cursor = path
+    while not cursor.exists():
+        missing.append(cursor)
+        if cursor.parent == cursor:
+            break
+        cursor = cursor.parent
+    path.mkdir(parents=True, exist_ok=True)
+    for created in reversed(missing):
+        _fsync_dir(created.parent)
 
 
 # ── applying a register ───────────────────────────────────────────────────────

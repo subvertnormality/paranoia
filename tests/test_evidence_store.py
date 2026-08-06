@@ -88,3 +88,21 @@ def test_new_root_replaces_dropped_evidence_instead_of_growing_forever(tmp_path:
     with pytest.raises(EvidenceStoreError, match="missing"):
         store.read(old)
     assert store.read(new) == b"current"
+
+
+def test_first_evidence_root_creation_fsyncs_its_parent_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence_root = tmp_path / "new" / "evidence"
+    calls: list[Path] = []
+    original = EvidenceStore._fsync_dir
+
+    def record(path: Path) -> None:
+        calls.append(Path(path))
+        original(Path(path))
+
+    monkeypatch.setattr(EvidenceStore, "_fsync_dir", staticmethod(record))
+    EvidenceStore(evidence_root).begin("first")
+    assert tmp_path in calls
+    assert evidence_root.parent in calls
+    assert evidence_root in calls

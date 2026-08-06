@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from paranoia_local import class_closure as cc
-from paranoia_local import handlers, plan_claims as pc
+from paranoia_local import claim_verification as cv, handlers, plan_claims as pc
 from paranoia_local.engines import Review
 
 
@@ -33,7 +33,7 @@ class ClaimEngine:
             return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([event]))
         if "neutral evidence planner" in prompt:
             claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
-            request = {"op": "READ_BLOB", "claim_id": claim_id, "path": "app.py",
+            request = {"op": "READ_BLOB", "claim_id": claim_id, "path": "app.py", "offset": 0,
                        "max_bytes": 1048576}
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request]))
         if "preparing bounded repository context" in prompt:
@@ -174,7 +174,7 @@ def test_tightening_independent_policy_invalidates_cache_and_reauthorizes(
         cc.default_state_root(), "policy-plan", stamp="T3", mode=cc.PLAN_MODE
     )
     claim = next(iter(pc.state_from_json("policy-plan", lineage.claim_state).claims.values()))
-    assert claim.independent_check["status"] == "complete"
+    assert claim.truth_authorization["status"] == "complete"
 
 
 def test_structural_add_receives_real_span_vocabulary_and_remains_blocking(
@@ -235,3 +235,96 @@ def test_malformed_nested_claim_state_is_quarantined_without_stranding_latch(
     assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
     assert not (directory / "malformed-plan.pending").exists()
     assert list(directory.glob("malformed-plan.corrupt-*.json"))
+
+
+def test_independent_auditor_receives_exact_proposition_and_claim_state(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("auditor")
+    add = {
+        "op": "ADD", "temp_id": "one", "claim": "The exact proposition",
+        "kind": "fact", "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+    }
+    events = pc.parse_role_register(
+        "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([add]), pc.RESEARCH_ROLE
+    )
+    claim_id = pc.apply_events(
+        state, events, role=pc.RESEARCH_ROLE, spans=spans
+    )["one"]
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "supported",
+    })
+    digest = "a" * 64
+    record = cv.EvidenceRecord(
+        "e1", claim_id, "external", "https://example.com/", digest, digest, 1,
+        0, 1, digest, "x", {},
+    )
+
+    class Auditor:
+        name = "other"
+        default_model = "other-model"
+
+        def __init__(self) -> None:
+            self.prompt = ""
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            self.prompt = prompt
+            return _review("CHECK: ACCEPT")
+
+    auditor = Auditor()
+    monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
+    checks = handlers._independent_checks(
+        event, required=True, primary_engine=ClaimEngine(), primary_model="fake-model",
+        evidence_records=[record], claim_state=state, effort="high", on_progress=None,
+    )
+    assert len(checks) == 2
+    assert '"proposition":"The exact proposition"' in auditor.prompt
+    assert f'"claim_id":"{claim_id}"' in auditor.prompt
+    assert '"status":"unchecked"' in auditor.prompt
+
+
+@pytest.mark.parametrize("stage", ["research", "evidence", "verifier", "structural"])
+def test_twice_malformed_register_creates_durable_debt_and_disables_cache(
+    repo: Path, tmp_path: Path, stage: str
+) -> None:
+    lineage_id = f"malformed-{stage}-register-plan"
+    args = {
+        "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+        "lineage": lineage_id, "round": 1,
+    }
+    handlers.critique_plan(
+        args, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+
+    class MalformedEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            self.tool_less_prompts.append(prompt)
+            selected = (
+                (stage == "research" and "neutral claim extractor" in prompt)
+                or (stage == "evidence" and "neutral evidence planner" in prompt)
+                or (stage == "verifier" and "neutral evidence verifier" in prompt)
+                or (stage == "structural" and "adversarial reviewer of plans" in prompt)
+            )
+            if selected:
+                return _review("not a register")
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    args.update({"round": 2, "refresh_claims": True})
+    out = handlers.critique_plan(
+        args, engine=MalformedEngine(), log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "Claim register failed closed" in out and "CONVERGENCE: BLOCKED" in out
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T3", mode=cc.PLAN_MODE
+    )
+    state = pc.state_from_json(lineage_id, lineage.claim_state)
+    assert state.debt and lineage.debt
+    assert not (cc.lineage_dir(cc.default_state_root()) / f"{lineage_id}.pending").exists()
+    args.update({"round": 3, "refresh_claims": False})
+    repaired = handlers.critique_plan(
+        args, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T3",
+    )
+    assert "cache-hit" not in repaired and "CONVERGENCE: NOT-BLOCKED" in repaired
