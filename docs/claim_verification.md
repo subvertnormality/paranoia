@@ -25,8 +25,12 @@ models cannot share a misconception. `NOT-BLOCKED` is not an approval.
 
 One closure round performs these stages:
 
-1. Read the exact plan bytes and expose ordered opaque span IDs beside bounded display
-   text. Models reference span IDs; the server owns byte offsets and hashes.
+1. Accept at most 1 MiB of exact plan bytes and expose ordered opaque span IDs beside
+   bounded display text. Inline schema validation rejects oversized text early; filesystem
+   plans must be absolute, no-follow, nonblocking regular files whose identity, size, and
+   timestamps remain stable across a bounded read. Unsafe input returns the standard five
+   sections and an explicit blocked preflight verdict before any latch or model call.
+   Models reference span IDs; the server owns byte offsets and hashes.
 2. Snapshot tracked and non-ignored untracked repository bytes by opening exact files with
    no-follow semantics, hashing through `git hash-object --stdin` (never repository
    filters), and inserting explicit object IDs/modes into a private index. Hooks,
@@ -198,7 +202,8 @@ longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result
 
 Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
 claim, eight external HTTP attempts (debited before each hop, including failures),
-1 MiB per source, 5 MiB aggregate across claim, search, supplied, and structural phases,
+1 MiB for the plan, 1 MiB per source, 5 MiB aggregate across claim, search, supplied,
+and structural phases,
 4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;
 the same budget begins before cache validation: retained CAS bytes are reserved before

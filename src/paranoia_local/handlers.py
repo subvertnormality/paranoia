@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import tempfile
 import time
@@ -442,6 +443,13 @@ class _RegisterStageFailure(_ClaimStageFailure):
     """A live model replied, but both terminal registers were invalid."""
 
 
+class _PlanInputUnavailable(ValueError):
+    pass
+
+
+MAX_PLAN_BYTES = 1 << 20
+
+
 def critique_plan(
     arguments: dict[str, Any],
     *,
@@ -471,18 +479,82 @@ def critique_plan(
 
 def _read_plan_bytes(arguments: dict[str, Any]) -> tuple[bytes, str, str | None]:
     plan_text, plan_path = arguments.get("plan_text"), arguments.get("plan_path")
-    if plan_text and plan_path:
+    if plan_text is not None and plan_path is not None:
         raise ValueError("critique_plan takes plan_text OR plan_path, not both")
-    if not plan_text and not plan_path:
+    if plan_text is None and plan_path is None:
         raise ValueError("critique_plan requires plan_text or plan_path")
-    if plan_path:
-        try:
-            raw = Path(plan_path).read_bytes()
-        except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
-            raise ValueError(f"cannot read plan_path: {exc}") from exc
+    if plan_path is not None:
+        if not isinstance(plan_path, str) or not plan_path or not Path(plan_path).is_absolute():
+            raise ValueError("plan_path must be a nonempty absolute path string")
+        raw = _read_bounded_plan_file(Path(plan_path))
         return raw, raw.decode("utf-8", errors="replace"), str(plan_path)
-    text = str(plan_text)
-    return text.encode("utf-8", errors="surrogateescape"), text, None
+    if not isinstance(plan_text, str) or not plan_text:
+        raise ValueError("plan_text must be a nonempty string")
+    if len(plan_text) > MAX_PLAN_BYTES:
+        raise _PlanInputUnavailable(f"plan_text exceeds the {MAX_PLAN_BYTES}-byte cap")
+    raw = plan_text.encode("utf-8", errors="surrogateescape")
+    if len(raw) > MAX_PLAN_BYTES:
+        raise _PlanInputUnavailable(f"plan_text exceeds the {MAX_PLAN_BYTES}-byte cap")
+    return raw, plan_text, None
+
+
+def _read_bounded_plan_file(path: Path) -> bytes:
+    """Read a stable regular-file inode without following or blocking."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        raise _PlanInputUnavailable("plan_path no-follow reads are unavailable")
+    try:
+        before = path.lstat()
+    except OSError as exc:
+        raise _PlanInputUnavailable(f"plan_path is unavailable: {exc}") from exc
+    if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_PLAN_BYTES:
+        raise _PlanInputUnavailable(
+            f"plan_path must be a regular file no larger than {MAX_PLAN_BYTES} bytes"
+        )
+    flags = os.O_RDONLY | nofollow
+    flags |= getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0)
+    fd: int | None = None
+    try:
+        fd = os.open(path, flags)
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) \
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) \
+                or opened.st_size > MAX_PLAN_BYTES:
+            raise _PlanInputUnavailable("plan_path changed while opening")
+        chunks: list[bytes] = []
+        total = 0
+        while total <= MAX_PLAN_BYTES:
+            chunk = os.read(fd, min(65536, MAX_PLAN_BYTES + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        after = os.fstat(fd)
+        identity_before = (
+            opened.st_dev, opened.st_ino, opened.st_size,
+            opened.st_mtime_ns, opened.st_ctime_ns,
+        )
+        identity_after = (
+            after.st_dev, after.st_ino, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns,
+        )
+        if total > MAX_PLAN_BYTES:
+            raise _PlanInputUnavailable(f"plan_path exceeds the {MAX_PLAN_BYTES}-byte cap")
+        if total == 0:
+            raise _PlanInputUnavailable("plan_path must not be empty")
+        if identity_before != identity_after or total != opened.st_size:
+            raise _PlanInputUnavailable("plan_path changed while reading")
+        return b"".join(chunks)
+    except _PlanInputUnavailable:
+        raise
+    except OSError as exc:
+        raise _PlanInputUnavailable(f"plan_path is unavailable: {exc}") from exc
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 def _tool_less_call(
@@ -569,7 +641,15 @@ def _critique_plan_verified(
     arguments: dict[str, Any], *, engine: Engine, log_dir: Path, now: Clock,
     on_progress: Callable[[str], None] | None,
 ) -> str:
-    raw_plan, plan_text, plan_path = _read_plan_bytes(arguments)
+    try:
+        raw_plan, plan_text, plan_path = _read_plan_bytes(arguments)
+    except _PlanInputUnavailable as exc:
+        return (
+            _preflight_failure_review(f"plan input unavailable: {exc}")
+            + "\n\nCLAIM-CLOSURE: INPUT-UNAVAILABLE — plan input was rejected\n"
+            "CLASS-CLOSURE: INPUT-UNAVAILABLE — plan input was rejected\n"
+            "CONVERGENCE: BLOCKED — plan input could not be safely retained this round."
+        )
     repo = _require_repo(arguments)
     # Closure mode treats repository bytes as hostile evidence. A checked-in config must
     # not select policy or become peer-level role instructions.
@@ -1317,17 +1397,10 @@ def _critique_plan_legacy(
     now: Clock = _default_clock,
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
-    plan_text = arguments.get("plan_text")
-    plan_path = arguments.get("plan_path")
-    if plan_text and plan_path:
-        raise ValueError("critique_plan takes plan_text OR plan_path, not both")
-    if not plan_text and not plan_path:
-        raise ValueError("critique_plan requires plan_text or plan_path")
-    if plan_path:
-        try:
-            plan_text = Path(plan_path).read_text(encoding="utf-8", errors="replace")
-        except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
-            raise ValueError(f"cannot read plan_path: {exc}") from exc
+    try:
+        _raw_plan, plan_text, plan_path = _read_plan_bytes(arguments)
+    except _PlanInputUnavailable as exc:
+        raise ValueError(f"cannot safely retain plan input: {exc}") from exc
 
     context = arguments.get("context")
     focus = arguments.get("focus")

@@ -199,8 +199,21 @@ TOOLS: list[Tool] = [
         inputSchema={
             "type": "object",
             "properties": {
-                "plan_text": {"type": "string", "description": "The plan as markdown. Provide this OR plan_path, never both."},
-                "plan_path": {"type": "string", "description": "Absolute path to a markdown plan file. Provide this OR plan_text, never both."},
+                "plan_text": {
+                    "type": "string", "minLength": 1,
+                    "maxLength": handlers.MAX_PLAN_BYTES,
+                    "description": (
+                        "The plan as markdown (1 MiB maximum). Provide this OR plan_path, "
+                        "never both."
+                    ),
+                },
+                "plan_path": {
+                    "type": "string", "minLength": 1, "maxLength": 4096,
+                    "description": (
+                        "Absolute path to a stable regular markdown file no larger than "
+                        "1 MiB. Provide this OR plan_text, never both."
+                    ),
+                },
                 "context": {"type": "string", "description": "Background the reviewer needs to judge the plan fairly."},
                 "repo_path": {"type": "string", "description": "REQUIRED. The repo the plan concerns. Testing the plan's premises against the real code is the reviewer's highest-value job — a plan that asserts 'X currently does Y' when the code shows otherwise is the most dangerous kind — and an ungrounded review cannot do it."},
                 "focus": {"type": "string", "description": "Narrow the review to a specific concern."},

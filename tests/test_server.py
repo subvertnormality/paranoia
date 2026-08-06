@@ -56,6 +56,13 @@ class TestToolListing:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
         assert "repo_path" in tool.inputSchema["required"]
 
+    def test_critique_plan_schema_caps_inline_text_and_path_length(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "critique_plan")
+        props = tool.inputSchema["properties"]
+        assert props["plan_text"]["maxLength"] == server.handlers.MAX_PLAN_BYTES
+        assert props["plan_text"]["minLength"] == 1
+        assert props["plan_path"]["maxLength"] == 4096
+
     def test_rebut_requires_session_and_rebuttal(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "rebut")
         req = tool.inputSchema["required"]

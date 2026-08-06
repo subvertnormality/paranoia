@@ -358,8 +358,8 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `repo_path` | string | **required** | The repo the plan concerns |
-| `plan_text` | string | **one of these two** | The plan as markdown |
-| `plan_path` | string | **one of these two** | Absolute path to a markdown plan file |
+| `plan_text` | string | **one of these two** | The plan as markdown, up to 1 MiB of UTF-8 bytes |
+| `plan_path` | string | **one of these two** | Absolute path to a stable no-follow regular markdown file, up to 1 MiB |
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
@@ -679,6 +679,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   are rejected; inert unrelated object-store names are ignored, including inert nested
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
   and record caps before its output is retained or decoded.
+  Inline and filesystem-backed plan inputs share a 1 MiB ceiling; plan files are opened
+  no-follow and nonblocking and rejected if their identity or metadata changes while read.
   Network budgets charge each
   redirect hop and every response body, including rejected responses, while DNS and all
   later phases share one enforceable total deadline. Synthetic snapshot commits always

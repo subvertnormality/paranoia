@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
 from pathlib import Path
 
 import pytest
@@ -116,6 +118,103 @@ def test_closure_mode_ignores_repository_config_in_every_role_prompt(
     )
     assert engine.tool_less_prompts
     assert all(marker not in prompt for prompt in engine.tool_less_prompts)
+
+
+@pytest.mark.parametrize(
+    "unsafe_kind", ["fifo", "symlink", "device", "empty", "oversize"],
+)
+def test_unsafe_plan_paths_fail_closed_before_latch_or_model_call(
+    unsafe_kind: str, repo: Path, tmp_path: Path,
+) -> None:
+    target = tmp_path / "plan.md"
+    if unsafe_kind == "fifo":
+        target = tmp_path / "plan.pipe"
+        os.mkfifo(target)
+    elif unsafe_kind == "symlink":
+        outside = tmp_path / "outside.md"
+        outside.write_text("outside")
+        target.symlink_to(outside)
+    elif unsafe_kind == "device":
+        target = Path("/dev/null")
+    elif unsafe_kind == "empty":
+        target.write_bytes(b"")
+    else:
+        target.write_bytes(b"x" * (handlers.MAX_PLAN_BYTES + 1))
+    engine = ClaimEngine()
+    started = time.monotonic()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_path": str(target),
+            "lineage": f"unsafe-plan-{unsafe_kind}", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert time.monotonic() - started < 1.0
+    assert "CONVERGENCE: BLOCKED" in out and "INPUT-UNAVAILABLE" in out
+    assert all(out.count(heading) == 1 for heading in (
+        "## What works", "## What doesn't work", "## Risks", "## Gaps",
+        "## Improvements",
+    ))
+    assert not engine.tool_less_prompts
+    pending = cc.lineage_dir(cc.default_state_root()) / f"unsafe-plan-{unsafe_kind}.pending"
+    assert not pending.exists()
+
+
+def test_plan_text_and_file_enforce_the_same_exact_byte_limit(tmp_path: Path) -> None:
+    text = "x" * handlers.MAX_PLAN_BYTES
+    raw, decoded, path = handlers._read_plan_bytes({"plan_text": text})
+    assert len(raw) == handlers.MAX_PLAN_BYTES and decoded == text and path is None
+    plan = tmp_path / "limit.md"
+    plan.write_bytes(raw)
+    from_file, _, returned_path = handlers._read_plan_bytes({"plan_path": str(plan)})
+    assert from_file == raw and returned_path == str(plan)
+    with pytest.raises(ValueError, match="byte cap"):
+        handlers._read_plan_bytes({"plan_text": text + "x"})
+
+
+def test_oversized_inline_plan_returns_blocked_preflight_without_model_call(
+    repo: Path, tmp_path: Path,
+) -> None:
+    engine = ClaimEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "x" * (handlers.MAX_PLAN_BYTES + 1),
+            "lineage": "oversized-inline-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: BLOCKED" in out and "INPUT-UNAVAILABLE" in out
+    assert not engine.tool_less_prompts
+
+
+def test_plan_file_growth_during_read_fails_closed(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = tmp_path / "growing.md"
+    plan.write_bytes(b"initial")
+    original_read = handlers.os.read
+    changed = False
+
+    def grow_then_read(fd: int, size: int) -> bytes:
+        nonlocal changed
+        if not changed:
+            changed = True
+            with plan.open("ab") as handle:
+                handle.write(b" changed")
+        return original_read(fd, size)
+
+    monkeypatch.setattr(handlers.os, "read", grow_then_read)
+    engine = ClaimEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_path": str(plan),
+            "lineage": "growing-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: BLOCKED" in out
+    assert "changed while reading" in out
+    assert not engine.tool_less_prompts
 
 
 def test_unverified_registered_fact_blocks_even_when_classes_are_empty(
