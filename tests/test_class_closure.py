@@ -548,6 +548,31 @@ class TestLineageState:
         assert state["rounds"] == 9
         assert not list(cc.lineage_dir(tmp_path).glob("*.tmp")), "no temp file may survive"
 
+    def test_save_reports_failures_before_and_at_replace_as_distinct_phases(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        lin = lineage_with(("inv", cc.MAJOR, "X"))
+        original_fsync = cc.os.fsync
+
+        def fail_file_fsync(fd: int) -> None:
+            if not Path(f"/proc/self/fd/{fd}").resolve().is_dir():
+                raise OSError("file fsync failed")
+            original_fsync(fd)
+
+        monkeypatch.setattr(cc.os, "fsync", fail_file_fsync)
+        with pytest.raises(cc.StateUnavailable) as pre:
+            cc.save_lineage(tmp_path / "pre", lin)
+        assert not isinstance(pre.value, cc.StatePublicationAmbiguous)
+
+        monkeypatch.setattr(cc.os, "fsync", original_fsync)
+
+        def fail_replace(*_args: object) -> None:
+            raise OSError("replace failed")
+
+        monkeypatch.setattr(cc.os, "replace", fail_replace)
+        with pytest.raises(cc.StatePublicationAmbiguous):
+            cc.save_lineage(tmp_path / "replace", lin)
+
 
 # ── the trailer ───────────────────────────────────────────────────────────────
 

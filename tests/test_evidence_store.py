@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from paranoia_local import class_closure as cc
 from paranoia_local.evidence_store import (
     EvidenceCommitAmbiguous,
     EvidenceStore,
@@ -60,13 +61,29 @@ def test_hash_mismatch_fails_closed(tmp_path: Path) -> None:
         store.read(digest)
 
 
+def test_prepublication_state_failure_is_recoverable_and_removes_candidate(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path, orphan_ttl_seconds=0)
+    store.begin("run-safe-failure")
+    digest = store.stage("run-safe-failure", b"still-rooted")
+
+    def fail() -> None:
+        raise cc.StateUnavailable("temporary-file fsync failed")
+
+    with pytest.raises(EvidenceStoreError, match="before atomic publication"):
+        store.commit_state("lineage", "run-safe-failure", [digest], fail)
+    assert (tmp_path / "journals" / "run-safe-failure.json").exists()
+    assert not list((tmp_path / "roots").glob("lineage.candidate-*.json"))
+    store.gc(now=100)
+    assert store.read(digest) == b"still-rooted"
+
+
 def test_ambiguous_state_commit_keeps_journal_and_candidate_as_gc_roots(tmp_path: Path) -> None:
     store = EvidenceStore(tmp_path, orphan_ttl_seconds=0)
     store.begin("run-ambiguous")
     digest = store.stage("run-ambiguous", b"still-rooted")
 
     def fail() -> None:
-        raise OSError("replace outcome unknown")
+        raise cc.StatePublicationAmbiguous("replace outcome unknown")
 
     with pytest.raises(EvidenceCommitAmbiguous):
         store.commit_state("lineage", "run-ambiguous", [digest], fail)
@@ -74,6 +91,13 @@ def test_ambiguous_state_commit_keeps_journal_and_candidate_as_gc_roots(tmp_path
     assert list((tmp_path / "roots").glob("lineage.candidate-*.json"))
     store.gc(now=100)
     assert store.read(digest) == b"still-rooted"
+
+
+def test_deep_manifest_json_is_normalized_to_store_error(tmp_path: Path) -> None:
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 2000 + "0" + "]" * 2000)
+    with pytest.raises(EvidenceStoreError, match="manifest"):
+        EvidenceStore._read_manifest(path)
 
 
 def test_new_root_replaces_dropped_evidence_instead_of_growing_forever(tmp_path: Path) -> None:

@@ -253,7 +253,7 @@ def parse_role_register(text: str, role: str) -> list[Event]:
         raw = json.loads(payload, object_pairs_hook=_no_duplicate_pairs)
     except ClaimRegisterError:
         raise
-    except (json.JSONDecodeError, UnicodeError) as exc:
+    except (json.JSONDecodeError, UnicodeError, RecursionError, ValueError) as exc:
         raise ClaimRegisterError(f"EVENTS-JSON is invalid: {exc}") from exc
     if not isinstance(raw, list):
         raise ClaimRegisterError("EVENTS-JSON must be an array")

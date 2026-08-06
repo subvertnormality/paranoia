@@ -77,6 +77,7 @@ def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
 def _run_bounded(
     repo: Path, args: list[str], *, max_bytes: int, stop_after_nuls: int,
     debit_bytes: Callable[[int], None] | None = None,
+    remaining_bytes: Callable[[], int] | None = None,
 ) -> bytes:
     """Read bounded Git output and terminate once complete records reach the limit."""
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
@@ -92,12 +93,15 @@ def _run_bounded(
             remaining = max_bytes - len(output)
             if remaining <= 0:
                 raise SnapshotUnavailable("bounded Git output exceeds byte cap")
-            read_size = min(65536, remaining + 1)
-            if debit_bytes is not None:
-                debit_bytes(read_size)
+            budget_remaining = remaining_bytes() if remaining_bytes is not None else remaining + 1
+            if budget_remaining <= 0:
+                raise SnapshotUnavailable("bounded Git output exceeds shared byte budget")
+            read_size = min(65536, remaining + 1, budget_remaining)
             chunk = _read_deadline(proc.stdout, read_size, deadline)
             if not chunk:
                 break
+            if debit_bytes is not None:
+                debit_bytes(len(chunk))
             output.extend(chunk)
             if len(output) > max_bytes:
                 raise SnapshotUnavailable("bounded Git output exceeds byte cap")
@@ -118,6 +122,56 @@ def _read_deadline(pipe: object, size: int, deadline: float) -> bytes:
     if remaining <= 0 or not select.select([pipe], [], [], remaining)[0]:
         raise SnapshotUnavailable("Git streaming read exceeded hard deadline")
     return os.read(pipe.fileno(), size)  # type: ignore[attr-defined]
+
+
+def _read_small_regular(
+    path: Path, *, max_bytes: int = 4096, missing_ok: bool = False,
+) -> bytes:
+    """Read supplied metadata without following links or ever blocking on a FIFO.
+
+    ``lstat`` bounds the candidate before open; ``O_NOFOLLOW|O_NONBLOCK`` and the
+    post-open identity check close replacement races with symlinks and special files.
+    """
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        if missing_ok:
+            return b""
+        raise SnapshotUnavailable(f"repository metadata is missing: {path}") from None
+    except OSError as exc:
+        raise SnapshotUnavailable(f"repository metadata is unavailable at {path}: {exc}") from exc
+    if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
+        raise SnapshotUnavailable(f"repository metadata must be a small regular file: {path}")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    fd: int | None = None
+    try:
+        fd = os.open(path, flags)
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) \
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) \
+                or opened.st_size > max_bytes:
+            raise SnapshotUnavailable(f"repository metadata changed while opening: {path}")
+        chunks = bytearray()
+        while len(chunks) <= max_bytes:
+            chunk = os.read(fd, min(65536, max_bytes + 1 - len(chunks)))
+            if not chunk:
+                break
+            chunks.extend(chunk)
+        if len(chunks) > max_bytes:
+            raise SnapshotUnavailable(f"repository metadata exceeds byte cap: {path}")
+        return bytes(chunks)
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"repository metadata is unavailable at {path}: {exc}") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _ref_token(run_id: str) -> str:
@@ -334,6 +388,7 @@ class PlanRepositorySnapshot:
     def list_tree(
         self, prefix: str = "", *, limit: int = 200,
         debit_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
     ) -> list[str]:
         self._verify_wrapper()
         if limit < 1 or limit > 200:
@@ -348,19 +403,22 @@ class PlanRepositorySnapshot:
             args += ["--", ":(literal)" + prefix]
         rows = _run_bounded(
             self.repo, args, max_bytes=1 << 20, stop_after_nuls=limit,
-            debit_bytes=debit_bytes,
+            debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         ).split(b"\0")
         return [r.decode("utf-8", errors="surrogateescape") for r in rows if r][:limit]
 
     def search_literal(self, pattern: str, *, paths: list[str] | None = None,
                        limit: int = 50,
-                       debit_bytes: Callable[[int], None] | None = None
+                       debit_bytes: Callable[[int], None] | None = None,
+                       remaining_bytes: Callable[[], int] | None = None,
                        ) -> list[dict[str, object]]:
         if not isinstance(pattern, str) or not pattern or len(pattern.encode()) > 256 \
                 or not (1 <= limit <= 50):
             raise SnapshotUnavailable("literal search exceeds bounds")
         results: list[dict[str, object]] = []
-        candidates = paths or self.list_tree(limit=200, debit_bytes=debit_bytes)
+        candidates = paths or self.list_tree(
+            limit=200, debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
+        )
         if any(not isinstance(path, str) for path in candidates):
             raise SnapshotUnavailable("literal search paths must be strings")
         for path in candidates[:200]:
@@ -388,6 +446,7 @@ class PlanRepositorySnapshot:
     def history(
         self, ref: str, path: str, *, limit: int = 20,
         debit_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
     ) -> list[dict[str, str]]:
         """Read only commits reachable from the initial pinned ref map."""
         self._verify_wrapper()
@@ -407,7 +466,7 @@ class PlanRepositorySnapshot:
             ["log", f"-{limit}", "--format=%H%x00%ct%x00%s%x00", oid, "--",
              ":(literal)" + path],
             max_bytes=1 << 20, stop_after_nuls=limit * 3,
-            debit_bytes=debit_bytes,
+            debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         )
         tokens = output.decode("utf-8", errors="replace").split("\0")
         rows: list[dict[str, str]] = []
@@ -548,32 +607,27 @@ def _validate_object_boundary(repo: Path) -> None:
     _validate_object_store_paths(objects)
     for name in ("alternates", "http-alternates"):
         path = objects / "info" / name
-        try:
-            if path.exists():
-                info = path.stat(follow_symlinks=False)
-                if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
-                    raise SnapshotUnavailable(
-                        f"repository object alternates metadata is unsafe: {path}"
-                    )
-            if path.exists() and path.read_bytes().strip():
-                raise SnapshotUnavailable(
-                    f"repository object alternates are outside the approved snapshot boundary: {path}"
-                )
-        except OSError as exc:
-            raise SnapshotUnavailable(f"could not validate object alternates at {path}: {exc}") from exc
+        if _read_small_regular(path, missing_ok=True).strip():
+            raise SnapshotUnavailable(
+                f"repository object alternates are outside the approved snapshot boundary: {path}"
+            )
 
 
 def _approved_common_dir(repo: Path) -> Path:
     dotgit = repo / ".git"
-    if dotgit.is_symlink():
+    try:
+        dotgit_info = dotgit.lstat()
+    except OSError as exc:
+        raise SnapshotUnavailable(f"repository gitfile is unavailable: {exc}") from exc
+    if stat.S_ISLNK(dotgit_info.st_mode):
         raise SnapshotUnavailable("repository .git may not be a symlink")
-    if dotgit.is_dir():
+    if stat.S_ISDIR(dotgit_info.st_mode):
         return dotgit.resolve()
     try:
-        marker = dotgit.read_text(encoding="utf-8", errors="strict").strip()
-    except (OSError, UnicodeError) as exc:
+        marker = _read_small_regular(dotgit).decode("utf-8", errors="strict").strip()
+    except UnicodeError as exc:
         raise SnapshotUnavailable(f"repository gitfile is unavailable: {exc}") from exc
-    if len(marker) > 4096 or not marker.startswith("gitdir: "):
+    if not marker.startswith("gitdir: "):
         raise SnapshotUnavailable("repository gitfile is malformed")
     git_dir = Path(marker[8:])
     if not git_dir.is_absolute():
@@ -581,9 +635,13 @@ def _approved_common_dir(repo: Path) -> Path:
     else:
         git_dir = git_dir.resolve()
     try:
-        common_marker = (git_dir / "commondir").read_text(encoding="utf-8").strip()
-        backlink = (git_dir / "gitdir").read_text(encoding="utf-8").strip()
-    except OSError as exc:
+        common_marker = _read_small_regular(git_dir / "commondir").decode(
+            "utf-8", errors="strict"
+        ).strip()
+        backlink = _read_small_regular(git_dir / "gitdir").decode(
+            "utf-8", errors="strict"
+        ).strip()
+    except (SnapshotUnavailable, UnicodeError) as exc:
         raise SnapshotUnavailable(f"linked-worktree metadata is unavailable: {exc}") from exc
     common = (git_dir / common_marker).resolve()
     backlink_path = Path(backlink)

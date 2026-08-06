@@ -128,7 +128,9 @@ export PARANOIA_SEARCH_ENDPOINT='https://search.internal.example/query?q={query}
 The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
 preflights the template and permits only `{query}` plus optional `{limit}` placeholders.
 Top-level and hit objects use exact schemas and reject duplicate or unknown JSON keys.
-Formatting errors are blocked network-evidence failures, never raw exceptions. Fetching
+Formatting, encoding, numeric-conversion, and excessive-nesting errors are normalized to
+role-specific blocked failures, never raw exceptions; the same rule applies to every
+model register, evidence request, cached record, and persisted manifest. Fetching
 rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
 different from the selected address, unsupported media/encodings, excessive redirects,
 non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
@@ -145,9 +147,10 @@ write, exact live-root replacement, and sweep. Replaced files and their containi
 directory entries are fsynced before success is reported or journals/latches are cleared.
 Defaults are 100 MiB per lineage, 1 GiB globally, and a seven-day orphan TTL. Expired
 evidence leaves the live lineage root and becomes collectible. Hash mismatch, missing
-content, malformed roots, or cap exhaustion fails closed. Pre-publication filesystem
-failures enter the blocked transaction path; only ambiguous publication retains its
-recovery journal and latch.
+content, malformed roots, or cap exhaustion fails closed. Lineage state publication
+tracks its phase: temporary-file creation, serialization, and pre-replace fsync failures
+enter the recoverable blocked transaction path, while entering the atomic replace or any
+later root/journal durability step is ambiguous and retains its recovery roots and latch.
 
 Callers may provide up to 20 `{claim, source, content}` records through
 `supplied_evidence`. `claim` must match exactly one registered proposition. These records
@@ -191,9 +194,13 @@ repository reuse recomputes every passage/identity field and is bound to exact b
 snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
 charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
 Git output, debit it as it is read, and terminate at their record or byte cap instead of
-capturing an unbounded result. Every snapshot Git process and pipe read also has a hard
+capturing an unbounded result. Each read is also sized to the shared budget remaining, so
+attempted pipe I/O cannot cross the aggregate cap before accounting rejects it. Every
+snapshot Git process and pipe read also has a hard
 deadline and is killed/reaped on expiry; directly read Git metadata must be small regular
-files rather than FIFOs or devices. Network evidence is audit
+files opened with no-follow and nonblocking flags, then checked again by file identity and
+size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
+Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 Any cached record discarded during validation disables the zero-research cache for that

@@ -124,7 +124,7 @@ def parse_requests(text: str, active_claim_ids: set[str]) -> list[EvidenceReques
         raw = json.loads(line[len(REQUESTS_PREFIX):], object_pairs_hook=_pairs)
     except EvidenceRequestError:
         raise
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError, ValueError) as exc:
         raise EvidenceRequestError(f"REQUESTS-JSON is invalid: {exc}") from exc
     if not isinstance(raw, list) or len(raw) > MAX_REQUESTS:
         raise EvidenceRequestError(f"REQUESTS-JSON must be an array of at most {MAX_REQUESTS}")
@@ -215,7 +215,8 @@ def collect_evidence(
         claim_id = data["claim_id"]
         if request.op == "LIST_TREE":
             paths = snapshot.list_tree(
-                data["prefix"], limit=data["limit"], debit_bytes=budget.debit_bytes
+                data["prefix"], limit=data["limit"], debit_bytes=budget.debit_bytes,
+                remaining_bytes=lambda: budget.remaining_bytes,
             )
             body = json.dumps(paths, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
@@ -247,7 +248,8 @@ def collect_evidence(
         elif request.op == "SEARCH_LITERAL":
             matches = snapshot.search_literal(data["pattern"], paths=data["paths"],
                                                limit=min(data["limit"], 50),
-                                               debit_bytes=budget.debit_bytes)
+                                               debit_bytes=budget.debit_bytes,
+                                               remaining_bytes=lambda: budget.remaining_bytes)
             body = json.dumps(matches, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
@@ -260,6 +262,7 @@ def collect_evidence(
             rows = snapshot.history(
                 data["ref"], data["path"], limit=data["limit"],
                 debit_bytes=budget.debit_bytes,
+                remaining_bytes=lambda: budget.remaining_bytes,
             )
             body = json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode()
             budget.debit_bytes(len(body))

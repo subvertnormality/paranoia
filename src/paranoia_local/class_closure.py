@@ -336,6 +336,12 @@ class StateUnavailable(RuntimeError):
     a storage fault must not become a false all-clear (plan §2.7)."""
 
 
+class StatePublicationAmbiguous(StateUnavailable):
+    """The lineage atomic-replace boundary was entered, so its outcome needs repair."""
+
+    publication_ambiguous = True
+
+
 #: Where lineage state lives. Deliberately NOT derived from `log_dir`: `--log-dir` is
 #: documented as the audit-log directory, so a caller who moves their logs would silently
 #: get an empty state root and could be told NOT-BLOCKED with classes still open.
@@ -479,19 +485,36 @@ def clear_latch(root: Path, lineage_id: str) -> None:
 
 def save_lineage(root: Path, lineage: Lineage) -> None:
     state_path, _ = _paths(root, lineage.lineage_id)
-    _mkdir_durable(state_path.parent)
+    tmp: str | None = None
+    publication_started = False
     try:
+        _mkdir_durable(state_path.parent)
         fd, tmp = tempfile.mkstemp(dir=str(state_path.parent), suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(_to_json(lineage), fh, indent=2, default=str)
             fh.flush()
             os.fsync(fh.fileno())
+        # An error returned by replace cannot prove which directory entry is visible.
+        # From this point the caller must retain its recovery latch and evidence roots.
+        publication_started = True
         os.replace(tmp, state_path)
+        tmp = None
         _fsync_dir(state_path.parent)
-    except OSError as exc:
-        raise StateUnavailable(
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        error_type = StatePublicationAmbiguous if publication_started else StateUnavailable
+        raise error_type(
             f"could not write lineage state under {state_path.parent}: {exc}"
         ) from exc
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                # The primary publication result is authoritative. A stale temporary
+                # file is never a live state candidate and cannot make it ambiguous.
+                pass
 
 
 def quarantine_lineage(root: Path, lineage_id: str, *, stamp: str, reason: str) -> Path:

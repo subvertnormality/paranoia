@@ -71,6 +71,13 @@ def test_research_register_rejects_duplicate_and_unknown_json_fields() -> None:
         pc.parse_role_register(_research([event]), pc.RESEARCH_ROLE)
 
 
+def test_deep_register_json_is_a_recoverable_register_error() -> None:
+    payload = "[" * 2000 + "0" + "]" * 2000
+    text = "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + payload
+    with pytest.raises(pc.ClaimRegisterError, match="EVENTS-JSON is invalid"):
+        pc.parse_role_register(text, pc.RESEARCH_ROLE)
+
+
 def test_every_add_is_server_minted_pending_and_blocking() -> None:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

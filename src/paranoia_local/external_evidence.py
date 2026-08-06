@@ -447,7 +447,8 @@ class EndpointSearchProvider:
             if not isinstance(payload, dict) or set(payload) != {"hits"}:
                 raise NetworkEvidenceError("search endpoint has unknown or missing fields")
             rows = payload["hits"]
-        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError) as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError,
+                RecursionError, ValueError) as exc:
             raise NetworkEvidenceError("search endpoint returned malformed JSON") from exc
         if not isinstance(rows, list) or len(rows) > 100:
             raise NetworkEvidenceError("search endpoint hits must be a bounded array")

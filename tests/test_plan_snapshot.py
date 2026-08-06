@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -86,6 +87,30 @@ def test_external_object_alternates_are_rejected(repo: Path, tmp_path: Path) -> 
         PlanRepositorySnapshot.create(repo, run_id="alternate")
 
 
+@pytest.mark.parametrize("metadata_name", [".git", "commondir", "gitdir"])
+def test_supplied_git_metadata_fifos_are_rejected_without_blocking(
+    tmp_path: Path, metadata_name: str,
+) -> None:
+    fake = tmp_path / "fake-repo"
+    fake.mkdir()
+    if metadata_name == ".git":
+        os.mkfifo(fake / ".git")
+    else:
+        common = tmp_path / "common"
+        git_dir = common / "worktrees" / "fake"
+        git_dir.mkdir(parents=True)
+        (fake / ".git").write_text(f"gitdir: {git_dir}\n")
+        if metadata_name == "commondir":
+            os.mkfifo(git_dir / "commondir")
+        else:
+            (git_dir / "commondir").write_text("../..\n")
+            os.mkfifo(git_dir / "gitdir")
+    started = time.monotonic()
+    with pytest.raises(SnapshotUnavailable, match="regular file|metadata"):
+        ps._approved_common_dir(fake)
+    assert time.monotonic() - started < 1.0
+
+
 def test_symlinked_object_store_root_is_rejected(repo: Path, tmp_path: Path) -> None:
     objects = repo / ".git" / "objects"
     external = tmp_path / "external-objects"
@@ -157,6 +182,27 @@ def test_git_tree_output_is_bounded_while_streaming(repo: Path) -> None:
             repo, ["ls-tree", "-r", "-z", "--name-only", "HEAD"],
             max_bytes=2, stop_after_nuls=200,
         )
+
+
+def test_bounded_git_output_debits_only_bytes_actually_read(repo: Path) -> None:
+    debits: list[int] = []
+    output = ps._run_bounded(
+        repo, ["ls-tree", "-r", "-z", "--name-only", "HEAD"],
+        max_bytes=1 << 20, stop_after_nuls=200, debit_bytes=debits.append,
+    )
+    assert sum(debits) == len(output)
+    assert sum(debits) < 65536
+
+
+def test_bounded_git_output_never_reads_past_shared_budget(repo: Path) -> None:
+    debits: list[int] = []
+    with pytest.raises(SnapshotUnavailable, match="shared byte budget"):
+        ps._run_bounded(
+            repo, ["ls-tree", "-r", "-z", "--name-only", "HEAD"],
+            max_bytes=1 << 20, stop_after_nuls=200, debit_bytes=debits.append,
+            remaining_bytes=lambda: 3 - sum(debits),
+        )
+    assert sum(debits) == 3
 
 
 def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: Path) -> None:

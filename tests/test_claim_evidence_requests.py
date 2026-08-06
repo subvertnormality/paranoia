@@ -44,6 +44,13 @@ def test_arbitrary_adapter_or_extra_command_fields_are_rejected() -> None:
         cv.parse_requests(_requests([bad]), {"claim"})
 
 
+def test_deep_request_json_is_a_recoverable_request_error() -> None:
+    payload = "[" * 2000 + "0" + "]" * 2000
+    text = "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + payload
+    with pytest.raises(cv.EvidenceRequestError, match="REQUESTS-JSON is invalid"):
+        cv.parse_requests(text, {"claim"})
+
+
 @pytest.mark.parametrize(
     "request_row",
     [

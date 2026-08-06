@@ -656,7 +656,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   alternates and symlinked object-store components are rejected, inherited object-database
   settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
   plan evidence. Persisted evidence uses strict per-kind schemas; every retained claim
-  dependency must still resolve to a valid same-claim record. Network budgets charge each
+  dependency must still resolve to a valid same-claim record. Deeply nested or otherwise
+  malformed model, network, and persisted JSON is converted to a recoverable blocked
+  result. Direct Git metadata is accepted only through bounded, no-follow regular-file
+  reads. Publication distinguishes failures before the lineage atomic replace from
+  ambiguous failures at or after that boundary, retaining latches only for the latter.
+  Network budgets charge each
   redirect hop and every response body, including rejected responses, while DNS and all
   later phases share one enforceable total deadline. Synthetic snapshot commits always
   disable repository-configured signing programs.

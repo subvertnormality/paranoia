@@ -37,6 +37,17 @@ class FakeTransport:
         )
 
 
+def test_deep_search_json_is_a_recoverable_network_error() -> None:
+    body = ("[" * 2000 + "0" + "]" * 2000).encode()
+    transport = FakeTransport(TransportResponse(
+        200, {"content-type": "application/json"}, [body], "93.184.216.34",
+    ))
+    client = SafeHttpClient(resolver=lambda _host: ["93.184.216.34"], transport=transport)
+    provider = EndpointSearchProvider("https://search.example/?q={query}", client)
+    with pytest.raises(NetworkEvidenceError, match="malformed JSON"):
+        provider.search("test")
+
+
 def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
     transport = FakeTransport()
     client = SafeHttpClient(resolver=lambda host: ["93.184.216.34", "127.0.0.1"],

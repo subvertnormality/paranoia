@@ -134,8 +134,10 @@ class EvidenceStore:
                      state_writer: Callable[[], None]) -> None:
         """Publish candidate roots and lineage state under one global transaction lock.
 
-        The journal and candidate both remain GC roots across any ambiguous failure.
-        Callers must retain their lineage latch when this method raises.
+        The journal and available candidate roots remain GC roots across an ambiguous
+        failure. A writer failure explicitly reported before its atomic replace is a
+        normal store error, allowing callers to publish blocking debt and release their
+        lineage latch. Callers retain the latch only for ambiguous publication.
         """
         with self.locked():
             journal = self._read_manifest(self._journal(run_id))
@@ -161,13 +163,29 @@ class EvidenceStore:
             })
             try:
                 state_writer()
+            except BaseException as exc:
+                if getattr(exc, "publication_ambiguous", False):
+                    raise EvidenceCommitAmbiguous(
+                        "lineage state commit is ambiguous; recovery roots retained"
+                    ) from exc
+                try:
+                    candidate.unlink(missing_ok=True)
+                    self._fsync_dir(self.roots)
+                except OSError:
+                    # A stale candidate only retains extra evidence. The lineage state
+                    # replace was never entered, so the state outcome remains known.
+                    pass
+                raise EvidenceStoreError(
+                    "lineage state failed before atomic publication"
+                ) from exc
+            try:
                 os.replace(candidate, self._root(lineage_id))
                 self._fsync_dir(self.roots)
                 self._journal(run_id).unlink(missing_ok=True)
                 self._fsync_dir(self.journals)
             except BaseException as exc:
                 raise EvidenceCommitAmbiguous(
-                    "evidence/state commit is ambiguous; journal and candidate roots retained"
+                    "evidence-root commit is ambiguous; available recovery roots retained"
                 ) from exc
 
     def abort(self, run_id: str) -> None:
@@ -244,7 +262,7 @@ class EvidenceStore:
             return missing
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
             raise EvidenceStoreError(f"evidence manifest {path} is unavailable: {exc}") from exc
         if not isinstance(raw, dict) or not isinstance(raw.get("digests"), list):
             raise EvidenceStoreError(f"evidence manifest {path} is malformed")

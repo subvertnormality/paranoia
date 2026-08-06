@@ -676,7 +676,8 @@ def _critique_plan_verified(
                     if claim.status != pc.SUPERSEDED
                 }
                 tree_listing = snapshot.list_tree(
-                    limit=200, debit_bytes=round_budget.debit_bytes
+                    limit=200, debit_bytes=round_budget.debit_bytes,
+                    remaining_bytes=lambda: round_budget.remaining_bytes,
                 )
                 evidence_prompt = prompts.compose(
                     prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS,
@@ -782,7 +783,8 @@ def _critique_plan_verified(
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
                         + json.dumps(snapshot.list_tree(
-                            limit=200, debit_bytes=round_budget.debit_bytes
+                            limit=200, debit_bytes=round_budget.debit_bytes,
+                            remaining_bytes=lambda: round_budget.remaining_bytes,
                         ), ensure_ascii=True),
                         cv.render_evidence(
                             [r for r in evidence_records if r.kind.startswith("repository")],
@@ -956,7 +958,7 @@ def _critique_plan_verified(
     except (pc.ClaimRegisterError, pc.ClaimTransitionError, cv.EvidenceRequestError,
             EvidenceStoreError, SnapshotUnavailable, cc.RegisterError,
             cc.StateUnavailable, NetworkEvidenceError, TypeError, AttributeError,
-            UnicodeError, OSError) as exc:
+            UnicodeError, OSError, RecursionError) as exc:
         state.debt = {"round": round_no, "reason": str(exc)}
         closure.lineage.claim_state = pc.state_to_json(state)
         closure.lineage.debt = closure.lineage.debt or {
@@ -1515,9 +1517,14 @@ class _ClosureRound:
         lineage.rounds += 1
         try:
             cc.save_lineage(self.state_root, lineage)
+        except cc.StatePublicationAmbiguous as exc:
+            # The latch deliberately STAYS once atomic replacement may have started.
+            return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+                    "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
         except cc.StateUnavailable as exc:
-            # The latch deliberately STAYS: a write that may have half-happened must block
-            # the next round rather than let it start from an empty lineage.
+            # No atomic replace was entered. This invocation still blocks, but its
+            # ownership latch can be released so a later repair round can proceed.
+            self._settled = True
             return (f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
                     "CONVERGENCE: BLOCKED — this round's classes were not persisted.")
         self._settled = True
