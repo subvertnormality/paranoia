@@ -125,7 +125,9 @@ byte ranges for a literal search, but its evidence ID is ineligible for truth, b
 dispute, or deferral authorization. This prevents a bounded prefix, passage, match set,
 history, or partial large-blob scan from being treated as proof of absence. The verifier can
 request a complete narrower source where the operation supports it or leave the claim
-blocking.
+blocking. Validated metadata is rendered in full, never cut at a display-character limit;
+its bounded per-kind arrays and the shared rendered-byte debit limit the packet without
+hiding `complete`, candidate paths, or inspected ranges.
 
 Persisted records have an exact per-kind metadata schema, including nested collection
 types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
@@ -231,11 +233,15 @@ state must contain both `schema_version: 2` and the complete `claim_state` objec
 unknown, downgraded, or wrong-typed envelope fields quarantine the lineage rather than
 defaulting to an empty claim register. The `None` claim-state default exists only for a new
 lineage that has no state file yet. The surrounding class records, matches, exemptions,
-debt, severities, statuses, mechanisms, and supersession graph are likewise type-, shape-,
-cardinality-, and reachability-checked before use; duplicate identities or invented clear
-states quarantine the file. Evidence invalidation skips terminal superseded claims,
-so expiry cannot resurrect an inert predecessor or create a state the loader rejects; the
-verified/deferred replacement alone governs closure.
+debt (exactly a positive round and nonempty reason), severities, statuses, mechanisms, and
+supersession graph are likewise type-, shape-, cardinality-, and reachability-checked before
+use; duplicate identities or invented clear states quarantine the file. Evidence
+invalidation skips terminal superseded claims, so expiry cannot resurrect an inert
+predecessor or create a state the loader rejects. A replacement may later become stale,
+disputed, or otherwise blocking without invalidating the terminal predecessor; the active
+replacement alone governs closure. If invalidation removes evidence named by a pending
+transition, that now-unexecutable transition is cleared alongside its evidence and a fresh
+verifier may propose a new event bound to refreshed IDs.
 
 ## Budgets and caching
 
@@ -250,6 +256,8 @@ bounded no-follow reads, repository/history/adapter revalidation is charged as a
 and evidence records are charged again when rendered into verifier or auditor prompts.
 Serialized bounded tree listings are likewise charged before their first evidence-planner
 or structural-planner call, in addition to the raw Git bytes charged during enumeration.
+Ignored-untracked and unsupported-nonregular path disclosures are completeness-marked and
+charged before the research call, and charged again if a correction resends them.
 If a register needs correction, the exact evidence portion resent in the correction prompt
 is debited a second time before the retry call; insufficient remaining budget blocks
 without transmitting it.

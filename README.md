@@ -705,8 +705,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   correction boundary. Existing plan lineage files require the exact schema-v2 envelope;
   missing claim state is quarantined instead of defaulting to an empty register, and
   class records and their status/supersession graphs are fully validated before use.
-  Invalidation never resurrects terminal superseded claims. Serialized tree listings are
-  charged to the shared evidence budget before their first model call. Claude closure roles
+  Invalidation clears pending events tied to expired evidence and never resurrects terminal
+  superseded claims, even when the active replacement becomes stale. Evidence metadata is
+  rendered without truncating its exact scope. Serialized tree listings and excluded-path
+  disclosures are charged to the shared evidence budget before their first model call and
+  again on correction. Claude closure roles
   additionally probe the installed CLI help contract before acquiring repository or
   lineage state.
   Inline and filesystem-backed plan inputs share a 1 MiB ceiling; plan files are opened

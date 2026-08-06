@@ -574,6 +574,17 @@ def test_serialized_tree_listing_is_debited_before_model_transmission() -> None:
         handlers._budgeted_tree_listing(paths, complete=False, budget=budget)
 
 
+def test_excluded_path_disclosure_is_debited_before_model_transmission() -> None:
+    disclosure = {
+        "ignored_untracked": {"paths": ["x" * 200], "complete": True},
+        "unsupported_nonregular": {"paths": [], "complete": True},
+    }
+    rendered = json.dumps(disclosure, ensure_ascii=True)
+    budget = cv.EvidenceBudget(aggregate_bytes=cv.MAX_AGGREGATE_BYTES - len(rendered) + 1)
+    with pytest.raises(cv.EvidenceBudgetExceeded):
+        handlers._budgeted_json_data(disclosure, budget=budget)
+
+
 def test_cleanup_failure_retains_plan_latch_and_evidence_journal(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

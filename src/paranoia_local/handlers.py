@@ -453,9 +453,16 @@ MAX_PLAN_BYTES = 1 << 20
 def _budgeted_tree_listing(
     paths: list[str], *, complete: bool, budget: cv.EvidenceBudget,
 ) -> str:
-    rendered = json.dumps(
+    return _budgeted_json_data(
         {"paths": paths, "limit": 200, "complete": complete}, ensure_ascii=True,
+        budget=budget,
     )
+
+
+def _budgeted_json_data(
+    value: Any, *, budget: cv.EvidenceBudget, ensure_ascii: bool = True,
+) -> str:
+    rendered = json.dumps(value, ensure_ascii=ensure_ascii)
     budget.debit_bytes(len(rendered.encode("utf-8")))
     return rendered
 
@@ -779,16 +786,21 @@ def _critique_plan_verified(
             if cache_hit:
                 research_status = "cache-hit (zero research calls, zero fetches)"
             else:
+                excluded_paths_json = _budgeted_json_data({
+                    "ignored_untracked": {
+                        "paths": snapshot.ignored_paths, "complete": True,
+                    },
+                    "unsupported_nonregular": {
+                        "paths": snapshot.unavailable_paths, "complete": True,
+                    },
+                }, budget=round_budget)
                 research_prompt = prompts.compose(
                     prompts.PLAN_RESEARCH_INSTRUCTIONS,
                     _prepend(calibration, "\n\n".join([
                         plan_packet, pc.render_claim_summary(state),
                         "Do not ADD a proposition already present in ACTIVE CLAIMS.",
                         "=== EXCLUDED REPOSITORY PATHS ===\n"
-                        + json.dumps({
-                            "ignored_untracked": snapshot.ignored_paths,
-                            "unsupported_nonregular": snapshot.unavailable_paths,
-                        }, ensure_ascii=True),
+                        + excluded_paths_json,
                     ])),
                 )
                 def validate_research(events: list[pc.Event]) -> None:
@@ -806,6 +818,8 @@ def _critique_plan_verified(
                     engine, research_prompt, model, effort,
                     lambda text: pc.parse_role_register(text, pc.RESEARCH_ROLE), on_progress,
                     validate_research,
+                    retry_debit_bytes=round_budget.debit_bytes,
+                    retry_evidence_bytes=len(excluded_paths_json.encode("utf-8")),
                 )
                 pc.apply_events(
                     draft_claims, research_events, role=pc.RESEARCH_ROLE, spans=spans,

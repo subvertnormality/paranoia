@@ -472,7 +472,7 @@ def render_evidence(
                 "  metadata=" + json.dumps(
                     record.metadata, sort_keys=True, separators=(",", ":"),
                     ensure_ascii=True,
-                )[:2000]
+                )
             )
         if include_passages:
             record_lines.append(
@@ -601,9 +601,16 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
         value = metadata.get(key)
         if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
             raise EvidenceRequestError(f"persisted {kind}.{key} must be a string array")
+    array_caps = {
+        "paths": 50, "candidate_paths": 200, "argv": 22, "redirects": 5,
+        "independence_groups": 20, "conflicts": 20,
+    }
+    for key, cap in array_caps.items():
+        if key in expected and len(metadata[key]) > cap:
+            raise EvidenceRequestError(f"persisted {kind}.{key} exceeds its array cap")
     if "input_hashes" in expected:
         hashes = metadata.get("input_hashes")
-        if not isinstance(hashes, dict) or any(
+        if not isinstance(hashes, dict) or len(hashes) > 20 or any(
             not isinstance(path, str) or not isinstance(digest, str)
             or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest)
             for path, digest in hashes.items()
@@ -611,7 +618,7 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
             raise EvidenceRequestError("persisted empirical.input_hashes is malformed")
     if "inspected_ranges" in expected:
         ranges = metadata.get("inspected_ranges")
-        if not isinstance(ranges, list):
+        if not isinstance(ranges, list) or len(ranges) > 200:
             raise EvidenceRequestError("persisted repository-search.inspected_ranges is malformed")
         for item in ranges:
             if not isinstance(item, dict) or set(item) != {
@@ -768,6 +775,9 @@ def validate_cached_records(
         for claim in state.claims.values():
             if claim.status == pc.SUPERSEDED:
                 continue
+            pending_ids = set((claim.pending_transition or {}).get("evidence_ids", []))
+            if invalid_ids.intersection(pending_ids):
+                claim.pending_transition = None
             if invalid_ids.intersection(claim.evidence_ids):
                 claim.status = pc.STALE
             for field_name in (
@@ -776,8 +786,7 @@ def validate_cached_records(
             ):
                 info = getattr(claim, field_name) or {}
                 if invalid_ids.intersection(info.get("evidence_ids", [])):
-                    info["status"] = "pending"
-                    setattr(claim, field_name, info)
+                    setattr(claim, field_name, None)
     valid_bindings = evidence_bindings(valid)
     for claim in state.claims.values():
         if claim.status == pc.SUPERSEDED:
@@ -794,14 +803,17 @@ def validate_cached_records(
         }
         if missing:
             claim.status = pc.STALE
+            if missing.intersection(
+                (claim.pending_transition or {}).get("evidence_ids", [])
+            ):
+                claim.pending_transition = None
             for field_name in (
                 "truth_authorization", "bearing_authorization", "dispute_authorization",
                 "deferral_authorization",
             ):
                 info = getattr(claim, field_name) or {}
                 if missing.intersection(info.get("evidence_ids", [])):
-                    info["status"] = "pending"
-                    setattr(claim, field_name, info)
+                    setattr(claim, field_name, None)
     return valid
 
 

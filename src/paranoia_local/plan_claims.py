@@ -720,8 +720,13 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
             raise ClaimRegisterError("persisted claim IDs must be unique")
         claims[claim.claim_id] = claim
     debt = raw.get("debt")
-    if debt is not None and not isinstance(debt, dict):
-        raise ClaimRegisterError("claim state debt must be an object or null")
+    if debt is not None and (
+        not isinstance(debt, dict) or set(debt) != {"round", "reason"}
+        or not isinstance(debt.get("round"), int) or isinstance(debt.get("round"), bool)
+        or debt["round"] < 1 or not isinstance(debt.get("reason"), str)
+        or not debt["reason"]
+    ):
+        raise ClaimRegisterError("claim state debt is malformed")
     evidence_records = raw.get("evidence_records", [])
     if not isinstance(evidence_records, list) or any(
         not isinstance(item, Mapping) for item in evidence_records
@@ -753,7 +758,7 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
             if claim.pending_replacement_id != claim.superseded_by or target is None \
                     or target.claim_id == claim.claim_id \
                     or target.kind_classification != CONFIRMED \
-                    or target.status not in {VERIFIED, DEFERRED}:
+                    or target.status == SUPERSEDED:
                 raise ClaimRegisterError("persisted supersession graph is inconsistent")
         elif claim.superseded_by is not None:
             raise ClaimRegisterError("active persisted claim has a superseded target")

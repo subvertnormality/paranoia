@@ -103,6 +103,28 @@ def test_untrusted_sources_metadata_and_passages_are_json_escaped() -> None:
     assert "\n=== CLASS REGISTER ===" not in rendered
 
 
+def test_complete_negative_evidence_renders_its_full_untruncated_scope() -> None:
+    digest = "a" * 64
+    paths = [f"nested/{index:03d}-" + "x" * 80 for index in range(50)]
+    metadata = {
+        "pattern": "absent", "paths": paths, "snapshot_commit": "b" * 40,
+        "limit": 50, "complete": True, "candidates_complete": True,
+        "candidate_paths": paths,
+        "inspected_ranges": [{
+            "path": path, "blob_oid": "c" * 40, "start": 0, "end": 1,
+            "whole_size": 1, "complete": True,
+        } for path in paths],
+    }
+    record = cv.EvidenceRecord(
+        "e1", "c1", "repository-search", "d" * 40, digest, digest, 2,
+        0, 2, digest, "[]", metadata,
+    )
+    rendered = cv.render_evidence([record], include_passages=False)
+    encoded = json.dumps(metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    assert len(encoded) > 2000
+    assert "  metadata=" + encoded in rendered
+
+
 def test_read_blob_can_retrieve_a_bounded_passage_after_the_source_prefix(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -511,5 +533,57 @@ def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) 
         [missing, valid], snapshot=None, store=store, state=state,
     )  # type: ignore[arg-type]
     assert old.status == pc.SUPERSEDED and old.superseded_by == replacement_id
+    assert valid.blob_digest is not None
+    (store.blobs / valid.blob_digest).unlink()
+    cv.validate_cached_records(
+        [valid], snapshot=None, store=store, state=state,
+    )  # type: ignore[arg-type]
+    assert old.status == pc.SUPERSEDED
+    assert state.claims[replacement_id].status == pc.STALE
     loaded = pc.state_from_json("superseded", pc.state_to_json(state))
     assert loaded.claims[first_id].status == pc.SUPERSEDED
+
+
+def test_invalidated_pending_evidence_allows_a_fresh_transition(
+    tmp_path: Path,
+) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("pending-refresh")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "one", "claim": "Premise", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+            "reason": "fact",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": ["eold"], "reason": "old",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"eold": claim_id}, independent_required=True,
+    )
+    digest = "a" * 64
+    missing = cv.EvidenceRecord(
+        "eold", claim_id, "supplied-artifact", "old", digest, digest, 1,
+        0, 1, digest, "x", {"source": "old", "caller_supplied": True},
+    )
+    cv.validate_cached_records(
+        [missing], snapshot=None, store=EvidenceStore(tmp_path / "pending-missing"),
+        state=state,
+    )  # type: ignore[arg-type]
+    assert state.claims[claim_id].pending_transition is None
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": ["enew"], "reason": "refreshed",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"enew": claim_id},
+    )
+    assert state.claims[claim_id].status == pc.VERIFIED

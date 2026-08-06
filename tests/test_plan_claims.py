@@ -471,6 +471,15 @@ def test_truncated_claim_state_cannot_default_to_no_claims() -> None:
         pc.state_from_json("plan", {"next_seq": 1})
 
 
+@pytest.mark.parametrize("debt", [{}, {"round": False, "reason": "bad"},
+                                   {"round": 1, "reason": "bad", "extra": 1}])
+def test_malformed_dictionary_shaped_claim_debt_is_rejected(debt: dict) -> None:
+    raw = pc.state_to_json(pc.ClaimState("debt"))
+    raw["debt"] = debt
+    with pytest.raises(pc.ClaimRegisterError, match="debt is malformed"):
+        pc.state_from_json("debt", raw)
+
+
 def test_overlapping_anchor_occurrences_are_ambiguous() -> None:
     spans = pc.segment_plan(b"aaaa")
     state = pc.ClaimState("overlap")
