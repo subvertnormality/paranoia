@@ -114,6 +114,8 @@ def render_spans(spans: Sequence[PlanSpan]) -> str:
 
 
 def resolve_anchor(raw: Mapping[str, Any], spans: Sequence[PlanSpan]) -> ResolvedAnchor:
+    if not isinstance(raw, Mapping):
+        raise ClaimRegisterError("plan_anchor must be an object")
     if set(raw) != {"first_span", "last_span"}:
         raise ClaimRegisterError("plan_anchor needs exactly first_span and last_span")
     positions = {span.span_id: i for i, span in enumerate(spans)}
@@ -337,6 +339,10 @@ def apply_events(
         claim = state.claims.get(claim_id)
         if claim is None or claim.status == SUPERSEDED:
             raise ClaimTransitionError(f"unknown or superseded claim {claim_id!r}")
+        if claim.pending_transition is not None and claim.pending_transition != data:
+            raise ClaimTransitionError(
+                "claim has a different independently authorized transition pending"
+            )
         if event.op == "CONFIRM_KIND":
             if claim.kind_classification != PROPOSED:
                 raise ClaimTransitionError("claim kind is already confirmed")

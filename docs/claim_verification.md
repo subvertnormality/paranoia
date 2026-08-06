@@ -51,7 +51,9 @@ One closure round performs these stages:
    as untrusted JSON data and never share a call with repository bytes.
 6. A fresh toolless structural reviewer sees the plan, repository evidence, external
    metadata, active claims, and existing class procedures. It emits one atomic PLAN and
-   CLASS register.
+   CLASS register. Like every other role, it receives plan bytes only inside ordered,
+   injectively JSON-escaped `SPAN` data records; raw plan prose is never interpolated as
+   peer-level prompt control text.
 7. Python validates role permissions, applies both registers to drafts, roots exact
    evidence bytes, atomically replaces lineage state, and computes one trailer. An
    atomically exclusive per-lineage latch rejects concurrent rounds before either can
@@ -127,7 +129,7 @@ decompressed byte caps. Every redirect hop consumes a fetch attempt, and every r
 body is charged before redirect, status, media-type, or decoding acceptance; decompressed
 output is additionally capped by the aggregate bytes still available before inflation and
 charged as it is produced. DNS resolution, connect, TLS, headers, redirects, and body reads
-all share the same enforceable total deadline. With no endpoint, external research
+and decompression all share the same enforceable total deadline. With no endpoint, external research
 explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
@@ -184,7 +186,8 @@ authorize a later transition.
 Any cached record discarded during validation disables the zero-research cache for that
 round, even if no claim directly depended on that record. Persisted supersession is also
 validated as a bounded graph: the replacement must exist, be confirmed, and already be
-verified or safely deferred.
+verified or safely deferred. Every persisted non-abstention record must retain its rooted
+content digest and exact CAS bytes.
 
 ## Output
 

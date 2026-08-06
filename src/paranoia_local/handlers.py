@@ -781,7 +781,8 @@ def _critique_plan_verified(
             repository_records = [r for r in evidence_records if r.kind.startswith("repository")]
             external_records = [r for r in evidence_records if r.kind in {"external", "abstention"}]
             structural_body = _plan_body(
-                plan_text, context, focus, already, repo_grounded=False,
+                "Plan bytes are supplied only as escaped PINNED PLAN SPANS below.",
+                context, focus, already, repo_grounded=False,
                 class_blocks=class_blocks,
             )
             structural_body += "\n\n" + plan_packet

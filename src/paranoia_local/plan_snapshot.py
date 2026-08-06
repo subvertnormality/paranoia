@@ -84,11 +84,12 @@ def _run_bounded(
             remaining = max_bytes - len(output)
             if remaining <= 0:
                 raise SnapshotUnavailable("bounded Git output exceeds byte cap")
-            chunk = proc.stdout.read(min(65536, remaining + 1))
+            read_size = min(65536, remaining + 1)
+            if debit_bytes is not None:
+                debit_bytes(read_size)
+            chunk = proc.stdout.read(read_size)
             if not chunk:
                 break
-            if debit_bytes is not None:
-                debit_bytes(len(chunk))
             output.extend(chunk)
             if len(output) > max_bytes:
                 raise SnapshotUnavailable("bounded Git output exceeds byte cap")

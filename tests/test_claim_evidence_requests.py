@@ -296,3 +296,13 @@ def test_persisted_empirical_metadata_is_deeply_validated() -> None:
     )
     with pytest.raises(cv.EvidenceRequestError, match="input_hashes"):
         cv.records_from_json([asdict(record)])
+
+
+def test_persisted_non_abstention_record_requires_rooted_bytes() -> None:
+    digest = "a" * 64
+    row = asdict(cv.EvidenceRecord(
+        "e1", "c1", "supplied-artifact", "source", None, digest, 1,
+        0, 1, digest, "x", {"source": "source", "caller_supplied": True},
+    ))
+    with pytest.raises(cv.EvidenceRequestError, match="root exact bytes"):
+        cv.records_from_json([row])

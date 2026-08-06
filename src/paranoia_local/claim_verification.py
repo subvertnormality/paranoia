@@ -220,15 +220,16 @@ def collect_evidence(
                                    }))
         elif request.op == "READ_BLOB":
             try:
-                allowed = min(data["max_bytes"], budget.remaining_bytes + 1)
+                _blob_oid, whole_size = snapshot.blob_identity(data["path"])
+                source_size = min(data["max_bytes"], max(0, whole_size - data["offset"]))
+                budget.debit_bytes(source_size)
                 body = snapshot.read_blob(
-                    data["path"], offset=data["offset"], max_bytes=allowed,
+                    data["path"], offset=data["offset"], max_bytes=max(1, source_size),
                 )
             except SnapshotUnavailable as exc:
                 if "gitlinks are unavailable" in str(exc):
                     continue
                 raise
-            budget.debit_bytes(len(body))
             blob_oid, whole_size = snapshot.blob_identity(data["path"])
             records.append(_record(store, run_id, claim_id, "repository-blob",
                                    data["path"], body,
@@ -267,10 +268,10 @@ def collect_evidence(
                 _oid, input_size = snapshot.blob_identity(path)
                 if input_size > 1 << 20:
                     raise EvidenceRequestError("empirical adapter input exceeds 1 MiB")
+                budget.debit_bytes(input_size)
                 source = snapshot.read_blob(
-                    path, max_bytes=min(1 << 20, budget.remaining_bytes + 1)
+                    path, max_bytes=max(1, input_size)
                 )
-                budget.debit_bytes(len(source))
                 inputs[path] = hashlib.sha256(source).hexdigest()
                 try:
                     compile(source, path, "exec")
@@ -487,6 +488,8 @@ def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]
             or any(c not in "0123456789abcdef" for c in digest)
         ):
             raise EvidenceRequestError("persisted evidence blob digest is malformed")
+        if row["kind"] != "abstention" and digest is None:
+            raise EvidenceRequestError("persisted non-abstention evidence must root exact bytes")
         for key in ("source_size", "passage_start", "passage_end"):
             if not isinstance(row.get(key), int) or isinstance(row[key], bool) or row[key] < 0:
                 raise EvidenceRequestError(f"persisted evidence {key} is malformed")

@@ -125,14 +125,13 @@ class HttpsTransport:
                 if remaining <= 0:
                     raise NetworkEvidenceError("external request total deadline expired")
                 wrapped.settimeout(min(limits.read_timeout, max(0.1, remaining)))
-                chunk = response.read1(
-                    min(65536, limits.max_compressed_bytes - total + 1)
-                )
+                read_size = min(65536, limits.max_compressed_bytes - total + 1)
+                if on_bytes is not None:
+                    on_bytes(read_size)
+                chunk = response.read1(read_size)
                 if not chunk:
                     break
                 total += len(chunk)
-                if on_bytes is not None:
-                    on_bytes(len(chunk))
                 if total > limits.max_compressed_bytes:
                     raise NetworkEvidenceError("compressed response exceeds byte cap")
                 chunks.append(chunk)
@@ -176,8 +175,8 @@ class SafeHttpClient:
             if not addresses or any(not _public(address) for address in addresses):
                 raise NetworkEvidenceError("DNS returned an empty or non-public address set")
             selected = sorted(addresses, key=lambda item: ipaddress.ip_address(item).packed)[0]
-            response = self.transport.request(
-                current, selected, limits, deadline, on_bytes=on_bytes
+            response = self._request_with_deadline(
+                current, selected, limits, deadline, on_bytes
             )
             if response.peer_ip != selected or not _public(response.peer_ip):
                 raise NetworkEvidenceError("connected peer did not match the selected public address")
@@ -205,7 +204,7 @@ class SafeHttpClient:
                 )
             body = self._decode(
                 compressed, headers.get("content-encoding", ""), decode_limits,
-                on_output=on_bytes,
+                on_output=on_bytes, deadline=deadline, clock=self.clock,
             )
             media = headers.get("content-type", "text/plain").split(";", 1)[0].lower().strip()
             if not self._text_media(media):
@@ -247,6 +246,34 @@ class SafeHttpClient:
             raise NetworkEvidenceError(f"DNS resolution failed for {host}: {value}")
         return value  # type: ignore[return-value]
 
+    def _request_with_deadline(
+        self, url: str, address: str, limits: FetchLimits, deadline: float,
+        on_bytes: Callable[[int], None] | None,
+    ) -> TransportResponse:
+        result: queue.Queue[tuple[bool, object]] = queue.Queue(maxsize=1)
+
+        def run() -> None:
+            try:
+                result.put((True, self.transport.request(
+                    url, address, limits, deadline, on_bytes=on_bytes
+                )))
+            except BaseException as exc:
+                result.put((False, exc))
+
+        threading.Thread(target=run, daemon=True, name="paranoia-https").start()
+        remaining = deadline - self.clock()
+        if remaining <= 0:
+            raise NetworkEvidenceError("external request total deadline expired")
+        try:
+            ok, value = result.get(timeout=remaining)
+        except queue.Empty as exc:
+            raise NetworkEvidenceError("external request exceeded total deadline") from exc
+        if not ok:
+            if isinstance(value, Exception):
+                raise value
+            raise NetworkEvidenceError("external request failed")
+        return value  # type: ignore[return-value]
+
     @staticmethod
     def _validate_url(url: str) -> urllib.parse.SplitResult:
         if not isinstance(url, str) or any(
@@ -272,6 +299,8 @@ class SafeHttpClient:
     def _decode(
         data: bytes, encoding: str, limits: FetchLimits,
         *, on_output: Callable[[int], None] | None = None,
+        deadline: float | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> bytes:
         encoding = encoding.strip().lower()
         try:
@@ -279,11 +308,13 @@ class SafeHttpClient:
                 body = data
             elif encoding == "gzip":
                 body = _bounded_inflate(
-                    data, limits.max_decompressed_bytes, 16 + zlib.MAX_WBITS, on_output
+                    data, limits.max_decompressed_bytes, 16 + zlib.MAX_WBITS, on_output,
+                    deadline, clock,
                 )
             elif encoding == "deflate":
                 body = _bounded_inflate(
-                    data, limits.max_decompressed_bytes, zlib.MAX_WBITS, on_output
+                    data, limits.max_decompressed_bytes, zlib.MAX_WBITS, on_output,
+                    deadline, clock,
                 )
             else:
                 raise NetworkEvidenceError(f"unsupported content encoding {encoding!r}")
@@ -374,12 +405,16 @@ class EndpointSearchProvider:
 def _bounded_inflate(
     data: bytes, limit: int, wbits: int,
     on_output: Callable[[int], None] | None = None,
+    deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> bytes:
     """Inflate with ``max_length`` so hostile ratios never allocate past the cap."""
     decoder = zlib.decompressobj(wbits)
     output = bytearray()
     pending = data
     while pending:
+        if deadline is not None and clock() >= deadline:
+            raise NetworkEvidenceError("response decompression exceeded total deadline")
         remaining = limit - len(output)
         piece = decoder.decompress(pending, remaining + 1)
         if on_output is not None:
@@ -391,6 +426,8 @@ def _bounded_inflate(
         if not pending:
             break
     remaining = limit - len(output)
+    if deadline is not None and clock() >= deadline:
+        raise NetworkEvidenceError("response decompression exceeded total deadline")
     flushed = decoder.flush(remaining + 1)
     if on_output is not None:
         on_output(len(flushed))

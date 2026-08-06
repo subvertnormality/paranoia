@@ -246,7 +246,8 @@ outcome. Register correction covers semantic transition errors as well as JSON g
 correcting a structural register preserves the original five-section critique.
 
 Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
-bounded repository records, and no filesystem path. External passages only enter a
+bounded repository records, and no filesystem path. Plan bytes appear only as ordered,
+JSON-escaped span data, including for the structural reviewer. External passages only enter a
 command-incapable role; the structural reviewer receives their metadata, not remote bytes.
 Unavailable sources cause abstention and remain blocking. The full trust model, register
 grammar, evidence limits, caching, and recovery rules are in

@@ -58,6 +58,19 @@ def test_dns_resolution_obeys_the_shared_total_deadline() -> None:
     assert time.monotonic() - started < 0.04
 
 
+def test_transport_headers_and_body_share_the_total_deadline() -> None:
+    class SlowTransport:
+        def request(self, url, address, limits, deadline, on_bytes=None):
+            time.sleep(0.05)
+            return TransportResponse(200, {"content-type": "text/plain"}, [b"late"], address)
+
+    client = SafeHttpClient(
+        resolver=lambda _host: ["93.184.216.34"], transport=SlowTransport()
+    )
+    with pytest.raises(NetworkEvidenceError, match="request exceeded"):
+        client.fetch("https://example.com/", FetchLimits(total_timeout=0.01))
+
+
 def test_connected_peer_must_equal_the_server_selected_public_address() -> None:
     response = TransportResponse(200, {"content-type": "text/plain"}, [b"ok"], "10.0.0.1")
     client = SafeHttpClient(resolver=lambda host: ["93.184.216.34"],

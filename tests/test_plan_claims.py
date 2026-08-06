@@ -305,6 +305,40 @@ def test_invalid_required_truth_transition_cannot_leave_a_decision_nonblocking()
     assert pc.claim_blocks(claim), "persisted pending state must block even for decisions"
 
 
+def test_distinct_transition_cannot_erase_pending_independent_authorization() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    pending = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": ["e1"], "reason": "pending audit",
+    })
+    pc.apply_events(
+        state, [pending], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[],
+    )
+    verify = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e2"], "reason": "different transition",
+    })
+    with pytest.raises(pc.ClaimTransitionError, match="different independently"):
+        pc.apply_events(
+            state, [verify], role=pc.VERIFIER_ROLE, spans=spans,
+            evidence_ids={"e2": claim_id},
+        )
+    assert state.claims[claim_id].pending_transition == pending.data
+
+
+def test_null_model_anchor_is_a_correctable_register_error() -> None:
+    state = pc.ClaimState("null-anchor")
+    spans = pc.segment_plan(b"Plan.\n")
+    event = pc.Event("ADD", {
+        "op": "ADD", "temp_id": "bad", "claim": "Premise", "kind": "fact",
+        "assertion_mode": "asserted", "plan_anchor": None,
+    })
+    with pytest.raises(pc.ClaimRegisterError, match="must be an object"):
+        pc.apply_events(state, [event], role=pc.RESEARCH_ROLE, spans=spans)
+
+
 def test_dispute_resolution_names_and_applies_the_audited_outcome() -> None:
     state, claim_id, spans = _state_with_confirmed_fact()
     pc.apply_events(
