@@ -102,14 +102,16 @@ class PlanRepositorySnapshot:
             ).stdout.decode("ascii").strip()
         )
         ignored_raw = _run(
-            repo, ["ls-files", "--others", "-i", "--exclude-standard", "-z"]
+            repo, ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"]
         ).stdout
         ignored = tuple(
             item.decode("utf-8", errors="surrogateescape")
             for item in ignored_raw.split(b"\0") if item
         )
         tree, unavailable = _snapshot_tree_without_filters(repo)
-        unavailable = tuple(dict.fromkeys([*unavailable, *_find_special_paths(repo)]))
+        unavailable = tuple(dict.fromkeys([
+            *unavailable, *_find_special_paths(repo, ignored_paths=ignored)
+        ]))
         commit_args = ["commit-tree", tree]
         if has_head:
             commit_args += ["-p", head]
@@ -469,6 +471,7 @@ def _validate_object_boundary(repo: Path) -> None:
     if common != approved:
         raise SnapshotUnavailable("Git common directory is outside the approved repository boundary")
     objects = common / "objects"
+    _validate_object_store_paths(objects)
     for name in ("alternates", "http-alternates"):
         path = objects / "info" / name
         try:
@@ -514,11 +517,37 @@ def _approved_common_dir(repo: Path) -> Path:
     return common
 
 
-def _find_special_paths(repo: Path, *, max_entries: int = 50_000) -> tuple[str, ...]:
+def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -> None:
+    if objects.is_symlink() or not objects.is_dir():
+        raise SnapshotUnavailable("repository object-store root must be a real directory")
+    pending = [objects]
+    seen = 0
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = list(os.scandir(directory))
+        except OSError as exc:
+            raise SnapshotUnavailable(f"could not inspect repository object store: {exc}") from exc
+        for entry in entries:
+            seen += 1
+            if seen > max_entries:
+                raise SnapshotUnavailable("repository object-store metadata scan exceeds safety cap")
+            if entry.is_symlink():
+                raise SnapshotUnavailable(
+                    f"repository object-store path may not be a symlink: {entry.path}"
+                )
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(Path(entry.path))
+
+
+def _find_special_paths(
+    repo: Path, *, ignored_paths: tuple[str, ...] = (), max_entries: int = 50_000
+) -> tuple[str, ...]:
     """Disclose nonregular entries Git omits from ``ls-files --others``."""
     special: list[str] = []
     pending = [repo]
     seen = 0
+    ignored = {path.rstrip("/") for path in ignored_paths}
     while pending:
         directory = pending.pop()
         try:
@@ -527,6 +556,9 @@ def _find_special_paths(repo: Path, *, max_entries: int = 50_000) -> tuple[str, 
             raise SnapshotUnavailable(f"could not inspect repository entry types: {exc}") from exc
         for entry in entries:
             if directory == repo and entry.name == ".git":
+                continue
+            relative = Path(entry.path).relative_to(repo).as_posix()
+            if relative in ignored:
                 continue
             seen += 1
             if seen > max_entries:
@@ -537,6 +569,6 @@ def _find_special_paths(repo: Path, *, max_entries: int = 50_000) -> tuple[str, 
             mode = entry.stat(follow_symlinks=False).st_mode
             if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
                 special.append(
-                    Path(entry.path).relative_to(repo).as_posix()
+                    relative
                 )
     return tuple(sorted(special))

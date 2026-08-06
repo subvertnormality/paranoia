@@ -60,7 +60,8 @@ class SearchHit:
 
 class Transport(Protocol):
     def request(self, url: str, address: str, limits: FetchLimits,
-                deadline: float) -> TransportResponse: ...
+                deadline: float, on_bytes: Callable[[int], None] | None = None
+                ) -> TransportResponse: ...
 
 
 Resolver = Callable[[str], Sequence[str]]
@@ -88,7 +89,8 @@ class HttpsTransport:
     """Connect to the selected IP while TLS authenticates the original hostname."""
 
     def request(self, url: str, address: str, limits: FetchLimits,
-                deadline: float) -> TransportResponse:
+                deadline: float, on_bytes: Callable[[int], None] | None = None
+                ) -> TransportResponse:
         parsed = urllib.parse.urlsplit(url)
         host = parsed.hostname or ""
         port = parsed.port or 443
@@ -127,6 +129,8 @@ class HttpsTransport:
                 if not chunk:
                     break
                 total += len(chunk)
+                if on_bytes is not None:
+                    on_bytes(len(chunk))
                 if total > limits.max_compressed_bytes:
                     raise NetworkEvidenceError("compressed response exceeds byte cap")
                 chunks.append(chunk)
@@ -149,7 +153,11 @@ class SafeHttpClient:
         self.transport = transport or HttpsTransport()
         self.clock = clock
 
-    def fetch(self, url: str, limits: FetchLimits | None = None) -> RawResponse:
+    def fetch(
+        self, url: str, limits: FetchLimits | None = None, *,
+        on_attempt: Callable[[], None] | None = None,
+        on_bytes: Callable[[int], None] | None = None,
+    ) -> RawResponse:
         limits = limits or FetchLimits()
         requested = url
         current = url
@@ -157,14 +165,21 @@ class SafeHttpClient:
         deadline = self.clock() + limits.total_timeout
         for hop in range(limits.max_redirects + 1):
             parsed = self._validate_url(current)
+            if on_attempt is not None:
+                on_attempt()
             addresses = list(dict.fromkeys(self.resolver(parsed.hostname or "")))
             if not addresses or any(not _public(address) for address in addresses):
                 raise NetworkEvidenceError("DNS returned an empty or non-public address set")
             selected = sorted(addresses, key=lambda item: ipaddress.ip_address(item).packed)[0]
-            response = self.transport.request(current, selected, limits, deadline)
+            response = self.transport.request(
+                current, selected, limits, deadline, on_bytes=on_bytes
+            )
             if response.peer_ip != selected or not _public(response.peer_ip):
                 raise NetworkEvidenceError("connected peer did not match the selected public address")
             headers = {key.lower(): value for key, value in response.headers.items()}
+            compressed = b"".join(response.chunks)
+            if len(compressed) > limits.max_compressed_bytes:
+                raise NetworkEvidenceError("compressed response exceeds byte cap")
             if response.status in {301, 302, 303, 307, 308}:
                 location = headers.get("location")
                 if not location:
@@ -176,10 +191,10 @@ class SafeHttpClient:
                 continue
             if not 200 <= response.status < 300:
                 raise NetworkEvidenceError(f"external source returned HTTP {response.status}")
-            compressed = b"".join(response.chunks)
-            if len(compressed) > limits.max_compressed_bytes:
-                raise NetworkEvidenceError("compressed response exceeds byte cap")
-            body = self._decode(compressed, headers.get("content-encoding", ""), limits)
+            body = self._decode(
+                compressed, headers.get("content-encoding", ""), limits,
+                on_output=on_bytes,
+            )
             media = headers.get("content-type", "text/plain").split(";", 1)[0].lower().strip()
             if not self._text_media(media):
                 raise NetworkEvidenceError(f"unsupported external media type {media!r}")
@@ -218,15 +233,22 @@ class SafeHttpClient:
         return parsed
 
     @staticmethod
-    def _decode(data: bytes, encoding: str, limits: FetchLimits) -> bytes:
+    def _decode(
+        data: bytes, encoding: str, limits: FetchLimits,
+        *, on_output: Callable[[int], None] | None = None,
+    ) -> bytes:
         encoding = encoding.strip().lower()
         try:
             if not encoding or encoding == "identity":
                 body = data
             elif encoding == "gzip":
-                body = _bounded_inflate(data, limits.max_decompressed_bytes, 16 + zlib.MAX_WBITS)
+                body = _bounded_inflate(
+                    data, limits.max_decompressed_bytes, 16 + zlib.MAX_WBITS, on_output
+                )
             elif encoding == "deflate":
-                body = _bounded_inflate(data, limits.max_decompressed_bytes, zlib.MAX_WBITS)
+                body = _bounded_inflate(
+                    data, limits.max_decompressed_bytes, zlib.MAX_WBITS, on_output
+                )
             else:
                 raise NetworkEvidenceError(f"unsupported content encoding {encoding!r}")
         except (OSError, zlib.error) as exc:
@@ -274,7 +296,9 @@ class EndpointSearchProvider:
         self.last_response_size = 0
 
     def search(self, query: str, *, limit: int = 5,
-               limits: FetchLimits | None = None) -> list[SearchHit]:
+               limits: FetchLimits | None = None,
+               on_attempt: Callable[[], None] | None = None,
+               on_bytes: Callable[[int], None] | None = None) -> list[SearchHit]:
         self.last_response_size = 0
         if not query or len(query) > 500 or not (1 <= limit <= 10):
             raise NetworkEvidenceError("external search query exceeds bounds")
@@ -284,7 +308,9 @@ class EndpointSearchProvider:
             )
         except (KeyError, IndexError, ValueError) as exc:
             raise NetworkEvidenceError(f"search endpoint formatting failed: {exc}") from exc
-        response = self.client.fetch(url, limits)
+        response = self.client.fetch(
+            url, limits, on_attempt=on_attempt, on_bytes=on_bytes
+        )
         self.last_response_size = response.size
         if response.media_type not in {"application/json", "application/ld+json"}:
             raise NetworkEvidenceError("search endpoint did not return JSON")
@@ -307,7 +333,10 @@ class EndpointSearchProvider:
         return hits
 
 
-def _bounded_inflate(data: bytes, limit: int, wbits: int) -> bytes:
+def _bounded_inflate(
+    data: bytes, limit: int, wbits: int,
+    on_output: Callable[[int], None] | None = None,
+) -> bytes:
     """Inflate with ``max_length`` so hostile ratios never allocate past the cap."""
     decoder = zlib.decompressobj(wbits)
     output = bytearray()
@@ -315,6 +344,8 @@ def _bounded_inflate(data: bytes, limit: int, wbits: int) -> bytes:
     while pending:
         remaining = limit - len(output)
         piece = decoder.decompress(pending, remaining + 1)
+        if on_output is not None:
+            on_output(len(piece))
         output.extend(piece)
         if len(output) > limit:
             raise NetworkEvidenceError("decompressed response exceeds byte cap")
@@ -322,7 +353,10 @@ def _bounded_inflate(data: bytes, limit: int, wbits: int) -> bytes:
         if not pending:
             break
     remaining = limit - len(output)
-    output.extend(decoder.flush(remaining + 1))
+    flushed = decoder.flush(remaining + 1)
+    if on_output is not None:
+        on_output(len(flushed))
+    output.extend(flushed)
     if len(output) > limit:
         raise NetworkEvidenceError("decompressed response exceeds byte cap")
     if not decoder.eof:

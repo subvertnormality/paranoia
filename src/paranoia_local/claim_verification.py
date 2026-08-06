@@ -285,25 +285,25 @@ def collect_evidence(
                 # Absence is explicit abstention, never a fabricated evidence record.
                 continue
             try:
-                budget.debit_fetch()
                 hits = search_provider.search(
                     data["query"], limit=min(data["limit"], 2),
                     limits=_fetch_limits(budget.remaining_bytes),
+                    on_attempt=budget.debit_fetch,
+                    on_bytes=budget.debit_bytes,
                 )
-                budget.debit_bytes(search_provider.last_response_size)
             except NetworkEvidenceError as exc:
-                if search_provider.last_response_size:
-                    budget.debit_bytes(search_provider.last_response_size)
                 records.append(_abstention(claim_id, "external-search", data["query"], str(exc)))
                 continue
             for hit in hits:
-                budget.debit_fetch()
                 try:
-                    response = http_client.fetch(hit.url, _fetch_limits(budget.remaining_bytes))
+                    response = http_client.fetch(
+                        hit.url, _fetch_limits(budget.remaining_bytes),
+                        on_attempt=budget.debit_fetch,
+                        on_bytes=budget.debit_bytes,
+                    )
                 except NetworkEvidenceError as exc:
                     records.append(_abstention(claim_id, "external-fetch", hit.url, str(exc)))
                     continue
-                budget.debit_bytes(len(response.body))
                 records.append(_record(
                     store, run_id, claim_id, "external", response.final_url, response.body,
                     {
@@ -481,8 +481,60 @@ def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]
             raise EvidenceRequestError("persisted evidence passage bounds are malformed")
         if not isinstance(row.get("metadata"), dict):
             raise EvidenceRequestError("persisted evidence metadata is malformed")
+        _validate_metadata(row["kind"], row["metadata"])
         records.append(EvidenceRecord(**row))
     return records
+
+
+def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
+    schemas = {
+        "repository-list": {"prefix", "snapshot_commit"},
+        "repository-blob": {
+            "snapshot_commit", "path", "blob_oid", "whole_size", "offset", "length",
+        },
+        "repository-search": {"pattern", "paths", "snapshot_commit"},
+        "repository-history": {"ref", "path", "history_oid", "limit", "snapshot_commit"},
+        "empirical": {
+            "argv", "runtime", "snapshot_commit", "input_hashes", "exit_status",
+            "falsifying_result",
+        },
+        "external": {
+            "requested_url", "final_url", "retrieved_at", "http_status", "media_type",
+            "redirects", "publisher_domain", "source_class", "independence_groups", "conflicts",
+        },
+        "supplied-artifact": {"source", "caller_supplied"},
+        "abstention": {"stage", "reason"},
+    }
+    expected = schemas.get(kind)
+    if expected is None or set(metadata) != expected:
+        raise EvidenceRequestError(f"persisted {kind} metadata has missing or unknown fields")
+    string_fields = {
+        "prefix", "snapshot_commit", "path", "blob_oid", "pattern", "ref", "history_oid",
+        "runtime", "requested_url", "final_url", "retrieved_at", "media_type",
+        "publisher_domain", "source_class", "source", "stage", "reason",
+    }
+    for key in expected.intersection(string_fields):
+        if not isinstance(metadata.get(key), str):
+            raise EvidenceRequestError(f"persisted {kind}.{key} must be a string")
+    for key in expected.intersection({"whole_size", "offset", "length", "limit", "exit_status", "http_status"}):
+        value = metadata.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise EvidenceRequestError(f"persisted {kind}.{key} must be a nonnegative integer")
+    for key in expected.intersection({"caller_supplied", "falsifying_result"}):
+        if not isinstance(metadata.get(key), bool):
+            raise EvidenceRequestError(f"persisted {kind}.{key} must be boolean")
+    for key in expected.intersection({"paths", "argv", "redirects", "independence_groups", "conflicts"}):
+        value = metadata.get(key)
+        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+            raise EvidenceRequestError(f"persisted {kind}.{key} must be a string array")
+    if "input_hashes" in expected:
+        hashes = metadata.get("input_hashes")
+        if not isinstance(hashes, dict) or any(
+            not isinstance(path, str) or not isinstance(digest, str)
+            or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest)
+            for path, digest in hashes.items()
+        ):
+            raise EvidenceRequestError("persisted empirical.input_hashes is malformed")
 
 
 def validate_cached_records(
@@ -577,6 +629,30 @@ def validate_cached_records(
             ):
                 info = getattr(claim, field_name) or {}
                 if invalid_ids.intersection(info.get("evidence_ids", [])):
+                    info["status"] = "pending"
+                    setattr(claim, field_name, info)
+    valid_bindings = {record.evidence_id: record.claim_id for record in valid}
+    for claim in state.claims.values():
+        if claim.status == pc.SUPERSEDED:
+            continue
+        dependencies = set(claim.evidence_ids)
+        for field_name in (
+            "truth_authorization", "bearing_authorization", "dispute_authorization",
+            "deferral_authorization",
+        ):
+            dependencies.update((getattr(claim, field_name) or {}).get("evidence_ids", []))
+        missing = {
+            evidence_id for evidence_id in dependencies
+            if valid_bindings.get(evidence_id) != claim.claim_id
+        }
+        if missing:
+            claim.status = pc.STALE
+            for field_name in (
+                "truth_authorization", "bearing_authorization", "dispute_authorization",
+                "deferral_authorization",
+            ):
+                info = getattr(claim, field_name) or {}
+                if missing.intersection(info.get("evidence_ids", [])):
                     info["status"] = "pending"
                     setattr(claim, field_name, info)
     return valid

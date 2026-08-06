@@ -29,11 +29,13 @@ One closure round performs these stages:
    filters), and inserting explicit object IDs/modes into a private index. Hooks,
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
    Inherited Git environment is cleared, native linked-worktree object storage is the only
-   approved object database, alternates are rejected, and grafts/replacement objects are
-   disabled for snapshot and history operations. Lazy fetching is disabled, so a partial
+   approved object database, alternates and symlinked object-store components are rejected,
+   and grafts/replacement objects are disabled for snapshot and history operations. Lazy
+   fetching is disabled, so a partial
    clone with missing objects fails closed instead of invoking a configured promisor remote.
    Ignored untracked paths and unsupported FIFOs/sockets/devices are JSON-escaped,
-   disclosed, and unavailable. A temporary
+   disclosed, and unavailable. Ignored regular directories are pruned from the bounded
+   special-entry walk, so a large ignored build tree cannot exhaust that scan. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
 3. A fresh toolless research role registers load-bearing claims. The server parses its
@@ -90,6 +92,12 @@ underlying blob/ref object identity, exact original bytes,
 source and passage hashes, byte bounds, and separately decoded display text. Lossy display
 text is never evidence identity.
 
+Persisted records have an exact per-kind metadata schema, including nested collection
+types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
+dispute, deferral-authorization, or other claim dependency must resolve to one valid record
+bound to that exact claim. Missing, malformed, mismatched, or wrong-claim dependencies stale
+the claim and leave it blocking.
+
 The initial empirical adapter set is deliberately narrow: `PYTHON_COMPILE` compiles up to
 20 pinned Python blobs without executing them and records the fixed recipe, interpreter
 version, input hashes, structured results, exit status, and falsifying result. It is
@@ -113,7 +121,9 @@ Formatting errors are blocked network-evidence failures, never raw exceptions. F
 rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
 different from the selected address, unsupported media/encodings, excessive redirects,
 non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
-decompressed byte caps. With no endpoint, external research
+decompressed byte caps. Every redirect hop consumes a fetch attempt, and every response
+body is charged before redirect, status, media-type, or decoding acceptance; decompressed
+output is additionally charged as it is produced. With no endpoint, external research
 explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
@@ -154,7 +164,7 @@ longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result
 ## Budgets and caching
 
 Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
-claim, eight external fetch attempts (debited before network I/O, including failures),
+claim, eight external HTTP attempts (debited before each hop, including failures),
 1 MiB per source, 5 MiB aggregate across claim, search, supplied, and structural phases,
 4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;

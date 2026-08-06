@@ -279,6 +279,32 @@ def test_truth_and_bearing_keep_distinct_evidence_dependencies() -> None:
     assert claim.evidence_ids == ["truth", "bearing"]
 
 
+def test_invalid_required_truth_transition_cannot_leave_a_decision_nonblocking() -> None:
+    state, claim_id, spans = _state_with_claim()
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "decision", "reason": "chosen design",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "invalid truth transition",
+    })
+    digest = pc.event_digest(event)
+    with pytest.raises(pc.ClaimTransitionError, match="confirmed factual"):
+        pc.apply_events(
+            state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+            evidence_ids={"e1": claim_id}, independent_required=True,
+            vendor_checks=[pc.VendorCheck("one", "m", digest, ("e1",), True, "t")],
+        )
+    claim = state.claims[claim_id]
+    claim.pending_transition = event.data
+    assert pc.claim_blocks(claim), "persisted pending state must block even for decisions"
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

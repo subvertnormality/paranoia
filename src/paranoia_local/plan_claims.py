@@ -348,6 +348,15 @@ def apply_events(
             claim.status = NOT_APPLICABLE if kind == DECISION else UNVERIFIED
         elif event.op in {"VERIFY", "CONTRADICT", "RESOLVE_DISPUTE", "SET_BEARING"}:
             ids = _validated_evidence(data, available, claim.claim_id)
+            if event.op in {"VERIFY", "CONTRADICT"}:
+                _require_fact(claim)
+            elif event.op == "RESOLVE_DISPUTE" and claim.status != DISPUTED:
+                raise ClaimTransitionError("only a disputed claim can resolve a dispute")
+            elif event.op == "SET_BEARING":
+                if data["bearing"] not in {BLOCKING, ADVISORY}:
+                    raise ClaimTransitionError("bearing must be blocking or advisory")
+                if data["bearing"] == ADVISORY and not ids:
+                    raise ClaimTransitionError("advisory bearing requires evidence")
             if not _authorize_independent(
                 claim, event, ids, independent_required, vendor_checks
             ):
@@ -356,34 +365,26 @@ def apply_events(
                 continue
             claim.pending_transition = None
             if event.op == "VERIFY":
-                _require_fact(claim)
                 claim.status, claim.truth_evidence_ids = VERIFIED, ids
-                _retain_evidence(claim, ids)
+                _refresh_evidence_dependencies(claim)
             elif event.op == "CONTRADICT":
-                _require_fact(claim)
                 claim.status, claim.truth_evidence_ids = CONTRADICTED, ids
-                _retain_evidence(claim, ids)
+                _refresh_evidence_dependencies(claim)
             elif event.op == "RESOLVE_DISPUTE":
-                if claim.status != DISPUTED:
-                    raise ClaimTransitionError("only a disputed claim can resolve a dispute")
                 claim.status = VERIFIED
                 claim.truth_evidence_ids = ids
                 claim.dispute_evidence_ids = ids
                 claim.disputed_evidence_ids = []
-                _retain_evidence(claim, ids)
+                _refresh_evidence_dependencies(claim)
             else:
-                if data["bearing"] not in {BLOCKING, ADVISORY}:
-                    raise ClaimTransitionError("bearing must be blocking or advisory")
-                if data["bearing"] == ADVISORY and not ids:
-                    raise ClaimTransitionError("advisory bearing requires evidence")
                 claim.bearing, claim.bearing_evidence_ids = data["bearing"], ids
-                _retain_evidence(claim, ids)
+                _refresh_evidence_dependencies(claim)
             claim.reason = data["reason"]
         elif event.op == "DISPUTE":
             ids = _validated_evidence(data, available, claim.claim_id)
             claim.status, claim.disputed_evidence_ids = DISPUTED, ids
             claim.dispute_evidence_ids = ids
-            _retain_evidence(claim, ids)
+            _refresh_evidence_dependencies(claim)
             claim.reason = data["reason"]
         elif event.op == "DEFER":
             _require_fact(claim)
@@ -537,6 +538,8 @@ def _authorization_valid(info: dict[str, Any] | None, *, must_be_required: bool 
 def claim_blocks(claim: Claim) -> bool:
     if claim.status == SUPERSEDED:
         return False
+    if claim.pending_transition is not None:
+        return True
     if claim.kind_classification != CONFIRMED:
         return True
     if claim.kind == DECISION:
@@ -550,8 +553,13 @@ def claim_blocks(claim: Claim) -> bool:
     return True
 
 
-def _retain_evidence(claim: Claim, ids: Sequence[str]) -> None:
-    claim.evidence_ids = list(dict.fromkeys([*claim.evidence_ids, *ids]))
+def _refresh_evidence_dependencies(claim: Claim) -> None:
+    claim.evidence_ids = list(dict.fromkeys([
+        *claim.truth_evidence_ids,
+        *claim.bearing_evidence_ids,
+        *claim.dispute_evidence_ids,
+        *claim.disputed_evidence_ids,
+    ]))
 
 
 def blocking_claims(state: ClaimState) -> list[Claim]:

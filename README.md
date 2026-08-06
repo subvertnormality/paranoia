@@ -647,8 +647,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call. Git
-  alternates are rejected, inherited object-database settings are cleared, and replacement
-  objects/grafts and lazy fetching are disabled for plan evidence.
+  alternates and symlinked object-store components are rejected, inherited object-database
+  settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
+  plan evidence. Persisted evidence uses strict per-kind schemas; every retained claim
+  dependency must still resolve to a valid same-claim record. Network budgets charge each
+  redirect hop and every response body, including rejected responses.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from paranoia_local import plan_snapshot as ps
 from paranoia_local.plan_snapshot import PlanRepositorySnapshot, SnapshotUnavailable
 
 
@@ -85,6 +86,15 @@ def test_external_object_alternates_are_rejected(repo: Path, tmp_path: Path) -> 
         PlanRepositorySnapshot.create(repo, run_id="alternate")
 
 
+def test_symlinked_object_store_root_is_rejected(repo: Path, tmp_path: Path) -> None:
+    objects = repo / ".git" / "objects"
+    external = tmp_path / "external-objects"
+    objects.rename(external)
+    objects.symlink_to(external, target_is_directory=True)
+    with pytest.raises(SnapshotUnavailable, match="object-store root"):
+        PlanRepositorySnapshot.create(repo, run_id="symlinked-objects")
+
+
 def test_inherited_git_object_environment_is_cleared(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -114,6 +124,17 @@ def test_untracked_special_files_are_disclosed_and_skipped(repo: Path) -> None:
         assert snap.read_blob("app.py").startswith(b'"""App module')
         with pytest.raises(SnapshotUnavailable, match="not present"):
             snap.read_blob("events.pipe")
+
+
+def test_special_file_scan_prunes_ignored_regular_directories(repo: Path) -> None:
+    (repo / ".gitignore").write_text("ignored/\n")
+    ignored = repo / "ignored"
+    ignored.mkdir()
+    for index in range(10):
+        (ignored / f"{index}.txt").write_text("x")
+    assert ps._find_special_paths(
+        repo, ignored_paths=("ignored/",), max_entries=3
+    ) == ()
 
 
 def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: Path) -> None:

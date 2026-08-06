@@ -24,9 +24,16 @@ class FakeTransport:
         self.responses = list(responses)
         self.calls: list[tuple[str, str]] = []
 
-    def request(self, url, address, limits, deadline):
+    def request(self, url, address, limits, deadline, on_bytes=None):
         self.calls.append((url, address))
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        chunks = list(response.chunks)
+        if on_bytes is not None:
+            for chunk in chunks:
+                on_bytes(len(chunk))
+        return TransportResponse(
+            response.status, response.headers, chunks, response.peer_ip
+        )
 
 
 def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
@@ -59,6 +66,63 @@ def test_redirect_is_resolved_and_revalidated_per_hop() -> None:
         ("https://example.com/", "93.184.216.34"),
         ("https://other.example/x", "1.1.1.1"),
     ]
+
+
+def test_every_redirect_hop_and_body_is_accounted_before_following() -> None:
+    transport = FakeTransport(
+        TransportResponse(
+            302, {"location": "https://example.com/final"}, [b"redirect-body"],
+            "93.184.216.34",
+        ),
+        TransportResponse(200, {"content-type": "text/plain"}, [b"final"], "93.184.216.34"),
+    )
+    client = SafeHttpClient(
+        resolver=lambda host: ["93.184.216.34"], transport=transport
+    )
+    attempts: list[int] = []
+    charged: list[int] = []
+    result = client.fetch(
+        "https://example.com/start",
+        on_attempt=lambda: attempts.append(1), on_bytes=charged.append,
+    )
+    assert result.body == b"final"
+    assert len(attempts) == 2
+    assert sum(charged) == len(b"redirect-body") + len(b"final")
+
+
+def test_rejected_response_body_is_still_accounted() -> None:
+    transport = FakeTransport(
+        TransportResponse(
+            500, {"content-type": "text/plain"}, [b"failed-body"], "93.184.216.34"
+        )
+    )
+    client = SafeHttpClient(
+        resolver=lambda host: ["93.184.216.34"], transport=transport
+    )
+    charged: list[int] = []
+    with pytest.raises(NetworkEvidenceError, match="HTTP 500"):
+        client.fetch("https://example.com/fail", on_bytes=charged.append)
+    assert sum(charged) == len(b"failed-body")
+
+
+def test_redirect_hops_consume_the_shared_fetch_attempt_budget() -> None:
+    responses = [
+        TransportResponse(
+            302, {"location": "https://example.com/next"}, [], "93.184.216.34"
+        )
+        for _ in range(cv.MAX_FETCHES + 1)
+    ]
+    transport = FakeTransport(*responses)
+    client = SafeHttpClient(
+        resolver=lambda host: ["93.184.216.34"], transport=transport
+    )
+    budget = cv.EvidenceBudget()
+    with pytest.raises(cv.EvidenceRequestError, match="fetch-attempt"):
+        client.fetch(
+            "https://example.com/start", FetchLimits(max_redirects=20),
+            on_attempt=budget.debit_fetch, on_bytes=budget.debit_bytes,
+        )
+    assert len(transport.calls) == cv.MAX_FETCHES
 
 
 def test_compressed_and_decompressed_size_caps_are_both_enforced() -> None:

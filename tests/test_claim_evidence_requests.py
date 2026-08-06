@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -238,3 +238,61 @@ def test_literal_search_charges_every_inspected_blob_to_the_round_budget(
                 parsed, snapshot=snapshot, store=store, run_id="search-budget-run",
                 budget=cv.EvidenceBudget(),
             )
+
+
+def test_missing_persisted_evidence_dependency_stales_a_verified_claim(
+    repo: Path, tmp_path: Path
+) -> None:
+    spans = pc.segment_plan(b"Premise.\n")
+    state = pc.ClaimState("missing")
+    add = {
+        "op": "ADD", "temp_id": "one", "claim": "Missing evidence premise",
+        "kind": "fact", "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+    }
+    claim_id = pc.apply_events(
+        state,
+        pc.parse_role_register(
+            "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + json.dumps([add]),
+            pc.RESEARCH_ROLE,
+        ),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    pc.apply_events(
+        state,
+        [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": ["e-missing"], "reason": "was present",
+        })],
+        role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e-missing": claim_id},
+    )
+    with PlanRepositorySnapshot.create(repo, run_id="missing-dependency") as snapshot:
+        assert cv.validate_cached_records(
+            [], snapshot=snapshot, store=EvidenceStore(tmp_path / "missing-store"), state=state
+        ) == []
+    assert state.claims[claim_id].status == pc.STALE
+    assert pc.claim_blocks(state.claims[claim_id])
+
+
+def test_persisted_empirical_metadata_is_deeply_validated() -> None:
+    digest = "a" * 64
+    record = cv.EvidenceRecord(
+        evidence_id="e1", claim_id="c1", kind="empirical", source="PYTHON_COMPILE",
+        blob_digest=digest, source_sha256=digest, source_size=1,
+        passage_start=0, passage_end=1, passage_sha256=digest,
+        display_passage="x", metadata={
+            "argv": ["python", "adapter"], "runtime": "3.x", "snapshot_commit": digest,
+            "input_hashes": [], "exit_status": 0, "falsifying_result": False,
+        },
+    )
+    with pytest.raises(cv.EvidenceRequestError, match="input_hashes"):
+        cv.records_from_json([asdict(record)])
