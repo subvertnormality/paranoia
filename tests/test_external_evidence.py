@@ -203,12 +203,23 @@ def test_non_text_media_is_rejected() -> None:
         "https://search.example/?q={query!r}",
         "https://search.example/?q={query:{limit}}",
         "https://search.example/?limit={limit}",
+        "https://{query}/search",
+        "https://search.example:{limit}/?q={query}",
+        "https://search.example/?q=fixed#{query}",
     ],
 )
 def test_search_endpoint_templates_allow_only_query_and_limit(template: str) -> None:
     client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
     with pytest.raises(NetworkEvidenceError, match="template"):
         EndpointSearchProvider(template, client)
+
+
+def test_search_endpoint_allows_placeholders_only_below_a_fixed_origin() -> None:
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    provider = EndpointSearchProvider(
+        "https://search.example/api/{limit}?q={query}", client,
+    )
+    assert provider._origin[1] == "search.example"
 
 
 def test_expired_external_cache_is_removed_before_it_can_authorize_a_round(

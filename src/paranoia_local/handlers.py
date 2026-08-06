@@ -756,10 +756,7 @@ def _critique_plan_verified(
             state.authorization_policy = current_policy
             state.evidence_records = cv.records_to_json(evidence_records)
             draft_claims = state.copy()
-            evidence_ids = {
-                record.evidence_id: record.claim_id for record in evidence_records
-                if record.kind != "abstention"
-            }
+            evidence_ids = cv.evidence_bindings(evidence_records)
             cache_hit = (
                 state.plan_sha256 == hashlib.sha256(raw_plan).hexdigest()
                 and not pc.blocking_claims(state)
@@ -813,11 +810,13 @@ def _critique_plan_verified(
                     claim.claim_id for claim in draft_claims.claims.values()
                     if claim.status != pc.SUPERSEDED
                 }
-                tree_listing = snapshot.list_tree(
+                tree_listing, tree_complete = snapshot.list_tree_scoped(
                     limit=200, debit_bytes=round_budget.debit_bytes,
                     remaining_bytes=lambda: round_budget.remaining_bytes,
                 )
-                tree_listing_json = json.dumps(tree_listing, ensure_ascii=True)
+                tree_listing_json = json.dumps({
+                    "paths": tree_listing, "limit": 200, "complete": tree_complete,
+                }, ensure_ascii=True)
                 evidence_prompt = prompts.compose(
                     prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS,
                     "\n\n".join([
@@ -847,10 +846,7 @@ def _critique_plan_verified(
                 )
                 evidence_records = _merge_evidence(evidence_records, new_records)
 
-                evidence_ids = {
-                    record.evidence_id: record.claim_id for record in evidence_records
-                    if record.kind != "abstention"
-                }
+                evidence_ids = cv.evidence_bindings(evidence_records)
                 local_records = [
                     record for record in evidence_records
                     if record.kind not in {"external", "supplied-artifact"}
@@ -932,10 +928,14 @@ def _critique_plan_verified(
                         )
 
             if not cache_hit:
-                structural_tree_json = json.dumps(snapshot.list_tree(
+                structural_tree, structural_tree_complete = snapshot.list_tree_scoped(
                     limit=200, debit_bytes=round_budget.debit_bytes,
                     remaining_bytes=lambda: round_budget.remaining_bytes,
-                ), ensure_ascii=True)
+                )
+                structural_tree_json = json.dumps({
+                    "paths": structural_tree, "limit": 200,
+                    "complete": structural_tree_complete,
+                }, ensure_ascii=True)
                 structural_record_text = cv.render_evidence(
                     [r for r in evidence_records if r.kind.startswith("repository")],
                     include_passages=False, debit_bytes=round_budget.debit_bytes,

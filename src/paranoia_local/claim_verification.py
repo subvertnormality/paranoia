@@ -218,7 +218,7 @@ def collect_evidence(
         data = request.data
         claim_id = data["claim_id"]
         if request.op == "LIST_TREE":
-            paths = snapshot.list_tree(
+            paths, complete = snapshot.list_tree_scoped(
                 data["prefix"], limit=data["limit"], debit_bytes=budget.debit_bytes,
                 remaining_bytes=lambda: budget.remaining_bytes,
             )
@@ -230,6 +230,8 @@ def collect_evidence(
                                    snapshot.commit_id, body, {
                                        "prefix": data["prefix"],
                                        "snapshot_commit": snapshot.commit_id,
+                                       "limit": data["limit"],
+                                       "complete": complete,
                                    }))
         elif request.op == "READ_BLOB":
             try:
@@ -250,10 +252,11 @@ def collect_evidence(
                                     "blob_oid": blob_oid, "whole_size": whole_size,
                                     "offset": data["offset"], "length": len(body)}))
         elif request.op == "SEARCH_LITERAL":
-            matches = snapshot.search_literal(data["pattern"], paths=data["paths"],
-                                               limit=min(data["limit"], 50),
-                                               debit_bytes=budget.debit_bytes,
-                                               remaining_bytes=lambda: budget.remaining_bytes)
+            matches, scope = snapshot.search_literal_scoped(
+                data["pattern"], paths=data["paths"], limit=min(data["limit"], 50),
+                debit_bytes=budget.debit_bytes,
+                remaining_bytes=lambda: budget.remaining_bytes,
+            )
             body = json.dumps(matches, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
@@ -261,9 +264,9 @@ def collect_evidence(
             records.append(_record(store, run_id, claim_id, "repository-search",
                                    snapshot.commit_id, body,
                                    {"pattern": data["pattern"], "paths": data["paths"],
-                                    "snapshot_commit": snapshot.commit_id}))
+                                    "snapshot_commit": snapshot.commit_id, **scope}))
         elif request.op == "HISTORY":
-            rows = snapshot.history(
+            rows, complete = snapshot.history_scoped(
                 data["ref"], data["path"], limit=data["limit"],
                 debit_bytes=budget.debit_bytes,
                 remaining_bytes=lambda: budget.remaining_bytes,
@@ -274,7 +277,7 @@ def collect_evidence(
                 store, run_id, claim_id, "repository-history", data["ref"], body,
                 {"ref": data["ref"], "path": data["path"],
                  "history_oid": snapshot.history_oid(data["ref"]), "limit": data["limit"],
-                 "snapshot_commit": snapshot.commit_id},
+                 "snapshot_commit": snapshot.commit_id, "complete": complete},
             ))
         elif request.op == "RUN_ADAPTER":
             rows: list[dict[str, Any]] = []
@@ -485,6 +488,23 @@ def records_to_json(records: Sequence[EvidenceRecord]) -> list[dict[str, Any]]:
     return [asdict(record) for record in records]
 
 
+def evidence_bindings(records: Sequence[EvidenceRecord]) -> dict[str, str]:
+    """Return only records safe to name in a truth/bearing transition.
+
+    Incomplete bounded repository queries remain visible as explicit abstention material,
+    but cannot authorize absence (or any stronger transition) by evidence ID.
+    """
+    return {
+        record.evidence_id: record.claim_id
+        for record in records
+        if record.kind != "abstention"
+        and not (
+            record.kind in {"repository-list", "repository-search", "repository-history"}
+            and record.metadata.get("complete") is not True
+        )
+    }
+
+
 def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]:
     if not isinstance(rows, list) or len(rows) > 1000:
         raise EvidenceRequestError("persisted evidence records must be a bounded array")
@@ -529,12 +549,17 @@ def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]
 
 def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
     schemas = {
-        "repository-list": {"prefix", "snapshot_commit"},
+        "repository-list": {"prefix", "snapshot_commit", "limit", "complete"},
         "repository-blob": {
             "snapshot_commit", "path", "blob_oid", "whole_size", "offset", "length",
         },
-        "repository-search": {"pattern", "paths", "snapshot_commit"},
-        "repository-history": {"ref", "path", "history_oid", "limit", "snapshot_commit"},
+        "repository-search": {
+            "pattern", "paths", "snapshot_commit", "limit", "complete",
+            "candidates_complete", "candidate_paths", "inspected_ranges",
+        },
+        "repository-history": {
+            "ref", "path", "history_oid", "limit", "snapshot_commit", "complete",
+        },
         "empirical": {
             "argv", "runtime", "snapshot_commit", "input_hashes", "exit_status",
             "falsifying_result",
@@ -561,10 +586,15 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
         value = metadata.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise EvidenceRequestError(f"persisted {kind}.{key} must be a nonnegative integer")
-    for key in expected.intersection({"caller_supplied", "falsifying_result"}):
+    for key in expected.intersection({
+        "caller_supplied", "falsifying_result", "complete", "candidates_complete",
+    }):
         if not isinstance(metadata.get(key), bool):
             raise EvidenceRequestError(f"persisted {kind}.{key} must be boolean")
-    for key in expected.intersection({"paths", "argv", "redirects", "independence_groups", "conflicts"}):
+    for key in expected.intersection({
+        "paths", "candidate_paths", "argv", "redirects", "independence_groups",
+        "conflicts",
+    }):
         value = metadata.get(key)
         if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
             raise EvidenceRequestError(f"persisted {kind}.{key} must be a string array")
@@ -576,6 +606,34 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
             for path, digest in hashes.items()
         ):
             raise EvidenceRequestError("persisted empirical.input_hashes is malformed")
+    if "inspected_ranges" in expected:
+        ranges = metadata.get("inspected_ranges")
+        if not isinstance(ranges, list):
+            raise EvidenceRequestError("persisted repository-search.inspected_ranges is malformed")
+        for item in ranges:
+            if not isinstance(item, dict) or set(item) != {
+                "path", "blob_oid", "start", "end", "whole_size", "complete",
+            }:
+                raise EvidenceRequestError(
+                    "persisted repository-search inspected range has invalid fields"
+                )
+            if not isinstance(item["path"], str) or not isinstance(item["blob_oid"], str) \
+                    or not isinstance(item["complete"], bool):
+                raise EvidenceRequestError(
+                    "persisted repository-search inspected range has invalid types"
+                )
+            oid = item["blob_oid"]
+            if len(oid) not in {40, 64} or any(char not in "0123456789abcdef" for char in oid):
+                raise EvidenceRequestError(
+                    "persisted repository-search inspected range has invalid object ID"
+                )
+            integers = (item["start"], item["end"], item["whole_size"])
+            if any(not isinstance(value, int) or isinstance(value, bool) or value < 0
+                   for value in integers) or item["start"] > item["end"] \
+                    or item["end"] > item["whole_size"]:
+                raise EvidenceRequestError(
+                    "persisted repository-search inspected range has invalid bounds"
+                )
 
 
 def validate_cached_records(
@@ -610,7 +668,38 @@ def validate_cached_records(
                     )
                 ):
                     raise EvidenceRequestError("cached evidence derived fields are inconsistent")
-            if record.kind == "repository-blob":
+            if record.kind.startswith("repository") \
+                    and record.metadata.get("snapshot_commit") != snapshot.commit_id:
+                raise EvidenceRequestError("repository query scope changed")
+            if record.kind == "repository-list":
+                paths, complete = snapshot.list_tree_scoped(
+                    record.metadata["prefix"], limit=record.metadata["limit"],
+                    debit_bytes=budget.debit_bytes,
+                    remaining_bytes=lambda: budget.remaining_bytes,
+                )
+                current = json.dumps(
+                    paths, ensure_ascii=False, separators=(",", ":"),
+                ).encode("utf-8", errors="surrogateescape")
+                budget.debit_bytes(len(current))
+                if record.source != snapshot.commit_id \
+                        or complete != record.metadata["complete"] \
+                        or hashlib.sha256(current).hexdigest() != record.source_sha256:
+                    raise EvidenceRequestError("repository list result changed")
+            elif record.kind == "repository-search":
+                matches, scope = snapshot.search_literal_scoped(
+                    record.metadata["pattern"], paths=record.metadata["paths"],
+                    limit=record.metadata["limit"], debit_bytes=budget.debit_bytes,
+                    remaining_bytes=lambda: budget.remaining_bytes,
+                )
+                current = json.dumps(
+                    matches, ensure_ascii=False, separators=(",", ":"),
+                ).encode("utf-8", errors="surrogateescape")
+                budget.debit_bytes(len(current))
+                if record.source != snapshot.commit_id \
+                        or any(record.metadata[key] != value for key, value in scope.items()) \
+                        or hashlib.sha256(current).hexdigest() != record.source_sha256:
+                    raise EvidenceRequestError("repository literal-search result changed")
+            elif record.kind == "repository-blob":
                 path = record.metadata["path"]
                 offset = record.metadata["offset"]
                 length = record.metadata["length"]
@@ -635,19 +724,18 @@ def validate_cached_records(
                         or ref != record.source \
                         or snapshot.history_oid(ref) != record.metadata["history_oid"]:
                     raise EvidenceRequestError("repository history ref identity changed")
+                rows, complete = snapshot.history_scoped(
+                    ref, path, limit=limit, debit_bytes=budget.debit_bytes,
+                    remaining_bytes=lambda: budget.remaining_bytes,
+                )
                 current = json.dumps(
-                    snapshot.history(
-                        ref, path, limit=limit, debit_bytes=budget.debit_bytes,
-                        remaining_bytes=lambda: budget.remaining_bytes,
-                    ),
+                    rows,
                     ensure_ascii=False, separators=(",", ":"),
                 ).encode()
                 budget.debit_bytes(len(current))
-                if hashlib.sha256(current).hexdigest() != record.source_sha256:
+                if complete != record.metadata["complete"] \
+                        or hashlib.sha256(current).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("repository history result changed")
-            elif record.kind.startswith("repository"):
-                if record.metadata.get("snapshot_commit", snapshot.commit_id) != snapshot.commit_id:
-                    raise EvidenceRequestError("repository query scope changed")
             elif record.kind == "empirical":
                 if record.metadata.get("runtime") != sys.version:
                     raise EvidenceRequestError("empirical adapter runtime changed")
@@ -683,7 +771,7 @@ def validate_cached_records(
                 if invalid_ids.intersection(info.get("evidence_ids", [])):
                     info["status"] = "pending"
                     setattr(claim, field_name, info)
-    valid_bindings = {record.evidence_id: record.claim_id for record in valid}
+    valid_bindings = evidence_bindings(valid)
     for claim in state.claims.values():
         if claim.status == pc.SUPERSEDED:
             continue

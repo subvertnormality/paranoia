@@ -413,11 +413,29 @@ class EndpointSearchProvider:
         if any(spec or conversion for _literal, _field, spec, conversion in parsed_fields):
             raise NetworkEvidenceError("search endpoint template formats/conversions are forbidden")
         try:
-            rendered = endpoint_template.format(query="probe", limit=1)
+            rendered = endpoint_template.format(query="query-a.example", limit=1)
+            alternate = endpoint_template.format(query="query-b.example", limit=2)
         except (KeyError, IndexError, ValueError) as exc:
             raise NetworkEvidenceError(f"search endpoint template is malformed: {exc}") from exc
         client._validate_url(rendered)
+        client._validate_url(alternate)
+        rendered_parts = urllib.parse.urlsplit(rendered)
+        alternate_parts = urllib.parse.urlsplit(alternate)
+        rendered_origin = (
+            rendered_parts.scheme.lower(), rendered_parts.hostname,
+            rendered_parts.port, rendered_parts.username, rendered_parts.password,
+        )
+        alternate_origin = (
+            alternate_parts.scheme.lower(), alternate_parts.hostname,
+            alternate_parts.port, alternate_parts.username, alternate_parts.password,
+        )
+        if rendered_origin != alternate_origin or rendered_parts.fragment != alternate_parts.fragment:
+            raise NetworkEvidenceError(
+                "search endpoint template placeholders are allowed only in path/query components"
+            )
         self.endpoint_template = endpoint_template
+        self._origin = rendered_origin
+        self._fragment = rendered_parts.fragment
         self.client = client
         self.last_response_size = 0
 
@@ -435,6 +453,10 @@ class EndpointSearchProvider:
             )
         except (KeyError, IndexError, ValueError) as exc:
             raise NetworkEvidenceError(f"search endpoint formatting failed: {exc}") from exc
+        parts = urllib.parse.urlsplit(url)
+        origin = (parts.scheme.lower(), parts.hostname, parts.port, parts.username, parts.password)
+        if origin != self._origin or parts.fragment != self._fragment:
+            raise NetworkEvidenceError("search endpoint formatting changed fixed origin")
         response = self.client.fetch(
             url, limits, on_attempt=on_attempt, on_bytes=on_bytes,
             remaining_bytes=remaining_bytes,

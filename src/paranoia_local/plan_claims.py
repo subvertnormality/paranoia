@@ -383,6 +383,11 @@ def apply_events(
                 _require_fact(claim)
             elif event.op == "RESOLVE_DISPUTE" and claim.status != DISPUTED:
                 raise ClaimTransitionError("only a disputed claim can resolve a dispute")
+            elif event.op == "RESOLVE_DISPUTE" \
+                    and data["outcome"] not in {VERIFIED, CONTRADICTED}:
+                raise ClaimTransitionError(
+                    "dispute outcome must be verified or contradicted"
+                )
             elif event.op == "SET_BEARING":
                 if data["bearing"] not in {BLOCKING, ADVISORY}:
                     raise ClaimTransitionError("bearing must be blocking or advisory")
@@ -402,10 +407,6 @@ def apply_events(
                 claim.status, claim.truth_evidence_ids = CONTRADICTED, ids
                 _refresh_evidence_dependencies(claim)
             elif event.op == "RESOLVE_DISPUTE":
-                if data["outcome"] not in {VERIFIED, CONTRADICTED}:
-                    raise ClaimTransitionError(
-                        "dispute outcome must be verified or contradicted"
-                    )
                 claim.status = data["outcome"]
                 claim.truth_evidence_ids = ids
                 claim.dispute_evidence_ids = ids
@@ -424,12 +425,6 @@ def apply_events(
             claim.reason = data["reason"]
         elif event.op == "DEFER":
             _require_fact(claim)
-            if not _authorize_independent(
-                claim, event, [], independent_required, vendor_checks
-            ):
-                claim.pending_transition = copy.deepcopy(event.data)
-                continue
-            claim.pending_transition = None
             verification = resolve_anchor(data["verification_anchor"], spans)
             dependents_raw = data["dependent_anchors"]
             if not isinstance(dependents_raw, list) or not dependents_raw:
@@ -437,8 +432,7 @@ def apply_events(
             dependents = [resolve_anchor(anchor, spans) for anchor in dependents_raw]
             if any(verification.end > anchor.start for anchor in dependents):
                 raise ClaimTransitionError("verification step must precede every dependency")
-            claim.status = DEFERRED
-            claim.deferral = {
+            deferral = {
                 "verification_anchor": asdict(verification),
                 "dependent_anchors": [asdict(a) for a in dependents],
                 "completion_evidence": data["completion_evidence"],
@@ -446,6 +440,14 @@ def apply_events(
                 "stop_action": data["stop_action"],
                 "plan_sha256": sha256(b"".join(span.raw for span in spans)),
             }
+            if not _authorize_independent(
+                claim, event, [], independent_required, vendor_checks
+            ):
+                claim.pending_transition = copy.deepcopy(event.data)
+                continue
+            claim.pending_transition = None
+            claim.status = DEFERRED
+            claim.deferral = deferral
         elif event.op == "SUPERSEDE":
             if role != VERIFIER_ROLE:
                 raise ClaimTransitionError("only verifier may propose supersession")

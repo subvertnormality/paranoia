@@ -691,7 +691,15 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   ambiguous and retains recovery state. Only symlinks in Git-resolvable object namespaces
   are rejected; inert unrelated object-store names are ignored, including inert nested
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
-  and record caps before its output is retained or decoded.
+  and record caps before its output is retained or decoded. Bounded tree, literal-search,
+  and history evidence carries an explicit completeness result; literal searches also bind
+  candidate paths and inspected object/range identities. Incomplete query records remain
+  visible as context but cannot authorize claim-state or bearing transitions, so truncation
+  cannot masquerade as proof of absence. Configured search endpoint placeholders are
+  restricted to path/query components and the fixed HTTPS origin is rechecked after
+  substitution. Independently audited events complete semantic validation before
+  authorization state is consulted, keeping invalid transitions inside the normal
+  correction boundary.
   Inline and filesystem-backed plan inputs share a 1 MiB ceiling; plan files are opened
   no-follow and nonblocking and rejected if their identity or metadata changes while read.
   Network budgets charge each

@@ -52,6 +52,9 @@ One closure round performs these stages:
    later roles need to refer to them.
 4. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
+   Tree, literal-search, and history results disclose their exact limit and whether the
+   requested scope was completely inspected. Literal-search records additionally bind the
+   candidate paths and each inspected blob object/range.
 5. A toolless verifier sees exact server evidence bound to the exact claim ID that
    requested it; evidence for one claim cannot authorize another. Every model-visible source, path,
    metadata object, and passage is injectively JSON escaped. Remote passages are framed
@@ -112,6 +115,13 @@ underlying blob/ref object identity, exact original bytes,
 source and passage hashes, byte bounds, and separately decoded display text. Lossy display
 text is never evidence identity.
 
+Bounded `LIST_TREE`, `SEARCH_LITERAL`, and `HISTORY` records state whether their requested
+scope is complete. A truncated result remains visible to the verifier as context, including
+the exact candidates and inspected byte ranges for a literal search, but its evidence ID is
+ineligible for truth, bearing, dispute, or deferral authorization. This prevents a bounded
+prefix, match set, history, or partial large-blob scan from being treated as proof of
+absence. The verifier can request a narrower complete scope or leave the claim blocking.
+
 Persisted records have an exact per-kind metadata schema, including nested collection
 types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
 dispute, deferral-authorization, or other claim dependency must resolve to one valid record
@@ -141,6 +151,10 @@ export PARANOIA_SEARCH_ENDPOINT='https://search.internal.example/query?q={query}
 
 The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
 preflights the template and permits only `{query}` plus optional `{limit}` placeholders.
+Those placeholders may occur only in the path or query components: the HTTPS scheme,
+hostname, port, and fragment must remain fixed under formatting, while credentials remain
+forbidden. The query is percent-encoded before substitution and the formatted origin is
+checked again before each request.
 Top-level and hit objects use exact schemas and reject duplicate or unknown JSON keys.
 Formatting, encoding, numeric-conversion, and excessive-nesting errors are normalized to
 role-specific blocked failures, never raw exceptions; the same rule applies to every
@@ -197,6 +211,11 @@ truth check cannot erase the mandatory audit that made a claim advisory. Their e
 dependencies and exact event objects also persist separately while a retained-ID union
 drives freshness invalidation.
 
+Semantic validation of an independently audited event happens before its authorization is
+looked up or marked pending. Invalid dispute outcomes, deferral anchors, dependent-claim
+sets, or ordering snapshots therefore enter the ordinary one-retry correction path and
+cannot consume or persist independent-authorization state.
+
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A
 stricter policy immediately reblocks an authorization whose persisted provenance is no
@@ -218,9 +237,11 @@ is debited a second time before the retry call; insufficient remaining budget bl
 without transmitting it.
 
 Repository reuse recomputes every passage/identity field and is bound to exact blob,
-snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
-charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
-Git output, debit it as it is read, and terminate at their record or byte cap instead of
+snapshot, history-ref, operation, canonical query-parameter identities, completeness, and
+recorded search scope. Literal search charges each inspected blob before reading it and
+records its object ID, byte range, whole size, and range completeness. `LIST_TREE` and
+`HISTORY` read one bounded look-ahead record to distinguish complete results from truncation,
+debit Git output as it is read, and terminate at their record or byte cap instead of
 capturing an unbounded result. Each read is also sized to the shared budget remaining, so
 attempted pipe I/O cannot cross the aggregate cap before accounting rejects it.
 Snapshot-discovery enumerations are likewise streamed before decoding or retention, with

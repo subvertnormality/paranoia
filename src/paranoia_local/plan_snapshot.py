@@ -437,6 +437,17 @@ class PlanRepositorySnapshot:
         debit_bytes: Callable[[int], None] | None = None,
         remaining_bytes: Callable[[], int] | None = None,
     ) -> list[str]:
+        rows, _complete = self.list_tree_scoped(
+            prefix, limit=limit, debit_bytes=debit_bytes,
+            remaining_bytes=remaining_bytes,
+        )
+        return rows
+
+    def list_tree_scoped(
+        self, prefix: str = "", *, limit: int = 200,
+        debit_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
+    ) -> tuple[list[str], bool]:
         self._verify_wrapper()
         if limit < 1 or limit > 200:
             raise SnapshotUnavailable("tree result limit must be 1..200")
@@ -449,52 +460,104 @@ class PlanRepositorySnapshot:
                 raise SnapshotUnavailable("tree prefix escapes snapshot")
             args += ["--", ":(literal)" + prefix]
         rows = _run_bounded(
-            self.repo, args, max_bytes=1 << 20, stop_after_nuls=limit,
+            self.repo, args, max_bytes=1 << 20, stop_after_nuls=limit + 1,
             debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         ).split(b"\0")
-        return [r.decode("utf-8", errors="surrogateescape") for r in rows if r][:limit]
+        decoded = [r.decode("utf-8", errors="surrogateescape") for r in rows if r]
+        return decoded[:limit], len(decoded) <= limit
 
     def search_literal(self, pattern: str, *, paths: list[str] | None = None,
                        limit: int = 50,
                        debit_bytes: Callable[[int], None] | None = None,
                        remaining_bytes: Callable[[], int] | None = None,
                        ) -> list[dict[str, object]]:
+        matches, _scope = self.search_literal_scoped(
+            pattern, paths=paths, limit=limit, debit_bytes=debit_bytes,
+            remaining_bytes=remaining_bytes,
+        )
+        return matches
+
+    def search_literal_scoped(
+        self, pattern: str, *, paths: list[str] | None = None,
+        limit: int = 50,
+        debit_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
+    ) -> tuple[list[dict[str, object]], dict[str, object]]:
         if not isinstance(pattern, str) or not pattern or len(pattern.encode()) > 256 \
                 or not (1 <= limit <= 50):
             raise SnapshotUnavailable("literal search exceeds bounds")
         results: list[dict[str, object]] = []
-        candidates = paths or self.list_tree(
-            limit=200, debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
-        )
+        if paths:
+            candidates, candidates_complete = list(paths), True
+        else:
+            candidates, candidates_complete = self.list_tree_scoped(
+                limit=200, debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
+            )
         if any(not isinstance(path, str) for path in candidates):
             raise SnapshotUnavailable("literal search paths must be strings")
+        inspected_ranges: list[dict[str, object]] = []
+        all_blobs_complete = True
+        processed = 0
         for path in candidates[:200]:
             try:
-                _oid, source_size = self.blob_identity(path)
+                oid, source_size = self.blob_identity(path)
                 inspected = min(source_size, 1 << 20)
                 if debit_bytes is not None:
                     debit_bytes(inspected)
                 data = self.read_blob(path, max_bytes=max(1, inspected))
             except SnapshotUnavailable:
+                all_blobs_complete = False
                 continue
+            processed += 1
+            whole_blob = inspected == source_size
+            all_blobs_complete = all_blobs_complete and whole_blob
+            inspected_ranges.append({
+                "path": path, "blob_oid": oid, "start": 0, "end": len(data),
+                "whole_size": source_size, "complete": whole_blob,
+            })
             start = 0
             needle = pattern.encode("utf-8")
-            while len(results) < limit:
+            while len(results) <= limit:
                 offset = data.find(needle, start)
                 if offset < 0:
                     break
                 line = data.count(b"\n", 0, offset) + 1
                 results.append({"path": path, "byte": offset, "line": line})
                 start = offset + max(1, len(needle))
-            if len(results) >= limit:
+            if len(results) > limit:
                 break
-        return results
+        complete = (
+            candidates_complete
+            and processed == len(candidates[:200])
+            and len(candidates) <= 200
+            and all_blobs_complete
+            and len(results) <= limit
+        )
+        scope: dict[str, object] = {
+            "limit": limit,
+            "complete": complete,
+            "candidates_complete": candidates_complete and len(candidates) <= 200,
+            "candidate_paths": list(candidates[:200]),
+            "inspected_ranges": inspected_ranges,
+        }
+        return results[:limit], scope
 
     def history(
         self, ref: str, path: str, *, limit: int = 20,
         debit_bytes: Callable[[int], None] | None = None,
         remaining_bytes: Callable[[], int] | None = None,
     ) -> list[dict[str, str]]:
+        rows, _complete = self.history_scoped(
+            ref, path, limit=limit, debit_bytes=debit_bytes,
+            remaining_bytes=remaining_bytes,
+        )
+        return rows
+
+    def history_scoped(
+        self, ref: str, path: str, *, limit: int = 20,
+        debit_bytes: Callable[[int], None] | None = None,
+        remaining_bytes: Callable[[], int] | None = None,
+    ) -> tuple[list[dict[str, str]], bool]:
         """Read only commits reachable from the initial pinned ref map."""
         self._verify_wrapper()
         if not (1 <= limit <= 50):
@@ -510,9 +573,9 @@ class PlanRepositorySnapshot:
             raise SnapshotUnavailable("pinned history object is missing")
         output = _run_bounded(
             self.repo,
-            ["log", f"-{limit}", "--format=%H%x00%ct%x00%s%x00", oid, "--",
+            ["log", f"-{limit + 1}", "--format=%H%x00%ct%x00%s%x00", oid, "--",
              ":(literal)" + path],
-            max_bytes=1 << 20, stop_after_nuls=limit * 3,
+            max_bytes=1 << 20, stop_after_nuls=(limit + 1) * 3,
             debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         )
         tokens = output.decode("utf-8", errors="replace").split("\0")
@@ -522,7 +585,7 @@ class PlanRepositorySnapshot:
             if commit:
                 rows.append({"commit": commit.strip(), "timestamp": timestamp,
                              "subject": subject.strip()[:500]})
-        return rows
+        return rows[:limit], len(rows) <= limit
 
     def history_oid(self, ref: str) -> str:
         if ref == "SNAPSHOT":

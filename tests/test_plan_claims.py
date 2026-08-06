@@ -256,6 +256,47 @@ def test_required_defer_applies_only_after_two_vendor_acceptances(
         assert claim.deferral_authorization["status"] == "pending"
 
 
+def test_invalid_required_defer_is_rejected_before_authorization_or_pending_state() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    event = pc.Event("DEFER", {
+        "op": "DEFER", "claim_id": claim_id,
+        "verification_anchor": {"first_span": "p999999", "last_span": "p999999"},
+        "dependent_anchors": [{"first_span": "p000001", "last_span": "p000001"}],
+        "completion_evidence": "done", "failure_condition": "failed",
+        "stop_action": "stop",
+    })
+    with pytest.raises(pc.ClaimRegisterError, match="unknown server span"):
+        pc.apply_events(
+            state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+            independent_required=True,
+        )
+    claim = state.claims[claim_id]
+    assert claim.pending_transition is None and claim.deferral_authorization is None
+
+
+def test_invalid_required_dispute_outcome_is_rejected_before_authorization() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    pc.apply_events(
+        state,
+        [pc.Event("DISPUTE", {
+            "op": "DISPUTE", "claim_id": claim_id,
+            "evidence_ids": ["e1"], "reason": "conflict",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans, evidence_ids={"e1": claim_id},
+    )
+    event = pc.Event("RESOLVE_DISPUTE", {
+        "op": "RESOLVE_DISPUTE", "claim_id": claim_id, "outcome": "unknown",
+        "evidence_ids": ["e2"], "reason": "bad outcome",
+    })
+    with pytest.raises(pc.ClaimTransitionError, match="outcome"):
+        pc.apply_events(
+            state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+            evidence_ids={"e2": claim_id}, independent_required=True,
+        )
+    claim = state.claims[claim_id]
+    assert claim.pending_transition is None and claim.dispute_authorization is None
+
+
 def test_truth_and_bearing_keep_distinct_evidence_dependencies() -> None:
     state, claim_id, spans = _state_with_confirmed_fact()
     verify = pc.Event("VERIFY", {

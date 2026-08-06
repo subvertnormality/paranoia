@@ -674,6 +674,61 @@ def test_semantic_register_failures_receive_one_correction_attempt(
     assert any("=== CORRECTION REQUIRED ===" in prompt for prompt in engine.tool_less_prompts)
 
 
+def test_independently_required_invalid_defer_is_corrected_before_audit(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class InvalidDeferEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "neutral evidence verifier" in prompt \
+                    and "=== CORRECTION REQUIRED ===" not in prompt:
+                self.tool_less_prompts.append(prompt)
+                claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                events = [
+                    {"op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+                     "reason": "fact"},
+                    {
+                        "op": "DEFER", "claim_id": claim_id,
+                        "verification_anchor": {
+                            "first_span": "p999999", "last_span": "p999999",
+                        },
+                        "dependent_anchors": [{
+                            "first_span": "p000001", "last_span": "p000001",
+                        }],
+                        "completion_evidence": "done", "failure_condition": "failed",
+                        "stop_action": "stop",
+                    },
+                ]
+                return _review(
+                    "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json(events)
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    def accept_checks(event, **_kwargs):
+        digest = pc.event_digest(event)
+        evidence_ids = tuple(event.data.get("evidence_ids", []))
+        return [
+            pc.VendorCheck("one", "m1", digest, evidence_ids, True, "t1"),
+            pc.VendorCheck("two", "m2", digest, evidence_ids, True, "t2"),
+        ]
+
+    monkeypatch.setattr(handlers, "_independent_checks", accept_checks)
+    engine = InvalidDeferEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+            "lineage": "independent-defer-retry", "round": 1,
+            "independent_check": "require",
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    corrections = [
+        prompt for prompt in engine.tool_less_prompts
+        if "=== CORRECTION REQUIRED ===" in prompt
+    ]
+    assert len(corrections) == 1 and "unknown server span" in corrections[0]
+
+
 def test_structural_add_receives_real_span_vocabulary_and_remains_blocking(
     repo: Path, tmp_path: Path
 ) -> None:

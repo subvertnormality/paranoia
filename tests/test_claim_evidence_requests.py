@@ -225,6 +225,73 @@ def test_repository_query_parameters_are_part_of_evidence_identity(
     assert records[0].evidence_id != records[1].evidence_id
 
 
+def test_truncated_tree_listing_discloses_scope_and_cannot_authorize(
+    repo: Path, tmp_path: Path,
+) -> None:
+    request = cv.EvidenceRequest("LIST_TREE", {
+        "op": "LIST_TREE", "claim_id": "claim", "prefix": "", "limit": 1,
+    })
+    store = EvidenceStore(tmp_path / "tree-scope")
+    store.begin("tree-scope-run")
+    with PlanRepositorySnapshot.create(repo, run_id="tree-scope") as snapshot:
+        records = cv.collect_evidence(
+            [request], snapshot=snapshot, store=store, run_id="tree-scope-run",
+        )
+    record = records[0]
+    assert record.metadata["limit"] == 1 and record.metadata["complete"] is False
+    assert record.evidence_id not in cv.evidence_bindings(records)
+    assert '"complete":false' in cv.render_evidence(records, include_passages=True)
+
+
+def test_truncated_literal_search_records_exact_ranges_and_cannot_authorize(
+    repo: Path, tmp_path: Path,
+) -> None:
+    body = b"x" * (1 << 20) + b"ONLY-BEYOND-CAP"
+    (repo / "large.txt").write_bytes(body)
+    request = cv.EvidenceRequest("SEARCH_LITERAL", {
+        "op": "SEARCH_LITERAL", "claim_id": "claim",
+        "pattern": "ONLY-BEYOND-CAP", "paths": ["large.txt"], "limit": 5,
+    })
+    store = EvidenceStore(tmp_path / "search-scope")
+    store.begin("search-scope-run")
+    with PlanRepositorySnapshot.create(repo, run_id="search-scope") as snapshot:
+        records = cv.collect_evidence(
+            [request], snapshot=snapshot, store=store, run_id="search-scope-run",
+        )
+    record = records[0]
+    inspected = record.metadata["inspected_ranges"]
+    assert record.display_passage == "[]" and record.metadata["complete"] is False
+    assert inspected == [{
+        "path": "large.txt", "blob_oid": inspected[0]["blob_oid"],
+        "start": 0, "end": 1 << 20, "whole_size": len(body), "complete": False,
+    }]
+    assert record.evidence_id not in cv.evidence_bindings(records)
+
+
+def test_truncated_history_discloses_incompleteness_and_cannot_authorize(
+    repo: Path, tmp_path: Path,
+) -> None:
+    (repo / "app.py").write_text("first change\n")
+    subprocess.run(["git", "add", "app.py"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.com",
+         "-c", "commit.gpgsign=false", "commit", "-m", "first"],
+        cwd=repo, check=True,
+    )
+    request = cv.EvidenceRequest("HISTORY", {
+        "op": "HISTORY", "claim_id": "claim", "ref": "refs/heads/main",
+        "path": "app.py", "limit": 1,
+    })
+    store = EvidenceStore(tmp_path / "history-scope")
+    store.begin("history-scope-run")
+    with PlanRepositorySnapshot.create(repo, run_id="history-scope") as snapshot:
+        records = cv.collect_evidence(
+            [request], snapshot=snapshot, store=store, run_id="history-scope-run",
+        )
+    assert records[0].metadata["complete"] is False
+    assert records[0].evidence_id not in cv.evidence_bindings(records)
+
+
 def test_literal_search_charges_every_inspected_blob_to_the_round_budget(
     repo: Path, tmp_path: Path
 ) -> None:
