@@ -521,6 +521,19 @@ class TestLineageState:
             cc.load_lineage(tmp_path, "test", stamp="20260728T000000")
         assert list(d.glob("test.corrupt-*.json")), "the corrupt file must be moved aside"
 
+    def test_semantically_invalid_class_state_blocks_and_is_quarantined(
+        self, tmp_path: Path,
+    ) -> None:
+        lin = lineage_with(("inv", cc.MAJOR, "X"))
+        cc.save_lineage(tmp_path, lin)
+        path = cc.lineage_dir(tmp_path) / "test.json"
+        raw = json.loads(path.read_text())
+        raw["classes"][0]["status"] = "invented-clear-state"
+        path.write_text(json.dumps(raw))
+        with pytest.raises(cc.StateUnavailable, match="quarantined"):
+            cc.load_lineage(tmp_path, "test", stamp="semantic")
+        assert list(cc.lineage_dir(tmp_path).glob("test.corrupt-*.json"))
+
     def test_rerunning_after_quarantine_does_not_start_a_fresh_lineage(self, tmp_path: Path) -> None:
         """Round 4's FATAL: quarantine alone created the empty-lineage path it closed."""
         d = cc.lineage_dir(tmp_path)

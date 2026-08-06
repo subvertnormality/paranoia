@@ -49,6 +49,8 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
+MAX_PERSISTED_CLASSES = 1000
+MAX_EXEMPTIONS = 1000
 PER_CLASS_TIMEOUT = 10     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
 
@@ -214,6 +216,8 @@ def _parse_block(block: str) -> dict[str, str]:
         line = line.rstrip()
         if not line.strip():
             continue
+        if "\0" in line:
+            raise RegisterError("register fields may not contain NUL")
         if line.lstrip().startswith("#"):
             continue
         if ":" not in line:
@@ -296,6 +300,8 @@ def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
 def _reject_pathspec_magic(pathspec: str) -> None:
     """A leading `:` is git pathspec magic. Verified: `-- ':(exclude)src'` is accepted
     and silently changes the result set, so a model-authored pathspec must not carry it."""
+    if "\0" in pathspec:
+        raise RegisterError("pathspec may not contain NUL")
     if pathspec.startswith(":"):
         raise RegisterError(
             f"pathspec magic is not allowed (leading ':') — {pathspec!r}"
@@ -416,27 +422,134 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
 
 
 def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
+    if not isinstance(raw, dict):
+        raise StateUnavailable("lineage state must be an object")
+    mode = raw.get("mode", BRANCH_MODE)
+    base_fields = {"mode", "rounds", "next_seq", "classes", "exemptions", "debt"}
+    if mode == PLAN_MODE:
+        if set(raw) != base_fields | {"schema_version", "claim_state"}:
+            raise StateUnavailable(
+                "plan lineage has missing or unknown schema-v2 envelope fields"
+            )
+        if raw["schema_version"] != 2 or not isinstance(raw["claim_state"], dict):
+            raise StateUnavailable("plan lineage schema version or claim state is malformed")
+    elif "schema_version" in raw or "claim_state" in raw:
+        raise StateUnavailable("non-plan lineage cannot contain a plan claim envelope")
+    rounds, next_seq = raw.get("rounds", 0), raw.get("next_seq", 1)
+    if not isinstance(rounds, int) or isinstance(rounds, bool) or rounds < 0:
+        raise StateUnavailable("lineage rounds must be a nonnegative integer")
+    if not isinstance(next_seq, int) or isinstance(next_seq, bool) or next_seq < 1:
+        raise StateUnavailable("lineage next_seq must be a positive integer")
+    classes = _classes_from_json(raw.get("classes", []), mode=mode)
+    exemptions = _exemptions_from_json(raw.get("exemptions", []), classes=classes)
+    debt = raw.get("debt")
+    if debt is not None and (
+        not isinstance(debt, dict) or set(debt) != {"round", "reason"}
+        or not isinstance(debt.get("round"), int) or isinstance(debt.get("round"), bool)
+        or debt["round"] < 1 or not isinstance(debt.get("reason"), str)
+        or not debt["reason"]
+    ):
+        raise StateUnavailable("lineage debt is malformed")
     return Lineage(
         lineage_id=lineage_id,
         # Absent means branch: every lineage that existed before plan mode was one, so
         # this needs no migration and cannot mistake old state for plan state.
-        mode=raw.get("mode", BRANCH_MODE),
-        rounds=int(raw.get("rounds", 0)),
-        next_seq=int(raw.get("next_seq", 1)),
-        classes={
-            c["class_id"]: TrackedClass(
-                class_id=c["class_id"], invariant=c["invariant"], severity=c["severity"],
-                first_round=int(c["first_round"]), status=c["status"],
-                pattern=c.get("pattern"), pathspec=c.get("pathspec"),
-                procedure=c.get("procedure"), superseded_by=c.get("superseded_by"),
-                detail=c.get("detail"), matches=tuple(c.get("matches", ())),
-            )
-            for c in raw.get("classes", [])
-        },
-        exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
-        debt=raw.get("debt"),
+        mode=mode,
+        rounds=rounds,
+        next_seq=next_seq,
+        classes=classes,
+        exemptions=exemptions,
+        debt=debt,
         claim_state=raw.get("claim_state"),
     )
+
+
+def _classes_from_json(raw: Any, *, mode: str) -> dict[str, TrackedClass]:
+    required = {"class_id", "invariant", "severity", "first_round", "status", "matches"}
+    optional = {"pattern", "pathspec", "procedure", "superseded_by", "detail"}
+    if not isinstance(raw, list) or len(raw) > MAX_PERSISTED_CLASSES:
+        raise StateUnavailable("lineage classes must be a bounded array")
+    classes: dict[str, TrackedClass] = {}
+    for item in raw:
+        if not isinstance(item, dict) or not required.issubset(item) \
+                or not set(item).issubset(required | optional):
+            raise StateUnavailable("persisted class has missing or unknown fields")
+        class_id, invariant = item["class_id"], item["invariant"]
+        first_round, status = item["first_round"], item["status"]
+        if not isinstance(class_id, str) or not class_id or class_id in classes \
+                or not isinstance(invariant, str) or not invariant:
+            raise StateUnavailable("persisted class identity is malformed or duplicated")
+        if item["severity"] not in SEVERITIES or status not in {
+            OPEN, CLOSED, OVER_BROAD, MALFORMED, UNCHECKED, SUPERSEDED,
+        }:
+            raise StateUnavailable("persisted class severity or status is malformed")
+        if not isinstance(first_round, int) or isinstance(first_round, bool) or first_round < 1:
+            raise StateUnavailable("persisted class first_round is malformed")
+        for key in optional:
+            if key in item and (not isinstance(item[key], str) or not item[key]):
+                raise StateUnavailable(f"persisted class {key} is malformed")
+        pattern, pathspec, procedure = (
+            item.get("pattern"), item.get("pathspec"), item.get("procedure")
+        )
+        if (pattern is None) != (pathspec is None) or (pattern is None) == (procedure is None):
+            raise StateUnavailable("persisted class mechanism is malformed")
+        if mode == PLAN_MODE and procedure is None:
+            raise StateUnavailable("plan lineage cannot persist a mechanized class")
+        if any("\0" in value for value in (pattern, pathspec, procedure) if value is not None) \
+                or (pathspec is not None and pathspec.startswith(":")):
+            raise StateUnavailable("persisted class mechanism contains an unsafe operand")
+        matches = item["matches"]
+        if not isinstance(matches, list) or len(matches) > MAX_MATCHES:
+            raise StateUnavailable("persisted class matches must be a bounded array")
+        for match in matches:
+            expected = {"path", "line", "text"}
+            if not isinstance(match, dict) or frozenset(match) not in {
+                frozenset(expected), frozenset(expected | {"binary"}),
+            }:
+                raise StateUnavailable("persisted class match has invalid fields")
+            if not isinstance(match["path"], str) or not isinstance(match["text"], str) \
+                    or not isinstance(match["line"], int) or isinstance(match["line"], bool) \
+                    or match["line"] < 0 or ("binary" in match and match["binary"] is not True):
+                raise StateUnavailable("persisted class match is malformed")
+        classes[class_id] = TrackedClass(
+            class_id=class_id, invariant=invariant, severity=item["severity"],
+            first_round=first_round, status=status, pattern=pattern, pathspec=pathspec,
+            procedure=procedure, superseded_by=item.get("superseded_by"),
+            detail=item.get("detail"), matches=tuple(matches),
+        )
+    if len([item for item in classes.values() if item.status != SUPERSEDED]) \
+            > MAX_ACTIVE_CLASSES:
+        raise StateUnavailable("lineage exceeds the active class cap")
+    for item in classes.values():
+        if item.status == SUPERSEDED:
+            target = classes.get(item.superseded_by or "")
+            if target is None or target.class_id == item.class_id or target.status == SUPERSEDED:
+                raise StateUnavailable("persisted class supersession graph is malformed")
+        elif item.superseded_by is not None:
+            raise StateUnavailable("active persisted class has a superseded target")
+    return classes
+
+
+def _exemptions_from_json(
+    raw: Any, *, classes: dict[str, TrackedClass],
+) -> list[Exemption]:
+    if not isinstance(raw, list) or len(raw) > MAX_EXEMPTIONS:
+        raise StateUnavailable("lineage exemptions must be a bounded array")
+    exemptions: list[Exemption] = []
+    for item in raw:
+        if not isinstance(item, dict) or set(item) != {"class_id", "path", "line", "fingerprint"}:
+            raise StateUnavailable("persisted exemption has invalid fields")
+        identity = (item["class_id"], item["path"], item["line"])
+        if not isinstance(identity[0], str) or identity[0] not in classes \
+                or not isinstance(identity[1], str) or not identity[1] \
+                or not isinstance(identity[2], int) or isinstance(identity[2], bool) \
+                or identity[2] < 1 \
+                or not isinstance(item["fingerprint"], str) \
+                or len(item["fingerprint"]) != 16 \
+                or any(char not in "0123456789abcdef" for char in item["fingerprint"]):
+            raise StateUnavailable("persisted exemption is malformed")
+        exemptions.append(Exemption(**item))
+    return exemptions
 
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
@@ -451,7 +564,9 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
     }
-    if lineage.mode == PLAN_MODE and lineage.claim_state is not None:
+    if lineage.mode == PLAN_MODE:
+        if lineage.claim_state is None:
+            raise StateUnavailable("plan lineage cannot be written without claim state")
         payload["schema_version"] = 2
         payload["claim_state"] = lineage.claim_state
     return payload

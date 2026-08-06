@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -79,4 +80,29 @@ def test_toolless_preflight_rejects_a_missing_cli_before_build(
 ) -> None:
     monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: None)
     with pytest.raises(ToollessUnavailable, match="not installed"):
+        ClaudeEngine().preflight_toolless("claude", "high")
+
+
+def test_claude_toolless_preflight_probes_every_required_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: "/cli/claude")
+    help_text = " ".join(sorted(ClaudeEngine.TOOLLESS_REQUIRED_FLAGS))
+    monkeypatch.setattr(
+        "paranoia_local.engines.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, help_text, ""),
+    )
+    ClaudeEngine().preflight_toolless("claude", "high")
+
+
+def test_claude_toolless_preflight_rejects_an_incompatible_installed_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: "/cli/claude")
+    help_text = " ".join(sorted(ClaudeEngine.TOOLLESS_REQUIRED_FLAGS - {"--tools"}))
+    monkeypatch.setattr(
+        "paranoia_local.engines.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, help_text, ""),
+    )
+    with pytest.raises(ToollessUnavailable, match="--tools"):
         ClaudeEngine().preflight_toolless("claude", "high")

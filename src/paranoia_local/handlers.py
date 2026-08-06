@@ -450,6 +450,16 @@ class _PlanInputUnavailable(ValueError):
 MAX_PLAN_BYTES = 1 << 20
 
 
+def _budgeted_tree_listing(
+    paths: list[str], *, complete: bool, budget: cv.EvidenceBudget,
+) -> str:
+    rendered = json.dumps(
+        {"paths": paths, "limit": 200, "complete": complete}, ensure_ascii=True,
+    )
+    budget.debit_bytes(len(rendered.encode("utf-8")))
+    return rendered
+
+
 def critique_plan(
     arguments: dict[str, Any],
     *,
@@ -814,9 +824,9 @@ def _critique_plan_verified(
                     limit=200, debit_bytes=round_budget.debit_bytes,
                     remaining_bytes=lambda: round_budget.remaining_bytes,
                 )
-                tree_listing_json = json.dumps({
-                    "paths": tree_listing, "limit": 200, "complete": tree_complete,
-                }, ensure_ascii=True)
+                tree_listing_json = _budgeted_tree_listing(
+                    tree_listing, complete=tree_complete, budget=round_budget,
+                )
                 evidence_prompt = prompts.compose(
                     prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS,
                     "\n\n".join([
@@ -932,10 +942,10 @@ def _critique_plan_verified(
                     limit=200, debit_bytes=round_budget.debit_bytes,
                     remaining_bytes=lambda: round_budget.remaining_bytes,
                 )
-                structural_tree_json = json.dumps({
-                    "paths": structural_tree, "limit": 200,
-                    "complete": structural_tree_complete,
-                }, ensure_ascii=True)
+                structural_tree_json = _budgeted_tree_listing(
+                    structural_tree, complete=structural_tree_complete,
+                    budget=round_budget,
+                )
                 structural_record_text = cv.render_evidence(
                     [r for r in evidence_records if r.kind.startswith("repository")],
                     include_passages=False, debit_bytes=round_budget.debit_bytes,

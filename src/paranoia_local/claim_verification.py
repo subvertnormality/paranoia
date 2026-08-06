@@ -250,7 +250,9 @@ def collect_evidence(
                                    data["path"], body,
                                    {"snapshot_commit": snapshot.commit_id, "path": data["path"],
                                     "blob_oid": blob_oid, "whole_size": whole_size,
-                                    "offset": data["offset"], "length": len(body)}))
+                                    "offset": data["offset"], "length": len(body),
+                                    "complete": data["offset"] == 0
+                                    and len(body) == whole_size}))
         elif request.op == "SEARCH_LITERAL":
             matches, scope = snapshot.search_literal_scoped(
                 data["pattern"], paths=data["paths"], limit=min(data["limit"], 50),
@@ -499,7 +501,7 @@ def evidence_bindings(records: Sequence[EvidenceRecord]) -> dict[str, str]:
         for record in records
         if record.kind != "abstention"
         and not (
-            record.kind in {"repository-list", "repository-search", "repository-history"}
+            record.kind.startswith("repository")
             and record.metadata.get("complete") is not True
         )
     }
@@ -552,6 +554,7 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
         "repository-list": {"prefix", "snapshot_commit", "limit", "complete"},
         "repository-blob": {
             "snapshot_commit", "path", "blob_oid", "whole_size", "offset", "length",
+            "complete",
         },
         "repository-search": {
             "pattern", "paths", "snapshot_commit", "limit", "complete",
@@ -705,7 +708,9 @@ def validate_cached_records(
                 length = record.metadata["length"]
                 if path != record.source or not isinstance(offset, int) \
                         or isinstance(offset, bool) or not isinstance(length, int) \
-                        or isinstance(length, bool) or length != record.source_size:
+                        or isinstance(length, bool) or length != record.source_size \
+                        or record.metadata["complete"] \
+                        != (offset == 0 and length == record.metadata["whole_size"]):
                     raise EvidenceRequestError("repository blob cache metadata is malformed")
                 oid, whole_size = snapshot.blob_identity(path)
                 if oid != record.metadata.get("blob_oid") \
@@ -761,6 +766,8 @@ def validate_cached_records(
             invalid_ids.add(record.evidence_id)
     if invalid_ids:
         for claim in state.claims.values():
+            if claim.status == pc.SUPERSEDED:
+                continue
             if invalid_ids.intersection(claim.evidence_ids):
                 claim.status = pc.STALE
             for field_name in (

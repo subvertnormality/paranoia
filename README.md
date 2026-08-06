@@ -42,6 +42,9 @@ structured critique.
   `bwrap` on `PATH`, and an audited Codex CLI version exactly `0.144.6` or
   `0.146.0-alpha.3.1`. Other Codex versions remain usable for ordinary review paths but
   fail this default plan mode closed before snapshot or lineage work.
+- Closure-enabled `critique_plan` with Claude as reviewer runs a bounded `claude --help`
+  compatibility probe and requires every flag used by its empty-tool profile. An older or
+  incompatible installed CLI fails before snapshot or lineage work.
 
 **2. Install**
 
@@ -691,15 +694,21 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   ambiguous and retains recovery state. Only symlinks in Git-resolvable object namespaces
   are rejected; inert unrelated object-store names are ignored, including inert nested
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
-  and record caps before its output is retained or decoded. Bounded tree, literal-search,
-  and history evidence carries an explicit completeness result; literal searches also bind
+  and record caps before its output is retained or decoded. Bounded tree, blob,
+  literal-search, and history evidence carries an explicit completeness result; searches bind
   candidate paths and inspected object/range identities. Incomplete query records remain
   visible as context but cannot authorize claim-state or bearing transitions, so truncation
   cannot masquerade as proof of absence. Configured search endpoint placeholders are
   restricted to path/query components and the fixed HTTPS origin is rechecked after
   substitution. Independently audited events complete semantic validation before
   authorization state is consulted, keeping invalid transitions inside the normal
-  correction boundary.
+  correction boundary. Existing plan lineage files require the exact schema-v2 envelope;
+  missing claim state is quarantined instead of defaulting to an empty register, and
+  class records and their status/supersession graphs are fully validated before use.
+  Invalidation never resurrects terminal superseded claims. Serialized tree listings are
+  charged to the shared evidence budget before their first model call. Claude closure roles
+  additionally probe the installed CLI help contract before acquiring repository or
+  lineage state.
   Inline and filesystem-backed plan inputs share a 1 MiB ceiling; plan files are opened
   no-follow and nonblocking and rejected if their identity or metadata changes while read.
   Network budgets charge each

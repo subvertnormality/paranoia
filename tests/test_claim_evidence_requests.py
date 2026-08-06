@@ -121,6 +121,35 @@ def test_read_blob_can_retrieve_a_bounded_passage_after_the_source_prefix(
     assert records[0].display_passage.startswith("RELEVANT_CALL()")
     assert records[0].metadata["offset"] == 5000
     assert records[0].metadata["whole_size"] > 5000
+    assert records[0].metadata["complete"] is False
+    assert records[0].evidence_id not in cv.evidence_bindings(records)
+
+
+def test_complete_blob_can_authorize_but_partial_prefix_cannot(
+    repo: Path, tmp_path: Path,
+) -> None:
+    body = (repo / "app.py").read_bytes()
+    requests = cv.parse_requests(_requests([
+        {
+            "op": "READ_BLOB", "claim_id": "claim", "path": "app.py",
+            "offset": 0, "max_bytes": len(body),
+        },
+        {
+            "op": "READ_BLOB", "claim_id": "other", "path": "app.py",
+            "offset": 0, "max_bytes": max(1, len(body) - 1),
+        },
+    ]), {"claim", "other"})
+    store = EvidenceStore(tmp_path / "complete-range-store")
+    store.begin("complete-range-run")
+    with PlanRepositorySnapshot.create(repo, run_id="complete-range") as snapshot:
+        records = cv.collect_evidence(
+            requests, snapshot=snapshot, store=store, run_id="complete-range-run",
+        )
+    bindings = cv.evidence_bindings(records)
+    assert records[0].metadata["complete"] is True
+    assert bindings[records[0].evidence_id] == "claim"
+    assert records[1].metadata["complete"] is False
+    assert records[1].evidence_id not in bindings
 
 
 def test_python_adapter_charges_input_bytes_to_the_shared_aggregate_budget(
@@ -419,3 +448,68 @@ def test_cached_prompt_rendering_uses_the_same_byte_budget() -> None:
         cv.render_evidence(
             [record], include_passages=True, debit_bytes=budget.debit_bytes,
         )
+
+
+def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("superseded")
+    first_id = pc.apply_events(
+        state,
+        [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "old", "claim": "Old premise", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })],
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["old"]
+    replacement_id = pc.apply_events(
+        state,
+        [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "new", "claim": "Replacement premise",
+            "kind": "fact", "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })],
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["new"]
+    for claim_id in (first_id, replacement_id):
+        pc.apply_events(
+            state, [pc.Event("CONFIRM_KIND", {
+                "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+                "reason": "fact",
+            })], role=pc.STRUCTURAL_ROLE, spans=spans,
+        )
+    store = EvidenceStore(tmp_path / "missing-store")
+    store.begin("superseded-run")
+    valid = cv._record(
+        store, "superseded-run", replacement_id, "supplied-artifact", "valid", b"ok",
+        {"source": "valid", "caller_supplied": True},
+    )
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": replacement_id,
+            "evidence_ids": [valid.evidence_id], "reason": "replacement verified",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={valid.evidence_id: replacement_id},
+    )
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": first_id,
+            "evidence_ids": ["ebad"], "reason": "old evidence",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"ebad": first_id},
+    )
+    old = state.claims[first_id]
+    old.status = pc.SUPERSEDED
+    old.pending_replacement_id = replacement_id
+    old.superseded_by = replacement_id
+    digest = "a" * 64
+    missing = cv.EvidenceRecord(
+        "ebad", first_id, "supplied-artifact", "missing", digest, digest, 1,
+        0, 1, digest, "x", {"source": "missing", "caller_supplied": True},
+    )
+    cv.validate_cached_records(
+        [missing, valid], snapshot=None, store=store, state=state,
+    )  # type: ignore[arg-type]
+    assert old.status == pc.SUPERSEDED and old.superseded_by == replacement_id
+    loaded = pc.state_from_json("superseded", pc.state_to_json(state))
+    assert loaded.claims[first_id].status == pc.SUPERSEDED

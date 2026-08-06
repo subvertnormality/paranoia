@@ -564,6 +564,16 @@ def test_register_retry_reserves_resent_evidence_before_second_model_call() -> N
     assert engine.calls == 1
 
 
+def test_serialized_tree_listing_is_debited_before_model_transmission() -> None:
+    paths = ["odd-\udcff.py"]
+    rendered = json.dumps(
+        {"paths": paths, "limit": 200, "complete": False}, ensure_ascii=True,
+    )
+    budget = cv.EvidenceBudget(aggregate_bytes=cv.MAX_AGGREGATE_BYTES - len(rendered) + 1)
+    with pytest.raises(cv.EvidenceBudgetExceeded):
+        handlers._budgeted_tree_listing(paths, complete=False, budget=budget)
+
+
 def test_cleanup_failure_retains_plan_latch_and_evidence_journal(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -796,6 +806,33 @@ def test_malformed_nested_claim_state_is_quarantined_without_stranding_latch(
     assert out.count("CONVERGENCE:") == 1
     assert not (directory / "malformed-plan.pending").exists()
     assert list(directory.glob("malformed-plan.corrupt-*.json"))
+
+
+@pytest.mark.parametrize("missing", ["schema_version", "claim_state"])
+def test_missing_plan_lineage_envelope_fields_are_quarantined(
+    repo: Path, tmp_path: Path, missing: str,
+) -> None:
+    directory = cc.lineage_dir(cc.default_state_root())
+    directory.mkdir(parents=True)
+    payload = {
+        "mode": cc.PLAN_MODE, "rounds": 1, "next_seq": 1, "classes": [],
+        "exemptions": [], "debt": None, "schema_version": 2,
+        "claim_state": {
+            "next_seq": 1, "claims": [], "debt": None, "evidence_records": [],
+            "plan_sha256": None, "authorization_policy": None,
+        },
+    }
+    del payload[missing]
+    (directory / f"missing-{missing}.json").write_text(json.dumps(payload))
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Plan.\n",
+            "lineage": f"missing-{missing}", "round": 2,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
+    assert list(directory.glob(f"missing-{missing}.corrupt-*.json"))
 
 
 def test_independent_auditor_receives_exact_proposition_and_claim_state(

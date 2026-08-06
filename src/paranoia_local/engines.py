@@ -406,6 +406,35 @@ class ClaudeEngine(Engine):
     default_model = "claude-fable-5"
     binary = "claude"
 
+    TOOLLESS_REQUIRED_FLAGS = frozenset({
+        "--output-format", "--model", "--effort", "--permission-mode",
+        "--setting-sources", "--allowedTools", "--tools", "--strict-mcp-config",
+        "--mcp-config", "--disallowedTools",
+    })
+
+    def preflight_toolless(self, model: str, effort: str) -> None:
+        """Prove the installed CLI advertises every flag in the empty-tool profile."""
+        executable = shutil.which(self.binary)
+        if not executable:
+            raise ToollessUnavailable("claude CLI is not installed")
+        try:
+            result = subprocess.run(
+                [executable, "--help"], capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ToollessUnavailable(
+                f"Claude toolless capability preflight failed: {exc}"
+            ) from exc
+        advertised = result.stdout + "\n" + result.stderr
+        missing = sorted(flag for flag in self.TOOLLESS_REQUIRED_FLAGS if flag not in advertised)
+        if result.returncode or missing:
+            detail = ", ".join(missing) if missing else f"exit {result.returncode}"
+            raise ToollessUnavailable(
+                f"installed Claude CLI has no compatible empty-tool profile ({detail})"
+            )
+        self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
+
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
         denied = list(dict.fromkeys([*CLAUDE_RO_TOOLS, *CLAUDE_WEB_TOOLS, *CLAUDE_DENY_TOOLS]))
         return [

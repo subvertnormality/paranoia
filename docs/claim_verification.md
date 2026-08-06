@@ -70,7 +70,10 @@ One closure round performs these stages:
    construct a stale draft.
 
 For Claude, toolless means bare settings, an empty allowlist, an explicit deny list, an
-empty `--tools` availability set, and strict empty MCP configuration.
+empty `--tools` availability set, and strict empty MCP configuration. Before snapshot or
+lineage work, a bounded `claude --help` compatibility probe must successfully advertise
+every CLI flag used to construct that profile; merely finding an executable on `PATH` is
+not sufficient.
 For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
 empty working directory, auth, TLS/DNS files, and no shell, repository, common Git store,
 or sibling worktree. Shell, unified execution, multi-agent, apps, browser/computer, code,
@@ -115,12 +118,14 @@ underlying blob/ref object identity, exact original bytes,
 source and passage hashes, byte bounds, and separately decoded display text. Lossy display
 text is never evidence identity.
 
-Bounded `LIST_TREE`, `SEARCH_LITERAL`, and `HISTORY` records state whether their requested
-scope is complete. A truncated result remains visible to the verifier as context, including
-the exact candidates and inspected byte ranges for a literal search, but its evidence ID is
-ineligible for truth, bearing, dispute, or deferral authorization. This prevents a bounded
-prefix, match set, history, or partial large-blob scan from being treated as proof of
-absence. The verifier can request a narrower complete scope or leave the claim blocking.
+Bounded `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and `HISTORY` records state whether the
+entire requested source scope is complete. A partial blob range or other truncated result
+remains visible to the verifier as context, including the exact candidates and inspected
+byte ranges for a literal search, but its evidence ID is ineligible for truth, bearing,
+dispute, or deferral authorization. This prevents a bounded prefix, passage, match set,
+history, or partial large-blob scan from being treated as proof of absence. The verifier can
+request a complete narrower source where the operation supports it or leave the claim
+blocking.
 
 Persisted records have an exact per-kind metadata schema, including nested collection
 types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
@@ -221,6 +226,17 @@ classification, and policy version. Any change invalidates the zero-research cac
 stricter policy immediately reblocks an authorization whose persisted provenance is no
 longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result.
 
+Every persisted plan lineage uses one exact schema-version 2 outer envelope. Existing plan
+state must contain both `schema_version: 2` and the complete `claim_state` object; missing,
+unknown, downgraded, or wrong-typed envelope fields quarantine the lineage rather than
+defaulting to an empty claim register. The `None` claim-state default exists only for a new
+lineage that has no state file yet. The surrounding class records, matches, exemptions,
+debt, severities, statuses, mechanisms, and supersession graph are likewise type-, shape-,
+cardinality-, and reachability-checked before use; duplicate identities or invented clear
+states quarantine the file. Evidence invalidation skips terminal superseded claims,
+so expiry cannot resurrect an inert predecessor or create a state the loader rejects; the
+verified/deferred replacement alone governs closure.
+
 ## Budgets and caching
 
 Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
@@ -232,6 +248,8 @@ and one correction retry per model register. Evidence is content-addressed and r
 the same budget begins before cache validation: retained CAS bytes are reserved before
 bounded no-follow reads, repository/history/adapter revalidation is charged as attempted,
 and evidence records are charged again when rendered into verifier or auditor prompts.
+Serialized bounded tree listings are likewise charged before their first evidence-planner
+or structural-planner call, in addition to the raw Git bytes charged during enumeration.
 If a register needs correction, the exact evidence portion resent in the correction prompt
 is debited a second time before the retry call; insufficient remaining budget blocks
 without transmitting it.

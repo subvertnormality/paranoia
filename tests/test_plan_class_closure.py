@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 from paranoia_local import class_closure as cc
-from paranoia_local import handlers, prompts
+from paranoia_local import handlers, plan_claims as pc, prompts
 
 
 def test_lineage_latch_has_exactly_one_concurrent_owner(tmp_path: Path) -> None:
@@ -414,7 +414,10 @@ class TestCrossModeLineages:
 
     def test_a_plan_lineage_cannot_be_opened_as_a_branch(self, tmp_path: Path) -> None:
         root = cc.default_state_root()
-        cc.save_lineage(root, cc.Lineage("shared-key", mode=cc.PLAN_MODE))
+        cc.save_lineage(root, cc.Lineage(
+            "shared-key", mode=cc.PLAN_MODE,
+            claim_state=pc.state_to_json(pc.ClaimState("shared-key")),
+        ))
         with pytest.raises(cc.StateUnavailable, match="created by a plan review"):
             cc.load_lineage(root, "shared-key", stamp="T", mode=cc.BRANCH_MODE)
 
