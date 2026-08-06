@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -513,8 +514,13 @@ def _validate_five_sections(text: str) -> None:
         "## What works", "## What doesn't work", "## Risks", "## Gaps",
         "## Improvements",
     ]
-    positions = [text.find(heading) for heading in headings]
-    if any(position < 0 for position in positions) or positions != sorted(positions):
+    matches = [list(re.finditer(rf"(?m)^{re.escape(heading)}[ \t]*$", text)) for heading in headings]
+    if any(len(found) != 1 for found in matches):
+        raise pc.ClaimRegisterError(
+            "structural review must contain the five ordered review sections"
+        )
+    positions = [found[0].start() for found in matches]
+    if positions != sorted(positions):
         raise pc.ClaimRegisterError(
             "structural review must contain the five ordered review sections"
         )
@@ -922,7 +928,10 @@ def _critique_plan_verified(
     except _ClaimStageFailure as exc:
         # A failed model call is not a review and must leave durable lineage byte-identical.
         # The returned verdict still fails closed for this invocation.
-        store.abort(run_id)
+        try:
+            store.abort(run_id)
+        except (EvidenceStoreError, OSError):
+            pass
         closure.abandon()
         structural_review = Review(
             text=f"## What works\n\nNothing notable.\n\n## What doesn't work\n\n"
@@ -935,7 +944,7 @@ def _critique_plan_verified(
     except (pc.ClaimRegisterError, pc.ClaimTransitionError, cv.EvidenceRequestError,
             EvidenceStoreError, SnapshotUnavailable, cc.RegisterError,
             cc.StateUnavailable, NetworkEvidenceError, TypeError, AttributeError,
-            UnicodeError) as exc:
+            UnicodeError, OSError) as exc:
         state.debt = {"round": round_no, "reason": str(exc)}
         closure.lineage.claim_state = pc.state_to_json(state)
         closure.lineage.debt = closure.lineage.debt or {
@@ -947,7 +956,10 @@ def _critique_plan_verified(
             closure._settled = True
         except cc.StateUnavailable:
             pass
-        store.abort(run_id)
+        try:
+            store.abort(run_id)
+        except (EvidenceStoreError, OSError):
+            pass
         structural_review = Review(
             text=f"## What works\n\nNothing notable.\n\n## What doesn't work\n\n"
                  f"[FATAL] Claim verification failed closed: {exc}\n\n## Risks\n\n"

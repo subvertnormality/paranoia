@@ -24,6 +24,15 @@ class NetworkEvidenceError(RuntimeError):
     pass
 
 
+def _strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise NetworkEvidenceError(f"duplicate network JSON key {key!r}")
+        result[key] = value
+    return result
+
+
 @dataclass(frozen=True)
 class FetchLimits:
     connect_timeout: float = 5.0
@@ -266,17 +275,17 @@ class SafeHttpClient:
         child.close()
         remaining = deadline - self.clock()
         if remaining <= 0:
-            worker.terminate()
-            worker.join()
+            worker.kill()
+            worker.join(timeout=0)
             raise NetworkEvidenceError("external request total deadline expired")
         if not parent.poll(remaining):
-            worker.terminate()
-            worker.join()
+            worker.kill()
+            worker.join(timeout=0)
             parent.close()
             raise NetworkEvidenceError("external DNS resolution exceeded total deadline")
         ok, value = parent.recv()
         parent.close()
-        worker.join(timeout=1.0)
+        worker.join(timeout=max(0.0, deadline - self.clock()))
         if not ok:
             raise NetworkEvidenceError(f"DNS resolution failed for {host}: {value}")
         return value
@@ -430,7 +439,9 @@ class EndpointSearchProvider:
         if response.media_type not in {"application/json", "application/ld+json"}:
             raise NetworkEvidenceError("search endpoint did not return JSON")
         try:
-            payload = json.loads(response.body)
+            payload = json.loads(response.body, object_pairs_hook=_strict_object)
+            if not isinstance(payload, dict) or set(payload) != {"hits"}:
+                raise NetworkEvidenceError("search endpoint has unknown or missing fields")
             rows = payload["hits"]
         except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError) as exc:
             raise NetworkEvidenceError("search endpoint returned malformed JSON") from exc
@@ -438,7 +449,8 @@ class EndpointSearchProvider:
             raise NetworkEvidenceError("search endpoint hits must be a bounded array")
         hits: list[SearchHit] = []
         for row in rows[:limit]:
-            if not isinstance(row, dict) or not isinstance(row.get("url"), str):
+            if not isinstance(row, dict) or set(row) != {"url", "title"} \
+                    or not isinstance(row.get("url"), str):
                 raise NetworkEvidenceError("search endpoint hit is malformed")
             self.client._validate_url(row["url"])
             title = row.get("title", "")

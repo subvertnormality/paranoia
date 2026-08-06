@@ -50,17 +50,24 @@ class EvidenceStore:
 
     @contextmanager
     def locked(self) -> Iterator[None]:
-        self._mkdir_durable(self.root)
-        lock_existed = self.lock_path.exists()
-        fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
-        if not lock_existed:
-            self._fsync_dir(self.root)
+        fd: int | None = None
         try:
+            self._mkdir_durable(self.root)
+            lock_existed = self.lock_path.exists()
+            fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+            if not lock_existed:
+                self._fsync_dir(self.root)
             fcntl.flock(fd, fcntl.LOCK_EX)
             yield
+        except OSError as exc:
+            raise EvidenceStoreError(f"evidence store filesystem failure: {exc}") from exc
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+            if fd is not None:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                    os.close(fd)
+                except OSError:
+                    pass
 
     def _journal(self, run_id: str) -> Path:
         return self.journals / f"{_name(run_id)}.json"
@@ -204,20 +211,28 @@ class EvidenceStore:
 
     @staticmethod
     def _atomic_bytes(path: Path, data: bytes) -> None:
-        EvidenceStore._mkdir_durable(path.parent)
-        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        tmp: str | None = None
         try:
+            EvidenceStore._mkdir_durable(path.parent)
+            fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
             with os.fdopen(fd, "wb") as handle:
                 handle.write(data)
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp, path)
             EvidenceStore._fsync_dir(path.parent)
+        except OSError as exc:
+            raise EvidenceStoreError(f"could not publish evidence file: {exc}") from exc
         finally:
-            try:
-                os.unlink(tmp)
-            except FileNotFoundError:
-                pass
+            if tmp is not None:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    raise EvidenceStoreError(
+                        f"could not clean evidence temporary file: {exc}"
+                    ) from exc
 
     @classmethod
     def _atomic_json(cls, path: Path, value: dict[str, Any]) -> None:

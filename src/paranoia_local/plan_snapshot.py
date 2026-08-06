@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import select
 import stat
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Callable
@@ -41,6 +43,7 @@ _SNAPSHOT_IDENTITY = {
     "GIT_AUTHOR_DATE": "2000-01-01T00:00:00 +0000",
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00 +0000",
 }
+GIT_TIMEOUT_SECONDS = 30.0
 
 
 class SnapshotUnavailable(RuntimeError):
@@ -55,10 +58,14 @@ def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
          check: bool = True,
          extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-    result = subprocess.run(
-        ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes, capture_output=True,
-        env={**ambient, **_GIT_ENV, **(extra_env or {})},
-    )
+    try:
+        result = subprocess.run(
+            ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes,
+            capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
+            env={**ambient, **_GIT_ENV, **(extra_env or {})},
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SnapshotUnavailable(f"git {' '.join(args[:2])} exceeded hard deadline") from exc
     if check and result.returncode:
         raise SnapshotUnavailable(
             f"git {' '.join(args[:2])} failed: "
@@ -78,6 +85,7 @@ def _run_bounded(
         stderr=subprocess.DEVNULL, env={**ambient, **_GIT_ENV},
     )
     output = bytearray()
+    deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
     try:
         assert proc.stdout is not None
         while output.count(b"\0") < stop_after_nuls:
@@ -87,7 +95,7 @@ def _run_bounded(
             read_size = min(65536, remaining + 1)
             if debit_bytes is not None:
                 debit_bytes(read_size)
-            chunk = proc.stdout.read(read_size)
+            chunk = _read_deadline(proc.stdout, read_size, deadline)
             if not chunk:
                 break
             output.extend(chunk)
@@ -103,6 +111,13 @@ def _run_bounded(
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+
+
+def _read_deadline(pipe: object, size: int, deadline: float) -> bytes:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0 or not select.select([pipe], [], [], remaining)[0]:
+        raise SnapshotUnavailable("Git streaming read exceeded hard deadline")
+    return os.read(pipe.fileno(), size)  # type: ignore[attr-defined]
 
 
 def _ref_token(run_id: str) -> str:
@@ -283,14 +298,19 @@ class PlanRepositorySnapshot:
         assert proc.stdout is not None
         result = bytearray()
         skipped = 0
+        deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
         try:
             while skipped < offset:
-                chunk = proc.stdout.read(min(65536, offset - skipped))
+                chunk = _read_deadline(
+                    proc.stdout, min(65536, offset - skipped), deadline
+                )
                 if not chunk:
                     raise SnapshotUnavailable("repository blob ended before requested offset")
                 skipped += len(chunk)
             while len(result) < wanted:
-                chunk = proc.stdout.read(min(65536, wanted - len(result)))
+                chunk = _read_deadline(
+                    proc.stdout, min(65536, wanted - len(result)), deadline
+                )
                 if not chunk:
                     break
                 result.extend(chunk)
