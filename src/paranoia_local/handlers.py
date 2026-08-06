@@ -128,7 +128,7 @@ def _require_round(review_round: Any, closure_on: bool, tool: str) -> None:
 
 
 STAKES_NOTICE = ("STAKES: unstated — the reviewer assumed a modest internal tool. Set "
-                 "`stakes` per call, or once for the project in .paranoia.toml; pass "
+                 "`stakes` per call; pass "
                  "`stakes: \"unstated\"` to accept that reading deliberately and silence "
                  "this line.")
 
@@ -571,7 +571,9 @@ def _critique_plan_verified(
 ) -> str:
     raw_plan, plan_text, plan_path = _read_plan_bytes(arguments)
     repo = _require_repo(arguments)
-    cfg = load_repo_config(repo)
+    # Closure mode treats repository bytes as hostile evidence. A checked-in config must
+    # not select policy or become peer-level role instructions.
+    cfg: dict[str, Any] = {}
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))

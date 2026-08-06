@@ -160,8 +160,9 @@ assume adversaries, scale, or failure modes beyond it are dropped or tagged
 internal tool; a review with no stakes ends with a `STAKES: unstated` line. Pass
 `stakes: "unstated"` to accept that reading deliberately and silence the line.
 
-Set it once per project in [`.paranoia.toml`](#paranoiatoml); override per call to
-tighten it for a specific surface.
+Set it once per project in [`.paranoia.toml`](#paranoiatoml) for ordinary and branch
+reviews, or pass it per call. Closure-enabled plan review accepts it only per call because
+repository-controlled configuration is part of the hostile evidence boundary.
 
 ### `already_raised` — what not to repeat
 
@@ -373,8 +374,10 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | `already_raised` | array | `[]` | Claims already accepted from prior rounds |
 | `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
 
-`class_closure` and `lineage` are **call arguments only** here — `.paranoia.toml`
-is not consulted for either. The sole legacy one-shot escape is
+Closure-enabled plan review does not consult `.paranoia.toml` for any setting. Its model,
+effort, web policy, stakes, and other controls come only from call arguments and process
+defaults; checked-in repository bytes cannot become role instructions or weaken the gate.
+The sole legacy one-shot escape is
 `class_closure: false`: it performs one ordinary review and emits no lineage state or
 `CONVERGENCE`. There is no closure-enabled off/shadow mode.
 
@@ -602,7 +605,10 @@ Honoured keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
 Set trusted process environment variable `PARANOIA_SEARCH_ENDPOINT` for the plan
 claim-verification fetch boundary. A reviewed repository cannot select an outbound host.
 
-`critique_plan`'s `class_closure` and `lineage` are **not** read from here.
+The loader accepts at most 64 KiB from a no-follow, nonblocking regular file and ignores
+symlinks, special files, oversized input, and files changed during the read. Closure-enabled
+`critique_plan` ignores this file completely; its one-shot mode retains the ordinary
+configuration behavior.
 
 ### Command line
 

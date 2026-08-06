@@ -9,6 +9,9 @@
 
 There is no closure-enabled off or shadow setting. `claim_verification` may be omitted or
 set to `blocking`; any explicit claim mode with `class_closure: false` is rejected.
+Closure mode ignores repository `.paranoia.toml` settings completely. Model, effort,
+web policy, stakes, and every other review control come only from explicit call arguments
+or trusted process defaults, so repository-controlled text cannot become role instructions.
 
 ## What the gate proves
 
