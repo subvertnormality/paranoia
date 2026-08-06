@@ -8,6 +8,7 @@ import ipaddress
 import json
 import socket
 import ssl
+import string
 import time
 import urllib.parse
 import zlib
@@ -250,8 +251,24 @@ class EndpointSearchProvider:
     """
 
     def __init__(self, endpoint_template: str, client: SafeHttpClient) -> None:
-        if "{query}" not in endpoint_template:
-            raise ValueError("search endpoint template must contain {query}")
+        if not isinstance(endpoint_template, str):
+            raise NetworkEvidenceError("search endpoint template must be a string")
+        try:
+            parsed_fields = list(string.Formatter().parse(endpoint_template))
+        except ValueError as exc:
+            raise NetworkEvidenceError(f"search endpoint template is malformed: {exc}") from exc
+        fields = [field for _literal, field, _spec, _conversion in parsed_fields if field]
+        if "query" not in fields or any(field not in {"query", "limit"} for field in fields):
+            raise NetworkEvidenceError(
+                "search endpoint template must use {query} and optional {limit} only"
+            )
+        if any(spec or conversion for _literal, _field, spec, conversion in parsed_fields):
+            raise NetworkEvidenceError("search endpoint template formats/conversions are forbidden")
+        try:
+            rendered = endpoint_template.format(query="probe", limit=1)
+        except (KeyError, IndexError, ValueError) as exc:
+            raise NetworkEvidenceError(f"search endpoint template is malformed: {exc}") from exc
+        client._validate_url(rendered)
         self.endpoint_template = endpoint_template
         self.client = client
         self.last_response_size = 0
@@ -261,9 +278,12 @@ class EndpointSearchProvider:
         self.last_response_size = 0
         if not query or len(query) > 500 or not (1 <= limit <= 10):
             raise NetworkEvidenceError("external search query exceeds bounds")
-        url = self.endpoint_template.format(
-            query=urllib.parse.quote_plus(query), limit=limit,
-        )
+        try:
+            url = self.endpoint_template.format(
+                query=urllib.parse.quote_plus(query), limit=limit,
+            )
+        except (KeyError, IndexError, ValueError) as exc:
+            raise NetworkEvidenceError(f"search endpoint formatting failed: {exc}") from exc
         response = self.client.fetch(url, limits)
         self.last_response_size = response.size
         if response.media_type not in {"application/json", "application/ld+json"}:

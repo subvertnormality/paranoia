@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import gzip
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from paranoia_local.external_evidence import (
+    EndpointSearchProvider,
     FetchLimits,
     NetworkEvidenceError,
     SafeHttpClient,
@@ -93,6 +95,21 @@ def test_non_text_media_is_rejected() -> None:
         client.fetch("https://example.com/")
 
 
+@pytest.mark.parametrize(
+    "template",
+    [
+        "https://search.example/?q={query}&x={missing}",
+        "https://search.example/?q={query!r}",
+        "https://search.example/?q={query:{limit}}",
+        "https://search.example/?limit={limit}",
+    ],
+)
+def test_search_endpoint_templates_allow_only_query_and_limit(template: str) -> None:
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    with pytest.raises(NetworkEvidenceError, match="template"):
+        EndpointSearchProvider(template, client)
+
+
 def test_expired_external_cache_is_removed_before_it_can_authorize_a_round(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -114,3 +131,73 @@ def test_expired_external_cache_is_removed_before_it_can_authorize_a_round(
             now=datetime(2026, 1, 9, tzinfo=timezone.utc),
         )
     assert valid == []
+
+
+def test_expired_truth_source_stales_claim_after_separate_bearing_evidence(
+    repo: Path, tmp_path: Path
+) -> None:
+    store = EvidenceStore(tmp_path / "separate-evidence")
+    store.begin("separate-run")
+    spans = pc.segment_plan(b"Premise.\n")
+    state = pc.ClaimState("lineage")
+    add = {
+        "op": "ADD", "temp_id": "one", "claim": "External premise",
+        "kind": "fact", "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+    }
+    claim_id = pc.apply_events(
+        state,
+        pc.parse_role_register(
+            "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + json.dumps([add]),
+            pc.RESEARCH_ROLE,
+        ),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    truth = cv._record(
+        store, "separate-run", claim_id, "external", "https://truth.example/",
+        b"truth", {"retrieved_at": "2026-01-01T00:00:00+00:00"},
+    )
+    bearing = cv._record(
+        store, "separate-run", claim_id, "external", "https://bearing.example/",
+        b"bearing", {"retrieved_at": "2026-01-09T00:00:00+00:00"},
+    )
+    pc.apply_events(
+        state,
+        [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": [truth.evidence_id], "reason": "source",
+        })],
+        role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={truth.evidence_id: claim_id},
+    )
+    bearing_event = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": [bearing.evidence_id], "reason": "not load bearing",
+    })
+    digest = pc.event_digest(bearing_event)
+    pc.apply_events(
+        state, [bearing_event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={bearing.evidence_id: claim_id}, independent_required=True,
+        vendor_checks=[
+            pc.VendorCheck("one", "m1", digest, (bearing.evidence_id,), True, "t"),
+            pc.VendorCheck("two", "m2", digest, (bearing.evidence_id,), True, "t"),
+        ],
+    )
+    store.adopt(
+        "lineage", "separate-run", [truth.blob_digest, bearing.blob_digest]
+    )
+    with PlanRepositorySnapshot.create(repo, run_id="separate-cache") as snapshot:
+        valid = cv.validate_cached_records(
+            [truth, bearing], snapshot=snapshot, store=store, state=state,
+            now=datetime(2026, 1, 9, 1, tzinfo=timezone.utc),
+        )
+    assert [record.evidence_id for record in valid] == [bearing.evidence_id]
+    assert state.claims[claim_id].status == pc.STALE

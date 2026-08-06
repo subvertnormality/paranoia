@@ -106,6 +106,16 @@ def test_native_linked_worktree_common_store_is_explicitly_approved(
         assert snap.read_blob("app.py").startswith(b'"""App module')
 
 
+def test_untracked_special_files_are_disclosed_and_skipped(repo: Path) -> None:
+    fifo = repo / "events.pipe"
+    os.mkfifo(fifo)
+    with PlanRepositorySnapshot.create(repo, run_id="special-file") as snap:
+        assert "events.pipe" in snap.unavailable_paths
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+        with pytest.raises(SnapshotUnavailable, match="not present"):
+            snap.read_blob("events.pipe")
+
+
 def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: Path) -> None:
     tree = subprocess.run(
         ["git", "rev-parse", "HEAD^{tree}"], cwd=repo, check=True,
@@ -125,3 +135,26 @@ def test_replacement_objects_are_disabled_and_not_exposed_as_history_refs(repo: 
         assert not any(name.startswith("refs/replace/") for name in snap.history_refs)
         subjects = [row["subject"] for row in snap.history("refs/heads/main", "app.py")]
         assert "FORGED REPLACEMENT" not in subjects
+
+
+def test_missing_promisor_objects_never_trigger_lazy_fetch(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "lazy-fetch-ran"
+    upload_pack = tmp_path / "hostile-upload-pack"
+    upload_pack.write_text(f"#!/bin/sh\ntouch {marker}\nexit 1\n")
+    upload_pack.chmod(0o755)
+    subprocess.run(["git", "config", "core.repositoryFormatVersion", "1"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "extensions.partialClone", "origin"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "remote.origin.promisor", "true"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "remote.origin.url", str(repo)], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "remote.origin.uploadpack", str(upload_pack)], cwd=repo, check=True
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    object_path = repo / ".git" / "objects" / head[:2] / head[2:]
+    assert object_path.exists(), "fixture commit should be a loose object"
+    object_path.unlink()
+    with pytest.raises(SnapshotUnavailable):
+        PlanRepositorySnapshot.create(repo, run_id="no-lazy-fetch")
+    assert not marker.exists()

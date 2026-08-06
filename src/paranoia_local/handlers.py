@@ -25,7 +25,7 @@ from . import logs, orientation, prompts
 from .config import load_repo_config, resolve
 from .engines import Engine, Review, ToollessUnavailable
 from .evidence_store import EvidenceCommitAmbiguous, EvidenceStore, EvidenceStoreError
-from .external_evidence import EndpointSearchProvider, SafeHttpClient
+from .external_evidence import EndpointSearchProvider, NetworkEvidenceError, SafeHttpClient
 from .plan_snapshot import PlanRepositorySnapshot, SnapshotCleanupError, SnapshotUnavailable
 from .worktree import worktree_at
 
@@ -510,6 +510,9 @@ def _critique_plan_verified(
     independent_policy = str(arguments.get("independent_check", "auto"))
     if independent_policy not in {"auto", "require"}:
         raise ValueError("independent_check must be 'auto' or 'require'")
+    stakes_level = arguments.get("stakes_level")
+    if stakes_level not in (None, "low", "high"):
+        raise ValueError("stakes_level must be 'low' or 'high' when supplied")
     lineage_id = arguments.get("lineage")
     if not lineage_id:
         raise ValueError(
@@ -558,7 +561,7 @@ def _critique_plan_verified(
         with PlanRepositorySnapshot.create(
             repo, run_id=run_id, before_pin=journal_snapshot
         ) as snapshot:
-            high_stakes = _is_high_stakes(stakes)
+            high_stakes = _is_high_stakes(stakes, stakes_level)
             current_policy = {
                 "version": 1,
                 "independent_check": independent_policy,
@@ -595,8 +598,11 @@ def _critique_plan_verified(
                     _prepend(calibration, "\n\n".join([
                         plan_packet, pc.render_claim_summary(state),
                         "Do not ADD a proposition already present in ACTIVE CLAIMS.",
-                        "=== EXCLUDED IGNORED UNTRACKED PATHS ===\n"
-                        + json.dumps(snapshot.ignored_paths, ensure_ascii=True),
+                        "=== EXCLUDED REPOSITORY PATHS ===\n"
+                        + json.dumps({
+                            "ignored_untracked": snapshot.ignored_paths,
+                            "unsupported_nonregular": snapshot.unavailable_paths,
+                        }, ensure_ascii=True),
                     ])),
                 )
                 _, research_events, research_retry = _role_register_call(
@@ -685,12 +691,12 @@ def _critique_plan_verified(
                             )
                         required = _independent_required(
                             event, draft_claims, evidence_records,
-                            independent_policy, stakes,
+                            independent_policy, high_stakes,
                         )
                         checks = _independent_checks(
                             event, required=required, primary_engine=engine, primary_model=model,
                             evidence_records=batch, claim_state=draft_claims, effort=effort,
-                            on_progress=on_progress,
+                            plan_context=plan_packet, on_progress=on_progress,
                         )
                         pc.apply_events(
                             draft_claims, [event], role=pc.VERIFIER_ROLE, spans=spans,
@@ -842,7 +848,7 @@ def _critique_plan_verified(
         state.debt = {"round": round_no, "reason": str(exc)}
     except (pc.ClaimRegisterError, pc.ClaimTransitionError, cv.EvidenceRequestError,
             EvidenceStoreError, SnapshotUnavailable, cc.RegisterError,
-            cc.StateUnavailable) as exc:
+            cc.StateUnavailable, NetworkEvidenceError) as exc:
         state.debt = {"round": round_no, "reason": str(exc)}
         closure.lineage.claim_state = pc.state_to_json(state)
         closure.lineage.debt = closure.lineage.debt or {
@@ -900,30 +906,30 @@ def _merge_evidence(
 
 def _independent_required(
     event: pc.Event, state: pc.ClaimState, records: list[cv.EvidenceRecord],
-    policy: str, stakes: str | None,
+    policy: str, high_stakes: bool,
 ) -> bool:
     if policy not in {"auto", "require"}:
         raise pc.ClaimTransitionError("independent_check must be auto or require")
-    if policy == "require" or event.op in {"SET_BEARING", "RESOLVE_DISPUTE"}:
+    guarded = {"VERIFY", "CONTRADICT", "DEFER", "RESOLVE_DISPUTE", "SET_BEARING"}
+    if policy == "require" and event.op in guarded:
+        return True
+    if event.op in {"SET_BEARING", "RESOLVE_DISPUTE"}:
         return True
     claim = state.claims.get(str(event.data.get("claim_id")))
     if event.op == "VERIFY" and claim and claim.status == pc.CONTRADICTED:
         return True
-    high_stakes = _is_high_stakes(stakes)
     ids = set(event.data.get("evidence_ids", []))
     external = any(record.evidence_id in ids and record.kind == "external" for record in records)
     return high_stakes and external
 
 
-def _is_high_stakes(stakes: str | None) -> bool:
-    """Fail safe on natural-language stakes: only explicit low/modest labels opt down."""
-    if not stakes:
-        return False
-    normalized = stakes.lower()
-    return not any(
-        marker in normalized
-        for marker in ("low-stakes", "low risk", "modest internal", "non-production")
-    )
+def _is_high_stakes(stakes: str | None, explicit_level: str | None = None) -> bool:
+    """Risk policy is explicit; prose is never parsed for security semantics."""
+    if explicit_level is not None:
+        if explicit_level not in {"low", "high"}:
+            raise ValueError("stakes_level must be low or high")
+        return explicit_level == "high"
+    return bool(stakes)
 
 
 def _reblock_for_policy(
@@ -938,11 +944,12 @@ def _reblock_for_policy(
     for claim in state.claims.values():
         truth_or_bearing = (
             claim.kind == pc.FACT and claim.status in {pc.VERIFIED, pc.CONTRADICTED}
-        ) or claim.bearing == pc.ADVISORY
+        ) or claim.bearing == pc.ADVISORY or claim.status == pc.DEFERRED
         if not truth_or_bearing:
             continue
         required = policy["independent_check"] == "require" or (
-            policy["high_stakes"] and bool(external_ids.intersection(claim.evidence_ids))
+            policy["high_stakes"]
+            and bool(external_ids.intersection(claim.truth_evidence_ids))
         )
         if not required:
             continue
@@ -959,11 +966,15 @@ def _reblock_for_policy(
         if claim.bearing == pc.ADVISORY \
                 and not (claim.bearing_authorization or {}).get("required"):
             claim.bearing_authorization = dict(pending)
+        if claim.status == pc.DEFERRED \
+                and not (claim.deferral_authorization or {}).get("required"):
+            claim.deferral_authorization = dict(pending)
 
 
 def _independent_checks(
     event: pc.Event, *, required: bool, primary_engine: Engine, primary_model: str,
     evidence_records: list[cv.EvidenceRecord], claim_state: pc.ClaimState, effort: str,
+    plan_context: str,
     on_progress: Callable[[str], None] | None,
 ) -> list[pc.VendorCheck]:
     if not required:
@@ -998,6 +1009,7 @@ def _independent_checks(
                     "sha256": claim.plan_anchor.sha256,
                 },
             }, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n\n"
+            + "PLAN-SPANS:\n" + plan_context + "\n\n"
             + cv.render_evidence(
                 [r for r in evidence_records if r.evidence_id in evidence_ids],
                 include_passages=True,

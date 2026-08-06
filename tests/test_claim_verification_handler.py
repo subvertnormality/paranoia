@@ -177,6 +177,12 @@ def test_tightening_independent_policy_invalidates_cache_and_reauthorizes(
     assert claim.truth_authorization["status"] == "complete"
 
 
+def test_stakes_risk_is_explicit_and_never_inferred_from_negated_words() -> None:
+    assert handlers._is_high_stakes("not low risk; production financial system") is True
+    assert handlers._is_high_stakes("not low risk; production financial system", "low") is False
+    assert handlers._is_high_stakes(None, "high") is True
+
+
 def test_structural_add_receives_real_span_vocabulary_and_remains_blocking(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -278,7 +284,8 @@ def test_independent_auditor_receives_exact_proposition_and_claim_state(
     monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
     checks = handlers._independent_checks(
         event, required=True, primary_engine=ClaimEngine(), primary_model="fake-model",
-        evidence_records=[record], claim_state=state, effort="high", on_progress=None,
+        evidence_records=[record], claim_state=state, effort="high",
+        plan_context=pc.render_spans(spans), on_progress=None,
     )
     assert len(checks) == 2
     assert '"proposition":"The exact proposition"' in auditor.prompt

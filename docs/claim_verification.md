@@ -30,8 +30,10 @@ One closure round performs these stages:
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
    Inherited Git environment is cleared, native linked-worktree object storage is the only
    approved object database, alternates are rejected, and grafts/replacement objects are
-   disabled for snapshot and history operations.
-   Ignored untracked paths are JSON-escaped, disclosed, and unavailable. A temporary
+   disabled for snapshot and history operations. Lazy fetching is disabled, so a partial
+   clone with missing objects fails closed instead of invoking a configured promisor remote.
+   Ignored untracked paths and unsupported FIFOs/sockets/devices are JSON-escaped,
+   disclosed, and unavailable. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
 3. A fresh toolless research role registers load-bearing claims. The server parses its
@@ -106,6 +108,8 @@ search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}
 ```
 
 The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
+preflights the template and permits only `{query}` plus optional `{limit}` placeholders.
+Formatting errors are blocked network-evidence failures, never raw exceptions. Fetching
 rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
 different from the selected address, unsupported media/encodings, excessive redirects,
 non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
@@ -127,19 +131,20 @@ their exact bytes, but they still pass through the verifier and are never self-a
 
 ## Independence and authorization
 
-`independent_check` is `auto` (default) or `require`. Auto treats explicitly described
-stakes as high unless they say `low-stakes`, `low risk`, `modest internal`, or
-`non-production`; it requires a distinct-vendor audit for high-stakes external claims,
-contradiction reversal, evidence-dispute
+`independent_check` is `auto` (default) or `require`. Risk classification is explicit
+through `stakes_level = low | high`; when omitted, any nonempty stakes description is
+high. Natural-language stakes are never parsed for security-significant words. Auto
+requires a distinct-vendor audit for high-stakes external claims, contradiction reversal, evidence-dispute
 resolution, and blocking-to-advisory changes. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload.
 
 The second vendor receives the server-owned proposition, current kind/bearing/status,
-plan-anchor identity, complete proposed event, and exact named evidence. Truth, dispute,
-and bearing authorizations persist in separate slots, so a later ordinary truth check
-cannot erase the mandatory audit that made a claim advisory.
+plan-anchor identity and spans, complete proposed event, and exact named evidence. Truth,
+dispute, deferral, and bearing authorizations persist in separate slots, so a later ordinary
+truth check cannot erase the mandatory audit that made a claim advisory. Their evidence
+dependencies also persist separately while a retained-ID union drives freshness invalidation.
 
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A
@@ -154,7 +159,8 @@ claim, eight external fetch attempts (debited before network I/O, including fail
 4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;
 repository reuse recomputes every passage/identity field and is bound to exact blob,
-snapshot, history-ref, and query identities. Network evidence is audit
+snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
+charges each inspected blob before reading it. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 

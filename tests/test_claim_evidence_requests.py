@@ -196,3 +196,45 @@ def test_history_cache_is_invalidated_when_its_pinned_ref_moves(
             [record], snapshot=snapshot, store=store, state=pc.ClaimState("lineage")
         )
     assert valid == []
+
+
+def test_repository_query_parameters_are_part_of_evidence_identity(
+    repo: Path, tmp_path: Path
+) -> None:
+    rows = [
+        {"op": "SEARCH_LITERAL", "claim_id": "claim", "pattern": pattern,
+         "paths": ["app.py"], "limit": 5}
+        for pattern in ("NO_MATCH_ONE", "NO_MATCH_TWO")
+    ]
+    parsed = cv.parse_requests(_requests(rows), {"claim"})
+    store = EvidenceStore(tmp_path / "query-identity")
+    store.begin("query-run")
+    with PlanRepositorySnapshot.create(repo, run_id="query-identity") as snapshot:
+        records = cv.collect_evidence(
+            parsed, snapshot=snapshot, store=store, run_id="query-run"
+        )
+    assert records[0].display_passage == records[1].display_passage == "[]"
+    assert records[0].evidence_id != records[1].evidence_id
+
+
+def test_literal_search_charges_every_inspected_blob_to_the_round_budget(
+    repo: Path, tmp_path: Path
+) -> None:
+    paths = []
+    for index in range(6):
+        path = f"search_{index}.txt"
+        (repo / path).write_bytes(b"x" * 900_000)
+        paths.append(path)
+    request = {
+        "op": "SEARCH_LITERAL", "claim_id": "claim", "pattern": "absent",
+        "paths": paths, "limit": 5,
+    }
+    parsed = cv.parse_requests(_requests([request]), {"claim"})
+    store = EvidenceStore(tmp_path / "search-budget")
+    store.begin("search-budget-run")
+    with PlanRepositorySnapshot.create(repo, run_id="search-budget") as snapshot:
+        with pytest.raises(cv.EvidenceRequestError, match="aggregate"):
+            cv.collect_evidence(
+                parsed, snapshot=snapshot, store=store, run_id="search-budget-run",
+                budget=cv.EvidenceBudget(),
+            )

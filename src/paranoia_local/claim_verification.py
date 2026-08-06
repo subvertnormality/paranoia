@@ -229,7 +229,8 @@ def collect_evidence(
                                     "offset": data["offset"], "length": len(body)}))
         elif request.op == "SEARCH_LITERAL":
             matches = snapshot.search_literal(data["pattern"], paths=data["paths"],
-                                               limit=min(data["limit"], 50))
+                                               limit=min(data["limit"], 50),
+                                               debit_bytes=budget.debit_bytes)
             body = json.dumps(matches, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
@@ -368,7 +369,7 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
             body: bytes, metadata: dict[str, Any]) -> EvidenceRecord:
     digest = store.stage(run_id, body)
     passage = body[:MAX_PASSAGE_BYTES]
-    identity = _evidence_identity(claim_id, kind, source, digest)
+    identity = _evidence_identity(claim_id, kind, source, digest, metadata)
     return EvidenceRecord(
         evidence_id="e" + identity,
         claim_id=claim_id,
@@ -385,9 +386,14 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
     )
 
 
-def _evidence_identity(claim_id: str, kind: str, source: str, digest: str) -> str:
+def _evidence_identity(
+    claim_id: str, kind: str, source: str, digest: str, metadata: Mapping[str, Any]
+) -> str:
+    scope = json.dumps(
+        metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
     return hashlib.sha256(
-        (claim_id + "\0" + kind + "\0" + source + "\0" + digest).encode(
+        (claim_id + "\0" + kind + "\0" + source + "\0" + digest + "\0" + scope).encode(
             "utf-8", errors="surrogateescape"
         )
     ).hexdigest()[:12]
@@ -504,7 +510,8 @@ def validate_cached_records(
                     or record.passage_sha256 != hashlib.sha256(passage).hexdigest()
                     or record.display_passage != passage.decode("utf-8", errors="replace")
                     or record.evidence_id != "e" + _evidence_identity(
-                        record.claim_id, record.kind, record.source, record.source_sha256
+                        record.claim_id, record.kind, record.source,
+                        record.source_sha256, record.metadata,
                     )
                 ):
                     raise EvidenceRequestError("cached evidence derived fields are inconsistent")
@@ -565,7 +572,8 @@ def validate_cached_records(
             if invalid_ids.intersection(claim.evidence_ids):
                 claim.status = pc.STALE
             for field_name in (
-                "truth_authorization", "bearing_authorization", "dispute_authorization"
+                "truth_authorization", "bearing_authorization", "dispute_authorization",
+                "deferral_authorization",
             ):
                 info = getattr(claim, field_name) or {}
                 if invalid_ids.intersection(info.get("evidence_ids", [])):

@@ -21,6 +21,7 @@ _GIT_ENV = {
     "GIT_PAGER": "cat",
     "PAGER": "cat",
     "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_NO_LAZY_FETCH": "1",
     "GIT_GRAFT_FILE": os.devnull,
 }
 _GIT_CONFIG = [
@@ -80,6 +81,7 @@ class PlanRepositorySnapshot:
     wrapper_ref: str
     history_refs: dict[str, str]
     ignored_paths: tuple[str, ...]
+    unavailable_paths: tuple[str, ...]
     _owned_refs: list[tuple[str, str]] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -106,7 +108,8 @@ class PlanRepositorySnapshot:
             item.decode("utf-8", errors="surrogateescape")
             for item in ignored_raw.split(b"\0") if item
         )
-        tree = _snapshot_tree_without_filters(repo)
+        tree, unavailable = _snapshot_tree_without_filters(repo)
+        unavailable = tuple(dict.fromkeys([*unavailable, *_find_special_paths(repo)]))
         commit_args = ["commit-tree", tree]
         if has_head:
             commit_args += ["-p", head]
@@ -138,7 +141,10 @@ class PlanRepositorySnapshot:
         if before_pin is not None:
             before_pin(owned)
         cls._create_refs(repo, owned)
-        return cls(repo, head, tree, commit, wrapper_ref, history, ignored, owned)
+        return cls(
+            repo, head, tree, commit, wrapper_ref, history, ignored,
+            unavailable, owned,
+        )
 
     @staticmethod
     def _create_refs(repo: Path, refs: list[tuple[str, str]]) -> None:
@@ -280,7 +286,9 @@ class PlanRepositorySnapshot:
         return [r.decode("utf-8", errors="surrogateescape") for r in rows if r][:limit]
 
     def search_literal(self, pattern: str, *, paths: list[str] | None = None,
-                       limit: int = 50) -> list[dict[str, object]]:
+                       limit: int = 50,
+                       debit_bytes: Callable[[int], None] | None = None
+                       ) -> list[dict[str, object]]:
         if not isinstance(pattern, str) or not pattern or len(pattern.encode()) > 256 \
                 or not (1 <= limit <= 50):
             raise SnapshotUnavailable("literal search exceeds bounds")
@@ -290,7 +298,11 @@ class PlanRepositorySnapshot:
             raise SnapshotUnavailable("literal search paths must be strings")
         for path in candidates[:200]:
             try:
-                data = self.read_blob(path, max_bytes=1 << 20)
+                _oid, source_size = self.blob_identity(path)
+                inspected = min(source_size, 1 << 20)
+                if debit_bytes is not None:
+                    debit_bytes(inspected)
+                data = self.read_blob(path, max_bytes=max(1, inspected))
             except SnapshotUnavailable:
                 continue
             start = 0
@@ -344,7 +356,7 @@ class PlanRepositorySnapshot:
 
 
 
-def _snapshot_tree_without_filters(repo: Path) -> str:
+def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
     """Hash working-tree bytes without ``git add`` or repository-selected commands.
 
     Git supplies only the candidate path set and object database. File bytes are opened
@@ -367,6 +379,7 @@ def _snapshot_tree_without_filters(repo: Path) -> str:
         repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]
     ).stdout
     rows: list[tuple[str, str, str]] = []
+    unavailable: list[str] = []
     for raw_path in [item for item in candidates.split(b"\0") if item]:
         path = raw_path.decode("utf-8", errors="surrogateescape")
         pure = PurePosixPath(path)
@@ -392,7 +405,8 @@ def _snapshot_tree_without_filters(repo: Path) -> str:
             rows.append(("120000", oid, path))
             continue
         if not stat.S_ISREG(info.st_mode):
-            raise SnapshotUnavailable(f"snapshot path is not a regular file: {path!r}")
+            unavailable.append(path)
+            continue
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(target, flags)
         try:
@@ -435,7 +449,8 @@ def _snapshot_tree_without_filters(repo: Path) -> str:
             repo, ["update-index", "-z", "--index-info"],
             input_bytes=payload, extra_env=private_env,
         )
-        return _run(repo, ["write-tree"], extra_env=private_env).stdout.decode("ascii").strip()
+        tree = _run(repo, ["write-tree"], extra_env=private_env).stdout.decode("ascii").strip()
+        return tree, tuple(unavailable)
     finally:
         import shutil
         shutil.rmtree(index_dir, ignore_errors=True)
@@ -497,3 +512,31 @@ def _approved_common_dir(repo: Path) -> Path:
             or backlink_path != dotgit.resolve():
         raise SnapshotUnavailable("gitfile is not a self-consistent native linked worktree")
     return common
+
+
+def _find_special_paths(repo: Path, *, max_entries: int = 50_000) -> tuple[str, ...]:
+    """Disclose nonregular entries Git omits from ``ls-files --others``."""
+    special: list[str] = []
+    pending = [repo]
+    seen = 0
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = list(os.scandir(directory))
+        except OSError as exc:
+            raise SnapshotUnavailable(f"could not inspect repository entry types: {exc}") from exc
+        for entry in entries:
+            if directory == repo and entry.name == ".git":
+                continue
+            seen += 1
+            if seen > max_entries:
+                raise SnapshotUnavailable("repository entry scan exceeds safety cap")
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(Path(entry.path))
+                continue
+            mode = entry.stat(follow_symlinks=False).st_mode
+            if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
+                special.append(
+                    Path(entry.path).relative_to(repo).as_posix()
+                )
+    return tuple(sorted(special))

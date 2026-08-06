@@ -239,7 +239,8 @@ is a fact or decision. A blocking fact closes only with exact server evidence or
 plan deferral whose verification step precedes every dependency, has falsifiable evidence,
 and stops on failure. Advisory bearing requires its own evidence-bearing verifier event.
 Evidence IDs are bound to one exact claim; another claim cannot reuse them. Truth, dispute,
-and bearing audits persist separately. Model agreement and citations alone do not verify anything.
+deferral, and bearing audits and evidence dependencies persist separately. Model agreement
+and citations alone do not verify anything.
 
 Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
 bounded repository records, and no filesystem path. External passages only enter a
@@ -358,7 +359,8 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
 | `claim_verification` | `blocking` | `blocking` when closure is on | Integrated claim gate. Rejected with `class_closure: false` |
-| `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy. Auto treats stated stakes as high unless explicitly low/modest; unavailable required checks stay blocking |
+| `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking, including required deferrals |
+| `stakes_level` | `low` \| `high` | high for any stated stakes | Explicit authorization-risk policy for `auto`; natural-language stakes are never parsed for opt-down words |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
 | `refresh_claims` | boolean | `false` | Bypass an otherwise valid zero-research cache hit for this round |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
@@ -646,7 +648,7 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call. Git
   alternates are rejected, inherited object-database settings are cleared, and replacement
-  objects/grafts are disabled for plan evidence.
+  objects/grafts and lazy fetching are disabled for plan evidence.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived

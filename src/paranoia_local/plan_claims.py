@@ -164,6 +164,9 @@ class Claim:
     kind_classification: str = PROPOSED
     status: str = UNCHECKED
     evidence_ids: list[str] = field(default_factory=list)
+    truth_evidence_ids: list[str] = field(default_factory=list)
+    bearing_evidence_ids: list[str] = field(default_factory=list)
+    dispute_evidence_ids: list[str] = field(default_factory=list)
     reason: str | None = None
     deferral: dict[str, Any] | None = None
     disputed_evidence_ids: list[str] = field(default_factory=list)
@@ -172,6 +175,7 @@ class Claim:
     truth_authorization: dict[str, Any] | None = None
     bearing_authorization: dict[str, Any] | None = None
     dispute_authorization: dict[str, Any] | None = None
+    deferral_authorization: dict[str, Any] | None = None
     pending_transition: dict[str, Any] | None = None
 
 
@@ -353,27 +357,42 @@ def apply_events(
             claim.pending_transition = None
             if event.op == "VERIFY":
                 _require_fact(claim)
-                claim.status, claim.evidence_ids = VERIFIED, ids
+                claim.status, claim.truth_evidence_ids = VERIFIED, ids
+                _retain_evidence(claim, ids)
             elif event.op == "CONTRADICT":
                 _require_fact(claim)
-                claim.status, claim.evidence_ids = CONTRADICTED, ids
+                claim.status, claim.truth_evidence_ids = CONTRADICTED, ids
+                _retain_evidence(claim, ids)
             elif event.op == "RESOLVE_DISPUTE":
                 if claim.status != DISPUTED:
                     raise ClaimTransitionError("only a disputed claim can resolve a dispute")
-                claim.status, claim.evidence_ids, claim.disputed_evidence_ids = VERIFIED, ids, []
+                claim.status = VERIFIED
+                claim.truth_evidence_ids = ids
+                claim.dispute_evidence_ids = ids
+                claim.disputed_evidence_ids = []
+                _retain_evidence(claim, ids)
             else:
                 if data["bearing"] not in {BLOCKING, ADVISORY}:
                     raise ClaimTransitionError("bearing must be blocking or advisory")
                 if data["bearing"] == ADVISORY and not ids:
                     raise ClaimTransitionError("advisory bearing requires evidence")
-                claim.bearing, claim.evidence_ids = data["bearing"], ids
+                claim.bearing, claim.bearing_evidence_ids = data["bearing"], ids
+                _retain_evidence(claim, ids)
             claim.reason = data["reason"]
         elif event.op == "DISPUTE":
             ids = _validated_evidence(data, available, claim.claim_id)
             claim.status, claim.disputed_evidence_ids = DISPUTED, ids
+            claim.dispute_evidence_ids = ids
+            _retain_evidence(claim, ids)
             claim.reason = data["reason"]
         elif event.op == "DEFER":
             _require_fact(claim)
+            if not _authorize_independent(
+                claim, event, [], independent_required, vendor_checks
+            ):
+                claim.pending_transition = copy.deepcopy(event.data)
+                continue
+            claim.pending_transition = None
             verification = resolve_anchor(data["verification_anchor"], spans)
             dependents_raw = data["dependent_anchors"]
             if not isinstance(dependents_raw, list) or not dependents_raw:
@@ -462,10 +481,14 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
     slot = (
         "bearing_authorization" if event.op == "SET_BEARING"
         else "dispute_authorization" if event.op == "RESOLVE_DISPUTE"
+        else "deferral_authorization" if event.op == "DEFER"
         else "truth_authorization"
     )
     if not required:
-        setattr(claim, slot, {"required": False, "status": "not-required"})
+        setattr(claim, slot, {
+            "required": False, "status": "not-required",
+            "event_digest": event_digest(event), "evidence_ids": evidence_ids, "checks": [],
+        })
         return True
     digest = event_digest(event)
     matching = [
@@ -498,7 +521,7 @@ def _authorization_valid(info: dict[str, Any] | None, *, must_be_required: bool 
     if not info:
         return not must_be_required
     if not info.get("required"):
-        return not must_be_required
+        return not must_be_required and info.get("status") == "not-required"
     if info.get("status") != "complete":
         return False
     digest, evidence = info.get("event_digest"), tuple(info.get("evidence_ids", []))
@@ -522,7 +545,13 @@ def claim_blocks(claim: Claim) -> bool:
         return not _authorization_valid(claim.bearing_authorization, must_be_required=True)
     if claim.status == VERIFIED:
         return not _authorization_valid(claim.truth_authorization)
-    return claim.status != DEFERRED
+    if claim.status == DEFERRED:
+        return not _authorization_valid(claim.deferral_authorization)
+    return True
+
+
+def _retain_evidence(claim: Claim, ids: Sequence[str]) -> None:
+    claim.evidence_ids = list(dict.fromkeys([*claim.evidence_ids, *ids]))
 
 
 def blocking_claims(state: ClaimState) -> list[Claim]:
@@ -694,7 +723,10 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
     first_round = row.get("first_round")
     if not isinstance(first_round, int) or isinstance(first_round, bool) or first_round < 1:
         raise ClaimRegisterError("persisted first_round is malformed")
-    for key in ("evidence_ids", "disputed_evidence_ids"):
+    for key in (
+        "evidence_ids", "truth_evidence_ids", "bearing_evidence_ids",
+        "dispute_evidence_ids", "disputed_evidence_ids",
+    ):
         value = row.get(key)
         if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
             raise ClaimRegisterError(f"persisted {key} is malformed")
@@ -704,7 +736,7 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
             raise ClaimRegisterError(f"persisted {key} is malformed")
     for key in (
         "deferral", "truth_authorization", "bearing_authorization",
-        "dispute_authorization", "pending_transition",
+        "dispute_authorization", "deferral_authorization", "pending_transition",
     ):
         value = row.get(key)
         if value is not None and not isinstance(value, dict):
@@ -727,12 +759,13 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         if any(not isinstance(deferral.get(key), str) or not deferral[key]
                for key in ("completion_evidence", "failure_condition", "stop_action")):
             raise ClaimRegisterError("persisted deferral rule is malformed")
-    if row.get("status") in {VERIFIED, CONTRADICTED} and not row.get("evidence_ids"):
+    if row.get("status") in {VERIFIED, CONTRADICTED} and not row.get("truth_evidence_ids"):
         raise ClaimRegisterError("persisted truth transition has no evidence")
-    if row.get("bearing") == ADVISORY and not row.get("evidence_ids"):
+    if row.get("bearing") == ADVISORY and not row.get("bearing_evidence_ids"):
         raise ClaimRegisterError("persisted advisory claim has no evidence")
     for authorization_key in (
-        "truth_authorization", "bearing_authorization", "dispute_authorization"
+        "truth_authorization", "bearing_authorization", "dispute_authorization",
+        "deferral_authorization",
     ):
         info = row.get(authorization_key)
         if info is None:

@@ -102,7 +102,11 @@ def test_first_evidence_root_creation_fsyncs_its_parent_directory(
         original(Path(path))
 
     monkeypatch.setattr(EvidenceStore, "_fsync_dir", staticmethod(record))
-    EvidenceStore(evidence_root).begin("first")
+    store = EvidenceStore(evidence_root)
+    store.begin("first")
     assert tmp_path in calls
     assert evidence_root.parent in calls
     assert evidence_root in calls
+    before_stage = len(calls)
+    store.stage("first", b"blob")
+    assert evidence_root in calls[before_stage:], "sha256 directory entry must be fsynced"

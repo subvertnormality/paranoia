@@ -251,6 +251,15 @@ TOOLS: list[Tool] = [
                         "downgrades. Unavailability remains pending and blocks."
                     ),
                 },
+                "stakes_level": {
+                    "type": "string",
+                    "enum": ["low", "high"],
+                    "description": (
+                        "Explicit authorization-risk classification for auto independent "
+                        "checks. When omitted, any nonempty stakes description is treated "
+                        "as high; natural-language stakes are never parsed for low-risk words."
+                    ),
+                },
                 "supplied_evidence": {
                     "type": "array",
                     "maxItems": 20,

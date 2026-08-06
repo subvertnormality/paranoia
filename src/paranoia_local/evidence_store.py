@@ -85,7 +85,7 @@ class EvidenceStore:
     def stage(self, run_id: str, data: bytes, *, now: float | None = None) -> str:
         digest = hashlib.sha256(data).hexdigest()
         with self.locked():
-            self.blobs.mkdir(parents=True, exist_ok=True)
+            self._mkdir_durable(self.blobs)
             target = self.blobs / digest
             if not target.exists():
                 used = sum(path.stat().st_size for path in self.blobs.iterdir() if path.is_file())

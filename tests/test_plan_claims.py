@@ -204,6 +204,81 @@ def test_nonrequired_truth_check_does_not_erase_audited_advisory_authorization()
     assert not pc.claim_blocks(claim)
 
 
+@pytest.mark.parametrize("secondary_accepts", [True, False, None])
+def test_required_defer_applies_only_after_two_vendor_acceptances(
+    secondary_accepts: bool | None,
+) -> None:
+    spans = pc.segment_plan(b"Verify first.\nUse result.\n")
+    state = pc.ClaimState("defer")
+    add = _add(plan_anchor={"first_span": "p000001", "last_span": "p000001"})
+    claim_id = pc.apply_events(
+        state, pc.parse_role_register(_research([add]), pc.RESEARCH_ROLE),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["new-1"]
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    event = pc.Event("DEFER", {
+        "op": "DEFER", "claim_id": claim_id,
+        "verification_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        "dependent_anchors": [
+            {"first_span": "p000002", "last_span": "p000002"}
+        ],
+        "completion_evidence": "exit status zero",
+        "failure_condition": "nonzero status",
+        "stop_action": "stop rollout",
+    })
+    digest = pc.event_digest(event)
+    checks = [pc.VendorCheck("one", "m1", digest, (), True, "t")]
+    if secondary_accepts is not None:
+        checks.append(pc.VendorCheck("two", "m2", digest, (), secondary_accepts, "t"))
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        independent_required=True, vendor_checks=checks,
+    )
+    claim = state.claims[claim_id]
+    if secondary_accepts is True:
+        assert claim.status == pc.DEFERRED and not pc.claim_blocks(claim)
+    else:
+        assert claim.status == pc.UNVERIFIED and pc.claim_blocks(claim)
+        assert claim.deferral_authorization["status"] == "pending"
+
+
+def test_truth_and_bearing_keep_distinct_evidence_dependencies() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    verify = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["truth"], "reason": "truth source",
+    })
+    pc.apply_events(
+        state, [verify], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"truth": claim_id},
+    )
+    bearing = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": ["bearing"], "reason": "no dependent step",
+    })
+    digest = pc.event_digest(bearing)
+    checks = [
+        pc.VendorCheck("one", "m1", digest, ("bearing",), True, "t"),
+        pc.VendorCheck("two", "m2", digest, ("bearing",), True, "t"),
+    ]
+    pc.apply_events(
+        state, [bearing], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"bearing": claim_id}, independent_required=True,
+        vendor_checks=checks,
+    )
+    claim = state.claims[claim_id]
+    assert claim.truth_evidence_ids == ["truth"]
+    assert claim.bearing_evidence_ids == ["bearing"]
+    assert claim.evidence_ids == ["truth", "bearing"]
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")
