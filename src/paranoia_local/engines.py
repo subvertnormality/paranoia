@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
@@ -205,6 +206,17 @@ class CodexEngine(Engine):
         root = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
         return root / "auth.json"
 
+    @staticmethod
+    def _audit_toolless_binary(native: Path) -> None:
+        result = subprocess.run(
+            [str(native), "--version"], capture_output=True, text=True, timeout=10,
+        )
+        version = result.stdout.strip().removeprefix("codex-cli ")
+        if result.returncode or version not in {"0.144.6", "0.146.0-alpha.3.1"}:
+            raise ToollessUnavailable(
+                f"Codex {version or 'unknown'} has no audited empty-tool profile"
+            )
+
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
         bwrap = shutil.which("bwrap")
         if not bwrap:
@@ -212,6 +224,7 @@ class CodexEngine(Engine):
         native, auth = self._native_binary(), self._auth_file()
         if not auth.is_file():
             raise ToollessUnavailable("Codex auth file is unavailable for isolated role")
+        type(self)._audit_toolless_binary(native)
         argv = [
             bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net",
             "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
@@ -241,7 +254,12 @@ class CodexEngine(Engine):
             "--disable", "apps", "--disable", "browser_use",
             "--disable", "computer_use", "--disable", "code_mode",
             "--disable", "code_mode_host", "--disable", "image_generation",
-            "--disable", "goals", "--disable", "workspace_dependencies", "-",
+            "--disable", "goals", "--disable", "workspace_dependencies",
+            "--disable", "auth_elicitation", "--disable", "in_app_browser",
+            "--disable", "plugins", "--disable", "plugin_sharing",
+            "--disable", "remote_plugin", "--disable", "skill_search",
+            "--disable", "skill_mcp_dependency_install",
+            "--disable", "tool_call_mcp_elicitation", "--disable", "tool_suggest", "-",
         ]
         return argv
 

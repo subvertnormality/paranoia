@@ -265,7 +265,9 @@ def test_semantic_structural_retry_preserves_original_five_sections(
             self.tool_less_prompts.append(prompt)
             if "=== CORRECTION REQUIRED ===" in prompt:
                 return _review(
-                    "=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
+                    "## What works\n\nCorrected.\n\n## What doesn't work\n\nNone.\n\n"
+                    "## Risks\n\nNone.\n\n## Gaps\n\nNone.\n\n"
+                    "## Improvements\n\nNone.\n\n=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
                     "=== CLASS REGISTER ===\nNONE"
                 )
             invalid = {

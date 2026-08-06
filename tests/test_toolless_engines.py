@@ -28,6 +28,7 @@ def test_codex_toolless_profile_exposes_native_binary_not_shell_or_repository(
     auth.write_text("{}")
     monkeypatch.setattr(CodexEngine, "_native_binary", lambda self: native)
     monkeypatch.setattr(CodexEngine, "_auth_file", lambda self: auth)
+    monkeypatch.setattr(CodexEngine, "_audit_toolless_binary", lambda self: None)
     argv = CodexEngine().build_toolless_argv(tmp_path / "scratch", "gpt", "high")
     joined = " ".join(argv)
     assert argv[0].endswith("bwrap")

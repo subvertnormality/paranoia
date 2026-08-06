@@ -187,6 +187,14 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
         if not isinstance(item.get("paths"), list) or not 1 <= len(item["paths"]) <= 20 \
                 or any(not isinstance(path, str) or not path for path in item["paths"]):
             raise EvidenceRequestError("RUN_ADAPTER.paths must contain 1..20 paths")
+    git_operands = [
+        item[key] for key in ("prefix", "path", "ref", "pattern")
+        if isinstance(item.get(key), str)
+    ]
+    if isinstance(item.get("paths"), list):
+        git_operands.extend(path for path in item["paths"] if isinstance(path, str))
+    if any("\0" in value for value in git_operands):
+        raise EvidenceRequestError(f"{op} Git operands may not contain NUL")
 
 
 def collect_evidence(

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import tempfile
 import time
@@ -507,6 +508,25 @@ def _role_register_call(
             ) from second
 
 
+def _validate_five_sections(text: str) -> None:
+    headings = [
+        "## What works", "## What doesn't work", "## Risks", "## Gaps",
+        "## Improvements",
+    ]
+    positions = [text.find(heading) for heading in headings]
+    if any(position < 0 for position in positions) or positions != sorted(positions):
+        raise pc.ClaimRegisterError(
+            "structural review must contain the five ordered review sections"
+        )
+    register_at = text.find(pc.PLAN_MARKER)
+    boundaries = [*positions[1:], register_at]
+    if register_at < 0 or any(
+        not text[start + len(heading):end].strip()
+        for start, heading, end in zip(positions, headings, boundaries)
+    ):
+        raise pc.ClaimRegisterError("structural review sections must be nonempty")
+
+
 def _critique_plan_verified(
     arguments: dict[str, Any], *, engine: Engine, log_dir: Path, now: Clock,
     on_progress: Callable[[str], None] | None,
@@ -665,7 +685,7 @@ def _critique_plan_verified(
                     engine, evidence_prompt, model, effort,
                     lambda text: cv.parse_requests(text, active_ids), on_progress,
                 )
-                endpoint = resolve("search_endpoint", None, cfg, None) if web_search else None
+                endpoint = os.environ.get("PARANOIA_SEARCH_ENDPOINT") if web_search else None
                 http_client = SafeHttpClient() if endpoint else None
                 provider = EndpointSearchProvider(str(endpoint), http_client) if endpoint else None
                 new_records = cv.collect_evidence(
@@ -800,7 +820,15 @@ def _critique_plan_verified(
                 structural_instructions, _prepend(calibration, structural_body)
             )
 
+            structural_sections_valid = False
+
             def parse_composite(text: str) -> tuple[list[pc.Event], cc.Register]:
+                nonlocal structural_sections_valid
+                if "## What works" in text:
+                    _validate_five_sections(text)
+                    structural_sections_valid = True
+                elif not structural_sections_valid:
+                    _validate_five_sections(text)
                 claim_events, class_text = pc.parse_structural_register(text, cc.REGISTER_MARKER)
                 return claim_events, cc.parse_register(class_text, allow_mechanized=False)
 
@@ -906,7 +934,8 @@ def _critique_plan_verified(
         state.debt = {"round": round_no, "reason": str(exc)}
     except (pc.ClaimRegisterError, pc.ClaimTransitionError, cv.EvidenceRequestError,
             EvidenceStoreError, SnapshotUnavailable, cc.RegisterError,
-            cc.StateUnavailable, NetworkEvidenceError) as exc:
+            cc.StateUnavailable, NetworkEvidenceError, TypeError, AttributeError,
+            UnicodeError) as exc:
         state.debt = {"round": round_no, "reason": str(exc)}
         closure.lineage.claim_state = pc.state_to_json(state)
         closure.lineage.debt = closure.lineage.debt or {

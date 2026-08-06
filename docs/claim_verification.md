@@ -117,10 +117,11 @@ use a literal-search byte position to retrieve relevant code after the first dis
 passage without widening the 1 MiB source cap or 5 MiB round cap. Fixed adapters charge
 every input byte they inspect, not only their small structured result.
 
-External work requires a configured HTTPS JSON search endpoint in `.paranoia.toml`:
+External work requires a trusted process-level HTTPS JSON search endpoint. Repository
+configuration cannot select a network destination:
 
-```toml
-search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}"
+```bash
+export PARANOIA_SEARCH_ENDPOINT='https://search.internal.example/query?q={query}&limit={limit}'
 ```
 
 The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching

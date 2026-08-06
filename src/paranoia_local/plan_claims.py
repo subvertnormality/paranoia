@@ -852,6 +852,16 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
                 or any(not isinstance(item, str) or not item for item in ids) \
                 or not isinstance(checks, list):
             raise ClaimRegisterError("persisted independent authorization inputs are malformed")
+        slot_ops = {
+            "truth_authorization": {"VERIFY", "CONTRADICT"},
+            "bearing_authorization": {"SET_BEARING"},
+            "dispute_authorization": {"RESOLVE_DISPUTE"},
+            "deferral_authorization": {"DEFER"},
+        }
+        if event.get("op") not in slot_ops[authorization_key] \
+                or event.get("claim_id") != row.get("claim_id") \
+                or list(dict.fromkeys(event.get("evidence_ids", []))) != ids:
+            raise ClaimRegisterError("persisted authorization is bound to the wrong transition")
         if not info["required"] and checks:
             raise ClaimRegisterError("non-required authorization may not retain vendor checks")
         for check in checks:

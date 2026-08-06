@@ -98,6 +98,14 @@ def _review(text: str, session_ref: str | None) -> _R:
 
 
 def review_with(register: str, body: str = "## What doesn't work\n\nSomething.") -> str:
+    if "## What works" not in body:
+        body = "## What works\n\nNothing notable.\n\n" + body
+    if "## Risks" not in body:
+        body += "\n\n## Risks\n\nNothing notable."
+    if "## Gaps" not in body:
+        body += "\n\n## Gaps\n\nNothing notable."
+    if "## Improvements" not in body:
+        body += "\n\n## Improvements\n\nNothing notable."
     return (
         f"{body}\n\n=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
         f"=== CLASS REGISTER ===\n{register}"

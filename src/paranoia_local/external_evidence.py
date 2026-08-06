@@ -313,11 +313,6 @@ class SafeHttpClient:
             cancel = getattr(self.transport, "cancel", None)
             if callable(cancel):
                 cancel()
-            worker.join(timeout=1.0)
-            if worker.is_alive() and isinstance(self.transport, HttpsTransport):
-                raise NetworkEvidenceError(
-                    "external request cancellation did not terminate transport"
-                ) from exc
             raise NetworkEvidenceError("external request exceeded total deadline") from exc
         if not ok:
             if isinstance(value, Exception):
@@ -437,7 +432,7 @@ class EndpointSearchProvider:
         try:
             payload = json.loads(response.body)
             rows = payload["hits"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError) as exc:
             raise NetworkEvidenceError("search endpoint returned malformed JSON") from exc
         if not isinstance(rows, list) or len(rows) > 100:
             raise NetworkEvidenceError("search endpoint hits must be a bounded array")

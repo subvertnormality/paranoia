@@ -595,12 +595,12 @@ stakes = "Internal booking API, single team, authenticated first-party callers, 
 web_search = true
 isolate = true
 # Optional server-owned external discovery for critique_plan claim verification.
-search_endpoint = "https://search.internal.example/query?q={query}&limit={limit}"
 ```
 
 Honoured keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
-`class_closure`, `max_packet_chars`, `model`, `effort`, `web_search`, and
-`search_endpoint` (for the plan claim-verification fetch boundary).
+`class_closure`, `max_packet_chars`, `model`, `effort`, and `web_search`.
+Set trusted process environment variable `PARANOIA_SEARCH_ENDPOINT` for the plan
+claim-verification fetch boundary. A reviewed repository cannot select an outbound host.
 
 `critique_plan`'s `class_closure` and `lineage` are **not** read from here.
 
