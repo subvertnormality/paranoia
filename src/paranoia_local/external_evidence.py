@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import gzip
 import hashlib
 import http.client
 import ipaddress
@@ -194,6 +193,8 @@ class SafeHttpClient:
 
     @staticmethod
     def _validate_url(url: str) -> urllib.parse.SplitResult:
+        if not isinstance(url, str) or any(ord(char) < 0x20 or ord(char) == 0x7F for char in url):
+            raise NetworkEvidenceError("external evidence URL contains control characters")
         try:
             parsed = urllib.parse.urlsplit(url)
             _ = parsed.port
@@ -214,9 +215,9 @@ class SafeHttpClient:
             if not encoding or encoding == "identity":
                 body = data
             elif encoding == "gzip":
-                body = gzip.decompress(data)
+                body = _bounded_inflate(data, limits.max_decompressed_bytes, 16 + zlib.MAX_WBITS)
             elif encoding == "deflate":
-                body = zlib.decompress(data)
+                body = _bounded_inflate(data, limits.max_decompressed_bytes, zlib.MAX_WBITS)
             else:
                 raise NetworkEvidenceError(f"unsupported content encoding {encoding!r}")
         except (OSError, zlib.error) as exc:
@@ -245,15 +246,18 @@ class EndpointSearchProvider:
             raise ValueError("search endpoint template must contain {query}")
         self.endpoint_template = endpoint_template
         self.client = client
+        self.last_response_size = 0
 
     def search(self, query: str, *, limit: int = 5,
                limits: FetchLimits | None = None) -> list[SearchHit]:
+        self.last_response_size = 0
         if not query or len(query) > 500 or not (1 <= limit <= 10):
             raise NetworkEvidenceError("external search query exceeds bounds")
         url = self.endpoint_template.format(
             query=urllib.parse.quote_plus(query), limit=limit,
         )
         response = self.client.fetch(url, limits)
+        self.last_response_size = response.size
         if response.media_type not in {"application/json", "application/ld+json"}:
             raise NetworkEvidenceError("search endpoint did not return JSON")
         try:
@@ -261,10 +265,38 @@ class EndpointSearchProvider:
             rows = payload["hits"]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise NetworkEvidenceError("search endpoint returned malformed JSON") from exc
+        if not isinstance(rows, list) or len(rows) > 100:
+            raise NetworkEvidenceError("search endpoint hits must be a bounded array")
         hits: list[SearchHit] = []
         for row in rows[:limit]:
             if not isinstance(row, dict) or not isinstance(row.get("url"), str):
                 raise NetworkEvidenceError("search endpoint hit is malformed")
             self.client._validate_url(row["url"])
-            hits.append(SearchHit(row["url"], str(row.get("title", ""))[:500]))
+            title = row.get("title", "")
+            if not isinstance(title, str):
+                raise NetworkEvidenceError("search endpoint hit title is malformed")
+            hits.append(SearchHit(row["url"], title[:500]))
         return hits
+
+
+def _bounded_inflate(data: bytes, limit: int, wbits: int) -> bytes:
+    """Inflate with ``max_length`` so hostile ratios never allocate past the cap."""
+    decoder = zlib.decompressobj(wbits)
+    output = bytearray()
+    pending = data
+    while pending:
+        remaining = limit - len(output)
+        piece = decoder.decompress(pending, remaining + 1)
+        output.extend(piece)
+        if len(output) > limit:
+            raise NetworkEvidenceError("decompressed response exceeds byte cap")
+        pending = decoder.unconsumed_tail
+        if not pending:
+            break
+    remaining = limit - len(output)
+    output.extend(decoder.flush(remaining + 1))
+    if len(output) > limit:
+        raise NetworkEvidenceError("decompressed response exceeds byte cap")
+    if not decoder.eof:
+        raise NetworkEvidenceError("response decompression was incomplete")
+    return bytes(output)

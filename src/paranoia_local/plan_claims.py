@@ -12,7 +12,7 @@ import copy
 import base64
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Iterable, Mapping, Sequence
 
 RESEARCH_ROLE = "research"
@@ -104,7 +104,13 @@ def segment_plan(raw: bytes, *, max_span_bytes: int = 1024) -> list[PlanSpan]:
 
 
 def render_spans(spans: Sequence[PlanSpan]) -> str:
-    return "".join(f"[{s.span_id}] {s.display}" for s in spans)
+    return "\n".join(
+        "SPAN=" + json.dumps(
+            {"span_id": span.span_id, "display": span.display},
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        )
+        for span in spans
+    )
 
 
 def resolve_anchor(raw: Mapping[str, Any], spans: Sequence[PlanSpan]) -> ResolvedAnchor:
@@ -175,6 +181,7 @@ class ClaimState:
     debt: dict[str, Any] | None = None
     evidence_records: list[dict[str, Any]] = field(default_factory=list)
     plan_sha256: str | None = None
+    authorization_policy: dict[str, Any] | None = None
 
     def copy(self) -> "ClaimState":
         return copy.deepcopy(self)
@@ -566,22 +573,181 @@ def state_to_json(state: ClaimState) -> dict[str, Any]:
         "debt": state.debt,
         "evidence_records": state.evidence_records,
         "plan_sha256": state.plan_sha256,
+        "authorization_policy": state.authorization_policy,
     }
 
 
 def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimState:
     if not raw:
         return ClaimState(lineage_id)
+    if not isinstance(raw, Mapping):
+        raise ClaimRegisterError("claim state must be an object")
+    allowed = {
+        "next_seq", "claims", "debt", "evidence_records", "plan_sha256",
+        "authorization_policy",
+    }
+    if not set(raw).issubset(allowed):
+        raise ClaimRegisterError("claim state has unknown fields")
+    next_seq = raw.get("next_seq", 1)
+    if not isinstance(next_seq, int) or isinstance(next_seq, bool) or next_seq < 1:
+        raise ClaimRegisterError("claim state next_seq must be a positive integer")
+    rows = raw.get("claims", [])
+    if not isinstance(rows, list) or len(rows) > MAX_ACTIVE_CLAIMS * 4:
+        raise ClaimRegisterError("claim state claims must be a bounded array")
     claims: dict[str, Claim] = {}
-    for item in raw.get("claims", []):
+    expected_claim_fields = {item.name for item in fields(Claim)}
+    for item in rows:
+        if not isinstance(item, Mapping) or set(item) != expected_claim_fields:
+            raise ClaimRegisterError("persisted claim has missing or unknown fields")
         row = dict(item)
-        row["plan_anchor"] = ResolvedAnchor(**row["plan_anchor"])
+        anchor = row.get("plan_anchor")
+        if not isinstance(anchor, Mapping) or set(anchor) != {
+            "first_span", "last_span", "start", "end", "sha256"
+        }:
+            raise ClaimRegisterError("persisted claim anchor is malformed")
+        if (
+            not all(isinstance(anchor.get(key), str) and anchor.get(key)
+                    for key in ("first_span", "last_span"))
+            or not isinstance(anchor.get("start"), int)
+            or isinstance(anchor.get("start"), bool)
+            or not isinstance(anchor.get("end"), int)
+            or isinstance(anchor.get("end"), bool)
+            or anchor["start"] < 0 or anchor["end"] < anchor["start"]
+            or not isinstance(anchor.get("sha256"), str)
+            or not _digest(anchor["sha256"])
+        ):
+            raise ClaimRegisterError("persisted claim anchor values are malformed")
+        row["plan_anchor"] = ResolvedAnchor(**anchor)
+        _validate_persisted_claim(row)
         claim = Claim(**row)
+        if claim.claim_id in claims:
+            raise ClaimRegisterError("persisted claim IDs must be unique")
         claims[claim.claim_id] = claim
+    debt = raw.get("debt")
+    if debt is not None and not isinstance(debt, dict):
+        raise ClaimRegisterError("claim state debt must be an object or null")
+    evidence_records = raw.get("evidence_records", [])
+    if not isinstance(evidence_records, list) or any(
+        not isinstance(item, Mapping) for item in evidence_records
+    ):
+        raise ClaimRegisterError("claim evidence records must be an object array")
+    plan_sha = raw.get("plan_sha256")
+    if plan_sha is not None and (not isinstance(plan_sha, str) or not _digest(plan_sha)):
+        raise ClaimRegisterError("claim plan_sha256 is malformed")
+    policy = raw.get("authorization_policy")
+    if policy is not None and (
+        not isinstance(policy, dict)
+        or set(policy) != {"version", "independent_check", "high_stakes"}
+        or policy.get("version") != 1
+        or policy.get("independent_check") not in {"auto", "require"}
+        or not isinstance(policy.get("high_stakes"), bool)
+    ):
+        raise ClaimRegisterError("claim authorization policy is malformed")
     return ClaimState(
-        lineage_id, int(raw.get("next_seq", 1)), claims, raw.get("debt"),
-        list(raw.get("evidence_records", [])), raw.get("plan_sha256"),
+        lineage_id, next_seq, claims, debt,
+        list(evidence_records), plan_sha, policy,
     )
+
+
+def _digest(value: str) -> bool:
+    return len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+
+def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
+    for key in ("claim_id", "claim", "anchor_excerpt_b64", "origin_role"):
+        if not isinstance(row.get(key), str) or (key != "anchor_excerpt_b64" and not row[key]):
+            raise ClaimRegisterError(f"persisted claim {key} is malformed")
+    try:
+        base64.b64decode(row["anchor_excerpt_b64"], validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ClaimRegisterError("persisted claim anchor excerpt is malformed") from exc
+    if row.get("kind") not in {FACT, DECISION}:
+        raise ClaimRegisterError("persisted claim kind is malformed")
+    if row.get("assertion_mode") not in {ASSERTED, ASSUMPTION, ESTIMATE}:
+        raise ClaimRegisterError("persisted assertion mode is malformed")
+    if row.get("origin_role") not in {RESEARCH_ROLE, VERIFIER_ROLE, STRUCTURAL_ROLE}:
+        raise ClaimRegisterError("persisted origin role is malformed")
+    if row.get("bearing") not in {BLOCKING, ADVISORY}:
+        raise ClaimRegisterError("persisted bearing is malformed")
+    if row.get("kind_classification") not in {PROPOSED, CONFIRMED}:
+        raise ClaimRegisterError("persisted kind classification is malformed")
+    if row.get("status") not in {
+        UNVERIFIED, VERIFIED, CONTRADICTED, DISPUTED, DEFERRED, STALE,
+        MALFORMED, UNCHECKED, NOT_APPLICABLE, SUPERSEDED,
+    }:
+        raise ClaimRegisterError("persisted status is malformed")
+    first_round = row.get("first_round")
+    if not isinstance(first_round, int) or isinstance(first_round, bool) or first_round < 1:
+        raise ClaimRegisterError("persisted first_round is malformed")
+    for key in ("evidence_ids", "disputed_evidence_ids"):
+        value = row.get(key)
+        if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+            raise ClaimRegisterError(f"persisted {key} is malformed")
+    for key in ("reason", "pending_replacement_id", "superseded_by"):
+        value = row.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ClaimRegisterError(f"persisted {key} is malformed")
+    for key in ("deferral", "independent_check", "pending_transition"):
+        value = row.get(key)
+        if value is not None and not isinstance(value, dict):
+            raise ClaimRegisterError(f"persisted {key} is malformed")
+    if row.get("status") == DEFERRED:
+        deferral = row.get("deferral")
+        if not isinstance(deferral, dict) or set(deferral) != {
+            "verification_anchor", "dependent_anchors", "completion_evidence",
+            "failure_condition", "stop_action", "plan_sha256",
+        }:
+            raise ClaimRegisterError("persisted deferral is malformed")
+        if not isinstance(deferral.get("dependent_anchors"), list) \
+                or not deferral["dependent_anchors"]:
+            raise ClaimRegisterError("persisted deferral dependencies are malformed")
+        anchors = [deferral.get("verification_anchor"), *deferral["dependent_anchors"]]
+        if any(not _persisted_anchor(anchor) for anchor in anchors):
+            raise ClaimRegisterError("persisted deferral anchor is malformed")
+        if not isinstance(deferral.get("plan_sha256"), str) or not _digest(deferral["plan_sha256"]):
+            raise ClaimRegisterError("persisted deferral plan digest is malformed")
+        if any(not isinstance(deferral.get(key), str) or not deferral[key]
+               for key in ("completion_evidence", "failure_condition", "stop_action")):
+            raise ClaimRegisterError("persisted deferral rule is malformed")
+    if row.get("status") in {VERIFIED, CONTRADICTED} and not row.get("evidence_ids"):
+        raise ClaimRegisterError("persisted truth transition has no evidence")
+    if row.get("bearing") == ADVISORY and not row.get("evidence_ids"):
+        raise ClaimRegisterError("persisted advisory claim has no evidence")
+    info = row.get("independent_check")
+    if info is not None:
+        allowed = {"required", "status", "event_digest", "evidence_ids", "checks", "reason"}
+        if not set(info).issubset(allowed) or not isinstance(info.get("required"), bool) \
+                or info.get("status") not in {"not-required", "pending", "complete"}:
+            raise ClaimRegisterError("persisted independent authorization is malformed")
+        if info["required"]:
+            ids = info.get("evidence_ids", [])
+            checks = info.get("checks", [])
+            if not isinstance(ids, list) or any(not isinstance(item, str) or not item for item in ids) \
+                    or not isinstance(checks, list):
+                raise ClaimRegisterError("persisted independent authorization inputs are malformed")
+            for check in checks:
+                if not isinstance(check, dict) or set(check) != {
+                    "vendor", "model", "event_digest", "evidence_ids", "accepted", "checked_at"
+                }:
+                    raise ClaimRegisterError("persisted vendor check is malformed")
+                if any(not isinstance(check.get(key), str) or not check[key]
+                       for key in ("vendor", "model", "event_digest", "checked_at")) \
+                        or not _digest(check["event_digest"]) \
+                        or not isinstance(check.get("evidence_ids"), (list, tuple)) \
+                        or any(not isinstance(item, str) or not item for item in check["evidence_ids"]) \
+                        or not isinstance(check.get("accepted"), bool):
+                    raise ClaimRegisterError("persisted vendor check values are malformed")
+
+
+def _persisted_anchor(anchor: Any) -> bool:
+    return isinstance(anchor, Mapping) and set(anchor) == {
+        "first_span", "last_span", "start", "end", "sha256"
+    } and all(isinstance(anchor.get(key), str) and anchor[key]
+              for key in ("first_span", "last_span")) \
+        and isinstance(anchor.get("start"), int) and not isinstance(anchor.get("start"), bool) \
+        and isinstance(anchor.get("end"), int) and not isinstance(anchor.get("end"), bool) \
+        and anchor["start"] >= 0 and anchor["end"] >= anchor["start"] \
+        and isinstance(anchor.get("sha256"), str) and _digest(anchor["sha256"])
 
 
 def render_claim_summary(state: ClaimState) -> str:
@@ -590,11 +756,19 @@ def render_claim_summary(state: ClaimState) -> str:
         if claim.status == SUPERSEDED:
             continue
         lines.append(
-            f"[{claim.claim_id}] {claim.claim} — kind={claim.kind}/"
-            f"{claim.kind_classification}, bearing={claim.bearing}, status={claim.status}"
+            "CLAIM=" + json.dumps(
+                {
+                    "claim_id": claim.claim_id,
+                    "claim": claim.claim,
+                    "kind": claim.kind,
+                    "kind_classification": claim.kind_classification,
+                    "bearing": claim.bearing,
+                    "status": claim.status,
+                    "evidence_ids": claim.evidence_ids,
+                },
+                sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            )
         )
-        if claim.evidence_ids:
-            lines.append("  evidence: " + ", ".join(claim.evidence_ids))
     if len(lines) == 1:
         lines.append("NONE")
     return "\n".join(lines)

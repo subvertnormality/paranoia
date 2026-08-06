@@ -74,3 +74,17 @@ def test_ambiguous_state_commit_keeps_journal_and_candidate_as_gc_roots(tmp_path
     assert list((tmp_path / "roots").glob("lineage.candidate-*.json"))
     store.gc(now=100)
     assert store.read(digest) == b"still-rooted"
+
+
+def test_new_root_replaces_dropped_evidence_instead_of_growing_forever(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path, orphan_ttl_seconds=0)
+    old = store.stage("old-run", b"expired")
+    store.adopt("lineage", "old-run", [old])
+    new = store.stage("new-run", b"current")
+    store.commit_state("lineage", "new-run", [new], lambda: None)
+    manifest = json.loads((tmp_path / "roots" / "lineage.json").read_text())
+    assert manifest["digests"] == [new]
+    store.gc(now=10**12)
+    with pytest.raises(EvidenceStoreError, match="missing"):
+        store.read(old)
+    assert store.read(new) == b"current"

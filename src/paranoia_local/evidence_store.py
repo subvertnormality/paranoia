@@ -131,12 +131,17 @@ class EvidenceStore:
             journal = self._read_manifest(self._journal(run_id))
             staged = set(journal.get("digests", []))
             requested = list(dict.fromkeys(digests))
-            if any(digest not in staged for digest in requested):
-                raise EvidenceStoreError("cannot adopt evidence outside the in-flight journal")
             existing = self._read_manifest(
                 self._root(lineage_id), missing={"lineage_id": lineage_id, "digests": []}
             )
-            roots = list(dict.fromkeys([*existing.get("digests", []), *requested]))
+            previously_rooted = set(existing.get("digests", []))
+            if any(digest not in staged and digest not in previously_rooted for digest in requested):
+                raise EvidenceStoreError(
+                    "cannot adopt evidence outside the journal or prior lineage root"
+                )
+            # The caller supplies the exact live reference set. Dropped/expired evidence
+            # must stop charging the lineage cap and become collectible after its TTL.
+            roots = requested
             size = sum(len(self.read(digest)) for digest in roots)
             if size > self.lineage_cap:
                 raise EvidenceStoreError("lineage evidence cap would be exceeded")
@@ -147,7 +152,9 @@ class EvidenceStore:
             try:
                 state_writer()
                 os.replace(candidate, self._root(lineage_id))
+                self._fsync_dir(self.roots)
                 self._journal(run_id).unlink(missing_ok=True)
+                self._fsync_dir(self.journals)
             except BaseException as exc:
                 raise EvidenceCommitAmbiguous(
                     "evidence/state commit is ambiguous; journal and candidate roots retained"
@@ -156,6 +163,7 @@ class EvidenceStore:
     def abort(self, run_id: str) -> None:
         with self.locked():
             self._journal(run_id).unlink(missing_ok=True)
+            self._fsync_dir(self.journals)
 
     def quarantine(self, lineage_id: str) -> None:
         """Keep its last strict root and record that only repair/abandon may remove it."""
@@ -187,11 +195,16 @@ class EvidenceStore:
                     continue
                 path.unlink()
                 removed.append(path.name)
+            if removed:
+                self._fsync_dir(self.blobs)
             return removed
 
     @staticmethod
     def _atomic_bytes(path: Path, data: bytes) -> None:
+        parent_existed = path.parent.exists()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if not parent_existed:
+            EvidenceStore._fsync_dir(path.parent.parent)
         fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as handle:
@@ -199,6 +212,7 @@ class EvidenceStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp, path)
+            EvidenceStore._fsync_dir(path.parent)
         finally:
             try:
                 os.unlink(tmp)
@@ -223,3 +237,13 @@ class EvidenceStore:
                for item in raw["digests"]):
             raise EvidenceStoreError(f"evidence manifest {path} has invalid digests")
         return raw
+
+    @staticmethod
+    def _fsync_dir(path: Path) -> None:
+        if not path.exists():
+            return
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)

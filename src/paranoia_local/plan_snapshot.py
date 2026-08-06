@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import os
-import posixpath
 import re
+import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Callable
-
-from . import orientation
 
 MAX_PINNED_REFS = 1024
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -19,6 +18,24 @@ _GIT_ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_SYSTEM": os.devnull,
     "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_PAGER": "cat",
+    "PAGER": "cat",
+}
+_GIT_CONFIG = [
+    "-c", "core.fsmonitor=false",
+    "-c", "core.untrackedCache=false",
+    "-c", "core.hooksPath=/dev/null",
+    "-c", "core.attributesFile=/dev/null",
+    "-c", "core.alternateRefsCommand=false",
+    "--no-pager",
+]
+_SNAPSHOT_IDENTITY = {
+    "GIT_AUTHOR_NAME": "paranoia",
+    "GIT_AUTHOR_EMAIL": "paranoia@localhost",
+    "GIT_COMMITTER_NAME": "paranoia",
+    "GIT_COMMITTER_EMAIL": "paranoia@localhost",
+    "GIT_AUTHOR_DATE": "2000-01-01T00:00:00 +0000",
+    "GIT_COMMITTER_DATE": "2000-01-01T00:00:00 +0000",
 }
 
 
@@ -26,11 +43,16 @@ class SnapshotUnavailable(RuntimeError):
     pass
 
 
+class SnapshotCleanupError(SnapshotUnavailable):
+    """Temporary refs may remain; the journal/latch must be retained for repair."""
+
+
 def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
-         check: bool = True) -> subprocess.CompletedProcess[bytes]:
+         check: bool = True,
+         extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
     result = subprocess.run(
-        ["git", *args], cwd=repo, input=input_bytes, capture_output=True,
-        env={**os.environ, **_GIT_ENV},
+        ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes, capture_output=True,
+        env={**os.environ, **_GIT_ENV, **(extra_env or {})},
     )
     if check and result.returncode:
         raise SnapshotUnavailable(
@@ -64,8 +86,15 @@ class PlanRepositorySnapshot:
         before_pin: Callable[[list[tuple[str, str]]], None] | None = None,
     ) -> "PlanRepositorySnapshot":
         repo = Path(repo).resolve()
-        has_head = orientation.has_head(repo)
-        head = orientation.resolve_head(repo) if has_head else orientation.empty_tree(repo)
+        head_result = _run(repo, ["rev-parse", "--verify", "--quiet", "HEAD"], check=False)
+        has_head = head_result.returncode == 0
+        head = (
+            head_result.stdout.decode("ascii").strip()
+            if has_head
+            else _run(
+                repo, ["hash-object", "-t", "tree", "--stdin"], input_bytes=b""
+            ).stdout.decode("ascii").strip()
+        )
         ignored_raw = _run(
             repo, ["ls-files", "--others", "-i", "--exclude-standard", "-z"]
         ).stdout
@@ -73,10 +102,14 @@ class PlanRepositorySnapshot:
             item.decode("utf-8", errors="surrogateescape")
             for item in ignored_raw.split(b"\0") if item
         )
-        tree = orientation.snapshot_tree(repo, head)
-        commit = orientation.wrap_commit(
-            repo, tree, head if has_head else None, "paranoia-plan-snapshot"
-        )
+        tree = _snapshot_tree_without_filters(repo)
+        commit_args = ["commit-tree", tree]
+        if has_head:
+            commit_args += ["-p", head]
+        commit_args += ["-m", "paranoia-plan-snapshot"]
+        commit = _run(
+            repo, commit_args, extra_env=_SNAPSHOT_IDENTITY
+        ).stdout.decode("ascii").strip()
         token = _ref_token(run_id)
         wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
         raw_refs = _run(
@@ -101,13 +134,7 @@ class PlanRepositorySnapshot:
         if before_pin is not None:
             before_pin(owned)
         cls._create_refs(repo, owned)
-        snapshot = cls(repo, head, tree, commit, wrapper_ref, history, ignored, owned)
-        try:
-            snapshot._reject_escaping_symlinks()
-        except BaseException:
-            snapshot.close()
-            raise
-        return snapshot
+        return cls(repo, head, tree, commit, wrapper_ref, history, ignored, owned)
 
     @staticmethod
     def _create_refs(repo: Path, refs: list[tuple[str, str]]) -> None:
@@ -123,11 +150,23 @@ class PlanRepositorySnapshot:
     def close(self) -> None:
         if self._closed:
             return
-        # Supply the old OID so a foreign replacement is never deleted as if we owned it.
-        commands = [f"delete {name} {oid}" for name, oid in self._owned_refs]
-        if commands:
-            _run(self.repo, ["update-ref", "--stdin"],
-                 input_bytes=("\n".join(commands) + "\n").encode(), check=False)
+        failures: list[str] = []
+        for name, oid in self._owned_refs:
+            current = _run(self.repo, ["rev-parse", "--verify", name], check=False)
+            if current.returncode:
+                continue
+            if current.stdout.decode("ascii").strip() != oid:
+                failures.append(f"{name} changed owner")
+                continue
+            result = _run(self.repo, ["update-ref", "-d", name, oid], check=False)
+            if result.returncode:
+                failures.append(
+                    f"{name}: " + result.stderr.decode("utf-8", errors="replace").strip()
+                )
+        if failures:
+            raise SnapshotCleanupError(
+                "could not delete temporary snapshot refs: " + "; ".join(failures)
+            )
         self._closed = True
 
     def _verify_wrapper(self) -> None:
@@ -139,6 +178,8 @@ class PlanRepositorySnapshot:
 
     def _entry(self, path: str) -> tuple[str, str, str]:
         self._verify_wrapper()
+        if not isinstance(path, str):
+            raise SnapshotUnavailable("repository evidence path must be a string")
         pure = PurePosixPath(path)
         if not path or pure.is_absolute() or ".." in pure.parts or "\0" in path:
             raise SnapshotUnavailable("repository evidence path escapes the snapshot")
@@ -173,6 +214,8 @@ class PlanRepositorySnapshot:
         if limit < 1 or limit > 200:
             raise SnapshotUnavailable("tree result limit must be 1..200")
         args = ["ls-tree", "-r", "-z", "--name-only", self.commit_id]
+        if not isinstance(prefix, str):
+            raise SnapshotUnavailable("tree prefix must be a string")
         if prefix:
             pure = PurePosixPath(prefix)
             if pure.is_absolute() or ".." in pure.parts:
@@ -183,10 +226,13 @@ class PlanRepositorySnapshot:
 
     def search_literal(self, pattern: str, *, paths: list[str] | None = None,
                        limit: int = 50) -> list[dict[str, object]]:
-        if not pattern or len(pattern.encode()) > 256 or not (1 <= limit <= 50):
+        if not isinstance(pattern, str) or not pattern or len(pattern.encode()) > 256 \
+                or not (1 <= limit <= 50):
             raise SnapshotUnavailable("literal search exceeds bounds")
         results: list[dict[str, object]] = []
         candidates = paths or self.list_tree(limit=200)
+        if any(not isinstance(path, str) for path in candidates):
+            raise SnapshotUnavailable("literal search paths must be strings")
         for path in candidates[:200]:
             try:
                 data = self.read_blob(path, max_bytes=1 << 20)
@@ -216,6 +262,8 @@ class PlanRepositorySnapshot:
             oid = self.history_refs.get(ref, "")
             if not oid:
                 raise SnapshotUnavailable("history ref was not in the initial pinned map")
+        if not isinstance(ref, str) or not isinstance(path, str):
+            raise SnapshotUnavailable("history ref and path must be strings")
         pure = PurePosixPath(path)
         if not path or pure.is_absolute() or ".." in pure.parts:
             raise SnapshotUnavailable("history path escapes snapshot")
@@ -236,19 +284,95 @@ class PlanRepositorySnapshot:
                              "subject": subject.strip()[:500]})
         return rows
 
-    def _reject_escaping_symlinks(self) -> None:
-        out = _run(self.repo, ["ls-tree", "-r", "-z", self.commit_id]).stdout
-        for row in [item for item in out.split(b"\0") if item]:
-            meta, _, raw_path = row.partition(b"\t")
-            mode, kind, oid = meta.decode("ascii").split()
-            if mode != "120000" or kind != "blob":
-                continue
-            path = raw_path.decode("utf-8", errors="surrogateescape")
-            target = _run(self.repo, ["cat-file", "blob", oid]).stdout.decode(
-                "utf-8", errors="surrogateescape"
+
+
+def _snapshot_tree_without_filters(repo: Path) -> str:
+    """Hash working-tree bytes without ``git add`` or repository-selected commands.
+
+    Git supplies only the candidate path set and object database. File bytes are opened
+    with ``O_NOFOLLOW``, hashed through stdin (which bypasses clean filters), and inserted
+    into a private index with explicit modes/object IDs. Repository hooks, fsmonitor,
+    attributes, filters, pagers, and aliases therefore cannot select an executable step.
+    """
+    cached = _run(repo, ["ls-files", "-s", "-z"]).stdout
+    index_entries: dict[str, tuple[str, str]] = {}
+    for row in [item for item in cached.split(b"\0") if item]:
+        meta, sep, raw_path = row.partition(b"\t")
+        fields = meta.decode("ascii", errors="strict").split()
+        if not sep or len(fields) != 3:
+            raise SnapshotUnavailable("git index entry was malformed")
+        mode, oid, stage = fields
+        if stage == "0":
+            index_entries[raw_path.decode("utf-8", errors="surrogateescape")] = (mode, oid)
+
+    candidates = _run(
+        repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]
+    ).stdout
+    rows: list[tuple[str, str, str]] = []
+    for raw_path in [item for item in candidates.split(b"\0") if item]:
+        path = raw_path.decode("utf-8", errors="surrogateescape")
+        pure = PurePosixPath(path)
+        if pure.is_absolute() or ".." in pure.parts or not pure.parts:
+            raise SnapshotUnavailable("snapshot candidate path escapes repository")
+        target = repo.joinpath(*pure.parts)
+        cursor = repo
+        for part in pure.parts[:-1]:
+            cursor = cursor / part
+            if cursor.is_symlink():
+                raise SnapshotUnavailable(f"snapshot path traverses a symlink: {path!r}")
+        try:
+            info = target.lstat()
+        except FileNotFoundError:
+            continue  # tracked deletion
+        indexed = index_entries.get(path)
+        if indexed and indexed[0] == "160000":
+            rows.append(("160000", indexed[1], path))
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            body = os.readlink(target).encode("utf-8", errors="surrogateescape")
+            oid = _run(repo, ["hash-object", "-w", "--stdin"], input_bytes=body).stdout.decode().strip()
+            rows.append(("120000", oid, path))
+            continue
+        if not stat.S_ISREG(info.st_mode):
+            raise SnapshotUnavailable(f"snapshot path is not a regular file: {path!r}")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(target, flags)
+        try:
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                raise SnapshotUnavailable(f"snapshot path changed while opening: {path!r}")
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                proc = subprocess.run(
+                    ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
+                    cwd=repo, stdin=handle, capture_output=True, env={**os.environ, **_GIT_ENV},
+                )
+            if proc.returncode:
+                raise SnapshotUnavailable(
+                    "git hash-object failed: "
+                    + proc.stderr.decode("utf-8", errors="replace").strip()
+                )
+            oid = proc.stdout.decode("ascii").strip()
+        finally:
+            os.close(fd)
+        rows.append(("100755" if opened.st_mode & 0o111 else "100644", oid, path))
+
+    index_dir = Path(tempfile.mkdtemp(prefix="paranoia-plan-index-"))
+    try:
+        env_index = str(index_dir / "index")
+        private_env = {"GIT_INDEX_FILE": env_index}
+        _run(repo, ["read-tree", "--empty"], extra_env=private_env)
+        payload = b"".join(
+            f"{mode} {oid}\t".encode("ascii")
+            + path.encode("utf-8", errors="surrogateescape") + b"\0"
+            for mode, oid, path in sorted(
+                rows, key=lambda item: item[2].encode("utf-8", "surrogateescape")
             )
-            if target.startswith("/"):
-                raise SnapshotUnavailable(f"escaping symlink in snapshot: {path}")
-            combined = posixpath.normpath(posixpath.join(posixpath.dirname(path), target))
-            if combined == ".." or combined.startswith("../"):
-                raise SnapshotUnavailable(f"escaping symlink in snapshot: {path}")
+        )
+        _run(
+            repo, ["update-index", "-z", "--index-info"],
+            input_bytes=payload, extra_env=private_env,
+        )
+        return _run(repo, ["write-tree"], extra_env=private_env).stdout.decode("ascii").strip()
+    finally:
+        import shutil
+        shutil.rmtree(index_dir, ignore_errors=True)

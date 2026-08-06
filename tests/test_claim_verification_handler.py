@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from paranoia_local import class_closure as cc
 from paranoia_local import handlers, plan_claims as pc
 from paranoia_local.engines import Review
@@ -21,6 +23,8 @@ class ClaimEngine:
     def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
         self.tool_less_prompts.append(prompt)
         if "neutral claim extractor" in prompt:
+            if '"claim":"app.py defines greet"' in prompt:
+                return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: []")
             event = {
                 "op": "ADD", "temp_id": "premise", "claim": "app.py defines greet",
                 "kind": "fact", "assertion_mode": "asserted",
@@ -28,19 +32,21 @@ class ClaimEngine:
             }
             return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([event]))
         if "neutral evidence planner" in prompt:
-            claim_id = re.search(r"\[([0-9a-f]{10})\] app.py", prompt).group(1)
+            claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
             request = {"op": "READ_BLOB", "claim_id": claim_id, "path": "app.py",
                        "max_bytes": 1048576}
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request]))
         if "preparing bounded repository context" in prompt:
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []")
         if "neutral evidence verifier" in prompt:
-            claim_id = re.search(r"\[([0-9a-f]{10})\] app.py", prompt).group(1)
-            evidence = re.search(r"\[(e[0-9a-f]{12})\]", prompt).group(1)
-            events = [
-                {"op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
-                 "reason": "an implementation assertion"},
-            ]
+            claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+            evidence = re.search(r'"evidence_id":"(e[0-9a-f]{12})"', prompt).group(1)
+            events = []
+            if '"kind_classification":"proposed"' in prompt:
+                events.append(
+                    {"op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+                     "reason": "an implementation assertion"}
+                )
             if self.verify:
                 events.append({"op": "VERIFY", "claim_id": claim_id,
                                "evidence_ids": [evidence], "reason": "exact pinned blob"})
@@ -132,3 +138,100 @@ def test_unchanged_valid_cache_round_spends_zero_research_or_fetch_calls(
     assert len(second.tool_less_prompts) == 1
     assert "adversarial reviewer of plans" in second.tool_less_prompts[0]
     assert "CLAIM-REGISTER: cache-hit (zero research calls, zero fetches)" in out
+
+
+def test_tightening_independent_policy_invalidates_cache_and_reauthorizes(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = {
+        "repo_path": str(repo),
+        "plan_text": "Use the existing greet function.\n",
+        "lineage": "policy-plan",
+        "round": 1,
+    }
+    handlers.critique_plan(
+        args, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+
+    def checks(event, **_kwargs):
+        digest = pc.event_digest(event)
+        ids = tuple(event.data.get("evidence_ids", []))
+        return [
+            pc.VendorCheck("fake", "fake-model", digest, ids, True, "T2"),
+            pc.VendorCheck("other", "other-model", digest, ids, True, "T2"),
+        ]
+
+    monkeypatch.setattr(handlers, "_independent_checks", checks)
+    second = ClaimEngine()
+    args.update({"round": 2, "independent_check": "require"})
+    out = handlers.critique_plan(
+        args, engine=second, log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert len(second.tool_less_prompts) > 1
+    assert "cache-hit" not in out
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "policy-plan", stamp="T3", mode=cc.PLAN_MODE
+    )
+    claim = next(iter(pc.state_from_json("policy-plan", lineage.claim_state).claims.values()))
+    assert claim.independent_check["status"] == "complete"
+
+
+def test_structural_add_receives_real_span_vocabulary_and_remains_blocking(
+    repo: Path, tmp_path: Path
+) -> None:
+    class StructuralAddEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "adversarial reviewer of plans" not in prompt:
+                return super().run_toolless(prompt, model, effort, **kwargs)
+            self.tool_less_prompts.append(prompt)
+            assert '"span_id":"p000001"' in prompt
+            event = {
+                "op": "ADD", "temp_id": "structural-1", "claim": "Deployment exists",
+                "kind": "fact", "assertion_mode": "assumption",
+                "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+            }
+            return _review(
+                "## What works\n\nGrounded.\n\n## What doesn't work\n\nNothing notable.\n\n"
+                "## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n"
+                "## Improvements\n\nNothing notable.\n\n=== PLAN REGISTER ===\n"
+                "EVENTS-JSON: " + _json([event]) + "\n=== CLASS REGISTER ===\nNONE"
+            )
+
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Deploy it.\n",
+            "lineage": "structural-add-plan", "round": 1,
+        },
+        engine=StructuralAddEngine(verify=False),
+        log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "Deployment exists" in out and "CONVERGENCE: BLOCKED" in out
+
+
+def test_malformed_nested_claim_state_is_quarantined_without_stranding_latch(
+    repo: Path, tmp_path: Path
+) -> None:
+    directory = cc.lineage_dir(cc.default_state_root())
+    directory.mkdir(parents=True)
+    state_path = directory / "malformed-plan.json"
+    state_path.write_text(json.dumps({
+        "mode": cc.PLAN_MODE,
+        "rounds": 1,
+        "next_seq": 1,
+        "classes": [],
+        "exemptions": [],
+        "debt": None,
+        "schema_version": 2,
+        "claim_state": {"next_seq": 1, "claims": [], "evidence_records": ["bad"]},
+    }))
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Plan.\n",
+            "lineage": "malformed-plan", "round": 2,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
+    assert not (directory / "malformed-plan.pending").exists()
+    assert list(directory.glob("malformed-plan.corrupt-*.json"))

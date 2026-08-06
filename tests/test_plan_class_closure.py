@@ -20,12 +20,28 @@ introduced by an earlier round's fix:
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
 from paranoia_local import class_closure as cc
 from paranoia_local import handlers, prompts
+
+
+def test_lineage_latch_has_exactly_one_concurrent_owner(tmp_path: Path) -> None:
+    root = tmp_path / "state"
+
+    def acquire(_index: int) -> bool:
+        try:
+            cc.open_latch(root, "same-lineage")
+            return True
+        except cc.StateUnavailable:
+            return False
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        outcomes = list(pool.map(acquire, range(8)))
+    assert outcomes.count(True) == 1
 
 
 class FakeEngine:

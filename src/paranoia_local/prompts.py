@@ -160,7 +160,14 @@ End with exactly:
 EVENTS-JSON: <one-line JSON array>
 
 Allowed operations are CONFIRM_KIND, VERIFY, CONTRADICT, DEFER, RESOLVE_DISPUTE,
-SET_BEARING, and SUPERSEDE using the exact claim-event schema supplied in the task packet.
+SET_BEARING, and SUPERSEDE. Exact objects:
+{"op":"CONFIRM_KIND","claim_id":"...","kind":"fact|decision","reason":"..."}
+{"op":"VERIFY","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
+{"op":"CONTRADICT","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
+{"op":"DEFER","claim_id":"...","verification_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"},"dependent_anchors":[{"first_span":"pNNNNNN","last_span":"pNNNNNN"}],"completion_evidence":"...","failure_condition":"...","stop_action":"..."}
+{"op":"RESOLVE_DISPUTE","claim_id":"...","evidence_ids":["e..."],"reason":"..."}
+{"op":"SET_BEARING","claim_id":"...","bearing":"blocking|advisory","evidence_ids":["e..."],"reason":"..."}
+{"op":"SUPERSEDE","claim_id":"...","replacement":{"temp_id":"...","claim":"...","kind":"fact|decision","assertion_mode":"asserted|assumption|estimate","plan_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"}},"reason":"..."}
 Every truth or bearing transition must name server evidence IDs. Use [] to abstain."""
 
 PLAN_CLAIM_REGISTER_INSTRUCTIONS = """## Register claims and evidence disputes
@@ -171,7 +178,10 @@ EVENTS-JSON: <one-line JSON array>
 
 You may ADD a newly noticed claim using the research ADD schema, DISPUTE an evidence record
 with {"op":"DISPUTE","claim_id":"...","evidence_ids":["..."],"reason":"..."}, or
-CONFIRM_KIND for a claim created by another role. You may not verify, waive, supersede, or
+CONFIRM_KIND with {"op":"CONFIRM_KIND","claim_id":"...","kind":"fact|decision","reason":"..."}
+for a claim created by another role. ADD is
+{"op":"ADD","temp_id":"...","claim":"...","kind":"fact|decision","assertion_mode":"asserted|assumption|estimate","plan_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"}}.
+You may not verify, waive, supersede, or
 downgrade a claim. Use []. Then emit the CLASS REGISTER immediately after it."""
 
 QUERY_INSTRUCTIONS = """You are Paranoia in QUERY mode: a fast, rigorous second opinion on a single question. This is NOT a full review — do NOT produce the five-section report.

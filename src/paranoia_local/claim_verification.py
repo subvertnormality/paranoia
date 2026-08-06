@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
@@ -49,6 +49,39 @@ class EvidenceRecord:
     metadata: dict[str, Any]
 
 
+@dataclass
+class EvidenceBudget:
+    """One budget shared by every evidence phase in a closure round."""
+
+    requests: int = 0
+    fetch_attempts: int = 0
+    aggregate_bytes: int = 0
+    per_claim: dict[str, int] = field(default_factory=dict)
+
+    def debit_requests(self, requests: Sequence[EvidenceRequest]) -> None:
+        if self.requests + len(requests) > MAX_REQUESTS:
+            raise EvidenceRequestError("review evidence request budget exceeded")
+        for request in requests:
+            claim_id = request.data["claim_id"]
+            count = self.per_claim.get(claim_id, 0) + 1
+            if count > MAX_PER_CLAIM:
+                raise EvidenceRequestError(
+                    f"claim {claim_id} exceeds shared per-round request budget"
+                )
+            self.per_claim[claim_id] = count
+        self.requests += len(requests)
+
+    def debit_fetch(self) -> None:
+        if self.fetch_attempts >= MAX_FETCHES:
+            raise EvidenceRequestError("external fetch-attempt budget exceeded")
+        self.fetch_attempts += 1
+
+    def debit_bytes(self, size: int) -> None:
+        if size < 0 or self.aggregate_bytes + size > MAX_AGGREGATE_BYTES:
+            raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
+        self.aggregate_bytes += size
+
+
 _REQUEST_FIELDS = {
     "LIST_TREE": {"op", "claim_id", "prefix", "limit"},
     "READ_BLOB": {"op", "claim_id", "path", "max_bytes"},
@@ -86,13 +119,14 @@ def parse_requests(text: str, active_claim_ids: set[str]) -> list[EvidenceReques
     requests: list[EvidenceRequest] = []
     per_claim: dict[str, int] = {}
     for item in raw:
-        if not isinstance(item, dict) or item.get("op") not in _REQUEST_FIELDS:
+        if not isinstance(item, dict) or not isinstance(item.get("op"), str) \
+                or item.get("op") not in _REQUEST_FIELDS:
             raise EvidenceRequestError("unknown evidence request operation")
         op = item["op"]
         if set(item) != _REQUEST_FIELDS[op]:
             raise EvidenceRequestError(f"{op} has missing or unknown fields")
         claim_id = item.get("claim_id")
-        if claim_id not in active_claim_ids:
+        if not isinstance(claim_id, str) or claim_id not in active_claim_ids:
             raise EvidenceRequestError("evidence request references an unknown claim")
         per_claim[claim_id] = per_claim.get(claim_id, 0) + 1
         if per_claim[claim_id] > MAX_PER_CLAIM:
@@ -109,14 +143,19 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
     ):
         raise EvidenceRequestError(f"{op}.limit is out of bounds")
     if op == "READ_BLOB":
+        if not isinstance(item.get("path"), str) or not item["path"]:
+            raise EvidenceRequestError("READ_BLOB.path is required")
         size = item.get("max_bytes")
         if not isinstance(size, int) or isinstance(size, bool) or not 1 <= size <= 1 << 20:
             raise EvidenceRequestError("READ_BLOB.max_bytes is out of bounds")
     if op == "SEARCH_LITERAL":
         if not isinstance(item.get("pattern"), str) or not item["pattern"] or len(item["pattern"]) > 256:
             raise EvidenceRequestError("SEARCH_LITERAL.pattern is out of bounds")
-        if not isinstance(item.get("paths"), list) or len(item["paths"]) > 50:
+        if not isinstance(item.get("paths"), list) or len(item["paths"]) > 50 \
+                or any(not isinstance(path, str) or not path for path in item["paths"]):
             raise EvidenceRequestError("SEARCH_LITERAL.paths is out of bounds")
+    if op == "LIST_TREE" and not isinstance(item.get("prefix"), str):
+        raise EvidenceRequestError("LIST_TREE.prefix must be a string")
     if op == "SEARCH_EXTERNAL":
         if not isinstance(item.get("query"), str) or not item["query"] or len(item["query"]) > 500:
             raise EvidenceRequestError("SEARCH_EXTERNAL.query is out of bounds")
@@ -143,10 +182,11 @@ def collect_evidence(
     run_id: str,
     search_provider: EndpointSearchProvider | None = None,
     http_client: SafeHttpClient | None = None,
+    budget: EvidenceBudget | None = None,
 ) -> list[EvidenceRecord]:
+    budget = budget or EvidenceBudget()
+    budget.debit_requests(requests)
     records: list[EvidenceRecord] = []
-    aggregate = 0
-    fetches = 0
     for request in requests:
         data = request.data
         claim_id = data["claim_id"]
@@ -155,12 +195,12 @@ def collect_evidence(
             body = json.dumps(paths, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
+            budget.debit_bytes(len(body))
             records.append(_record(store, run_id, claim_id, "repository-list",
                                    snapshot.commit_id, body, {
                                        "prefix": data["prefix"],
                                        "snapshot_commit": snapshot.commit_id,
                                    }))
-            aggregate += len(body)
         elif request.op == "READ_BLOB":
             try:
                 body = snapshot.read_blob(data["path"], max_bytes=data["max_bytes"])
@@ -168,30 +208,30 @@ def collect_evidence(
                 if "gitlinks are unavailable" in str(exc):
                     continue
                 raise
+            budget.debit_bytes(len(body))
             records.append(_record(store, run_id, claim_id, "repository-blob",
                                    data["path"], body,
                                    {"snapshot_commit": snapshot.commit_id, "path": data["path"]}))
-            aggregate += len(body)
         elif request.op == "SEARCH_LITERAL":
             matches = snapshot.search_literal(data["pattern"], paths=data["paths"],
                                                limit=min(data["limit"], 50))
             body = json.dumps(matches, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8", errors="surrogateescape"
             )
+            budget.debit_bytes(len(body))
             records.append(_record(store, run_id, claim_id, "repository-search",
                                    snapshot.commit_id, body,
                                    {"pattern": data["pattern"], "paths": data["paths"],
                                     "snapshot_commit": snapshot.commit_id}))
-            aggregate += len(body)
         elif request.op == "HISTORY":
             rows = snapshot.history(data["ref"], data["path"], limit=data["limit"])
             body = json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode()
+            budget.debit_bytes(len(body))
             records.append(_record(
                 store, run_id, claim_id, "repository-history", data["ref"], body,
                 {"ref": data["ref"], "path": data["path"],
                  "snapshot_commit": snapshot.commit_id},
             ))
-            aggregate += len(body)
         elif request.op == "RUN_ADAPTER":
             rows: list[dict[str, Any]] = []
             inputs: dict[str, str] = {}
@@ -205,6 +245,7 @@ def collect_evidence(
                     rows.append({"path": path, "compiled": False,
                                  "error": f"{type(exc).__name__}: {exc}"[:1000]})
             body = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
+            budget.debit_bytes(len(body))
             records.append(_record(
                 store, run_id, claim_id, "empirical", "PYTHON_COMPILE", body,
                 {
@@ -216,25 +257,27 @@ def collect_evidence(
                     "falsifying_result": any(not row["compiled"] for row in rows),
                 },
             ))
-            aggregate += len(body)
         else:
             if search_provider is None or http_client is None:
                 # Absence is explicit abstention, never a fabricated evidence record.
                 continue
             try:
+                budget.debit_fetch()
                 hits = search_provider.search(data["query"], limit=min(data["limit"], 2))
+                budget.debit_bytes(search_provider.last_response_size)
             except NetworkEvidenceError as exc:
+                if search_provider.last_response_size:
+                    budget.debit_bytes(search_provider.last_response_size)
                 records.append(_abstention(claim_id, "external-search", data["query"], str(exc)))
                 continue
             for hit in hits:
-                if fetches >= MAX_FETCHES:
-                    raise EvidenceRequestError("external fetch budget exceeded")
+                budget.debit_fetch()
                 try:
                     response = http_client.fetch(hit.url)
                 except NetworkEvidenceError as exc:
                     records.append(_abstention(claim_id, "external-fetch", hit.url, str(exc)))
                     continue
-                fetches += 1
+                budget.debit_bytes(len(response.body))
                 records.append(_record(
                     store, run_id, claim_id, "external", response.final_url, response.body,
                     {
@@ -253,21 +296,18 @@ def collect_evidence(
                         "conflicts": [],
                     },
                 ))
-                aggregate += len(response.body)
-        if aggregate > MAX_AGGREGATE_BYTES:
-            raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
     return records
 
 
 def collect_supplied_evidence(
     supplied: Sequence[Mapping[str, Any]], *, claims: pc.ClaimState,
-    store: EvidenceStore, run_id: str,
+    store: EvidenceStore, run_id: str, budget: EvidenceBudget | None = None,
 ) -> list[EvidenceRecord]:
     """Hash bounded caller artifacts and bind them to one exact registered claim."""
     if len(supplied) > 20:
         raise EvidenceRequestError("supplied_evidence exceeds 20 records")
     records: list[EvidenceRecord] = []
-    total = 0
+    budget = budget or EvidenceBudget()
     for item in supplied:
         if set(item) != {"claim", "source", "content"}:
             raise EvidenceRequestError(
@@ -280,9 +320,9 @@ def collect_supplied_evidence(
         if len(matches) != 1:
             raise EvidenceRequestError("supplied evidence claim must match one registered claim")
         body = content.encode("utf-8", errors="surrogateescape")
-        total += len(body)
-        if len(body) > 1 << 20 or total > MAX_AGGREGATE_BYTES:
+        if len(body) > 1 << 20:
             raise EvidenceRequestError("supplied evidence exceeds byte budget")
+        budget.debit_bytes(len(body))
         records.append(_record(
             store, run_id, matches[0].claim_id, "supplied-artifact", source, body,
             {"source": source, "caller_supplied": True},
@@ -331,20 +371,30 @@ def render_evidence(records: Sequence[EvidenceRecord], *, include_passages: bool
         return lines[0] + "\nNONE — verification must abstain."
     for record in records:
         lines.append(
-            f"[{record.evidence_id}] claim={record.claim_id} kind={record.kind} "
-            f"source={record.source} sha256={record.source_sha256} bytes={record.source_size}"
+            "RECORD=" + json.dumps(
+                {
+                    "evidence_id": record.evidence_id,
+                    "claim_id": record.claim_id,
+                    "kind": record.kind,
+                    "source": record.source,
+                    "sha256": record.source_sha256,
+                    "bytes": record.source_size,
+                },
+                sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            )
         )
         if record.metadata:
             lines.append(
                 "  metadata=" + json.dumps(
                     record.metadata, sort_keys=True, separators=(",", ":"),
-                    ensure_ascii=False,
+                    ensure_ascii=True,
                 )[:2000]
             )
         if include_passages:
-            lines.append("  UNTRUSTED-DATA-BEGIN")
-            lines.append("  " + record.display_passage.replace("\n", "\n  "))
-            lines.append("  UNTRUSTED-DATA-END")
+            lines.append(
+                "  UNTRUSTED-DATA-JSON="
+                + json.dumps(record.display_passage, ensure_ascii=True)
+            )
     return "\n".join(lines)
 
 
@@ -353,7 +403,42 @@ def records_to_json(records: Sequence[EvidenceRecord]) -> list[dict[str, Any]]:
 
 
 def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]:
-    return [EvidenceRecord(**dict(row)) for row in rows]
+    if not isinstance(rows, list) or len(rows) > 1000:
+        raise EvidenceRequestError("persisted evidence records must be a bounded array")
+    expected = {item.name for item in EvidenceRecord.__dataclass_fields__.values()}
+    records: list[EvidenceRecord] = []
+    seen: set[str] = set()
+    for raw in rows:
+        if not isinstance(raw, Mapping) or set(raw) != expected:
+            raise EvidenceRequestError("persisted evidence record has missing or unknown fields")
+        row = dict(raw)
+        for key in (
+            "evidence_id", "claim_id", "kind", "source", "source_sha256",
+            "passage_sha256", "display_passage",
+        ):
+            if not isinstance(row.get(key), str):
+                raise EvidenceRequestError(f"persisted evidence {key} is malformed")
+        if not row["evidence_id"] or row["evidence_id"] in seen or not row["claim_id"]:
+            raise EvidenceRequestError("persisted evidence identity is malformed")
+        seen.add(row["evidence_id"])
+        for key in ("source_sha256", "passage_sha256"):
+            if len(row[key]) != 64 or any(c not in "0123456789abcdef" for c in row[key]):
+                raise EvidenceRequestError(f"persisted evidence {key} is malformed")
+        digest = row.get("blob_digest")
+        if digest is not None and (
+            not isinstance(digest, str) or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+        ):
+            raise EvidenceRequestError("persisted evidence blob digest is malformed")
+        for key in ("source_size", "passage_start", "passage_end"):
+            if not isinstance(row.get(key), int) or isinstance(row[key], bool) or row[key] < 0:
+                raise EvidenceRequestError(f"persisted evidence {key} is malformed")
+        if row["passage_start"] > row["passage_end"] or row["passage_end"] > row["source_size"]:
+            raise EvidenceRequestError("persisted evidence passage bounds are malformed")
+        if not isinstance(row.get("metadata"), dict):
+            raise EvidenceRequestError("persisted evidence metadata is malformed")
+        records.append(EvidenceRecord(**row))
+    return records
 
 
 def validate_cached_records(

@@ -357,7 +357,7 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
 | `claim_verification` | `blocking` | `blocking` when closure is on | Integrated claim gate. Rejected with `class_closure: false` |
-| `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking |
+| `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy. Auto treats stated stakes as high unless explicitly low/modest; unavailable required checks stay blocking |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
 | `refresh_claims` | boolean | `false` | Bypass an otherwise valid zero-research cache hit for this round |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
@@ -641,7 +641,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 - **Plan evidence is server-mediated.** Closure-enabled `critique_plan` roles do not
   receive a repository worktree. Claude uses an empty tool allowlist; Codex uses a
   `bwrap` namespace with no shell or repository mounts. Native web is disabled. Exact
-  repository bytes and configured HTTPS sources are fetched only by bounded server code.
+  repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
+  fetched only by bounded server code. All model-visible paths, sources, metadata, and
+  passages are JSON escaped; remote and repository bodies never share a role call.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived

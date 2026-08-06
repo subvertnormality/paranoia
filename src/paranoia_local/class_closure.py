@@ -450,8 +450,20 @@ def open_latch(root: Path, lineage_id: str) -> None:
     Without it a *failed* write leaves no marker and the next round starts empty."""
     _, pending = _paths(root, lineage_id)
     try:
+        parent_existed = pending.parent.exists()
         pending.parent.mkdir(parents=True, exist_ok=True)
-        pending.write_text("pending\n", encoding="utf-8")
+        if not parent_existed:
+            _fsync_dir(pending.parent.parent)
+        fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(b"pending\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        _fsync_dir(pending.parent)
+    except FileExistsError as exc:
+        raise StateUnavailable(
+            f"another round owns the pending lineage latch at {pending}"
+        ) from exc
     except OSError as exc:
         # Same treatment as a failed lineage save: block, but never prevent the review
         # from running or discard its text over a storage fault.
@@ -468,22 +480,52 @@ def clear_latch(root: Path, lineage_id: str) -> None:
     _, pending = _paths(root, lineage_id)
     try:
         pending.unlink(missing_ok=True)
+        _fsync_dir(pending.parent)
     except OSError:
         pass
 
 
 def save_lineage(root: Path, lineage: Lineage) -> None:
     state_path, _ = _paths(root, lineage.lineage_id)
+    parent_existed = state_path.parent.exists()
     state_path.parent.mkdir(parents=True, exist_ok=True)
+    if not parent_existed:
+        _fsync_dir(state_path.parent.parent)
     try:
         fd, tmp = tempfile.mkstemp(dir=str(state_path.parent), suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(_to_json(lineage), fh, indent=2, default=str)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, state_path)
+        _fsync_dir(state_path.parent)
     except OSError as exc:
         raise StateUnavailable(
             f"could not write lineage state under {state_path.parent}: {exc}"
         ) from exc
+
+
+def quarantine_lineage(root: Path, lineage_id: str, *, stamp: str, reason: str) -> Path:
+    """Move a loaded-but-invalid lineage aside before a latch is acquired."""
+    state_path, _ = _paths(root, lineage_id)
+    dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
+    try:
+        os.replace(state_path, dest)
+        _fsync_dir(dest.parent)
+    except OSError as exc:
+        raise StateUnavailable(
+            f"lineage state at {state_path} is invalid ({reason}) and could not be "
+            f"quarantined: {exc}"
+        ) from exc
+    return dest
+
+
+def _fsync_dir(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 # ── applying a register ───────────────────────────────────────────────────────

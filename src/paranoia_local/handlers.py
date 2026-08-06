@@ -26,7 +26,7 @@ from .config import load_repo_config, resolve
 from .engines import Engine, Review, ToollessUnavailable
 from .evidence_store import EvidenceCommitAmbiguous, EvidenceStore, EvidenceStoreError
 from .external_evidence import EndpointSearchProvider, SafeHttpClient
-from .plan_snapshot import PlanRepositorySnapshot, SnapshotUnavailable
+from .plan_snapshot import PlanRepositorySnapshot, SnapshotCleanupError, SnapshotUnavailable
 from .worktree import worktree_at
 
 
@@ -542,7 +542,6 @@ def _critique_plan_verified(
     research_status = "not-run"
     class_status = cc.NONE
     minted_classes: list[str] = []
-    staged_digests: list[str] = []
     try:
         def journal_snapshot(refs: list[tuple[str, str]]) -> None:
             store.begin(run_id, metadata={
@@ -553,15 +552,21 @@ def _critique_plan_verified(
         with PlanRepositorySnapshot.create(
             repo, run_id=run_id, before_pin=journal_snapshot
         ) as snapshot:
-            high_stakes = any(
-                word in (stakes or "").lower()
-                for word in ("high-stakes", "regulated", "medical", "financial", "safety-critical")
-            )
+            high_stakes = _is_high_stakes(stakes)
+            current_policy = {
+                "version": 1,
+                "independent_check": independent_policy,
+                "high_stakes": high_stakes,
+            }
             evidence_records = cv.validate_cached_records(
                 evidence_records, snapshot=snapshot, store=store, state=state,
                 high_stakes=high_stakes,
             )
+            persisted_policy = state.authorization_policy
+            _reblock_for_policy(state, evidence_records, current_policy)
+            state.authorization_policy = current_policy
             draft_claims = state.copy()
+            round_budget = cv.EvidenceBudget()
             evidence_ids = {
                 record.evidence_id for record in evidence_records
                 if record.kind != "abstention"
@@ -570,6 +575,7 @@ def _critique_plan_verified(
                 state.plan_sha256 == hashlib.sha256(raw_plan).hexdigest()
                 and not pc.blocking_claims(state)
                 and len(evidence_records) == len(state.evidence_records)
+                and persisted_policy == current_policy
                 and not arguments.get("supplied_evidence")
                 and not bool(arguments.get("refresh_claims", False))
             )
@@ -582,7 +588,7 @@ def _critique_plan_verified(
                         plan_packet, pc.render_claim_summary(state),
                         "Do not ADD a proposition already present in ACTIVE CLAIMS.",
                         "=== EXCLUDED IGNORED UNTRACKED PATHS ===\n"
-                        + ("\n".join(snapshot.ignored_paths) or "NONE"),
+                        + json.dumps(snapshot.ignored_paths, ensure_ascii=True),
                     ])),
                 )
                 _, research_events, research_retry = _role_register_call(
@@ -613,7 +619,7 @@ def _critique_plan_verified(
                         plan_packet,
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
-                        + "\n".join(tree_listing),
+                        + json.dumps(tree_listing, ensure_ascii=True),
                     ]),
                 )
                 _, requests, _ = _role_register_call(
@@ -626,13 +632,13 @@ def _critique_plan_verified(
                 new_records = cv.collect_evidence(
                     requests, snapshot=snapshot, store=store, run_id=run_id,
                     search_provider=provider, http_client=http_client,
+                    budget=round_budget,
                 )
                 new_records += cv.collect_supplied_evidence(
                     list(arguments.get("supplied_evidence", [])), claims=draft_claims,
-                    store=store, run_id=run_id,
+                    store=store, run_id=run_id, budget=round_budget,
                 )
                 evidence_records = _merge_evidence(evidence_records, new_records)
-                staged_digests = [record.blob_digest for record in new_records if record.blob_digest]
 
                 evidence_ids = {
                     record.evidence_id for record in evidence_records
@@ -691,7 +697,7 @@ def _critique_plan_verified(
                         plan_packet,
                         pc.render_claim_summary(draft_claims),
                         "=== PINNED REPOSITORY FILES (bounded) ===\n"
-                        + "\n".join(snapshot.list_tree(limit=200)),
+                        + json.dumps(snapshot.list_tree(limit=200), ensure_ascii=True),
                         cv.render_evidence(
                             [r for r in evidence_records if r.kind.startswith("repository")],
                             include_passages=False,
@@ -708,11 +714,9 @@ def _critique_plan_verified(
                     )
                 structural_records = cv.collect_evidence(
                     structural_requests, snapshot=snapshot, store=store, run_id=run_id,
+                    budget=round_budget,
                 )
                 evidence_records = _merge_evidence(evidence_records, structural_records)
-                staged_digests.extend(
-                    record.blob_digest for record in structural_records if record.blob_digest
-                )
 
             repository_records = [r for r in evidence_records if r.kind.startswith("repository")]
             external_records = [r for r in evidence_records if r.kind in {"external", "abstention"}]
@@ -720,6 +724,7 @@ def _critique_plan_verified(
                 plan_text, context, focus, already, repo_grounded=False,
                 class_blocks=class_blocks,
             )
+            structural_body += "\n\n" + plan_packet
             structural_body += "\n\n" + pc.render_claim_summary(draft_claims)
             structural_body += "\n\n" + cv.render_evidence(repository_records, include_passages=True)
             structural_body += "\n\n=== EXTERNAL EVIDENCE METADATA ONLY ===\n" + cv.render_evidence(
@@ -755,6 +760,7 @@ def _critique_plan_verified(
             closure.retry_register = structural_retry
             draft_claims.evidence_records = cv.records_to_json(evidence_records)
             draft_claims.plan_sha256 = hashlib.sha256(raw_plan).hexdigest()
+            draft_claims.authorization_policy = current_policy
             draft_claims.debt = None
             draft_classes.claim_state = pc.state_to_json(draft_claims)
             draft_classes.debt = None
@@ -764,15 +770,18 @@ def _critique_plan_verified(
             # replace fails, the safe residue is retained evidence, never a dangling ref.
             snapshot.close()
             store.gc()
+            live_digests = list(dict.fromkeys(
+                record.blob_digest for record in evidence_records if record.blob_digest
+            ))
             store.commit_state(
-                lineage_id, run_id, staged_digests,
+                lineage_id, run_id, live_digests,
                 lambda: cc.save_lineage(closure.state_root, draft_classes),
             )
             closure.lineage = draft_classes
             closure._settled = True
             closure.register_status = class_status
             state = draft_claims
-    except EvidenceCommitAmbiguous as exc:
+    except (EvidenceCommitAmbiguous, SnapshotCleanupError) as exc:
         # Candidate roots and the in-flight journal deliberately survive. The lineage
         # latch also remains so no later round can guess which side of the replace won.
         structural_review = Review(
@@ -865,13 +874,49 @@ def _independent_required(
     claim = state.claims.get(str(event.data.get("claim_id")))
     if event.op == "VERIFY" and claim and claim.status == pc.CONTRADICTED:
         return True
-    high_stakes = any(
-        word in (stakes or "").lower()
-        for word in ("high-stakes", "regulated", "medical", "financial", "safety-critical")
-    )
+    high_stakes = _is_high_stakes(stakes)
     ids = set(event.data.get("evidence_ids", []))
     external = any(record.evidence_id in ids and record.kind == "external" for record in records)
     return high_stakes and external
+
+
+def _is_high_stakes(stakes: str | None) -> bool:
+    """Fail safe on natural-language stakes: only explicit low/modest labels opt down."""
+    if not stakes:
+        return False
+    normalized = stakes.lower()
+    return not any(
+        marker in normalized
+        for marker in ("low-stakes", "low risk", "modest internal", "non-production")
+    )
+
+
+def _reblock_for_policy(
+    state: pc.ClaimState,
+    records: list[cv.EvidenceRecord],
+    policy: dict[str, Any],
+) -> None:
+    """Invalidate cached authorizations when the current policy is stricter."""
+    external_ids = {
+        record.evidence_id for record in records if record.kind == "external"
+    }
+    for claim in state.claims.values():
+        truth_or_bearing = (
+            claim.kind == pc.FACT and claim.status in {pc.VERIFIED, pc.CONTRADICTED}
+        ) or claim.bearing == pc.ADVISORY
+        if not truth_or_bearing:
+            continue
+        required = policy["independent_check"] == "require" or (
+            policy["high_stakes"] and bool(external_ids.intersection(claim.evidence_ids))
+        )
+        if required and not (claim.independent_check or {}).get("required"):
+            claim.independent_check = {
+                "required": True,
+                "status": "pending",
+                "reason": "current authorization policy is stricter than persisted provenance",
+                "evidence_ids": list(claim.evidence_ids),
+                "checks": [],
+            }
 
 
 def _independent_checks(
@@ -1200,6 +1245,21 @@ class _ClosureRound:
             self.unavailable = str(exc)
             return []
         try:
+            self._validate_loaded()
+        except (TypeError, ValueError, KeyError, pc.ClaimRegisterError,
+                cv.EvidenceRequestError) as exc:
+            try:
+                dest = cc.quarantine_lineage(
+                    self.state_root, self.lineage_id, stamp=self.stamp, reason=str(exc)
+                )
+                self.unavailable = (
+                    f"lineage {self.lineage_id} contained invalid nested state ({exc}); "
+                    f"quarantined to {dest}"
+                )
+            except cc.StateUnavailable as quarantine_error:
+                self.unavailable = str(quarantine_error)
+            return []
+        try:
             cc.open_latch(self.state_root, self.lineage_id)
         except cc.StateUnavailable as exc:
             # The review still runs and is still returned; it simply cannot be settled.
@@ -1214,6 +1274,9 @@ class _ClosureRound:
 
     def _before_sweep(self) -> None:
         """Branch-only: fold `exempt`/`unexempt` arguments in before the sweep."""
+
+    def _validate_loaded(self) -> None:
+        """Validate mode-specific nested state before acquiring the lineage latch."""
 
     def _sweep(self, only: list[str] | None = None) -> None:
         """Branch-only: re-run every mechanized predicate. A plan lineage holds none."""
@@ -1384,6 +1447,11 @@ class _PlanClassClosure(_ClosureRound):
 
     mode = cc.PLAN_MODE
     allow_mechanized = False
+
+    def _validate_loaded(self) -> None:
+        assert self.lineage is not None
+        state = pc.state_from_json(self.lineage_id, self.lineage.claim_state)
+        cv.records_from_json(state.evidence_records)
 
 
 def _lineage_id(repo: Path, base_ref: str, head_ref: str | None, is_dirty: bool,

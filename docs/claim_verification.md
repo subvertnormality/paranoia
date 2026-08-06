@@ -24,8 +24,11 @@ One closure round performs these stages:
 
 1. Read the exact plan bytes and expose ordered opaque span IDs beside bounded display
    text. Models reference span IDs; the server owns byte offsets and hashes.
-2. Snapshot tracked and non-ignored untracked repository bytes with Git's private-index
-   machinery. Ignored untracked paths are disclosed but unavailable. A temporary
+2. Snapshot tracked and non-ignored untracked repository bytes by opening exact files with
+   no-follow semantics, hashing through `git hash-object --stdin` (never repository
+   filters), and inserting explicit object IDs/modes into a private index. Hooks,
+   fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
+   Ignored untracked paths are JSON-escaped, disclosed, and unavailable. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
 3. A fresh toolless research role registers load-bearing claims. The server parses its
@@ -33,13 +36,16 @@ One closure round performs these stages:
    later roles need to refer to them.
 4. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
-5. A toolless verifier sees exact server evidence. Remote passages are framed as
-   untrusted data and never share a call with repository bytes.
+5. A toolless verifier sees exact server evidence. Every model-visible source, path,
+   metadata object, and passage is injectively JSON escaped. Remote passages are framed
+   as untrusted JSON data and never share a call with repository bytes.
 6. A fresh toolless structural reviewer sees the plan, repository evidence, external
    metadata, active claims, and existing class procedures. It emits one atomic PLAN and
    CLASS register.
 7. Python validates role permissions, applies both registers to drafts, roots exact
-   evidence bytes, atomically replaces lineage state, and computes one trailer.
+   evidence bytes, atomically replaces lineage state, and computes one trailer. An
+   atomically exclusive per-lineage latch rejects concurrent rounds before either can
+   construct a stale draft.
 
 For Claude, toolless means bare settings, an empty allowlist, and an explicit deny list.
 For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
@@ -97,9 +103,11 @@ explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
 lineage root manifests are GC roots. A global file lock serializes reservation, blob
-write, adoption, and sweep. Defaults are 100 MiB per lineage, 1 GiB globally, and a
-seven-day orphan TTL. Hash mismatch, missing content, malformed roots, or cap exhaustion
-fails closed.
+write, exact live-root replacement, and sweep. Replaced files and their containing
+directory entries are fsynced before success is reported or journals/latches are cleared.
+Defaults are 100 MiB per lineage, 1 GiB globally, and a seven-day orphan TTL. Expired
+evidence leaves the live lineage root and becomes collectible. Hash mismatch, missing
+content, malformed roots, or cap exhaustion fails closed.
 
 Callers may provide up to 20 `{claim, source, content}` records through
 `supplied_evidence`. `claim` must match exactly one registered proposition. These records
@@ -108,17 +116,26 @@ their exact bytes, but they still pass through the verifier and are never self-a
 
 ## Independence and authorization
 
-`independent_check` is `auto` (default) or `require`. Auto requires a distinct-vendor
-audit for high-stakes external claims, contradiction reversal, evidence-dispute
+`independent_check` is `auto` (default) or `require`. Auto treats explicitly described
+stakes as high unless they say `low-stakes`, `low risk`, `modest internal`, or
+`non-production`; it requires a distinct-vendor audit for high-stakes external claims,
+contradiction reversal, evidence-dispute
 resolution, and blocking-to-advisory changes. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload.
 
+The persisted authorization-policy tuple includes the independent-check mode, stakes
+classification, and policy version. Any change invalidates the zero-research cache. A
+stricter policy immediately reblocks an authorization whose persisted provenance is no
+longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result.
+
 ## Budgets and caching
 
 Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
-claim, eight external fetches, 1 MiB per source, 5 MiB aggregate, 4 KiB display passages,
+claim, eight external fetch attempts (debited before network I/O, including failures),
+1 MiB per source, 5 MiB aggregate across claim, search, supplied, and structural phases,
+4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;
 repository reuse is bound to exact object/query identities. Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
@@ -149,7 +166,9 @@ old inexpensive review must explicitly use `class_closure: false` and accept tha
 result has no persistent stop condition.
 
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
-unchanged and returns a blocked verdict. Malformed registers record debt; corrupt lineage
-state is quarantined by the existing class-closure machinery. Never repair state by
-deleting evidence roots first: preserve the last valid root until the lineage is repaired
-or explicitly abandoned.
+unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
+fully validated and corrupt lineage state is quarantined before a latch is acquired.
+Malformed registers record debt. A failed snapshot-ref cleanup, ambiguous publication, or
+crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
+through to a stale writer. Never repair state by deleting evidence roots first: preserve
+the last valid root until the lineage is repaired or explicitly abandoned.
