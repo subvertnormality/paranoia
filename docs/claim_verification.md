@@ -73,7 +73,11 @@ empty working directory, auth, TLS/DNS files, and no shell, repository, common G
 or sibling worktree. Shell, unified execution, multi-agent, apps, browser/computer, code,
 image, goals, and workspace-dependency feature schemas are explicitly disabled under
 strict configuration. Native web is forced off for every claim-verification role. If that
-boundary cannot be constructed, the round fails closed and the lineage is unchanged.
+boundary cannot be constructed, the round fails closed before snapshot construction or
+latch acquisition and the lineage is unchanged. The currently audited Codex CLI versions
+for this boundary are exactly `0.144.6` and `0.146.0-alpha.3.1`; `bwrap` is required.
+Every role is fresh and nonresumable (Codex also uses `--ephemeral`), so internal session
+IDs are suppressed and closure-plan output does not offer the ordinary `rebut` workflow.
 
 ## Claim state
 

@@ -426,14 +426,18 @@ TOOLS: list[Tool] = [
     Tool(
         name="rebut",
         description=(
-            "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
-            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations."
+            "Dispute a specific finding from a prior resumable review whose footer printed "
+            "session_ref. Resumes the SAME reviewer session with counter-evidence. Fresh "
+            "toolless closure-plan roles are nonresumable and do not print a session_ref."
         ),
         inputSchema={
             "type": "object",
             "properties": {
                 "repo_path": {"type": "string", "description": "Absolute path to the git repo (same one the review ran against)."},
-                "session_ref": {"type": "string", "description": "The session_ref printed in the prior review's footer."},
+                "session_ref": {
+                    "type": "string",
+                    "description": "The session_ref printed in a prior resumable review footer.",
+                },
                 "rebuttal": {"type": "string", "description": "Your counter-evidence for the disputed finding."},
                 **_COMMON,
             },

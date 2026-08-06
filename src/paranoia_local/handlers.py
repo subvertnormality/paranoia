@@ -4,8 +4,8 @@ an injected fake engine and clock.
 Each handler: resolve inputs (call arg > `.paranoia.toml` > default), build the
 task body, compose it with the adversarial instructions, run the reviewer in
 the right boundary (a review worktree, the live dirty tree, or server-mediated
-tool-less plan evidence), write an audit record, and return the review with a
-footer exposing the session reference for `rebut`.
+tool-less plan evidence), write an audit record, and return the review. Resumable
+ordinary reviews expose a session reference; fresh closure-plan roles do not.
 """
 
 from __future__ import annotations
@@ -571,7 +571,16 @@ def _tool_less_call(
         raise _ClaimStageFailure(
             f"{engine.name} toolless role failed with exit {review.returncode}"
         )
-    return review
+    # Injected engines may predate Engine.run_toolless's nonresumable contract.
+    return Review(
+        text=review.text,
+        session_ref=None,
+        raw=getattr(review, "raw", ""),
+        returncode=getattr(review, "returncode", 0),
+        error=getattr(review, "error", False),
+        usage=getattr(review, "usage", None),
+        duration_ms=getattr(review, "duration_ms", None),
+    )
 
 
 def _role_register_call(
@@ -657,6 +666,17 @@ def _critique_plan_verified(
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
+    preflight_toolless = getattr(engine, "preflight_toolless", None)
+    if callable(preflight_toolless):
+        try:
+            preflight_toolless(model, effort)
+        except ToollessUnavailable as exc:
+            return (
+                _preflight_failure_review(f"toolless boundary unavailable: {exc}")
+                + "\n\nCLAIM-CLOSURE: TOOLLESS-UNAVAILABLE — capability preflight failed\n"
+                "CLASS-CLOSURE: TOOLLESS-UNAVAILABLE — capability preflight failed\n"
+                "CONVERGENCE: BLOCKED — no snapshot, latch, or model call was started."
+            )
     independent_policy = str(arguments.get("independent_check", "auto"))
     if independent_policy not in {"auto", "require"}:
         raise ValueError("independent_check must be 'auto' or 'require'")

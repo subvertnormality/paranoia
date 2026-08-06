@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from paranoia_local.engines import ClaudeEngine, CodexEngine, ToollessUnavailable
+from paranoia_local.runner import RunResult
 
 
 def test_claude_toolless_profile_has_empty_allowlist_and_forces_web_off(tmp_path: Path) -> None:
@@ -48,3 +49,34 @@ def test_codex_toolless_profile_fails_closed_without_auth(
     monkeypatch.setattr(CodexEngine, "_auth_file", lambda self: tmp_path / "missing")
     with pytest.raises(ToollessUnavailable, match="auth"):
         CodexEngine().build_toolless_argv(tmp_path, "gpt", "high")
+
+
+def test_toolless_run_never_exposes_ephemeral_codex_thread_for_rebut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = CodexEngine()
+    monkeypatch.setattr(engine, "build_toolless_argv", lambda *_args: ["codex"])
+
+    def runner(*_args):
+        return RunResult(
+            0,
+            '{"type":"thread.started","thread_id":"ephemeral"}\n'
+            '{"type":"item.completed","item":{"type":"agent_message","text":"done"}}',
+            "",
+        )
+
+    review = engine.run_toolless("prompt", "gpt", "high", runner=runner)
+    assert review.text == "done"
+    assert review.session_ref is None
+
+
+def test_codex_toolless_versions_are_an_exact_audited_set() -> None:
+    assert CodexEngine.TOOLLESS_VERSIONS == {"0.144.6", "0.146.0-alpha.3.1"}
+
+
+def test_toolless_preflight_rejects_a_missing_cli_before_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: None)
+    with pytest.raises(ToollessUnavailable, match="not installed"):
+        ClaudeEngine().preflight_toolless("claude", "high")

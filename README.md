@@ -38,6 +38,10 @@ structured critique.
   [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
   [Claude Code](https://code.claude.com) (`claude`)
 - `arbitrate` needs **both** CLIs; the four review tools need only the other one
+- Closure-enabled `critique_plan` with Codex as reviewer additionally requires Linux,
+  `bwrap` on `PATH`, and an audited Codex CLI version exactly `0.144.6` or
+  `0.146.0-alpha.3.1`. Other Codex versions remain usable for ordinary review paths but
+  fail this default plan mode closed before snapshot or lineage work.
 
 **2. Install**
 
@@ -111,11 +115,12 @@ You get back a five-section critique with severity-tagged findings, and a comput
 | [`critique_branch`](#critique_branch) | Review a git branch, a diff, or the dirty working tree | `repo_path` |
 | [`critique_plan`](#critique_plan) | Review a plan or design doc against the code it claims things about | `repo_path` + `plan_text` \| `plan_path` |
 | [`query`](#query) | Ask one question and get a cited answer — not a full review | `question` |
-| [`rebut`](#rebut) | Dispute a finding from a review you just got | `session_ref` from that review |
+| [`rebut`](#rebut) | Dispute a finding from a resumable review | `session_ref` when the footer provides one |
 | [`arbitrate`](#arbitrate) | Decide between 2–4 options using **both** vendors independently | `repo_path`, `decision`, `options`, `stakes` |
 
-Every review returns a `session_ref` in its footer. Pass it to `rebut` to reopen
-that exact reviewer session.
+Ordinary resumable reviews return a `session_ref` in their footer. Pass it to `rebut` to
+reopen that exact reviewer session. Closure-enabled plan roles are fresh, isolated, and
+nonresumable, so their footer deliberately omits a session reference.
 
 ---
 
@@ -401,6 +406,10 @@ Dispute one finding from a review. Resumes **that same reviewer session** with y
 counter-evidence, so it is cheaper and higher-resolution than a fresh round. The
 reviewer replies `CONCEDE` or `HOLD` with fresh citations.
 
+This applies only when the prior footer exposes `session_ref`. Closure-enabled plan
+reviews use fresh toolless/ephemeral roles and cannot be resumed through `rebut`; start a
+new closure round with the counter-evidence reflected in the plan or call arguments.
+
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `repo_path` | string | **required** | Same repo the review ran against |
@@ -535,7 +544,8 @@ Every item in the last four sections carries exactly one severity tag:
 A finding that recurs from a tracked class is marked `[RECURRENCE <class-id>]`
 next to its severity tag.
 
-The footer carries the `session_ref` for [`rebut`](#rebut).
+The footer carries a `session_ref` for [`rebut`](#rebut) only when that review session is
+persisted and compatible with ordinary resumption. Otherwise it identifies only the engine.
 
 ### Closure trailer
 
@@ -656,6 +666,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   `bwrap` namespace with no shell or repository mounts. Native web is disabled. Claude
   roles also receive an empty tool-availability set and strict empty MCP configuration. Exact
   Codex tool and agent feature schemas are explicitly disabled under strict configuration.
+  The server preflights this capability boundary before snapshot construction or lineage
+  latch acquisition. Codex roles are ephemeral and all plan roles are intentionally fresh,
+  so closure-plan responses never advertise those internal session IDs for `rebut`.
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call. Git

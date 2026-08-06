@@ -1,7 +1,7 @@
 """Best-effort audit trail. Each review writes a JSON record (engine, model,
-session ref, target, review text) so a finding's provenance survives and
-`rebut` has a session reference to resume. Logging must never crash a review,
-so all failures are swallowed and reported as a `None` return.
+optional resumable session ref, target, review text) so a finding's provenance
+survives. Logging must never crash a review, so all failures are swallowed and
+reported as a `None` return.
 """
 
 from __future__ import annotations

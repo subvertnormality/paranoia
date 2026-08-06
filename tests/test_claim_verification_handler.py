@@ -10,7 +10,7 @@ import pytest
 
 from paranoia_local import class_closure as cc
 from paranoia_local import claim_verification as cv, handlers, plan_claims as pc
-from paranoia_local.engines import Review
+from paranoia_local.engines import Review, ToollessUnavailable
 
 
 class ClaimEngine:
@@ -98,6 +98,35 @@ def test_verified_claim_and_empty_class_register_produce_one_not_blocked_verdict
         (cc.lineage_dir(cc.default_state_root()) / "verified-plan.json").read_text()
     )
     assert raw_state["schema_version"] == 2 and "claim_state" in raw_state
+    assert "session_ref=" not in out and "to dispute a finding" not in out
+
+
+def test_toolless_capability_preflight_blocks_before_snapshot_and_latch(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnavailableEngine(ClaimEngine):
+        def preflight_toolless(self, _model: str, _effort: str) -> None:
+            raise ToollessUnavailable("bwrap unavailable")
+
+    def snapshot_must_not_start(*_args, **_kwargs):
+        raise AssertionError("snapshot construction ran before capability preflight")
+
+    monkeypatch.setattr(
+        handlers.PlanRepositorySnapshot, "create", snapshot_must_not_start,
+    )
+    engine = UnavailableEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "capability-preflight-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "TOOLLESS-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
+    assert "no snapshot, latch, or model call" in out
+    assert not engine.tool_less_prompts
+    pending = cc.lineage_dir(cc.default_state_root()) / "capability-preflight-plan.pending"
+    assert not pending.exists()
 
 
 def test_closure_mode_ignores_repository_config_in_every_role_prompt(

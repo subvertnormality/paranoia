@@ -5,7 +5,8 @@ For ordinary code/query work the CLI *is* the reviewer: it has full read access
 to the repo at `cwd` and decides what to open. Claim-verification roles instead
 use ``run_toolless``: an enforceable empty-tool/filesystem profile whose only
 inputs are server packets. This module builds both profiles, feeds stdin, and
-parses the final message + a session reference (for `rebut`).
+parses the final message. Ordinary profiles retain resumable session references;
+fresh toolless profiles deliberately suppress them.
 
 `build_argv` / `build_resume_argv` / `parse_output` are pure and unit-tested.
 The impure subprocess call is injected via `runner` (see runner.py).
@@ -98,6 +99,19 @@ class Engine(ABC):
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
         raise ToollessUnavailable(f"{self.name} has no enforceable toolless profile")
 
+    def preflight_toolless(self, model: str, effort: str) -> None:
+        """Validate the empty-capability boundary before caller state is acquired."""
+        if not shutil.which(self.binary):
+            raise ToollessUnavailable(f"{self.binary} CLI is not installed")
+        try:
+            self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
+        except ToollessUnavailable:
+            raise
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ToollessUnavailable(
+                f"{self.name} toolless capability preflight failed: {exc}"
+            ) from exc
+
     def run_toolless(
         self,
         prompt: str,
@@ -115,7 +129,10 @@ class Engine(ABC):
         with tempfile.TemporaryDirectory(prefix=f"paranoia-{self.name}-tool-less-") as raw:
             cwd = Path(raw)
             argv = self.build_toolless_argv(cwd, model, effort)
-            return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+            review = self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+            # These roles are intentionally fresh and, for Codex, explicitly ephemeral.
+            # Never expose a token that ordinary `rebut` cannot safely resume.
+            return replace(review, session_ref=None)
 
     def resume(
         self,
@@ -180,12 +197,22 @@ class CodexEngine(Engine):
     default_model = "gpt-5.6-sol"
     binary = "codex"
 
+    TOOLLESS_VERSIONS = frozenset({"0.144.6", "0.146.0-alpha.3.1"})
+
+    @staticmethod
+    def _is_elf(path: Path) -> bool:
+        try:
+            with path.open("rb") as handle:
+                return handle.read(4) == b"\x7fELF"
+        except OSError:
+            return False
+
     def _native_binary(self) -> Path:
         launcher = shutil.which(self.binary)
         if not launcher:
             raise ToollessUnavailable("codex CLI is not installed")
         path = Path(launcher).resolve()
-        if path.read_bytes()[:4] == b"\x7fELF":
+        if self._is_elf(path):
             return path
         local = Path(launcher).resolve().parents[3] if len(Path(launcher).resolve().parents) >= 4 else None
         candidates = []
@@ -198,7 +225,7 @@ class CodexEngine(Engine):
         if local:
             candidates.append(local / "vendor/x86_64-unknown-linux-musl/bin/codex")
         for candidate in candidates:
-            if candidate.is_file() and candidate.read_bytes()[:4] == b"\x7fELF":
+            if candidate.is_file() and self._is_elf(candidate):
                 return candidate
         raise ToollessUnavailable("could not locate the native Codex binary for isolation")
 
@@ -212,7 +239,7 @@ class CodexEngine(Engine):
             [str(native), "--version"], capture_output=True, text=True, timeout=10,
         )
         version = result.stdout.strip().removeprefix("codex-cli ")
-        if result.returncode or version not in {"0.144.6", "0.146.0-alpha.3.1"}:
+        if result.returncode or version not in CodexEngine.TOOLLESS_VERSIONS:
             raise ToollessUnavailable(
                 f"Codex {version or 'unknown'} has no audited empty-tool profile"
             )
