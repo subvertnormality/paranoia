@@ -156,6 +156,9 @@ Callers may provide up to 20 `{claim, source, content}` records through
 `supplied_evidence`. `claim` must match exactly one registered proposition. These records
 are useful for bounded empirical output or inaccessible local artifacts: the server hashes
 their exact bytes, but they still pass through the verifier and are never self-authorizing.
+Caller-supplied passages are isolated in their own untrusted verifier call, never mixed
+with repository evidence. In high-stakes mode, a truth transition that relies on supplied
+content requires the same distinct-vendor authorization as fetched external evidence.
 
 ## Independence and authorization
 
@@ -169,7 +172,9 @@ or `contradicted`) in the audited event. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload. The exact pending event is rendered to the next verifier for recovery; a
-different event cannot erase it.
+different event cannot erase it. Reload also validates the authorization's exact event
+schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
+state, and applied outcome against the claim's current truth, bearing, or deferral state.
 
 The second vendor receives the server-owned proposition, current kind/bearing/status,
 plan-anchor identity and spans, complete proposed event, and exact named evidence. Truth,
@@ -190,6 +195,9 @@ claim, eight external HTTP attempts (debited before each hop, including failures
 1 MiB per source, 5 MiB aggregate across claim, search, supplied, and structural phases,
 4 KiB display passages,
 and one correction retry per model register. Evidence is content-addressed and reusable;
+the same budget begins before cache validation: retained CAS bytes are reserved before
+bounded no-follow reads, repository/history/adapter revalidation is charged as attempted,
+and evidence records are charged again when rendered into verifier or auditor prompts.
 repository reuse recomputes every passage/identity field and is bound to exact blob,
 snapshot, history-ref, operation, and canonical query-parameter identities. Literal search
 charges each inspected blob before reading it. `LIST_TREE` and `HISTORY` stream bounded
@@ -200,6 +208,8 @@ snapshot Git process and pipe read also has a hard
 deadline and is killed/reaped on expiry; directly read Git metadata must be small regular
 files opened with no-follow and nonblocking flags, then checked again by file identity and
 size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
+Within `.git/objects`, symlink rejection follows only Git-resolvable loose-object fanout,
+`pack`, and `info` namespaces; inert unrelated names do not invalidate a snapshot.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
@@ -228,7 +238,8 @@ preserved and the corrected register is displayed separately as the register act
 applied.
 
 There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
-`NOT-BLOCKED`.
+`NOT-BLOCKED`. Preflight failures such as latch contention and quarantined state return a
+synthetic review with the same five ordered, nonempty sections before the blocked trailer.
 
 ## Migration and recovery
 
@@ -247,7 +258,10 @@ attempt; a syntactically valid event with an invalid span, evidence binding, rol
 or state transition is corrected before application. Malformed registers record debt. A
 failed snapshot-ref cleanup, ambiguous publication, or
 crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
-through to a stale writer. A register still malformed after its one correction attempt is
+through to a stale writer. Latch release first renames the owner marker to a `releasing`
+recovery marker and fsyncs that transition. If unlink durability fails, the live marker is
+recreated and the current response is changed to blocked, so a later round cannot silently
+inherit an undurable clear. A register still malformed after its one correction attempt is
 published as durable blocking debt—even over an otherwise clear cache—and only a later
 valid replacement register clears it. Never repair state by deleting evidence roots first: preserve
 the last valid root until the lineage is repaired or explicitly abandoned.

@@ -365,6 +365,10 @@ def _paths(root: Path, lineage_id: str) -> tuple[Path, Path]:
     return d / f"{lineage_id}.json", d / f"{lineage_id}.pending"
 
 
+def _release_path(root: Path, lineage_id: str) -> Path:
+    return lineage_dir(root) / f"{lineage_id}.releasing"
+
+
 def load_lineage(root: Path, lineage_id: str, *, stamp: str,
                  mode: str = BRANCH_MODE) -> Lineage:
     """`mode` is the tool asking. Opening a lineage created by the other tool is
@@ -374,16 +378,18 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
     `lineage` is used verbatim as the filename, so the collision is one typo away, and
     the remedy is a mode-qualified key (`…-plan` / `…-branch`)."""
     state_path, pending = _paths(root, lineage_id)
+    releasing = _release_path(root, lineage_id)
     quarantined = sorted(lineage_dir(root).glob(f"{lineage_id}.corrupt-*.json"))
     if quarantined:
         raise StateUnavailable(
             f"lineage {lineage_id} has quarantined state — repair or delete "
             f"{quarantined[-1]} before this lineage can be used again"
         )
-    if pending.exists():
+    if pending.exists() or releasing.exists():
+        marker = pending if pending.exists() else releasing
         raise StateUnavailable(
-            f"a previous round left a pending write latch at {pending}; its state write "
-            "may not have completed. Inspect and remove it to continue."
+            f"a previous round left a pending write latch at {marker}; its state write "
+            "or durable release may not have completed. Inspect and remove it to continue."
         )
     if not state_path.exists():
         return Lineage(lineage_id, mode=mode)
@@ -455,8 +461,13 @@ def open_latch(root: Path, lineage_id: str) -> None:
     """Written before the engine call, cleared only once the round has finished writing.
     Without it a *failed* write leaves no marker and the next round starts empty."""
     _, pending = _paths(root, lineage_id)
+    releasing = _release_path(root, lineage_id)
     try:
         _mkdir_durable(pending.parent)
+        if releasing.exists():
+            raise StateUnavailable(
+                f"a previous round owns the releasing lineage latch at {releasing}"
+            )
         fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         with os.fdopen(fd, "wb") as handle:
             handle.write(b"pending\n")
@@ -474,13 +485,36 @@ def open_latch(root: Path, lineage_id: str) -> None:
 
 
 def clear_latch(root: Path, lineage_id: str) -> None:
-    """Durably clear the latch or report failure to the current invocation."""
+    """Durably clear the latch or leave a live recovery marker and report failure."""
     _, pending = _paths(root, lineage_id)
+    releasing = _release_path(root, lineage_id)
     try:
-        pending.unlink(missing_ok=True)
+        if not pending.exists() and not releasing.exists():
+            return
+        if pending.exists():
+            os.replace(pending, releasing)
+            _fsync_dir(pending.parent)
+        releasing.unlink()
         _fsync_dir(pending.parent)
     except OSError as exc:
-        raise StateUnavailable(f"could not durably clear pending latch at {pending}: {exc}") from exc
+        # If unlink succeeded but its directory fsync failed, recreate a marker in the
+        # live namespace before returning. This makes the next round block even though
+        # crash durability could not be established on the failing filesystem.
+        marker_error: OSError | None = None
+        if not pending.exists() and not releasing.exists():
+            try:
+                fd = os.open(releasing, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(b"release-ambiguous\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                _fsync_dir(releasing.parent)
+            except OSError as recovery_exc:
+                marker_error = recovery_exc
+        detail = f"; recovery marker error: {marker_error}" if marker_error else ""
+        raise StateUnavailable(
+            f"could not durably clear pending latch at {pending}: {exc}{detail}"
+        ) from exc
 
 
 def save_lineage(root: Path, lineage: Lineage) -> None:

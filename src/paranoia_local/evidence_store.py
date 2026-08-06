@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import tempfile
 import time
 from contextlib import contextmanager
@@ -115,14 +116,47 @@ class EvidenceStore:
             self._atomic_json(journal_path, {**journal, "run_id": run_id, "digests": digests})
         return digest
 
-    def read(self, digest: str) -> bytes:
+    def read(self, digest: str, *, max_bytes: int | None = None) -> bytes:
         if not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise EvidenceStoreError("invalid evidence digest")
+        if max_bytes is not None and (
+            not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0
+        ):
+            raise EvidenceStoreError("invalid evidence read limit")
         path = self.blobs / digest
+        fd: int | None = None
         try:
-            data = path.read_bytes()
+            before = path.lstat()
+            if not stat.S_ISREG(before.st_mode) \
+                    or (max_bytes is not None and before.st_size > max_bytes):
+                raise EvidenceStoreError(f"evidence blob {digest} is unsafe or exceeds its limit")
+            fd = os.open(
+                path,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            )
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode) \
+                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) \
+                    or (max_bytes is not None and opened.st_size > max_bytes):
+                raise EvidenceStoreError(f"evidence blob {digest} changed while opening")
+            limit = opened.st_size if max_bytes is None else max_bytes
+            chunks = bytearray()
+            while len(chunks) <= limit:
+                chunk = os.read(fd, min(65536, limit + 1 - len(chunks)))
+                if not chunk:
+                    break
+                chunks.extend(chunk)
+            if len(chunks) > limit:
+                raise EvidenceStoreError(f"evidence blob {digest} exceeds its read limit")
+            data = bytes(chunks)
         except OSError as exc:
             raise EvidenceStoreError(f"evidence blob {digest} is missing") from exc
+        finally:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
         if hashlib.sha256(data).hexdigest() != digest:
             raise EvidenceStoreError(f"evidence blob {digest} hash mismatch")
         return data

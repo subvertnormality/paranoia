@@ -7,7 +7,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .evidence_store import EvidenceStore, EvidenceStoreError
 from .external_evidence import (
@@ -27,6 +27,10 @@ MAX_PASSAGE_BYTES = 4096
 
 class EvidenceRequestError(ValueError):
     pass
+
+
+class EvidenceBudgetExceeded(EvidenceRequestError):
+    """The shared round budget is exhausted; callers must not treat this as stale data."""
 
 
 @dataclass(frozen=True)
@@ -68,12 +72,12 @@ class EvidenceBudget:
 
     def debit_requests(self, requests: Sequence[EvidenceRequest]) -> None:
         if self.requests + len(requests) > MAX_REQUESTS:
-            raise EvidenceRequestError("review evidence request budget exceeded")
+            raise EvidenceBudgetExceeded("review evidence request budget exceeded")
         for request in requests:
             claim_id = request.data["claim_id"]
             count = self.per_claim.get(claim_id, 0) + 1
             if count > MAX_PER_CLAIM:
-                raise EvidenceRequestError(
+                raise EvidenceBudgetExceeded(
                     f"claim {claim_id} exceeds shared per-round request budget"
                 )
             self.per_claim[claim_id] = count
@@ -81,12 +85,12 @@ class EvidenceBudget:
 
     def debit_fetch(self) -> None:
         if self.fetch_attempts >= MAX_FETCHES:
-            raise EvidenceRequestError("external fetch-attempt budget exceeded")
+            raise EvidenceBudgetExceeded("external fetch-attempt budget exceeded")
         self.fetch_attempts += 1
 
     def debit_bytes(self, size: int) -> None:
         if size < 0 or self.aggregate_bytes + size > MAX_AGGREGATE_BYTES:
-            raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
+            raise EvidenceBudgetExceeded("review evidence aggregate byte budget exceeded")
         self.aggregate_bytes += size
 
     @property
@@ -434,12 +438,15 @@ def _abstention(claim_id: str, kind: str, source: str, reason: str) -> EvidenceR
     )
 
 
-def render_evidence(records: Sequence[EvidenceRecord], *, include_passages: bool) -> str:
+def render_evidence(
+    records: Sequence[EvidenceRecord], *, include_passages: bool,
+    debit_bytes: Callable[[int], None] | None = None,
+) -> str:
     lines = ["=== SERVER EVIDENCE RECORDS ==="]
     if not records:
         return lines[0] + "\nNONE — verification must abstain."
     for record in records:
-        lines.append(
+        record_lines = [
             "RECORD=" + json.dumps(
                 {
                     "evidence_id": record.evidence_id,
@@ -451,19 +458,22 @@ def render_evidence(records: Sequence[EvidenceRecord], *, include_passages: bool
                 },
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
-        )
+        ]
         if record.metadata:
-            lines.append(
+            record_lines.append(
                 "  metadata=" + json.dumps(
                     record.metadata, sort_keys=True, separators=(",", ":"),
                     ensure_ascii=True,
                 )[:2000]
             )
         if include_passages:
-            lines.append(
+            record_lines.append(
                 "  UNTRUSTED-DATA-JSON="
                 + json.dumps(record.display_passage, ensure_ascii=True)
             )
+        if debit_bytes is not None:
+            debit_bytes(len("\n".join(record_lines).encode("utf-8")))
+        lines.extend(record_lines)
     return "\n".join(lines)
 
 
@@ -567,18 +577,20 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
 def validate_cached_records(
     records: Sequence[EvidenceRecord], *, snapshot: PlanRepositorySnapshot,
     store: EvidenceStore, state: pc.ClaimState, high_stakes: bool = False,
-    now: datetime | None = None,
+    now: datetime | None = None, budget: EvidenceBudget | None = None,
 ) -> list[EvidenceRecord]:
     """Revalidate identities/freshness and stale every claim that depended on a miss."""
     clock = now or datetime.now(timezone.utc)
     valid: list[EvidenceRecord] = []
     invalid_ids: set[str] = set()
+    budget = budget or EvidenceBudget()
     for record in records:
         try:
             if record.kind == "abstention":
                 raise EvidenceRequestError("abstention records are round-local")
             if record.blob_digest:
-                body = store.read(record.blob_digest)
+                budget.debit_bytes(record.source_size)
+                body = store.read(record.blob_digest, max_bytes=record.source_size)
                 if hashlib.sha256(body).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("cached evidence source hash mismatch")
                 passage = body[:MAX_PASSAGE_BYTES]
@@ -606,6 +618,7 @@ def validate_cached_records(
                 if oid != record.metadata.get("blob_oid") \
                         or whole_size != record.metadata.get("whole_size"):
                     raise EvidenceRequestError("repository blob object identity changed")
+                budget.debit_bytes(length)
                 current = snapshot.read_blob(path, offset=offset, max_bytes=max(1, length))
                 if hashlib.sha256(current).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("repository evidence blob changed")
@@ -619,9 +632,13 @@ def validate_cached_records(
                         or snapshot.history_oid(ref) != record.metadata["history_oid"]:
                     raise EvidenceRequestError("repository history ref identity changed")
                 current = json.dumps(
-                    snapshot.history(ref, path, limit=limit),
+                    snapshot.history(
+                        ref, path, limit=limit, debit_bytes=budget.debit_bytes,
+                        remaining_bytes=lambda: budget.remaining_bytes,
+                    ),
                     ensure_ascii=False, separators=(",", ":"),
                 ).encode()
+                budget.debit_bytes(len(current))
                 if hashlib.sha256(current).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("repository history result changed")
             elif record.kind.startswith("repository"):
@@ -632,8 +649,10 @@ def validate_cached_records(
                     raise EvidenceRequestError("empirical adapter runtime changed")
                 for path, expected in record.metadata.get("input_hashes", {}).items():
                     _oid, input_size = snapshot.blob_identity(path)
-                    if input_size > 1 << 20 \
-                            or hashlib.sha256(snapshot.read_blob(path)).hexdigest() != expected:
+                    if input_size > 1 << 20:
+                        raise EvidenceRequestError("empirical adapter input changed")
+                    budget.debit_bytes(input_size)
+                    if hashlib.sha256(snapshot.read_blob(path)).hexdigest() != expected:
                         raise EvidenceRequestError("empirical adapter input changed")
             elif record.kind == "external":
                 stamp = datetime.fromisoformat(str(record.metadata["retrieved_at"]))
@@ -643,6 +662,8 @@ def validate_cached_records(
                 if (clock - stamp).total_seconds() > ttl_hours * 3600:
                     raise EvidenceRequestError("external evidence expired")
             valid.append(record)
+        except EvidenceBudgetExceeded:
+            raise
         except (EvidenceRequestError, EvidenceStoreError, SnapshotUnavailable,
                 KeyError, TypeError, ValueError):
             invalid_ids.add(record.evidence_id)

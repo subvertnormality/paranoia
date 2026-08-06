@@ -428,6 +428,61 @@ def test_pending_transition_is_rendered_for_fresh_verifier_recovery() -> None:
     assert '"reason":"retry me"' in rendered
 
 
+def test_persisted_authorization_requires_exact_event_schema_and_current_outcome() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "exact source",
+    })
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id},
+    )
+    raw = pc.state_to_json(state)
+    info = raw["claims"][0]["truth_authorization"]
+    del info["event"]["reason"]
+    info["event_digest"] = pc.sha256(json.dumps(
+        info["event"], sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode())
+    with pytest.raises(pc.ClaimRegisterError, match="authorization inputs"):
+        pc.state_from_json("plan", raw)
+
+    raw = pc.state_to_json(state)
+    info = raw["claims"][0]["truth_authorization"]
+    info["event"]["op"] = "CONTRADICT"
+    info["event_digest"] = pc.sha256(json.dumps(
+        info["event"], sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode())
+    with pytest.raises(pc.ClaimRegisterError, match="outcome"):
+        pc.state_from_json("plan", raw)
+
+
+def test_completed_dispute_resolution_authorization_round_trips() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    pc.apply_events(
+        state, [pc.Event("DISPUTE", {
+            "op": "DISPUTE", "claim_id": claim_id,
+            "evidence_ids": ["e1"], "reason": "conflict",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id},
+    )
+    event = pc.Event("RESOLVE_DISPUTE", {
+        "op": "RESOLVE_DISPUTE", "claim_id": claim_id, "outcome": "verified",
+        "evidence_ids": ["e2"], "reason": "resolved",
+    })
+    digest = pc.event_digest(event)
+    checks = [
+        pc.VendorCheck("one", "m1", digest, ("e2",), True, "t1"),
+        pc.VendorCheck("two", "m2", digest, ("e2",), True, "t2"),
+    ]
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e2": claim_id}, independent_required=True, vendor_checks=checks,
+    )
+    loaded = pc.state_from_json("plan", pc.state_to_json(state))
+    assert loaded.claims[claim_id].status == pc.VERIFIED
+
+
 def _state_with_claim() -> tuple[pc.ClaimState, str, list[pc.PlanSpan]]:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

@@ -331,6 +331,7 @@ def _converge_branch_review(
     # entry and the engine call can all raise, and a latch stranded there would make every
     # later round STATE-UNAVAILABLE over a fault that already surfaced to the caller. A
     # failed *write* is the one case that deliberately keeps the latch (see `release`).
+    release_error: str | None = None
     try:
         packet = orientation.build_packet(
             repo, base_id, head_id,
@@ -355,7 +356,10 @@ def _converge_branch_review(
         raise
     finally:
         if closure:
-            closure.release()
+            release_error = closure.release()
+
+    if release_error:
+        trailer = _release_failure_trailer(release_error)
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
@@ -408,6 +412,25 @@ def _plan_body(
     # it, and a reviewer reading in order obeys the closer instruction (plan §2.12).
     parts.extend(class_blocks or [])
     return "\n\n".join(parts)
+
+
+def _release_failure_trailer(reason: str) -> str:
+    return (
+        f"CLASS-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
+        "CONVERGENCE: BLOCKED — the lineage latch was not durably released."
+    )
+
+
+def _preflight_failure_review(reason: str) -> str:
+    rendered = json.dumps(str(reason), ensure_ascii=True)
+    return (
+        "## What works\n\nThe review stopped before using unavailable lineage state.\n\n"
+        "## What doesn't work\n\n[FATAL] Lineage preflight failed closed: "
+        + rendered
+        + "\n\n## Risks\n\nNo review findings can be trusted until lineage state is available.\n\n"
+        "## Gaps\n\nThe structural review did not run.\n\n"
+        "## Improvements\n\nRepair the named lineage state or recovery marker, then retry."
+    )
 
 
 class _ClaimStageFailure(RuntimeError):
@@ -570,9 +593,13 @@ def _critique_plan_verified(
     class_blocks = closure.prepare()
     if closure.unavailable or closure.lineage is None:
         closure.abandon()
-        closure.release()
+        release_error = closure.release()
         reason = closure.unavailable or "lineage unavailable"
+        if release_error:
+            reason += f"; latch release failed: {release_error}"
         return (
+            _preflight_failure_review(reason)
+            + "\n\n"
             f"CLAIM-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
             "CONVERGENCE: BLOCKED — lineage state could not be used this round."
@@ -598,6 +625,7 @@ def _critique_plan_verified(
         with PlanRepositorySnapshot.create(
             repo, run_id=run_id, before_pin=journal_snapshot
         ) as snapshot:
+            round_budget = cv.EvidenceBudget()
             high_stakes = _is_high_stakes(stakes, stakes_level)
             current_policy = {
                 "version": 1,
@@ -606,7 +634,7 @@ def _critique_plan_verified(
             }
             evidence_records = cv.validate_cached_records(
                 evidence_records, snapshot=snapshot, store=store, state=state,
-                high_stakes=high_stakes,
+                high_stakes=high_stakes, budget=round_budget,
             )
             evidence_cache_intact = (
                 tuple(record.evidence_id for record in evidence_records)
@@ -617,7 +645,6 @@ def _critique_plan_verified(
             state.authorization_policy = current_policy
             state.evidence_records = cv.records_to_json(evidence_records)
             draft_claims = state.copy()
-            round_budget = cv.EvidenceBudget()
             evidence_ids = {
                 record.evidence_id: record.claim_id for record in evidence_records
                 if record.kind != "abstention"
@@ -710,14 +737,22 @@ def _critique_plan_verified(
                     record.evidence_id: record.claim_id for record in evidence_records
                     if record.kind != "abstention"
                 }
-                local_records = [record for record in evidence_records if record.kind != "external"]
+                local_records = [
+                    record for record in evidence_records
+                    if record.kind not in {"external", "supplied-artifact"}
+                ]
                 external_only = [record for record in evidence_records if record.kind == "external"]
-                # Remote bytes and repository bytes never share a model call. The local
-                # verifier always runs (it also confirms kinds); an external auditor runs
-                # separately only when the server actually fetched remote evidence.
+                supplied_only = [
+                    record for record in evidence_records if record.kind == "supplied-artifact"
+                ]
+                # Repository, fetched-remote, and caller-supplied bytes never share a
+                # model call. The local verifier always runs (it also confirms kinds);
+                # each untrusted source class gets its own verifier call when present.
                 verifier_batches = [("LOCAL SERVER EVIDENCE", local_records)]
                 if external_only:
                     verifier_batches.append(("EXTERNAL UNTRUSTED EVIDENCE ONLY", external_only))
+                if supplied_only:
+                    verifier_batches.append(("CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY", supplied_only))
                 for batch_label, batch in verifier_batches:
                     verifier_prompt = prompts.compose(
                         prompts.PLAN_VERIFIER_INSTRUCTIONS,
@@ -725,7 +760,10 @@ def _critique_plan_verified(
                             plan_packet,
                             pc.render_claim_summary(draft_claims),
                             f"=== {batch_label} ===",
-                            cv.render_evidence(batch, include_passages=True),
+                            cv.render_evidence(
+                                batch, include_passages=True,
+                                debit_bytes=round_budget.debit_bytes,
+                            ),
                         ]),
                     )
                     batch_ids = {
@@ -768,6 +806,7 @@ def _critique_plan_verified(
                             event, required=required, primary_engine=engine, primary_model=model,
                             evidence_records=batch, claim_state=draft_claims, effort=effort,
                             plan_context=plan_packet, on_progress=on_progress,
+                            budget=round_budget,
                         )
                         pc.apply_events(
                             draft_claims, [event], role=pc.VERIFIER_ROLE, spans=spans,
@@ -788,7 +827,7 @@ def _critique_plan_verified(
                         ), ensure_ascii=True),
                         cv.render_evidence(
                             [r for r in evidence_records if r.kind.startswith("repository")],
-                            include_passages=False,
+                            include_passages=False, debit_bytes=round_budget.debit_bytes,
                         ),
                     ]),
                 )
@@ -819,9 +858,13 @@ def _critique_plan_verified(
             )
             structural_body += "\n\n" + plan_packet
             structural_body += "\n\n" + pc.render_claim_summary(draft_claims)
-            structural_body += "\n\n" + cv.render_evidence(repository_records, include_passages=True)
+            structural_body += "\n\n" + cv.render_evidence(
+                repository_records, include_passages=True,
+                debit_bytes=round_budget.debit_bytes,
+            )
             structural_body += "\n\n=== EXTERNAL EVIDENCE METADATA ONLY ===\n" + cv.render_evidence(
-                external_records, include_passages=False
+                external_records, include_passages=False,
+                debit_bytes=round_budget.debit_bytes,
             )
             structural_instructions = (
                 prompts.PLAN_REVIEW_INSTRUCTIONS + "\n\n"
@@ -1038,8 +1081,12 @@ def _independent_required(
     if event.op == "CONTRADICT" and claim and claim.status == pc.VERIFIED:
         return True
     ids = set(event.data.get("evidence_ids", []))
-    external = any(record.evidence_id in ids and record.kind == "external" for record in records)
-    return high_stakes and external
+    untrusted = any(
+        record.evidence_id in ids
+        and record.kind in {"external", "supplied-artifact"}
+        for record in records
+    )
+    return high_stakes and untrusted
 
 
 def _is_high_stakes(stakes: str | None, explicit_level: str | None = None) -> bool:
@@ -1057,8 +1104,9 @@ def _reblock_for_policy(
     policy: dict[str, Any],
 ) -> None:
     """Invalidate cached authorizations when the current policy is stricter."""
-    external_ids = {
-        record.evidence_id for record in records if record.kind == "external"
+    untrusted_ids = {
+        record.evidence_id for record in records
+        if record.kind in {"external", "supplied-artifact"}
     }
     for claim in state.claims.values():
         truth_or_bearing = (
@@ -1068,7 +1116,7 @@ def _reblock_for_policy(
             continue
         required = policy["independent_check"] == "require" or (
             policy["high_stakes"]
-            and bool(external_ids.intersection(claim.truth_evidence_ids))
+            and bool(untrusted_ids.intersection(claim.truth_evidence_ids))
         )
         if not required:
             continue
@@ -1108,6 +1156,7 @@ def _independent_checks(
     evidence_records: list[cv.EvidenceRecord], claim_state: pc.ClaimState, effort: str,
     plan_context: str,
     on_progress: Callable[[str], None] | None,
+    budget: cv.EvidenceBudget | None = None,
 ) -> list[pc.VendorCheck]:
     if not required:
         return []
@@ -1145,6 +1194,7 @@ def _independent_checks(
             + cv.render_evidence(
                 [r for r in evidence_records if r.evidence_id in evidence_ids],
                 include_passages=True,
+                debit_bytes=budget.debit_bytes if budget is not None else None,
             )
         )
         review = _tool_less_call(other, body, other.default_model, effort, on_progress)
@@ -1273,6 +1323,7 @@ def _critique_plan_legacy(
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
 
+    release_error: str | None = None
     try:
         body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -1290,7 +1341,10 @@ def _critique_plan_legacy(
         raise
     finally:
         if closure:
-            closure.release()
+            release_error = closure.release()
+
+    if release_error:
+        trailer = _release_failure_trailer(release_error)
 
     _log(log_dir, "critique_plan", engine, review, now, {
         "grounded": bool(repo), "model": model,

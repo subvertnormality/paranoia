@@ -349,18 +349,42 @@ class TestFailurePaths:
 
         def boom(root: Path, lineage_id: str) -> None:
             calls.append(lineage_id)
-            raise OSError("read-only filesystem")
+            raise cc.StateUnavailable("read-only filesystem")
 
         try:
-            cc.clear_latch = lambda *a, **kw: real_clear(*a, **kw)
+            cc.clear_latch = boom
             out = run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
-            assert "CONVERGENCE: NOT-BLOCKED" in out
+            assert calls
+            assert "CONVERGENCE: BLOCKED" in out
+            assert "Nothing notable" in out, "the paid review text must survive"
         finally:
             cc.clear_latch = real_clear
         # And the unlink failure itself is swallowed rather than raised:
         latch = cc.lineage_dir(state_root(tmp_path)) / "nonexistent.pending"
         cc.clear_latch(state_root(tmp_path), "nonexistent")  # must not raise
         assert not latch.exists()
+
+    def test_failed_release_fsync_recreates_a_marker_that_blocks_the_next_round(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = state_root(tmp_path)
+        cc.open_latch(root, "release-fsync")
+        original = cc._fsync_dir
+        calls = 0
+
+        def fail_after_unlink(path: Path) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("directory fsync failed")
+            original(path)
+
+        monkeypatch.setattr(cc, "_fsync_dir", fail_after_unlink)
+        with pytest.raises(cc.StateUnavailable, match="durably clear"):
+            cc.clear_latch(root, "release-fsync")
+        assert (cc.lineage_dir(root) / "release-fsync.releasing").exists()
+        with pytest.raises(cc.StateUnavailable, match="pending write latch"):
+            cc.load_lineage(root, "release-fsync", stamp="s")
 
     def test_the_pending_latch_is_released_on_a_normal_round(
         self, repo: Path, tmp_path: Path

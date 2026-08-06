@@ -120,6 +120,29 @@ def test_symlinked_object_store_root_is_rejected(repo: Path, tmp_path: Path) -> 
         PlanRepositorySnapshot.create(repo, run_id="symlinked-objects")
 
 
+def test_irrelevant_object_store_symlink_does_not_invalidate_snapshot(
+    repo: Path, tmp_path: Path,
+) -> None:
+    inert_target = tmp_path / "inert"
+    inert_target.mkdir()
+    (repo / ".git" / "objects" / "not-a-git-namespace").symlink_to(
+        inert_target, target_is_directory=True,
+    )
+    with PlanRepositorySnapshot.create(repo, run_id="irrelevant-object-symlink") as snap:
+        assert snap.read_blob("app.py").startswith(b'"""App module')
+
+
+def test_symlink_in_resolvable_object_namespace_is_rejected(
+    repo: Path, tmp_path: Path,
+) -> None:
+    pack = repo / ".git" / "objects" / "pack"
+    if pack.exists():
+        pack.rmdir()
+    pack.symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(SnapshotUnavailable, match="object-store path"):
+        PlanRepositorySnapshot.create(repo, run_id="pack-symlink")
+
+
 def test_snapshot_commit_never_invokes_repository_gpg_program(
     repo: Path, tmp_path: Path,
 ) -> None:

@@ -658,7 +658,23 @@ def _approved_common_dir(repo: Path) -> Path:
 def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -> None:
     if objects.is_symlink() or not objects.is_dir():
         raise SnapshotUnavailable("repository object-store root must be a real directory")
-    pending = [objects]
+    try:
+        root_entries = list(os.scandir(objects))
+    except OSError as exc:
+        raise SnapshotUnavailable(f"could not inspect repository object store: {exc}") from exc
+    # Git resolves objects only through loose-object fanout plus the pack/info
+    # namespaces. Unrelated names are inert and must not make an otherwise safe
+    # repository unavailable merely because they are symlinks.
+    pending: list[Path] = []
+    for entry in root_entries:
+        if entry.name not in {"pack", "info"} and not re.fullmatch(r"[0-9a-fA-F]{2}", entry.name):
+            continue
+        if entry.is_symlink():
+            raise SnapshotUnavailable(
+                f"repository object-store path may not be a symlink: {entry.path}"
+            )
+        if entry.is_dir(follow_symlinks=False):
+            pending.append(Path(entry.path))
     seen = 0
     while pending:
         directory = pending.pop()

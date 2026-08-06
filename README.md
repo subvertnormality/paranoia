@@ -661,6 +661,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   result. Direct Git metadata is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
   ambiguous failures at or after that boundary, retaining latches only for the latter.
+  Latch release uses a separately recognized recovery marker and any durability failure
+  changes the current verdict to blocked. Caller-supplied artifacts have their own
+  untrusted verifier batch and receive the high-stakes independent-audit policy used for
+  fetched evidence. Cached CAS/repository reads and model-visible evidence rendering share
+  the round byte budget. Only symlinks in Git-resolvable object namespaces are rejected;
+  inert unrelated object-store names are ignored.
   Network budgets charge each
   redirect hop and every response body, including rejected responses, while DNS and all
   later phases share one enforceable total deadline. Synthetic snapshot commits always

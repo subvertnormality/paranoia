@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -313,3 +314,41 @@ def test_persisted_non_abstention_record_requires_rooted_bytes() -> None:
     ))
     with pytest.raises(cv.EvidenceRequestError, match="root exact bytes"):
         cv.records_from_json([row])
+
+
+def test_cached_body_is_budgeted_before_cas_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = b"eleven-byte"
+    digest = hashlib.sha256(body).hexdigest()
+    passage_digest = hashlib.sha256(body).hexdigest()
+    record = cv.EvidenceRecord(
+        "e1", "c1", "supplied-artifact", "source", digest, digest, len(body),
+        0, len(body), passage_digest, body.decode(),
+        {"source": "source", "caller_supplied": True},
+    )
+    budget = cv.EvidenceBudget(aggregate_bytes=cv.MAX_AGGREGATE_BYTES - len(body) + 1)
+    store = EvidenceStore(tmp_path / "cache-budget")
+
+    def must_not_read(*_args, **_kwargs):
+        raise AssertionError("CAS read happened before budget reservation")
+
+    monkeypatch.setattr(store, "read", must_not_read)
+    with pytest.raises(cv.EvidenceBudgetExceeded):
+        cv.validate_cached_records(
+            [record], snapshot=None, store=store, state=pc.ClaimState("c"),
+            budget=budget,
+        )  # type: ignore[arg-type]
+
+
+def test_cached_prompt_rendering_uses_the_same_byte_budget() -> None:
+    record = cv.EvidenceRecord(
+        "a1", "c1", "abstention", "source", None, "a" * 64, 0,
+        0, 0, hashlib.sha256(b"").hexdigest(), "",
+        {"stage": "external", "reason": "bounded failure"},
+    )
+    budget = cv.EvidenceBudget(aggregate_bytes=cv.MAX_AGGREGATE_BYTES - 1)
+    with pytest.raises(cv.EvidenceBudgetExceeded):
+        cv.render_evidence(
+            [record], include_passages=True, debit_bytes=budget.debit_bytes,
+        )
