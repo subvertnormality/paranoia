@@ -63,11 +63,13 @@ def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
          check: bool = True, git_env: dict[str, str] | None = None,
          extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    cwd = Path((git_env or {}).get("GIT_WORK_TREE", str(repo)))
     try:
         result = subprocess.run(
-            ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes,
+            ["git", *_GIT_CONFIG, *args], cwd=cwd, input=input_bytes,
             capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
             env={**ambient, **_GIT_ENV, **(git_env or {}), **(extra_env or {})},
+            close_fds=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise SnapshotUnavailable(f"git {' '.join(args[:2])} exceeded hard deadline") from exc
@@ -87,9 +89,11 @@ def _run_bounded(
 ) -> bytes:
     """Read bounded Git output and terminate once complete records reach the limit."""
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    cwd = Path((git_env or {}).get("GIT_WORK_TREE", str(repo)))
     proc = subprocess.Popen(
-        ["git", *_GIT_CONFIG, *args], cwd=repo, stdout=subprocess.PIPE,
+        ["git", *_GIT_CONFIG, *args], cwd=cwd, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, env={**ambient, **_GIT_ENV, **(git_env or {})},
+        close_fds=False,
     )
     output = bytearray()
     deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
@@ -252,6 +256,17 @@ def _read_small_regular(
 
 def _open_directory(path: Path) -> int:
     """Open an existing real directory and reject replacement with a link."""
+    if path.parent == Path("/proc/self/fd") and path.name.isdigit():
+        try:
+            fd = os.dup(int(path.name))
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                os.close(fd)
+                raise SnapshotUnavailable(f"retained repository fd is unsafe: {path}")
+            return fd
+        except OSError as exc:
+            raise SnapshotUnavailable(
+                f"retained repository fd is unavailable at {path}: {exc}"
+            ) from exc
     try:
         before = path.lstat()
         if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
@@ -329,7 +344,9 @@ def _read_small_regular_at(
     try:
         before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
-            raise SnapshotUnavailable(f"repository ref is unsafe or oversized: {name!r}")
+            raise SnapshotUnavailable(
+                f"repository metadata must be a small regular file: {name!r}"
+            )
         fd = os.open(
             name,
             os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
@@ -598,7 +615,9 @@ def _ref_token(run_id: str) -> str:
 class _GitControl:
     directory: Path
     environment: dict[str, str]
+    common: Path
     skipped_refs: tuple[str, ...] = ()
+    owned_fds: tuple[int, ...] = ()
 
 
 def _controlled_config_value(
@@ -610,6 +629,7 @@ def _controlled_config_value(
             ["git", "config", "--file", str(source), "--no-includes", "--get", key],
             cwd=directory, capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
             env={**ambient, **_GIT_ENV},
+            close_fds=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise SnapshotUnavailable("controlled Git config parsing exceeded hard deadline") from exc
@@ -630,10 +650,30 @@ def _create_git_control(repo: Path) -> _GitControl:
     """
     git_dir, common = _approved_repository_dirs(repo)
     directory = Path(tempfile.mkdtemp(prefix="paranoia-plan-git-control-"))
+    owned_fds: list[int] = []
     try:
+        repo_fd = _open_directory(repo)
+        git_fd = _open_directory(git_dir)
+        common_fd = _open_directory(common)
+        objects_fd = _open_child_directory(common_fd, "objects", create=False)
+        owned_fds = [repo_fd, git_fd, common_fd, objects_fd]
+        for fd in owned_fds:
+            os.set_inheritable(fd, True)
+        stable_repo = Path(f"/proc/self/fd/{repo_fd}")
+        stable_common = Path(f"/proc/self/fd/{common_fd}")
+        stable_objects = Path(f"/proc/self/fd/{objects_fd}")
+
+        def read_at(parent_fd: int, name: str, cap: int, *, missing_ok: bool) -> bytes:
+            try:
+                return _read_small_regular_at(parent_fd, name, max_bytes=cap)
+            except FileNotFoundError:
+                if missing_ok:
+                    return b""
+                raise SnapshotUnavailable(f"repository metadata is missing: {name}") from None
+
         source_config = directory / "source.config"
         source_config.write_bytes(
-            _read_small_regular(common / "config", max_bytes=1 << 20, missing_ok=True)
+            read_at(common_fd, "config", 1 << 20, missing_ok=True)
         )
         version = _controlled_config_value(
             directory, source_config, "core.repositoryformatversion"
@@ -656,26 +696,35 @@ def _create_git_control(repo: Path) -> _GitControl:
         (directory / "config").write_text("\n".join(config_lines) + "\n", encoding="ascii")
         source_config.unlink()
 
-        head = _read_small_regular(git_dir / "HEAD", max_bytes=4096)
+        head = read_at(git_fd, "HEAD", 4096, missing_ok=False)
         (directory / "HEAD").write_bytes(head)
-        for name, source, cap in (
-            ("index", git_dir / "index", 64 << 20),
-            ("packed-refs", common / "packed-refs", MAX_DISCOVERY_BYTES),
-            ("shallow", common / "shallow", MAX_DISCOVERY_BYTES),
+        for name, parent_fd, cap in (
+            ("index", git_fd, 64 << 20),
+            ("packed-refs", common_fd, MAX_DISCOVERY_BYTES),
+            ("shallow", common_fd, MAX_DISCOVERY_BYTES),
         ):
-            data = _read_small_regular(source, max_bytes=cap, missing_ok=True)
+            data = read_at(parent_fd, name, cap, missing_ok=True)
             if data:
                 (directory / name).write_bytes(data)
-        skipped_refs = _copy_loose_refs(common, directory / "refs")
+        os.close(git_fd)
+        owned_fds.remove(git_fd)
+        skipped_refs = _copy_loose_refs(stable_common, directory / "refs")
         environment = {
             "GIT_DIR": str(directory),
-            "GIT_WORK_TREE": str(repo),
-            "GIT_OBJECT_DIRECTORY": str(common / "objects"),
+            "GIT_WORK_TREE": str(stable_repo),
+            "GIT_OBJECT_DIRECTORY": str(stable_objects),
         }
-        return _GitControl(directory, environment, skipped_refs)
+        return _GitControl(
+            directory, environment, stable_common, skipped_refs, tuple(owned_fds)
+        )
     except Exception:
         import shutil
         shutil.rmtree(directory, ignore_errors=True)
+        for fd in owned_fds:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         raise
 
 
@@ -693,6 +742,7 @@ class PlanRepositorySnapshot:
     _control_dir: Path | None = field(default=None, repr=False)
     _common_dir: Path | None = field(default=None, repr=False)
     _owned_refs: list[tuple[str, str]] = field(default_factory=list, repr=False)
+    _owned_dir_fds: tuple[int, ...] = field(default_factory=tuple, repr=False)
     _closed: bool = field(default=False, repr=False)
 
     @classmethod
@@ -718,19 +768,17 @@ class PlanRepositorySnapshot:
                     git_env=git_env,
                 ).stdout.decode("ascii").strip()
             )
-            ignored_raw = _run_bounded_records(
-                repo,
-                ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"],
-                max_records=MAX_SNAPSHOT_PATHS, git_env=git_env,
+            # Working-tree discovery is server-owned and fd-relative. Git receives only
+            # the resulting explicit paths; it never traverses attacker-swappable names.
+            tree, unavailable, ignored = _snapshot_tree_without_filters(
+                repo, git_env=git_env,
             )
-            ignored = tuple(
-                item.decode("utf-8", errors="surrogateescape")
-                for item in ignored_raw.split(b"\0") if item
-            )
-            tree, unavailable = _snapshot_tree_without_filters(repo, git_env=git_env)
             unavailable = tuple(dict.fromkeys([
                 *unavailable, *control.skipped_refs,
-                *_find_special_paths(repo, ignored_paths=ignored)
+                *_find_special_paths(
+                    repo, ignored_paths=ignored,
+                    root_fd=int(Path(git_env["GIT_WORK_TREE"]).name),
+                )
             ]))
             commit_args = ["commit-tree", "--no-gpg-sign", tree]
             if has_head:
@@ -771,12 +819,12 @@ class PlanRepositorySnapshot:
                 )
             if before_pin is not None:
                 before_pin(owned)
-            _publish_owned_refs(common=Path(git_env["GIT_OBJECT_DIRECTORY"]).parent, refs=owned)
+            _publish_owned_refs(common=control.common, refs=owned)
             try:
                 cls._create_refs(repo, owned, git_env=git_env)
             except Exception as exc:
                 failures: list[str] = []
-                common = Path(git_env["GIT_OBJECT_DIRECTORY"]).parent
+                common = control.common
                 for name, oid in reversed(owned):
                     try:
                         _delete_owned_ref(common, name, oid)
@@ -791,11 +839,16 @@ class PlanRepositorySnapshot:
             return cls(
                 repo, head, tree, commit, wrapper_ref, history, ignored,
                 unavailable, git_env, control.directory,
-                Path(git_env["GIT_OBJECT_DIRECTORY"]).parent, owned,
+                control.common, owned, control.owned_fds,
             )
         except Exception:
             import shutil
             shutil.rmtree(control.directory, ignore_errors=True)
+            for fd in control.owned_fds:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
             raise
 
     @staticmethod
@@ -846,13 +899,17 @@ class PlanRepositorySnapshot:
                 raise SnapshotCleanupError(
                     f"could not remove server-owned Git control directory: {exc}"
                 ) from exc
+        for fd in self._owned_dir_fds:
+            try:
+                os.close(fd)
+            except OSError as exc:
+                raise SnapshotCleanupError(
+                    f"could not close retained repository directory fd: {exc}"
+                ) from exc
+        self._owned_dir_fds = ()
         self._closed = True
 
     def _verify_wrapper(self) -> None:
-        _validate_object_boundary(self.repo)
-        _git_dir, current_common = _approved_repository_dirs(self.repo)
-        if self._common_dir is None or current_common != self._common_dir:
-            raise SnapshotUnavailable("repository Git metadata boundary changed")
         if self._common_dir is None \
                 or _read_owned_ref(self._common_dir, self.wrapper_ref) != self.commit_id:
             raise SnapshotUnavailable("pinned snapshot object/ref is missing or changed")
@@ -915,9 +972,11 @@ class PlanRepositorySnapshot:
             key: value for key, value in os.environ.items() if not key.startswith("GIT_")
         }
         proc = subprocess.Popen(
-            ["git", *_GIT_CONFIG, "cat-file", "blob", oid], cwd=self.repo,
+            ["git", *_GIT_CONFIG, "cat-file", "blob", oid],
+            cwd=Path(self._git_env["GIT_WORK_TREE"]),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env={**ambient, **_GIT_ENV, **self._git_env},
+            close_fds=False,
         )
         assert proc.stdout is not None
         result = bytearray()
@@ -1130,12 +1189,94 @@ class PlanRepositorySnapshot:
 
 
 
+def _read_retained_worktree_file(root_fd: int, path: str, *, max_bytes: int) -> bytes:
+    parts = PurePosixPath(path).parts
+    parent_fd = os.dup(root_fd)
+    try:
+        for part in parts[:-1]:
+            child_fd = _open_child_directory(parent_fd, part, create=False)
+            os.close(parent_fd)
+            parent_fd = child_fd
+        before = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
+            raise SnapshotUnavailable(f"ignore file is unsafe or oversized: {path!r}")
+        fd = os.open(
+            parts[-1], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0), dir_fd=parent_fd,
+        )
+        try:
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode) or (
+                opened.st_dev, opened.st_ino
+            ) != (before.st_dev, before.st_ino):
+                raise SnapshotUnavailable(f"ignore file changed while opening: {path!r}")
+            data = bytearray()
+            while len(data) <= max_bytes:
+                chunk = os.read(fd, min(65536, max_bytes + 1 - len(data)))
+                if not chunk:
+                    break
+                data.extend(chunk)
+            if len(data) > max_bytes:
+                raise SnapshotUnavailable(f"ignore file exceeds byte cap: {path!r}")
+            return bytes(data)
+        finally:
+            os.close(fd)
+    finally:
+        os.close(parent_fd)
+
+
+def _classify_ignored_paths(
+    root_fd: int, paths: tuple[str, ...], tracked: set[str], *,
+    git_env: dict[str, str],
+) -> tuple[str, ...]:
+    untracked = [path for path in paths if path not in tracked]
+    if not untracked:
+        return ()
+    encoded = b"".join(
+        path.encode("utf-8", errors="surrogateescape") + b"\0" for path in untracked
+    )
+    if len(encoded) > MAX_DISCOVERY_BYTES:
+        raise SnapshotUnavailable("worktree path materialization exceeds byte cap")
+    private = Path(tempfile.mkdtemp(prefix="paranoia-ignore-worktree-"))
+    try:
+        for path in untracked:
+            if PurePosixPath(path).name != ".gitignore":
+                continue
+            body = _read_retained_worktree_file(root_fd, path, max_bytes=1 << 20)
+            target = private.joinpath(*PurePosixPath(path).parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(body)
+        ambient = {
+            key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        }
+        env = {**ambient, **_GIT_ENV, **git_env, "GIT_WORK_TREE": str(private)}
+        result = subprocess.run(
+            ["git", *_GIT_CONFIG, "check-ignore", "--no-index", "--stdin", "-z"],
+            cwd=private, input=encoded, capture_output=True,
+            timeout=GIT_TIMEOUT_SECONDS, env=env, close_fds=False,
+        )
+        if result.returncode not in {0, 1} or len(result.stdout) > len(encoded):
+            raise SnapshotUnavailable("private ignore classification failed or exceeded cap")
+        ignored = tuple(
+            item.decode("utf-8", errors="surrogateescape")
+            for item in result.stdout.split(b"\0") if item
+        )
+        if any(path not in set(untracked) for path in ignored):
+            raise SnapshotUnavailable("private ignore classification returned an unknown path")
+        return ignored
+    except subprocess.TimeoutExpired as exc:
+        raise SnapshotUnavailable("private ignore classification exceeded deadline") from exc
+    finally:
+        import shutil
+        shutil.rmtree(private, ignore_errors=True)
+
+
 def _snapshot_tree_without_filters(
     repo: Path, *, git_env: dict[str, str],
-) -> tuple[str, tuple[str, ...]]:
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     """Hash working-tree bytes without ``git add`` or repository-selected commands.
 
-    Git supplies only the candidate path set and object database. File bytes are opened
+    The server supplies the candidate path set from an fd-owned walk. File bytes are opened
     with ``O_NOFOLLOW``, hashed through stdin (which bypasses clean filters), and inserted
     into a private index with explicit modes/object IDs. Repository hooks, fsmonitor,
     attributes, filters, pagers, and aliases therefore cannot select an executable step.
@@ -1154,30 +1295,30 @@ def _snapshot_tree_without_filters(
         if stage == "0":
             index_entries[raw_path.decode("utf-8", errors="surrogateescape")] = (mode, oid)
 
-    candidates = _run_bounded_records(
-        repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        max_records=MAX_SNAPSHOT_PATHS, git_env=git_env,
+    discovered = _discover_worktree_paths(
+        int(Path(git_env["GIT_WORK_TREE"]).name), max_entries=MAX_SNAPSHOT_PATHS,
+    )
+    ignored = _classify_ignored_paths(
+        int(Path(git_env["GIT_WORK_TREE"]).name), discovered, set(index_entries),
+        git_env=git_env,
     )
     rows: list[tuple[str, str, str]] = []
     unavailable: list[str] = []
-    for raw_path in [item for item in candidates.split(b"\0") if item]:
-        path = raw_path.decode("utf-8", errors="surrogateescape")
+    candidate_paths = sorted(
+        {*index_entries, *(path for path in discovered if path not in set(ignored))},
+        key=lambda item: item.encode("utf-8", errors="surrogateescape"),
+    )
+    retained_root_fd = int(Path(git_env["GIT_WORK_TREE"]).name)
+    for path in candidate_paths:
         pure = PurePosixPath(path)
         if pure.is_absolute() or ".." in pure.parts or not pure.parts:
             raise SnapshotUnavailable("snapshot candidate path escapes repository")
-        root_before = repo.lstat()
-        root_fd = os.open(
-            repo,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        )
+        root_fd = os.dup(retained_root_fd)
         parent_fd = root_fd
         try:
             root_opened = os.fstat(root_fd)
-            if not stat.S_ISDIR(root_opened.st_mode) or (
-                root_before.st_dev, root_before.st_ino
-            ) != (root_opened.st_dev, root_opened.st_ino):
-                raise SnapshotUnavailable("repository root changed while opening")
+            if not stat.S_ISDIR(root_opened.st_mode):
+                raise SnapshotUnavailable("retained repository root is not a directory")
             for part in pure.parts[:-1]:
                 child_fd = _open_child_directory(parent_fd, part, create=False)
                 if parent_fd != root_fd:
@@ -1228,9 +1369,11 @@ def _snapshot_tree_without_filters(
                     try:
                         proc = subprocess.run(
                             ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
-                            cwd=repo, stdin=handle, capture_output=True,
+                            cwd=Path(git_env["GIT_WORK_TREE"]),
+                            stdin=handle, capture_output=True,
                             timeout=GIT_TIMEOUT_SECONDS,
                             env={**ambient, **_GIT_ENV, **git_env},
+                            close_fds=False,
                         )
                     except subprocess.TimeoutExpired as exc:
                         raise SnapshotUnavailable("git hash-object exceeded hard deadline") from exc
@@ -1270,7 +1413,7 @@ def _snapshot_tree_without_filters(
         tree = _run(
             repo, ["write-tree"], git_env=git_env, extra_env=private_env,
         ).stdout.decode("ascii").strip()
-        return tree, tuple(unavailable)
+        return tree, tuple(unavailable), ignored
     finally:
         import shutil
         shutil.rmtree(index_dir, ignore_errors=True)
@@ -1406,29 +1549,73 @@ def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -
                     )
 
 
+def _discover_worktree_paths(root_fd: int, *, max_entries: int) -> tuple[str, ...]:
+    """Materialize regular/symlink candidate names through owned directory fds."""
+    paths: list[str] = []
+    pending: list[tuple[int, str]] = [(os.dup(root_fd), "")]
+    seen = 0
+    try:
+        while pending:
+            directory_fd, prefix = pending.pop()
+            try:
+                with os.scandir(directory_fd) as entries:
+                    for entry in entries:
+                        if not prefix and entry.name == ".git":
+                            continue
+                        relative = f"{prefix}/{entry.name}" if prefix else entry.name
+                        seen += 1
+                        if seen > max_entries:
+                            raise SnapshotUnavailable(
+                                "repository entry discovery exceeds safety cap"
+                            )
+                        mode = entry.stat(follow_symlinks=False).st_mode
+                        if stat.S_ISDIR(mode):
+                            child_fd = _open_child_directory(
+                                directory_fd, entry.name, create=False,
+                            )
+                            pending.append((child_fd, relative))
+                        elif stat.S_ISREG(mode) or stat.S_ISLNK(mode):
+                            paths.append(relative)
+            finally:
+                os.close(directory_fd)
+    finally:
+        for directory_fd, _prefix in pending:
+            os.close(directory_fd)
+    return tuple(paths)
+
+
 def _find_special_paths(
-    repo: Path, *, ignored_paths: tuple[str, ...] = (), max_entries: int = 50_000
+    repo: Path, *, ignored_paths: tuple[str, ...] = (), max_entries: int = 50_000,
+    root_fd: int | None = None,
 ) -> tuple[str, ...]:
     """Disclose nonregular entries Git omits from ``ls-files --others``."""
     special: list[str] = []
     seen = 0
     ignored = {path.rstrip("/") for path in ignored_paths}
-    root_before = repo.lstat()
-    try:
-        root_fd = os.open(
-            repo,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        )
-    except OSError as exc:
-        raise SnapshotUnavailable(f"could not open repository entry scan root: {exc}") from exc
-    root_opened = os.fstat(root_fd)
-    if not stat.S_ISDIR(root_opened.st_mode) or (
-        root_before.st_dev, root_before.st_ino
-    ) != (root_opened.st_dev, root_opened.st_ino):
-        os.close(root_fd)
-        raise SnapshotUnavailable("repository entry scan root changed while opening")
-    pending: list[tuple[int, str]] = [(root_fd, "")]
+    if root_fd is None:
+        root_before = repo.lstat()
+        try:
+            scan_root_fd = os.open(
+                repo,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            )
+        except OSError as exc:
+            raise SnapshotUnavailable(
+                f"could not open repository entry scan root: {exc}"
+            ) from exc
+        root_opened = os.fstat(scan_root_fd)
+        if not stat.S_ISDIR(root_opened.st_mode) or (
+            root_before.st_dev, root_before.st_ino
+        ) != (root_opened.st_dev, root_opened.st_ino):
+            os.close(scan_root_fd)
+            raise SnapshotUnavailable("repository entry scan root changed while opening")
+    else:
+        scan_root_fd = os.dup(root_fd)
+        if not stat.S_ISDIR(os.fstat(scan_root_fd).st_mode):
+            os.close(scan_root_fd)
+            raise SnapshotUnavailable("retained repository entry scan root is unsafe")
+    pending: list[tuple[int, str]] = [(scan_root_fd, "")]
     try:
         while pending:
             directory_fd, prefix = pending.pop()

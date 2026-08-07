@@ -682,7 +682,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
   plan evidence. Before any repository-aware Git command, bounded no-follow metadata reads
   construct a private server-configured Git directory; repository config/config.worktree
-  and their include paths are never inputs to those commands. Supplied loose refs are
+  and their include paths are never inputs to those commands. Retained worktree, common-dir,
+  and object-store fds are inherited by Git through `/proc/self/fd` paths and remain live
+  through cleanup, so pathname replacement cannot redirect reads, object writes, or refs.
+  Working-tree discovery is an fd-relative server walk; ignore matching uses only its
+  explicit names and safely copied `.gitignore` files in a private worktree. Supplied loose refs are
   copied through bounded fd-anchored no-follow traversal; Git never receives the live ref
   tree, and temporary GC pins are created, verified, and removed with fd-relative
   no-follow operations. Persisted evidence journals, candidate/live roots, and quarantine

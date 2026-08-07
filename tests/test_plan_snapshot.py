@@ -410,6 +410,60 @@ def test_inherited_git_object_environment_is_cleared(
         assert snap.read_blob("app.py").startswith(b'"""App module')
 
 
+def test_retained_git_and_object_roots_survive_path_replacement(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    external_git = tmp_path / "external-git"
+    (external_git / "objects").mkdir(parents=True)
+    (external_git / "refs").mkdir()
+    sentinel = external_git / "sentinel"
+    sentinel.write_text("unchanged")
+    original_run = ps._run
+    swapped = False
+    observed_envs: list[dict[str, str]] = []
+
+    def swap_after_control(repo_path, args, **kwargs):
+        nonlocal swapped
+        git_env = kwargs.get("git_env") or {}
+        if git_env:
+            observed_envs.append(dict(git_env))
+        if not swapped and git_env:
+            swapped = True
+            (repo / ".git").rename(repo / ".git-original")
+            (repo / ".git").symlink_to(external_git, target_is_directory=True)
+        return original_run(repo_path, args, **kwargs)
+
+    monkeypatch.setattr(ps, "_run", swap_after_control)
+    with PlanRepositorySnapshot.create(repo, run_id="retained-roots") as snapshot:
+        assert snapshot.read_blob("app.py").startswith(b'"""App module')
+    assert sentinel.read_text() == "unchanged"
+    assert not (external_git / "refs" / "paranoia").exists()
+    assert observed_envs and all(
+        env["GIT_WORK_TREE"].startswith("/proc/self/fd/")
+        and env["GIT_OBJECT_DIRECTORY"].startswith("/proc/self/fd/")
+        for env in observed_envs
+    )
+
+
+def test_worktree_discovery_never_uses_git_directory_traversal(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_run_bounded = ps._run_bounded_records
+    commands: list[tuple[str, ...]] = []
+
+    def capture(repo_path, args, **kwargs):
+        commands.append(tuple(args))
+        return original_run_bounded(repo_path, args, **kwargs)
+
+    monkeypatch.setattr(ps, "_run_bounded_records", capture)
+    with PlanRepositorySnapshot.create(repo, run_id="server-discovery") as snapshot:
+        assert snapshot.read_blob("app.py")
+    assert not any(
+        command and command[0] == "ls-files" and "--others" in command
+        for command in commands
+    )
+
+
 def test_native_linked_worktree_common_store_is_explicitly_approved(
     repo: Path, tmp_path: Path
 ) -> None:

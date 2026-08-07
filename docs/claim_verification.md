@@ -43,7 +43,10 @@ One closure round performs these stages:
    Before the first repository-aware Git subprocess, the server reads approved Git-dir
    metadata with bounded no-follow file operations and builds a private Git control
    directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
-   metadata, an fd-anchored no-follow copy of loose refs, and the approved object directory.
+   metadata, an fd-anchored no-follow copy of loose refs, and inherited handles for the
+   approved worktree, common directory, and object store exposed as `/proc/self/fd/...`.
+   Those directory handles remain open through ref cleanup, so replacing `.git`, the common
+   directory, or `objects` after validation cannot redirect a subprocess or publication.
    Temporary GC pins are published separately through fd-relative, no-follow operations;
    Git never traverses the repository-controlled loose-ref tree. Repository `config`,
    `config.worktree`, `include.path`, and `includeIf` content
@@ -54,9 +57,13 @@ One closure round performs these stages:
    and grafts/replacement objects are disabled for snapshot and history operations. Lazy
    fetching is disabled, so a partial
    clone with missing objects fails closed instead of invoking a configured promisor remote.
-   Ignored untracked paths and unsupported FIFOs/sockets/devices are JSON-escaped,
-   disclosed, and unavailable. Ignored regular directories are pruned from the bounded
-   special-entry walk, so a large ignored build tree cannot exhaust that scan. A temporary
+   Working-tree names come from a server-owned fd-relative walk, never `git ls-files`
+   directory traversal. Ignore classification receives only those explicit names and a
+   private worktree containing bounded, safely copied `.gitignore` files; it cannot traverse
+   the supplied worktree. Ignored untracked paths and unsupported FIFOs/sockets/devices are
+   JSON-escaped, disclosed, and unavailable. Ignored regular directories are pruned from the
+   later special-entry walk; the initial server discovery remains subject to its hard entry
+   and byte caps. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
 3. A fresh toolless research role registers load-bearing candidates using only a temporary
@@ -364,8 +371,9 @@ records its object ID, byte range, whole size, and range completeness. `LIST_TRE
 debit Git output as it is read, and terminate at their record or byte cap instead of
 capturing an unbounded result. Each read is also sized to the shared budget remaining, so
 attempted pipe I/O cannot cross the aggregate cap before accounting rejects it.
-Snapshot-discovery enumerations are likewise streamed before decoding or retention, with
-a 100,000-path/32-MiB cap and a separate 4,096-total-ref discovery cap before the smaller
+Snapshot discovery walks retained directory fds under a 100,000-entry/32-MiB materialized
+path cap. Git receives explicit paths only; private ignore classification output is bounded
+by that input. Ref discovery retains its separate 4,096-total-ref cap before the smaller
 pinned-history limit is applied. Directory scans count entries while iterating instead of
 materializing an attacker-sized directory first. Every snapshot Git process and pipe read
 also has a hard deadline; a shared termination path kills and reaps the child under a
@@ -388,6 +396,9 @@ anchored parent. Replacing an inspected ancestor with an external symlink theref
 without hashing or disclosing external bytes. The auxiliary unsupported-entry disclosure
 scan uses the same boundary: its queue owns already-open directory fds rather than pathnames,
 so a later rename/symlink replacement cannot redirect enumeration or disclose external names.
+All Git subprocesses inherit only the retained worktree/object handles plus server-owned
+control metadata. Temporary refs are created and removed through the retained common-dir
+handle, not a re-resolved pathname.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
