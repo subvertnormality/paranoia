@@ -232,6 +232,17 @@ def test_edited_plan_can_supersede_a_stale_claim_through_real_handler(
                 return _review(
                     "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
                 )
+            if "fresh plan-only replacement kind" in prompt:
+                self.tool_less_prompts.append(prompt)
+                replacement_id = re.search(
+                    r'CLAIM=.*?"claim_id":"([0-9a-f]{32})"', prompt,
+                ).group(1)
+                return _review(
+                    "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([{
+                        "op": "CONFIRM_KIND", "claim_id": replacement_id,
+                        "kind": "decision", "reason": "fresh replacement classification",
+                    }])
+                )
             if "neutral evidence planner" in prompt and '"status":"not-applicable"' in prompt:
                 self.tool_less_prompts.append(prompt)
                 return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []")
@@ -262,6 +273,8 @@ def test_edited_plan_can_supersede_a_stale_claim_through_real_handler(
     replacement = [claim for claim in state.claims.values() if claim.status == pc.NOT_APPLICABLE]
     assert len(superseded) == len(replacement) == 1
     assert superseded[0].superseded_by == replacement[0].claim_id
+    assert any("plan-only claim policy classifier" in p for p in engine.tool_less_prompts)
+    assert any("fresh plan-only replacement kind" in p for p in engine.tool_less_prompts)
 
 
 def test_class_id_collision_through_real_handler_preserves_lineage_atomically(

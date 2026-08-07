@@ -37,6 +37,18 @@ def test_external_source_policy_is_exact_server_owned_provenance() -> None:
         "https://sub.docs.example.com/standard/v1", policy,
     ) == "unclassified-external"
     assert cv.classify_external_source(
+        "https://docs.example.com:443/standard/v1", policy,
+    ) == "primary"
+    for ambiguous in (
+        "https://docs.example.com:8443/standard/v1",
+        "https://docs.example.com/standard/../community/post",
+        "https://docs.example.com/standard/%2e%2e/community/post",
+    ):
+        assert cv.classify_external_source(ambiguous, policy) == "unclassified-external"
+    assert cv.classify_external_source(
+        "https://docs.example.com/standardized", policy,
+    ) == "authoritative"
+    assert cv.classify_external_source(
         "https://www.reddit.com/r/python/comments/example", policy,
     ) == "ugc"
     with pytest.raises(cv.EvidenceRequestError, match="exact lowercase host"):
@@ -46,6 +58,11 @@ def test_external_source_policy_is_exact_server_owned_provenance() -> None:
     with pytest.raises(cv.EvidenceRequestError, match="known UGC hosts"):
         cv.parse_external_source_policy([
             {"host": "www.reddit.com", "path_prefix": "/", "source_class": "primary"},
+        ])
+    with pytest.raises(cv.EvidenceRequestError, match="absolute URL path"):
+        cv.parse_external_source_policy([
+            {"host": "docs.example.com", "path_prefix": "/official/%2e%2e/ugc",
+             "source_class": "primary"},
         ])
 
 
@@ -336,6 +353,56 @@ def test_large_source_selects_a_claim_relevant_rooted_passage(tmp_path: Path) ->
     )
     assert framed["passage_start"] == record.passage_start
     assert framed["passage_complete"] is False
+
+
+def test_followup_passage_selects_any_rooted_range_without_refetch(
+    repo: Path, tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "followup-passage-store")
+    store.begin("initial-passage-run")
+    body = b"header\n" + b"x" * 12000 + b"distant entailing paraphrase\n"
+    retained = cv._record(
+        store, "initial-passage-run", "claim", "supplied-artifact", "caller",
+        body, {"source": "caller", "caller_supplied": True},
+    )
+    store.adopt("lineage", "initial-passage-run", [retained.blob_digest])
+    request_text = _requests([{
+        "op": "SELECT_PASSAGE", "claim_id": "claim",
+        "evidence_id": retained.evidence_id, "offset": 11900, "max_bytes": 512,
+    }])
+    requests = cv.parse_requests(
+        request_text, {"claim"}, {retained.evidence_id: "claim"},
+    )
+    store.begin("followup-passage-run")
+    with PlanRepositorySnapshot.create(repo, run_id="followup-passage") as snapshot:
+        selected = cv.collect_evidence(
+            requests, snapshot=snapshot, store=store, run_id="followup-passage-run",
+            retained_records=[retained],
+        )[0]
+    assert selected.source_sha256 == retained.source_sha256
+    assert selected.evidence_id != retained.evidence_id
+    assert selected.passage_start == 11900
+    assert "distant entailing paraphrase" in selected.display_passage
+    assert cv.evidence_bindings([selected]) == {selected.evidence_id: "claim"}
+
+    with pytest.raises(cv.EvidenceRequestError, match="cross-claim"):
+        cv.parse_requests(
+            request_text, {"claim"}, {retained.evidence_id: "different-claim"},
+        )
+
+
+def test_selected_passage_never_splits_valid_utf8(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "utf8-passage-store")
+    store.begin("utf8-passage-run")
+    body = b"x" * 4095 + "€".encode() + b"visible\n" + b"z" * 100
+    record = cv._record(
+        store, "utf8-passage-run", "claim", "supplied-artifact", "caller",
+        body, {"source": "caller", "caller_supplied": True},
+        passage_offset=4096, passage_max_bytes=32,
+    )
+    assert "\ufffd" not in record.display_passage
+    assert record.passage_start == 4098
+    assert record.display_passage.startswith("visible")
 
 
 @pytest.mark.parametrize(

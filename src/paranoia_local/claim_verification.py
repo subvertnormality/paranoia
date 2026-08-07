@@ -53,6 +53,33 @@ def _ugc_host(host: str) -> bool:
     return any(host == suffix or host.endswith("." + suffix) for suffix in UGC_HOST_SUFFIXES)
 
 
+def _canonical_policy_target(url: str) -> tuple[str, str] | None:
+    """Return the exact default-HTTPS origin/path eligible for caller authority rules."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port
+    except (TypeError, ValueError):
+        return None
+    host = (parts.hostname or "").lower()
+    path = parts.path or "/"
+    if parts.scheme.lower() != "https" or not host \
+            or parts.username is not None or parts.password is not None \
+            or port not in {None, 443} or "%" in path or "\\" in path:
+        return None
+    segments = path.split("/")
+    if any(segment in {".", ".."} for segment in segments):
+        return None
+    return host, path
+
+
+def _policy_path_matches(path: str, prefix: str) -> bool:
+    if prefix == "/":
+        return True
+    if prefix.endswith("/"):
+        return path.startswith(prefix)
+    return path == prefix or path.startswith(prefix + "/")
+
+
 def parse_external_source_policy(raw: object) -> tuple[dict[str, str], ...]:
     """Validate trusted caller rules; models never classify their own sources."""
     if raw is None:
@@ -79,7 +106,9 @@ def parse_external_source_policy(raw: object) -> tuple[dict[str, str], ...]:
         except UnicodeError as exc:
             raise EvidenceRequestError("external source rule host must be ASCII") from exc
         if not isinstance(prefix, str) or not prefix.startswith("/") \
-                or len(prefix.encode("utf-8")) > 1024 or "\0" in prefix:
+                or len(prefix.encode("utf-8")) > 1024 or "\0" in prefix \
+                or "%" in prefix or "\\" in prefix \
+                or any(segment in {".", ".."} for segment in prefix.split("/")):
             raise EvidenceRequestError("external source rule path_prefix must be an absolute URL path")
         if source_class not in {"primary", "authoritative", "secondary", "ugc"}:
             raise EvidenceRequestError("external source rule source_class is invalid")
@@ -98,14 +127,21 @@ def parse_external_source_policy(raw: object) -> tuple[dict[str, str], ...]:
 def classify_external_source(
     url: str, policy: Sequence[Mapping[str, str]],
 ) -> str:
-    parts = urllib.parse.urlsplit(url)
-    host = (parts.hostname or "").lower()
-    path = parts.path or "/"
+    try:
+        raw_host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    except ValueError:
+        raw_host = ""
+    if _ugc_host(raw_host):
+        return "ugc"
+    target = _canonical_policy_target(url)
+    if target is None:
+        return "unclassified-external"
+    host, path = target
     if _ugc_host(host):
         return "ugc"
     matches = [
         rule for rule in policy
-        if rule["host"] == host and path.startswith(rule["path_prefix"])
+        if rule["host"] == host and _policy_path_matches(path, rule["path_prefix"])
     ]
     if not matches:
         return "unclassified-external"
@@ -184,6 +220,7 @@ _REQUEST_FIELDS = {
     "HISTORY": {"op", "claim_id", "ref", "path", "limit"},
     "RUN_ADAPTER": {"op", "claim_id", "adapter", "paths"},
     "SEARCH_EXTERNAL": {"op", "claim_id", "query", "limit"},
+    "SELECT_PASSAGE": {"op", "claim_id", "evidence_id", "offset", "max_bytes"},
 }
 
 
@@ -196,7 +233,10 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return out
 
 
-def parse_requests(text: str, active_claim_ids: set[str]) -> list[EvidenceRequest]:
+def parse_requests(
+    text: str, active_claim_ids: set[str],
+    retained_evidence: Mapping[str, str] | None = None,
+) -> list[EvidenceRequest]:
     if text.count(REQUEST_MARKER) != 1:
         raise EvidenceRequestError("expected exactly one EVIDENCE REQUESTS block")
     tail = text.split(REQUEST_MARKER, 1)[1].lstrip("\n")
@@ -227,13 +267,20 @@ def parse_requests(text: str, active_claim_ids: set[str]) -> list[EvidenceReques
         if per_claim[claim_id] > MAX_PER_CLAIM:
             raise EvidenceRequestError(f"claim {claim_id} exceeds per-round request budget")
         _validate_request(op, item)
+        if op == "SELECT_PASSAGE" and (
+            retained_evidence is None
+            or retained_evidence.get(item["evidence_id"]) != claim_id
+        ):
+            raise EvidenceRequestError(
+                "SELECT_PASSAGE references unknown or cross-claim evidence"
+            )
         requests.append(EvidenceRequest(op, item))
     return requests
 
 
 def _validate_request(op: str, item: Mapping[str, Any]) -> None:
     limit = item.get("limit")
-    if op not in {"READ_BLOB", "RUN_ADAPTER"} and (
+    if op not in {"READ_BLOB", "RUN_ADAPTER", "SELECT_PASSAGE"} and (
         not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 200
     ):
         raise EvidenceRequestError(f"{op}.limit is out of bounds")
@@ -245,6 +292,19 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
         offset = item.get("offset")
         if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
             raise EvidenceRequestError("READ_BLOB.offset is out of bounds")
+    if op == "SELECT_PASSAGE":
+        evidence_id = item.get("evidence_id")
+        if not isinstance(evidence_id, str) or len(evidence_id) != 33 \
+                or not evidence_id.startswith("e") \
+                or any(char not in "0123456789abcdef" for char in evidence_id[1:]):
+            raise EvidenceRequestError("SELECT_PASSAGE.evidence_id is invalid")
+        size = item.get("max_bytes")
+        if not isinstance(size, int) or isinstance(size, bool) \
+                or not 1 <= size <= MAX_PASSAGE_BYTES:
+            raise EvidenceRequestError("SELECT_PASSAGE.max_bytes is out of bounds")
+        offset = item.get("offset")
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise EvidenceRequestError("SELECT_PASSAGE.offset is out of bounds")
     if op == "SEARCH_LITERAL":
         _validate_utf8_scalar(
             item.get("pattern"), field="SEARCH_LITERAL.pattern", max_bytes=256,
@@ -342,14 +402,34 @@ def collect_evidence(
     http_client: SafeHttpClient | None = None,
     budget: EvidenceBudget | None = None,
     external_source_policy: Sequence[Mapping[str, str]] = (),
+    retained_records: Sequence[EvidenceRecord] = (),
 ) -> list[EvidenceRecord]:
     budget = budget or EvidenceBudget()
     budget.debit_requests(requests)
     records: list[EvidenceRecord] = []
+    retained_by_id = {record.evidence_id: record for record in retained_records}
     for request in requests:
         data = request.data
         claim_id = data["claim_id"]
-        if request.op == "LIST_TREE":
+        if request.op == "SELECT_PASSAGE":
+            source_record = retained_by_id.get(data["evidence_id"])
+            if source_record is None or source_record.claim_id != claim_id \
+                    or source_record.blob_digest is None:
+                raise EvidenceRequestError(
+                    "SELECT_PASSAGE references unavailable retained evidence"
+                )
+            if data["offset"] >= source_record.source_size:
+                raise EvidenceRequestError("SELECT_PASSAGE.offset exceeds source size")
+            body = store.read(
+                source_record.blob_digest, max_bytes=source_record.source_size,
+            )
+            records.append(_record(
+                store, run_id, source_record.claim_id, source_record.kind,
+                source_record.source, body, dict(source_record.metadata),
+                passage_offset=data["offset"],
+                passage_max_bytes=data["max_bytes"],
+            ))
+        elif request.op == "LIST_TREE":
             paths, complete = snapshot.list_tree_scoped(
                 data["prefix"], limit=data["limit"], debit_bytes=budget.debit_bytes,
                 remaining_bytes=lambda: budget.remaining_bytes,
@@ -536,9 +616,23 @@ def collect_supplied_evidence(
     return records
 
 
-def _passage_bounds(body: bytes, hint: str | None) -> tuple[int, int]:
+def _align_utf8_window(body: bytes, start: int, end: int) -> tuple[int, int]:
+    while start < end and body[start] & 0xC0 == 0x80:
+        start += 1
+    while end > start and end < len(body) and body[end] & 0xC0 == 0x80:
+        end -= 1
+    return start, end
+
+
+def _passage_bounds(
+    body: bytes, hint: str | None, *, requested_start: int | None = None,
+    max_bytes: int = MAX_PASSAGE_BYTES,
+) -> tuple[int, int]:
     """Choose one deterministic bounded window while retaining the full rooted source."""
-    if len(body) <= MAX_PASSAGE_BYTES:
+    if requested_start is not None:
+        start = min(requested_start, len(body))
+        return _align_utf8_window(body, start, min(len(body), start + max_bytes))
+    if len(body) <= max_bytes:
         return 0, len(body)
     position: int | None = None
     if hint:
@@ -557,18 +651,23 @@ def _passage_bounds(body: bytes, hint: str | None) -> tuple[int, int]:
         if found:
             position = min(found)
     if position is None:
-        return 0, MAX_PASSAGE_BYTES
-    start = max(0, position - MAX_PASSAGE_BYTES // 4)
-    start = min(start, len(body) - MAX_PASSAGE_BYTES)
-    return start, start + MAX_PASSAGE_BYTES
+        return _align_utf8_window(body, 0, max_bytes)
+    start = max(0, position - max_bytes // 4)
+    start = min(start, len(body) - max_bytes)
+    return _align_utf8_window(body, start, start + max_bytes)
 
 
 def _record(
     store: EvidenceStore, run_id: str, claim_id: str, kind: str, source: str,
     body: bytes, metadata: dict[str, Any], *, passage_hint: str | None = None,
+    passage_offset: int | None = None,
+    passage_max_bytes: int = MAX_PASSAGE_BYTES,
 ) -> EvidenceRecord:
     digest = store.stage(run_id, body)
-    passage_start, passage_end = _passage_bounds(body, passage_hint)
+    passage_start, passage_end = _passage_bounds(
+        body, passage_hint, requested_start=passage_offset,
+        max_bytes=passage_max_bytes,
+    )
     passage = body[passage_start:passage_end]
     identity = _evidence_identity(
         claim_id, kind, source, digest, metadata, passage_start, passage_end,

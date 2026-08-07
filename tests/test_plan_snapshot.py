@@ -238,6 +238,42 @@ def test_skip_worktree_file_is_preserved_from_the_index(
         assert snapshot.read_blob("sparse-only.txt") == b"indexed sparse content\n"
 
 
+@pytest.mark.parametrize(
+    "mutation", ["create", "delete", "rename", "edit", "index"],
+)
+def test_repository_wide_manifest_rejects_mutation_during_snapshot(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, mutation: str,
+) -> None:
+    original = ps._read_regular
+    fired = False
+
+    def mutate_after_read(path: Path, *, remaining: int):
+        nonlocal fired
+        result = original(path, remaining=remaining)
+        if fired:
+            return result
+        fired = True
+        target = repo / "app.py"
+        if mutation == "create":
+            (repo / "created-during-snapshot.txt").write_text("late\n")
+        elif mutation == "delete":
+            target.unlink()
+        elif mutation == "rename":
+            target.rename(repo / "renamed-during-snapshot.py")
+        elif mutation == "edit":
+            target.write_text("changed during snapshot\n")
+        else:
+            subprocess.run(
+                ["git", "update-index", "--chmod=+x", "app.py"],
+                cwd=repo, check=True,
+            )
+        return result
+
+    monkeypatch.setattr(ps, "_read_regular", mutate_after_read)
+    with pytest.raises(SnapshotUnavailable, match="changed during snapshot"):
+        PlanRepositorySnapshot.create(repo, run_id=f"manifest-{mutation}")
+
+
 def test_bounded_git_output_enforces_local_and_shared_budgets(repo: Path) -> None:
     with pytest.raises(SnapshotUnavailable, match="byte cap"):
         ps._run_bounded(

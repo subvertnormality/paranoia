@@ -657,7 +657,7 @@ def test_persisted_supersession_accepts_a_confirmed_plan_decision_target() -> No
     assert loaded.claims[claim_id].status == pc.SUPERSEDED
 
 
-def test_clean_policy_supersedes_stale_claim_with_current_anchored_decision() -> None:
+def test_distinct_role_must_confirm_superseding_decision() -> None:
     old_spans = pc.segment_plan(b"Use the legacy premise.\n")
     state = pc.ClaimState("supersession")
     old_id = pc.apply_events(
@@ -685,9 +685,24 @@ def test_clean_policy_supersedes_stale_claim_with_current_anchored_decision() ->
         state, [event], role=pc.CLEAN_POLICY_ROLE, spans=current_spans,
     )
     source = state.claims[old_id]
-    target = state.claims[source.superseded_by or ""]
-    assert source.status == pc.SUPERSEDED
+    target = state.claims[source.pending_replacement_id or ""]
+    assert source.status == pc.STALE and source.superseded_by is None
     assert target.claim == "Choose the replacement design."
+    assert target.kind_classification == pc.PROPOSED
+    assert target.status == pc.UNCHECKED
+    confirmation = pc.Event("CONFIRM_KIND", {
+        "op": "CONFIRM_KIND", "claim_id": target.claim_id,
+        "kind": "decision", "reason": "fresh plan-only classification",
+    })
+    with pytest.raises(pc.ClaimTransitionError, match="self-confirm"):
+        pc.apply_events(
+            state, [confirmation], role=pc.CLEAN_POLICY_ROLE, spans=current_spans,
+        )
+    pc.apply_events(
+        state, [confirmation], role=pc.REPLACEMENT_CONFIRM_ROLE, spans=current_spans,
+    )
+    assert source.status == pc.SUPERSEDED
+    assert source.superseded_by == target.claim_id
     assert target.kind_classification == pc.CONFIRMED
     assert target.status == pc.NOT_APPLICABLE
     assert not pc.blocking_claims(state)

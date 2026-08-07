@@ -148,8 +148,10 @@ class HttpsTransport:
                 self._active = wrapped
             wrapped.settimeout(min(limits.read_timeout, max(0.1, deadline - time.monotonic())))
             path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+            authority_host = f"[{host}]" if ":" in host else host
+            host_header = authority_host if port == 443 else f"{authority_host}:{port}"
             request = (
-                f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: paranoia-local/0.1\r\n"
+                f"GET {path} HTTP/1.1\r\nHost: {host_header}\r\nUser-Agent: paranoia-local/0.1\r\n"
                 "Accept: text/plain,text/html,application/json,application/xml;q=0.8\r\n"
                 "Accept-Encoding: gzip,deflate\r\nConnection: close\r\n\r\n"
             ).encode("ascii")

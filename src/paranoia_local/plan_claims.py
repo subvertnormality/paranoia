@@ -19,6 +19,7 @@ RESEARCH_ROLE = "research"
 VERIFIER_ROLE = "verifier"
 STRUCTURAL_ROLE = "structural"
 CLEAN_POLICY_ROLE = "clean-policy"
+REPLACEMENT_CONFIRM_ROLE = "replacement-confirmation"
 
 FACT, DECISION = "fact", "decision"
 ASSERTED, ASSUMPTION, ESTIMATE = "asserted", "assumption", "estimate"
@@ -216,6 +217,7 @@ _ROLE_OPS = {
     RESEARCH_ROLE: frozenset({"ADD"}),
     STRUCTURAL_ROLE: frozenset({"ADD", "DISPUTE", "CONFIRM_KIND"}),
     CLEAN_POLICY_ROLE: frozenset({"CONFIRM_KIND", "DEFER", "SUPERSEDE"}),
+    REPLACEMENT_CONFIRM_ROLE: frozenset({"CONFIRM_KIND"}),
     VERIFIER_ROLE: frozenset(_SCHEMAS) - {"ADD", "DISPUTE", "SUPERSEDE"},
 }
 
@@ -232,7 +234,7 @@ def _no_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def _marker_for(role: str) -> str:
     if role == RESEARCH_ROLE:
         return RESEARCH_MARKER
-    if role in {VERIFIER_ROLE, CLEAN_POLICY_ROLE}:
+    if role in {VERIFIER_ROLE, CLEAN_POLICY_ROLE, REPLACEMENT_CONFIRM_ROLE}:
         return VERIFICATION_MARKER
     if role == STRUCTURAL_ROLE:
         return PLAN_MARKER
@@ -478,10 +480,6 @@ def apply_events(
             _add_claim(state, replacement, role, spans, round_no, local, seen_temp)
             replacement_id = next(iter(local.values()))
             replacement_claim = state.claims[replacement_id]
-            replacement_claim.kind_classification = CONFIRMED
-            replacement_claim.status = (
-                NOT_APPLICABLE if replacement_claim.kind == DECISION else UNVERIFIED
-            )
             replacement_claim.bearing = BLOCKING
             claim.pending_replacement_id = replacement_id
             claim.reason = data["reason"]
@@ -1166,7 +1164,10 @@ def render_clean_policy_candidates(state: ClaimState) -> str:
     """
     lines = ["=== PLAN-ONLY CLAIM CANDIDATES ==="]
     for claim in state.claims.values():
-        proposed = claim.kind_classification == PROPOSED
+        proposed = (
+            claim.kind_classification == PROPOSED
+            and claim.origin_role != CLEAN_POLICY_ROLE
+        )
         stale = claim.status == STALE and claim.pending_replacement_id is None
         if claim.status == SUPERSEDED or not (proposed or stale):
             continue
@@ -1187,6 +1188,30 @@ def render_clean_policy_candidates(state: ClaimState) -> str:
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
         )
+    if len(lines) == 1:
+        lines.append("NONE")
+    return "\n".join(lines)
+
+
+def render_replacement_confirmation_candidates(state: ClaimState) -> str:
+    """Render only proposed targets created by the separate supersession role."""
+    target_ids = {
+        claim.pending_replacement_id for claim in state.claims.values()
+        if claim.pending_replacement_id is not None
+    }
+    lines = ["=== REPLACEMENT KIND CANDIDATES ==="]
+    for claim_id in sorted(target_ids):
+        claim = state.claims.get(claim_id)
+        if claim is None or claim.origin_role != CLEAN_POLICY_ROLE \
+                or claim.kind_classification != PROPOSED:
+            continue
+        lines.append("CLAIM=" + json.dumps({
+            "claim_id": claim.claim_id,
+            "plan_anchor": {
+                "first_span": claim.plan_anchor.first_span,
+                "last_span": claim.plan_anchor.last_span,
+            },
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=True))
     if len(lines) == 1:
         lines.append("NONE")
     return "\n".join(lines)

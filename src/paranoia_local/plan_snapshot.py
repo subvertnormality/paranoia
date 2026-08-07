@@ -482,6 +482,37 @@ def _special_paths(repo: Path, *, ignored: set[str]) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _worktree_manifest(
+    repo: Path, candidates: tuple[str, ...],
+) -> tuple[tuple[str, tuple[object, ...]], ...]:
+    """Capture bounded identities for a repository-wide pre/post stability check."""
+    rows: list[tuple[str, tuple[object, ...]]] = []
+    for path in candidates:
+        full = repo / Path(path)
+        try:
+            item = full.lstat()
+        except FileNotFoundError:
+            rows.append((path, ("missing",)))
+            continue
+        except OSError as exc:
+            raise SnapshotUnavailable(
+                f"snapshot manifest failed at {path!r}: {exc}"
+            ) from exc
+        identity: tuple[object, ...] = (
+            item.st_dev, item.st_ino, item.st_mode, item.st_size,
+            item.st_mtime_ns, item.st_ctime_ns,
+        )
+        if stat.S_ISLNK(item.st_mode):
+            try:
+                identity += (os.readlink(full),)
+            except OSError as exc:
+                raise SnapshotUnavailable(
+                    f"snapshot manifest symlink failed at {path!r}: {exc}"
+                ) from exc
+        rows.append((path, identity))
+    return tuple(rows)
+
+
 def _read_regular(path: Path, *, remaining: int) -> tuple[bytes, os.stat_result]:
     before = path.lstat()
     if not stat.S_ISREG(before.st_mode):
@@ -523,8 +554,10 @@ def _snapshot_tree(
     index = _index_entries(repo, control)
     candidates = _candidate_paths(repo, control)
     ignored = _ignored_paths(repo, control)
+    initial_special = _special_paths(repo, ignored=set(ignored))
+    initial_manifest = _worktree_manifest(repo, candidates)
     rows: list[tuple[str, str, str]] = []
-    unavailable: list[str] = list(_special_paths(repo, ignored=set(ignored)))
+    unavailable: list[str] = list(initial_special)
     retained_bytes = 0
 
     for path in candidates:
@@ -583,6 +616,20 @@ def _snapshot_tree(
             git_env=control.environment,
         )
     tree = _run(repo, ["write-tree"], git_env=control.environment).stdout.decode("ascii").strip()
+
+    final_index = _index_entries(repo, control)
+    final_candidates = _candidate_paths(repo, control)
+    final_ignored = _ignored_paths(repo, control)
+    final_special = _special_paths(repo, ignored=set(final_ignored))
+    final_manifest = _worktree_manifest(repo, final_candidates)
+    if (
+        final_index != index
+        or final_candidates != candidates
+        or final_ignored != ignored
+        or final_special != initial_special
+        or final_manifest != initial_manifest
+    ):
+        raise SnapshotUnavailable("repository changed during snapshot construction")
     return tree, tuple(unavailable), ignored
 
 

@@ -740,7 +740,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   supplied, and local bodies are sent as separate packets that must all be accepted, and
   authoring a transition never substitutes for that complete audit. Each record exposes the
   exact offsets of its at-most-4-KiB passage within the rooted full source. Large external
-  and supplied sources use a deterministic claim/query-relevant window. A bounded passage
+  and supplied sources use a deterministic claim/query-relevant window; a follow-up round
+  can select any explicit bounded range from retained evidence without refetching it. A bounded passage
   can authorize only a fact directly entailed by visible bytes—not absence, exhaustive
   coverage, or an unshown source-wide property. Non-UTF-8 bytes that require lossy
   replacement decoding are likewise context-only. Authorization

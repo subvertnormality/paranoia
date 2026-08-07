@@ -98,8 +98,9 @@ The snapshot boundary retains these protections:
 - repository config includes and `config.worktree` are not loaded into evidence commands;
 - native `objects/info/alternates` is rejected rather than followed;
 - path, record, per-file, total snapshot, output, and subprocess-time limits are enforced;
-- dirty regular files are read with pre/open/post identity checks so ordinary concurrent
-  edits fail explicitly;
+- dirty regular files are read with pre/open/post identity checks, and bounded repository-wide
+  pre/post manifests compare candidate paths, index entries, special paths, and file identities,
+  so ordinary edits spanning construction fail explicitly;
 - ignored files and unsupported nonregular paths are disclosed but are not evidence blobs;
 - history refs are copied into the private control directory at snapshot creation, so later
   ref movement does not change their identity.
@@ -139,7 +140,9 @@ Every evidence record has a server-generated ID, exact full-content hash, claim 
 source kind, source identity, bounded passage, exact passage offsets, and completeness
 metadata. Evidence for one claim cannot authorize another. For a large external or supplied
 source, the server deterministically selects a claim/query-relevant window while retaining
-the complete source in the content-addressed journal.
+the complete source in the content-addressed journal. If that initial window is insufficient,
+a later round can issue `SELECT_PASSAGE` for any explicit at-most-4-KiB byte range of the
+already rooted source; the server enforces the claim binding and aligns UTF-8 boundaries.
 
 A visible bounded passage may authorize only a proposition directly entailed by those
 bytes. It cannot prove absence, exhaustive coverage, or an unshown source-wide property.
@@ -172,7 +175,9 @@ Search rank is not source authority. Callers provide trusted `external_source_po
 with an exact lowercase host, URL path prefix, and `primary`, `authoritative`, `secondary`,
 or `ugc`
 classification. The longest exact-host/path match governs; subdomains do not inherit a rule.
-Unmatched pages remain `unclassified-external`. Only primary and authoritative records may
+Authority rules apply only to HTTPS's default origin (effective port 443). Path prefixes
+match complete path segments; alternate ports and ambiguous percent-encoded, backslash, or
+dot-segment paths remain unclassified. Unmatched pages remain `unclassified-external`. Only primary and authoritative records may
 authorize an external truth or bearing transition. Secondary and unclassified records may
 guide structural critique but cannot clear a load-bearing claim. The verifier still judges
 whether an eligible passage actually entails the proposition; server classification does
