@@ -1165,60 +1165,88 @@ def _snapshot_tree_without_filters(
         pure = PurePosixPath(path)
         if pure.is_absolute() or ".." in pure.parts or not pure.parts:
             raise SnapshotUnavailable("snapshot candidate path escapes repository")
-        target = repo.joinpath(*pure.parts)
-        cursor = repo
-        for part in pure.parts[:-1]:
-            cursor = cursor / part
-            if cursor.is_symlink():
-                raise SnapshotUnavailable(f"snapshot path traverses a symlink: {path!r}")
+        root_before = repo.lstat()
+        root_fd = os.open(
+            repo,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        parent_fd = root_fd
         try:
-            info = target.lstat()
+            root_opened = os.fstat(root_fd)
+            if not stat.S_ISDIR(root_opened.st_mode) or (
+                root_before.st_dev, root_before.st_ino
+            ) != (root_opened.st_dev, root_opened.st_ino):
+                raise SnapshotUnavailable("repository root changed while opening")
+            for part in pure.parts[:-1]:
+                child_fd = _open_child_directory(parent_fd, part, create=False)
+                if parent_fd != root_fd:
+                    os.close(parent_fd)
+                parent_fd = child_fd
+            info = os.stat(pure.parts[-1], dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
+            if parent_fd != root_fd:
+                os.close(parent_fd)
+            os.close(root_fd)
             continue  # tracked deletion
-        indexed = index_entries.get(path)
-        if indexed and indexed[0] == "160000":
-            rows.append(("160000", indexed[1], path))
-            continue
-        if stat.S_ISLNK(info.st_mode):
-            body = os.readlink(target).encode("utf-8", errors="surrogateescape")
-            oid = _run(
-                repo, ["hash-object", "-w", "--stdin"], input_bytes=body,
-                git_env=git_env,
-            ).stdout.decode().strip()
-            rows.append(("120000", oid, path))
-            continue
-        if not stat.S_ISREG(info.st_mode):
-            unavailable.append(path)
-            continue
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(target, flags)
+        except Exception:
+            if parent_fd != root_fd:
+                os.close(parent_fd)
+            os.close(root_fd)
+            raise
         try:
-            opened = os.fstat(fd)
-            if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
-                raise SnapshotUnavailable(f"snapshot path changed while opening: {path!r}")
-            with os.fdopen(fd, "rb", closefd=False) as handle:
-                ambient = {
-                    key: value for key, value in os.environ.items()
-                    if not key.startswith("GIT_")
-                }
-                try:
-                    proc = subprocess.run(
-                        ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
-                        cwd=repo, stdin=handle, capture_output=True,
-                        timeout=GIT_TIMEOUT_SECONDS,
-                        env={**ambient, **_GIT_ENV, **git_env},
+            indexed = index_entries.get(path)
+            if indexed and indexed[0] == "160000":
+                rows.append(("160000", indexed[1], path))
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                body = os.readlink(
+                    pure.parts[-1], dir_fd=parent_fd,
+                ).encode("utf-8", errors="surrogateescape")
+                oid = _run(
+                    repo, ["hash-object", "-w", "--stdin"], input_bytes=body,
+                    git_env=git_env,
+                ).stdout.decode().strip()
+                rows.append(("120000", oid, path))
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                unavailable.append(path)
+                continue
+            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(pure.parts[-1], flags, dir_fd=parent_fd)
+            try:
+                opened = os.fstat(fd)
+                if not stat.S_ISREG(opened.st_mode) or (
+                    opened.st_dev, opened.st_ino
+                ) != (info.st_dev, info.st_ino):
+                    raise SnapshotUnavailable(f"snapshot path changed while opening: {path!r}")
+                with os.fdopen(fd, "rb", closefd=False) as handle:
+                    ambient = {
+                        key: value for key, value in os.environ.items()
+                        if not key.startswith("GIT_")
+                    }
+                    try:
+                        proc = subprocess.run(
+                            ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
+                            cwd=repo, stdin=handle, capture_output=True,
+                            timeout=GIT_TIMEOUT_SECONDS,
+                            env={**ambient, **_GIT_ENV, **git_env},
+                        )
+                    except subprocess.TimeoutExpired as exc:
+                        raise SnapshotUnavailable("git hash-object exceeded hard deadline") from exc
+                if proc.returncode:
+                    raise SnapshotUnavailable(
+                        "git hash-object failed: "
+                        + proc.stderr.decode("utf-8", errors="replace").strip()
                     )
-                except subprocess.TimeoutExpired as exc:
-                    raise SnapshotUnavailable("git hash-object exceeded hard deadline") from exc
-            if proc.returncode:
-                raise SnapshotUnavailable(
-                    "git hash-object failed: "
-                    + proc.stderr.decode("utf-8", errors="replace").strip()
-                )
-            oid = proc.stdout.decode("ascii").strip()
+                oid = proc.stdout.decode("ascii").strip()
+            finally:
+                os.close(fd)
+            rows.append(("100755" if opened.st_mode & 0o111 else "100644", oid, path))
         finally:
-            os.close(fd)
-        rows.append(("100755" if opened.st_mode & 0o111 else "100644", oid, path))
+            if parent_fd != root_fd:
+                os.close(parent_fd)
+            os.close(root_fd)
 
     index_dir = Path(tempfile.mkdtemp(prefix="paranoia-plan-index-"))
     try:

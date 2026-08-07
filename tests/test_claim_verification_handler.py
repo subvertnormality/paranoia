@@ -952,6 +952,55 @@ def test_authorization_contract_upgrade_reruns_both_persisted_vendor_checks(
     assert state.authorization_policy["version"] == 2
 
 
+def test_contract_upgrade_reblocks_intrinsically_required_auto_bearing() -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("auto-bearing-upgrade")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "one", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+            "reason": "fact",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    digest = hashlib.sha256(b"x").hexdigest()
+    record = cv.EvidenceRecord(
+        "e1", claim_id, "repository-blob", "app.py", digest, digest, 1,
+        0, 1, digest, "x", {"complete": True},
+    )
+    event = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": pc.ADVISORY,
+        "evidence_ids": ["e1"], "reason": "nonblocking",
+    })
+    event_digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[
+            pc.VendorCheck("codex", "m1", event_digest, ("e1",), True, "T1"),
+            pc.VendorCheck("claude", "m2", event_digest, ("e1",), True, "T1"),
+        ],
+    )
+    state.authorization_policy = {
+        "version": 1, "independent_check": "auto", "high_stakes": False,
+    }
+    assert not pc.claim_blocks(state.claims[claim_id])
+    handlers._reblock_for_policy(
+        state, [record],
+        {"version": 2, "independent_check": "auto", "high_stakes": False},
+        persisted_policy=state.authorization_policy,
+    )
+    authorization = state.claims[claim_id].bearing_authorization
+    assert authorization is not None and authorization["status"] == "pending"
+    assert authorization["checks"] == []
+    assert pc.claim_blocks(state.claims[claim_id])
+
+
 def test_unknown_persisted_audit_vendor_is_quarantined_before_cache_reuse(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1852,9 +1901,77 @@ def test_independent_auditor_receives_exact_proposition_and_claim_state(
     assert auditor.calls == 2
     assert len(budget.debits) == 2
     assert budget.debits[0] == budget.debits[1] > 0
-    assert '"proposition":"Use it."' in auditor.prompt
+    assert '"claim":"Use it."' in auditor.prompt
     assert f'"claim_id":"{claim_id}"' in auditor.prompt
     assert '"status":"unchecked"' in auditor.prompt
+    assert '"assertion_mode":"asserted"' in auditor.prompt
+    assert '"deferral":null' in auditor.prompt
+    assert '"pending_transition":null' in auditor.prompt
+    assert '"truth_authorization":null' in auditor.prompt
+
+
+def test_independent_auditor_sees_complete_deferral_before_retiring_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = pc.segment_plan(b"Assume it.\nVerify it.\nUse it.\n")
+    state = pc.ClaimState("deferred-prestate")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "one", "kind": "fact",
+            "assertion_mode": "assumption",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+            "reason": "fact",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    pc.apply_events(
+        state, [pc.Event("DEFER", {
+            "op": "DEFER", "claim_id": claim_id,
+            "verification_anchor": {"first_span": "p000002", "last_span": "p000002"},
+            "dependent_anchors": [{"first_span": "p000003", "last_span": "p000003"}],
+            "completion_evidence": "probe succeeds",
+            "failure_condition": "probe fails",
+            "stop_action": "stop before use",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+    )
+    digest = hashlib.sha256(b"x").hexdigest()
+    record = cv.EvidenceRecord(
+        "e1", claim_id, "external", "https://example.com/", digest, digest, 1,
+        0, 1, digest, "x", {},
+    )
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "probe result",
+    })
+
+    class Auditor:
+        name = "other"
+        default_model = "audit-model"
+
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            self.prompts.append(prompt)
+            return _review("CHECK: ACCEPT")
+
+    auditor = Auditor()
+    monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
+    checks = handlers._independent_checks(
+        event, required=True, primary_engine=ClaimEngine(), primary_model="m",
+        evidence_records=[record], claim_state=state, effort="high",
+        plan_context=pc.render_spans(spans), on_progress=None,
+    )
+    assert len(checks) == 2 and len(auditor.prompts) == 2
+    for prompt in auditor.prompts:
+        assert '"status":"deferred"' in prompt
+        assert '"completion_evidence":"probe succeeds"' in prompt
+        assert '"failure_condition":"probe fails"' in prompt
+        assert '"stop_action":"stop before use"' in prompt
 
 
 def test_initial_independent_audits_receive_all_source_isolated_dependencies(

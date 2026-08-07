@@ -18,7 +18,7 @@ import stat
 import subprocess
 import tempfile
 import time
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -1448,6 +1448,14 @@ def _reblock_for_policy(
             policy["high_stakes"]
             and bool(untrusted_ids.intersection(claim.truth_evidence_ids))
         )
+        if authorization_contract_changed and any(
+            (getattr(claim, slot) or {}).get("required") is True
+            for slot in (
+                "truth_authorization", "bearing_authorization",
+                "dispute_authorization", "deferral_authorization",
+            )
+        ):
+            required = True
         if not required:
             continue
         def pending_from(info: dict[str, Any] | None, ids: list[str]) -> dict[str, Any]:
@@ -1604,24 +1612,9 @@ def _independent_checks(
         "is supported by the named server evidence. Output exactly CHECK: ACCEPT or "
         "CHECK: REJECT.\n\nEVENT-DIGEST: " + digest + "\nEVENT: "
         + json.dumps(event.data, sort_keys=True, separators=(",", ":"))
-        + "\nCLAIM-STATE: " + json.dumps({
-            "claim_id": claim.claim_id,
-            "proposition": claim.claim,
-            "kind": claim.kind,
-            "kind_classification": claim.kind_classification,
-            "bearing": claim.bearing,
-            "status": claim.status,
-            "evidence_ids": claim.evidence_ids,
-            "truth_evidence_ids": claim.truth_evidence_ids,
-            "bearing_evidence_ids": claim.bearing_evidence_ids,
-            "dispute_evidence_ids": claim.dispute_evidence_ids,
-            "disputed_evidence_ids": claim.disputed_evidence_ids,
-            "plan_anchor": {
-                "first_span": claim.plan_anchor.first_span,
-                "last_span": claim.plan_anchor.last_span,
-                "sha256": claim.plan_anchor.sha256,
-            },
-        }, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n\n"
+        + "\nCLAIM-STATE: " + json.dumps(
+            asdict(claim), sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ) + "\n\n"
         + "PLAN-SPANS:\n" + plan_context
     )
     for vendor in sorted(pc.SUPPORTED_AUDIT_VENDORS - {check.vendor for check in checks}):

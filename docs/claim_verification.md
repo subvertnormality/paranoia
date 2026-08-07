@@ -280,7 +280,8 @@ schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, com
 state, and applied outcome against the claim's current truth, bearing, or deferral state.
 
 Each auditing vendor receives the server-owned proposition, current kind/bearing/status,
-all current truth/bearing/dispute dependency IDs, plan-anchor identity and spans, the
+the complete validated pre-transition claim record (including assertion mode, deferral,
+authorization slots, pending transition, and every dependency ID), plan-anchor spans, the
 complete proposed event, its new evidence, and the pre-transition evidence it would
 displace. Evidence bodies are split into repository, external, supplied, and local packets;
 the vendor must accept every source-isolated packet before the server records one accepted
@@ -380,6 +381,11 @@ size before a bounded read; FIFOs, devices, symlinks, and replacement races are 
 Within `.git/objects`, symlink rejection follows only exact Git-resolvable loose-object,
 pack/multi-pack-index, alternates, and commit-graph names; inert nested names even beneath
 `pack` or `info` do not invalidate a snapshot.
+Every dirty-tree candidate is likewise opened relative to a verified repository-directory
+fd. Each ancestor is opened one component at a time with no-follow and pre/post-open inode
+checks, and the final lstat, symlink read, or regular-file open remains relative to that
+anchored parent. Replacing an inspected ancestor with an external symlink therefore blocks
+without hashing or disclosing external bytes.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.

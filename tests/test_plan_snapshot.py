@@ -200,6 +200,34 @@ def test_repository_owned_ref_ancestor_symlink_fails_closed(
     assert [path.name for path in external.iterdir()] == ["sentinel"]
 
 
+def test_dirty_tree_ancestor_swap_to_external_symlink_fails_closed(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nested = repo / "nested"
+    nested.mkdir()
+    (nested / "evidence.txt").write_text("repository bytes")
+    subprocess.run(["git", "add", "nested/evidence.txt"], cwd=repo, check=True)
+    external = tmp_path / "external-tree"
+    external.mkdir()
+    secret = external / "evidence.txt"
+    secret.write_text("host secret")
+    original_open = ps._open_child_directory
+    swapped = False
+
+    def swap_then_open(parent_fd: int, name: str, *, create: bool) -> int:
+        nonlocal swapped
+        if name == "nested" and not swapped:
+            swapped = True
+            nested.rename(repo / "nested-original")
+            nested.symlink_to(external, target_is_directory=True)
+        return original_open(parent_fd, name, create=create)
+
+    monkeypatch.setattr(ps, "_open_child_directory", swap_then_open)
+    with pytest.raises(SnapshotUnavailable, match="ref directory is unsafe"):
+        PlanRepositorySnapshot.create(repo, run_id="ancestor-swap")
+    assert secret.read_text() == "host secret"
+
+
 def test_cleanup_does_not_follow_a_replaced_pin_directory(
     repo: Path, tmp_path: Path,
 ) -> None:

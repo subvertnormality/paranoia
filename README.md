@@ -730,7 +730,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   repository, empirical, external, and supplied records remain context-only. Non-UTF-8
   bytes that require lossy replacement decoding are likewise context-only. Authorization
   contract version 2 reblocks and reruns required version-1 provenance through both actual
-  vendors before migration. Cached
+  vendors before migration, including intrinsically audited advisory-bearing and dispute
+  events under `auto`/low stakes. Auditor packets contain the complete validated claim
+  record, including deferral and pending-transition state. Cached
   CAS/repository reads and model-visible evidence rendering share the round byte budget,
   including evidence resent for a register correction; the same auditor packet is debited
   separately before each vendor launch. A CAS or snapshot I/O failure blocks the round
@@ -748,7 +750,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
   and record caps before its output is retained or decoded. Symlinked or nonregular loose-ref
   entries are skipped without traversal and disclosed as unavailable; unsafe ancestors in
-  the server-owned temporary-pin namespace still fail closed. Bounded tree, blob,
+  the server-owned temporary-pin namespace still fail closed. Dirty-tree files are opened
+  through repository-fd-relative, no-follow traversal of every ancestor and final component,
+  so a concurrent ancestor-to-symlink swap blocks without exposing external bytes. Bounded tree, blob,
   literal-search, and history evidence carries an explicit completeness result; searches bind
   candidate paths and inspected object/range identities. Incomplete query records remain
   visible as context but cannot authorize claim-state or bearing transitions, so truncation
