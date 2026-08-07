@@ -101,6 +101,10 @@ def test_gitlink_makes_containing_negative_scope_incomplete(repo: Path) -> None:
         assert paths == ["vendor/module"]
         assert "vendor/module" in snapshot.unavailable_paths
         assert complete is False
+        descendants, descendants_complete = snapshot.list_tree_scoped(
+            "vendor/module/docs", limit=20,
+        )
+        assert descendants == [] and descendants_complete is False
         matches, scope = snapshot.search_literal_scoped(
             "counterexample", paths=None, limit=10,
         )

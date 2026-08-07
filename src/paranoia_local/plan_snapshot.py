@@ -938,7 +938,12 @@ class PlanRepositorySnapshot:
             if not prefix:
                 return True
             normalized = prefix.rstrip("/")
-            return path == normalized or path.startswith(normalized + "/")
+            omitted = path.rstrip("/")
+            return (
+                omitted == normalized
+                or omitted.startswith(normalized + "/")
+                or normalized.startswith(omitted + "/")
+            )
 
         coverage_complete = not any(
             omitted_in_scope(path)
