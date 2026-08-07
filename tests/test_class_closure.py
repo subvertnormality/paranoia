@@ -521,6 +521,40 @@ class TestLineageState:
             cc.load_lineage(tmp_path, "test", stamp="20260728T000000")
         assert list(d.glob("test.corrupt-*.json")), "the corrupt file must be moved aside"
 
+    def test_parse_quarantine_fsyncs_the_changed_directory_entry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        d = cc.lineage_dir(tmp_path)
+        d.mkdir(parents=True)
+        (d / "test.json").write_text("{not json", encoding="utf-8")
+        synced: list[Path] = []
+        real_fsync_dir = cc._fsync_dir
+
+        def record_fsync(path: Path) -> None:
+            synced.append(path)
+            real_fsync_dir(path)
+
+        monkeypatch.setattr(cc, "_fsync_dir", record_fsync)
+        with pytest.raises(cc.StateUnavailable, match="quarantined to"):
+            cc.load_lineage(tmp_path, "test", stamp="durable")
+        assert synced == [d]
+
+    def test_failed_parse_quarantine_never_claims_success(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        d = cc.lineage_dir(tmp_path)
+        d.mkdir(parents=True)
+        state_path = d / "test.json"
+        state_path.write_text("{not json", encoding="utf-8")
+        def fail_replace(*_args) -> None:
+            raise OSError("rename failed")
+
+        monkeypatch.setattr(cc.os, "replace", fail_replace)
+        with pytest.raises(cc.StateUnavailable, match="could not be quarantined") as caught:
+            cc.load_lineage(tmp_path, "test", stamp="failed")
+        assert "quarantined to" not in str(caught.value)
+        assert state_path.exists()
+
     def test_semantically_invalid_class_state_blocks_and_is_quarantined(
         self, tmp_path: Path,
     ) -> None:

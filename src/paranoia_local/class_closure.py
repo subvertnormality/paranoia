@@ -403,11 +403,12 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
         raw = json.loads(state_path.read_text(encoding="utf-8"))
         lineage = _from_json(lineage_id, raw)
     except Exception as exc:  # noqa: BLE001 — any unreadable state blocks, none is repaired silently
-        dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
-        try:
-            state_path.replace(dest)
-        except OSError:
-            dest = state_path
+        # Use the same crash-durable operation as post-load semantic quarantine.
+        # A rename or directory-fsync failure is reported as a quarantine failure;
+        # never claim that the live malformed entry was safely moved when it was not.
+        dest = quarantine_lineage(
+            root, lineage_id, stamp=stamp, reason=f"state did not parse: {exc}",
+        )
         raise StateUnavailable(
             f"lineage state at {state_path} did not parse ({exc}); quarantined to {dest}. "
             "Repair or delete it and re-run."

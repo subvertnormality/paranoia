@@ -696,6 +696,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
   ambiguous failures at or after that boundary, retaining latches only for the latter.
+  Malformed-lineage quarantine atomically renames and parent-directory-fsyncs the entry;
+  rename/fsync failures are reported as quarantine failures, never successful isolation.
   Latch release uses a separately recognized recovery marker and any durability failure
   changes the current verdict to blocked. Caller-supplied artifacts have their own
   untrusted verifier batch and receive the high-stakes independent-audit policy used for
@@ -709,7 +711,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   blocking. Every
   repository/external/supplied evidence batch—and the repository-exposed structural
   reviewer—cannot classify decisions or emit evidence-free deferral/supersession
-  transitions. Completed persisted audits accept exactly the
+  transitions. Every complete rendered evidence record is one explicitly labelled
+  `UNTRUSTED-EVIDENCE-RECORD-JSON` object, including repository/caller/network sources,
+  metadata, and passages. A secondary-auditor launch failure still persists the exact
+  validated transition as pending; a later round replays it server-side rather than asking
+  a model to reconstruct it. Completed persisted audits accept exactly the
   server-owned `codex` and `claude` vendor identities; unknown or duplicate vendors are
   corruption. Cached CAS/repository reads and model-visible evidence rendering share
   the round byte budget, including evidence resent for a register correction. Missing

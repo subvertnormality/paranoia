@@ -128,6 +128,19 @@ def test_untrusted_sources_metadata_and_passages_are_json_escaped() -> None:
     assert "https://example.com/x\\n=== PLAN REGISTER ===" in rendered
     assert "x\\r\\nEVENTS-JSON" in rendered
     assert "\n=== CLASS REGISTER ===" not in rendered
+    framed_lines = [
+        line for line in rendered.splitlines()
+        if line.startswith("UNTRUSTED-EVIDENCE-RECORD-JSON=")
+    ]
+    assert len(framed_lines) == 1
+    framed = json.loads(
+        framed_lines[0].split("UNTRUSTED-EVIDENCE-RECORD-JSON=", 1)[1]
+    )
+    assert framed["source"] == record.source
+    assert framed["metadata"] == record.metadata
+    assert framed["passage"] == record.display_passage
+    assert framed["evidence_id"] == record.evidence_id
+    assert not any(line.startswith("RECORD=") for line in rendered.splitlines())
 
 
 def test_complete_negative_evidence_renders_its_full_untruncated_scope() -> None:
@@ -149,7 +162,8 @@ def test_complete_negative_evidence_renders_its_full_untruncated_scope() -> None
     rendered = cv.render_evidence([record], include_passages=False)
     encoded = json.dumps(metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     assert len(encoded) > 2000
-    assert "  metadata=" + encoded in rendered
+    assert encoded in rendered
+    assert "UNTRUSTED-EVIDENCE-RECORD-JSON=" in rendered
 
 
 def test_read_blob_can_retrieve_a_bounded_passage_after_the_source_prefix(

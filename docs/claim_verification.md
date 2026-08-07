@@ -82,8 +82,10 @@ One closure round performs these stages:
    candidate paths and each inspected blob object/range.
 6. A toolless verifier sees exact server evidence bound to the exact claim ID that
    requested it; evidence for one claim cannot authorize another. Every model-visible source, path,
-   metadata object, and passage is injectively JSON escaped. Repository, remote, and
-   supplied passages are all untrusted JSON data, never share a call across source classes,
+   metadata object, and passage is injectively JSON escaped. Each rendered record is one
+   explicitly labelled `UNTRUSTED-EVIDENCE-RECORD-JSON` object: IDs and hashes are
+   server-generated identity, while repository/caller/network source, metadata, and
+   passage values are untrusted data. Repository, remote, and supplied records never share a call across source classes,
    and cannot classify decisions or emit evidence-free deferral/supersession transitions.
 7. A fresh toolless structural reviewer sees the plan, repository evidence, external
    metadata, active claims, and existing class procedures. It emits one atomic PLAN and
@@ -249,8 +251,8 @@ event digest, vendor/model identities, and audit results persist. Missing, dupli
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
 after reload. The vendor vocabulary is server-owned and fixed to `codex` and `claude`;
 unknown or duplicate vendor identities are malformed, and `complete` requires accepted
-checks from exactly both supported vendors. The exact pending event is rendered to the next verifier for recovery; a
-different event cannot erase it. Reload also validates the authorization's exact event
+checks from exactly both supported vendors. The exact pending event is retained for
+server-side replay on the next round; a different event cannot erase it. Reload also validates the authorization's exact event
 schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
 state, and applied outcome against the claim's current truth, bearing, or deferral state.
 
@@ -265,6 +267,12 @@ Semantic validation of an independently audited event happens before its authori
 looked up or marked pending. Invalid dispute outcomes, deferral anchors, dependent-claim
 sets, or ordering snapshots therefore enter the ordinary one-retry correction path and
 cannot consume or persist independent-authorization state.
+
+If a required secondary auditor cannot launch, including an OS permission or resource
+failure, the validated exact event still persists with incomplete checks as a pending,
+blocking transition. At the start of a later round the server replays that stored event
+and its exact evidence bindings directly through authorization; no model is asked to
+guess or reconstruct hidden event fields.
 
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A
@@ -375,6 +383,9 @@ result has no persistent stop condition.
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
 unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
 fully validated and corrupt lineage state is quarantined before a latch is acquired. A
+quarantine uses an atomic rename followed by a parent-directory fsync. Rename or fsync
+failure is reported as a quarantine failure and never as a successful move; the operator
+is not told that malformed live state was safely isolated when durability is ambiguous. A
 present claim-state object must contain the exact complete serialized field set—missing
 fields never default to an empty claim collection. Kind,
 classification, and status combinations must be transition-reachable, and anchor
