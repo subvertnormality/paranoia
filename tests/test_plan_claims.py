@@ -288,6 +288,63 @@ def test_advisory_claim_blocks_while_stricter_truth_authorization_is_pending() -
     assert pc.claim_blocks(claim)
 
 
+def test_authorization_validity_requires_exact_complete_audit_provenance() -> None:
+    assert pc._authorization_valid(None)
+    assert not pc._authorization_valid(None, must_be_required=True)
+    assert not pc._authorization_valid({"required": False, "status": "pending"})
+    assert not pc._authorization_valid({"required": True, "status": "pending"})
+    assert not pc._authorization_valid({"required": True, "status": "complete"})
+
+    complete = {
+        "required": True,
+        "status": "complete",
+        "event_digest": "digest",
+        "evidence_ids": ["evidence"],
+        "checks": [
+            {
+                "vendor": vendor,
+                "accepted": True,
+                "event_digest": "digest",
+                "evidence_ids": ["evidence"],
+            }
+            for vendor in ("codex", "claude")
+        ],
+    }
+    assert pc._authorization_valid(complete, must_be_required=True)
+    missing_check_evidence = copy.deepcopy(complete)
+    missing_check_evidence["checks"][0].pop("evidence_ids")
+    assert not pc._authorization_valid(missing_check_evidence, must_be_required=True)
+
+
+def test_claim_blocking_predicate_covers_each_authorization_path() -> None:
+    state, claim_id, _spans = _state_with_confirmed_fact()
+    claim = state.claims[claim_id]
+    claim.status = pc.VERIFIED
+
+    claim.dispute_authorization = {"required": True, "status": "pending"}
+    assert pc.claim_blocks(claim)
+    claim.dispute_authorization = {"required": False, "status": "pending"}
+    assert not pc.claim_blocks(claim)
+
+    claim.status = pc.DEFERRED
+    claim.dispute_authorization = None
+    claim.deferral_authorization = {
+        "required": True, "status": "complete", "event_digest": "digest",
+        "evidence_ids": ["evidence"], "checks": [],
+    }
+    assert pc.claim_blocks(claim)
+
+    claim.status = pc.VERIFIED
+    claim.deferral_authorization = None
+    claim.bearing = pc.ADVISORY
+    claim.bearing_authorization = None
+    assert pc.claim_blocks(claim)
+
+    claim.bearing = pc.BLOCKING
+    claim.status = pc.UNVERIFIED
+    assert pc.claim_blocks(claim)
+
+
 @pytest.mark.parametrize("secondary_accepts", [True, False, None])
 def test_required_defer_applies_only_after_two_vendor_acceptances(
     secondary_accepts: bool | None,
