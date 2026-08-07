@@ -143,7 +143,8 @@ claims. Omission never deletes a claim.
 
 Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
 ambiguous anchors become stale. Deferred claims additionally invalidate when their plan
-ordering snapshot changes.
+ordering snapshot changes; pending deferrals are invalidated before replay under the same
+full-plan snapshot rule.
 
 ## Evidence
 
@@ -221,7 +222,8 @@ Defaults are 100 MiB per lineage, 1 GiB globally, and a seven-day orphan TTL. Ex
 evidence leaves the live lineage root and becomes collectible. Hash mismatch, missing
 content, malformed roots, or cap exhaustion fails closed. Lineage state publication
 tracks its phase: temporary-file creation, serialization, and pre-replace fsync failures
-enter the recoverable blocked transaction path, while entering the atomic replace or any
+enter the recoverable blocked transaction path and release the unambiguous ownership
+latch, while entering the atomic replace or any
 later root/journal durability step is ambiguous and retains its recovery roots and latch.
 
 Callers may provide up to 20 `{claim, source, content}` records through
@@ -272,7 +274,12 @@ If a required secondary auditor cannot launch, including an OS permission or res
 failure, the validated exact event still persists with incomplete checks as a pending,
 blocking transition. At the start of a later round the server replays that stored event
 and its exact evidence bindings directly through authorization; no model is asked to
-guess or reconstruct hidden event fields.
+guess or reconstruct hidden event fields. Replay reuses only accepted vendor provenance
+whose event digest and evidence tuple are identical; every missing vendor, including the
+current primary vendor when necessary, is actually invoked. A pending deferral is bound to
+the complete plan snapshot on which its ordinal span IDs were selected. Any plan edit
+clears that pending event and marks the claim stale before replay can reinterpret those IDs
+against different bytes.
 
 The persisted authorization-policy tuple includes the independent-check mode, stakes
 classification, and policy version. Any change invalidates the zero-research cache. A
@@ -358,6 +365,7 @@ LINEAGE: project-42-plan (rounds recorded: 3)
 CLAIM-REGISTER: parsed 2
 CLAIMS: verified=1, unverified=1
 CLAIM-CLOSURE: BLOCKED — 1 load-bearing claim(s) unresolved
+CLAIM-DATA-JSON={"claim":"Exact anchored plan text","claim_id":"0123456789","status":"unverified"}
 CLASS-REGISTER: NONE
 CLASS-CLOSURE: 0 open, 2 closed, 2 unmechanized
 CONVERGENCE: BLOCKED — 1 claim(s)
@@ -367,11 +375,14 @@ If a structural terminal register needs correction, the original five-section cr
 preserved and the corrected register is displayed separately as the register actually
 applied.
 
-There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
+Every server-rendered claim, class, warning, and debt value is an injectively escaped,
+one-line `*-DATA-JSON` record. There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
 `NOT-BLOCKED`. Preflight failures such as latch contention and quarantined state return a
 synthetic review with the same five ordered, nonempty sections before the blocked trailer.
 Structural prose containing a model-authored line beginning `CONVERGENCE:` is rejected and
-must be corrected; only the server-computed trailer is returned.
+must be corrected; any reserved verdict-looking line in a generated failure body is framed
+as `UNTRUSTED-REVIEW-LINE-JSON`. The completed response asserts that only the
+server-computed trailer line remains.
 
 ## Migration and recovery
 

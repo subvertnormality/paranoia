@@ -263,6 +263,46 @@ def test_required_defer_applies_only_after_two_vendor_acceptances(
         assert claim.deferral_authorization["status"] == "pending"
 
 
+def test_pending_defer_is_invalidated_before_ordinal_spans_can_be_reinterpreted() -> None:
+    raw = b"Assume service.\nVerify service.\nUse service.\n"
+    spans = pc.segment_plan(raw)
+    state = pc.ClaimState("pending-edit")
+    claim_id = pc.apply_events(
+        state, pc.parse_role_register(_research([_add()]), pc.RESEARCH_ROLE),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["new-1"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    event = pc.Event("DEFER", {
+        "op": "DEFER", "claim_id": claim_id,
+        "verification_anchor": {"first_span": "p000002", "last_span": "p000002"},
+        "dependent_anchors": [{"first_span": "p000003", "last_span": "p000003"}],
+        "completion_evidence": "success", "failure_condition": "failure",
+        "stop_action": "stop",
+    })
+    digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        independent_required=True, vendor_checks=[
+            pc.VendorCheck("codex", "m1", digest, (), True, "t"),
+        ],
+    )
+    state.plan_sha256 = pc.sha256(raw)
+    claim = state.claims[claim_id]
+    assert claim.pending_transition == event.data
+
+    edited = b"Assume service.\nSkip verification.\nUse service.\n"
+    pc.reconcile_plan(state, edited, pc.segment_plan(edited))
+    assert claim.status == pc.STALE
+    assert claim.pending_transition is None
+    assert claim.deferral_authorization is None
+    assert pc.claim_blocks(claim)
+
+
 def test_invalid_required_defer_is_rejected_before_authorization_or_pending_state() -> None:
     state, claim_id, spans = _state_with_confirmed_fact()
     event = pc.Event("DEFER", {

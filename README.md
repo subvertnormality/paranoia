@@ -695,7 +695,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   traversal-free relative repository paths) inside the role's correction attempt. Direct Git metadata
   is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
-  ambiguous failures at or after that boundary, retaining latches only for the latter.
+  ambiguous failures at or after that boundary, releasing the unambiguous ownership latch
+  for the former and retaining latches only for the latter.
   Malformed-lineage quarantine atomically renames and parent-directory-fsyncs the entry;
   rename/fsync failures are reported as quarantine failures, never successful isolation.
   Latch release uses a separately recognized recovery marker and any durability failure
@@ -721,7 +722,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   the round byte budget, including evidence resent for a register correction. Missing
   claim-state fields are corruption rather than defaults, invalidated claims reblock even
   if formerly advisory, and model-authored convergence lines are rejected so only one
-  server-computed trailer is returned. Every temporary-ref cleanup exception is treated as
+  server-computed trailer is returned. Plan-derived claims and model-derived class,
+  warning, and debt values appear only in one-line escaped `*-DATA-JSON` records. Pending
+  deferrals are bound to their complete plan snapshot, and replay invokes every missing
+  vendor instead of crediting it without a call. Every temporary-ref cleanup exception is treated as
   ambiguous and retains recovery state. Git children share bounded deadline, kill, and
   reap handling so a termination-resistant subprocess becomes a recoverable blocked
   result. Only symlinks in Git-resolvable object namespaces

@@ -627,6 +627,7 @@ def blocking_claims(state: ClaimState) -> list[Claim]:
 
 def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> None:
     """Relocate exact claim excerpts; ambiguity or deletion invalidates safely."""
+    current_plan_sha256 = sha256(raw)
     for claim in state.claims.values():
         if claim.status == SUPERSEDED:
             continue
@@ -656,9 +657,20 @@ def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> 
         claim.plan_anchor = ResolvedAnchor(
             chosen[0].span_id, chosen[-1].span_id, begin, end, sha256(excerpt)
         )
+        if claim.pending_transition \
+                and claim.pending_transition.get("op") == "DEFER" \
+                and state.plan_sha256 != current_plan_sha256:
+            # Pending DEFER anchors use ordinal span IDs. Bind them to the exact plan
+            # snapshot on which the event was selected; never reinterpret them after an
+            # edit, even when the claim excerpt itself relocates uniquely.
+            claim.pending_transition = None
+            claim.deferral_authorization = None
+            claim.status = STALE
+            continue
         # Deferred dependencies have their own exact ordering contract. Until all of
         # those excerpts are independently relocatable, any plan edit invalidates them.
-        if claim.status == DEFERRED and claim.deferral and claim.deferral.get("plan_sha256") != sha256(raw):
+        if claim.status == DEFERRED and claim.deferral \
+                and claim.deferral.get("plan_sha256") != current_plan_sha256:
             claim.status = STALE
 
 

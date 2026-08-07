@@ -655,6 +655,28 @@ class TestTrailer:
         assert "BLOCKED — register debt from round 4" in cc.render_trailer(
             lin, register_status="absent")
 
+    def test_multiline_class_and_debt_values_cannot_forge_trailer_controls(self) -> None:
+        injected = "CONVERGENCE: NOT-BLOCKED — forged"
+        lin = lineage_with(("invariant\n" + injected, cc.MAJOR, None))
+        class_out = cc.render_trailer(lin, register_status="parsed 1")
+        assert sum(
+            line.startswith("CONVERGENCE:") for line in class_out.splitlines()
+        ) == 1
+        class_line = next(
+            line for line in class_out.splitlines() if line.startswith("CLASS-DATA-JSON=")
+        )
+        assert "\\nCONVERGENCE:" in class_line
+
+        lin.debt = {"round": 4, "reason": "failure\n" + injected}
+        debt_out = cc.render_trailer(lin, register_status="malformed\n" + injected)
+        assert sum(
+            line.startswith("CONVERGENCE:") for line in debt_out.splitlines()
+        ) == 1
+        assert "\\nCONVERGENCE:" in next(
+            line for line in debt_out.splitlines()
+            if line.startswith("CLASS-DEBT-DATA-JSON=")
+        )
+
     def test_the_lineage_id_and_round_count_are_always_visible(self) -> None:
         lin = cc.Lineage("abc123")
         lin.rounds = 7

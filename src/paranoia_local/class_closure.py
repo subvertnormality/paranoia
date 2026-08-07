@@ -1137,7 +1137,7 @@ def render_trailer(lineage: Lineage, *, register_status: str,
     )
     lines = [
         f"LINEAGE: {lineage.lineage_id} (rounds recorded: {lineage.rounds})",
-        f"CLASS-REGISTER: {register_status}",
+        "CLASS-REGISTER: " + json.dumps(register_status, ensure_ascii=True)[1:-1],
         f"CLASS-CLOSURE: {counts}",
     ]
     # A predicate can be wrong in the SAFE direction — too narrow, matching none of the
@@ -1149,17 +1149,25 @@ def render_trailer(lineage: Lineage, *, register_status: str,
         and lineage.classes[c].mechanized
     ]
     if born_closed:
-        lines.append(
-            "CLASS-CLOSURE-WARNING: " + "; ".join(
-                f"{c.class_id} closed in the round it was registered — verify its predicate "
-                f"actually matches the violation it describes ({display(c.invariant)})"
-                for c in born_closed
+        lines.extend(
+            "CLASS-CLOSURE-WARNING-DATA-JSON=" + json.dumps(
+                {
+                    "class_id": c.class_id,
+                    "invariant": c.invariant,
+                    "warning": "closed in the round it was registered; verify its predicate",
+                },
+                sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
+            for c in born_closed
         )
     if lineage.debt:
         lines.append(
-            f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}: "
-            f"{lineage.debt.get('reason')}"
+            "CLASS-DEBT-DATA-JSON=" + json.dumps(
+                lineage.debt, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            )
+        )
+        lines.append(
+            f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}"
         )
     elif blocking:
         lines.append(f"CONVERGENCE: BLOCKED — {len(blocking)} class(es) unclosed:")
@@ -1168,7 +1176,16 @@ def render_trailer(lineage: Lineage, *, register_status: str,
                    else "unmechanized: awaiting reviewer CLOSED or RECLASSIFY")
             if c.status in (MALFORMED, OVER_BROAD, UNCHECKED):
                 how = f"{c.status}: {display(c.detail or 'closure not proven')}"
-            lines.append(f"  {c.class_id} {display(c.invariant)} ({how})")
+            lines.append(
+                "CLASS-DATA-JSON=" + json.dumps(
+                    {
+                        "class_id": c.class_id,
+                        "invariant": c.invariant,
+                        "closure": how,
+                    },
+                    sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                )
+            )
         lines.append(
             "  Any `CONVERGED` in the review text above is VOID: it is the reviewer's "
             "judgement about new findings, not a statement about these classes."
@@ -1176,4 +1193,7 @@ def render_trailer(lineage: Lineage, *, register_status: str,
     else:
         lines.append("CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed; advisory "
                      "classes may remain open. Reviewer findings still govern.")
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    if sum(line.startswith("CONVERGENCE:") for line in rendered.splitlines()) != 1:
+        raise AssertionError("class convergence trailer must contain exactly one verdict line")
+    return rendered
