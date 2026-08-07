@@ -385,7 +385,9 @@ Every dirty-tree candidate is likewise opened relative to a verified repository-
 fd. Each ancestor is opened one component at a time with no-follow and pre/post-open inode
 checks, and the final lstat, symlink read, or regular-file open remains relative to that
 anchored parent. Replacing an inspected ancestor with an external symlink therefore blocks
-without hashing or disclosing external bytes.
+without hashing or disclosing external bytes. The auxiliary unsupported-entry disclosure
+scan uses the same boundary: its queue owns already-open directory fds rather than pathnames,
+so a later rename/symlink replacement cannot redirect enumeration or disclose external names.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
@@ -435,8 +437,11 @@ old inexpensive review must explicitly use `class_closure: false` and accept tha
 result has no persistent stop condition.
 
 A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
-unchanged and returns a blocked verdict. Nested schema-version-2 claim/evidence records are
-fully validated and corrupt lineage state is quarantined before a latch is acquired. A
+unchanged and returns a blocked verdict. Exclusive lineage ownership is acquired before
+state is loaded, and the owning loader requires that live latch; a delayed round can never
+load an old generation and later acquire ownership over a newer publication. Nested
+schema-version-2 claim/evidence records are fully validated and corrupt lineage state is
+quarantined while that latch remains held. A
 quarantine uses an atomic rename followed by a parent-directory fsync. Rename or fsync
 failure is reported as a quarantine failure and never as a successful move; the operator
 is not told that malformed live state was safely isolated when durability is ambiguous. A

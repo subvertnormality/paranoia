@@ -752,7 +752,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   entries are skipped without traversal and disclosed as unavailable; unsafe ancestors in
   the server-owned temporary-pin namespace still fail closed. Dirty-tree files are opened
   through repository-fd-relative, no-follow traversal of every ancestor and final component,
-  so a concurrent ancestor-to-symlink swap blocks without exposing external bytes. Bounded tree, blob,
+  so a concurrent ancestor-to-symlink swap blocks without exposing external bytes. The
+  unsupported-entry disclosure scan queues owned directory fds, never reopenable pathnames.
+  Exclusive lineage ownership is acquired before state load, preventing delayed stale
+  writers from overwriting a newer round. Bounded tree, blob,
   literal-search, and history evidence carries an explicit completeness result; searches bind
   candidate paths and inspected object/range identities. Incomplete query records remain
   visible as context but cannot authorize claim-state or bearing transitions, so truncation

@@ -228,6 +228,33 @@ def test_dirty_tree_ancestor_swap_to_external_symlink_fails_closed(
     assert secret.read_text() == "host secret"
 
 
+def test_special_path_scan_keeps_queued_directory_fd_after_symlink_swap(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nested = repo / "nested-scan"
+    nested.mkdir()
+    (nested / "ordinary.txt").write_text("repository bytes")
+    external = tmp_path / "external-scan-tree"
+    external.mkdir()
+    os.mkfifo(external / "host-secret-pipe")
+    original_open = ps._open_child_directory
+    swapped = False
+
+    def open_then_swap(parent_fd: int, name: str, *, create: bool) -> int:
+        nonlocal swapped
+        child_fd = original_open(parent_fd, name, create=create)
+        if name == "nested-scan" and not swapped:
+            swapped = True
+            nested.rename(repo / "nested-scan-original")
+            nested.symlink_to(external, target_is_directory=True)
+        return child_fd
+
+    monkeypatch.setattr(ps, "_open_child_directory", open_then_swap)
+    unavailable = ps._find_special_paths(repo)
+    assert "nested-scan/host-secret-pipe" not in unavailable
+    assert (external / "host-secret-pipe").is_fifo()
+
+
 def test_cleanup_does_not_follow_a_replaced_pin_directory(
     repo: Path, tmp_path: Path,
 ) -> None:

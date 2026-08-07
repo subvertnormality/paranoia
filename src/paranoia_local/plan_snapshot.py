@@ -1411,29 +1411,57 @@ def _find_special_paths(
 ) -> tuple[str, ...]:
     """Disclose nonregular entries Git omits from ``ls-files --others``."""
     special: list[str] = []
-    pending = [repo]
     seen = 0
     ignored = {path.rstrip("/") for path in ignored_paths}
-    while pending:
-        directory = pending.pop()
-        try:
-            entries = os.scandir(directory)
-        except OSError as exc:
-            raise SnapshotUnavailable(f"could not inspect repository entry types: {exc}") from exc
-        with entries:
-            for entry in entries:
-                if directory == repo and entry.name == ".git":
-                    continue
-                relative = Path(entry.path).relative_to(repo).as_posix()
-                if relative in ignored:
-                    continue
-                seen += 1
-                if seen > max_entries:
-                    raise SnapshotUnavailable("repository entry scan exceeds safety cap")
-                if entry.is_dir(follow_symlinks=False):
-                    pending.append(Path(entry.path))
-                    continue
-                mode = entry.stat(follow_symlinks=False).st_mode
-                if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
-                    special.append(relative)
+    root_before = repo.lstat()
+    try:
+        root_fd = os.open(
+            repo,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+    except OSError as exc:
+        raise SnapshotUnavailable(f"could not open repository entry scan root: {exc}") from exc
+    root_opened = os.fstat(root_fd)
+    if not stat.S_ISDIR(root_opened.st_mode) or (
+        root_before.st_dev, root_before.st_ino
+    ) != (root_opened.st_dev, root_opened.st_ino):
+        os.close(root_fd)
+        raise SnapshotUnavailable("repository entry scan root changed while opening")
+    pending: list[tuple[int, str]] = [(root_fd, "")]
+    try:
+        while pending:
+            directory_fd, prefix = pending.pop()
+            try:
+                entries = os.scandir(directory_fd)
+                with entries:
+                    for entry in entries:
+                        if not prefix and entry.name == ".git":
+                            continue
+                        relative = f"{prefix}/{entry.name}" if prefix else entry.name
+                        if relative in ignored:
+                            continue
+                        seen += 1
+                        if seen > max_entries:
+                            raise SnapshotUnavailable(
+                                "repository entry scan exceeds safety cap"
+                            )
+                        mode = entry.stat(follow_symlinks=False).st_mode
+                        if stat.S_ISDIR(mode):
+                            child_fd = _open_child_directory(
+                                directory_fd, entry.name, create=False,
+                            )
+                            pending.append((child_fd, relative))
+                            continue
+                        if not stat.S_ISREG(mode) and not stat.S_ISLNK(mode):
+                            special.append(relative)
+            except OSError as exc:
+                raise SnapshotUnavailable(
+                    f"could not inspect repository entry types: {exc}"
+                ) from exc
+            finally:
+                os.close(directory_fd)
+    finally:
+        for directory_fd, _prefix in pending:
+            os.close(directory_fd)
     return tuple(sorted(special))

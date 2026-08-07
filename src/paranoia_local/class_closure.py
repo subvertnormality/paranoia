@@ -376,7 +376,7 @@ def _release_path(root: Path, lineage_id: str) -> Path:
 
 
 def load_lineage(root: Path, lineage_id: str, *, stamp: str,
-                 mode: str = BRANCH_MODE) -> Lineage:
+                 mode: str = BRANCH_MODE, latch_owned: bool = False) -> Lineage:
     """`mode` is the tool asking. Opening a lineage created by the other tool is
     REFUSED, not merged: a plan round that loaded a branch lineage would either sweep
     mechanized predicates with no reviewed snapshot, or skip the sweep and carry a
@@ -391,7 +391,12 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
             f"lineage {lineage_id} has quarantined state — repair or delete "
             f"{quarantined[-1]} before this lineage can be used again"
         )
-    if pending.exists() or releasing.exists():
+    if latch_owned:
+        if not pending.exists() or releasing.exists():
+            raise StateUnavailable(
+                f"lineage {lineage_id} ownership latch is missing or releasing"
+            )
+    elif pending.exists() or releasing.exists():
         marker = pending if pending.exists() else releasing
         raise StateUnavailable(
             f"a previous round left a pending write latch at {marker}; its state write "

@@ -393,6 +393,34 @@ class TestFailurePaths:
         run_round(repo, FakeEngine(review_with("NONE")), tmp_path, round=1)
         assert not list(cc.lineage_dir(state_root(tmp_path)).glob("*.pending"))
 
+    def test_round_owns_lineage_before_loading_so_interleaved_round_blocks(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = state_root(tmp_path)
+        original_load = cc.load_lineage
+        interleaved: list[handlers._PlanClassClosure] = []
+
+        def load_with_interleaving(*args, **kwargs):
+            assert kwargs.get("latch_owned") is True
+            other = handlers._PlanClassClosure(
+                "ownership-before-load", round_no=2,
+                state_root=root, stamp="second",
+            )
+            assert other.prepare() == []
+            assert other.unavailable and "another round owns" in other.unavailable
+            interleaved.append(other)
+            return original_load(*args, **kwargs)
+
+        monkeypatch.setattr(cc, "load_lineage", load_with_interleaving)
+        first = handlers._PlanClassClosure(
+            "ownership-before-load", round_no=1,
+            state_root=root, stamp="first",
+        )
+        first.prepare()
+        assert first.lineage is not None and interleaved
+        first.abandon()
+        assert first.release() is None
+
     def test_a_stranded_latch_blocks_the_next_round_rather_than_starting_empty(
         self, repo: Path, tmp_path: Path
     ) -> None:

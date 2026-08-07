@@ -1957,12 +1957,22 @@ class _ClosureRound:
         self._settled = False
 
     def prepare(self) -> list[str]:
-        """Load state, re-check what the lineage already holds, and render the blocks."""
+        """Own, load, re-check what the lineage already holds, and render the blocks."""
         try:
-            self.lineage = cc.load_lineage(self.state_root, self.lineage_id,
-                                           stamp=self.stamp, mode=self.mode)
+            cc.open_latch(self.state_root, self.lineage_id)
+        except cc.StateUnavailable as exc:
+            # The review still runs and is still returned; it simply cannot be settled.
+            self.unavailable = str(exc)
+            return []
+        self._latched = True
+        try:
+            self.lineage = cc.load_lineage(
+                self.state_root, self.lineage_id, stamp=self.stamp,
+                mode=self.mode, latch_owned=True,
+            )
         except cc.StateUnavailable as exc:
             self.unavailable = str(exc)
+            self._settled = True
             return []
         try:
             self._validate_loaded()
@@ -1978,14 +1988,8 @@ class _ClosureRound:
                 )
             except cc.StateUnavailable as quarantine_error:
                 self.unavailable = str(quarantine_error)
+            self._settled = True
             return []
-        try:
-            cc.open_latch(self.state_root, self.lineage_id)
-        except cc.StateUnavailable as exc:
-            # The review still runs and is still returned; it simply cannot be settled.
-            self.unavailable = str(exc)
-            return []
-        self._latched = True
         self._before_sweep()
         self._sweep()
         return self._blocks()
@@ -1996,7 +2000,7 @@ class _ClosureRound:
         """Branch-only: fold `exempt`/`unexempt` arguments in before the sweep."""
 
     def _validate_loaded(self) -> None:
-        """Validate mode-specific nested state before acquiring the lineage latch."""
+        """Validate mode-specific nested state while holding the lineage latch."""
 
     def _sweep(self, only: list[str] | None = None) -> None:
         """Branch-only: re-run every mechanized predicate. A plan lineage holds none."""
