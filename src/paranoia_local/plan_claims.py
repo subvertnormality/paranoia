@@ -197,7 +197,7 @@ class ClaimState:
 
 
 _SCHEMAS: dict[str, frozenset[str]] = {
-    "ADD": frozenset({"op", "temp_id", "claim", "kind", "assertion_mode", "plan_anchor"}),
+    "ADD": frozenset({"op", "temp_id", "kind", "assertion_mode", "plan_anchor"}),
     "VERIFY": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
     "CONTRADICT": frozenset({"op", "claim_id", "evidence_ids", "reason"}),
     "DEFER": frozenset({"op", "claim_id", "verification_anchor", "dependent_anchors",
@@ -488,15 +488,18 @@ def _add_claim(state: ClaimState, data: Mapping[str, Any], role: str,
     temp_id = data.get("temp_id")
     if not isinstance(temp_id, str) or not temp_id or temp_id in seen_temp:
         raise ClaimTransitionError("ADD temp_id must be nonempty and unique per register")
-    proposition = data.get("claim")
-    if not isinstance(proposition, str) or not proposition.strip():
-        raise ClaimTransitionError("ADD claim must be nonempty")
     kind, assertion = data.get("kind"), data.get("assertion_mode")
     if kind not in {FACT, DECISION}:
         raise ClaimTransitionError("ADD kind must be fact or decision")
     if assertion not in {ASSERTED, ASSUMPTION, ESTIMATE}:
         raise ClaimTransitionError("invalid assertion_mode")
     anchor = resolve_anchor(data.get("plan_anchor", {}), spans)
+    # Repository-aware roles select only control-safe server span IDs.  They never
+    # author prose later consumed by a clean role: the durable proposition is the
+    # exact plan text covered by those IDs, decoded the same way as the plan packet.
+    proposition = _anchor_bytes(anchor, spans).decode("utf-8", errors="replace").strip()
+    if not proposition:
+        raise ClaimTransitionError("ADD plan_anchor must cover non-whitespace plan text")
     claim_id = mint_claim_id(state.lineage_id, state.next_seq, proposition)
     state.next_seq += 1
     state.claims[claim_id] = Claim(
@@ -795,9 +798,15 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         if not isinstance(row.get(key), str) or (key != "anchor_excerpt_b64" and not row[key]):
             raise ClaimRegisterError(f"persisted claim {key} is malformed")
     try:
-        base64.b64decode(row["anchor_excerpt_b64"], validate=True)
+        excerpt = base64.b64decode(row["anchor_excerpt_b64"], validate=True)
     except (ValueError, TypeError) as exc:
         raise ClaimRegisterError("persisted claim anchor excerpt is malformed") from exc
+    anchor = row.get("plan_anchor")
+    if not isinstance(anchor, ResolvedAnchor) or sha256(excerpt) != anchor.sha256:
+        raise ClaimRegisterError("persisted claim anchor excerpt identity is malformed")
+    canonical = excerpt.decode("utf-8", errors="replace").strip()
+    if not canonical or row.get("claim") != canonical:
+        raise ClaimRegisterError("persisted claim proposition is not server-derived")
     if row.get("kind") not in {FACT, DECISION}:
         raise ClaimRegisterError("persisted claim kind is malformed")
     if row.get("assertion_mode") not in {ASSERTED, ASSUMPTION, ESTIMATE}:
@@ -1024,6 +1033,34 @@ def render_claim_summary(state: ClaimState) -> str:
                             "dispute": claim.dispute_authorization,
                             "deferral": claim.deferral_authorization,
                         }.items() if info and info.get("status") == "pending"
+                    },
+                },
+                sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            )
+        )
+    if len(lines) == 1:
+        lines.append("NONE")
+    return "\n".join(lines)
+
+
+def render_clean_policy_candidates(state: ClaimState) -> str:
+    """Render only server-owned IDs/anchors for the plan-only policy role.
+
+    Persisted claim prose and model-proposed labels are deliberately excluded.  The
+    clean role derives the proposition and its kind from the already supplied plan spans.
+    """
+    lines = ["=== PLAN-ONLY CLAIM CANDIDATES ==="]
+    for claim in state.claims.values():
+        if claim.status == SUPERSEDED or claim.kind_classification != PROPOSED:
+            continue
+        lines.append(
+            "CLAIM=" + json.dumps(
+                {
+                    "claim_id": claim.claim_id,
+                    "kind_classification": claim.kind_classification,
+                    "plan_anchor": {
+                        "first_span": claim.plan_anchor.first_span,
+                        "last_span": claim.plan_anchor.last_span,
                     },
                 },
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,

@@ -253,7 +253,7 @@ def test_expired_truth_source_stales_claim_after_separate_bearing_evidence(
     spans = pc.segment_plan(b"Premise.\n")
     state = pc.ClaimState("lineage")
     add = {
-        "op": "ADD", "temp_id": "one", "claim": "External premise",
+        "op": "ADD", "temp_id": "one",
         "kind": "fact", "assertion_mode": "asserted",
         "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
     }

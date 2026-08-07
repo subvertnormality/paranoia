@@ -59,13 +59,19 @@ One closure round performs these stages:
    special-entry walk, so a large ignored build tree cannot exhaust that scan. A temporary
    `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
    against concurrent pruning.
-3. A fresh toolless research role registers load-bearing claims. The server parses its
-   strict JSON immediately into a non-durable draft and mints durable-style IDs before
+3. A fresh toolless research role registers load-bearing candidates using only a temporary
+   ID, enum labels, and server span IDs. `ADD` has no model-authored proposition field. The
+   server derives the durable proposition from the exact anchored plan bytes, parses the
+   strict JSON immediately into a non-durable draft, and mints durable-style IDs before
    later roles need to refer to them.
-4. A fresh plan-only policy role receives escaped plan spans and active claim summaries,
-   but no repository paths, bytes, metadata, external results, or supplied artifacts. It
-   alone may classify genuine plan decisions and may defer a newly confirmed unverified
-   fact when the plan itself supplies the complete ordered verification contract.
+4. A fresh plan-only policy role receives escaped plan spans plus only server-formatted
+   candidate IDs and anchors. It never receives persisted claim prose, proposed kind
+   labels, repository paths/bytes/metadata, external results, or supplied artifacts. It
+   derives each proposition from the anchored plan spans, alone may classify genuine plan
+   decisions, and may defer a newly confirmed unverified fact when the plan itself supplies
+   the complete ordered verification contract. Every deferral follows the same independent
+   authorization policy as evidence-role transitions; `independent_check: require` cannot
+   publish it without accepted checks from both supported vendors.
 5. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
    Request parsing rejects non-UTF-8 scalars before execution; repository operands must be
@@ -84,7 +90,9 @@ One closure round performs these stages:
    CLASS register. Like every other role, it receives plan bytes only inside ordered,
    injectively JSON-escaped `SPAN` data records; raw plan prose is never interpolated as
    peer-level prompt control text. Because it receives repository passages, it may confirm
-   only factual kinds; decision classification remains in the clean plan-only role.
+   only factual kinds; decision classification remains in the clean plan-only role. Its
+   `ADD` events likewise contain anchors rather than repository-influenced prose, and any
+   persisted legacy claim text is excluded from the later clean-role packet.
 8. Python validates role permissions, applies both registers to drafts, roots exact
    evidence bytes, atomically replaces lineage state, and computes one trailer. An
    atomically exclusive per-lineage latch rejects concurrent rounds before either can
@@ -121,7 +129,10 @@ The important orthogonal fields are:
   stale | malformed | not-applicable | superseded`.
 
 Every new claim starts `proposed`, `blocking`, and `unchecked`, regardless of what the
-extractor proposed. A different role must confirm its kind. Advisory bearing is reachable
+extractor proposed. The model selects server span IDs, while the server derives the stored
+proposition from those exact anchored plan bytes; repository-aware roles cannot author a
+free-form claim string for a later clean role. A different role must confirm its kind.
+Advisory bearing is reachable
 only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
 Facts block until verified or safely deferred. Decisions become `not-applicable` only
 after cross-role kind confirmation and block again if a plan edit or dispute makes them
@@ -225,7 +236,9 @@ of the trusted local/structural roles.
 
 ## Independence and authorization
 
-`independent_check` is `auto` (default) or `require`. Risk classification is explicit
+`independent_check` is `auto` (default) or `require`. Required policy applies equally to a
+clean-role `DEFER`: semantic validation happens first, then the exact deferral event must
+receive accepted `codex` and `claude` checks or remain pending and blocking. Risk classification is explicit
 through `stakes_level = low | high`; when omitted, any nonempty stakes description is
 high. Natural-language stakes are never parsed for security-significant words. Auto
 requires a distinct-vendor audit for high-stakes external claims, every closure transition

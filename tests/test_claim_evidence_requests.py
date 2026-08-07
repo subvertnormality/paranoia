@@ -399,7 +399,7 @@ def test_missing_persisted_evidence_dependency_stales_a_verified_claim(
     spans = pc.segment_plan(b"Premise.\n")
     state = pc.ClaimState("missing")
     add = {
-        "op": "ADD", "temp_id": "one", "claim": "Missing evidence premise",
+        "op": "ADD", "temp_id": "one",
         "kind": "fact", "assertion_mode": "asserted",
         "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
     }
@@ -505,7 +505,7 @@ def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) 
     first_id = pc.apply_events(
         state,
         [pc.Event("ADD", {
-            "op": "ADD", "temp_id": "old", "claim": "Old premise", "kind": "fact",
+            "op": "ADD", "temp_id": "old", "kind": "fact",
             "assertion_mode": "asserted",
             "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
         })],
@@ -514,7 +514,7 @@ def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) 
     replacement_id = pc.apply_events(
         state,
         [pc.Event("ADD", {
-            "op": "ADD", "temp_id": "new", "claim": "Replacement premise",
+            "op": "ADD", "temp_id": "new",
             "kind": "fact", "assertion_mode": "asserted",
             "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
         })],
@@ -578,7 +578,7 @@ def test_invalidated_pending_evidence_allows_a_fresh_transition(
     state = pc.ClaimState("pending-refresh")
     claim_id = pc.apply_events(
         state, [pc.Event("ADD", {
-            "op": "ADD", "temp_id": "one", "claim": "Premise", "kind": "fact",
+            "op": "ADD", "temp_id": "one", "kind": "fact",
             "assertion_mode": "asserted",
             "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
         })], role=pc.RESEARCH_ROLE, spans=spans,

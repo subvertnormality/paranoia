@@ -700,7 +700,13 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   changes the current verdict to blocked. Caller-supplied artifacts have their own
   untrusted verifier batch and receive the high-stakes independent-audit policy used for
   fetched evidence. A separate plan-only policy role receives no repository, external, or
-  supplied evidence and owns decision classification plus fresh-plan deferral. Every
+  supplied evidence and owns decision classification plus fresh-plan deferral. Repository-
+  aware `ADD` events contain only server span anchors and enum labels; the server derives
+  the durable proposition from exact anchored plan bytes, and the clean role receives only
+  server-formatted candidate IDs/anchors rather than persisted or model-authored claim
+  prose. Every clean-role deferral passes through the configured independent-check policy,
+  so `require` needs accepted checks from both supported vendors before it can stop
+  blocking. Every
   repository/external/supplied evidence batch—and the repository-exposed structural
   reviewer—cannot classify decisions or emit evidence-free deferral/supersession
   transitions. Completed persisted audits accept exactly the

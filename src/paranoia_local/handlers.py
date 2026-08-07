@@ -840,8 +840,10 @@ def _critique_plan_verified(
                         prompts.PLAN_CLEAN_POLICY_INSTRUCTIONS,
                         _prepend(calibration, "\n\n".join([
                             plan_packet,
-                            pc.render_claim_summary(draft_claims),
-                            "No repository paths, bytes, metadata, external results, or "
+                            pc.render_clean_policy_candidates(draft_claims),
+                            "Candidate claim IDs and span anchors are server-formatted. "
+                            "Derive each proposition only from its anchored plan spans. "
+                            "No repository paths, bytes, prose, external results, or "
                             "caller-supplied artifacts are available in this role.",
                         ])),
                     )
@@ -878,9 +880,21 @@ def _critique_plan_verified(
                             raise pc.ClaimTransitionError(
                                 "plan-only DEFER requires a newly confirmed unverified fact"
                             )
+                        required = _independent_required(
+                            event, draft_claims, evidence_records,
+                            independent_policy, high_stakes,
+                        )
+                        checks = _independent_checks(
+                            event, required=required, primary_engine=engine,
+                            primary_model=model, evidence_records=[],
+                            claim_state=draft_claims, effort=effort,
+                            plan_context=plan_packet, on_progress=on_progress,
+                            budget=round_budget,
+                        )
                         pc.apply_events(
                             draft_claims, [event], role=pc.VERIFIER_ROLE, spans=spans,
-                            round_no=round_no,
+                            round_no=round_no, independent_required=required,
+                            vendor_checks=checks,
                         )
 
                 active_ids = {

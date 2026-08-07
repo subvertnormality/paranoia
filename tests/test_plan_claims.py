@@ -19,7 +19,6 @@ def _add(**overrides) -> dict:
     event = {
         "op": "ADD",
         "temp_id": "new-1",
-        "claim": "The repository already has a durable cache.",
         "kind": "fact",
         "assertion_mode": "asserted",
         "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
@@ -60,7 +59,7 @@ def test_unknown_or_reversed_model_spans_fail_closed(anchor: dict) -> None:
 def test_research_register_rejects_duplicate_and_unknown_json_fields() -> None:
     duplicate = (
         '=== RESEARCH REGISTER ===\nEVENTS-JSON: '
-        '[{"op":"ADD","op":"ADD","temp_id":"x","claim":"c","kind":"fact",'
+        '[{"op":"ADD","op":"ADD","temp_id":"x","kind":"fact",'
         '"assertion_mode":"asserted","plan_anchor":{"first_span":"p000001",'
         '"last_span":"p000001"}}]'
     )
@@ -80,7 +79,7 @@ def test_deep_register_json_is_a_recoverable_register_error() -> None:
 
 
 def test_lone_surrogate_in_model_string_is_a_correctable_register_error() -> None:
-    event = _add(claim="bad\ud800claim")
+    event = _add(temp_id="bad\ud800id")
     with pytest.raises(pc.ClaimRegisterError, match="nonempty string"):
         pc.parse_role_register(_research([event]), pc.RESEARCH_ROLE)
 
@@ -91,6 +90,7 @@ def test_every_add_is_server_minted_pending_and_blocking() -> None:
     events = pc.parse_role_register(_research([_add()]), pc.RESEARCH_ROLE)
     minted = pc.apply_events(state, events, role=pc.RESEARCH_ROLE, spans=spans)
     claim = state.claims[minted["new-1"]]
+    assert claim.claim == "Do it."
     assert claim.bearing == pc.BLOCKING
     assert claim.kind_classification == pc.PROPOSED
     assert claim.status == pc.UNCHECKED
@@ -162,7 +162,7 @@ def test_evidence_from_another_claim_cannot_authorize_any_transition(op: str) ->
     state, first_id, spans = _state_with_confirmed_fact()
     minted = pc.apply_events(
         state,
-        pc.parse_role_register(_research([_add(temp_id="second", claim="Second premise")]),
+        pc.parse_role_register(_research([_add(temp_id="second")]),
                                pc.RESEARCH_ROLE),
         role=pc.RESEARCH_ROLE, spans=spans,
     )
@@ -387,7 +387,7 @@ def test_null_model_anchor_is_a_correctable_register_error() -> None:
     state = pc.ClaimState("null-anchor")
     spans = pc.segment_plan(b"Plan.\n")
     event = pc.Event("ADD", {
-        "op": "ADD", "temp_id": "bad", "claim": "Premise", "kind": "fact",
+        "op": "ADD", "temp_id": "bad", "kind": "fact",
         "assertion_mode": "asserted", "plan_anchor": None,
     })
     with pytest.raises(pc.ClaimRegisterError, match="must be an object"):
@@ -444,7 +444,6 @@ def test_persisted_supersession_requires_a_live_reachable_clear_target() -> None
     source = state.claims[claim_id]
     target = copy.deepcopy(source)
     target.claim_id = "replacement"
-    target.claim = "Choose the replacement approach."
     target.kind = pc.DECISION
     target.kind_classification = pc.CONFIRMED
     target.status = pc.NOT_APPLICABLE
@@ -523,6 +522,14 @@ def test_persisted_completed_authorization_requires_exact_supported_vendors(
     checks = raw["claims"][0]["truth_authorization"]["checks"]
     checks[0]["vendor"] = "invented" if mutation == "unknown" else "claude"
     with pytest.raises(pc.ClaimRegisterError, match="vendor check values"):
+        pc.state_from_json("plan", raw)
+
+
+def test_persisted_claim_prose_must_match_server_owned_anchor_bytes() -> None:
+    state, _claim_id, _spans = _state_with_claim()
+    raw = pc.state_to_json(state)
+    raw["claims"][0]["claim"] = "repository-authored relay instruction"
+    with pytest.raises(pc.ClaimRegisterError, match="proposition is not server-derived"):
         pc.state_from_json("plan", raw)
 
 
