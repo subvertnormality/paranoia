@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from paranoia_local.external_evidence import (
-    EndpointSearchProvider,
     FetchLimits,
+    NativeSearchProvider,
     NetworkEvidenceError,
     SafeHttpClient,
     TransportResponse,
@@ -38,14 +38,79 @@ class FakeTransport:
 
 
 def test_deep_search_json_is_a_recoverable_network_error() -> None:
-    body = ("[" * 2000 + "0" + "]" * 2000).encode()
-    transport = FakeTransport(TransportResponse(
-        200, {"content-type": "application/json"}, [body], "93.184.216.34",
-    ))
-    client = SafeHttpClient(resolver=lambda _host: ["93.184.216.34"], transport=transport)
-    provider = EndpointSearchProvider("https://search.example/?q={query}", client)
+    body = "[" * 2000 + "0" + "]" * 2000
+    client = SafeHttpClient(resolver=lambda _host: [], transport=FakeTransport())
+    provider = NativeSearchProvider(
+        lambda _prompt, _timeout: "=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: " + body,
+        client,
+    )
     with pytest.raises(NetworkEvidenceError, match="malformed JSON"):
         provider.search("test")
+
+
+def test_native_search_uses_bounded_strict_candidate_output_without_an_endpoint() -> None:
+    prompts: list[str] = []
+
+    timeouts: list[int] = []
+
+    def discover(prompt: str, timeout: int) -> str:
+        prompts.append(prompt)
+        timeouts.append(timeout)
+        return (
+            '=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: '
+            '[{"url":"https://docs.example.com/reference","title":"Official reference"}]'
+        )
+
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    provider = NativeSearchProvider(discover, client)
+    attempts: list[int] = []
+    charged: list[int] = []
+    hits = provider.search(
+        "neutral api version query", limit=2,
+        on_attempt=lambda: attempts.append(1), on_bytes=charged.append,
+    )
+
+    assert [(hit.url, hit.title) for hit in hits] == [
+        ("https://docs.example.com/reference", "Official reference")
+    ]
+    assert attempts == [1]
+    assert sum(charged) == provider.last_response_size
+    assert timeouts == [30]
+    assert "primary or authoritative" in prompts[0]
+    assert "supporting and contradicting" in prompts[0]
+    assert "original artifact that actually defines the disputed item" in prompts[0]
+    assert "include its own compact canonical record" in prompts[0]
+    assert "distinct primary sources" in prompts[0]
+    assert "compact canonical HTML or plain-text" in prompts[0]
+    assert "Search results are leads, not evidence" in prompts[0]
+
+
+def test_native_search_rejects_model_authority_labels_and_non_https_candidates() -> None:
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    outputs = iter([
+        '=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: '
+        '[{"url":"https://docs.example.com/","title":"Docs","source_class":"primary"}]',
+        '=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: '
+        '[{"url":"http://docs.example.com/","title":"Docs"}]',
+    ])
+    provider = NativeSearchProvider(lambda _prompt, _timeout: next(outputs), client)
+
+    with pytest.raises(NetworkEvidenceError, match="malformed"):
+        provider.search("query")
+    with pytest.raises(NetworkEvidenceError, match="HTTPS"):
+        provider.search("query")
+
+
+def test_native_search_does_not_round_up_a_subsecond_deadline() -> None:
+    calls: list[int] = []
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    provider = NativeSearchProvider(
+        lambda _prompt, timeout: calls.append(timeout) or "", client,
+    )
+
+    with pytest.raises(NetworkEvidenceError, match="less than one second"):
+        provider.search("query", limits=FetchLimits(total_timeout=0.5))
+    assert calls == []
 
 
 def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
@@ -55,6 +120,20 @@ def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
     with pytest.raises(NetworkEvidenceError, match="non-public"):
         client.fetch("https://example.com/")
     assert not transport.calls
+
+
+def test_dual_stack_dns_prefers_public_ipv4_for_common_ipv4_only_hosts() -> None:
+    response = TransportResponse(
+        200, {"content-type": "text/plain"}, [b"ok"], "104.18.20.81",
+    )
+    transport = FakeTransport(response)
+    client = SafeHttpClient(
+        resolver=lambda _host: ["2606:4700::6812:1451", "104.18.20.81"],
+        transport=transport,
+    )
+
+    assert client.fetch("https://example.com/").body == b"ok"
+    assert transport.calls == [("https://example.com/", "104.18.20.81")]
 
 
 def test_dns_resolution_obeys_the_shared_total_deadline() -> None:
@@ -194,32 +273,6 @@ def test_non_text_media_is_rejected() -> None:
                             transport=FakeTransport(response))
     with pytest.raises(NetworkEvidenceError, match="media type"):
         client.fetch("https://example.com/")
-
-
-@pytest.mark.parametrize(
-    "template",
-    [
-        "https://search.example/?q={query}&x={missing}",
-        "https://search.example/?q={query!r}",
-        "https://search.example/?q={query:{limit}}",
-        "https://search.example/?limit={limit}",
-        "https://{query}/search",
-        "https://search.example:{limit}/?q={query}",
-        "https://search.example/?q=fixed#{query}",
-    ],
-)
-def test_search_endpoint_templates_allow_only_query_and_limit(template: str) -> None:
-    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
-    with pytest.raises(NetworkEvidenceError, match="template"):
-        EndpointSearchProvider(template, client)
-
-
-def test_search_endpoint_allows_placeholders_only_below_a_fixed_origin() -> None:
-    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
-    provider = EndpointSearchProvider(
-        "https://search.example/api/{limit}?q={query}", client,
-    )
-    assert provider._origin[1] == "search.example"
 
 
 def test_expired_external_cache_is_removed_before_it_can_authorize_a_round(

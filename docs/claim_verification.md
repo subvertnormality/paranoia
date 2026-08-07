@@ -1,6 +1,6 @@
 # Plan claim verification
 
-Plan claim verification is an optional research-and-verify phase for `critique_plan`.
+Plan claim verification is an integrated research-and-verify phase for `critique_plan`.
 It answers a narrower question than structural review: are the registered load-bearing
 premises verified, contradicted, safely deferred, or explicitly unresolved?
 
@@ -11,17 +11,18 @@ premises verified, contradicted, safely deferred, or explicitly unresolved?
 | Mode | Effect |
 |---|---|
 | `off` | Opt out and preserve ordinary class-closure plan review; do not run or persist claim research |
-| `diagnostic` | Default. Run and persist claim research, display claim closure, but let only class closure govern `CONVERGENCE` |
+| `diagnostic` | **Default.** Run and persist claim research and display claim closure, but let only class closure govern `CONVERGENCE` |
 | `blocking` | Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
 
 Diagnostic mode ignores unresolved claim findings for convergence; it never ignores an
 operationally incomplete round. Model-role failure, register debt, state failure, or an
 abandoned structural/class transaction blocks in every enabled mode.
 
-`diagnostic` is the required rollout stage. Promote a workflow to `blocking` only after its
-operators have measured latency, false-block rate, extraction quality, state growth, and
-recovery behavior on representative plans. `class_closure: false` remains the stateless
-one-shot review and accepts only `claim_verification: off`.
+`diagnostic` is the out-of-box rollout stage: verification is running, cached, visible, and
+measurable without prematurely changing the merge verdict. Select `blocking` explicitly
+when the workflow has representative completion, latency, and false-block measurements.
+`class_closure: false` is the stateless one-shot review and accepts only
+`claim_verification: off`.
 
 ## Stakes and trust model
 
@@ -70,9 +71,11 @@ A diagnostic or blocking round performs these stages:
    plan-authored deferral contract.
 5. Ask a toolless evidence planner for bounded repository, empirical, external, or supplied
    records. The server executes those requests.
-6. Ask source-isolated verifier roles what each complete evidence record establishes.
-7. Run a separate structural reviewer using the plan and bounded evidence context.
-8. Validate both registers, atomically persist the lineage/evidence roots, and compute the
+6. For each unmatched external page, ask a fresh page-isolated role to classify the
+   publisher's relationship to that claim, without judging claim truth.
+7. Ask source-isolated verifier roles what each complete evidence record establishes.
+8. Run a separate structural reviewer using the plan and bounded evidence context.
+9. Validate both registers, atomically persist the lineage/evidence roots, and compute the
    claim and class trailers in Python.
 
 The extractor cannot clear its own claim. Omission in a later round never deletes a durable
@@ -181,18 +184,46 @@ adapter until one is deliberately added.
 
 ## External and supplied evidence
 
-External discovery is optional and uses the trusted process-level
-`PARANOIA_SEARCH_ENDPOINT`. The endpoint must be HTTPS and return the documented bounded
-JSON search shape. Redirects, DNS results, connected peers, response media, compressed and
-decompressed bytes, and a shared total deadline are validated by server code.
+External discovery uses the selected reviewer's normal, already-authenticated native search:
 
-Search rank is not source authority. Callers provide trusted `external_source_policy` rules
+- Codex runs live `--search` in a fresh bubblewrap profile;
+- Claude runs with `WebSearch` as its only available tool.
+
+No extra API key, search service, endpoint, plugin, or repository setting is required. The
+discovery role has no repository, shell, local-file, MCP, app, browser, or direct page-fetch
+capability. It receives one neutral query and may return only a bounded list of public HTTPS
+URL/title candidates. The server then fetches every candidate independently. Redirects,
+DNS answers, connected peers, response media, compressed/decompressed bytes, and the shared
+round deadline and byte/fetch budgets are validated by server code. `web_search: false`
+explicitly disables this path; a load-bearing internet-only claim then remains unresolved.
+
+These are fixed product integrations, not a provider interface exposed to callers. Codex's
+API is its signed-in CLI `--search` capability; Claude's API is the signed-in Claude Code
+`WebSearch` tool. There is deliberately no `PARANOIA_SEARCH_ENDPOINT`: requiring a fictional
+or operator-hosted service would make the default verification path incomplete. Both CLI
+profiles are capability-preflighted before snapshot or lineage state is acquired.
+
+Search rank is not source authority, and the discovery role cannot assign source class.
+Callers may provide `external_source_policy` rules
 with an exact lowercase host, URL path prefix, and `primary`, `authoritative`, `secondary`,
 or `ugc`
 classification. The longest exact-host/path match governs; subdomains do not inherit a rule.
 Authority rules apply only to HTTPS's default origin (effective port 443). Path prefixes
 match complete path segments; alternate ports and ambiguous percent-encoded, backslash, or
-dot-segment paths remain unclassified. Unmatched pages remain `unclassified-external`. Only primary and authoritative records may
+dot-segment paths remain unclassified. An unmatched page receives a fresh tool-less,
+page-isolated provenance assessment bound to its claim and evidence ID:
+
+- `primary`: the original artifact, dataset, research, standard, release, repository, or
+  first-party record that owns a material subject or value needed to test the claim,
+  including primary counterevidence to a false attribution;
+- `authoritative`: the publisher defines, operates, or controls the claimed behavior;
+- `secondary`: reporting, analysis, summaries, aggregators, or independent commentary;
+- `ugc`: community posts, forums, social media, Q&A, reviews, and user-authored reports;
+- `unclassified-external`: the bounded record cannot establish the publisher relationship.
+
+The assessment changes the evidence identity and persists its method and rationale. It is a
+bounded model judgment, not proof that the source is honest or that the claim is true. Only
+primary and authoritative records may
 authorize an external truth or bearing transition. Secondary and unclassified records may
 guide structural critique but cannot clear a load-bearing claim. The verifier still judges
 whether an eligible passage actually entails the proposition; server classification does
@@ -202,8 +233,11 @@ Known user-generated-content hosts—including Reddit, Stack Overflow/Stack Exch
 News, Quora, and common social/publishing platforms—are forced to `ugc`; a caller rule cannot
 promote them to primary or authoritative. UGC can expose leads, conflicts, or user-experience
 reports, but cannot authorize general API, standard, regulatory, historical, or product facts.
-Cached external URLs are reclassified against the current caller policy on every round; a
-removed or downgraded rule invalidates the record and stales every dependent active claim.
+The provenance model also cannot promote them, regardless of its output. Exact caller rules
+can classify or downgrade other origins before model assessment. Cached external URLs are
+reclassified against current hard UGC rules and caller policy on every round; a new, removed,
+or changed rule invalidates the record and stales every dependent active claim.
+Model-assessed provenance is retained only with the same bounded fetched-content TTL.
 
 Remote content and caller-supplied artifacts are untrusted data. They receive isolated
 verifier calls and cannot classify plan decisions, author evidence-free deferrals, or waive
@@ -214,7 +248,9 @@ claims. Unavailable sources produce an abstention and leave a load-bearing claim
 `independent_check` is `auto` or `require`. Required authorization uses the fixed vendor
 identities `codex` and `claude`. `auto` applies it to higher-risk transitions including
 external high-stakes evidence, contradiction reversal, dispute resolution, and a change
-from blocking to advisory.
+from blocking to advisory. When an external class came from isolated model assessment, the
+independent high-stakes auditor must also accept the publisher relationship; it rejects UGC
+or secondary material mislabeled as primary/authoritative.
 
 The exact event, evidence IDs, claim state, vendor/model identities, and checks persist.
 Unavailable checks remain pending and are replayed from the stored event in a later round.
@@ -243,17 +279,26 @@ Important bounds include:
 - individual dirty file: 32 MiB;
 - dirty-tree content retained for a snapshot: 256 MiB;
 - evidence records and requests: bounded per operation and by one shared round budget;
-- external work: bounded requests, redirects, compressed/decompressed bytes, and total time;
+- external work: at most 8 shared search/fetch attempts, 4 MiB compressed and decompressed
+  per response within the 16 MiB round aggregate shared with repository evidence and model
+  packets, bounded redirects, and one hard 480-second monotonic round deadline;
 - persisted evidence: 100 MiB per lineage and 1 GiB globally by default.
 
 Snapshot latency is measured separately from model latency. On the development repository,
 the refactored snapshot dropped from roughly 17.2 seconds to roughly 0.23 seconds. This is a
-local benchmark, not a universal guarantee; representative diagnostic rollout data governs
-promotion.
+local benchmark, not a universal guarantee. Native discovery adds one bounded search-only
+model call per external query, and provenance adds one fresh call per unmatched fetched page
+(at most the shared external-fetch budget).
 
-## Promotion and rollback criteria
+The 480-second deadline begins after input and CLI capability preflight and governs snapshot
+work, every model role and register retry, discovery, retrieval, provenance, verification,
+independent audits, and structural review. Each subprocess or HTTP request receives only the
+time still remaining; no phase resets the clock. Expiry is an explicit blocked round, never
+an abstention that can clear a claim.
 
-Promote `diagnostic` to `blocking` for a workflow only when:
+## Diagnostic and rollback criteria
+
+Use explicit `diagnostic` while evaluating a workflow when:
 
 - representative plans show useful claim extraction with an acceptable false-block rate;
 - snapshot and non-model overhead meet the workflow's latency budget;
@@ -261,7 +306,10 @@ Promote `diagnostic` to `blocking` for a workflow only when:
 - malformed, stale, interrupted, and unavailable cases recover without manual state edits;
 - operators understand that the gate covers only registered claims.
 
-Remain diagnostic or roll back to `off` when latency, model calls, false blocking, state
-growth, or operational recovery outweigh the additional premise assurance. Rollback does
-not delete lineage evidence; it only stops the claim gate from running or governing future
-verdicts.
+Promote a workflow to explicit `blocking` mode once those measurements are acceptable. Use
+`off` only when the operator explicitly accepts ordinary structural review without claim
+verification. Changing modes does not delete lineage evidence; it only changes whether the
+claim gate runs or governs future verdicts.
+
+The maintained live-integration evidence and release procedure are in
+[`native_web_acceptance.md`](native_web_acceptance.md).

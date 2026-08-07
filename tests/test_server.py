@@ -63,7 +63,7 @@ class TestToolListing:
         assert props["plan_text"]["minLength"] == 1
         assert props["plan_path"]["maxLength"] == 4096
 
-    def test_claim_verification_rolls_out_off_then_diagnostic_then_blocking(self) -> None:
+    def test_claim_verification_defaults_to_diagnostic_with_explicit_modes(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "critique_plan")
         claim_mode = tool.inputSchema["properties"]["claim_verification"]
         assert claim_mode["enum"] == ["off", "diagnostic", "blocking"]

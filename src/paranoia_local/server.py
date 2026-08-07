@@ -248,10 +248,11 @@ TOOLS: list[Tool] = [
                     "enum": ["off", "diagnostic", "blocking"],
                     "default": "diagnostic",
                     "description": (
-                        "Plan claim verification rollout. 'off' preserves ordinary "
-                        "class-closure review. 'diagnostic' (the default) records and reports "
-                        "claim closure without letting it govern CONVERGENCE. 'blocking' "
-                        "combines claim and class gates. Non-off modes require class_closure."
+                        "Plan claim verification rollout. 'diagnostic' (the default) runs, "
+                        "records, and reports claim closure without letting unresolved claim "
+                        "findings govern CONVERGENCE. 'blocking' combines claim and class "
+                        "gates after representative rollout evidence. 'off' is the explicit "
+                        "opt-out. Non-off modes require class_closure."
                     ),
                 },
                 "independent_check": {
@@ -310,9 +311,10 @@ TOOLS: list[Tool] = [
                         "additionalProperties": False,
                     },
                     "description": (
-                        "Trusted exact host/path provenance rules for fetched evidence. "
+                        "Optional trusted exact host/path provenance overrides for fetched "
+                        "evidence. Unmatched pages receive an isolated provenance assessment. "
                         "Only primary or authoritative records may authorize an external "
-                        "truth/bearing transition; unmatched and secondary pages are context."
+                        "truth/bearing transition; secondary and UGC pages are context."
                     ),
                 },
                 "refresh_claims": {

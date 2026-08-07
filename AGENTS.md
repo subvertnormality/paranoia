@@ -39,9 +39,10 @@ A proportionate local-tool statement looks like this:
 > content and Git configuration, supplied artifacts, and fetched pages are untrusted data.
 > No hostile local process can mutate the repository or its ancestors during a round;
 > ordinary user edits may occur and must produce an explicit retry/block, not a false clear.
-> Network access is limited to the configured HTTPS search service. Expected scale is about
-> 1,000 files and tens of claims. A false `NOT-BLOCKED` is high impact; a recoverable blocked
-> round is acceptable.
+> Native search uses only the selected signed-in reviewer CLI; the server retrieves candidate
+> pages over public HTTPS without sending page-bound credentials. Expected scale is about
+> 1,000 files, tens of claims, eight search/fetch attempts, and an eight-minute hard round
+> limit. A false `NOT-BLOCKED` is high impact; a recoverable blocked round is acceptable.
 
 If hostile concurrent mutation is intended, say so separately and name the writable paths:
 
@@ -127,6 +128,18 @@ completion evidence before changing defaults.
 ## Review and delivery discipline
 
 - Use tests to reproduce accepted in-scope failures before changing production code.
+- Prove the primary user capability end to end before starting adversarial convergence. A
+  placeholder URL, hypothetical service, optional plugin, caller-supplied adapter, or unit
+  test around a fake is not an implementation of a required default path. For an external
+  integration, name the concrete generally available API or built-in mechanism, its auth
+  source, its failure behavior, and execute a live smoke test when credentials permit.
+- Record the supported environment, CLI versions, exact capability profile, representative
+  true/false outcome, elapsed time, and any account/network limitation for a default external
+  integration. Keep diagnostic as the default until that evidence is broad enough to justify
+  promotion; a fake-backed unit test or one convenient success is not rollout evidence.
+- Treat acceptance failures as architectural evidence. A clean prose/code review cannot
+  compensate for a primary path that has never successfully run in its supported operating
+  environment.
 - Test class invariants and root causes, not only the latest example.
 - After a class fix, run one focused verification round to test that architectural decision;
   do not automatically begin another unbounded patch cycle.

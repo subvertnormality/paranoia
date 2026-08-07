@@ -9,7 +9,6 @@ import json
 import multiprocessing
 import socket
 import ssl
-import string
 import queue
 import threading
 import time
@@ -39,8 +38,8 @@ class FetchLimits:
     read_timeout: float = 15.0
     total_timeout: float = 30.0
     max_redirects: int = 5
-    max_compressed_bytes: int = 1 << 20
-    max_decompressed_bytes: int = 1 << 20
+    max_compressed_bytes: int = 2 << 20
+    max_decompressed_bytes: int = 2 << 20
 
 
 @dataclass(frozen=True)
@@ -68,6 +67,14 @@ class RawResponse:
 class SearchHit:
     url: str
     title: str
+
+
+class SearchProvider(Protocol):
+    def search(self, query: str, *, limit: int = 5,
+               limits: FetchLimits | None = None,
+               on_attempt: Callable[[], None] | None = None,
+               on_bytes: Callable[[int], None] | None = None,
+               remaining_bytes: Callable[[], int] | None = None) -> list[SearchHit]: ...
 
 
 class Transport(Protocol):
@@ -217,7 +224,16 @@ class SafeHttpClient:
             ))
             if not addresses or any(not _public(address) for address in addresses):
                 raise NetworkEvidenceError("DNS returned an empty or non-public address set")
-            selected = sorted(addresses, key=lambda item: ipaddress.ip_address(item).packed)[0]
+            # Many local/WSL environments have IPv4 connectivity but no IPv6 route even
+            # when DNS returns AAAA records. Prefer a validated public IPv4 answer when
+            # one exists; IPv6-only origins still use their validated IPv6 answer.
+            selected = sorted(
+                addresses,
+                key=lambda item: (
+                    ipaddress.ip_address(item).version != 4,
+                    ipaddress.ip_address(item).packed,
+                ),
+            )[0]
             response = self._request_with_deadline(
                 current, selected, limits, deadline, on_bytes
             )
@@ -393,99 +409,109 @@ class SafeHttpClient:
         }
 
 
-class EndpointSearchProvider:
-    """A bounded configurable HTTPS JSON search endpoint.
+class NativeSearchProvider:
+    """Bounded discovery through the selected reviewer's built-in web search.
 
-    The endpoint template must contain ``{query}`` and may contain ``{limit}``.  It
-    returns ``{"hits":[{"url":"https://...","title":"..."}]}``.
+    ``discover`` runs in the engine layer's search-only profile. Its result is only a
+    list of candidate URLs; the server validates and fetches every candidate itself.
     """
 
-    def __init__(self, endpoint_template: str, client: SafeHttpClient) -> None:
-        if not isinstance(endpoint_template, str):
-            raise NetworkEvidenceError("search endpoint template must be a string")
-        try:
-            parsed_fields = list(string.Formatter().parse(endpoint_template))
-        except ValueError as exc:
-            raise NetworkEvidenceError(f"search endpoint template is malformed: {exc}") from exc
-        fields = [field for _literal, field, _spec, _conversion in parsed_fields if field]
-        if "query" not in fields or any(field not in {"query", "limit"} for field in fields):
-            raise NetworkEvidenceError(
-                "search endpoint template must use {query} and optional {limit} only"
-            )
-        if any(spec or conversion for _literal, _field, spec, conversion in parsed_fields):
-            raise NetworkEvidenceError("search endpoint template formats/conversions are forbidden")
-        try:
-            rendered = endpoint_template.format(query="query-a.example", limit=1)
-            alternate = endpoint_template.format(query="query-b.example", limit=2)
-        except (KeyError, IndexError, ValueError) as exc:
-            raise NetworkEvidenceError(f"search endpoint template is malformed: {exc}") from exc
-        client._validate_url(rendered)
-        client._validate_url(alternate)
-        rendered_parts = urllib.parse.urlsplit(rendered)
-        alternate_parts = urllib.parse.urlsplit(alternate)
-        rendered_origin = (
-            rendered_parts.scheme.lower(), rendered_parts.hostname,
-            rendered_parts.port, rendered_parts.username, rendered_parts.password,
-        )
-        alternate_origin = (
-            alternate_parts.scheme.lower(), alternate_parts.hostname,
-            alternate_parts.port, alternate_parts.username, alternate_parts.password,
-        )
-        if rendered_origin != alternate_origin or rendered_parts.fragment != alternate_parts.fragment:
-            raise NetworkEvidenceError(
-                "search endpoint template placeholders are allowed only in path/query components"
-            )
-        self.endpoint_template = endpoint_template
-        self._origin = rendered_origin
-        self._fragment = rendered_parts.fragment
+    _MARKER = "=== SEARCH CANDIDATES ==="
+    _PREFIX = "CANDIDATES-JSON: "
+    _MAX_OUTPUT_BYTES = 64 << 10
+
+    def __init__(
+        self, discover: Callable[[str, int], str], client: SafeHttpClient,
+    ) -> None:
+        self.discover = discover
         self.client = client
         self.last_response_size = 0
+
+    @staticmethod
+    def _prompt(query: str, limit: int) -> str:
+        return (
+            "You are a neutral web-source discovery role. Use native web search only. "
+            "Search results are leads, not evidence, and search rank is not authority. "
+            "Prefer original specifications, official documentation, original research, "
+            "regulator/government material, canonical repositories, releases, and datasets. "
+            "Seek sources capable of testing the query, including materially supporting and "
+            "contradicting sources; do not hunt only for confirmation. For a contested "
+            "attribution, seek the original artifact that actually defines the disputed item, "
+            "even when it is a different artifact from the one named in the query. If a query "
+            "names a document, product, release, or dataset, include its own compact canonical "
+            "record as one candidate so its actual contents can be checked. When more "
+            "than one candidate is allowed, prefer distinct primary sources over alternate "
+            "formats or mirrors of the same document. Prefer compact canonical HTML or "
+            "plain-text artifacts over PDFs, search pages, generated views, or mirrors. "
+            "User-generated content "
+            "may reveal leads but is never primary or authoritative for general factual claims. "
+            f"Return at most {limit} distinct public HTTPS candidates for this query. Do not "
+            "classify their authority and do not quote page content.\n\n"
+            "QUERY-JSON: " + json.dumps(query, ensure_ascii=True) + "\n\n"
+            "End with exactly two lines:\n"
+            "=== SEARCH CANDIDATES ===\n"
+            "CANDIDATES-JSON: <one-line JSON array of exact "
+            '{"url":"https://...","title":"..."} objects>'
+        )
 
     def search(self, query: str, *, limit: int = 5,
                limits: FetchLimits | None = None,
                on_attempt: Callable[[], None] | None = None,
                on_bytes: Callable[[int], None] | None = None,
                remaining_bytes: Callable[[], int] | None = None) -> list[SearchHit]:
+        limits = limits or FetchLimits()
         self.last_response_size = 0
-        if not query or len(query) > 500 or not (1 <= limit <= 10):
+        if not query or len(query.encode("utf-8", errors="strict")) > 500 \
+                or not (1 <= limit <= 10):
             raise NetworkEvidenceError("external search query exceeds bounds")
+        if on_attempt is not None:
+            on_attempt()
         try:
-            url = self.endpoint_template.format(
-                query=urllib.parse.quote_plus(query), limit=limit,
+            timeout = int(limits.total_timeout)
+            if timeout < 1:
+                raise NetworkEvidenceError(
+                    "native web discovery has less than one second remaining"
+                )
+            output = self.discover(
+                self._prompt(query, limit), timeout,
             )
-        except (KeyError, IndexError, ValueError) as exc:
-            raise NetworkEvidenceError(f"search endpoint formatting failed: {exc}") from exc
-        parts = urllib.parse.urlsplit(url)
-        origin = (parts.scheme.lower(), parts.hostname, parts.port, parts.username, parts.password)
-        if origin != self._origin or parts.fragment != self._fragment:
-            raise NetworkEvidenceError("search endpoint formatting changed fixed origin")
-        response = self.client.fetch(
-            url, limits, on_attempt=on_attempt, on_bytes=on_bytes,
-            remaining_bytes=remaining_bytes,
-        )
-        self.last_response_size = response.size
-        if response.media_type not in {"application/json", "application/ld+json"}:
-            raise NetworkEvidenceError("search endpoint did not return JSON")
+        except NetworkEvidenceError:
+            raise
+        except Exception as exc:
+            raise NetworkEvidenceError(f"native web discovery failed: {exc}") from exc
+        if not isinstance(output, str):
+            raise NetworkEvidenceError("native web discovery returned malformed output")
+        encoded_size = len(output.encode("utf-8", errors="strict"))
+        self.last_response_size = encoded_size
+        if encoded_size > self._MAX_OUTPUT_BYTES \
+                or remaining_bytes is not None and encoded_size > remaining_bytes():
+            raise NetworkEvidenceError("native web discovery output exceeds byte cap")
+        if on_bytes is not None:
+            on_bytes(encoded_size)
+        if output.count(self._MARKER) != 1:
+            raise NetworkEvidenceError("native web discovery returned malformed output")
+        tail = output.split(self._MARKER, 1)[1].lstrip("\n")
+        line, _, rest = tail.partition("\n")
+        if rest.strip() or not line.startswith(self._PREFIX):
+            raise NetworkEvidenceError("native web discovery returned malformed output")
         try:
-            payload = json.loads(response.body, object_pairs_hook=_strict_object)
-            if not isinstance(payload, dict) or set(payload) != {"hits"}:
-                raise NetworkEvidenceError("search endpoint has unknown or missing fields")
-            rows = payload["hits"]
-        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError,
-                RecursionError, ValueError) as exc:
-            raise NetworkEvidenceError("search endpoint returned malformed JSON") from exc
-        if not isinstance(rows, list) or len(rows) > 100:
-            raise NetworkEvidenceError("search endpoint hits must be a bounded array")
+            rows = json.loads(line[len(self._PREFIX):], object_pairs_hook=_strict_object)
+        except (json.JSONDecodeError, RecursionError, TypeError, ValueError) as exc:
+            raise NetworkEvidenceError("native web discovery returned malformed JSON") from exc
+        if not isinstance(rows, list) or len(rows) > limit:
+            raise NetworkEvidenceError("native web discovery returned malformed candidates")
         hits: list[SearchHit] = []
-        for row in rows[:limit]:
+        seen: set[str] = set()
+        for row in rows:
             if not isinstance(row, dict) or set(row) != {"url", "title"} \
-                    or not isinstance(row.get("url"), str):
-                raise NetworkEvidenceError("search endpoint hit is malformed")
+                    or not isinstance(row.get("url"), str) \
+                    or not isinstance(row.get("title"), str):
+                raise NetworkEvidenceError("native web discovery candidate is malformed")
             self.client._validate_url(row["url"])
-            title = row.get("title", "")
-            if not isinstance(title, str):
-                raise NetworkEvidenceError("search endpoint hit title is malformed")
-            hits.append(SearchHit(row["url"], title[:500]))
+            if row["url"] in seen:
+                continue
+            seen.add(row["url"])
+            hits.append(SearchHit(row["url"], row["title"][:500]))
         return hits
 
 

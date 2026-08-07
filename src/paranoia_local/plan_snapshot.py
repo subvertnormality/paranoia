@@ -78,6 +78,17 @@ def _ambient() -> dict[str, str]:
     return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
 
 
+def _operation_deadline(shared_deadline: float | None) -> tuple[float, float]:
+    now = time.monotonic()
+    deadline = now + GIT_TIMEOUT_SECONDS
+    if shared_deadline is not None:
+        deadline = min(deadline, shared_deadline)
+    remaining = deadline - now
+    if remaining <= 0:
+        raise SnapshotUnavailable("review round deadline expired before Git operation")
+    return deadline, remaining
+
+
 def _run(
     repo: Path,
     args: list[str],
@@ -86,15 +97,17 @@ def _run(
     check: bool = True,
     git_env: dict[str, str] | None = None,
     extra_env: dict[str, str] | None = None,
+    deadline: float | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     env = {**_ambient(), **_GIT_ENV, **(git_env or {}), **(extra_env or {})}
     try:
+        _operation_end, timeout = _operation_deadline(deadline)
         result = subprocess.run(
             ["git", *_GIT_CONFIG, *args],
             cwd=repo,
             input=input_bytes,
             capture_output=True,
-            timeout=GIT_TIMEOUT_SECONDS,
+            timeout=timeout,
             env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -158,7 +171,9 @@ def _run_bounded(
     git_env: dict[str, str] | None = None,
     debit_bytes: Callable[[int], None] | None = None,
     remaining_bytes: Callable[[], int] | None = None,
+    deadline: float | None = None,
 ) -> bytes:
+    operation_deadline, _timeout = _operation_deadline(deadline)
     proc = subprocess.Popen(
         ["git", *_GIT_CONFIG, *args],
         cwd=repo,
@@ -167,7 +182,6 @@ def _run_bounded(
         env={**_ambient(), **_GIT_ENV, **(git_env or {})},
     )
     output = bytearray()
-    deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
     try:
         assert proc.stdout is not None
         while output.count(b"\0") < stop_after_nuls:
@@ -180,7 +194,7 @@ def _run_bounded(
             if shared_remaining <= 0:
                 raise SnapshotUnavailable("bounded Git output exceeds shared byte budget")
             chunk = _read_deadline(
-                proc.stdout, min(65536, local_remaining + 1, shared_remaining), deadline
+                proc.stdout, min(65536, local_remaining + 1, shared_remaining), operation_deadline
             )
             if not chunk:
                 break
@@ -192,7 +206,7 @@ def _run_bounded(
         stopped_early = output.count(b"\0") >= stop_after_nuls
         returncode = _wait_and_reap(
             proc,
-            deadline=deadline,
+            deadline=operation_deadline,
             terminate=stopped_early,
             context="bounded Git command",
         )
@@ -211,6 +225,7 @@ def _run_bounded_records(
     terminators_per_record: int = 1,
     max_bytes: int = MAX_DISCOVERY_BYTES,
     git_env: dict[str, str] | None = None,
+    deadline: float | None = None,
 ) -> bytes:
     if max_records < 1 or terminators_per_record < 1:
         raise SnapshotUnavailable("Git enumeration bounds must be positive")
@@ -220,6 +235,7 @@ def _run_bounded_records(
         max_bytes=max_bytes,
         stop_after_nuls=(max_records + 1) * terminators_per_record,
         git_env=git_env,
+        deadline=deadline,
     )
     terminators = output.count(b"\0")
     if terminators > max_records * terminators_per_record:
@@ -269,6 +285,7 @@ class _GitControl:
     environment: dict[str, str]
     discovery_environment: dict[str, str]
     object_format: str
+    deadline: float | None
 
 
 def _read_metadata(path: Path, *, max_bytes: int) -> bytes:
@@ -307,7 +324,7 @@ def _copy_ref_tree(source: Path, destination: Path) -> None:
             (target_root / name).write_bytes(body)
 
 
-def _create_git_control(repo: Path) -> _GitControl:
+def _create_git_control(repo: Path, *, deadline: float | None = None) -> _GitControl:
     git_dir, common = _repository_dirs(repo)
     native_objects = common / "objects"
     if not native_objects.is_dir():
@@ -336,6 +353,7 @@ def _create_git_control(repo: Path) -> _GitControl:
         config = common / "config"
         object_format = "sha1"
         if config.exists():
+            _operation_end, timeout = _operation_deadline(deadline)
             result = subprocess.run(
                 [
                     "git", "config", "--file", str(config), "--no-includes", "--get",
@@ -343,7 +361,7 @@ def _create_git_control(repo: Path) -> _GitControl:
                 ],
                 cwd=directory,
                 capture_output=True,
-                timeout=GIT_TIMEOUT_SECONDS,
+                timeout=timeout,
                 env={**_ambient(), **_GIT_ENV},
             )
             if result.returncode == 0:
@@ -378,6 +396,7 @@ def _create_git_control(repo: Path) -> _GitControl:
             environment,
             discovery_environment,
             object_format,
+            deadline,
         )
     except Exception:
         shutil.rmtree(directory, ignore_errors=True)
@@ -416,6 +435,7 @@ def _index_entries(
         ["ls-files", "--stage", "-t", "-z"],
         max_records=MAX_SNAPSHOT_PATHS,
         git_env=control.discovery_environment,
+        deadline=control.deadline,
     )
     entries: dict[str, tuple[str, str, bool]] = {}
     for row in raw.split(b"\0"):
@@ -440,6 +460,7 @@ def _candidate_paths(repo: Path, control: _GitControl) -> tuple[str, ...]:
         ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
         max_records=MAX_SNAPSHOT_PATHS,
         git_env=control.discovery_environment,
+        deadline=control.deadline,
     )
     return tuple(dict.fromkeys(_decode_path(row) for row in raw.split(b"\0") if row))
 
@@ -450,6 +471,7 @@ def _ignored_paths(repo: Path, control: _GitControl) -> tuple[str, ...]:
         ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
         max_records=MAX_SNAPSHOT_PATHS,
         git_env=control.discovery_environment,
+        deadline=control.deadline,
     )
     return tuple(_decode_path(row) for row in raw.split(b"\0") if row)
 
@@ -602,7 +624,10 @@ def _snapshot_tree(
         mode = "100755" if opened.st_mode & 0o111 else "100644"
         rows.append((mode, _store_object(control, "blob", body), path))
 
-    _run(repo, ["read-tree", "--empty"], git_env=control.environment)
+    _run(
+        repo, ["read-tree", "--empty"], git_env=control.environment,
+        deadline=control.deadline,
+    )
     payload = b"".join(
         f"{mode} {oid} 0\t".encode("ascii")
         + path.encode("utf-8", errors="surrogateescape")
@@ -617,8 +642,12 @@ def _snapshot_tree(
             ["update-index", "-z", "--index-info"],
             input_bytes=payload,
             git_env=control.environment,
+            deadline=control.deadline,
         )
-    tree = _run(repo, ["write-tree"], git_env=control.environment).stdout.decode("ascii").strip()
+    tree = _run(
+        repo, ["write-tree"], git_env=control.environment,
+        deadline=control.deadline,
+    ).stdout.decode("ascii").strip()
 
     final_index = _index_entries(repo, control)
     final_candidates = _candidate_paths(repo, control)
@@ -643,6 +672,7 @@ def _ref_token(run_id: str) -> str:
 
 def _history_ref_map(
     repo: Path, *, git_env: dict[str, str] | None = None,
+    deadline: float | None = None,
 ) -> dict[str, str]:
     raw_refs = _run_bounded_records(
         repo,
@@ -650,6 +680,7 @@ def _history_ref_map(
         max_records=MAX_DISCOVERED_REFS,
         terminators_per_record=2,
         git_env=git_env,
+        deadline=deadline,
     )
     history: dict[str, str] = {}
     for line in raw_refs.splitlines():
@@ -711,6 +742,7 @@ class PlanRepositorySnapshot:
     unavailable_paths: tuple[str, ...]
     _git_env: dict[str, str] = field(default_factory=dict, repr=False)
     _control_dir: Path | None = field(default=None, repr=False)
+    _deadline: float | None = field(default=None, repr=False)
     _closed: bool = field(default=False, repr=False)
 
     @classmethod
@@ -720,18 +752,20 @@ class PlanRepositorySnapshot:
         *,
         run_id: str,
         before_pin: Callable[[list[tuple[str, str]]], None] | None = None,
+        deadline: float | None = None,
     ) -> "PlanRepositorySnapshot":
         repo = Path(repo).resolve()
         if not repo.is_dir():
             raise SnapshotUnavailable("repository root is unavailable")
         native_refs_before = _native_ref_storage_identity(repo)
-        control = _create_git_control(repo)
+        control = _create_git_control(repo, deadline=deadline)
         try:
             head_result = _run(
                 repo,
                 ["rev-parse", "--verify", "--quiet", "HEAD"],
                 check=False,
                 git_env=control.environment,
+                deadline=deadline,
             )
             has_head = head_result.returncode == 0
             head = head_result.stdout.decode("ascii").strip() if has_head else ""
@@ -745,9 +779,12 @@ class PlanRepositorySnapshot:
                 commit_args,
                 git_env=control.environment,
                 extra_env=_SNAPSHOT_IDENTITY,
+                deadline=deadline,
             ).stdout.decode("ascii").strip()
 
-            history = _history_ref_map(repo, git_env=control.environment)
+            history = _history_ref_map(
+                repo, git_env=control.environment, deadline=deadline,
+            )
             native_refs_after = _native_ref_storage_identity(repo)
             if native_refs_before != native_refs_after:
                 raise SnapshotUnavailable(
@@ -767,6 +804,7 @@ class PlanRepositorySnapshot:
                 unavailable,
                 control.environment,
                 control.directory,
+                deadline,
             )
         except Exception:
             shutil.rmtree(control.directory, ignore_errors=True)
@@ -798,6 +836,7 @@ class PlanRepositorySnapshot:
             ["cat-file", "-e", self.commit_id + "^{commit}"],
             check=False,
             git_env=self._git_env,
+            deadline=self._deadline,
         )
         if result.returncode:
             raise SnapshotUnavailable("ephemeral snapshot object is unavailable")
@@ -815,6 +854,7 @@ class PlanRepositorySnapshot:
             max_records=1,
             max_bytes=16384,
             git_env=self._git_env,
+            deadline=self._deadline,
         )
         rows = [row for row in out.split(b"\0") if row]
         if len(rows) != 1:
@@ -835,7 +875,10 @@ class PlanRepositorySnapshot:
             raise SnapshotContentUnavailable("gitlinks require supplied evidence")
         if kind != "blob":
             raise SnapshotContentUnavailable("repository evidence path is not a blob")
-        raw = _run(self.repo, ["cat-file", "-s", oid], git_env=self._git_env).stdout
+        raw = _run(
+            self.repo, ["cat-file", "-s", oid], git_env=self._git_env,
+            deadline=self._deadline,
+        ).stdout
         try:
             return oid, int(raw.decode("ascii").strip())
         except ValueError as exc:
@@ -850,6 +893,7 @@ class PlanRepositorySnapshot:
         if offset > size:
             raise SnapshotUnavailable("repository blob offset exceeds source size")
         wanted = min(max_bytes, size - offset)
+        operation_deadline, _timeout = _operation_deadline(self._deadline)
         proc = subprocess.Popen(
             ["git", *_GIT_CONFIG, "cat-file", "blob", oid],
             cwd=self.repo,
@@ -859,23 +903,26 @@ class PlanRepositorySnapshot:
         )
         result = bytearray()
         skipped = 0
-        deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
         try:
             assert proc.stdout is not None
             while skipped < offset:
-                chunk = _read_deadline(proc.stdout, min(65536, offset - skipped), deadline)
+                chunk = _read_deadline(
+                    proc.stdout, min(65536, offset - skipped), operation_deadline,
+                )
                 if not chunk:
                     raise SnapshotUnavailable("repository blob ended before requested offset")
                 skipped += len(chunk)
             while len(result) < wanted:
-                chunk = _read_deadline(proc.stdout, min(65536, wanted - len(result)), deadline)
+                chunk = _read_deadline(
+                    proc.stdout, min(65536, wanted - len(result)), operation_deadline,
+                )
                 if not chunk:
                     break
                 result.extend(chunk)
             complete = offset + wanted == size
             returncode = _wait_and_reap(
                 proc,
-                deadline=deadline,
+                deadline=operation_deadline,
                 terminate=not complete,
                 context="git cat-file",
             )
@@ -930,6 +977,7 @@ class PlanRepositorySnapshot:
             git_env=self._git_env,
             debit_bytes=debit_bytes,
             remaining_bytes=remaining_bytes,
+            deadline=self._deadline,
         )
         decoded = [
             row.decode("utf-8", errors="surrogateescape")
@@ -1089,6 +1137,7 @@ class PlanRepositorySnapshot:
             ["cat-file", "-e", oid + "^{commit}"],
             check=False,
             git_env=self._git_env,
+            deadline=self._deadline,
         ).returncode:
             raise SnapshotUnavailable("pinned history object is unavailable")
         raw = _run_bounded(
@@ -1106,6 +1155,7 @@ class PlanRepositorySnapshot:
             git_env=self._git_env,
             debit_bytes=debit_bytes,
             remaining_bytes=remaining_bytes,
+            deadline=self._deadline,
         )
         tokens = raw.decode("utf-8", errors="replace").split("\0")
         rows = [

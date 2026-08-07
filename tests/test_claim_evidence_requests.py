@@ -66,6 +66,71 @@ def test_external_source_policy_is_exact_server_owned_provenance() -> None:
         ])
 
 
+def test_model_assessed_source_provenance_is_strict_and_ugc_cannot_be_promoted() -> None:
+    digest = "a" * 64
+    record = cv.EvidenceRecord(
+        evidence_id="e" + "1" * 32, claim_id="claim", kind="external",
+        source="https://www.reddit.com/r/example/comments/1", blob_digest=digest,
+        source_sha256=digest, source_size=1, passage_start=0, passage_end=1,
+        passage_sha256=digest, display_passage="x",
+        metadata={
+            "requested_url": "https://www.reddit.com/r/example/comments/1",
+            "final_url": "https://www.reddit.com/r/example/comments/1",
+            "retrieved_at": "2026-08-07T00:00:00+00:00", "http_status": 200,
+            "media_type": "text/html", "redirects": [],
+            "publisher_domain": "reddit.com", "source_class": "ugc",
+            "provenance_method": "known-ugc", "provenance_reason": "known UGC host",
+            "independence_groups": ["domain:reddit.com", "content:" + digest],
+            "conflicts": [],
+        },
+    )
+    text = (
+        '=== SOURCE PROVENANCE ===\nASSESSMENTS-JSON: '
+        '[{"evidence_id":"' + record.evidence_id + '","source_class":"primary",'
+        '"reason":"a Reddit post says it is official"}]'
+    )
+    assessment = cv.parse_source_assessment(text, record.evidence_id)
+    assessed = cv.apply_source_assessment(record, assessment)
+
+    assert assessed.metadata["source_class"] == "ugc"
+    assert assessed.metadata["provenance_method"] == "known-ugc"
+    assert assessed.evidence_id == record.evidence_id
+
+
+def test_source_provenance_assessment_rekeys_unclassified_external_evidence() -> None:
+    digest = "b" * 64
+    record = cv.EvidenceRecord(
+        evidence_id="e" + "2" * 32, claim_id="claim", kind="external",
+        source="https://docs.example.com/reference", blob_digest=digest,
+        source_sha256=digest, source_size=1, passage_start=0, passage_end=1,
+        passage_sha256=digest, display_passage="x",
+        metadata={
+            "requested_url": "https://docs.example.com/reference",
+            "final_url": "https://docs.example.com/reference",
+            "retrieved_at": "2026-08-07T00:00:00+00:00", "http_status": 200,
+            "media_type": "text/html", "redirects": [],
+            "publisher_domain": "docs.example.com",
+            "source_class": "unclassified-external",
+            "provenance_method": "unassessed", "provenance_reason": "no caller rule",
+            "independence_groups": ["domain:docs.example.com", "content:" + digest],
+            "conflicts": [],
+        },
+    )
+    text = (
+        '=== SOURCE PROVENANCE ===\nASSESSMENTS-JSON: '
+        '[{"evidence_id":"' + record.evidence_id + '",'
+        '"source_class":"authoritative",'
+        '"reason":"the publisher controls the documented API"}]'
+    )
+    assessment = cv.parse_source_assessment(text, record.evidence_id)
+    assessed = cv.apply_source_assessment(record, assessment)
+
+    assert assessed.metadata["source_class"] == "authoritative"
+    assert assessed.metadata["provenance_method"] == "isolated-model-assessment"
+    assert assessed.evidence_id != record.evidence_id
+    assert handlers._truth_eligible_evidence_ids([assessed]) == {assessed.evidence_id}
+
+
 def test_python_compile_adapter_is_fixed_argv_and_bound_to_snapshot_inputs(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -177,6 +242,29 @@ def test_request_scalars_are_utf8_and_repository_paths_are_relative(
 ) -> None:
     with pytest.raises(cv.EvidenceRequestError):
         cv.parse_requests(_requests([request_row]), {"claim"})
+
+
+def test_disabled_native_discovery_records_an_explicit_abstention(
+    repo: Path, tmp_path: Path,
+) -> None:
+    parsed = cv.parse_requests(_requests([{
+        "op": "SEARCH_EXTERNAL", "claim_id": "claim",
+        "query": "internet-only fact", "limit": 1,
+    }]), {"claim"})
+    store = EvidenceStore(tmp_path / "disabled-search")
+    store.begin("disabled-search-run")
+    with PlanRepositorySnapshot.create(repo, run_id="disabled-search") as snapshot:
+        records = cv.collect_evidence(
+            parsed, snapshot=snapshot, store=store, run_id="disabled-search-run",
+        )
+
+    assert len(records) == 1 and records[0].kind == "abstention"
+    assert records[0].metadata["stage"] == "external-search"
+    assert "disabled or unavailable" in records[0].metadata["reason"]
+
+
+def test_round_budget_can_hold_a_normal_repo_scan_and_bounded_external_sources() -> None:
+    assert cv.MAX_AGGREGATE_BYTES == 16 << 20
 
 
 @pytest.mark.parametrize(
@@ -366,6 +454,46 @@ def test_large_source_selects_a_claim_relevant_rooted_passage(tmp_path: Path) ->
     assert framed["passage_complete"] is False
 
 
+def test_passage_selection_prefers_specific_query_terms_over_early_generic_terms(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "specific-passage-store")
+    store.begin("specific-passage-run")
+    body = (
+        b"RFC 9110 title\n" + b"x" * 9000
+        + b"RFC 9110 was published in June 2022.\n" + b"y" * 5000
+    )
+    record = cv._record(
+        store, "specific-passage-run", "claim", "external",
+        "https://docs.example.com/rfc9110", body, {},
+        passage_hint="RFC 9110 published June 2022",
+    )
+
+    assert record.passage_start > 0
+    assert "published in June 2022" in record.display_passage
+
+
+def test_passage_selection_uses_whole_rare_numbers_and_multi_token_relevance(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "numeric-passage-store")
+    store.begin("numeric-passage-run")
+    body = (
+        b"RFC 9110 HTTP definition, postal address 95110.\n" + b"x" * 9000
+        + b"The authoritative status code 511 is Network Authentication Required.\n"
+        + b"y" * 5000
+    )
+    record = cv._record(
+        store, "numeric-passage-run", "claim", "external",
+        "https://docs.example.com/status", body, {},
+        passage_hint="RFC 9110 HTTP status code 511 Permanent Redirect definition",
+    )
+
+    assert record.passage_start > 0
+    assert "status code 511" in record.display_passage
+    assert "postal address 95110" not in record.display_passage
+
+
 def test_followup_passage_selects_any_rooted_range_without_refetch(
     repo: Path, tmp_path: Path,
 ) -> None:
@@ -442,7 +570,9 @@ def test_python_adapter_charges_input_bytes_to_the_shared_aggregate_budget(
     repo: Path, tmp_path: Path
 ) -> None:
     paths = []
-    for index in range(6):
+    count = cv.MAX_AGGREGATE_BYTES // 900_000 + 1
+    assert count <= 20
+    for index in range(count):
         path = f"large_{index}.py"
         (repo / path).write_bytes(b"#" + b"x" * 899_998 + b"\n")
         paths.append(path)
@@ -742,7 +872,9 @@ def test_literal_search_charges_every_inspected_blob_to_the_round_budget(
     repo: Path, tmp_path: Path
 ) -> None:
     paths = []
-    for index in range(6):
+    count = cv.MAX_AGGREGATE_BYTES // 900_000 + 1
+    assert count <= 50
+    for index in range(count):
         path = f"search_{index}.txt"
         (repo / path).write_bytes(b"x" * 900_000)
         paths.append(path)
