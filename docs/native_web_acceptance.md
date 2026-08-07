@@ -70,6 +70,7 @@ convergence:
 |---|---|---|
 | Codex empty-tool | Codex CLI 0.144.6 | Completed with the isolated no-tool profile |
 | Codex search-only | Codex CLI 0.144.6 | Returned the canonical RFC Editor candidate using native live search |
+| Claude empty-tool | Claude Code 2.1.197, Sonnet | Preflight completed; fresh empty-tool call returned exactly `EMPTY-TOOL: OK` with exit 0 and no in-band error |
 | Claude search-only | Claude Code 2.1.197, Sonnet | Returned canonical RFC candidates with only `WebSearch` enabled |
 | Claude full RFC fixture | Claude Code 2.1.197, Sonnet | Completed accurately in about 262 seconds: true claim verified, hidden falsehood contradicted |
 | Claude configured default model | Claude Code 2.1.197, Fable | Account reported exhausted usage credits before a result; this is an external account limitation, not recorded as a successful model check |
