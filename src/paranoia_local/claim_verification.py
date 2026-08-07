@@ -462,13 +462,20 @@ def _evidence_identity(
         (claim_id + "\0" + kind + "\0" + source + "\0" + digest + "\0" + scope).encode(
             "utf-8", errors="surrogateescape"
         )
-    ).hexdigest()[:12]
+    ).hexdigest()[:32]
+
+
+def _abstention_identity(claim_id: str, kind: str, source: str, reason: str) -> str:
+    return hashlib.sha256(
+        (claim_id + "\0" + kind + "\0" + source + "\0" + reason).encode()
+    ).hexdigest()[:32]
 
 
 def _abstention(claim_id: str, kind: str, source: str, reason: str) -> EvidenceRecord:
     digest = hashlib.sha256((claim_id + "\0" + kind + "\0" + source + "\0" + reason).encode()).hexdigest()
     return EvidenceRecord(
-        evidence_id="a" + digest[:12], claim_id=claim_id, kind="abstention",
+        evidence_id="a" + _abstention_identity(claim_id, kind, source, reason),
+        claim_id=claim_id, kind="abstention",
         source=source, blob_digest=None, source_sha256=digest, source_size=0,
         passage_start=0, passage_end=0, passage_sha256=hashlib.sha256(b"").hexdigest(),
         display_passage="", metadata={"stage": kind, "reason": reason[:1000]},
@@ -550,7 +557,11 @@ def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]
         ):
             if not isinstance(row.get(key), str):
                 raise EvidenceRequestError(f"persisted evidence {key} is malformed")
-        if not row["evidence_id"] or row["evidence_id"] in seen or not row["claim_id"]:
+        expected_prefix = "a" if row["kind"] == "abstention" else "e"
+        if len(row["evidence_id"]) != 33 \
+                or row["evidence_id"][0] != expected_prefix \
+                or any(char not in "0123456789abcdef" for char in row["evidence_id"][1:]) \
+                or row["evidence_id"] in seen or not row["claim_id"]:
             raise EvidenceRequestError("persisted evidence identity is malformed")
         seen.add(row["evidence_id"])
         for key in ("source_sha256", "passage_sha256"):

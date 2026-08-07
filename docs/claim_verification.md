@@ -155,7 +155,10 @@ full-plan snapshot rule.
 Repository records contain the pinned commit, literal path/query or requested byte range,
 underlying blob/ref object identity, exact original bytes,
 source and passage hashes, byte bounds, and separately decoded display text. Lossy display
-text is never evidence identity.
+text is never evidence identity. Evidence and abstention IDs retain 128 SHA-256 bits.
+Persisted IDs must have the exact server prefix/width, and merging retained with newly
+collected records rejects an occupied ID unless the complete canonical records are equal;
+a collision can never replace the bytes beneath an existing dependency.
 
 Bounded `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and `HISTORY` records state whether the
 entire requested source scope is complete. A partial blob range or other truncated result
@@ -268,8 +271,14 @@ server-side replay on the next round; a different event cannot erase it. Reload 
 schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
 state, and applied outcome against the claim's current truth, bearing, or deferral state.
 
-The second vendor receives the server-owned proposition, current kind/bearing/status,
-plan-anchor identity and spans, complete proposed event, and exact named evidence. Truth,
+Each auditing vendor receives the server-owned proposition, current kind/bearing/status,
+all current truth/bearing/dispute dependency IDs, plan-anchor identity and spans, the
+complete proposed event, its new evidence, and the pre-transition evidence it would
+displace. Evidence bodies are split into repository, external, supplied, and local packets;
+the vendor must accept every source-isolated packet before the server records one accepted
+check. A dispute-resolution author is not credited as an auditor merely for proposing the
+event, and old resolution checks are rerun on replay so legacy partial context cannot clear
+a dispute. Truth,
 dispute, deferral, and bearing authorizations persist in separate slots, so a later ordinary
 truth check cannot erase the mandatory audit that made a claim advisory. Their evidence
 dependencies and exact event objects also persist separately while a retained-ID union

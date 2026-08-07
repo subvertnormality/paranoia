@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from paranoia_local import claim_verification as cv, plan_claims as pc
+from paranoia_local import claim_verification as cv, handlers, plan_claims as pc
 from paranoia_local.evidence_store import EvidenceStore, EvidenceStoreError
 from paranoia_local.plan_snapshot import PlanRepositorySnapshot
 
@@ -315,6 +315,33 @@ def test_repository_query_parameters_are_part_of_evidence_identity(
         )
     assert records[0].display_passage == records[1].display_passage == "[]"
     assert records[0].evidence_id != records[1].evidence_id
+    assert all(len(record.evidence_id) == 33 for record in records)
+
+
+def test_nonidentical_evidence_and_abstention_id_collisions_block_merge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = EvidenceStore(tmp_path / "collision-store")
+    store.begin("collision-run")
+    monkeypatch.setattr(cv, "_evidence_identity", lambda *_args: "f" * 32)
+    first = cv._record(
+        store, "collision-run", "claim", "supplied-artifact", "one", b"one",
+        {"source": "one", "caller_supplied": True},
+    )
+    second = cv._record(
+        store, "collision-run", "claim", "supplied-artifact", "two", b"two",
+        {"source": "two", "caller_supplied": True},
+    )
+    assert first.evidence_id == second.evidence_id == "e" + "f" * 32
+    with pytest.raises(cv.EvidenceRequestError, match="identity collision"):
+        handlers._merge_evidence([first], [second])
+
+    monkeypatch.setattr(cv, "_abstention_identity", lambda *_args: "e" * 32)
+    first_failure = cv._abstention("claim", "external-search", "one", "failed one")
+    second_failure = cv._abstention("claim", "external-fetch", "two", "failed two")
+    assert first_failure.evidence_id == second_failure.evidence_id == "a" + "e" * 32
+    with pytest.raises(cv.EvidenceRequestError, match="identity collision"):
+        handlers._merge_evidence([first_failure], [second_failure])
 
 
 def test_truncated_tree_listing_discloses_scope_and_cannot_authorize(
@@ -453,7 +480,7 @@ def test_missing_persisted_evidence_dependency_stales_a_verified_claim(
 def test_persisted_empirical_metadata_is_deeply_validated() -> None:
     digest = "a" * 64
     record = cv.EvidenceRecord(
-        evidence_id="e1", claim_id="c1", kind="empirical", source="PYTHON_COMPILE",
+        evidence_id="e" + "1" * 32, claim_id="c1", kind="empirical", source="PYTHON_COMPILE",
         blob_digest=digest, source_sha256=digest, source_size=1,
         passage_start=0, passage_end=1, passage_sha256=digest,
         display_passage="x", metadata={
@@ -468,10 +495,20 @@ def test_persisted_empirical_metadata_is_deeply_validated() -> None:
 def test_persisted_non_abstention_record_requires_rooted_bytes() -> None:
     digest = "a" * 64
     row = asdict(cv.EvidenceRecord(
-        "e1", "c1", "supplied-artifact", "source", None, digest, 1,
+        "e" + "1" * 32, "c1", "supplied-artifact", "source", None, digest, 1,
         0, 1, digest, "x", {"source": "source", "caller_supplied": True},
     ))
     with pytest.raises(cv.EvidenceRequestError, match="root exact bytes"):
+        cv.records_from_json([row])
+
+
+def test_persisted_short_evidence_identity_is_rejected() -> None:
+    digest = "a" * 64
+    row = asdict(cv.EvidenceRecord(
+        "e123456789abc", "c1", "supplied-artifact", "source", digest, digest, 1,
+        0, 1, digest, "x", {"source": "source", "caller_supplied": True},
+    ))
+    with pytest.raises(cv.EvidenceRequestError, match="identity"):
         cv.records_from_json([row])
 
 

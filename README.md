@@ -719,8 +719,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   validated transition as pending; a later round replays it server-side rather than asking
   a model to reconstruct it. Completed persisted audits accept exactly the
   server-owned `codex` and `claude` vendor identities; unknown or duplicate vendors are
-  corruption. Replay deduplicates matching accepted vendor provenance copied across the
-  truth and dispute slots of one resolution, then invokes every missing vendor. Cached
+  corruption. Evidence and abstention IDs retain 128 hash bits, and a nonidentical record
+  can never replace an occupied ID during retained/new evidence merging. Replay deduplicates
+  matching accepted vendor provenance copied across the truth and dispute slots of one
+  resolution, then invokes every missing vendor. Dispute resolution audits include the full
+  pre-transition dependency set and evidence being displaced; repository, external,
+  supplied, and local bodies are sent as separate packets that must all be accepted. Cached
   CAS/repository reads and model-visible evidence rendering share the round byte budget,
   including evidence resent for a register correction; the same auditor packet is debited
   separately before each vendor launch. A CAS or snapshot I/O failure blocks the round

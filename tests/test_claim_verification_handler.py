@@ -60,7 +60,7 @@ class ClaimEngine:
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []")
         if "neutral evidence verifier" in prompt:
             claim_id = re.search(r'"claim_id":"([0-9a-f]{32})"', prompt).group(1)
-            evidence = re.search(r'"evidence_id":"(e[0-9a-f]{12})"', prompt).group(1)
+            evidence = re.search(r'"evidence_id":"(e[0-9a-f]{32})"', prompt).group(1)
             events = []
             if '"kind_classification":"proposed"' in prompt:
                 events.append(
@@ -648,7 +648,7 @@ def test_high_stakes_supplied_artifact_is_isolated_and_independently_authorized(
                     "kind": "fact", "reason": "implementation assertion",
                 })
             if "CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY" in prompt:
-                evidence = re.search(r'"evidence_id":"(e[0-9a-f]{12})"', prompt).group(1)
+                evidence = re.search(r'"evidence_id":"(e[0-9a-f]{32})"', prompt).group(1)
                 events.append({
                     "op": "VERIFY", "claim_id": claim_id,
                     "evidence_ids": [evidence], "reason": "supplied result",
@@ -1847,32 +1847,50 @@ def test_pending_dispute_resolution_deduplicates_vendor_provenance_on_replay(
     class Primary(ClaimEngine):
         name = "codex"
 
+        def __init__(self) -> None:
+            super().__init__()
+            self.audit_prompts: list[str] = []
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            if "independent text-only evidence auditor" in prompt:
+                self.audit_prompts.append(prompt)
+                return _review("CHECK: ACCEPT")
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
     class Auditor:
         name = "claude"
         default_model = "auditor-model"
 
         def __init__(self) -> None:
             self.calls = 0
+            self.prompts: list[str] = []
 
         def run_toolless(self, prompt, model, effort, **kwargs):
             self.calls += 1
+            self.prompts.append(prompt)
             return _review("CHECK: ACCEPT")
 
     auditor = Auditor()
+    primary = Primary()
     monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
     handlers._resume_pending_authorizations(
         state, records=records, policy="require", high_stakes=False,
-        engine=Primary(), model="primary-model", effort="high",
+        engine=primary, model="primary-model", effort="high",
         plan_context=pc.render_spans(spans), spans=spans, round_no=2,
         on_progress=None, budget=cv.EvidenceBudget(),
     )
     assert auditor.calls == 1
+    assert len(primary.audit_prompts) == 1
+    for prompt in [*auditor.prompts, *primary.audit_prompts]:
+        assert '"evidence_id":"e1"' in prompt
+        assert '"evidence_id":"e2"' in prompt
+        assert '"disputed_evidence_ids":["e1"]' in prompt
     assert claim.status == pc.VERIFIED and claim.pending_transition is None
     for authorization in (claim.truth_authorization, claim.dispute_authorization):
         assert authorization is not None and authorization["status"] == "complete"
-        assert [check["vendor"] for check in authorization["checks"]] == [
+        assert {check["vendor"] for check in authorization["checks"]} == {
             "codex", "claude",
-        ]
+        }
 
     loaded = pc.state_from_json(state.lineage_id, pc.state_to_json(state))
     loaded_claim = loaded.claims[claim_id]
