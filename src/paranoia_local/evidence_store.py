@@ -391,11 +391,11 @@ class EvidenceStore:
             raise EvidenceStoreError(f"evidence manifest {path} has invalid metadata")
         if not raw:
             return raw
-        if set(raw) != {"repo", "lineage", "snapshot_refs"}:
+        keys = set(raw)
+        if keys not in ({"repo", "lineage"}, {"repo", "lineage", "snapshot_refs"}):
             raise EvidenceStoreError(f"evidence manifest {path} has invalid metadata")
         repo = raw["repo"]
         lineage = raw["lineage"]
-        refs = raw["snapshot_refs"]
         if not isinstance(repo, str) or not repo or len(repo) > 4096 or "\0" in repo:
             raise EvidenceStoreError(f"evidence manifest {path} has invalid repository metadata")
         try:
@@ -405,6 +405,9 @@ class EvidenceStore:
                 f"evidence manifest {path} has invalid repository metadata"
             ) from exc
         _identity(lineage, field="metadata.lineage")
+        # schema-v1 journals carried native snapshot refs. New ephemeral snapshots own
+        # no repository refs, but old recovery journals remain readable.
+        refs = raw.get("snapshot_refs", [])
         if not isinstance(refs, list) or len(refs) > MAX_SNAPSHOT_REFS:
             raise EvidenceStoreError(f"evidence manifest {path} has invalid snapshot refs")
         names: set[str] = set()

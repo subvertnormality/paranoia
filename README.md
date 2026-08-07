@@ -40,11 +40,11 @@ structured critique.
   [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
   [Claude Code](https://code.claude.com) (`claude`)
 - `arbitrate` needs **both** CLIs; the four review tools need only the other one
-- Closure-enabled `critique_plan` with Codex as reviewer additionally requires Linux,
+- Claim-enabled (`diagnostic` or `blocking`) `critique_plan` with Codex as reviewer additionally requires Linux,
   `bwrap` on `PATH`, and an audited Codex CLI version exactly `0.144.6` or
   `0.146.0-alpha.3.1`. Other Codex versions remain usable for ordinary review paths but
-  fail this default plan mode closed before snapshot or lineage work.
-- Closure-enabled `critique_plan` with Claude as reviewer runs a bounded `claude --help`
+  fail the claim-verification mode closed before snapshot or lineage work.
+- Claim-enabled `critique_plan` with Claude as reviewer runs a bounded `claude --help`
   compatibility probe and requires every flag used by its empty-tool profile. An older or
   incompatible installed CLI fails before snapshot or lineage work.
 
@@ -240,10 +240,13 @@ registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
 ### Plan claim verification — closing load-bearing premises
 
-Closure-enabled `critique_plan` first runs fresh toolless roles that extract factual
-premises, request bounded server-owned repository/external evidence, and verify,
-contradict, defer, or abstain. Registered claims persist independently of defect classes;
-a later reviewer cannot make one disappear by omission.
+`critique_plan` can add fresh toolless roles that extract factual premises, request
+bounded server-owned repository/external evidence, and verify, contradict, defer, or
+abstain. The rollout is explicit: `diagnostic` is the default and records/reports claims
+without governing convergence, `blocking` combines the claim and class gates, and `off` is
+an explicit opt-out.
+Registered claims persist independently of defect classes; a later reviewer cannot make
+one disappear by omission.
 
 Every new claim starts unchecked and blocking. A different role must confirm whether it
 is a fact or decision. A blocking fact closes only with exact server evidence or a safe
@@ -256,10 +259,12 @@ states require the independent audit, and dispute resolution states the exact au
 outcome. Register correction covers semantic transition errors as well as JSON grammar;
 correcting a structural register preserves the original five-section critique.
 
-Repository reads are pinned to one exact dirty-tree snapshot. Models see server span IDs,
-bounded repository records, and no filesystem path. Plan bytes appear only as ordered,
-JSON-escaped span data, including for the structural reviewer. External passages only enter a
-command-incapable role; the structural reviewer receives their metadata, not remote bytes.
+Repository reads are pinned to one ephemeral dirty-tree snapshot. A private Git control,
+index, and object directory batch dirty-file hashing without copying the native object
+database or publishing refs. Models see server span IDs and bounded repository records, not
+repository tools. Plan bytes appear only as ordered, JSON-escaped span data, including for
+the structural reviewer. External passages only enter a command-incapable role; the
+structural reviewer receives their metadata, not remote bytes.
 Unavailable sources cause round-local abstention and remain blocking; abstentions are never
 sent to an evidence verifier or mixed with repository/supplied verifier packets. The full trust model, register
 grammar, evidence limits, caching, and recovery rules are in
@@ -360,11 +365,11 @@ so it must be paired with `class_closure: false`.
 
 ### `critique_plan`
 
-Integrated claim verification followed by adversarial review of a plan or design
-document. Exact plan bytes and one dirty-tree Git snapshot are pinned; toolless roles
-extract load-bearing claims, request bounded server evidence, and verify or abstain before
-a separate structural reviewer judges the design. Python combines claim closure and
-defect-class closure into one verdict. See [plan claim verification](docs/claim_verification.md).
+Adversarial review of a plan or design document, with optional claim verification. When
+enabled, exact plan bytes and one dirty-tree Git snapshot are pinned; toolless roles extract
+load-bearing claims, request bounded server evidence, and verify or abstain before a
+separate structural reviewer judges the design. See
+[plan claim verification](docs/claim_verification.md).
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
@@ -374,10 +379,11 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
-| `claim_verification` | `blocking` | `blocking` when closure is on | Integrated claim gate. Rejected with `class_closure: false` |
+| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `diagnostic` | Verification runs by default; `diagnostic` reports/persists claims without governing convergence, while `blocking` combines both gates. Non-off modes require class closure |
 | `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking, including required deferrals |
 | `stakes_level` | `low` \| `high` | high for any stated stakes | Explicit authorization-risk policy for `auto`; natural-language stakes are never parsed for opt-down words |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
+| `external_source_policy` | array | `[]` | Trusted exact `{host, path_prefix, source_class}` rules. Only `primary`/`authoritative` records may authorize truth; secondary, UGC (including Reddit-style hosts), and unmatched pages are context |
 | `refresh_claims` | boolean | `false` | Bypass an otherwise valid zero-research cache hit for this round |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
 | `focus` | string | — | Narrow the review to a specific concern |
@@ -385,12 +391,12 @@ defect-class closure into one verdict. See [plan claim verification](docs/claim_
 | `already_raised` | array | `[]` | Claims already accepted from prior rounds |
 | `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
 
-Closure-enabled plan review does not consult `.paranoia.toml` for any setting. Its model,
+Claim-enabled plan review does not consult `.paranoia.toml` for any setting. Its model,
 effort, web policy, stakes, and other controls come only from call arguments and process
 defaults; checked-in repository bytes cannot become role instructions or weaken the gate.
-The sole legacy one-shot escape is
-`class_closure: false`: it performs one ordinary review and emits no lineage state or
-`CONVERGENCE`. There is no closure-enabled off/shadow mode.
+`class_closure: false` performs one ordinary review and emits no lineage state or
+`CONVERGENCE`. Keep new deployments in `diagnostic` until representative measurements
+justify promotion to `blocking`.
 
 ### `query`
 
@@ -667,7 +673,7 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   target ref, so they never collide with your working tree and can review a branch
   that isn't checked out. Dirty-working-tree reviews necessarily run in the live
   repo, read-only.
-- **Plan evidence is server-mediated.** Closure-enabled `critique_plan` roles do not
+- **Plan evidence is server-mediated.** Claim-enabled `critique_plan` roles do not
   receive a repository worktree. Claude uses an empty tool allowlist; Codex uses a
   `bwrap` namespace with no shell or repository mounts. Native web is disabled. Claude
   roles also receive an empty tool-availability set and strict empty MCP configuration. Exact
@@ -678,24 +684,15 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call.
-  Inherited object-database settings are cleared, and replacement objects/grafts and lazy
-  fetching are disabled for plan evidence. Before any repository-aware Git command, bounded
-  fd-relative no-follow reads materialize loose objects and pack files into a private object
-  database and construct a private server-configured Git directory; native alternates and
-  `objects/info` metadata are omitted, and repository config/config.worktree plus their
-  include paths are never inputs to those commands. Git uses the private object database
-  exclusively. Retained worktree and common-dir fds remain live through cleanup, so later
-  pathname or native object-descendant replacement cannot redirect reads, object writes,
-  or refs. Private loose objects are published back only through atomic fd-anchored writes
-  needed to make the durable native GC pin resolvable; objects already present at
-  materialization are not recopied. Ordinary `.git` is opened relative to the retained
-  repository descriptor, and linked-worktree directory paths are opened componentwise
-  without following symlinks.
-  Working-tree discovery is an fd-relative server walk; ignore matching uses only its
-  explicit names and safely copied `.gitignore` files in a private worktree. Supplied loose refs are
-  copied through bounded fd-anchored no-follow traversal; Git never receives the live ref
-  tree, and temporary GC pins are created, verified, and removed with fd-relative
-  no-follow operations. Persisted evidence journals, candidate/live roots, and quarantine
+  Inherited object-database settings are cleared, and replacement objects, grafts, lazy
+  fetching, filters, hooks, fsmonitor, and signing are disabled for plan evidence. Snapshot
+  construction uses a temporary Git directory, index, and object directory. It copies only
+  bounded ref metadata, reads native objects through one server-selected alternate, hashes
+  dirty files in-process, and builds the tree with batched index operations. Repository
+  config includes and `config.worktree` are not loaded; native `objects/info/alternates` is
+  rejected. The native index and refs are not modified. Dirty files receive ordinary-change
+  identity checks, but the local threat model does not include a hostile process racing
+  filesystem namespace operations. Persisted evidence journals, candidate/live roots, and quarantine
   records use distinct exact schemas with bounded no-follow reads and filename-bound
   run/lineage identities. Persisted evidence records use
   strict per-kind schemas; every retained claim
@@ -762,18 +759,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   server-computed trailer is returned. Plan-derived claims and model-derived class,
   warning, and debt values appear only in one-line escaped `*-DATA-JSON` records. Pending
   deferrals are bound to their complete plan snapshot. Any stale transition clears all
-  incomplete authorization slots before replay. Every temporary-ref cleanup exception is treated as
-  ambiguous and retains recovery state. Git children share bounded deadline, kill, and
+  incomplete authorization slots before replay. Git children share bounded deadline, kill, and
   reap handling so a termination-resistant subprocess becomes a recoverable blocked
-  result. Required loose-object and pack directories/files reject symlinks; unrelated native
-  object-store names are ignored and native `objects/info` is never copied. Snapshot
-  path/ref discovery is streamed under explicit byte
-  and record caps before its output is retained or decoded. Symlinked or nonregular loose-ref
-  entries are skipped without traversal and disclosed as unavailable; unsafe ancestors in
-  the server-owned temporary-pin namespace still fail closed. Dirty-tree files are opened
-  through repository-fd-relative, no-follow traversal of every ancestor and final component,
-  so a concurrent ancestor-to-symlink swap blocks without exposing external bytes. The
-  unsupported-entry disclosure scan queues owned directory fds, never reopenable pathnames.
+  result. Snapshot path/ref discovery is streamed under explicit byte and record caps before
+  its output is retained or decoded. Ignored and unsupported nonregular entries are disclosed
+  but cannot become evidence blobs.
   Exclusive lineage ownership is acquired before state load, preventing delayed stale
   writers from overwriting a newer round. Bounded tree, blob,
   literal-search, and history evidence carries an explicit completeness result; searches bind
@@ -809,16 +799,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   registration until the next `git worktree prune` / `git gc`. Your working tree
   and index are never touched.
 
-  **Ref exceptions:** `arbitrate` with `retain_snapshot: true` creates
+  **Ref exception:** `arbitrate` with `retain_snapshot: true` creates
   `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It is the
-  persistent opt-in ref. Closure-enabled plan verification also creates temporary
-  `refs/paranoia/plan-snapshots/<run>/...` refs so concurrent `git gc` cannot reclaim
-  the dirty wrapper or initial history roots mid-round; the server deletes them after
-  evidence adoption or abort recovery. Remove an abandoned one only after confirming
-  its lineage/in-flight journal is no longer active, with `git update-ref -d <ref>`.
-  Publication owns each new inode immediately after exclusive creation and rolls it back
-  after any later write, fsync, or close failure. An unverifiable rollback retains the
-  pre-published recovery journal and lineage latch.
+  persistent opt-in ref. Plan claim verification creates no native refs; its synthetic
+  objects and copied ref metadata live only in the temporary snapshot directory.
 
 ### Rate limits
 

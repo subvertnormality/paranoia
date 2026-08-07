@@ -245,12 +245,13 @@ TOOLS: list[Tool] = [
                 },
                 "claim_verification": {
                     "type": "string",
-                    "enum": ["blocking"],
+                    "enum": ["off", "diagnostic", "blocking"],
+                    "default": "diagnostic",
                     "description": (
-                        "Integrated blocking claim verification. Omission resolves to "
-                        "'blocking' whenever class_closure is true. It is rejected when "
-                        "class_closure is false: that combination is the sole one-shot "
-                        "path and emits no closure state or CONVERGENCE trailer."
+                        "Plan claim verification rollout. 'off' preserves ordinary "
+                        "class-closure review. 'diagnostic' (the default) records and reports "
+                        "claim closure without letting it govern CONVERGENCE. 'blocking' "
+                        "combines claim and class gates. Non-off modes require class_closure."
                     ),
                 },
                 "independent_check": {
@@ -290,6 +291,28 @@ TOOLS: list[Tool] = [
                         "Optional bounded caller artifact text, bound by an exact unique "
                         "registered claim proposition and hashed by the server. It is "
                         "evidence input, not a verified status."
+                    ),
+                },
+                "external_source_policy": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "maxLength": 253},
+                            "path_prefix": {"type": "string", "maxLength": 1024},
+                            "source_class": {
+                                "type": "string",
+                                "enum": ["primary", "authoritative", "secondary", "ugc"],
+                            },
+                        },
+                        "required": ["host", "path_prefix", "source_class"],
+                        "additionalProperties": False,
+                    },
+                    "description": (
+                        "Trusted exact host/path provenance rules for fetched evidence. "
+                        "Only primary or authoritative records may authorize an external "
+                        "truth/bearing transition; unmatched and secondary pages are context."
                     ),
                 },
                 "refresh_claims": {

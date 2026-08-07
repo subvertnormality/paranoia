@@ -156,7 +156,9 @@ Use [] when none."""
 PLAN_EVIDENCE_REQUEST_INSTRUCTIONS = """You are a neutral evidence planner with no tools.
 Request only evidence needed for the registered blocking factual claims. Repository-first;
 external search only when the pinned repository and supplied records cannot answer it.
-Never treat a citation or model opinion as evidence.
+Never treat a citation or model opinion as evidence. The repository may use any language,
+framework, file layout, or project domain. Prefer the language-neutral repository operations;
+request PYTHON_COMPILE only when the exact claim concerns Python source that is in the snapshot.
 
 End with exactly:
 === EVIDENCE REQUESTS ===
@@ -175,7 +177,8 @@ PLAN_STRUCTURAL_EVIDENCE_INSTRUCTIONS = """You are preparing bounded repository 
 for a structural plan critic with no tools. Request only the smallest repository reads
 needed to test operational steps, ordering, integrations, and current-behaviour premises
 not already covered by the supplied records. Use claim_id "__plan__". External search is
-forbidden in this role.
+forbidden in this role. The repository may use any language, framework, file layout, or
+project domain; PYTHON_COMPILE is an optional Python-only adapter, not a general prerequisite.
 
 End with exactly the EVIDENCE REQUESTS block. Allowed operations are LIST_TREE, READ_BLOB,
 SEARCH_LITERAL, HISTORY, and the fixed PYTHON_COMPILE adapter with the same exact schemas
@@ -188,6 +191,12 @@ citation text alone are not evidence. Preserve uncertainty by emitting no truth 
 Repository list/search metadata states its exact inspected scope and `complete` flag.
 An incomplete bounded record is context only and its evidence ID cannot authorize a
 transition; abstain or request a narrower complete read instead.
+External metadata has a server-owned `source_class`. `primary` and `authoritative` are
+eligible to authorize truth transitions when the passage actually entails the claim.
+`secondary`, `ugc`, and `unclassified-external` are context only and cannot clear a claim.
+User-generated reports can reveal leads, conflicts, or user experience, but are not
+authoritative for API, standards, regulatory, historical, or product-behavior facts. Never
+upgrade or infer a source class yourself.
 
 End with exactly:
 === VERIFICATION REGISTER ===

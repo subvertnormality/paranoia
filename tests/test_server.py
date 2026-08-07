@@ -63,6 +63,17 @@ class TestToolListing:
         assert props["plan_text"]["minLength"] == 1
         assert props["plan_path"]["maxLength"] == 4096
 
+    def test_claim_verification_rolls_out_off_then_diagnostic_then_blocking(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "critique_plan")
+        claim_mode = tool.inputSchema["properties"]["claim_verification"]
+        assert claim_mode["enum"] == ["off", "diagnostic", "blocking"]
+        assert claim_mode["default"] == "diagnostic"
+        source_policy = tool.inputSchema["properties"]["external_source_policy"]
+        assert source_policy["maxItems"] == 50
+        assert source_policy["items"]["properties"]["source_class"]["enum"] == [
+            "primary", "authoritative", "secondary", "ugc",
+        ]
+
     def test_rebut_requires_session_and_rebuttal(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "rebut")
         req = tool.inputSchema["required"]

@@ -1,515 +1,237 @@
 # Plan claim verification
 
-`critique_plan` has two modes:
+Plan claim verification is an optional research-and-verify phase for `critique_plan`.
+It answers a narrower question than structural review: are the registered load-bearing
+premises verified, contradicted, safely deferred, or explicitly unresolved?
 
-- closure mode (the default): a blocking research-and-verify preflight followed by
-  structural critique, with one combined claim/class `CONVERGENCE` verdict;
-- one-shot mode (`class_closure: false`): one ordinary structural review, no research,
-  lineage state, terminal registers, or convergence trailer.
+## Rollout modes
 
-paranoia-local requires a POSIX runtime (Linux or macOS; use WSL on Windows) because its
-durable lineage and evidence transactions use POSIX advisory locks and directory fsync.
+`claim_verification` has three modes:
 
-There is no closure-enabled off or shadow setting. `claim_verification` may be omitted or
-set to `blocking`; any explicit claim mode with `class_closure: false` is rejected.
-Closure mode ignores repository `.paranoia.toml` settings completely. Model, effort,
-web policy, stakes, and every other review control come only from explicit call arguments
-or trusted process defaults, so repository-controlled text cannot become role instructions.
+| Mode | Effect |
+|---|---|
+| `off` | Opt out and preserve ordinary class-closure plan review; do not run or persist claim research |
+| `diagnostic` | Default. Run and persist claim research, display claim closure, but let only class closure govern `CONVERGENCE` |
+| `blocking` | Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
+
+`diagnostic` is the required rollout stage. Promote a workflow to `blocking` only after its
+operators have measured latency, false-block rate, extraction quality, state growth, and
+recovery behavior on representative plans. `class_closure: false` remains the stateless
+one-shot review and accepts only `claim_verification: off`.
+
+## Stakes and trust model
+
+The initial implementation is a single-user local MCP tool:
+
+- the operator, OS, filesystem implementation, and other local processes are trusted;
+- plan bytes, repository content, Git configuration, supplied artifacts, persisted records,
+  and fetched pages are untrusted data;
+- no hostile local process is assumed to rename or replace repository path components while
+  a round is running;
+- ordinary edits may occur and must cause an explicit unavailable/stale result rather than a
+  false clear;
+- repository configuration must not select hooks, filters, signing programs, lazy fetches,
+  alternate object databases, or inherited Git behavior used by evidence collection;
+- model-visible untrusted values remain escaped data and cannot become role instructions;
+- false `NOT-BLOCKED`, cross-claim evidence reuse, stale evidence reuse, and silent durable
+  state loss are in scope;
+- defending against a compromised OS, a hostile process with concurrent filesystem write
+  access, or deliberate mutation of server-owned state by another local principal is out of
+  scope for this rollout.
+
+“Malicious repository” in this document means malicious static bytes and configuration. It
+does not mean an active process racing `open(2)`. Expanding that threat model requires a new
+architecture decision and performance budget; it is not an incremental hardening task.
 
 ## What the gate proves
 
-The gate proves a negative about the registered set: no active registered load-bearing
-fact is unresolved, contradicted, stale, disputed, malformed, or unchecked, and no
-blocking defect class is open. It does not prove that claim extraction was complete,
-that a source is true, that semantic entailment is mathematically correct, or that two
-models cannot share a misconception. `NOT-BLOCKED` is not an approval.
+For the registered claim set, claim closure proves that no active load-bearing claim is
+unchecked, unverified, contradicted, disputed, malformed, stale, or missing a required
+authorization. It also verifies that every evidence dependency still resolves to a valid
+record bound to that claim.
 
-## Round topology and trust boundary
+It does not prove that extraction found every premise, that a primary source is truthful,
+that semantic entailment is mathematically certain, or that two models cannot share a
+mistake. `NOT-BLOCKED` is a gate result, not approval of the plan.
 
-One closure round performs these stages:
+## Round topology
 
-1. Accept at most 1 MiB of exact plan bytes and expose ordered opaque span IDs beside
-   bounded display text. Inline schema validation rejects oversized or non-UTF-8 scalar
-   text early; either failure still returns the five sections and blocked trailer. Filesystem
-   plans must be absolute, no-follow, nonblocking regular files whose identity, size, and
-   timestamps remain stable across a bounded read. Unsafe input returns the standard five
-   sections and an explicit blocked preflight verdict before any latch or model call.
-   Models reference span IDs; the server owns byte offsets and hashes.
-2. Snapshot tracked and non-ignored untracked repository bytes by opening exact files with
-   no-follow semantics, hashing through `git hash-object --stdin` (never repository
-   filters), and inserting explicit object IDs/modes into a private index. Hooks,
-   fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
-   Synthetic commits explicitly disable signing, including repository-configured GPG
-   programs.
-   Before the first repository-aware Git subprocess, the server opens an ordinary `.git`
-   directory relative to the already-retained repository descriptor, without a later
-   pathname resolution. Linked-worktree targets are opened one absolute component at a time
-   with no-follow semantics. It then reads approved Git-dir
-   metadata with bounded no-follow file operations and builds a private Git control
-   directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
-   metadata, an fd-anchored no-follow copy of loose refs, inherited handles for the
-   approved worktree and common directory, and a server-owned materialized object database.
-   Loose objects and pack-family files are copied through retained directory handles with
-   pre/post identity checks, entry and byte caps, and no-follow opens. Native `objects/info`
-   metadata—including alternates—is never copied. Every Git read and snapshot-object write
-   uses only the private database, so creating an alternate or replacing native `pack`,
-   `info`, or a loose-object fanout later cannot affect the snapshot.
-   The worktree/common handles remain open through ref cleanup, so replacing `.git` or the
-   common directory cannot redirect a subprocess or publication.
-   Temporary GC pins are published separately through fd-relative, no-follow operations;
-   Git never traverses the repository-controlled loose-ref tree. Repository `config`,
-   `config.worktree`, `include.path`, and `includeIf` content
-   is never part of a repository-aware Git invocation; only repository/object format values
-   are extracted from a bounded private copy with `git config --no-includes`.
-   Only loose objects created after materialization are copied back to the native store for
-   durable GC pins; pre-existing native objects are tracked and skipped:
-   publication uses retained directory handles, no-follow opens, an atomic temporary-file
-   link, and exact-content collision checks; Git never reads that mutable copy. Inherited
-   Git environment is cleared, and grafts/replacement objects are disabled for snapshot and
-   history operations. Lazy
-   fetching is disabled, so a partial
-   clone with missing objects fails closed instead of invoking a configured promisor remote.
-   Working-tree names come from a server-owned fd-relative walk, never `git ls-files`
-   directory traversal. Ignore classification receives only those explicit names and a
-   private worktree containing bounded, safely copied `.gitignore` files; it cannot traverse
-   the supplied worktree. Ignored untracked paths and unsupported FIFOs/sockets/devices are
-   JSON-escaped, disclosed, and unavailable. Ignored regular directories are pruned from the
-   later special-entry walk; the initial server discovery remains subject to its hard entry
-   and byte caps. A temporary
-   `refs/paranoia/plan-snapshots/...` namespace pins the wrapper and initial history roots
-   against concurrent pruning.
-3. A fresh toolless research role registers load-bearing candidates using only a temporary
-   ID, enum labels, and server span IDs. `ADD` has no model-authored proposition field. The
-   server derives the durable proposition from the exact anchored plan bytes, parses the
-   strict JSON immediately into a non-durable draft, and mints durable-style IDs before
-   later roles need to refer to them.
-4. A fresh plan-only policy role receives escaped plan spans plus only server-formatted
-   candidate IDs and anchors. For a stale claim only, it also receives the exact escaped
-   prior plan proposition, stale status, and prior server anchor alongside the current plan
-   spans. It never receives other persisted claim prose, proposed kind
-   labels, repository paths/bytes/metadata, external results, or supplied artifacts. It
-   derives each proposition from the anchored plan spans, alone may classify genuine plan
-   decisions, may replace a stale claim with a real proposition anchored in the current plan,
-   and may defer a newly confirmed unverified fact when the plan itself supplies
-   the complete ordered verification contract. Every deferral follows the same independent
-   authorization policy as evidence-role transitions; `independent_check: require` cannot
-   publish it without accepted checks from both supported vendors.
-5. A toolless evidence-planning role emits bounded structured requests. The server alone
-   executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
-   Request parsing rejects non-UTF-8 scalars before execution; repository operands must be
-   bounded relative POSIX paths without `..`, while search/ref/query operands have strict
-   byte ceilings. These semantic checks remain inside the role's one correction attempt.
-   Tree, literal-search, and history results disclose their exact limit and whether the
-   requested scope was completely inspected. Literal-search records additionally bind the
-   candidate paths and each inspected blob object/range.
-6. A toolless verifier sees exact server evidence bound to the exact claim ID that
-   requested it; evidence for one claim cannot authorize another. Every model-visible source, path,
-   metadata object, and passage is injectively JSON escaped. Each rendered record is one
-   explicitly labelled `UNTRUSTED-EVIDENCE-RECORD-JSON` object: IDs and hashes are
-   server-generated identity, while repository/caller/network source, metadata, and
-   passage values are untrusted data. Repository, remote, and supplied records never share a call across source classes,
-   and cannot classify decisions or emit evidence-free deferral/supersession transitions.
-7. A fresh toolless structural reviewer sees the plan, repository evidence, external
-   metadata, active claims, and existing class procedures. It emits one atomic PLAN and
-   CLASS register. Like every other role, it receives plan bytes only inside ordered,
-   injectively JSON-escaped `SPAN` data records; raw plan prose is never interpolated as
-   peer-level prompt control text. Because it receives repository passages, it may confirm
-   only factual kinds; decision classification remains in the clean plan-only role. Its
-   `ADD` events likewise contain anchors rather than repository-influenced prose, and any
-   persisted legacy claim text is excluded from the later clean-role packet.
-8. Python validates role permissions, applies both registers to drafts, roots exact
-   evidence bytes, atomically replaces lineage state, and computes one trailer. An
-   atomically exclusive per-lineage latch rejects concurrent rounds before either can
-   construct a stale draft.
+A diagnostic or blocking round performs these stages:
 
-For Claude, toolless means bare settings, an empty allowlist, an explicit deny list, an
-empty `--tools` availability set, and strict empty MCP configuration. Before snapshot or
-lineage work, a bounded `claude --help` compatibility probe must successfully advertise
-every CLI flag used to construct that profile; merely finding an executable on `PATH` is
-not sufficient.
-For Codex on Linux, the native binary runs inside a `bwrap` mount namespace containing an
-empty working directory, auth, TLS/DNS files, and no shell, repository, common Git store,
-or sibling worktree. Shell, unified execution, multi-agent, apps, browser/computer, code,
-image, goals, and workspace-dependency feature schemas are explicitly disabled under
-strict configuration. Native web is forced off for every claim-verification role. If that
-boundary cannot be constructed, the round fails closed before snapshot construction or
-latch acquisition and the lineage is unchanged. The currently audited Codex CLI versions
-for this boundary are exactly `0.144.6` and `0.146.0-alpha.3.1`; `bwrap` is required.
-Every role is fresh and nonresumable (Codex also uses `--ephemeral`), so internal session
-IDs are suppressed and closure-plan output does not offer the ordinary `rebut` workflow.
+1. Read at most 1 MiB of exact UTF-8 plan bytes and divide them into server-owned span IDs.
+2. Build an ephemeral dirty-tree repository snapshot without running repository filters,
+   hooks, signing commands, lazy fetches, or inherited Git configuration.
+3. Ask a fresh plan-only extractor to register candidate load-bearing claims by span anchor.
+4. Ask a separate clean policy role to confirm fact/decision classification and any complete
+   plan-authored deferral contract.
+5. Ask a toolless evidence planner for bounded repository, empirical, external, or supplied
+   records. The server executes those requests.
+6. Ask source-isolated verifier roles what each complete evidence record establishes.
+7. Run a separate structural reviewer using the plan and bounded evidence context.
+8. Validate both registers, atomically persist the lineage/evidence roots, and compute the
+   claim and class trailers in Python.
+
+The extractor cannot clear its own claim. Omission in a later round never deletes a durable
+claim. Research output never edits the plan.
+
+## Fast repository snapshot
+
+`plan_snapshot.py` uses a server-owned temporary Git directory, index, and object directory.
+It copies only bounded ref metadata, points Git at the native object directory through an
+explicit server-selected alternate, and writes dirty/untracked blob objects into the
+temporary object directory. One batched index update and `write-tree` create the exact
+dirty-tree snapshot commit.
+
+This avoids copying the repository's complete object database and avoids one Git process per
+worktree file. The native repository is not given temporary refs and its index is not
+modified. The temporary directory keeps the synthetic objects alive for the round.
+
+The snapshot boundary retains these protections:
+
+- inherited `GIT_*` settings are removed;
+- hooks, fsmonitor, signing, replacement objects, grafts, lazy fetches, and filters are not
+  used by snapshot construction;
+- repository config includes and `config.worktree` are not loaded into evidence commands;
+- native `objects/info/alternates` is rejected rather than followed;
+- path, record, per-file, total snapshot, output, and subprocess-time limits are enforced;
+- dirty regular files are read with pre/open/post identity checks so ordinary concurrent
+  edits fail explicitly;
+- ignored files and unsupported nonregular paths are disclosed but are not evidence blobs;
+- history refs are copied into the private control directory at snapshot creation, so later
+  ref movement does not change their identity.
+
+The snapshot does not defend against an active process replacing the repository root,
+ancestors, native object files, or temporary directory while the round runs. If ordinary
+maintenance removes a captured native object, the later evidence operation fails explicitly.
 
 ## Claim state
 
-Claims persist in schema-version 2 of the existing plan lineage envelope. Branch lineage
-JSON and branch output remain on their existing representation.
-
-The important orthogonal fields are:
+Claims persist in schema version 2 of the plan lineage envelope. The main fields are:
 
 - kind: `fact | decision`;
 - assertion mode: `asserted | assumption | estimate`;
 - kind classification: `proposed | confirmed`;
 - bearing: `blocking | advisory`;
-- status: `unchecked | unverified | verified | contradicted | disputed | deferred |
-  stale | malformed | not-applicable | superseded`.
+- status: `unchecked | unverified | verified | contradicted | disputed | deferred | stale |
+  malformed | not-applicable | superseded`.
 
-Every new claim starts `proposed`, `blocking`, and `unchecked`, regardless of what the
-extractor proposed. The model selects server span IDs, while the server derives the stored
-proposition from those exact anchored plan bytes; repository-aware roles cannot author a
-free-form claim string for a later clean role. Durable claim IDs retain 128 bits of a
-server-generated SHA-256 identity, and an occupied generated key rejects the new `ADD`
-before its sequence or claim map can change. A different role must confirm its kind.
-Advisory bearing is reachable
-only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
-Facts block until verified or safely deferred. Decisions become `not-applicable` only
-after cross-role kind confirmation and block again if a plan edit or dispute makes them
-stale/disputed. Evidence disputes are accepted only for cross-role-confirmed factual
-claims. Omission never deletes a claim.
+New claims begin proposed, blocking, and unchecked. A separate role must confirm kind.
+Facts remain blocking until verified, safely deferred, or independently authorized as
+advisory. Decisions become nonblocking only as confirmed `not-applicable` decisions.
 
-Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
-ambiguous anchors become stale. Marking a claim stale atomically clears every pending
-transition and incomplete truth, bearing, dispute, or deferral authorization, so replay
-cannot overwrite the stale result. Deferred claims additionally invalidate when their plan
-ordering snapshot changes; pending deferrals are invalidated before replay under the same
-full-plan snapshot rule. The clean plan-only role may emit `SUPERSEDE` for a stale claim only
-when it anchors a complete replacement in current plan spans. A replacement fact remains
-blocking until verified or safely deferred; a confirmed replacement decision is
-`not-applicable`. Only then does the predecessor become terminally superseded.
+Truth, bearing, dispute, and deferral authorizations occupy separate slots. Tightening the
+current authorization policy reblocks an applied transition until its required checks
+complete. An advisory bearing never bypasses pending or invalid truth authorization.
 
-## Evidence
+Plan edits relocate claims only when their exact anchored bytes still occur uniquely.
+Otherwise they become stale. A clean plan-only role may supersede a stale claim with a
+replacement anchored in the current plan. Persisted active replacement edges are accepted
+only from a stale source to an existing confirmed non-clear target; a clear target must
+already have completed the source transition to `superseded`.
 
-Repository records contain the pinned commit, literal path/query or requested byte range,
-underlying blob/ref object identity, exact original bytes,
-source and passage hashes, byte bounds, and separately decoded display text. Lossy display
-text is never evidence identity. Evidence and abstention IDs retain 128 SHA-256 bits.
-Persisted IDs must have the exact server prefix/width, and merging retained with newly
-collected records rejects an occupied ID unless the complete canonical records are equal;
-a collision can never replace the bytes beneath an existing dependency.
+## Evidence and accuracy
 
-The 4 KiB display passage is also an authorization boundary for every evidence kind.
-Repository, empirical, external, and supplied records whose source extends beyond the
-exposed passage remain context-only; their IDs are absent from transition bindings. A
-planner must obtain a complete bounded source whose conclusion-changing bytes are all
-exposed before any verifier or auditor can authorize from it. Eligibility also requires
-the displayed UTF-8 text to encode back to the exact passage bytes and hash. Sources that
-needed replacement decoding remain visible as context but cannot authorize a transition.
+Every evidence record has a server-generated ID, exact content hash, claim binding, source
+kind, source identity, bounded passage, and completeness metadata. Evidence for one claim
+cannot authorize another.
 
-Bounded `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and `HISTORY` records state whether the
-entire requested source scope is complete. A partial blob range or other truncated result
-remains visible to the verifier as context, including the exact candidates and inspected
-byte ranges for a literal search, but its evidence ID is ineligible for truth, bearing,
-dispute, or deferral authorization. This prevents a bounded prefix, passage, match set,
-history, or partial large-blob scan from being treated as proof of absence. The verifier can
-request a complete narrower source where the operation supports it or leave the claim
-blocking. Validated metadata is rendered in full, never cut at a display-character limit;
-its bounded per-kind arrays and the shared rendered-byte debit limit the packet without
-hiding `complete`, candidate paths, or inspected ranges.
+Incomplete tree, history, search, blob-range, or fetched records may provide context but
+cannot authorize a negative conclusion. Non-UTF-8 passages that require lossy display are
+also context-only. A citation is metadata, not proof.
 
-Persisted records have an exact per-kind metadata schema, including nested collection
-types, bounded Git object IDs/ref names, traversal-free repository operands, and empirical
-input paths/hashes. The same strict path/ref validators used for fresh requests run during
-load. Before cache evaluation, every retained truth, bearing,
-dispute, deferral-authorization, or other claim dependency must resolve to one valid record
-bound to that exact claim. Missing, malformed, mismatched, or wrong-claim dependencies stale
-the claim and leave it blocking. A missing dependency means that no retained manifest record
-exists; failure to open or read a named CAS blob or repository snapshot is instead an
-operational verification failure. It blocks the round without treating inaccessible bytes
-as proof that the record is semantically stale. A confirmed snapshot membership/type change
-(including a removed or newly gitlinked empirical input) is instead semantic invalidation:
-the record is discarded, its claim becomes stale, and its evidence phase can run again.
-`stale`, `disputed`, and `malformed` states override any earlier advisory-bearing
-authorization; invalidated evidence or plan bytes must be revalidated before the claim
-can become nonblocking again.
+Repository cache validity depends on the snapshot commit and every recorded object/path
+identity. Empirical cache validity additionally depends on the fixed adapter, runtime, and
+input hashes. External evidence carries retrieval and freshness metadata. Semantic source
+changes invalidate the record and stale the claim; an operational read failure blocks the
+round without pretending that the source changed.
 
-The initial empirical adapter set is deliberately narrow: `PYTHON_COMPILE` compiles up to
-20 pinned Python blobs without executing them and records the fixed recipe, interpreter
-version, input hashes, structured results, exit status, and falsifying result. It is
-invalidated by any runtime or input change. Arbitrary model-authored commands and shell
-strings are never accepted.
+The initial empirical adapter is `PYTHON_COMPILE`: a bounded compile-only check over pinned
+Python blobs. It is optional and is requested only for claims specifically about Python
+source. All snapshot, tree, blob, literal-search, history, supplied-evidence, external-source,
+claim-state, and convergence behavior is language-, framework-, and project-domain-neutral.
+Models cannot submit arbitrary shell commands. Projects using other languages still receive
+the complete generic verification flow; they simply have no language-specific empirical
+adapter until one is deliberately added.
 
-`READ_BLOB` accepts a nonnegative byte offset and bounded length. An evidence planner can
-use a literal-search byte position to retrieve relevant code after the first display
-passage without widening the 1 MiB source cap or 5 MiB round cap. Fixed adapters charge
-every input byte they inspect, not only their small structured result.
+## External and supplied evidence
 
-External work requires a trusted process-level HTTPS JSON search endpoint. Repository
-configuration cannot select a network destination:
+External discovery is optional and uses the trusted process-level
+`PARANOIA_SEARCH_ENDPOINT`. The endpoint must be HTTPS and return the documented bounded
+JSON search shape. Redirects, DNS results, connected peers, response media, compressed and
+decompressed bytes, and a shared total deadline are validated by server code.
 
-```bash
-export PARANOIA_SEARCH_ENDPOINT='https://search.internal.example/query?q={query}&limit={limit}'
-```
+Search rank is not source authority. Callers provide trusted `external_source_policy` rules
+with an exact lowercase host, URL path prefix, and `primary`, `authoritative`, `secondary`,
+or `ugc`
+classification. The longest exact-host/path match governs; subdomains do not inherit a rule.
+Unmatched pages remain `unclassified-external`. Only primary and authoritative records may
+authorize an external truth or bearing transition. Secondary and unclassified records may
+guide structural critique but cannot clear a load-bearing claim. The verifier still judges
+whether an eligible passage actually entails the proposition; server classification does
+not make irrelevant official material evidence.
 
-The endpoint must return `{"hits":[{"url":"https://…","title":"…"}]}`. Fetching
-preflights the template and permits only `{query}` plus optional `{limit}` placeholders.
-Those placeholders may occur only in the path or query components: the HTTPS scheme,
-hostname, port, and fragment must remain fixed under formatting, while credentials remain
-forbidden. The query is percent-encoded before substitution and the formatted origin is
-checked again before each request.
-Top-level and hit objects use exact schemas and reject duplicate or unknown JSON keys.
-Failed searches and fetches create round-local external abstentions, but abstentions are
-never sent to an evidence verifier and cannot share a packet with repository or supplied
-records. They remain visible only as non-authorizing failure context to the structural role.
-Formatting, encoding, numeric-conversion, and excessive-nesting errors are normalized to
-role-specific blocked failures, never raw exceptions; the same rule applies to every
-model register, evidence request, cached record, and persisted manifest. Fetching
-rejects credentials, non-HTTPS URLs, any DNS answer that is non-public, a connected peer
-different from the selected address, unsupported media/encodings, excessive redirects,
-non-ASCII/non-percent-encoded URL data, hard total deadlines, and streaming compressed or
-decompressed byte caps. Every redirect hop consumes a fetch attempt, and every response
-body is charged before redirect, status, media-type, or decoding acceptance; decompressed
-output is additionally capped by the aggregate bytes still available before inflation and
-charged as it is produced. DNS resolution, connect, TLS, headers, redirects, and body reads
-and decompression all share the same enforceable total deadline. With no endpoint, external research
-explicitly abstains and an otherwise unresolved external premise blocks.
+Known user-generated-content hosts—including Reddit, Stack Overflow/Stack Exchange, Hacker
+News, Quora, and common social/publishing platforms—are forced to `ugc`; a caller rule cannot
+promote them to primary or authoritative. UGC can expose leads, conflicts, or user-experience
+reports, but cannot authorize general API, standard, regulatory, historical, or product facts.
 
-Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
-lineage root manifests are GC roots. Journal, candidate-root, live-root, and quarantine
-manifests have distinct exact schemas, bounded no-follow reads, unique bounded digest sets,
-and filename-bound run/lineage identities; foreign, duplicate, unknown, oversized, or
-symlinked records fail closed before adoption or sweeping. A global file lock serializes reservation, blob
-write, exact live-root replacement, and sweep. Replaced files and their containing
-directory entries are fsynced before success is reported or journals/latches are cleared.
-Defaults are 100 MiB per lineage, 1 GiB globally, and a seven-day orphan TTL. Expired
-evidence leaves the live lineage root and becomes collectible. Hash mismatch, missing
-content, malformed roots, or cap exhaustion fails closed. Lineage state publication
-tracks its phase: temporary-file creation, serialization, and pre-replace fsync failures
-enter the recoverable blocked transaction path and release the unambiguous ownership
-latch, while entering the atomic replace or any
-later root/journal durability step is ambiguous and retains its recovery roots and latch.
+Remote content and caller-supplied artifacts are untrusted data. They receive isolated
+verifier calls and cannot classify plan decisions, author evidence-free deferrals, or waive
+claims. Unavailable sources produce an abstention and leave a load-bearing claim unresolved.
 
-Callers may provide up to 20 `{claim, source, content}` records through
-`supplied_evidence`. `claim` must match exactly one registered proposition. These records
-are useful for bounded empirical output or inaccessible local artifacts: the server hashes
-their exact bytes, but they still pass through the verifier and are never self-authorizing.
-Caller-supplied passages are isolated in their own untrusted verifier call, never mixed
-with repository evidence. In high-stakes mode, a truth transition that relies on supplied
-content requires the same distinct-vendor authorization as fetched external evidence.
-External and caller-supplied batches may confirm a proposition as factual, but may not
-classify it as a decision, defer it, supersede it, or emit any other transition without
-naming evidence from that exact isolated batch. Plan decisions remain the responsibility
-of the trusted local/structural roles.
+## Independent authorization
 
-## Independence and authorization
+`independent_check` is `auto` or `require`. Required authorization uses the fixed vendor
+identities `codex` and `claude`. `auto` applies it to higher-risk transitions including
+external high-stakes evidence, contradiction reversal, dispute resolution, and a change
+from blocking to advisory.
 
-`independent_check` is `auto` (default) or `require`. Required policy applies equally to a
-clean-role `DEFER`: semantic validation happens first, then the exact deferral event must
-receive accepted `codex` and `claude` checks or remain pending and blocking. Risk classification is explicit
-through `stakes_level = low | high`; when omitted, any nonempty stakes description is
-high. Natural-language stakes are never parsed for security-significant words. Auto
-requires a distinct-vendor audit for high-stakes external claims, every closure transition
-out of a contradicted or disputed state, truth reversal, evidence-dispute resolution, and
-blocking-to-advisory changes. `RESOLVE_DISPUTE` names its exact target outcome (`verified`
-or `contradicted`) in the audited event. The proposed transition, evidence IDs,
-event digest, vendor/model identities, and audit results persist. Missing, duplicate,
-mismatched, or tampered provenance leaves the transition pending and the claim blocking
-after reload. The vendor vocabulary is server-owned and fixed to `codex` and `claude`;
-unknown or duplicate vendor identities are malformed, and `complete` requires accepted
-checks from exactly both supported vendors. The exact pending event is retained for
-server-side replay on the next round; a different event cannot erase it. Reload also validates the authorization's exact event
-schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
-state, and applied outcome against the claim's current truth, bearing, or deferral state.
-Duplicate `evidence_ids` inside one event are rejected before digesting, auditing, or
-persistence; every accepted event uses one canonical evidence tuple end to end.
+The exact event, evidence IDs, claim state, vendor/model identities, and checks persist.
+Unavailable checks remain pending and are replayed from the stored event in a later round.
+Duplicate evidence IDs, unknown vendors, mismatched event digests, or incomplete provenance
+cannot clear a claim.
 
-Each auditing vendor receives the server-owned proposition, current kind/bearing/status,
-the complete validated pre-transition claim record (including assertion mode, deferral,
-authorization slots, pending transition, and every dependency ID), plan-anchor spans, the
-complete proposed event, its new evidence, and the pre-transition evidence it would
-displace. Evidence bodies are split into repository, external, supplied, and local packets;
-the vendor must accept every source-isolated packet before the server records one accepted
-check. Initial and replay audits receive the complete retained/new collection, not merely
-the verifier batch that proposed the transition. An authoring vendor is never credited
-without running these complete packets, and old dispute-resolution checks are rerun on
-replay so legacy partial context cannot clear a dispute. Truth,
-dispute, deferral, and bearing authorizations persist in separate slots, so a later ordinary
-truth check cannot erase the mandatory audit that made a claim advisory. Their evidence
-dependencies and exact event objects also persist separately while a retained-ID union
-drives freshness invalidation.
+## Persistence and recovery
 
-Semantic validation of an independently audited event happens before its authorization is
-looked up or marked pending. Invalid dispute outcomes, deferral anchors, dependent-claim
-sets, or ordering snapshots therefore enter the ordinary one-retry correction path and
-cannot consume or persist independent-authorization state.
+Exact evidence bytes live in the content-addressed evidence store beneath
+`$PARANOIA_STATE_ROOT/evidence/`. Lineage publication and evidence roots use atomic replace,
+advisory locking, and explicit recovery journals. Malformed persisted structures are
+quarantined or reported as blocked; they are never defaulted to empty state.
 
-If a required secondary auditor cannot launch, including an OS permission or resource
-failure, the validated exact event still persists with incomplete checks as a pending,
-blocking transition. At the start of a later round the server replays that stored event
-and its exact evidence bindings directly through authorization; no model is asked to
-guess or reconstruct hidden event fields. Replay reuses only accepted vendor provenance
-whose event digest and evidence tuple are identical. Provenance copied into multiple
-authorization slots by one `RESOLVE_DISPUTE` event is deduplicated by vendor before replay,
-and the completed identical authorization is written back to both slots. Every missing
-vendor, including the current primary vendor when necessary, is actually invoked. A pending deferral is bound to
-the complete plan snapshot on which its ordinal span IDs were selected. Any plan edit
-clears that pending event and marks the claim stale before replay can reinterpret those IDs
-against different bytes.
+Operational failures before an unambiguous publication boundary release the lineage latch.
+Ambiguous failures at or after publication retain recovery state for the next operator or
+round. The ephemeral repository snapshot itself owns no native refs, so snapshot cleanup is
+limited to removing its temporary directory.
 
-The persisted authorization-policy tuple includes the independent-check mode, stakes
-classification, and policy version. Authorization contract version 2 requires actual
-complete-packet calls to both vendors. Version-1 lineage remains loadable only so every
-required completed or pending transition can be reblocked, stripped of old checks, and
-replayed through both vendors before migration is published. An already-applied
-`RESOLVE_DISPUTE` is reauthorized against its exact persisted outcome and evidence without
-trying to consume the no-longer-current `disputed` state edge again. Any policy change
-invalidates the zero-research cache. A
-stricter policy immediately reblocks an authorization whose persisted provenance is no
-longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result.
+## Limits and performance
 
-Every persisted plan lineage uses one exact schema-version 2 outer envelope. Existing plan
-state must contain both `schema_version: 2` and the complete `claim_state` object; missing,
-unknown, downgraded, or wrong-typed envelope fields quarantine the lineage rather than
-defaulting to an empty claim register. The `None` claim-state default exists only for a new
-lineage that has no state file yet. The surrounding class records, matches, exemptions,
-debt (exactly a positive round and nonempty reason), severities, statuses, mechanisms, and
-supersession graph are likewise type-, shape-, cardinality-, and reachability-checked before
-use; duplicate identities or invented clear states quarantine the file. Evidence
-invalidation skips terminal superseded claims, so expiry cannot resurrect an inert
-predecessor or create a state the loader rejects. A replacement may later become stale,
-disputed, or otherwise blocking without invalidating the terminal predecessor; the active
-replacement alone governs closure. If invalidation removes evidence named by a pending
-transition, that now-unexecutable transition is cleared alongside its evidence and a fresh
-verifier may propose a new event bound to refreshed IDs.
+Important bounds include:
 
-## Budgets and caching
+- plan: 1 MiB;
+- paths: 100,000;
+- path enumeration: 32 MiB;
+- individual dirty file: 32 MiB;
+- dirty-tree content retained for a snapshot: 256 MiB;
+- evidence records and requests: bounded per operation and by one shared round budget;
+- external work: bounded requests, redirects, compressed/decompressed bytes, and total time;
+- persisted evidence: 100 MiB per lineage and 1 GiB globally by default.
 
-Hard per-round limits include 50 active claims, 20 evidence requests, two requests per
-claim, eight external HTTP attempts (debited before each hop, including failures),
-1 MiB for the plan, 1 MiB per source, 5 MiB aggregate across claim, search, supplied,
-and structural phases,
-4 KiB display passages,
-and one correction retry per model register. Evidence is content-addressed and reusable;
-the same budget begins before cache validation: retained CAS bytes are reserved before
-bounded no-follow reads, repository/history/adapter revalidation is charged as attempted,
-and evidence records are charged again when rendered into verifier or auditor prompts.
-An independent-auditor packet is reserved separately before each actual vendor launch;
-sending the same named evidence to both vendors therefore consumes two transmission debits.
-Serialized bounded tree listings are likewise charged before their first evidence-planner
-or structural-planner call, in addition to the raw Git bytes charged during enumeration.
-Ignored-untracked and unsupported-nonregular path disclosures are completeness-marked and
-charged before the research call, and charged again if a correction resends them.
-If a register needs correction, the exact evidence portion resent in the correction prompt
-is debited a second time before the retry call; insufficient remaining budget blocks
-without transmitting it.
+Snapshot latency is measured separately from model latency. On the development repository,
+the refactored snapshot dropped from roughly 17.2 seconds to roughly 0.23 seconds. This is a
+local benchmark, not a universal guarantee; representative diagnostic rollout data governs
+promotion.
 
-Repository reuse recomputes every passage/identity field and is bound to exact blob,
-snapshot, history-ref, operation, canonical query-parameter identities, completeness, and
-recorded search scope. Literal search charges each inspected blob before reading it and
-records its object ID, byte range, whole size, and range completeness. `LIST_TREE` and
-`HISTORY` read one bounded look-ahead record to distinguish complete results from truncation,
-debit Git output as it is read, and terminate at their record or byte cap instead of
-capturing an unbounded result. Each read is also sized to the shared budget remaining, so
-attempted pipe I/O cannot cross the aggregate cap before accounting rejects it.
-Snapshot discovery walks retained directory fds under a 100,000-entry/32-MiB materialized
-path cap. Git receives explicit paths only; private ignore classification output is bounded
-by that input. Ref discovery retains its separate 4,096-total-ref cap before the smaller
-pinned-history limit is applied. Directory scans count entries while iterating instead of
-materializing an attacker-sized directory first. Every snapshot Git process and pipe read
-also has a hard deadline; a shared termination path kills and reaps the child under a
-second bounded deadline and translates wait failures into recoverable snapshot errors.
-Loose refs are copied through fd-anchored, no-follow traversal under explicit entry, depth,
-per-file, and aggregate-byte caps. A symlinked or nonregular loose-ref entry is skipped,
-never opened, and disclosed as unavailable; safe sibling refs remain usable. Temporary pin
-creation, verification, and deletion use the same fd-relative boundary and reject every
-symlinked ancestor or ref file in the server-owned pin namespace. Directly
-read Git metadata must be small regular
-files opened with no-follow and nonblocking flags, then checked again by file identity and
-size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
-The native object root and each copied loose-object/pack directory are opened fd-relative
-with no-follow semantics. Only exact loose-object and pack-family regular-file names are
-materialized; `objects/info`, multi-pack indexes, commit graphs, alternates, and inert names
-are omitted because Git can discover the copied packs directly. A symlink in a required
-directory or accepted file position fails closed, while unrelated native names are ignored.
-Every dirty-tree candidate is likewise opened relative to a verified repository-directory
-fd. Each ancestor is opened one component at a time with no-follow and pre/post-open inode
-checks, and the final lstat, symlink read, or regular-file open remains relative to that
-anchored parent. Replacing an inspected ancestor with an external symlink therefore blocks
-without hashing or disclosing external bytes. The auxiliary unsupported-entry disclosure
-scan uses the same boundary: its queue owns already-open directory fds rather than pathnames,
-so a later rename/symlink replacement cannot redirect enumeration or disclose external names.
-All Git subprocesses receive the retained worktree handle, the private object database, and
-server-owned control metadata. Temporary refs are created and removed through the retained
-common-dir handle, not a re-resolved pathname.
-Network evidence is audit
-material and must be refreshed under the configured freshness policy before it can
-authorize a later transition.
-Any cached record discarded during validation disables the zero-research cache for that
-round, even if no claim directly depended on that record. Persisted supersession is also
-validated as a bounded graph: the replacement must exist, be confirmed, and already be
-either a verified/safely deferred fact or a not-applicable plan decision. The replacement
-is derived from a current server span anchor by the isolated clean role; evidence-facing
-roles cannot emit supersession. The loader also accepts a clear replacement that was later
-invalidated to contradicted, disputed, or stale; later evidence or plan loss cannot resurrect
-the terminally superseded source. Every
-persisted non-abstention record must retain its rooted
-content digest and exact CAS bytes.
+## Promotion and rollback criteria
 
-## Output
+Promote `diagnostic` to `blocking` for a workflow only when:
 
-Closure mode preserves the five review sections and appends:
+- representative plans show useful claim extraction with an acceptable false-block rate;
+- snapshot and non-model overhead meet the workflow's latency budget;
+- cached rounds avoid unnecessary research calls;
+- malformed, stale, interrupted, and unavailable cases recover without manual state edits;
+- operators understand that the gate covers only registered claims.
 
-```text
-LINEAGE: project-42-plan (rounds recorded: 3)
-CLAIM-REGISTER: parsed 2
-CLAIMS: verified=1, unverified=1
-CLAIM-CLOSURE: BLOCKED — 1 load-bearing claim(s) unresolved
-CLAIM-DATA-JSON={"claim":"Exact anchored plan text","claim_id":"0123456789abcdef0123456789abcdef","status":"unverified"}
-CLASS-REGISTER: NONE
-CLASS-CLOSURE: 0 open, 2 closed, 2 unmechanized
-CONVERGENCE: BLOCKED — 1 claim(s)
-```
-
-If a structural terminal register needs correction, the original five-section critique is
-preserved and the corrected register is displayed separately as the register actually
-applied.
-
-Every server-rendered claim, class, warning, and debt value is an injectively escaped,
-one-line `*-DATA-JSON` record. There is exactly one `CONVERGENCE` line. Both claim and class gates must be clear for
-`NOT-BLOCKED`. Preflight failures such as latch contention and quarantined state return a
-synthetic review with the same five ordered, nonempty sections before the blocked trailer.
-Structural prose containing a model-authored line beginning `CONVERGENCE:` is rejected and
-must be corrected; any reserved verdict-looking line in a generated failure body is framed
-as `UNTRUSTED-REVIEW-LINE-JSON`. The completed response asserts that only the
-server-computed trailer line remains.
-
-## Migration and recovery
-
-This is an intentional behavior and cost change for existing callers that omitted
-`class_closure`: default-on plan closure now runs the integrated gate. Callers wanting the
-old inexpensive review must explicitly use `class_closure: false` and accept that the
-result has no persistent stop condition.
-
-A failed model process or unavailable toolless boundary leaves lineage state byte-for-byte
-unchanged and returns a blocked verdict. Exclusive lineage ownership is acquired before
-state is loaded, and the owning loader requires that live latch; a delayed round can never
-load an old generation and later acquire ownership over a newer publication. Nested
-schema-version-2 claim/evidence records are fully validated and corrupt lineage state is
-quarantined while that latch remains held. A
-quarantine uses an atomic rename followed by a parent-directory fsync. Rename or fsync
-failure is reported as a quarantine failure and never as a successful move; the operator
-is not told that malformed live state was safely isolated when durability is ambiguous. A
-present claim-state object must contain the exact complete serialized field set—missing
-fields never default to an empty claim collection. Kind,
-classification, and status combinations must be transition-reachable, and anchor
-relocation treats overlapping occurrences as ambiguous.
-
-Register syntax and semantic transition validation share the same single correction
-attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
-state transition, request path/query operand, or non-UTF-8 surrogate-bearing scalar is
-corrected before application.
-Malformed registers record debt. A
-failed snapshot-ref cleanup, ambiguous publication, or
-crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
-through to a stale writer. Latch release first renames the owner marker to a `releasing`
-recovery marker and fsyncs that transition. If unlink durability fails, the live marker is
-recreated and the current response is changed to blocked, so a later round cannot silently
-inherit an undurable clear. A register still malformed after its one correction attempt is
-published as durable blocking debt—even over an otherwise clear cache—and only a later
-valid replacement register clears it. Never repair state by deleting evidence roots first: preserve
-the last valid root until the lineage is repaired or explicitly abandoned.
-
-Every exception while verifying or deleting temporary snapshot refs—including ownership,
-decoding, boundary, and filesystem failures—is normalized as
-ambiguous cleanup, so the journal and latch remain available for operator recovery.
-Publication takes rollback ownership immediately after the exclusive ref-file create; any
-later write, file fsync, close, or parent fsync failure removes only that exact fd-anchored
-inode. If its identity or rollback durability cannot be established, cleanup is ambiguous
-and the pre-published journal/latch are retained.
+Remain diagnostic or roll back to `off` when latency, model calls, false blocking, state
+growth, or operational recovery outweigh the additional premise assurance. Rollback does
+not delete lineage evidence; it only stops the claim gate from running or governing future
+verdicts.

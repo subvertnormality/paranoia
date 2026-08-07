@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import urllib.parse
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
@@ -34,6 +35,80 @@ class EvidenceRequestError(ValueError):
 
 class EvidenceBudgetExceeded(EvidenceRequestError):
     """The shared round budget is exhausted; callers must not treat this as stale data."""
+
+
+ELIGIBLE_EXTERNAL_SOURCE_CLASSES = frozenset({"primary", "authoritative"})
+EXTERNAL_SOURCE_CLASSES = ELIGIBLE_EXTERNAL_SOURCE_CLASSES | {
+    "secondary", "ugc", "unclassified-external",
+}
+UGC_HOST_SUFFIXES = frozenset({
+    "reddit.com", "stackoverflow.com", "stackexchange.com", "quora.com",
+    "news.ycombinator.com", "x.com", "twitter.com", "facebook.com",
+    "threads.net", "tiktok.com", "youtube.com", "medium.com",
+})
+
+
+def _ugc_host(host: str) -> bool:
+    return any(host == suffix or host.endswith("." + suffix) for suffix in UGC_HOST_SUFFIXES)
+
+
+def parse_external_source_policy(raw: object) -> tuple[dict[str, str], ...]:
+    """Validate trusted caller rules; models never classify their own sources."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or len(raw) > 50:
+        raise EvidenceRequestError("external_source_policy must be a bounded array")
+    rules: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in raw:
+        if not isinstance(item, Mapping) or set(item) != {
+            "host", "path_prefix", "source_class",
+        }:
+            raise EvidenceRequestError("external source rule has missing or unknown fields")
+        host = item.get("host")
+        prefix = item.get("path_prefix")
+        source_class = item.get("source_class")
+        if not isinstance(host, str) or not host or len(host) > 253 \
+                or host != host.lower() or "/" in host or "\0" in host \
+                or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for char in host) \
+                or host.startswith(".") or host.endswith(".") or ".." in host:
+            raise EvidenceRequestError("external source rule host must be an exact lowercase host")
+        try:
+            host.encode("ascii")
+        except UnicodeError as exc:
+            raise EvidenceRequestError("external source rule host must be ASCII") from exc
+        if not isinstance(prefix, str) or not prefix.startswith("/") \
+                or len(prefix.encode("utf-8")) > 1024 or "\0" in prefix:
+            raise EvidenceRequestError("external source rule path_prefix must be an absolute URL path")
+        if source_class not in {"primary", "authoritative", "secondary", "ugc"}:
+            raise EvidenceRequestError("external source rule source_class is invalid")
+        if _ugc_host(host) and source_class in ELIGIBLE_EXTERNAL_SOURCE_CLASSES:
+            raise EvidenceRequestError(
+                "known UGC hosts cannot be classified as primary or authoritative"
+            )
+        identity = (host, prefix)
+        if identity in seen:
+            raise EvidenceRequestError("external source policy contains duplicate scopes")
+        seen.add(identity)
+        rules.append({"host": host, "path_prefix": prefix, "source_class": source_class})
+    return tuple(rules)
+
+
+def classify_external_source(
+    url: str, policy: Sequence[Mapping[str, str]],
+) -> str:
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower()
+    path = parts.path or "/"
+    if _ugc_host(host):
+        return "ugc"
+    matches = [
+        rule for rule in policy
+        if rule["host"] == host and path.startswith(rule["path_prefix"])
+    ]
+    if not matches:
+        return "unclassified-external"
+    return max(matches, key=lambda rule: len(rule["path_prefix"]))["source_class"]
 
 
 @dataclass(frozen=True)
@@ -265,6 +340,7 @@ def collect_evidence(
     search_provider: EndpointSearchProvider | None = None,
     http_client: SafeHttpClient | None = None,
     budget: EvidenceBudget | None = None,
+    external_source_policy: Sequence[Mapping[str, str]] = (),
 ) -> list[EvidenceRecord]:
     budget = budget or EvidenceBudget()
     budget.debit_requests(requests)
@@ -403,7 +479,9 @@ def collect_evidence(
                         "media_type": response.media_type,
                         "redirects": list(response.redirects),
                         "publisher_domain": _domain(response.final_url),
-                        "source_class": "unclassified-external",
+                        "source_class": classify_external_source(
+                            response.final_url, external_source_policy,
+                        ),
                         "independence_groups": [
                             "domain:" + _domain(response.final_url),
                             "content:" + response.sha256,
@@ -651,6 +729,8 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
     for key in expected.intersection(string_fields):
         if not isinstance(metadata.get(key), str):
             raise EvidenceRequestError(f"persisted {kind}.{key} must be a string")
+    if kind == "external" and metadata.get("source_class") not in EXTERNAL_SOURCE_CLASSES:
+        raise EvidenceRequestError("persisted external.source_class is invalid")
     for key in expected.intersection({"whole_size", "offset", "length", "limit", "exit_status", "http_status"}):
         value = metadata.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:

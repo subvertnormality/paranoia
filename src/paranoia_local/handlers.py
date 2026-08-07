@@ -475,11 +475,11 @@ def critique_plan(
     now: Clock = _default_clock,
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
-    """Review a plan once, or run the integrated claim+class closure transaction."""
+    """Review a plan, optionally adding diagnostic or blocking claim verification."""
     closure_on = bool(arguments.get("class_closure", True))
     claim_mode = arguments.get("claim_verification")
     if not closure_on:
-        if claim_mode is not None:
+        if claim_mode not in {None, "off"}:
             raise ValueError(
                 "claim_verification is unavailable with class_closure:false; that is the "
                 "single no-state, no-CONVERGENCE one-shot mode"
@@ -487,10 +487,17 @@ def critique_plan(
         return _critique_plan_legacy(
             arguments, engine=engine, log_dir=log_dir, now=now, on_progress=on_progress
         )
-    if claim_mode not in (None, "blocking"):
-        raise ValueError("claim_verification must be 'blocking' when class_closure is enabled")
+    if claim_mode == "off":
+        return _critique_plan_legacy(
+            arguments, engine=engine, log_dir=log_dir, now=now, on_progress=on_progress
+        )
+    if claim_mode is None:
+        claim_mode = "diagnostic"
+    if claim_mode not in {"diagnostic", "blocking"}:
+        raise ValueError("claim_verification must be 'off', 'diagnostic', or 'blocking'")
     return _critique_plan_verified(
-        arguments, engine=engine, log_dir=log_dir, now=now, on_progress=on_progress
+        arguments, engine=engine, log_dir=log_dir, now=now, on_progress=on_progress,
+        claim_mode=claim_mode,
     )
 
 
@@ -668,7 +675,7 @@ def _validate_five_sections(text: str) -> None:
 
 def _critique_plan_verified(
     arguments: dict[str, Any], *, engine: Engine, log_dir: Path, now: Clock,
-    on_progress: Callable[[str], None] | None,
+    on_progress: Callable[[str], None] | None, claim_mode: str,
 ) -> str:
     try:
         raw_plan, plan_text, plan_path = _read_plan_bytes(arguments)
@@ -679,7 +686,15 @@ def _critique_plan_verified(
             "CLASS-CLOSURE: INPUT-UNAVAILABLE — plan input was rejected\n"
             "CONVERGENCE: BLOCKED — plan input could not be safely retained this round."
         )
-    repo = _require_repo(arguments)
+    try:
+        repo = _require_repo(arguments)
+    except (OSError, ValueError) as exc:
+        return (
+            _preflight_failure_review(f"repository unavailable: {exc}")
+            + "\n\nCLAIM-CLOSURE: REPOSITORY-UNAVAILABLE — repository input was rejected\n"
+            "CLASS-CLOSURE: REPOSITORY-UNAVAILABLE — repository input was rejected\n"
+            "CONVERGENCE: BLOCKED — repository input could not be safely opened this round."
+        )
     # Closure mode treats repository bytes as hostile evidence. A checked-in config must
     # not select policy or become peer-level role instructions.
     cfg: dict[str, Any] = {}
@@ -700,6 +715,9 @@ def _critique_plan_verified(
     independent_policy = str(arguments.get("independent_check", "auto"))
     if independent_policy not in {"auto", "require"}:
         raise ValueError("independent_check must be 'auto' or 'require'")
+    external_source_policy = cv.parse_external_source_policy(
+        arguments.get("external_source_policy", [])
+    )
     stakes_level = arguments.get("stakes_level")
     if stakes_level not in (None, "low", "high"):
         raise ValueError("stakes_level must be 'low' or 'high' when supplied")
@@ -747,10 +765,9 @@ def _critique_plan_verified(
     class_status = cc.NONE
     minted_classes: list[str] = []
     try:
-        def journal_snapshot(refs: list[tuple[str, str]]) -> None:
+        def journal_snapshot(_refs: list[tuple[str, str]]) -> None:
             store.begin(run_id, metadata={
                 "repo": str(repo), "lineage": lineage_id,
-                "snapshot_refs": [{"name": name, "oid": oid} for name, oid in refs],
             })
 
         with PlanRepositorySnapshot.create(
@@ -961,7 +978,7 @@ def _critique_plan_verified(
                 new_records = cv.collect_evidence(
                     requests, snapshot=snapshot, store=store, run_id=run_id,
                     search_provider=provider, http_client=http_client,
-                    budget=round_budget,
+                    budget=round_budget, external_source_policy=external_source_policy,
                 )
                 new_records += cv.collect_supplied_evidence(
                     list(arguments.get("supplied_evidence", [])), claims=draft_claims,
@@ -1004,12 +1021,14 @@ def _critique_plan_verified(
                     batch_ids = {
                         record.evidence_id for record in batch if record.kind != "abstention"
                     }
+                    eligible_batch_ids = _truth_eligible_evidence_ids(batch)
 
                     def validate_verifier(events: list[pc.Event]) -> None:
                         preview = draft_claims.copy()
                         for event in events:
                             _validate_verifier_batch_event(
-                                event, batch_ids=batch_ids, untrusted=untrusted_batch,
+                                event, batch_ids=batch_ids, eligible_ids=eligible_batch_ids,
+                                untrusted=untrusted_batch,
                             )
                             pc.apply_events(
                                 preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
@@ -1029,7 +1048,8 @@ def _critique_plan_verified(
                     )
                     for event in verifier_events:
                         _validate_verifier_batch_event(
-                            event, batch_ids=batch_ids, untrusted=untrusted_batch,
+                            event, batch_ids=batch_ids, eligible_ids=eligible_batch_ids,
+                            untrusted=untrusted_batch,
                         )
                         required = _independent_required(
                             event, draft_claims, evidence_records,
@@ -1329,6 +1349,7 @@ def _critique_plan_verified(
     trailer = _render_plan_convergence(
         closure.lineage, state, claim_register_status=research_status,
         class_register_status=class_status, minted=minted_classes,
+        claim_mode=claim_mode,
     )
     _log(log_dir, "critique_plan", engine, structural_review, now, {
         "grounded": True, "model": model, "round": round_no,
@@ -1372,6 +1393,20 @@ def _merge_evidence(
     return list(by_id.values())
 
 
+def _truth_eligible_evidence_ids(
+    records: list[cv.EvidenceRecord],
+) -> set[str]:
+    """Return records allowed to authorize truth; source rank is never authority."""
+    return {
+        record.evidence_id for record in records
+        if record.kind != "abstention" and (
+            record.kind != "external"
+            or record.metadata.get("source_class")
+            in cv.ELIGIBLE_EXTERNAL_SOURCE_CLASSES
+        )
+    }
+
+
 def _independent_required(
     event: pc.Event, state: pc.ClaimState, records: list[cv.EvidenceRecord],
     policy: str, high_stakes: bool,
@@ -1399,11 +1434,18 @@ def _independent_required(
 
 def _validate_verifier_batch_event(
     event: pc.Event, *, batch_ids: set[str], untrusted: bool,
+    eligible_ids: set[str] | None = None,
 ) -> None:
     event_ids = set(event.data.get("evidence_ids", []))
     if event_ids and not event_ids.issubset(batch_ids):
         raise pc.ClaimTransitionError(
             "verifier referenced evidence outside its isolated batch"
+        )
+    if event.op in {"VERIFY", "CONTRADICT", "RESOLVE_DISPUTE", "SET_BEARING"} \
+            and event_ids and eligible_ids is not None \
+            and not event_ids.issubset(eligible_ids):
+        raise pc.ClaimTransitionError(
+            "truth and bearing transitions require primary or authoritative external evidence"
         )
     if not untrusted:
         return
@@ -1674,7 +1716,7 @@ def _independent_checks(
 
 def _render_plan_convergence(
     lineage: cc.Lineage, state: pc.ClaimState, *, claim_register_status: str,
-    class_register_status: str, minted: list[str],
+    class_register_status: str, minted: list[str], claim_mode: str = "blocking",
 ) -> str:
     claims = [claim for claim in state.claims.values() if claim.status != pc.SUPERSEDED]
     blocking_claims = pc.blocking_claims(state)
@@ -1693,15 +1735,20 @@ def _render_plan_convergence(
         "CLAIM-REGISTER: " + json.dumps(claim_register_status, ensure_ascii=True)[1:-1],
         "CLAIMS: " + (", ".join(f"{key}={value}" for key, value in sorted(status_counts.items())) or "none"),
     ]
+    diagnostic = claim_mode == "diagnostic"
+    claim_prefix = "DIAGNOSTIC-" if diagnostic else ""
     if state.debt:
-        lines.append("CLAIM-CLOSURE: BLOCKED — register debt")
+        lines.append(f"CLAIM-CLOSURE: {claim_prefix}BLOCKED — register debt")
         lines.append(
             "CLAIM-DEBT-DATA-JSON=" + json.dumps(
                 state.debt, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
         )
     elif blocking_claims:
-        lines.append(f"CLAIM-CLOSURE: BLOCKED — {len(blocking_claims)} load-bearing claim(s) unresolved")
+        lines.append(
+            f"CLAIM-CLOSURE: {claim_prefix}BLOCKED — "
+            f"{len(blocking_claims)} load-bearing claim(s) unresolved"
+        )
         lines.extend(
             "CLAIM-DATA-JSON=" + json.dumps(
                 {
@@ -1714,7 +1761,10 @@ def _render_plan_convergence(
             for claim in blocking_claims
         )
     else:
-        lines.append("CLAIM-CLOSURE: NOT-BLOCKED — no registered load-bearing claim is unresolved")
+        lines.append(
+            f"CLAIM-CLOSURE: {claim_prefix}NOT-BLOCKED — "
+            "no registered load-bearing claim is unresolved"
+        )
     lines += [
         "CLASS-REGISTER: " + json.dumps(class_register_status, ensure_ascii=True)[1:-1],
         f"CLASS-CLOSURE: {class_counts}",
@@ -1741,23 +1791,33 @@ def _render_plan_convergence(
                 class_debt, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
         )
-    blocked = bool(state.debt or class_debt or blocking_claims or blocking_classes)
+    claims_govern = claim_mode == "blocking"
+    blocked = bool(
+        class_debt or blocking_classes
+        or (claims_govern and (state.debt or blocking_claims))
+    )
     if blocked:
         reasons = []
-        if state.debt:
+        if claims_govern and state.debt:
             reasons.append("claim register debt")
         if class_debt:
             reasons.append("class register debt")
-        if blocking_claims:
+        if claims_govern and blocking_claims:
             reasons.append(f"{len(blocking_claims)} claim(s)")
         if blocking_classes:
             reasons.append(f"{len(blocking_classes)} class(es)")
         lines.append("CONVERGENCE: BLOCKED — " + ", ".join(reasons))
     else:
-        lines.append(
-            "CONVERGENCE: NOT-BLOCKED — no blocking claim or defect class is unclosed; "
-            "reviewer findings still govern"
-        )
+        if diagnostic:
+            lines.append(
+                "CONVERGENCE: NOT-BLOCKED — no blocking defect class is unclosed; "
+                "diagnostic claim findings do not govern this rollout stage"
+            )
+        else:
+            lines.append(
+                "CONVERGENCE: NOT-BLOCKED — no blocking claim or defect class is unclosed; "
+                "reviewer findings still govern"
+            )
     rendered = "\n".join(lines)
     if sum(line.startswith("CONVERGENCE:") for line in rendered.splitlines()) != 1:
         raise AssertionError("plan convergence trailer must contain exactly one verdict line")

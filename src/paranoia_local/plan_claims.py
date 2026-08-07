@@ -656,12 +656,30 @@ def claim_blocks(claim: Claim) -> bool:
         return True
     if claim.kind == DECISION:
         return claim.status != NOT_APPLICABLE
+    # A stricter policy may require reauthorization of an already applied truth
+    # transition. Advisory bearing does not waive that pending truth decision.
+    if any(
+        authorization
+        and authorization.get("required") is True
+        and authorization.get("status") == "pending"
+        for authorization in (
+            claim.truth_authorization,
+            claim.bearing_authorization,
+            claim.dispute_authorization,
+            claim.deferral_authorization,
+        )
+    ):
+        return True
+    if claim.status == VERIFIED and not _authorization_valid(claim.truth_authorization):
+        return True
+    if claim.status == DEFERRED and not _authorization_valid(claim.deferral_authorization):
+        return True
     if claim.bearing == ADVISORY:
         return not _authorization_valid(claim.bearing_authorization, must_be_required=True)
     if claim.status == VERIFIED:
-        return not _authorization_valid(claim.truth_authorization)
+        return False
     if claim.status == DEFERRED:
-        return not _authorization_valid(claim.deferral_authorization)
+        return False
     return True
 
 
@@ -849,19 +867,30 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
             raise ClaimRegisterError("confirmed persisted fact has unreachable status")
         if claim.status == SUPERSEDED:
             target = claims.get(claim.superseded_by or "")
-            target_is_clear = target is not None and (
+            # A replacement was clear when supersession completed, but it may later
+            # become stale or disputed without resurrecting the terminal predecessor.
+            target_is_reachable = target is not None and (
                 (target.kind == FACT and target.status in {
-                    VERIFIED, DEFERRED, CONTRADICTED, DISPUTED, STALE,
+                    UNVERIFIED, VERIFIED, DEFERRED, CONTRADICTED, DISPUTED, STALE,
                 })
                 or (target.kind == DECISION and target.status in {NOT_APPLICABLE, STALE})
             )
             if claim.pending_replacement_id != claim.superseded_by or target is None \
                     or target.claim_id == claim.claim_id \
                     or target.kind_classification != CONFIRMED \
-                    or not target_is_clear:
+                    or not target_is_reachable:
                 raise ClaimRegisterError("persisted supersession graph is inconsistent")
         elif claim.superseded_by is not None:
             raise ClaimRegisterError("active persisted claim has a superseded target")
+        elif claim.pending_replacement_id is not None:
+            target = claims.get(claim.pending_replacement_id)
+            target_is_clear = target is not None \
+                and target.status in {VERIFIED, DEFERRED, NOT_APPLICABLE}
+            if claim.status != STALE or target is None \
+                    or target.claim_id == claim.claim_id \
+                    or target.kind_classification != CONFIRMED \
+                    or target_is_clear:
+                raise ClaimRegisterError("active supersession graph is inconsistent")
     return ClaimState(
         lineage_id, next_seq, claims, debt,
         list(evidence_records), plan_sha, policy,

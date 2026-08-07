@@ -259,6 +259,35 @@ def test_nonrequired_truth_check_does_not_erase_audited_advisory_authorization()
     assert not pc.claim_blocks(claim)
 
 
+def test_advisory_claim_blocks_while_stricter_truth_authorization_is_pending() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    bearing = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": "advisory",
+        "evidence_ids": ["e1"], "reason": "not load bearing",
+    })
+    bearing_digest = pc.event_digest(bearing)
+    pc.apply_events(
+        state, [bearing], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[
+            pc.VendorCheck("codex", "m1", bearing_digest, ("e1",), True, "t"),
+            pc.VendorCheck("claude", "m2", bearing_digest, ("e1",), True, "t"),
+        ],
+    )
+    verify = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id, "evidence_ids": ["e1"],
+        "reason": "truth requires the newly tightened policy",
+    })
+    pc.apply_events(
+        state, [verify], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+    )
+    claim = state.claims[claim_id]
+    assert claim.bearing == pc.ADVISORY
+    assert claim.truth_authorization["status"] == "pending"
+    assert pc.claim_blocks(claim)
+
+
 @pytest.mark.parametrize("secondary_accepts", [True, False, None])
 def test_required_defer_applies_only_after_two_vendor_acceptances(
     secondary_accepts: bool | None,
@@ -574,6 +603,30 @@ def test_inconsistent_persisted_supersession_is_rejected() -> None:
     claim.pending_replacement_id = "missing"
     claim.superseded_by = "missing"
     with pytest.raises(pc.ClaimRegisterError, match="supersession graph"):
+        pc.state_from_json("plan", pc.state_to_json(state))
+
+
+def test_active_persisted_supersession_edge_cannot_retire_an_unrelated_claim() -> None:
+    state, claim_id, _spans = _state_with_confirmed_fact()
+    source = state.claims[claim_id]
+    target = copy.deepcopy(source)
+    target.claim_id = "f" * 32
+    target.kind = pc.DECISION
+    target.status = pc.NOT_APPLICABLE
+    target.pending_replacement_id = None
+    target.superseded_by = None
+    target.evidence_ids = []
+    target.truth_evidence_ids = []
+    target.bearing_evidence_ids = []
+    target.dispute_evidence_ids = []
+    target.disputed_evidence_ids = []
+    target.truth_authorization = None
+    target.bearing_authorization = None
+    target.dispute_authorization = None
+    target.deferral_authorization = None
+    source.pending_replacement_id = target.claim_id
+    state.claims[target.claim_id] = target
+    with pytest.raises(pc.ClaimRegisterError, match="active supersession graph"):
         pc.state_from_json("plan", pc.state_to_json(state))
 
 

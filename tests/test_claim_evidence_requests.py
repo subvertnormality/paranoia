@@ -20,6 +20,34 @@ def _requests(rows: list[dict]) -> str:
     )
 
 
+def test_external_source_policy_is_exact_server_owned_provenance() -> None:
+    policy = cv.parse_external_source_policy([
+        {"host": "docs.example.com", "path_prefix": "/", "source_class": "authoritative"},
+        {"host": "docs.example.com", "path_prefix": "/standard/", "source_class": "primary"},
+        {"host": "news.example.com", "path_prefix": "/", "source_class": "secondary"},
+    ])
+    assert cv.classify_external_source(
+        "https://docs.example.com/standard/v1", policy,
+    ) == "primary"
+    assert cv.classify_external_source(
+        "https://docs.example.com/guide", policy,
+    ) == "authoritative"
+    assert cv.classify_external_source(
+        "https://sub.docs.example.com/standard/v1", policy,
+    ) == "unclassified-external"
+    assert cv.classify_external_source(
+        "https://www.reddit.com/r/python/comments/example", policy,
+    ) == "ugc"
+    with pytest.raises(cv.EvidenceRequestError, match="exact lowercase host"):
+        cv.parse_external_source_policy([
+            {"host": "*.example.com", "path_prefix": "/", "source_class": "primary"},
+        ])
+    with pytest.raises(cv.EvidenceRequestError, match="known UGC hosts"):
+        cv.parse_external_source_policy([
+            {"host": "www.reddit.com", "path_prefix": "/", "source_class": "primary"},
+        ])
+
+
 def test_python_compile_adapter_is_fixed_argv_and_bound_to_snapshot_inputs(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -43,6 +71,46 @@ def test_arbitrary_adapter_or_extra_command_fields_are_rejected() -> None:
     bad["command"] = "curl attacker"
     with pytest.raises(cv.EvidenceRequestError, match="unknown fields"):
         cv.parse_requests(_requests([bad]), {"claim"})
+
+
+def test_generic_evidence_flow_supports_a_non_python_project(
+    repo: Path, tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "rm", "-q", "app.py"], cwd=repo, check=True)
+    (repo / "README.md").write_text("# portable project\n")
+    (repo / "src").mkdir()
+    (repo / "src" / "main.rs").write_text(
+        'fn main() { println!("portable marker"); }\n'
+    )
+    (repo / "package.json").write_text('{"name":"mixed-project"}\n')
+    (repo / "architecture.svg").write_text("<svg><!-- portable marker --></svg>\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "non-python project"], cwd=repo, check=True)
+
+    parsed = cv.parse_requests(_requests([
+        {"op": "LIST_TREE", "claim_id": "layout", "prefix": "", "limit": 20},
+        {
+            "op": "READ_BLOB", "claim_id": "runtime", "path": "src/main.rs",
+            "offset": 0, "max_bytes": 4096,
+        },
+        {
+            "op": "SEARCH_LITERAL", "claim_id": "assets",
+            "pattern": "portable marker", "paths": [], "limit": 20,
+        },
+    ]), {"layout", "runtime", "assets"})
+    store = EvidenceStore(tmp_path / "portable-evidence")
+    store.begin("portable-run")
+    with PlanRepositorySnapshot.create(repo, run_id="portable") as snapshot:
+        records = cv.collect_evidence(
+            parsed, snapshot=snapshot, store=store, run_id="portable-run",
+        )
+
+    assert {record.kind for record in records} == {
+        "repository-list", "repository-blob", "repository-search",
+    }
+    assert any("src/main.rs" in record.display_passage for record in records)
+    assert any("architecture.svg" in record.display_passage for record in records)
+    assert all(record.kind != "empirical" for record in records)
 
 
 def test_deep_request_json_is_a_recoverable_request_error() -> None:
