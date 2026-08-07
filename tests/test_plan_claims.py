@@ -124,6 +124,20 @@ def test_generated_claim_id_collision_is_rejected_without_mutation(
     assert list(state.claims) == [claim_id]
 
 
+def test_duplicate_transition_evidence_ids_are_rejected_before_authorization() -> None:
+    event = {
+        "op": "VERIFY", "claim_id": "a" * 32,
+        "evidence_ids": ["e" + "1" * 32, "e" + "1" * 32],
+        "reason": "duplicate",
+    }
+    with pytest.raises(pc.ClaimRegisterError, match="must not contain duplicates"):
+        pc.parse_role_register(
+            "=== VERIFICATION REGISTER ===\nEVENTS-JSON: "
+            + json.dumps([event], separators=(",", ":"), sort_keys=True),
+            pc.VERIFIER_ROLE,
+        )
+
+
 def test_kind_confirmation_must_come_from_an_independent_role() -> None:
     state, claim_id, spans = _state_with_claim()
     event = pc.Event("CONFIRM_KIND", {"op": "CONFIRM_KIND", "claim_id": claim_id,

@@ -57,6 +57,10 @@ class SnapshotUnavailable(RuntimeError):
     pass
 
 
+class SnapshotContentUnavailable(SnapshotUnavailable):
+    """A requested path/ref is absent or has a now-unsupported repository type."""
+
+
 class SnapshotCleanupError(SnapshotUnavailable):
     """Temporary refs may remain; the journal/latch must be retained for repair."""
 
@@ -290,6 +294,24 @@ def _open_directory(path: Path) -> int:
         raise SnapshotUnavailable(f"repository directory is unavailable at {path}: {exc}") from exc
 
 
+def _open_absolute_directory_nofollow(path: Path) -> int:
+    """Open every component of an absolute directory path without following links."""
+    if not path.is_absolute() or ".." in path.parts:
+        raise SnapshotUnavailable(f"repository directory path is unsafe: {path}")
+    fd = _open_directory(Path("/"))
+    try:
+        for component in path.parts[1:]:
+            if not component:
+                continue
+            child = _open_child_directory(fd, component, create=False)
+            os.close(fd)
+            fd = child
+        return fd
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def _open_child_directory(parent_fd: int, name: str, *, create: bool) -> int:
     """Open one fd-relative component without following a supplied link."""
     if not name or name in {".", ".."} or "/" in name or "\0" in name:
@@ -433,7 +455,6 @@ def _copy_object_file(
                             raise OSError("object-store copy made no progress")
                         written += count
                     copied += len(chunk)
-                os.fsync(target_fd)
             finally:
                 os.close(target_fd)
             after = os.fstat(fd)
@@ -460,7 +481,7 @@ def _copy_object_file(
         ) from exc
 
 
-def _materialize_object_store(source_fd: int, destination: Path) -> None:
+def _materialize_object_store(source_fd: int, destination: Path) -> frozenset[str]:
     """Create a private object database without following native descendants.
 
     Only loose objects and pack-family regular files participate in object lookup.
@@ -473,6 +494,7 @@ def _materialize_object_store(source_fd: int, destination: Path) -> None:
     pack_target.mkdir(mode=0o700)
     entries = 0
     copied_bytes = 0
+    native_loose_objects: set[str] = set()
     loose_name = re.compile(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})$")
     object_hex = r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})"
     pack_name = re.compile(
@@ -511,6 +533,8 @@ def _materialize_object_store(source_fd: int, destination: Path) -> None:
                                     child_fd, name, target / name,
                                     remaining_bytes=MAX_OBJECT_STORE_BYTES - copied_bytes,
                                 )
+                                if root_name != "pack":
+                                    native_loose_objects.add(f"{root_name}/{name}")
                     except SnapshotUnavailable:
                         raise
                     except OSError as exc:
@@ -524,19 +548,12 @@ def _materialize_object_store(source_fd: int, destination: Path) -> None:
         raise
     except OSError as exc:
         raise SnapshotUnavailable(f"could not enumerate repository object store: {exc}") from exc
-    for path in (pack_target, destination / "info", destination):
-        fd = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        )
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+    return frozenset(native_loose_objects)
 
 
-def _publish_private_loose_objects(private_objects: Path, common: Path) -> None:
+def _publish_private_loose_objects(
+    private_objects: Path, common: Path, *, skip: frozenset[str],
+) -> None:
     """Copy content-addressed snapshot objects back for the durable native pin.
 
     Git never reads this mutable tree. Publication uses retained directory handles and
@@ -556,6 +573,8 @@ def _publish_private_loose_objects(private_objects: Path, common: Path) -> None:
             try:
                 for name in sorted(os.listdir(source_dir), key=os.fsencode):
                     if not re.fullmatch(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})", name):
+                        continue
+                    if f"{fanout}/{name}" in skip:
                         continue
                     before = os.stat(name, dir_fd=source_dir, follow_symlinks=False)
                     if not stat.S_ISREG(before.st_mode):
@@ -896,6 +915,7 @@ class _GitControl:
     common: Path
     skipped_refs: tuple[str, ...] = ()
     owned_fds: tuple[int, ...] = ()
+    native_loose_objects: frozenset[str] = frozenset()
 
 
 def _controlled_config_value(
@@ -927,13 +947,23 @@ def _create_git_control(repo: Path) -> _GitControl:
     packed refs, and shallow metadata are copied or replaced before any repository-aware
     Git command executes.
     """
-    git_dir, common = _approved_repository_dirs(repo)
     directory = Path(tempfile.mkdtemp(prefix="paranoia-plan-git-control-"))
     owned_fds: list[int] = []
     try:
         repo_fd = _open_directory(repo)
-        git_fd = _open_directory(git_dir)
-        common_fd = _open_directory(common)
+        try:
+            dotgit = os.stat(".git", dir_fd=repo_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise SnapshotUnavailable(f"repository .git is unavailable: {exc}") from exc
+        if stat.S_ISDIR(dotgit.st_mode) and not stat.S_ISLNK(dotgit.st_mode):
+            # The ordinary repository case never converts an approved inode back to a
+            # pathname. Both handles are opened relative to the already retained root.
+            git_fd = _open_child_directory(repo_fd, ".git", create=False)
+            common_fd = os.dup(git_fd)
+        else:
+            git_dir, common = _approved_repository_dirs(repo)
+            git_fd = _open_absolute_directory_nofollow(git_dir)
+            common_fd = _open_absolute_directory_nofollow(common)
         objects_fd = _open_child_directory(common_fd, "objects", create=False)
         owned_fds = [repo_fd, git_fd, common_fd, objects_fd]
         for fd in owned_fds:
@@ -941,7 +971,7 @@ def _create_git_control(repo: Path) -> _GitControl:
         stable_repo = Path(f"/proc/self/fd/{repo_fd}")
         stable_common = Path(f"/proc/self/fd/{common_fd}")
         private_objects = directory / "objects"
-        _materialize_object_store(objects_fd, private_objects)
+        native_loose_objects = _materialize_object_store(objects_fd, private_objects)
         os.close(objects_fd)
         owned_fds.remove(objects_fd)
 
@@ -997,7 +1027,8 @@ def _create_git_control(repo: Path) -> _GitControl:
             "GIT_OBJECT_DIRECTORY": str(private_objects),
         }
         return _GitControl(
-            directory, environment, stable_common, skipped_refs, tuple(owned_fds)
+            directory, environment, stable_common, skipped_refs, tuple(owned_fds),
+            native_loose_objects,
         )
     except Exception:
         import shutil
@@ -1070,6 +1101,7 @@ class PlanRepositorySnapshot:
             ).stdout.decode("ascii").strip()
             _publish_private_loose_objects(
                 Path(git_env["GIT_OBJECT_DIRECTORY"]), control.common,
+                skip=control.native_loose_objects,
             )
             token = _ref_token(run_id)
             wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
@@ -1219,7 +1251,9 @@ class PlanRepositorySnapshot:
         )
         rows = [row for row in out.split(b"\0") if row]
         if len(rows) != 1:
-            raise SnapshotUnavailable(f"path {path!r} is not present uniquely in the snapshot")
+            raise SnapshotContentUnavailable(
+                f"path {path!r} is not present uniquely in the snapshot"
+            )
         meta, _, actual_path = rows[0].partition(b"\t")
         parts = meta.decode("ascii").split()
         if len(parts) != 3 or actual_path.decode("utf-8", errors="surrogateescape") != path:
@@ -1229,11 +1263,13 @@ class PlanRepositorySnapshot:
     def blob_identity(self, path: str) -> tuple[str, int]:
         mode, kind, oid = self._entry(path)
         if mode == "120000":
-            raise SnapshotUnavailable("symlink paths are not repository evidence blobs")
+            raise SnapshotContentUnavailable("symlink paths are not repository evidence blobs")
         if mode == "160000" or kind == "commit":
-            raise SnapshotUnavailable("gitlinks are unavailable without a supplied artifact")
+            raise SnapshotContentUnavailable(
+                "gitlinks are unavailable without a supplied artifact"
+            )
         if kind != "blob":
-            raise SnapshotUnavailable("repository evidence path is not a blob")
+            raise SnapshotContentUnavailable("repository evidence path is not a blob")
         size_raw = _run(
             self.repo, ["cat-file", "-s", oid], git_env=self._git_env,
         ).stdout.decode("ascii").strip()
@@ -1468,7 +1504,7 @@ class PlanRepositorySnapshot:
             return self.commit_id
         oid = self.history_refs.get(ref, "")
         if not oid:
-            raise SnapshotUnavailable("history ref was not in the initial pinned map")
+            raise SnapshotContentUnavailable("history ref was not in the initial pinned map")
         return oid
 
 
@@ -1716,8 +1752,9 @@ def _approved_repository_dirs(repo: Path) -> tuple[Path, Path]:
     if stat.S_ISLNK(dotgit_info.st_mode):
         raise SnapshotUnavailable("repository .git may not be a symlink")
     if stat.S_ISDIR(dotgit_info.st_mode):
-        resolved = dotgit.resolve()
-        return resolved, resolved
+        # Callers that need authority open this path with O_NOFOLLOW. Never turn the
+        # checked directory into a new symlink-following lookup with Path.resolve().
+        return dotgit, dotgit
     try:
         marker = _read_small_regular(dotgit).decode("utf-8", errors="strict").strip()
     except UnicodeError as exc:

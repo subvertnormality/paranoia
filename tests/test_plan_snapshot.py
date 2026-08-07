@@ -452,6 +452,32 @@ def test_retained_git_and_object_roots_survive_path_replacement(
     )
 
 
+def test_dotgit_swap_before_descriptor_open_cannot_publish_externally(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    external = tmp_path / "external-git"
+    (external / "objects").mkdir(parents=True)
+    (external / "refs").mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_text("unchanged")
+    original = ps._open_child_directory
+    swapped = False
+
+    def swap_before_open(parent_fd: int, name: str, *, create: bool) -> int:
+        nonlocal swapped
+        if name == ".git" and not swapped:
+            swapped = True
+            (repo / ".git").rename(repo / ".git-original")
+            (repo / ".git").symlink_to(external, target_is_directory=True)
+        return original(parent_fd, name, create=create)
+
+    monkeypatch.setattr(ps, "_open_child_directory", swap_before_open)
+    with pytest.raises(SnapshotUnavailable, match="directory is unsafe"):
+        PlanRepositorySnapshot.create(repo, run_id="dotgit-pre-open-race")
+    assert sentinel.read_text() == "unchanged"
+    assert not (external / "refs" / "paranoia").exists()
+
+
 def test_native_object_descendants_cannot_change_later_snapshot_reads(
     repo: Path, tmp_path: Path,
 ) -> None:

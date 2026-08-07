@@ -14,7 +14,9 @@ from .evidence_store import EvidenceStore, EvidenceStoreError
 from .external_evidence import (
     EndpointSearchProvider, FetchLimits, NetworkEvidenceError, SafeHttpClient,
 )
-from .plan_snapshot import PlanRepositorySnapshot, SnapshotUnavailable
+from .plan_snapshot import (
+    PlanRepositorySnapshot, SnapshotContentUnavailable, SnapshotUnavailable,
+)
 from . import plan_claims as pc
 
 REQUEST_MARKER = "=== EVIDENCE REQUESTS ==="
@@ -185,7 +187,7 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
         if limit > 10:
             raise EvidenceRequestError("SEARCH_EXTERNAL.limit is out of bounds")
     if op == "HISTORY":
-        _validate_utf8_scalar(item.get("ref"), field="HISTORY.ref", max_bytes=1024)
+        _validate_history_ref(item.get("ref"), field="HISTORY.ref")
         _validate_repo_path(item.get("path"), field="HISTORY.path")
         if limit > 50:
             raise EvidenceRequestError("HISTORY.limit is out of bounds")
@@ -230,6 +232,27 @@ def _validate_repo_path(
     if not _is_repo_path(value, allow_empty=allow_empty):
         raise EvidenceRequestError(f"{field} must be a bounded relative repository path")
     assert isinstance(value, str)
+    return value
+
+
+def _validate_history_ref(value: object, *, field: str) -> str:
+    ref = _validate_utf8_scalar(value, field=field, max_bytes=1024)
+    if ref == "SNAPSHOT":
+        return ref
+    forbidden = set(" ~^:?*[\\")
+    parts = ref.split("/")
+    if not ref.startswith("refs/") or ref.endswith(("/", ".", ".lock")) \
+            or "@{" in ref or ".." in ref \
+            or any(not part or part.startswith(".") for part in parts) \
+            or any(ord(char) < 32 or ord(char) == 127 or char in forbidden for char in ref):
+        raise EvidenceRequestError(f"{field} must be SNAPSHOT or a canonical refs/... name")
+    return ref
+
+
+def _validate_oid(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or len(value) not in {40, 64} \
+            or any(char not in "0123456789abcdef" for char in value):
+        raise EvidenceRequestError(f"{field} must be a Git object ID")
     return value
 
 
@@ -651,6 +674,34 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
     for key, cap in array_caps.items():
         if key in expected and len(metadata[key]) > cap:
             raise EvidenceRequestError(f"persisted {kind}.{key} exceeds its array cap")
+    for key in expected.intersection({"snapshot_commit", "blob_oid", "history_oid"}):
+        _validate_oid(metadata.get(key), field=f"persisted {kind}.{key}")
+    if kind == "repository-list":
+        _validate_repo_path(
+            metadata.get("prefix"), field="persisted repository-list.prefix",
+            allow_empty=True,
+        )
+        if not 1 <= metadata["limit"] <= 200:
+            raise EvidenceRequestError("persisted repository-list.limit is out of bounds")
+    elif kind == "repository-blob":
+        _validate_repo_path(metadata.get("path"), field="persisted repository-blob.path")
+        if metadata["length"] > 1 << 20 or metadata["offset"] > metadata["whole_size"] \
+                or metadata["length"] > metadata["whole_size"] - metadata["offset"]:
+            raise EvidenceRequestError("persisted repository-blob bounds are invalid")
+    elif kind == "repository-search":
+        _validate_utf8_scalar(
+            metadata.get("pattern"), field="persisted repository-search.pattern",
+            max_bytes=256,
+        )
+        if not 1 <= metadata["limit"] <= 50:
+            raise EvidenceRequestError("persisted repository-search.limit is out of bounds")
+        for path in [*metadata["paths"], *metadata["candidate_paths"]]:
+            _validate_repo_path(path, field="persisted repository-search path")
+    elif kind == "repository-history":
+        _validate_history_ref(metadata.get("ref"), field="persisted repository-history.ref")
+        _validate_repo_path(metadata.get("path"), field="persisted repository-history.path")
+        if not 1 <= metadata["limit"] <= 50:
+            raise EvidenceRequestError("persisted repository-history.limit is out of bounds")
     if "input_hashes" in expected:
         hashes = metadata.get("input_hashes")
         if not isinstance(hashes, dict) or len(hashes) > 20 or any(
@@ -659,6 +710,8 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
             for path, digest in hashes.items()
         ):
             raise EvidenceRequestError("persisted empirical.input_hashes is malformed")
+        for path in hashes:
+            _validate_repo_path(path, field="persisted empirical.input_hashes path")
     if "inspected_ranges" in expected:
         ranges = metadata.get("inspected_ranges")
         if not isinstance(ranges, list) or len(ranges) > 200:
@@ -675,6 +728,9 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
                 raise EvidenceRequestError(
                     "persisted repository-search inspected range has invalid types"
                 )
+            _validate_repo_path(
+                item["path"], field="persisted repository-search inspected path",
+            )
             oid = item["blob_oid"]
             if len(oid) not in {40, 64} or any(char not in "0123456789abcdef" for char in oid):
                 raise EvidenceRequestError(
@@ -724,6 +780,9 @@ def validate_cached_records(
             if record.kind.startswith("repository") \
                     and record.metadata.get("snapshot_commit") != snapshot.commit_id:
                 raise EvidenceRequestError("repository query scope changed")
+            if record.kind == "empirical" \
+                    and record.metadata.get("snapshot_commit") != snapshot.commit_id:
+                raise EvidenceRequestError("empirical adapter input snapshot changed")
             if record.kind == "repository-list":
                 paths, complete = snapshot.list_tree_scoped(
                     record.metadata["prefix"], limit=record.metadata["limit"],
@@ -814,7 +873,10 @@ def validate_cached_records(
         # Semantic cache misses invalidate the record. Operational CAS/snapshot I/O
         # failures are not evidence that the record is stale and must fail the round
         # explicitly instead of silently permitting an unrelated NOT-BLOCKED verdict.
-        except (EvidenceRequestError, KeyError, TypeError, ValueError):
+        except (
+            EvidenceRequestError, SnapshotContentUnavailable,
+            KeyError, TypeError, ValueError,
+        ):
             invalid_ids.add(record.evidence_id)
     if invalid_ids:
         for claim in state.claims.values():

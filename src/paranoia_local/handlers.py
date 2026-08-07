@@ -509,7 +509,10 @@ def _read_plan_bytes(arguments: dict[str, Any]) -> tuple[bytes, str, str | None]
         raise ValueError("plan_text must be a nonempty string")
     if len(plan_text) > MAX_PLAN_BYTES:
         raise _PlanInputUnavailable(f"plan_text exceeds the {MAX_PLAN_BYTES}-byte cap")
-    raw = plan_text.encode("utf-8", errors="surrogateescape")
+    try:
+        raw = plan_text.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise _PlanInputUnavailable("plan_text must be valid UTF-8") from exc
     if len(raw) > MAX_PLAN_BYTES:
         raise _PlanInputUnavailable(f"plan_text exceeds the {MAX_PLAN_BYTES}-byte cap")
     return raw, plan_text, None
@@ -1572,6 +1575,13 @@ def _resume_pending_authorizations(
                 plan_context=plan_context, on_progress=on_progress, budget=budget,
                 prior_checks=tuple(prior_checks),
             )
+            if event.op == "RESOLVE_DISPUTE" \
+                    and claim.status == event.data.get("outcome") \
+                    and claim.pending_transition is None:
+                pc.reauthorize_applied_dispute(
+                    claim, event, evidence_ids=evidence_ids, vendor_checks=checks,
+                )
+                continue
             pc.apply_events(
                 state, [event], role=pc.VERIFIER_ROLE, spans=spans,
                 round_no=round_no, evidence_ids=evidence_ids,

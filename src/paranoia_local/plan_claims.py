@@ -306,6 +306,9 @@ def _validate_scalars(op: str, item: Mapping[str, Any]) -> None:
         or any(not _safe_model_string(v) for v in item["evidence_ids"])
     ):
         raise ClaimRegisterError(f"{op}.evidence_ids must be a string array")
+    if "evidence_ids" in item \
+            and len(set(item["evidence_ids"])) != len(item["evidence_ids"]):
+        raise ClaimRegisterError(f"{op}.evidence_ids must not contain duplicates")
     if op == "ADD":
         _validate_model_anchor(item.get("plan_anchor"), f"{op}.plan_anchor")
     if op == "DEFER":
@@ -573,6 +576,45 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
     setattr(claim, slot, authorization)
     if event.op == "RESOLVE_DISPUTE":
         claim.truth_authorization = copy.deepcopy(authorization)
+    return vendors == SUPPORTED_AUDIT_VENDORS
+
+
+def reauthorize_applied_dispute(
+    claim: Claim, event: Event, *, evidence_ids: Mapping[str, str],
+    vendor_checks: Sequence[VendorCheck],
+) -> bool:
+    """Reauthorize a migrated resolution without replaying its consumed state edge."""
+    if event.op != "RESOLVE_DISPUTE" or event.data.get("claim_id") != claim.claim_id:
+        raise ClaimTransitionError("migration reauthorization requires RESOLVE_DISPUTE")
+    _require_fact(claim)
+    outcome = event.data.get("outcome")
+    if outcome not in {VERIFIED, CONTRADICTED} or claim.status != outcome:
+        raise ClaimTransitionError(
+            "applied dispute outcome does not match migration authorization"
+        )
+    ids = _validated_evidence(event.data, evidence_ids, claim.claim_id)
+    if claim.truth_evidence_ids != ids or claim.dispute_evidence_ids != ids:
+        raise ClaimTransitionError(
+            "applied dispute evidence does not match migration authorization"
+        )
+    digest = event_digest(event)
+    matching = [
+        check for check in vendor_checks
+        if check.accepted and check.event_digest == digest
+        and check.evidence_ids == tuple(ids)
+        and check.vendor in SUPPORTED_AUDIT_VENDORS
+    ]
+    vendors = {check.vendor for check in matching}
+    authorization = {
+        "required": True,
+        "status": "complete" if vendors == SUPPORTED_AUDIT_VENDORS else "pending",
+        "event_digest": digest,
+        "event": copy.deepcopy(event.data),
+        "evidence_ids": ids,
+        "checks": [asdict(check) for check in matching],
+    }
+    claim.truth_authorization = copy.deepcopy(authorization)
+    claim.dispute_authorization = copy.deepcopy(authorization)
     return vendors == SUPPORTED_AUDIT_VENDORS
 
 

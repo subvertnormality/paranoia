@@ -541,6 +541,69 @@ def test_persisted_empirical_metadata_is_deeply_validated() -> None:
         cv.records_from_json([asdict(record)])
 
 
+@pytest.mark.parametrize("unsafe", ["../escape.py", "/absolute.py"])
+def test_persisted_repository_operands_reuse_strict_path_validation(
+    repo: Path, tmp_path: Path, unsafe: str,
+) -> None:
+    store = EvidenceStore(tmp_path / "operand-store")
+    store.begin("operand-run")
+    request = cv.EvidenceRequest("READ_BLOB", {
+        "op": "READ_BLOB", "claim_id": "claim", "path": "app.py",
+        "offset": 0, "max_bytes": 1024,
+    })
+    with PlanRepositorySnapshot.create(repo, run_id="operand-record") as snapshot:
+        row = asdict(cv.collect_evidence(
+            [request], snapshot=snapshot, store=store, run_id="operand-run",
+        )[0])
+    row["metadata"]["path"] = unsafe
+    with pytest.raises(cv.EvidenceRequestError, match="relative repository path"):
+        cv.records_from_json([row])
+
+
+def test_removed_empirical_input_invalidates_cache_and_stales_claim(
+    repo: Path, tmp_path: Path,
+) -> None:
+    spans = pc.segment_plan(b"Compile app.py.\n")
+    state = pc.ClaimState("removed-empirical-input")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "compile", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["compile"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "compile premise",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    store = EvidenceStore(tmp_path / "removed-input-store")
+    store.begin("removed-input-run")
+    request = cv.EvidenceRequest("RUN_ADAPTER", {
+        "op": "RUN_ADAPTER", "claim_id": claim_id,
+        "adapter": "PYTHON_COMPILE", "paths": ["app.py"],
+    })
+    with PlanRepositorySnapshot.create(repo, run_id="empirical-before") as before:
+        record = cv.collect_evidence(
+            [request], snapshot=before, store=store, run_id="removed-input-run",
+        )[0]
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": [record.evidence_id], "reason": "compiled",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={record.evidence_id: claim_id},
+    )
+    (repo / "app.py").unlink()
+    with PlanRepositorySnapshot.create(repo, run_id="empirical-after") as after:
+        assert cv.validate_cached_records(
+            [record], snapshot=after, store=store, state=state,
+        ) == []
+    assert state.claims[claim_id].status == pc.STALE
+    assert pc.claim_blocks(state.claims[claim_id])
+
+
 def test_persisted_non_abstention_record_requires_rooted_bytes() -> None:
     digest = "a" * 64
     row = asdict(cv.EvidenceRecord(

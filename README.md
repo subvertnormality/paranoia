@@ -687,7 +687,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   exclusively. Retained worktree and common-dir fds remain live through cleanup, so later
   pathname or native object-descendant replacement cannot redirect reads, object writes,
   or refs. Private loose objects are published back only through atomic fd-anchored writes
-  needed to make the durable native GC pin resolvable.
+  needed to make the durable native GC pin resolvable; objects already present at
+  materialization are not recopied. Ordinary `.git` is opened relative to the retained
+  repository descriptor, and linked-worktree directory paths are opened componentwise
+  without following symlinks.
   Working-tree discovery is an fd-relative server walk; ignore matching uses only its
   explicit names and safely copied `.gitignore` files in a private worktree. Supplied loose refs are
   copied through bounded fd-anchored no-follow traversal; Git never receives the live ref
@@ -700,7 +703,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   malformed model, network, and persisted JSON is converted to a recoverable blocked
   result, including model strings with non-UTF-8 surrogate code points. Evidence-request
   paths, patterns, refs, and queries are validated as bounded strict UTF-8 (with
-  traversal-free relative repository paths) inside the role's correction attempt. Direct Git metadata
+  traversal-free relative repository paths) both for new requests and persisted records.
+  Inline plan strings use strict UTF-8 preflight and retain the closure response shape on
+  failure. Direct Git metadata
   is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
   ambiguous failures at or after that boundary, releasing the unambiguous ownership latch
@@ -742,12 +747,16 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   bytes that require lossy replacement decoding are likewise context-only. Authorization
   contract version 2 reblocks and reruns required version-1 provenance through both actual
   vendors before migration, including intrinsically audited advisory-bearing and dispute
-  events under `auto`/low stakes. Auditor packets contain the complete validated claim
+  events under `auto`/low stakes. A completed dispute outcome is reauthorized in place
+  without replaying its already-consumed state edge, and duplicate event evidence IDs are
+  rejected before digest/audit persistence. Auditor packets contain the complete validated claim
   record, including deferral and pending-transition state. Cached
   CAS/repository reads and model-visible evidence rendering share the round byte budget,
   including evidence resent for a register correction; the same auditor packet is debited
-  separately before each vendor launch. A CAS or snapshot I/O failure blocks the round
-  instead of being downgraded to semantic cache invalidation. Missing
+  separately before each vendor launch. A CAS or operational snapshot I/O failure blocks
+  the round instead of being downgraded to semantic cache invalidation; confirmed
+  membership/type changes invalidate the cached record, stale its claim, and allow
+  recollection. Missing
   claim-state fields are corruption rather than defaults, invalidated claims reblock even
   if formerly advisory, and model-authored convergence lines are rejected so only one
   server-computed trailer is returned. Plan-derived claims and model-derived class,

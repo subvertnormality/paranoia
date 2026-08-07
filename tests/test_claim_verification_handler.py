@@ -253,6 +253,25 @@ def test_toolless_capability_preflight_blocks_before_snapshot_and_latch(
     assert not pending.exists()
 
 
+def test_invalid_inline_unicode_preserves_closure_response_shape(
+    repo: Path, tmp_path: Path,
+) -> None:
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "bad \ud800 plan",
+            "lineage": "invalid-inline-unicode", "round": 1,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    for heading in (
+        "## What works", "## What doesn't work", "## Risks", "## Gaps",
+        "## Improvements",
+    ):
+        assert out.count(heading) == 1
+    assert "INPUT-UNAVAILABLE" in out
+    assert out.count("CONVERGENCE:") == 1 and "CONVERGENCE: BLOCKED" in out
+
+
 def test_closure_mode_ignores_repository_config_in_every_role_prompt(
     repo: Path, tmp_path: Path,
 ) -> None:
@@ -1053,6 +1072,81 @@ def test_authorization_contract_upgrade_reruns_both_persisted_vendor_checks(
     )
     state = pc.state_from_json(lineage_id, lineage.claim_state)
     assert state.authorization_policy["version"] == 2
+
+
+def test_authorization_upgrade_rechecks_completed_dispute_without_reapplying_edge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("completed-dispute-upgrade")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "one", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    pc.apply_events(
+        state, [pc.Event("DISPUTE", {
+            "op": "DISPUTE", "claim_id": claim_id,
+            "evidence_ids": ["e1"], "reason": "conflict",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id},
+    )
+    resolution = pc.Event("RESOLVE_DISPUTE", {
+        "op": "RESOLVE_DISPUTE", "claim_id": claim_id, "outcome": "verified",
+        "evidence_ids": ["e2"], "reason": "resolved",
+    })
+    digest = pc.event_digest(resolution)
+    initial_checks = [
+        pc.VendorCheck("codex", "m1", digest, ("e2",), True, "T1"),
+        pc.VendorCheck("claude", "m2", digest, ("e2",), True, "T1"),
+    ]
+    pc.apply_events(
+        state, [resolution], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e2": claim_id}, independent_required=True,
+        vendor_checks=initial_checks,
+    )
+    body_digest = hashlib.sha256(b"x").hexdigest()
+    record = cv.EvidenceRecord(
+        "e2", claim_id, "supplied-artifact", "result", body_digest,
+        body_digest, 1, 0, 1, body_digest, "x",
+        {"source": "result", "caller_supplied": True},
+    )
+    policy = {"version": 2, "independent_check": "auto", "high_stakes": False}
+    handlers._reblock_for_policy(
+        state, [record], policy,
+        persisted_policy={
+            "version": 1, "independent_check": "auto", "high_stakes": False,
+        },
+    )
+    assert state.claims[claim_id].truth_authorization["status"] == "pending"
+
+    def refreshed_checks(event: pc.Event, **_kwargs) -> list[pc.VendorCheck]:
+        refreshed = pc.event_digest(event)
+        ids = tuple(event.data["evidence_ids"])
+        return [
+            pc.VendorCheck("codex", "m1", refreshed, ids, True, "T2"),
+            pc.VendorCheck("claude", "m2", refreshed, ids, True, "T2"),
+        ]
+
+    monkeypatch.setattr(handlers, "_independent_checks", refreshed_checks)
+    handlers._resume_pending_authorizations(
+        state, records=[record], policy="auto", high_stakes=False,
+        engine=ClaimEngine(), model="fake-model", effort="high",
+        plan_context=pc.render_spans(spans), spans=spans, round_no=2,
+        on_progress=None, budget=cv.EvidenceBudget(),
+    )
+    claim = state.claims[claim_id]
+    assert claim.status == pc.VERIFIED
+    assert claim.truth_authorization["status"] == "complete"
+    assert claim.dispute_authorization["status"] == "complete"
 
 
 def test_contract_upgrade_reblocks_intrinsically_required_auto_bearing() -> None:

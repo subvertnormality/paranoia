@@ -29,7 +29,8 @@ models cannot share a misconception. `NOT-BLOCKED` is not an approval.
 One closure round performs these stages:
 
 1. Accept at most 1 MiB of exact plan bytes and expose ordered opaque span IDs beside
-   bounded display text. Inline schema validation rejects oversized text early; filesystem
+   bounded display text. Inline schema validation rejects oversized or non-UTF-8 scalar
+   text early; either failure still returns the five sections and blocked trailer. Filesystem
    plans must be absolute, no-follow, nonblocking regular files whose identity, size, and
    timestamps remain stable across a bounded read. Unsafe input returns the standard five
    sections and an explicit blocked preflight verdict before any latch or model call.
@@ -40,7 +41,10 @@ One closure round performs these stages:
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
    Synthetic commits explicitly disable signing, including repository-configured GPG
    programs.
-   Before the first repository-aware Git subprocess, the server reads approved Git-dir
+   Before the first repository-aware Git subprocess, the server opens an ordinary `.git`
+   directory relative to the already-retained repository descriptor, without a later
+   pathname resolution. Linked-worktree targets are opened one absolute component at a time
+   with no-follow semantics. It then reads approved Git-dir
    metadata with bounded no-follow file operations and builds a private Git control
    directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
    metadata, an fd-anchored no-follow copy of loose refs, inherited handles for the
@@ -57,7 +61,8 @@ One closure round performs these stages:
    `config.worktree`, `include.path`, and `includeIf` content
    is never part of a repository-aware Git invocation; only repository/object format values
    are extracted from a bounded private copy with `git config --no-includes`.
-   New loose snapshot objects are copied back to the native store only for durable GC pins:
+   Only loose objects created after materialization are copied back to the native store for
+   durable GC pins; pre-existing native objects are tracked and skipped:
    publication uses retained directory handles, no-follow opens, an atomic temporary-file
    link, and exact-content collision checks; Git never reads that mutable copy. Inherited
    Git environment is cleared, and grafts/replacement objects are disabled for snapshot and
@@ -200,13 +205,17 @@ its bounded per-kind arrays and the shared rendered-byte debit limit the packet 
 hiding `complete`, candidate paths, or inspected ranges.
 
 Persisted records have an exact per-kind metadata schema, including nested collection
-types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
+types, bounded Git object IDs/ref names, traversal-free repository operands, and empirical
+input paths/hashes. The same strict path/ref validators used for fresh requests run during
+load. Before cache evaluation, every retained truth, bearing,
 dispute, deferral-authorization, or other claim dependency must resolve to one valid record
 bound to that exact claim. Missing, malformed, mismatched, or wrong-claim dependencies stale
 the claim and leave it blocking. A missing dependency means that no retained manifest record
 exists; failure to open or read a named CAS blob or repository snapshot is instead an
 operational verification failure. It blocks the round without treating inaccessible bytes
-as proof that the record is semantically stale.
+as proof that the record is semantically stale. A confirmed snapshot membership/type change
+(including a removed or newly gitlinked empirical input) is instead semantic invalidation:
+the record is discarded, its claim becomes stale, and its evidence phase can run again.
 `stale`, `disputed`, and `malformed` states override any earlier advisory-bearing
 authorization; invalidated evidence or plan bytes must be revalidated before the claim
 can become nonblocking again.
@@ -298,6 +307,8 @@ checks from exactly both supported vendors. The exact pending event is retained 
 server-side replay on the next round; a different event cannot erase it. Reload also validates the authorization's exact event
 schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
 state, and applied outcome against the claim's current truth, bearing, or deferral state.
+Duplicate `evidence_ids` inside one event are rejected before digesting, auditing, or
+persistence; every accepted event uses one canonical evidence tuple end to end.
 
 Each auditing vendor receives the server-owned proposition, current kind/bearing/status,
 the complete validated pre-transition claim record (including assertion mode, deferral,
@@ -336,7 +347,10 @@ The persisted authorization-policy tuple includes the independent-check mode, st
 classification, and policy version. Authorization contract version 2 requires actual
 complete-packet calls to both vendors. Version-1 lineage remains loadable only so every
 required completed or pending transition can be reblocked, stripped of old checks, and
-replayed through both vendors before migration is published. Any policy change invalidates the zero-research cache. A
+replayed through both vendors before migration is published. An already-applied
+`RESOLVE_DISPUTE` is reauthorized against its exact persisted outcome and evidence without
+trying to consume the no-longer-current `disputed` state edge again. Any policy change
+invalidates the zero-research cache. A
 stricter policy immediately reblocks an authorization whose persisted provenance is no
 longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result.
 
