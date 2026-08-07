@@ -58,6 +58,10 @@ def test_ignored_and_special_paths_are_disclosed_but_not_readable(repo: Path) ->
     with PlanRepositorySnapshot.create(repo, run_id="unavailable") as snapshot:
         assert "secret.txt" in snapshot.ignored_paths
         assert "events.pipe" in snapshot.unavailable_paths
+        _paths, complete = snapshot.list_tree_scoped(limit=200)
+        assert complete is False
+        matches, scope = snapshot.search_literal_scoped("token", paths=None, limit=10)
+        assert matches == [] and scope["complete"] is False
         with pytest.raises(SnapshotUnavailable, match="not present"):
             snapshot.read_blob("secret.txt")
         with pytest.raises(SnapshotUnavailable, match="not present"):
@@ -272,6 +276,35 @@ def test_repository_wide_manifest_rejects_mutation_during_snapshot(
     monkeypatch.setattr(ps, "_read_regular", mutate_after_read)
     with pytest.raises(SnapshotUnavailable, match="changed during snapshot"):
         PlanRepositorySnapshot.create(repo, run_id=f"manifest-{mutation}")
+
+
+def test_ref_manifest_rejects_multi_ref_update_during_capture(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = ps._copy_ref_tree
+    fired = False
+
+    def update_after_copy(source: Path, destination: Path) -> None:
+        nonlocal fired
+        original(source, destination)
+        if fired:
+            return
+        fired = True
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "update-ref", "--stdin"], cwd=repo, check=True,
+            input=(
+                f"create refs/heads/captured-topic {head}\n"
+                f"create refs/tags/captured-tag {head}\n"
+            ), text=True,
+        )
+
+    monkeypatch.setattr(ps, "_copy_ref_tree", update_after_copy)
+    with pytest.raises(SnapshotUnavailable, match="refs changed"):
+        PlanRepositorySnapshot.create(repo, run_id="ref-transaction")
 
 
 def test_bounded_git_output_enforces_local_and_shared_budgets(repo: Path) -> None:

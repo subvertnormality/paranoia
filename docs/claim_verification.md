@@ -99,9 +99,11 @@ The snapshot boundary retains these protections:
 - native `objects/info/alternates` is rejected rather than followed;
 - path, record, per-file, total snapshot, output, and subprocess-time limits are enforced;
 - dirty regular files are read with pre/open/post identity checks, and bounded repository-wide
-  pre/post manifests compare candidate paths, index entries, special paths, and file identities,
-  so ordinary edits spanning construction fail explicitly;
+  pre/post manifests compare candidate paths, index entries, special paths, file identities,
+  HEAD, and the bounded ref map, so ordinary edits or ref maintenance spanning construction
+  fail explicitly;
 - ignored files and unsupported nonregular paths are disclosed but are not evidence blobs;
+  their presence makes a containing list/search scope incomplete and unable to prove absence;
 - history refs are copied into the private control directory at snapshot creation, so later
   ref movement does not change their identity.
 
@@ -143,6 +145,8 @@ source, the server deterministically selects a claim/query-relevant window while
 the complete source in the content-addressed journal. If that initial window is insufficient,
 a later round can issue `SELECT_PASSAGE` for any explicit at-most-4-KiB byte range of the
 already rooted source; the server enforces the claim binding and aligns UTF-8 boundaries.
+Refinable records are surfaced fairly—one least-refined source per least-refined blocking
+claim—so bounded prompt limits rotate rather than permanently hiding later claims or sources.
 
 A visible bounded passage may authorize only a proposition directly entailed by those
 bytes. It cannot prove absence, exhaustive coverage, or an unshown source-wide property.

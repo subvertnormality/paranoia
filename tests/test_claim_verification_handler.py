@@ -183,6 +183,35 @@ def test_authoritative_external_evidence_is_only_eligible_not_self_proving() -> 
     )
 
 
+def test_refinable_evidence_rotates_fairly_across_claims_and_sources() -> None:
+    passage_digest = hashlib.sha256(b"x").hexdigest()
+
+    def record(index: int, claim_id: str, digest_char: str) -> cv.EvidenceRecord:
+        digest = digest_char * 64
+        return cv.EvidenceRecord(
+            evidence_id="e" + f"{index:032x}", claim_id=claim_id,
+            kind="supplied-artifact", source=f"source-{digest_char}",
+            blob_digest=digest, source_sha256=digest, source_size=10,
+            passage_start=0, passage_end=1, passage_sha256=passage_digest,
+            display_passage="x", metadata={"source": "caller", "caller_supplied": True},
+        )
+
+    records = [record(index + 1, f"claim-{index:02d}", "a") for index in range(21)]
+    blocking = {f"claim-{index:02d}" for index in range(21)}
+    first = handlers._fair_refinable_evidence(records, blocking)
+    assert len(first) == 20 and "claim-20" not in {item.claim_id for item in first}
+    records.extend(
+        record(100 + index, item.claim_id, "a") for index, item in enumerate(first)
+    )
+    second = handlers._fair_refinable_evidence(records, blocking)
+    assert "claim-20" in {item.claim_id for item in second}
+
+    two_sources = [record(500, "one", "a"), record(501, "one", "b")]
+    assert handlers._fair_refinable_evidence(two_sources, {"one"})[0].source == "source-a"
+    two_sources.append(record(502, "one", "a"))
+    assert handlers._fair_refinable_evidence(two_sources, {"one"})[0].source == "source-b"
+
+
 def test_verified_claim_and_empty_class_register_produce_one_not_blocked_verdict(
     repo: Path, tmp_path: Path
 ) -> None:

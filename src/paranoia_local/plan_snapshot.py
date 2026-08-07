@@ -638,6 +638,64 @@ def _ref_token(run_id: str) -> str:
     return f"{safe}-{hashlib.sha256(run_id.encode()).hexdigest()[:16]}"
 
 
+def _history_ref_map(
+    repo: Path, *, git_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    raw_refs = _run_bounded_records(
+        repo,
+        ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
+        max_records=MAX_DISCOVERED_REFS,
+        terminators_per_record=2,
+        git_env=git_env,
+    )
+    history: dict[str, str] = {}
+    for line in raw_refs.splitlines():
+        name_raw, separator, oid_raw = line.partition(b"\0")
+        if not separator or not oid_raw.endswith(b"\0"):
+            raise SnapshotUnavailable("Git ref enumeration returned a malformed record")
+        name = name_raw.decode("utf-8", errors="surrogateescape")
+        oid = oid_raw[:-1].decode("ascii", errors="strict")
+        if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
+            continue
+        history[name] = oid
+    if len(history) > MAX_PINNED_REFS:
+        raise SnapshotUnavailable(
+            f"repository has {len(history)} refs; history cap is {MAX_PINNED_REFS}"
+        )
+    return history
+
+
+def _native_ref_storage_identity(
+    repo: Path,
+) -> tuple[bytes, bytes | None, tuple[tuple[str, bytes], ...]]:
+    """Hash-bounded native ref storage without loading repository configuration."""
+    git_dir, common = _repository_dirs(repo)
+    head = _read_metadata(git_dir / "HEAD", max_bytes=4096)
+    packed_path = common / "packed-refs"
+    packed = (
+        _read_metadata(packed_path, max_bytes=MAX_DISCOVERY_BYTES)
+        if packed_path.exists() else None
+    )
+    root = common / "refs"
+    rows: list[tuple[str, bytes]] = []
+    retained = 0
+    if root.exists():
+        for directory, dirs, files in os.walk(root, followlinks=False):
+            dirs[:] = sorted(
+                name for name in dirs if not (Path(directory) / name).is_symlink()
+            )
+            for name in sorted(files):
+                candidate = Path(directory) / name
+                if candidate.is_symlink():
+                    continue
+                body = _read_metadata(candidate, max_bytes=1024)
+                retained += len(body)
+                if len(rows) >= MAX_DISCOVERED_REFS or retained > MAX_DISCOVERY_BYTES:
+                    raise SnapshotUnavailable("repository refs exceed capture bounds")
+                rows.append((candidate.relative_to(root).as_posix(), body))
+    return head, packed, tuple(rows)
+
+
 @dataclass
 class PlanRepositorySnapshot:
     repo: Path
@@ -663,6 +721,7 @@ class PlanRepositorySnapshot:
         repo = Path(repo).resolve()
         if not repo.is_dir():
             raise SnapshotUnavailable("repository root is unavailable")
+        native_refs_before = _native_ref_storage_identity(repo)
         control = _create_git_control(repo)
         try:
             head_result = _run(
@@ -685,26 +744,11 @@ class PlanRepositorySnapshot:
                 extra_env=_SNAPSHOT_IDENTITY,
             ).stdout.decode("ascii").strip()
 
-            raw_refs = _run_bounded_records(
-                repo,
-                ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
-                max_records=MAX_DISCOVERED_REFS,
-                terminators_per_record=2,
-                git_env=control.environment,
-            )
-            history: dict[str, str] = {}
-            for line in raw_refs.splitlines():
-                name_raw, separator, oid_raw = line.partition(b"\0")
-                if not separator or not oid_raw.endswith(b"\0"):
-                    raise SnapshotUnavailable("Git ref enumeration returned a malformed record")
-                name = name_raw.decode("utf-8", errors="surrogateescape")
-                oid = oid_raw[:-1].decode("ascii", errors="strict")
-                if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
-                    continue
-                history[name] = oid
-            if len(history) > MAX_PINNED_REFS:
+            history = _history_ref_map(repo, git_env=control.environment)
+            native_refs_after = _native_ref_storage_identity(repo)
+            if native_refs_before != native_refs_after:
                 raise SnapshotUnavailable(
-                    f"repository has {len(history)} refs; history cap is {MAX_PINNED_REFS}"
+                    "repository refs changed during snapshot construction"
                 )
             if before_pin is not None:
                 before_pin([])
@@ -894,7 +938,8 @@ class PlanRepositorySnapshot:
             return path == normalized or path.startswith(normalized + "/")
 
         coverage_complete = not any(
-            omitted_in_scope(path) for path in self.unavailable_paths
+            omitted_in_scope(path)
+            for path in (*self.unavailable_paths, *self.ignored_paths)
         )
         return decoded[:limit], len(decoded) <= limit and coverage_complete
 

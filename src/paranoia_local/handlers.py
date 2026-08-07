@@ -1008,14 +1008,10 @@ def _critique_plan_verified(
                     for record in evidence_records
                     if record.kind != "abstention" and record.claim_id in active_ids
                 }
-                refinable_records = [
-                    record for record in evidence_records
-                    if record.evidence_id in retained_evidence
-                    and (
-                        record.passage_start != 0
-                        or record.passage_end != record.source_size
-                    )
-                ][:20]
+                refinable_records = _fair_refinable_evidence(
+                    evidence_records,
+                    {claim.claim_id for claim in pc.blocking_claims(draft_claims)},
+                )
                 refinable_text = cv.render_evidence(
                     refinable_records, include_passages=True,
                     debit_bytes=round_budget.debit_bytes,
@@ -1476,6 +1472,30 @@ def _truth_eligible_evidence_ids(
             in cv.ELIGIBLE_EXTERNAL_SOURCE_CLASSES
         )
     }
+
+
+def _fair_refinable_evidence(
+    records: list[cv.EvidenceRecord], blocking_claim_ids: set[str], *, limit: int = 20,
+) -> list[cv.EvidenceRecord]:
+    """Expose one source per claim, rotating toward the least-refined claims/sources."""
+    by_claim: dict[str, dict[str, list[cv.EvidenceRecord]]] = {}
+    for record in records:
+        if record.claim_id not in blocking_claim_ids or record.blob_digest is None \
+                or record.kind == "abstention" \
+                or (record.passage_start == 0 and record.passage_end == record.source_size):
+            continue
+        by_claim.setdefault(record.claim_id, {}).setdefault(
+            record.blob_digest, [],
+        ).append(record)
+    ranked: list[tuple[int, str, cv.EvidenceRecord]] = []
+    for claim_id, sources in by_claim.items():
+        _digest, variants = min(
+            sources.items(), key=lambda item: (len(item[1]), item[0]),
+        )
+        total_variants = sum(len(items) for items in sources.values())
+        ranked.append((total_variants, claim_id, variants[-1]))
+    ranked.sort(key=lambda item: (item[0], item[1]))
+    return [record for _count, _claim_id, record in ranked[:limit]]
 
 
 def _independent_required(
