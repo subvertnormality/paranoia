@@ -758,17 +758,23 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
         if claim.kind_classification == PROPOSED and claim.status != UNCHECKED:
             raise ClaimRegisterError("proposed persisted claim has unreachable status")
         if claim.kind_classification == CONFIRMED and claim.kind == DECISION \
-                and claim.status not in {NOT_APPLICABLE, STALE, DISPUTED, SUPERSEDED}:
+                and claim.status not in {NOT_APPLICABLE, STALE, SUPERSEDED}:
             raise ClaimRegisterError("confirmed persisted decision has unreachable status")
         if claim.kind_classification == CONFIRMED and claim.kind == FACT \
-                and claim.status == NOT_APPLICABLE:
+                and claim.status not in {
+                    UNVERIFIED, VERIFIED, CONTRADICTED, DISPUTED, DEFERRED,
+                    STALE, SUPERSEDED,
+                }:
             raise ClaimRegisterError("confirmed persisted fact has unreachable status")
         if claim.status == SUPERSEDED:
             target = claims.get(claim.superseded_by or "")
             if claim.pending_replacement_id != claim.superseded_by or target is None \
                     or target.claim_id == claim.claim_id \
                     or target.kind_classification != CONFIRMED \
-                    or target.status == SUPERSEDED:
+                    or target.kind != FACT \
+                    or target.status not in {
+                        VERIFIED, DEFERRED, CONTRADICTED, DISPUTED, STALE,
+                    }:
                 raise ClaimRegisterError("persisted supersession graph is inconsistent")
         elif claim.superseded_by is not None:
             raise ClaimRegisterError("active persisted claim has a superseded target")

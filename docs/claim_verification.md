@@ -309,7 +309,11 @@ authorize a later transition.
 Any cached record discarded during validation disables the zero-research cache for that
 round, even if no claim directly depended on that record. Persisted supersession is also
 validated as a bounded graph: the replacement must exist, be confirmed, and already be
-verified or safely deferred. Every persisted non-abstention record must retain its rooted
+verified or safely deferred. The loader requires the target to be a confirmed fact and
+accepts only the original clear states or factual post-clear invalidation states. Thus a
+not-applicable decision cannot invent a clear source, while later evidence loss may stale
+the factual replacement without resurrecting the terminally superseded source. Every
+persisted non-abstention record must retain its rooted
 content digest and exact CAS bytes.
 
 ## Output

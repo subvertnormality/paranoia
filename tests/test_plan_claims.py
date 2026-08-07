@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 
 import pytest
@@ -434,6 +435,34 @@ def test_inconsistent_persisted_supersession_is_rejected() -> None:
     claim.status = pc.SUPERSEDED
     claim.pending_replacement_id = "missing"
     claim.superseded_by = "missing"
+    with pytest.raises(pc.ClaimRegisterError, match="supersession graph"):
+        pc.state_from_json("plan", pc.state_to_json(state))
+
+
+def test_persisted_supersession_requires_a_live_reachable_clear_target() -> None:
+    state, claim_id, _spans = _state_with_confirmed_fact()
+    source = state.claims[claim_id]
+    target = copy.deepcopy(source)
+    target.claim_id = "replacement"
+    target.claim = "Choose the replacement approach."
+    target.kind = pc.DECISION
+    target.kind_classification = pc.CONFIRMED
+    target.status = pc.NOT_APPLICABLE
+    target.pending_replacement_id = None
+    target.superseded_by = None
+    target.evidence_ids = []
+    target.truth_evidence_ids = []
+    target.bearing_evidence_ids = []
+    target.dispute_evidence_ids = []
+    target.disputed_evidence_ids = []
+    target.truth_authorization = None
+    target.bearing_authorization = None
+    target.dispute_authorization = None
+    target.deferral_authorization = None
+    source.status = pc.SUPERSEDED
+    source.pending_replacement_id = target.claim_id
+    source.superseded_by = target.claim_id
+    state.claims[target.claim_id] = target
     with pytest.raises(pc.ClaimRegisterError, match="supersession graph"):
         pc.state_from_json("plan", pc.state_to_json(state))
 

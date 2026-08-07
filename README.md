@@ -719,7 +719,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   authorization state is consulted, keeping invalid transitions inside the normal
   correction boundary. Existing plan lineage files require the exact schema-v2 envelope;
   missing claim state is quarantined instead of defaulting to an empty register, and
-  class records and their status/supersession graphs are fully validated before use.
+  class records and their status/supersession graphs are fully validated before use. A
+  persisted supersession clears its source only when the confirmed replacement is already
+  verified or safely deferred, matching the live transition state machine.
   Invalidation clears pending events tied to expired evidence and never resurrects terminal
   superseded claims, even when the active replacement becomes stale. Evidence metadata is
   rendered without truncating its exact scope. Serialized tree listings and excluded-path

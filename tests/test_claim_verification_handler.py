@@ -945,6 +945,57 @@ def test_malformed_nested_claim_state_is_quarantined_without_stranding_latch(
     assert list(directory.glob("malformed-plan.corrupt-*.json"))
 
 
+def test_invented_clear_supersession_is_quarantined_before_cache_reuse(
+    repo: Path, tmp_path: Path,
+) -> None:
+    lineage_id = "invented-clear-supersession-plan"
+    arguments = {
+        "repo_path": str(repo), "plan_text": "Use greet.\n",
+        "lineage": lineage_id, "round": 1,
+    }
+    first = handlers.critique_plan(
+        arguments, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in first
+    directory = cc.lineage_dir(cc.default_state_root())
+    state_path = directory / f"{lineage_id}.json"
+    payload = json.loads(state_path.read_text())
+    source = payload["claim_state"]["claims"][0]
+    target = json.loads(json.dumps(source))
+    target.update({
+        "claim_id": "replacement",
+        "claim": "Choose the replacement approach.",
+        "kind": pc.DECISION,
+        "kind_classification": pc.CONFIRMED,
+        "status": pc.NOT_APPLICABLE,
+        "pending_replacement_id": None,
+        "superseded_by": None,
+        "evidence_ids": [],
+        "truth_evidence_ids": [],
+        "bearing_evidence_ids": [],
+        "dispute_evidence_ids": [],
+        "disputed_evidence_ids": [],
+        "truth_authorization": None,
+        "bearing_authorization": None,
+        "dispute_authorization": None,
+        "deferral_authorization": None,
+    })
+    source.update({
+        "status": pc.SUPERSEDED,
+        "pending_replacement_id": target["claim_id"],
+        "superseded_by": target["claim_id"],
+    })
+    payload["claim_state"]["claims"].append(target)
+    state_path.write_text(json.dumps(payload))
+    arguments["round"] = 2
+    out = handlers.critique_plan(
+        arguments, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
+    assert not (directory / f"{lineage_id}.pending").exists()
+    assert list(directory.glob(f"{lineage_id}.corrupt-*.json"))
+
+
 @pytest.mark.parametrize("missing", ["schema_version", "claim_state"])
 def test_missing_plan_lineage_envelope_fields_are_quarantined(
     repo: Path, tmp_path: Path, missing: str,
