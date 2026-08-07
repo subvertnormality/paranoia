@@ -1,5 +1,11 @@
 # Brief: class closure for `critique_plan` — what transfers, what must not
 
+> **Historical design record.** The class-only plan gate described here is now composed
+> with first-class blocking claim verification. The current API, trust boundary, and
+> combined trailer are documented in [`claim_verification.md`](claim_verification.md).
+> Class grammar and mode separation remain authoritative here; class-only convergence
+> examples are no longer the complete `critique_plan` stop condition.
+
 Status: **IMPLEMENTED at revision 4. Plan-review loop stopped at round 3 by the
 operator — not converged.** Round 3 returned two FATALs, so this document never
 reached a clean round; §9 records what an approver still has to satisfy themselves

@@ -1,9 +1,12 @@
 """Engine abstraction — each engine drives a local coding-agent CLI in a
 headless, read-only mode over the user's subscription.
 
-The CLI *is* the reviewer: it has full read access to the repo at `cwd` and
-decides what to open. This module only builds the argv, feeds the prompt on
-stdin, and parses the final message + a session reference (for `rebut`).
+For ordinary code/query work the CLI *is* the reviewer: it has full read access
+to the repo at `cwd` and decides what to open. Claim-verification roles instead
+use ``run_toolless``: an enforceable empty-tool/filesystem profile whose only
+inputs are server packets. This module builds both profiles, feeds stdin, and
+parses the final message. Ordinary profiles retain resumable session references;
+fresh toolless profiles deliberately suppress them.
 
 `build_argv` / `build_resume_argv` / `parse_output` are pure and unit-tested.
 The impure subprocess call is injected via `runner` (see runner.py).
@@ -12,6 +15,10 @@ The impure subprocess call is injected via `runner` (see runner.py).
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -23,6 +30,10 @@ Runner = Callable[[list[str], str, Path, int], RunResult]
 
 # Longest progress message forwarded to the client (spinner-line sized).
 _PROGRESS_MSG_MAX = 100
+
+
+class ToollessUnavailable(RuntimeError):
+    """The selected engine cannot enforce a command- and repository-free role."""
 
 
 @dataclass(frozen=True)
@@ -84,6 +95,44 @@ class Engine(ABC):
     ) -> Review:
         argv = self.build_argv(cwd, model, effort, web_search)
         return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        raise ToollessUnavailable(f"{self.name} has no enforceable toolless profile")
+
+    def preflight_toolless(self, model: str, effort: str) -> None:
+        """Validate the empty-capability boundary before caller state is acquired."""
+        if not shutil.which(self.binary):
+            raise ToollessUnavailable(f"{self.binary} CLI is not installed")
+        try:
+            self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
+        except ToollessUnavailable:
+            raise
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ToollessUnavailable(
+                f"{self.name} toolless capability preflight failed: {exc}"
+            ) from exc
+
+    def run_toolless(
+        self,
+        prompt: str,
+        model: str,
+        effort: str,
+        runner: Runner | None = None,
+        timeout: int | None = None,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> Review:
+        """Run in a fresh empty directory with native web forcibly disabled.
+
+        Subclasses must make ``build_toolless_argv`` an actual capability boundary;
+        prompt instructions or the ordinary read-only repository sandbox do not qualify.
+        """
+        with tempfile.TemporaryDirectory(prefix=f"paranoia-{self.name}-tool-less-") as raw:
+            cwd = Path(raw)
+            argv = self.build_toolless_argv(cwd, model, effort)
+            review = self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+            # These roles are intentionally fresh and, for Codex, explicitly ephemeral.
+            # Never expose a token that ordinary `rebut` cannot safely resume.
+            return replace(review, session_ref=None)
 
     def resume(
         self,
@@ -147,6 +196,99 @@ class CodexEngine(Engine):
     name = "codex"
     default_model = "gpt-5.6-sol"
     binary = "codex"
+
+    TOOLLESS_VERSIONS = frozenset({"0.144.6", "0.146.0-alpha.3.1"})
+
+    @staticmethod
+    def _is_elf(path: Path) -> bool:
+        try:
+            with path.open("rb") as handle:
+                return handle.read(4) == b"\x7fELF"
+        except OSError:
+            return False
+
+    def _native_binary(self) -> Path:
+        launcher = shutil.which(self.binary)
+        if not launcher:
+            raise ToollessUnavailable("codex CLI is not installed")
+        path = Path(launcher).resolve()
+        if self._is_elf(path):
+            return path
+        local = Path(launcher).resolve().parents[3] if len(Path(launcher).resolve().parents) >= 4 else None
+        candidates = []
+        # npm layout: ~/.local/bin/codex -> ../lib/node_modules/@openai/codex/bin/codex.js
+        prefix = Path(launcher).parent.parent
+        candidates.append(
+            prefix / "lib/node_modules/@openai/codex/node_modules/@openai/"
+            "codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"
+        )
+        if local:
+            candidates.append(local / "vendor/x86_64-unknown-linux-musl/bin/codex")
+        for candidate in candidates:
+            if candidate.is_file() and self._is_elf(candidate):
+                return candidate
+        raise ToollessUnavailable("could not locate the native Codex binary for isolation")
+
+    def _auth_file(self) -> Path:
+        root = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+        return root / "auth.json"
+
+    @staticmethod
+    def _audit_toolless_binary(native: Path) -> None:
+        result = subprocess.run(
+            [str(native), "--version"], capture_output=True, text=True, timeout=10,
+        )
+        version = result.stdout.strip().removeprefix("codex-cli ")
+        if result.returncode or version not in CodexEngine.TOOLLESS_VERSIONS:
+            raise ToollessUnavailable(
+                f"Codex {version or 'unknown'} has no audited empty-tool profile"
+            )
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        bwrap = shutil.which("bwrap")
+        if not bwrap:
+            raise ToollessUnavailable("bwrap is required for Codex toolless roles")
+        native, auth = self._native_binary(), self._auth_file()
+        if not auth.is_file():
+            raise ToollessUnavailable("Codex auth file is unavailable for isolated role")
+        type(self)._audit_toolless_binary(native)
+        argv = [
+            bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net",
+            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+            "--dir", "/work", "--chdir", "/work",
+            "--dir", "/etc",
+            "--dir", "/home", "--dir", "/home/codex", "--dir", "/home/codex/.codex",
+            "--ro-bind", str(auth), "/home/codex/.codex/auth.json",
+            "--ro-bind", str(native), "/codex",
+            "--setenv", "HOME", "/home/codex",
+            "--setenv", "CODEX_HOME", "/home/codex/.codex",
+            "--setenv", "PATH", "/no-tools",
+        ]
+        for directory in ("/etc/ssl", "/etc/ssl/certs"):
+            if Path(directory).is_dir():
+                argv += ["--dir", directory]
+        for source in ("/etc/ssl/certs", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf"):
+            if Path(source).exists():
+                argv += ["--ro-bind", source, source]
+        argv += [
+            "--", "/codex", "exec", "--json", "--ephemeral", "--ignore-user-config",
+            "--strict-config",
+            "--skip-git-repo-check", "-s", "danger-full-access", "-C", "/work",
+            "-m", model, "-c", f'model_reasoning_effort="{effort}"',
+            "-c", "tools.web_search=false",
+            "--disable", "shell_tool", "--disable", "unified_exec",
+            "--disable", "multi_agent", "--disable", "multi_agent_v2",
+            "--disable", "apps", "--disable", "browser_use",
+            "--disable", "computer_use", "--disable", "code_mode",
+            "--disable", "code_mode_host", "--disable", "image_generation",
+            "--disable", "goals", "--disable", "workspace_dependencies",
+            "--disable", "auth_elicitation", "--disable", "in_app_browser",
+            "--disable", "plugins", "--disable", "plugin_sharing",
+            "--disable", "remote_plugin", "--disable", "skill_search",
+            "--disable", "skill_mcp_dependency_install",
+            "--disable", "tool_call_mcp_elicitation", "--disable", "tool_suggest", "-",
+        ]
+        return argv
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         argv = [
@@ -263,6 +405,46 @@ class ClaudeEngine(Engine):
     name = "claude"
     default_model = "claude-fable-5"
     binary = "claude"
+
+    TOOLLESS_REQUIRED_FLAGS = frozenset({
+        "--output-format", "--model", "--effort", "--permission-mode",
+        "--setting-sources", "--allowedTools", "--tools", "--strict-mcp-config",
+        "--mcp-config", "--disallowedTools",
+    })
+
+    def preflight_toolless(self, model: str, effort: str) -> None:
+        """Prove the installed CLI advertises every flag in the empty-tool profile."""
+        executable = shutil.which(self.binary)
+        if not executable:
+            raise ToollessUnavailable("claude CLI is not installed")
+        try:
+            result = subprocess.run(
+                [executable, "--help"], capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ToollessUnavailable(
+                f"Claude toolless capability preflight failed: {exc}"
+            ) from exc
+        advertised = result.stdout + "\n" + result.stderr
+        missing = sorted(flag for flag in self.TOOLLESS_REQUIRED_FLAGS if flag not in advertised)
+        if result.returncode or missing:
+            detail = ", ".join(missing) if missing else f"exit {result.returncode}"
+            raise ToollessUnavailable(
+                f"installed Claude CLI has no compatible empty-tool profile ({detail})"
+            )
+        self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        denied = list(dict.fromkeys([*CLAUDE_RO_TOOLS, *CLAUDE_WEB_TOOLS, *CLAUDE_DENY_TOOLS]))
+        return [
+            "claude", "-p", "--output-format", "json", "--model", model,
+            "--effort", effort, "--permission-mode", "default",
+            "--setting-sources", "", "--allowedTools", "",
+            "--tools", "", "--strict-mcp-config",
+            "--mcp-config", '{"mcpServers":{}}',
+            "--disallowedTools", ",".join(denied),
+        ]
 
     def _allowed(self, web_search: bool) -> str:
         # text_only: an EMPTY allowlist. In `-p` mode a tool that needs permission
