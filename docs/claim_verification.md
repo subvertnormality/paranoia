@@ -212,6 +212,10 @@ their exact bytes, but they still pass through the verifier and are never self-a
 Caller-supplied passages are isolated in their own untrusted verifier call, never mixed
 with repository evidence. In high-stakes mode, a truth transition that relies on supplied
 content requires the same distinct-vendor authorization as fetched external evidence.
+External and caller-supplied batches may confirm a proposition as factual, but may not
+classify it as a decision, defer it, supersede it, or emit any other transition without
+naming evidence from that exact isolated batch. Plan decisions remain the responsibility
+of the trusted local/structural roles.
 
 ## Independence and authorization
 
@@ -224,7 +228,9 @@ blocking-to-advisory changes. `RESOLVE_DISPUTE` names its exact target outcome (
 or `contradicted`) in the audited event. The proposed transition, evidence IDs,
 event digest, vendor/model identities, and audit results persist. Missing, duplicate,
 mismatched, or tampered provenance leaves the transition pending and the claim blocking
-after reload. The exact pending event is rendered to the next verifier for recovery; a
+after reload. The vendor vocabulary is server-owned and fixed to `codex` and `claude`;
+unknown or duplicate vendor identities are malformed, and `complete` requires accepted
+checks from exactly both supported vendors. The exact pending event is rendered to the next verifier for recovery; a
 different event cannot erase it. Reload also validates the authorization's exact event
 schema, scalar/nested fields, digest, evidence binding, vendor-check inputs, completion
 state, and applied outcome against the claim's current truth, bearing, or deferral state.

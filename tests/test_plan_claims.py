@@ -129,8 +129,8 @@ def test_advisory_bearing_requires_evidence_and_completed_independent_check() ->
     assert pc.blocking_claims(state)
     digest = pc.event_digest(event)
     checks = [
-        pc.VendorCheck("openai", "gpt", digest, ("e1",), True, "t1"),
-        pc.VendorCheck("anthropic", "claude", digest, ("e1",), True, "t2"),
+        pc.VendorCheck("codex", "gpt", digest, ("e1",), True, "t1"),
+        pc.VendorCheck("claude", "claude", digest, ("e1",), True, "t2"),
     ]
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
@@ -146,8 +146,8 @@ def test_verified_claim_reblocks_if_persisted_check_provenance_is_tampered() -> 
                                 "evidence_ids": ["e1"], "reason": "exact source"})
     digest = pc.event_digest(event)
     checks = [
-        pc.VendorCheck("openai", "gpt", digest, ("e1",), True, "t1"),
-        pc.VendorCheck("anthropic", "claude", digest, ("e1",), True, "t2"),
+        pc.VendorCheck("codex", "gpt", digest, ("e1",), True, "t1"),
+        pc.VendorCheck("claude", "claude", digest, ("e1",), True, "t2"),
     ]
     pc.apply_events(state, [event], role=pc.VERIFIER_ROLE, spans=spans,
                     evidence_ids={"e1": claim_id}, independent_required=True,
@@ -197,8 +197,8 @@ def test_nonrequired_truth_check_does_not_erase_audited_advisory_authorization()
     })
     digest = pc.event_digest(bearing)
     checks = [
-        pc.VendorCheck("one", "m1", digest, ("e1",), True, "t"),
-        pc.VendorCheck("two", "m2", digest, ("e1",), True, "t"),
+        pc.VendorCheck("codex", "m1", digest, ("e1",), True, "t"),
+        pc.VendorCheck("claude", "m2", digest, ("e1",), True, "t"),
     ]
     pc.apply_events(
         state, [bearing], role=pc.VERIFIER_ROLE, spans=spans,
@@ -248,9 +248,9 @@ def test_required_defer_applies_only_after_two_vendor_acceptances(
         "stop_action": "stop rollout",
     })
     digest = pc.event_digest(event)
-    checks = [pc.VendorCheck("one", "m1", digest, (), True, "t")]
+    checks = [pc.VendorCheck("codex", "m1", digest, (), True, "t")]
     if secondary_accepts is not None:
-        checks.append(pc.VendorCheck("two", "m2", digest, (), secondary_accepts, "t"))
+        checks.append(pc.VendorCheck("claude", "m2", digest, (), secondary_accepts, "t"))
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
         independent_required=True, vendor_checks=checks,
@@ -320,8 +320,8 @@ def test_truth_and_bearing_keep_distinct_evidence_dependencies() -> None:
     })
     digest = pc.event_digest(bearing)
     checks = [
-        pc.VendorCheck("one", "m1", digest, ("bearing",), True, "t"),
-        pc.VendorCheck("two", "m2", digest, ("bearing",), True, "t"),
+        pc.VendorCheck("codex", "m1", digest, ("bearing",), True, "t"),
+        pc.VendorCheck("claude", "m2", digest, ("bearing",), True, "t"),
     ]
     pc.apply_events(
         state, [bearing], role=pc.VERIFIER_ROLE, spans=spans,
@@ -353,7 +353,7 @@ def test_invalid_required_truth_transition_cannot_leave_a_decision_nonblocking()
         pc.apply_events(
             state, [event], role=pc.VERIFIER_ROLE, spans=spans,
             evidence_ids={"e1": claim_id}, independent_required=True,
-            vendor_checks=[pc.VendorCheck("one", "m", digest, ("e1",), True, "t")],
+            vendor_checks=[pc.VendorCheck("codex", "m", digest, ("e1",), True, "t")],
         )
     claim = state.claims[claim_id]
     claim.pending_transition = event.data
@@ -410,8 +410,8 @@ def test_dispute_resolution_names_and_applies_the_audited_outcome() -> None:
     })
     digest = pc.event_digest(event)
     checks = [
-        pc.VendorCheck("one", "m1", digest, ("e2",), True, "t"),
-        pc.VendorCheck("two", "m2", digest, ("e2",), True, "t"),
+        pc.VendorCheck("codex", "m1", digest, ("e2",), True, "t"),
+        pc.VendorCheck("claude", "m2", digest, ("e2",), True, "t"),
     ]
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
@@ -492,13 +492,38 @@ def test_invalidated_advisory_claim_always_reblocks(invalid_status: str) -> None
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,
         evidence_ids={"e1": claim_id}, independent_required=True,
         vendor_checks=[
-            pc.VendorCheck("one", "m1", digest, ("e1",), True, "t1"),
-            pc.VendorCheck("two", "m2", digest, ("e1",), True, "t2"),
+            pc.VendorCheck("codex", "m1", digest, ("e1",), True, "t1"),
+            pc.VendorCheck("claude", "m2", digest, ("e1",), True, "t2"),
         ],
     )
     assert not pc.claim_blocks(state.claims[claim_id])
     state.claims[claim_id].status = invalid_status
     assert pc.claim_blocks(state.claims[claim_id])
+
+
+@pytest.mark.parametrize("mutation", ["unknown", "duplicate"])
+def test_persisted_completed_authorization_requires_exact_supported_vendors(
+    mutation: str,
+) -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "verified",
+    })
+    digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[
+            pc.VendorCheck("codex", "m1", digest, ("e1",), True, "t1"),
+            pc.VendorCheck("claude", "m2", digest, ("e1",), True, "t2"),
+        ],
+    )
+    raw = pc.state_to_json(state)
+    checks = raw["claims"][0]["truth_authorization"]["checks"]
+    checks[0]["vendor"] = "invented" if mutation == "unknown" else "claude"
+    with pytest.raises(pc.ClaimRegisterError, match="vendor check values"):
+        pc.state_from_json("plan", raw)
 
 
 def test_truncated_claim_state_cannot_default_to_no_claims() -> None:
@@ -583,8 +608,8 @@ def test_completed_dispute_resolution_authorization_round_trips() -> None:
     })
     digest = pc.event_digest(event)
     checks = [
-        pc.VendorCheck("one", "m1", digest, ("e2",), True, "t1"),
-        pc.VendorCheck("two", "m2", digest, ("e2",), True, "t2"),
+        pc.VendorCheck("codex", "m1", digest, ("e2",), True, "t1"),
+        pc.VendorCheck("claude", "m2", digest, ("e2",), True, "t2"),
     ]
     pc.apply_events(
         state, [event], role=pc.VERIFIER_ROLE, spans=spans,

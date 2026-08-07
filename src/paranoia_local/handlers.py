@@ -888,6 +888,7 @@ def _critique_plan_verified(
                 if supplied_only:
                     verifier_batches.append(("CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY", supplied_only))
                 for batch_label, batch in verifier_batches:
+                    untrusted_batch = batch_label != "LOCAL SERVER EVIDENCE"
                     rendered_batch = cv.render_evidence(
                         batch, include_passages=True,
                         debit_bytes=round_budget.debit_bytes,
@@ -908,11 +909,9 @@ def _critique_plan_verified(
                     def validate_verifier(events: list[pc.Event]) -> None:
                         preview = draft_claims.copy()
                         for event in events:
-                            event_ids = set(event.data.get("evidence_ids", []))
-                            if event_ids and not event_ids.issubset(batch_ids):
-                                raise pc.ClaimTransitionError(
-                                    "verifier referenced evidence outside its isolated batch"
-                                )
+                            _validate_verifier_batch_event(
+                                event, batch_ids=batch_ids, untrusted=untrusted_batch,
+                            )
                             pc.apply_events(
                                 preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
                                 round_no=round_no, evidence_ids=evidence_ids,
@@ -930,11 +929,9 @@ def _critique_plan_verified(
                         retry_evidence_bytes=len(rendered_batch.encode("utf-8")),
                     )
                     for event in verifier_events:
-                        event_ids = set(event.data.get("evidence_ids", []))
-                        if event_ids and not event_ids.issubset(batch_ids):
-                            raise pc.ClaimTransitionError(
-                                "verifier referenced evidence outside its isolated batch"
-                            )
+                        _validate_verifier_batch_event(
+                            event, batch_ids=batch_ids, untrusted=untrusted_batch,
+                        )
                         required = _independent_required(
                             event, draft_claims, evidence_records,
                             independent_policy, high_stakes,
@@ -1255,6 +1252,30 @@ def _independent_required(
         for record in records
     )
     return high_stakes and untrusted
+
+
+def _validate_verifier_batch_event(
+    event: pc.Event, *, batch_ids: set[str], untrusted: bool,
+) -> None:
+    event_ids = set(event.data.get("evidence_ids", []))
+    if event_ids and not event_ids.issubset(batch_ids):
+        raise pc.ClaimTransitionError(
+            "verifier referenced evidence outside its isolated batch"
+        )
+    if not untrusted:
+        return
+    if event.op == "CONFIRM_KIND" and event.data.get("kind") != pc.FACT:
+        raise pc.ClaimTransitionError(
+            "untrusted evidence batches may not classify a claim as a decision"
+        )
+    if event.op in {"DEFER", "SUPERSEDE"}:
+        raise pc.ClaimTransitionError(
+            f"untrusted evidence batches may not emit evidence-free {event.op} transitions"
+        )
+    if event.op != "CONFIRM_KIND" and not event_ids:
+        raise pc.ClaimTransitionError(
+            "untrusted evidence transitions must name evidence from their isolated batch"
+        )
 
 
 def _is_high_stakes(stakes: str | None, explicit_level: str | None = None) -> bool:

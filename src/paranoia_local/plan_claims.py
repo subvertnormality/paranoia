@@ -36,6 +36,7 @@ PLAN_MARKER = "=== PLAN REGISTER ==="
 EVENTS_PREFIX = "EVENTS-JSON: "
 
 MAX_ACTIVE_CLAIMS = 50
+SUPPORTED_AUDIT_VENDORS = frozenset({"codex", "claude"})
 
 
 class ClaimRegisterError(ValueError):
@@ -545,11 +546,12 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
         check for check in checks
         if check.accepted and check.event_digest == digest
         and tuple(evidence_ids) == check.evidence_ids
+        and check.vendor in SUPPORTED_AUDIT_VENDORS
     ]
     vendors = {check.vendor for check in matching}
     authorization = {
         "required": True,
-        "status": "complete" if len(vendors) >= 2 else "pending",
+        "status": "complete" if vendors == SUPPORTED_AUDIT_VENDORS else "pending",
         "event_digest": digest,
         "event": copy.deepcopy(event.data),
         "evidence_ids": evidence_ids,
@@ -558,7 +560,7 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
     setattr(claim, slot, authorization)
     if event.op == "RESOLVE_DISPUTE":
         claim.truth_authorization = copy.deepcopy(authorization)
-    return len(vendors) >= 2
+    return vendors == SUPPORTED_AUDIT_VENDORS
 
 
 def _complete_supersessions(state: ClaimState) -> None:
@@ -582,7 +584,7 @@ def _authorization_valid(info: dict[str, Any] | None, *, must_be_required: bool 
         if item.get("accepted") is True and item.get("event_digest") == digest
         and tuple(item.get("evidence_ids", [])) == evidence
     }
-    return None not in vendors and len(vendors) >= 2
+    return vendors == SUPPORTED_AUDIT_VENDORS
 
 
 def claim_blocks(claim: Claim) -> bool:
@@ -959,6 +961,7 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         if not info["required"] and checks:
             raise ClaimRegisterError("non-required authorization may not retain vendor checks")
         accepted_vendors: set[str] = set()
+        seen_vendors: set[str] = set()
         for check in checks:
             if not isinstance(check, dict) or set(check) != {
                 "vendor", "model", "event_digest", "evidence_ids", "accepted", "checked_at"
@@ -966,6 +969,8 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
                 raise ClaimRegisterError("persisted vendor check is malformed")
             if any(not isinstance(check.get(key), str) or not check[key]
                    for key in ("vendor", "model", "event_digest", "checked_at")) \
+                    or check["vendor"] not in SUPPORTED_AUDIT_VENDORS \
+                    or check["vendor"] in seen_vendors \
                     or not _digest(check["event_digest"]) \
                     or not isinstance(check.get("evidence_ids"), (list, tuple)) \
                     or any(not isinstance(item, str) or not item for item in check["evidence_ids"]) \
@@ -973,11 +978,14 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
                     or check["event_digest"] != digest \
                     or list(check["evidence_ids"]) != ids:
                 raise ClaimRegisterError("persisted vendor check values are malformed")
+            seen_vendors.add(check["vendor"])
             if check["accepted"]:
                 accepted_vendors.add(check["vendor"])
         if info["required"] and (
-            (info["status"] == "complete" and len(accepted_vendors) < 2)
-            or (info["status"] == "pending" and len(accepted_vendors) >= 2)
+            (info["status"] == "complete"
+             and accepted_vendors != SUPPORTED_AUDIT_VENDORS)
+            or (info["status"] == "pending"
+                and accepted_vendors == SUPPORTED_AUDIT_VENDORS)
         ):
             raise ClaimRegisterError("persisted independent authorization status is malformed")
 
