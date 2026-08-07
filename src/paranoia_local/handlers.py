@@ -830,6 +830,59 @@ def _critique_plan_verified(
                     else f"parsed {len(research_events)}"
                 )
 
+                proposed_claims = any(
+                    claim.kind_classification == pc.PROPOSED
+                    and claim.status != pc.SUPERSEDED
+                    for claim in draft_claims.claims.values()
+                )
+                if proposed_claims:
+                    clean_policy_prompt = prompts.compose(
+                        prompts.PLAN_CLEAN_POLICY_INSTRUCTIONS,
+                        _prepend(calibration, "\n\n".join([
+                            plan_packet,
+                            pc.render_claim_summary(draft_claims),
+                            "No repository paths, bytes, metadata, external results, or "
+                            "caller-supplied artifacts are available in this role.",
+                        ])),
+                    )
+
+                    def validate_clean_policy(events: list[pc.Event]) -> None:
+                        preview = draft_claims.copy()
+                        for event in events:
+                            if event.op not in {"CONFIRM_KIND", "DEFER"}:
+                                raise pc.ClaimTransitionError(
+                                    "plan-only policy role may emit only CONFIRM_KIND or DEFER"
+                                )
+                            claim = preview.claims.get(str(event.data.get("claim_id")))
+                            if event.op == "DEFER" and (
+                                claim is None or claim.status != pc.UNVERIFIED
+                            ):
+                                raise pc.ClaimTransitionError(
+                                    "plan-only DEFER requires a newly confirmed unverified fact"
+                                )
+                            pc.apply_events(
+                                preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
+                                round_no=round_no,
+                            )
+
+                    _, clean_policy_events, _ = _role_register_call(
+                        engine, clean_policy_prompt, model, effort,
+                        lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE),
+                        on_progress, validate_clean_policy,
+                    )
+                    for event in clean_policy_events:
+                        claim = draft_claims.claims.get(str(event.data.get("claim_id")))
+                        if event.op == "DEFER" and (
+                            claim is None or claim.status != pc.UNVERIFIED
+                        ):
+                            raise pc.ClaimTransitionError(
+                                "plan-only DEFER requires a newly confirmed unverified fact"
+                            )
+                        pc.apply_events(
+                            draft_claims, [event], role=pc.VERIFIER_ROLE, spans=spans,
+                            round_no=round_no,
+                        )
+
                 active_ids = {
                     claim.claim_id for claim in draft_claims.claims.values()
                     if claim.status != pc.SUPERSEDED
@@ -880,15 +933,15 @@ def _critique_plan_verified(
                     record for record in evidence_records if record.kind == "supplied-artifact"
                 ]
                 # Repository, fetched-remote, and caller-supplied bytes never share a
-                # model call. The local verifier always runs (it also confirms kinds);
-                # each untrusted source class gets its own verifier call when present.
+                # model call. Every evidence batch lacks evidence-free clearance
+                # authority; clean classification ran in the plan-only role above.
                 verifier_batches = [("LOCAL SERVER EVIDENCE", local_records)]
                 if external_only:
                     verifier_batches.append(("EXTERNAL UNTRUSTED EVIDENCE ONLY", external_only))
                 if supplied_only:
                     verifier_batches.append(("CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY", supplied_only))
                 for batch_label, batch in verifier_batches:
-                    untrusted_batch = batch_label != "LOCAL SERVER EVIDENCE"
+                    untrusted_batch = True
                     rendered_batch = cv.render_evidence(
                         batch, include_passages=True,
                         debit_bytes=round_budget.debit_bytes,
@@ -1045,6 +1098,11 @@ def _critique_plan_verified(
             def validate_composite(composite: tuple[list[pc.Event], cc.Register]) -> None:
                 claim_events, register = composite
                 preview_claims = draft_claims.copy()
+                for event in claim_events:
+                    if event.op == "CONFIRM_KIND" and event.data.get("kind") != pc.FACT:
+                        raise pc.ClaimTransitionError(
+                            "repository-exposed structural role may not classify decisions"
+                        )
                 pc.apply_events(
                     preview_claims, claim_events, role=pc.STRUCTURAL_ROLE, spans=spans,
                     round_no=round_no, evidence_ids=evidence_ids,
@@ -1067,6 +1125,11 @@ def _critique_plan_verified(
                 if structural_retry is not None else None
             )
             structural_events, class_register = composite
+            for event in structural_events:
+                if event.op == "CONFIRM_KIND" and event.data.get("kind") != pc.FACT:
+                    raise pc.ClaimTransitionError(
+                        "repository-exposed structural role may not classify decisions"
+                    )
             pc.apply_events(
                 draft_claims, structural_events, role=pc.STRUCTURAL_ROLE, spans=spans,
                 round_no=round_no, evidence_ids=evidence_ids,

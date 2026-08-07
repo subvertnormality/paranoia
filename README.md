@@ -699,8 +699,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   Latch release uses a separately recognized recovery marker and any durability failure
   changes the current verdict to blocked. Caller-supplied artifacts have their own
   untrusted verifier batch and receive the high-stakes independent-audit policy used for
-  fetched evidence. Untrusted batches cannot classify decisions or emit evidence-free
-  deferral/supersession transitions. Completed persisted audits accept exactly the
+  fetched evidence. A separate plan-only policy role receives no repository, external, or
+  supplied evidence and owns decision classification plus fresh-plan deferral. Every
+  repository/external/supplied evidence batch—and the repository-exposed structural
+  reviewer—cannot classify decisions or emit evidence-free deferral/supersession
+  transitions. Completed persisted audits accept exactly the
   server-owned `codex` and `claude` vendor identities; unknown or duplicate vendors are
   corruption. Cached CAS/repository reads and model-visible evidence rendering share
   the round byte budget, including evidence resent for a register correction. Missing

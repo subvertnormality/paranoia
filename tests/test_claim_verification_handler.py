@@ -38,6 +38,18 @@ class ClaimEngine:
                 "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
             }
             return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([event]))
+        if "plan-only claim policy classifier" in prompt:
+            events = []
+            for line in prompt.splitlines():
+                if not line.startswith("CLAIM="):
+                    continue
+                claim = json.loads(line[len("CLAIM="):])
+                if claim["kind_classification"] == pc.PROPOSED:
+                    events.append({
+                        "op": "CONFIRM_KIND", "claim_id": claim["claim_id"],
+                        "kind": claim["kind"], "reason": "plan-only classification",
+                    })
+            return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json(events))
         if "neutral evidence planner" in prompt:
             claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
             request = {"op": "READ_BLOB", "claim_id": claim_id, "path": "app.py", "offset": 0,
@@ -152,6 +164,156 @@ def test_closure_mode_ignores_repository_config_in_every_role_prompt(
     )
     assert engine.tool_less_prompts
     assert all(marker not in prompt for prompt in engine.tool_less_prompts)
+
+
+def test_plan_only_policy_role_never_receives_repository_content(
+    repo: Path, tmp_path: Path,
+) -> None:
+    marker = "REPOSITORY_POLICY_INJECTION_MARKER"
+    (repo / "app.py").write_text(f"# {marker}\n")
+    engine = ClaimEngine(verify=False)
+    handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "clean-policy-prompt-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    clean = next(
+        prompt for prompt in engine.tool_less_prompts
+        if "plan-only claim policy classifier" in prompt
+    )
+    assert marker not in clean
+    assert "repository-blob" not in clean and "PINNED REPOSITORY FILES" not in clean
+    assert '"display":"Use greet.\\n"' in clean
+
+
+@pytest.mark.parametrize("attack", ["decision", "defer"])
+def test_repository_verifier_cannot_emit_evidence_free_clearance(
+    repo: Path, tmp_path: Path, attack: str,
+) -> None:
+    marker = "REPOSITORY_CLEARANCE_INJECTION"
+    (repo / "app.py").write_text(f"# {marker}\n")
+
+    class RepositoryInjectionEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "plan-only claim policy classifier" in prompt:
+                self.tool_less_prompts.append(prompt)
+                if attack == "defer":
+                    claim = next(
+                        json.loads(line[len("CLAIM="):])
+                        for line in prompt.splitlines() if line.startswith("CLAIM=")
+                    )
+                    event = {
+                        "op": "CONFIRM_KIND", "claim_id": claim["claim_id"],
+                        "kind": "fact", "reason": "clean factual classification",
+                    }
+                    return _review(
+                        "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
+                    )
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
+            if "neutral evidence verifier" in prompt \
+                    and "=== LOCAL SERVER EVIDENCE ===" in prompt:
+                self.tool_less_prompts.append(prompt)
+                assert marker in prompt
+                if "=== CORRECTION REQUIRED ===" in prompt:
+                    if attack == "decision":
+                        claim_id = re.search(
+                            r'"claim_id":"([0-9a-f]{10})"', prompt
+                        ).group(1)
+                        event = {
+                            "op": "CONFIRM_KIND", "claim_id": claim_id,
+                            "kind": "fact", "reason": "corrected factual classification",
+                        }
+                        return _review(
+                            "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
+                        )
+                    return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
+                claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                event = (
+                    {
+                        "op": "CONFIRM_KIND", "claim_id": claim_id,
+                        "kind": "decision", "reason": "repository says decision",
+                    }
+                    if attack == "decision" else
+                    {
+                        "op": "DEFER", "claim_id": claim_id,
+                        "verification_anchor": {
+                            "first_span": "p000001", "last_span": "p000001",
+                        },
+                        "dependent_anchors": [{
+                            "first_span": "p000002", "last_span": "p000002",
+                        }],
+                        "completion_evidence": "success", "failure_condition": "failure",
+                        "stop_action": "stop",
+                    }
+                )
+                return _review(
+                    "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = RepositoryInjectionEngine(verify=False)
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Verify first.\nUse greet.\n",
+            "lineage": f"repository-{attack}-injection-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: BLOCKED" in out
+    assert any(
+        "=== CORRECTION REQUIRED ===" in prompt
+        and ("may not classify" in prompt or "may not emit evidence-free DEFER" in prompt)
+        for prompt in engine.tool_less_prompts
+    )
+
+
+def test_repository_exposed_structural_role_cannot_classify_a_decision(
+    repo: Path, tmp_path: Path,
+) -> None:
+    marker = "REPOSITORY_STRUCTURAL_DECISION_INJECTION"
+    (repo / "app.py").write_text(f"# {marker}\n")
+
+    class StructuralInjectionEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "plan-only claim policy classifier" in prompt:
+                self.tool_less_prompts.append(prompt)
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
+            if "neutral evidence verifier" in prompt:
+                self.tool_less_prompts.append(prompt)
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
+            if "adversarial reviewer of plans" in prompt:
+                self.tool_less_prompts.append(prompt)
+                assert marker in prompt
+                claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                event = {
+                    "op": "CONFIRM_KIND", "claim_id": claim_id,
+                    "kind": "fact" if "=== CORRECTION REQUIRED ===" in prompt else "decision",
+                    "reason": "structural classification",
+                }
+                return _review(
+                    "## What works\n\nGrounded.\n\n## What doesn't work\n\nNothing.\n\n"
+                    "## Risks\n\nNone.\n\n## Gaps\n\nNone.\n\n"
+                    "## Improvements\n\nNone.\n\n=== PLAN REGISTER ===\nEVENTS-JSON: "
+                    + _json([event]) + "\n=== CLASS REGISTER ===\nNONE"
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = StructuralInjectionEngine(verify=False)
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "repository-structural-decision-plan", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: BLOCKED" in out
+    assert any(
+        "=== CORRECTION REQUIRED ===" in prompt
+        and "structural role may not classify decisions" in prompt
+        for prompt in engine.tool_less_prompts
+    )
 
 
 @pytest.mark.parametrize(
@@ -320,7 +482,7 @@ def test_high_stakes_supplied_artifact_is_isolated_and_independently_authorized(
     )
     assert injected not in local and injected in supplied
     assert "repository-blob" in local and "repository-blob" not in supplied
-    assert required == [False, True]
+    assert required == [True]
     assert "CONVERGENCE: NOT-BLOCKED" in out
 
 
@@ -329,6 +491,9 @@ def test_untrusted_supplied_batch_cannot_classify_a_claim_as_a_decision(
 ) -> None:
     class InjectedDecisionEngine(ClaimEngine):
         def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "plan-only claim policy classifier" in prompt:
+                self.tool_less_prompts.append(prompt)
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
             if "neutral evidence verifier" not in prompt:
                 return super().run_toolless(prompt, model, effort, **kwargs)
             self.tool_less_prompts.append(prompt)
@@ -807,13 +972,19 @@ def test_semantic_register_failures_receive_one_correction_attempt(
                     return _review(
                         "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request])
                     )
-                if stage == "verifier":
-                    claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
-                    evidence = re.search(r'"evidence_id":"(e[0-9a-f]{12})"', prompt).group(1)
-                    event = {
-                        "op": "VERIFY", "claim_id": claim_id,
-                        "evidence_ids": [evidence], "reason": "premature",
-                    }
+                    if stage == "verifier":
+                        claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                        event = {
+                            "op": "DEFER", "claim_id": claim_id,
+                            "verification_anchor": {
+                                "first_span": "p000001", "last_span": "p000001",
+                            },
+                            "dependent_anchors": [{
+                                "first_span": "p000001", "last_span": "p000001",
+                            }],
+                            "completion_evidence": "done", "failure_condition": "failed",
+                            "stop_action": "stop",
+                        }
                     return _review(
                         "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
                     )
@@ -909,7 +1080,7 @@ def test_independently_required_invalid_defer_is_corrected_before_audit(
 ) -> None:
     class InvalidDeferEngine(ClaimEngine):
         def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
-            if "neutral evidence verifier" in prompt \
+            if "plan-only claim policy classifier" in prompt \
                     and "=== CORRECTION REQUIRED ===" not in prompt:
                 self.tool_less_prompts.append(prompt)
                 claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)

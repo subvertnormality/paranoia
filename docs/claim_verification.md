@@ -62,7 +62,11 @@ One closure round performs these stages:
 3. A fresh toolless research role registers load-bearing claims. The server parses its
    strict JSON immediately into a non-durable draft and mints durable-style IDs before
    later roles need to refer to them.
-4. A toolless evidence-planning role emits bounded structured requests. The server alone
+4. A fresh plan-only policy role receives escaped plan spans and active claim summaries,
+   but no repository paths, bytes, metadata, external results, or supplied artifacts. It
+   alone may classify genuine plan decisions and may defer a newly confirmed unverified
+   fact when the plan itself supplies the complete ordered verification contract.
+5. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
    Request parsing rejects non-UTF-8 scalars before execution; repository operands must be
    bounded relative POSIX paths without `..`, while search/ref/query operands have strict
@@ -70,16 +74,18 @@ One closure round performs these stages:
    Tree, literal-search, and history results disclose their exact limit and whether the
    requested scope was completely inspected. Literal-search records additionally bind the
    candidate paths and each inspected blob object/range.
-5. A toolless verifier sees exact server evidence bound to the exact claim ID that
+6. A toolless verifier sees exact server evidence bound to the exact claim ID that
    requested it; evidence for one claim cannot authorize another. Every model-visible source, path,
-   metadata object, and passage is injectively JSON escaped. Remote passages are framed
-   as untrusted JSON data and never share a call with repository bytes.
-6. A fresh toolless structural reviewer sees the plan, repository evidence, external
+   metadata object, and passage is injectively JSON escaped. Repository, remote, and
+   supplied passages are all untrusted JSON data, never share a call across source classes,
+   and cannot classify decisions or emit evidence-free deferral/supersession transitions.
+7. A fresh toolless structural reviewer sees the plan, repository evidence, external
    metadata, active claims, and existing class procedures. It emits one atomic PLAN and
    CLASS register. Like every other role, it receives plan bytes only inside ordered,
    injectively JSON-escaped `SPAN` data records; raw plan prose is never interpolated as
-   peer-level prompt control text.
-7. Python validates role permissions, applies both registers to drafts, roots exact
+   peer-level prompt control text. Because it receives repository passages, it may confirm
+   only factual kinds; decision classification remains in the clean plan-only role.
+8. Python validates role permissions, applies both registers to drafts, roots exact
    evidence bytes, atomically replaces lineage state, and computes one trailer. An
    atomically exclusive per-lineage latch rejects concurrent rounds before either can
    construct a stale draft.
