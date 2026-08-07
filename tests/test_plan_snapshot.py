@@ -86,6 +86,27 @@ def test_path_traversal_symlinks_and_gitlinks_are_not_blob_evidence(
             snapshot.read_blob("../outside")
 
 
+def test_gitlink_makes_containing_negative_scope_incomplete(repo: Path) -> None:
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    (repo / "vendor" / "module").mkdir(parents=True)
+    subprocess.run(
+        ["git", "update-index", "--add", "--cacheinfo", f"160000,{head},vendor/module"],
+        cwd=repo, check=True,
+    )
+    with PlanRepositorySnapshot.create(repo, run_id="gitlink-scope") as snapshot:
+        paths, complete = snapshot.list_tree_scoped("vendor/module", limit=20)
+        assert paths == ["vendor/module"]
+        assert "vendor/module" in snapshot.unavailable_paths
+        assert complete is False
+        matches, scope = snapshot.search_literal_scoped(
+            "counterexample", paths=None, limit=10,
+        )
+        assert matches == [] and scope["complete"] is False
+
+
 def test_snapshot_hashing_does_not_execute_repository_filters_or_signing(
     repo: Path, tmp_path: Path,
 ) -> None:

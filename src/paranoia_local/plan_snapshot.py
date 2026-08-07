@@ -563,6 +563,12 @@ def _snapshot_tree(
     for path in candidates:
         full_path = repo / Path(path)
         indexed = index.get(path)
+        if indexed and indexed[0] == "160000":
+            rows.append(("160000", indexed[1], path))
+            # The gitlink itself is retained, but its repository contents are outside
+            # this snapshot. A containing negative scope is therefore incomplete.
+            unavailable.append(path)
+            continue
         try:
             info = full_path.lstat()
         except FileNotFoundError:
@@ -574,9 +580,6 @@ def _snapshot_tree(
         except OSError as exc:
             raise SnapshotUnavailable(f"snapshot path is unavailable: {path!r}: {exc}") from exc
 
-        if indexed and indexed[0] == "160000":
-            rows.append(("160000", indexed[1], path))
-            continue
         if stat.S_ISLNK(info.st_mode):
             try:
                 body = os.readlink(full_path).encode("utf-8", errors="surrogateescape")
