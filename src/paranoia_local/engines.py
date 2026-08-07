@@ -465,11 +465,13 @@ class ClaudeEngine(Engine):
     TOOLLESS_REQUIRED_FLAGS = frozenset({
         "--output-format", "--model", "--effort", "--permission-mode",
         "--setting-sources", "--allowedTools", "--tools", "--strict-mcp-config",
-        "--mcp-config", "--disallowedTools", "--max-turns",
+        "--mcp-config", "--disallowedTools",
     })
+    DISCOVERY_REQUIRED_FLAGS = TOOLLESS_REQUIRED_FLAGS | {"--max-turns"}
 
-    def preflight_toolless(self, model: str, effort: str) -> None:
-        """Prove the installed CLI advertises every flag in the empty-tool profile."""
+    def _preflight_flags(
+        self, required: frozenset[str], profile: str,
+    ) -> None:
         executable = shutil.which(self.binary)
         if not executable:
             raise ToollessUnavailable("claude CLI is not installed")
@@ -483,16 +485,20 @@ class ClaudeEngine(Engine):
                 f"Claude toolless capability preflight failed: {exc}"
             ) from exc
         advertised = result.stdout + "\n" + result.stderr
-        missing = sorted(flag for flag in self.TOOLLESS_REQUIRED_FLAGS if flag not in advertised)
+        missing = sorted(flag for flag in required if flag not in advertised)
         if result.returncode or missing:
             detail = ", ".join(missing) if missing else f"exit {result.returncode}"
             raise ToollessUnavailable(
-                f"installed Claude CLI has no compatible empty-tool profile ({detail})"
+                f"installed Claude CLI has no compatible {profile} profile ({detail})"
             )
+
+    def preflight_toolless(self, model: str, effort: str) -> None:
+        """Prove the installed CLI advertises every flag in the empty-tool profile."""
+        self._preflight_flags(self.TOOLLESS_REQUIRED_FLAGS, "empty-tool")
         self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
 
     def preflight_discovery(self, model: str, effort: str) -> None:
-        self.preflight_toolless(model, effort)
+        self._preflight_flags(self.DISCOVERY_REQUIRED_FLAGS, "search-only")
         self.build_discovery_argv(Path(tempfile.gettempdir()), model, effort)
 
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:

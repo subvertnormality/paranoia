@@ -492,7 +492,7 @@ def critique_plan(
             arguments, engine=engine, log_dir=log_dir, now=now, on_progress=on_progress
         )
     if claim_mode is None:
-        claim_mode = "blocking"
+        claim_mode = "diagnostic"
     if claim_mode not in {"diagnostic", "blocking"}:
         raise ValueError("claim_verification must be 'off', 'diagnostic', or 'blocking'")
     return _critique_plan_verified(
@@ -586,11 +586,12 @@ def _read_bounded_plan_file(path: Path) -> bytes:
 
 def _tool_less_call(
     engine: Engine, prompt: str, model: str, effort: str,
-    on_progress: Callable[[str], None] | None,
+    on_progress: Callable[[str], None] | None, *, budget: cv.EvidenceBudget,
 ) -> Review:
     try:
         review = engine.run_toolless(
-            prompt, model, effort, timeout=600, **_progress_kwargs(on_progress)
+            prompt, model, effort, timeout=budget.subprocess_timeout(600),
+            **_progress_kwargs(on_progress),
         )
     except (ToollessUnavailable, AttributeError) as exc:
         raise _ClaimStageFailure(str(exc)) from exc
@@ -612,11 +613,11 @@ def _tool_less_call(
 
 def _native_discovery_call(
     engine: Engine, prompt: str, model: str, effort: str,
-    on_progress: Callable[[str], None] | None,
+    on_progress: Callable[[str], None] | None, timeout: int,
 ) -> str:
     try:
         review = engine.run_discovery(
-            prompt, model, effort, timeout=300, **_progress_kwargs(on_progress)
+            prompt, model, effort, timeout=timeout, **_progress_kwargs(on_progress)
         )
     except (ToollessUnavailable, AttributeError, OSError, subprocess.SubprocessError) as exc:
         raise NetworkEvidenceError(str(exc)) from exc
@@ -631,10 +632,13 @@ def _role_register_call(
     engine: Engine, prompt: str, model: str, effort: str,
     parser: Callable[[str], Any], on_progress: Callable[[str], None] | None,
     validator: Callable[[Any], None] | None = None,
-    *, retry_debit_bytes: Callable[[int], None] | None = None,
+    *, budget: cv.EvidenceBudget,
+    retry_debit_bytes: Callable[[int], None] | None = None,
     retry_evidence_bytes: int = 0,
 ) -> tuple[Review, Any, str | None]:
-    review = _tool_less_call(engine, prompt, model, effort, on_progress)
+    review = _tool_less_call(
+        engine, prompt, model, effort, on_progress, budget=budget,
+    )
 
     def parse_and_validate(text: str) -> Any:
         parsed = parser(text)
@@ -651,7 +655,9 @@ def _role_register_call(
             prompt + "\n\n=== CORRECTION REQUIRED ===\nYour prior terminal register was rejected: "
             + str(first) + "\nReturn the complete required terminal register again."
         )
-        retry = _tool_less_call(engine, correction, model, effort, on_progress)
+        retry = _tool_less_call(
+            engine, correction, model, effort, on_progress, budget=budget,
+        )
         try:
             # The retry repairs only the terminal register. Preserve the original role
             # response, especially its five-section structural review.
@@ -732,6 +738,7 @@ def _run_plan_research_phase(
             engine, research_prompt, model, effort,
             lambda text: pc.parse_role_register(text, pc.RESEARCH_ROLE), on_progress,
             validate_research,
+            budget=round_budget,
             retry_debit_bytes=round_budget.debit_bytes,
             retry_evidence_bytes=len(excluded_paths_json.encode("utf-8")),
         )
@@ -798,7 +805,7 @@ def _run_plan_research_phase(
             _, clean_policy_events, _ = _role_register_call(
                 engine, clean_policy_prompt, model, effort,
                 lambda text: pc.parse_role_register(text, pc.CLEAN_POLICY_ROLE),
-                on_progress, validate_clean_policy,
+                on_progress, validate_clean_policy, budget=round_budget,
             )
             for event in clean_policy_events:
                 claim = draft_claims.claims.get(str(event.data.get("claim_id")))
@@ -867,7 +874,7 @@ def _run_plan_research_phase(
                 lambda text: pc.parse_role_register(
                     text, pc.REPLACEMENT_CONFIRM_ROLE,
                 ),
-                on_progress, validate_replacements,
+                on_progress, validate_replacements, budget=round_budget,
             )
             for event in replacement_events:
                 pc.apply_events(
@@ -882,10 +889,9 @@ def _prepare_plan_round_state(
     *, state, evidence_records, persisted_evidence_ids, snapshot, store,
     stakes, stakes_level, independent_policy, external_source_policy,
     engine, model, effort, plan_packet, spans, round_no, on_progress,
-    raw_plan, arguments,
+    raw_plan, arguments, round_budget,
 ):
     """Revalidate cached state and decide whether fresh research is required."""
-    round_budget = cv.EvidenceBudget()
     high_stakes = _is_high_stakes(stakes, stakes_level)
     current_policy = {
         "version": 3,
@@ -977,6 +983,7 @@ def _run_plan_evidence_phase(
         lambda text: cv.parse_requests(
             text, active_ids, retained_evidence,
         ), on_progress,
+        budget=round_budget,
         retry_debit_bytes=round_budget.debit_bytes,
         retry_evidence_bytes=len(
             (tree_listing_json + refinable_text).encode("utf-8")
@@ -985,8 +992,8 @@ def _run_plan_evidence_phase(
     http_client = SafeHttpClient() if web_search else None
     provider = (
         NativeSearchProvider(
-            lambda prompt: _native_discovery_call(
-                engine, prompt, model, effort, on_progress,
+            lambda prompt, timeout: _native_discovery_call(
+                engine, prompt, model, effort, on_progress, timeout,
             ),
             http_client,
         )
@@ -1058,6 +1065,7 @@ def _run_source_provenance_phase(
                 text, expected,
             ),
             on_progress,
+            budget=round_budget,
             retry_debit_bytes=round_budget.debit_bytes,
             retry_evidence_bytes=len(rendered.encode("utf-8")),
         )
@@ -1127,6 +1135,7 @@ def _run_plan_verifier_phase(
             engine, verifier_prompt, model, effort,
             lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE), on_progress,
             validate_verifier,
+            budget=round_budget,
             retry_debit_bytes=round_budget.debit_bytes,
             retry_evidence_bytes=len(rendered_batch.encode("utf-8")),
         )
@@ -1193,6 +1202,7 @@ def _run_plan_structural_evidence_phase(
             engine, structural_request_prompt, model, effort,
             lambda text: cv.parse_requests(text, {"__plan__"}), on_progress,
             validate_structural_requests,
+            budget=round_budget,
             retry_debit_bytes=round_budget.debit_bytes,
             retry_evidence_bytes=len(
                 (structural_tree_json + structural_record_text).encode("utf-8")
@@ -1306,6 +1316,7 @@ def _run_plan_structural_phase(
     structural_review, composite, structural_retry = _role_register_call(
         engine, structural_prompt, model, effort, parse_composite, on_progress,
         validate_composite,
+        budget=round_budget,
         retry_debit_bytes=round_budget.debit_bytes,
         retry_evidence_bytes=len(
             (structural_repository_text + structural_external_text).encode("utf-8")
@@ -1462,6 +1473,8 @@ def _critique_plan_verified(
     round_no = arguments["round"]
     stakes, no_stakes = _resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
     calibration = _calibration(stakes, round_no)
+    # One monotonic budget governs every subsequent phase and retry in this round.
+    round_budget = cv.EvidenceBudget()
     context, focus = arguments.get("context"), arguments.get("focus")
     already = list(arguments.get("already_raised", []))
     spans = pc.segment_plan(raw_plan)
@@ -1514,7 +1527,7 @@ def _critique_plan_verified(
                 external_source_policy=external_source_policy, engine=engine,
                 model=model, effort=effort, plan_packet=plan_packet, spans=spans,
                 round_no=round_no, on_progress=on_progress, raw_plan=raw_plan,
-                arguments=arguments,
+                arguments=arguments, round_budget=round_budget,
             )
             research_status = _run_plan_research_phase(
                 cache_hit=cache_hit, state=state, draft_claims=draft_claims,
@@ -1962,6 +1975,9 @@ def _independent_checks(
 ) -> list[pc.VendorCheck]:
     if not required:
         return []
+    timeout_budget = (
+        budget if isinstance(budget, cv.EvidenceBudget) else cv.EvidenceBudget()
+    )
     digest = pc.event_digest(event)
     evidence_ids = tuple(event.data.get("evidence_ids", []))
     claim = claim_state.claims.get(str(event.data.get("claim_id")))
@@ -2023,7 +2039,7 @@ def _independent_checks(
                     auditor,
                     body_prefix + "\n\nEVIDENCE-SOURCE-CLASS: " + source_class
                     + "\n\n" + auditor_evidence,
-                    auditor_model, effort, on_progress,
+                    auditor_model, effort, on_progress, budget=timeout_budget,
                 )
                 accepted = accepted and review.text.strip() == "CHECK: ACCEPT"
             checks.append(pc.VendorCheck(

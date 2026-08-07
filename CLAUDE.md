@@ -19,3 +19,5 @@ In particular:
 - Do not call a placeholder endpoint, optional plugin, or caller-supplied adapter a completed
   default integration. Exercise the primary capability end to end before convergence, and
   treat a live acceptance failure as an architecture-checkpoint input.
+- Keep verification enabled in the approved diagnostic rollout by default. Record live
+  true/false, latency, version, and failure evidence before proposing blocking-by-default.

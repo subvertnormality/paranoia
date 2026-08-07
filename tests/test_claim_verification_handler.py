@@ -117,20 +117,20 @@ def _json(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
-def test_claim_verification_is_blocking_by_default(
+def test_claim_verification_runs_diagnostically_by_default(
     repo: Path, tmp_path: Path,
 ) -> None:
-    engine = ClaimEngine()
+    engine = ClaimEngine(verify=False)
     out = handlers.critique_plan(
         {
             "repo_path": str(repo), "plan_text": "Use greet.\n",
-            "lineage": "default-blocking", "round": 1,
+            "lineage": "default-diagnostic", "round": 1,
         },
         engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
     )
     assert engine.tool_less_prompts
     assert not engine.ordinary_prompts
-    assert "CLAIM-CLOSURE: NOT-BLOCKED" in out
+    assert "CLAIM-CLOSURE: DIAGNOSTIC-BLOCKED" in out
     assert "CONVERGENCE: NOT-BLOCKED" in out
 
 
@@ -1668,9 +1668,50 @@ def test_register_retry_reserves_resent_evidence_before_second_model_call() -> N
         handlers._role_register_call(
             engine, "prompt", "model", "high",
             lambda _text: (_ for _ in ()).throw(pc.ClaimRegisterError("bad")),
-            None, retry_debit_bytes=budget.debit_bytes, retry_evidence_bytes=4,
+            None, budget=budget, retry_debit_bytes=budget.debit_bytes,
+            retry_evidence_bytes=4,
         )  # type: ignore[arg-type]
     assert engine.calls == 1
+
+
+def test_register_retry_consumes_one_shared_round_deadline() -> None:
+    now = [0.0]
+
+    class MalformedThenValid:
+        name = "fake"
+        default_model = "fake"
+
+        def __init__(self) -> None:
+            self.timeouts: list[int] = []
+
+        def run_toolless(self, *_args, **kwargs) -> Review:
+            self.timeouts.append(kwargs["timeout"])
+            now[0] += 4.0
+            return _review("bad" if len(self.timeouts) == 1 else "good")
+
+    engine = MalformedThenValid()
+    budget = cv.EvidenceBudget(deadline=10.0, clock=lambda: now[0])
+
+    def parse(text: str) -> str:
+        if text != "good":
+            raise pc.ClaimRegisterError("bad")
+        return text
+
+    _, parsed, retry = handlers._role_register_call(
+        engine, "prompt", "model", "high", parse, None, budget=budget,
+    )  # type: ignore[arg-type]
+    assert parsed == "good" and retry == "good"
+    assert engine.timeouts == [10, 6]
+
+
+def test_round_deadline_caps_fetches_and_fails_closed_at_expiry() -> None:
+    now = [20.0]
+    budget = cv.EvidenceBudget(deadline=25.0, clock=lambda: now[0])
+    limits = cv._fetch_limits(budget)
+    assert limits.total_timeout == 5.0
+    now[0] = 25.0
+    with pytest.raises(cv.EvidenceBudgetExceeded, match="480-second deadline"):
+        budget.debit_fetch()
 
 
 def test_serialized_tree_listing_is_debited_before_model_transmission() -> None:

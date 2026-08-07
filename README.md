@@ -45,8 +45,9 @@ structured critique.
   `0.146.0-alpha.3.1`. Other Codex versions remain usable for ordinary review paths but
   fail the claim-verification mode closed before snapshot or lineage work.
 - Claim-enabled `critique_plan` with Claude as reviewer runs a bounded `claude --help`
-  compatibility probe and requires every flag used by its empty-tool profile. An older or
-  incompatible installed CLI fails before snapshot or lineage work.
+  compatibility probe and requires every flag used by its empty-tool profile plus
+  `--max-turns` for the search-only profile. An older or incompatible installed CLI fails
+  before snapshot or lineage work.
 
 **2. Install**
 
@@ -240,11 +241,12 @@ registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
 ### Plan claim verification — closing load-bearing premises
 
-`critique_plan` can add fresh toolless roles that extract factual premises, request
+`critique_plan` adds fresh toolless roles by default that extract factual premises, request
 bounded server-owned repository/external evidence, and verify, contradict, defer, or
-abstain. `blocking` is the default and combines claim and class closure. `diagnostic`
-still runs and persists verification but does not let unresolved claim findings govern
-convergence; `off` is the explicit opt-out.
+abstain. `diagnostic` is the default rollout mode: it runs and persists the complete
+verification pipeline but does not let unresolved claim findings govern convergence.
+Select `blocking` explicitly to combine claim and class closure after representative rollout
+evidence; `off` is the explicit opt-out.
 Registered claims persist independently of defect classes; a later reviewer cannot make
 one disappear by omission.
 
@@ -274,6 +276,11 @@ Unavailable sources cause round-local abstention and remain blocking; abstention
 sent to an evidence verifier or mixed with repository/supplied verifier packets. The full trust model, register
 grammar, evidence limits, caching, and recovery rules are in
 [`docs/claim_verification.md`](docs/claim_verification.md).
+One hard 480-second monotonic deadline covers snapshot work, every model role and retry,
+native discovery, HTTP retrieval, provenance, verification, and structural review. Each
+operation receives only the time remaining; deadline expiry blocks the round explicitly.
+Live integration evidence and the manual release check are recorded in
+[`docs/native_web_acceptance.md`](docs/native_web_acceptance.md).
 
 ### `lineage` — which loop this round belongs to
 
@@ -384,7 +391,7 @@ separate structural reviewer judges the design. See
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
-| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `blocking` | Verification runs and governs convergence by default. `diagnostic` reports/persists unresolved claims without letting those findings govern convergence. Operationally incomplete rounds block in either enabled mode. Non-off modes require class closure |
+| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `diagnostic` | Verification runs and persists by default while class closure alone governs convergence. `blocking` explicitly promotes unresolved claims into the verdict. Operationally incomplete rounds block in either enabled mode. Non-off modes require class closure |
 | `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking, including required deferrals |
 | `stakes_level` | `low` \| `high` | high for any stated stakes | Explicit authorization-risk policy for `auto`; natural-language stakes are never parsed for opt-down words |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
@@ -400,8 +407,9 @@ Claim-enabled plan review does not consult `.paranoia.toml` for any setting. Its
 effort, web policy, stakes, and other controls come only from call arguments and process
 defaults; checked-in repository bytes cannot become role instructions or weaken the gate.
 `class_closure: false` performs one ordinary review and emits no lineage state or
-`CONVERGENCE`. Use `diagnostic` deliberately when measuring extraction quality or tuning a
-workflow without enforcing claim closure; it is not the default safety posture.
+`CONVERGENCE`. The default `diagnostic` stage measures extraction quality, completion, and
+latency without enforcing claim closure. Promote a workflow to `blocking` explicitly after
+representative rollout evidence.
 
 ### `query`
 

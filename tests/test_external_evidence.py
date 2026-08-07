@@ -41,7 +41,7 @@ def test_deep_search_json_is_a_recoverable_network_error() -> None:
     body = "[" * 2000 + "0" + "]" * 2000
     client = SafeHttpClient(resolver=lambda _host: [], transport=FakeTransport())
     provider = NativeSearchProvider(
-        lambda _prompt: "=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: " + body,
+        lambda _prompt, _timeout: "=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: " + body,
         client,
     )
     with pytest.raises(NetworkEvidenceError, match="malformed JSON"):
@@ -51,8 +51,11 @@ def test_deep_search_json_is_a_recoverable_network_error() -> None:
 def test_native_search_uses_bounded_strict_candidate_output_without_an_endpoint() -> None:
     prompts: list[str] = []
 
-    def discover(prompt: str) -> str:
+    timeouts: list[int] = []
+
+    def discover(prompt: str, timeout: int) -> str:
         prompts.append(prompt)
+        timeouts.append(timeout)
         return (
             '=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: '
             '[{"url":"https://docs.example.com/reference","title":"Official reference"}]'
@@ -72,6 +75,7 @@ def test_native_search_uses_bounded_strict_candidate_output_without_an_endpoint(
     ]
     assert attempts == [1]
     assert sum(charged) == provider.last_response_size
+    assert timeouts == [30]
     assert "primary or authoritative" in prompts[0]
     assert "supporting and contradicting" in prompts[0]
     assert "Search results are leads, not evidence" in prompts[0]
@@ -85,7 +89,7 @@ def test_native_search_rejects_model_authority_labels_and_non_https_candidates()
         '=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: '
         '[{"url":"http://docs.example.com/","title":"Docs"}]',
     ])
-    provider = NativeSearchProvider(lambda _prompt: next(outputs), client)
+    provider = NativeSearchProvider(lambda _prompt, _timeout: next(outputs), client)
 
     with pytest.raises(NetworkEvidenceError, match="malformed"):
         provider.search("query")

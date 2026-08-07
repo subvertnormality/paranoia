@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import ipaddress
 import json
+import math
 import multiprocessing
 import socket
 import ssl
@@ -420,7 +421,9 @@ class NativeSearchProvider:
     _PREFIX = "CANDIDATES-JSON: "
     _MAX_OUTPUT_BYTES = 64 << 10
 
-    def __init__(self, discover: Callable[[str], str], client: SafeHttpClient) -> None:
+    def __init__(
+        self, discover: Callable[[str, int], str], client: SafeHttpClient,
+    ) -> None:
         self.discover = discover
         self.client = client
         self.last_response_size = 0
@@ -449,7 +452,7 @@ class NativeSearchProvider:
                on_attempt: Callable[[], None] | None = None,
                on_bytes: Callable[[int], None] | None = None,
                remaining_bytes: Callable[[], int] | None = None) -> list[SearchHit]:
-        del limits  # page retrieval limits are applied by SafeHttpClient after discovery
+        limits = limits or FetchLimits()
         self.last_response_size = 0
         if not query or len(query.encode("utf-8", errors="strict")) > 500 \
                 or not (1 <= limit <= 10):
@@ -457,7 +460,9 @@ class NativeSearchProvider:
         if on_attempt is not None:
             on_attempt()
         try:
-            output = self.discover(self._prompt(query, limit))
+            output = self.discover(
+                self._prompt(query, limit), max(1, math.ceil(limits.total_timeout)),
+            )
         except NetworkEvidenceError:
             raise
         except Exception as exc:

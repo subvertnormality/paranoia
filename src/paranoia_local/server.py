@@ -246,12 +246,13 @@ TOOLS: list[Tool] = [
                 "claim_verification": {
                     "type": "string",
                     "enum": ["off", "diagnostic", "blocking"],
-                    "default": "blocking",
+                    "default": "diagnostic",
                     "description": (
-                        "Plan claim verification rollout. 'off' preserves ordinary "
-                        "class-closure review. 'blocking' (the default) combines claim and "
-                        "class gates. 'diagnostic' records and reports claim closure without "
-                        "letting it govern CONVERGENCE. Non-off modes require class_closure."
+                        "Plan claim verification rollout. 'diagnostic' (the default) runs, "
+                        "records, and reports claim closure without letting unresolved claim "
+                        "findings govern CONVERGENCE. 'blocking' combines claim and class "
+                        "gates after representative rollout evidence. 'off' is the explicit "
+                        "opt-out. Non-off modes require class_closure."
                     ),
                 },
                 "independent_check": {

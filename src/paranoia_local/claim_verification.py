@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sys
+import time
 import urllib.parse
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
@@ -29,6 +31,7 @@ MAX_PER_CLAIM = 2
 MAX_AGGREGATE_BYTES = 16 << 20
 MAX_PASSAGE_BYTES = 4096
 MAX_EXTERNAL_RESPONSE_BYTES = 2 << 20
+MAX_ROUND_SECONDS = 8 * 60
 SOURCE_PROVENANCE_MARKER = "=== SOURCE PROVENANCE ==="
 SOURCE_PROVENANCE_PREFIX = "ASSESSMENTS-JSON: "
 
@@ -253,20 +256,38 @@ class EvidenceRecord:
 
 @dataclass
 class EvidenceBudget:
-    """One budget shared by every evidence phase in a closure round."""
+    """Byte, request, fetch, and wall-clock budgets shared by one closure round."""
 
     requests: int = 0
     fetch_attempts: int = 0
     aggregate_bytes: int = 0
     per_claim: dict[str, int] = field(default_factory=dict)
+    deadline: float = field(
+        default_factory=lambda: time.monotonic() + MAX_ROUND_SECONDS,
+        repr=False,
+    )
+    clock: Callable[[], float] = field(default=time.monotonic, repr=False, compare=False)
 
     def copy(self) -> "EvidenceBudget":
         return EvidenceBudget(
             self.requests, self.fetch_attempts, self.aggregate_bytes,
-            dict(self.per_claim),
+            dict(self.per_claim), self.deadline, self.clock,
         )
 
+    def remaining_seconds(self, maximum: float | None = None) -> float:
+        remaining = self.deadline - self.clock()
+        if remaining <= 0:
+            raise EvidenceBudgetExceeded(
+                f"review round exceeded its {MAX_ROUND_SECONDS}-second deadline"
+            )
+        return remaining if maximum is None else min(remaining, maximum)
+
+    def subprocess_timeout(self, maximum: int) -> int:
+        """Return an integer timeout without extending the shared deadline by a phase."""
+        return max(1, math.ceil(self.remaining_seconds(maximum)))
+
     def debit_requests(self, requests: Sequence[EvidenceRequest]) -> None:
+        self.remaining_seconds()
         if self.requests + len(requests) > MAX_REQUESTS:
             raise EvidenceBudgetExceeded("review evidence request budget exceeded")
         for request in requests:
@@ -280,17 +301,20 @@ class EvidenceBudget:
         self.requests += len(requests)
 
     def debit_fetch(self) -> None:
+        self.remaining_seconds()
         if self.fetch_attempts >= MAX_FETCHES:
             raise EvidenceBudgetExceeded("external fetch-attempt budget exceeded")
         self.fetch_attempts += 1
 
     def debit_bytes(self, size: int) -> None:
+        self.remaining_seconds()
         if size < 0 or self.aggregate_bytes + size > MAX_AGGREGATE_BYTES:
             raise EvidenceBudgetExceeded("review evidence aggregate byte budget exceeded")
         self.aggregate_bytes += size
 
     @property
     def remaining_bytes(self) -> int:
+        self.remaining_seconds()
         return MAX_AGGREGATE_BYTES - self.aggregate_bytes
 
 
@@ -621,7 +645,7 @@ def collect_evidence(
             try:
                 hits = search_provider.search(
                     data["query"], limit=min(data["limit"], 2),
-                    limits=_fetch_limits(budget.remaining_bytes),
+                    limits=_fetch_limits(budget),
                     on_attempt=budget.debit_fetch,
                     on_bytes=budget.debit_bytes,
                     remaining_bytes=lambda: budget.remaining_bytes,
@@ -637,7 +661,7 @@ def collect_evidence(
             for hit in hits:
                 try:
                     response = http_client.fetch(
-                        hit.url, _fetch_limits(budget.remaining_bytes),
+                        hit.url, _fetch_limits(budget),
                         on_attempt=budget.debit_fetch,
                         on_bytes=budget.debit_bytes,
                         remaining_bytes=lambda: budget.remaining_bytes,
@@ -674,12 +698,14 @@ def collect_evidence(
     return records
 
 
-def _fetch_limits(remaining: int) -> FetchLimits:
+def _fetch_limits(budget: EvidenceBudget) -> FetchLimits:
+    remaining = budget.remaining_bytes
     if remaining < 1:
         raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
     return FetchLimits(
         max_compressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
         max_decompressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
+        total_timeout=budget.remaining_seconds(30.0),
     )
 
 

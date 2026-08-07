@@ -11,16 +11,17 @@ premises verified, contradicted, safely deferred, or explicitly unresolved?
 | Mode | Effect |
 |---|---|
 | `off` | Opt out and preserve ordinary class-closure plan review; do not run or persist claim research |
-| `diagnostic` | Run and persist claim research and display claim closure, but let only class closure govern `CONVERGENCE` |
-| `blocking` | Default. Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
+| `diagnostic` | **Default.** Run and persist claim research and display claim closure, but let only class closure govern `CONVERGENCE` |
+| `blocking` | Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
 
 Diagnostic mode ignores unresolved claim findings for convergence; it never ignores an
 operationally incomplete round. Model-role failure, register debt, state failure, or an
 abandoned structural/class transaction blocks in every enabled mode.
 
-`blocking` is the out-of-box behavior because an unresolved load-bearing premise must not
-produce a clear convergence verdict. `diagnostic` remains an explicit measurement and
-tuning mode. `class_closure: false` is the stateless one-shot review and accepts only
+`diagnostic` is the out-of-box rollout stage: verification is running, cached, visible, and
+measurable without prematurely changing the merge verdict. Select `blocking` explicitly
+when the workflow has representative completion, latency, and false-block measurements.
+`class_closure: false` is the stateless one-shot review and accepts only
 `claim_verification: off`.
 
 ## Stakes and trust model
@@ -196,6 +197,12 @@ DNS answers, connected peers, response media, compressed/decompressed bytes, and
 round deadline and byte/fetch budgets are validated by server code. `web_search: false`
 explicitly disables this path; a load-bearing internet-only claim then remains unresolved.
 
+These are fixed product integrations, not a provider interface exposed to callers. Codex's
+API is its signed-in CLI `--search` capability; Claude's API is the signed-in Claude Code
+`WebSearch` tool. There is deliberately no `PARANOIA_SEARCH_ENDPOINT`: requiring a fictional
+or operator-hosted service would make the default verification path incomplete. Both CLI
+profiles are capability-preflighted before snapshot or lineage state is acquired.
+
 Search rank is not source authority, and the discovery role cannot assign source class.
 Callers may provide `external_source_policy` rules
 with an exact lowercase host, URL path prefix, and `primary`, `authoritative`, `secondary`,
@@ -273,7 +280,7 @@ Important bounds include:
 - evidence records and requests: bounded per operation and by one shared round budget;
 - external work: at most 8 shared search/fetch attempts, 2 MiB compressed and decompressed
   per response within the 16 MiB round aggregate shared with repository evidence and model
-  packets, bounded redirects, and total deadlines;
+  packets, bounded redirects, and one hard 480-second monotonic round deadline;
 - persisted evidence: 100 MiB per lineage and 1 GiB globally by default.
 
 Snapshot latency is measured separately from model latency. On the development repository,
@@ -281,6 +288,12 @@ the refactored snapshot dropped from roughly 17.2 seconds to roughly 0.23 second
 local benchmark, not a universal guarantee. Native discovery adds one bounded search-only
 model call per external query, and provenance adds one fresh call per unmatched fetched page
 (at most the shared external-fetch budget).
+
+The 480-second deadline begins after input and CLI capability preflight and governs snapshot
+work, every model role and register retry, discovery, retrieval, provenance, verification,
+independent audits, and structural review. Each subprocess or HTTP request receives only the
+time still remaining; no phase resets the clock. Expiry is an explicit blocked round, never
+an abstention that can clear a claim.
 
 ## Diagnostic and rollback criteria
 
@@ -292,7 +305,10 @@ Use explicit `diagnostic` while evaluating a workflow when:
 - malformed, stale, interrupted, and unavailable cases recover without manual state edits;
 - operators understand that the gate covers only registered claims.
 
-Return to the default `blocking` mode once those measurements are acceptable. Use `off` only
-when the operator explicitly accepts ordinary structural review without claim verification.
-Changing modes does not delete lineage evidence; it only changes whether the claim gate runs
-or governs future verdicts.
+Promote a workflow to explicit `blocking` mode once those measurements are acceptable. Use
+`off` only when the operator explicitly accepts ordinary structural review without claim
+verification. Changing modes does not delete lineage evidence; it only changes whether the
+claim gate runs or governs future verdicts.
+
+The maintained live-integration evidence and release procedure are in
+[`native_web_acceptance.md`](native_web_acceptance.md).

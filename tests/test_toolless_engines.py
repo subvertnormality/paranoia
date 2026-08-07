@@ -160,3 +160,17 @@ def test_claude_toolless_preflight_rejects_an_incompatible_installed_cli(
     )
     with pytest.raises(ToollessUnavailable, match="--tools"):
         ClaudeEngine().preflight_toolless("claude", "high")
+
+
+def test_claude_preflight_requires_max_turns_only_for_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: "/cli/claude")
+    help_text = " ".join(sorted(ClaudeEngine.TOOLLESS_REQUIRED_FLAGS))
+    monkeypatch.setattr(
+        "paranoia_local.engines.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, help_text, ""),
+    )
+    ClaudeEngine().preflight_toolless("claude", "high")
+    with pytest.raises(ToollessUnavailable, match="--max-turns"):
+        ClaudeEngine().preflight_discovery("claude", "high")
