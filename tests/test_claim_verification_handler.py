@@ -30,6 +30,8 @@ class ClaimEngine:
 
     def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
         self.tool_less_prompts.append(prompt)
+        if "independent text-only evidence auditor" in prompt:
+            return _review("CHECK: ACCEPT")
         if "neutral claim extractor" in prompt:
             if '"kind_classification":"confirmed"' in prompt:
                 return _review("=== RESEARCH REGISTER ===\nEVENTS-JSON: []")
@@ -1774,7 +1776,6 @@ def test_independent_auditor_receives_exact_proposition_and_claim_state(
         event, required=True, primary_engine=ClaimEngine(), primary_model="fake-model",
         evidence_records=[record], claim_state=state, effort="high",
         plan_context=pc.render_spans(spans), on_progress=None, budget=budget,
-        primary_authored=False,
     )
     assert len(checks) == 2
     assert auditor.calls == 2
@@ -1783,6 +1784,76 @@ def test_independent_auditor_receives_exact_proposition_and_claim_state(
     assert '"proposition":"Use it."' in auditor.prompt
     assert f'"claim_id":"{claim_id}"' in auditor.prompt
     assert '"status":"unchecked"' in auditor.prompt
+
+
+def test_initial_independent_audits_receive_all_source_isolated_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("complete-initial-audit")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "one", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+            "reason": "fact",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    digest = "a" * 64
+    external = cv.EvidenceRecord(
+        "e-old", claim_id, "external", "https://example.com/old",
+        digest, digest, 1, 0, 1, digest, "x", {},
+    )
+    repository = cv.EvidenceRecord(
+        "e-new", claim_id, "repository-blob", "app.py",
+        digest, digest, 1, 0, 1, digest, "y", {"complete": True},
+    )
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": [external.evidence_id], "reason": "verified",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={external.evidence_id: claim_id},
+    )
+    event = pc.Event("SET_BEARING", {
+        "op": "SET_BEARING", "claim_id": claim_id, "bearing": pc.ADVISORY,
+        "evidence_ids": [repository.evidence_id], "reason": "not load-bearing",
+    })
+
+    class Auditor:
+        default_model = "audit-model"
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.prompts: list[str] = []
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            self.prompts.append(prompt)
+            return _review("CHECK: ACCEPT")
+
+    primary = Auditor("codex")
+    secondary = Auditor("claude")
+    monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: secondary)
+    checks = handlers._independent_checks(
+        event, required=True, primary_engine=primary, primary_model="primary-model",
+        evidence_records=[external, repository], claim_state=state, effort="high",
+        plan_context=pc.render_spans(spans), on_progress=None,
+        budget=cv.EvidenceBudget(),
+    )
+    assert {check.vendor for check in checks if check.accepted} == {"codex", "claude"}
+    for auditor in (primary, secondary):
+        assert len(auditor.prompts) == 2
+        assert sum('"evidence_id":"e-old"' in prompt for prompt in auditor.prompts) == 1
+        assert sum('"evidence_id":"e-new"' in prompt for prompt in auditor.prompts) == 1
+        assert all(not (
+            '"evidence_id":"e-old"' in prompt and '"evidence_id":"e-new"' in prompt
+        ) for prompt in auditor.prompts)
+        assert all('"truth_evidence_ids":["e-old"]' in prompt for prompt in auditor.prompts)
 
 
 def test_pending_dispute_resolution_deduplicates_vendor_provenance_on_replay(

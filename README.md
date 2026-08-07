@@ -724,7 +724,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   matching accepted vendor provenance copied across the truth and dispute slots of one
   resolution, then invokes every missing vendor. Dispute resolution audits include the full
   pre-transition dependency set and evidence being displaced; repository, external,
-  supplied, and local bodies are sent as separate packets that must all be accepted. Cached
+  supplied, and local bodies are sent as separate packets that must all be accepted, and
+  authoring a transition never substitutes for that complete audit. The 4 KiB displayed
+  passage is authorization-complete only when it covers the entire source; longer
+  repository, empirical, external, and supplied records remain context-only. Cached
   CAS/repository reads and model-visible evidence rendering share the round byte budget,
   including evidence resent for a register correction; the same auditor packet is debited
   separately before each vendor launch. A CAS or snapshot I/O failure blocks the round

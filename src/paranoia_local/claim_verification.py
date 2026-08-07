@@ -534,6 +534,8 @@ def evidence_bindings(records: Sequence[EvidenceRecord]) -> dict[str, str]:
         record.evidence_id: record.claim_id
         for record in records
         if record.kind != "abstention"
+        and record.passage_start == 0
+        and record.passage_end == record.source_size
         and not (
             record.kind.startswith("repository")
             and record.metadata.get("complete") is not True

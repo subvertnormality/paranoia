@@ -160,6 +160,12 @@ Persisted IDs must have the exact server prefix/width, and merging retained with
 collected records rejects an occupied ID unless the complete canonical records are equal;
 a collision can never replace the bytes beneath an existing dependency.
 
+The 4 KiB display passage is also an authorization boundary for every evidence kind.
+Repository, empirical, external, and supplied records whose source extends beyond the
+exposed passage remain context-only; their IDs are absent from transition bindings. A
+planner must obtain a complete bounded source whose conclusion-changing bytes are all
+exposed before any verifier or auditor can authorize from it.
+
 Bounded `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and `HISTORY` records state whether the
 entire requested source scope is complete. A partial blob range or other truncated result
 remains visible to the verifier as context, including the exact candidates and inspected
@@ -276,9 +282,10 @@ all current truth/bearing/dispute dependency IDs, plan-anchor identity and spans
 complete proposed event, its new evidence, and the pre-transition evidence it would
 displace. Evidence bodies are split into repository, external, supplied, and local packets;
 the vendor must accept every source-isolated packet before the server records one accepted
-check. A dispute-resolution author is not credited as an auditor merely for proposing the
-event, and old resolution checks are rerun on replay so legacy partial context cannot clear
-a dispute. Truth,
+check. Initial and replay audits receive the complete retained/new collection, not merely
+the verifier batch that proposed the transition. An authoring vendor is never credited
+without running these complete packets, and old dispute-resolution checks are rerun on
+replay so legacy partial context cannot clear a dispute. Truth,
 dispute, deferral, and bearing authorizations persist in separate slots, so a later ordinary
 truth check cannot erase the mandatory audit that made a claim advisory. Their evidence
 dependencies and exact event objects also persist separately while a retained-ID union

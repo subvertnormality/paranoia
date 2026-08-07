@@ -215,6 +215,32 @@ def test_complete_blob_can_authorize_but_partial_prefix_cannot(
     assert records[1].evidence_id not in bindings
 
 
+@pytest.mark.parametrize(
+    ("kind", "metadata"),
+    [
+        ("repository-blob", {"complete": True}),
+        ("empirical", {}),
+        ("external", {}),
+        ("supplied-artifact", {}),
+    ],
+)
+def test_semantically_truncated_source_is_never_authorization_eligible(
+    kind: str, metadata: dict,
+) -> None:
+    digest = "a" * 64
+    record = cv.EvidenceRecord(
+        "e" + "1" * 32, "claim", kind, "source", digest, digest,
+        cv.MAX_PASSAGE_BYTES + 1, 0, cv.MAX_PASSAGE_BYTES, digest, "x", metadata,
+    )
+    assert cv.evidence_bindings([record]) == {}
+
+    complete = cv.EvidenceRecord(
+        "e" + "2" * 32, "claim", kind, "source", digest, digest, 1,
+        0, 1, digest, "x", metadata,
+    )
+    assert cv.evidence_bindings([complete]) == {complete.evidence_id: "claim"}
+
+
 def test_python_adapter_charges_input_bytes_to_the_shared_aggregate_budget(
     repo: Path, tmp_path: Path
 ) -> None:
