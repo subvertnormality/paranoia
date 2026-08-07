@@ -690,7 +690,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   strict per-kind schemas; every retained claim
   dependency must still resolve to a valid same-claim record. Deeply nested or otherwise
   malformed model, network, and persisted JSON is converted to a recoverable blocked
-  result, including model strings with non-UTF-8 surrogate code points. Direct Git metadata
+  result, including model strings with non-UTF-8 surrogate code points. Evidence-request
+  paths, patterns, refs, and queries are validated as bounded strict UTF-8 (with
+  traversal-free relative repository paths) inside the role's correction attempt. Direct Git metadata
   is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
   ambiguous failures at or after that boundary, retaining latches only for the latter.
@@ -746,6 +748,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   the dirty wrapper or initial history roots mid-round; the server deletes them after
   evidence adoption or abort recovery. Remove an abandoned one only after confirming
   its lineage/in-flight journal is no longer active, with `git update-ref -d <ref>`.
+  Publication owns each new inode immediately after exclusive creation and rolls it back
+  after any later write, fsync, or close failure. An unverifiable rollback retains the
+  pre-published recovery journal and lineage latch.
 
 ### Rate limits
 

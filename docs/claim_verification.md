@@ -64,6 +64,9 @@ One closure round performs these stages:
    later roles need to refer to them.
 4. A toolless evidence-planning role emits bounded structured requests. The server alone
    executes `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and configured external search.
+   Request parsing rejects non-UTF-8 scalars before execution; repository operands must be
+   bounded relative POSIX paths without `..`, while search/ref/query operands have strict
+   byte ceilings. These semantic checks remain inside the role's one correction attempt.
    Tree, literal-search, and history results disclose their exact limit and whether the
    requested scope was completely inspected. Literal-search records additionally bind the
    candidate paths and each inspected blob object/range.
@@ -350,7 +353,8 @@ relocation treats overlapping occurrences as ambiguous.
 
 Register syntax and semantic transition validation share the same single correction
 attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
-state transition, or non-UTF-8 surrogate-bearing scalar is corrected before application.
+state transition, request path/query operand, or non-UTF-8 surrogate-bearing scalar is
+corrected before application.
 Malformed registers record debt. A
 failed snapshot-ref cleanup, ambiguous publication, or
 crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
@@ -365,3 +369,7 @@ the last valid root until the lineage is repaired or explicitly abandoned.
 Every exception while verifying or deleting temporary snapshot refs—including ownership,
 decoding, boundary, and filesystem failures—is normalized as
 ambiguous cleanup, so the journal and latch remain available for operator recovery.
+Publication takes rollback ownership immediately after the exclusive ref-file create; any
+later write, file fsync, close, or parent fsync failure removes only that exact fd-anchored
+inode. If its identity or rollback durability cannot be established, cleanup is ambiguous
+and the pre-published journal/latch are retained.

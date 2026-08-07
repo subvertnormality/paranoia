@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 
 from paranoia_local import class_closure as cc
-from paranoia_local import claim_verification as cv, handlers, plan_claims as pc
+from paranoia_local import (
+    claim_verification as cv,
+    handlers,
+    plan_claims as pc,
+    plan_snapshot as ps,
+)
 from paranoia_local.engines import Review, ToollessUnavailable
 
 
@@ -605,6 +610,35 @@ def test_cleanup_failure_retains_plan_latch_and_evidence_journal(
     assert list((state_root / "evidence" / "journals").glob("*.json"))
 
 
+def test_ref_publication_rollback_failure_retains_latch_and_journal(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_write = ps.os.write
+
+    def fail_ref_write(fd: int, data: bytes) -> int:
+        if len(data) in {41, 65} and data.endswith(b"\n"):
+            raise OSError("injected ref write failure")
+        return original_write(fd, data)
+
+    def fail_rollback(*_args, **_kwargs) -> None:
+        raise ps.SnapshotCleanupError("injected ref rollback failure")
+
+    monkeypatch.setattr(ps.os, "write", fail_ref_write)
+    monkeypatch.setattr(ps, "_rollback_created_ref", fail_rollback)
+    lineage_id = "ref-publication-rollback-plan"
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": lineage_id, "round": 1,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    state_root = cc.default_state_root()
+    assert "persistence failed closed" in out and "CONVERGENCE: BLOCKED" in out
+    assert (cc.lineage_dir(state_root) / f"{lineage_id}.pending").exists()
+    assert list((state_root / "evidence" / "journals").glob("*.json"))
+
+
 def test_invalid_recovery_manifest_settles_as_recoverable_blocked_debt(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -750,6 +784,39 @@ def test_surrogate_model_string_receives_the_register_correction_attempt(
     assert "CONVERGENCE: NOT-BLOCKED" in out
     assert any(
         "=== CORRECTION REQUIRED ===" in prompt and "nonempty string" in prompt
+        for prompt in engine.tool_less_prompts
+    )
+
+
+def test_surrogate_evidence_operand_receives_the_request_correction_attempt(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class SurrogateEvidenceEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "neutral evidence planner" in prompt \
+                    and "=== CORRECTION REQUIRED ===" not in prompt:
+                self.tool_less_prompts.append(prompt)
+                claim_id = re.search(r'"claim_id":"([0-9a-f]{10})"', prompt).group(1)
+                request = {
+                    "op": "SEARCH_LITERAL", "claim_id": claim_id,
+                    "pattern": "bad\ud800pattern", "paths": [], "limit": 10,
+                }
+                return _review(
+                    "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request])
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = SurrogateEvidenceEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "surrogate-evidence-retry", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    assert any(
+        "=== CORRECTION REQUIRED ===" in prompt and "valid UTF-8" in prompt
         for prompt in engine.tool_less_prompts
     )
 

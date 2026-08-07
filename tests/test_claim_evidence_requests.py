@@ -66,6 +66,33 @@ def test_non_string_repository_operands_are_register_errors(request_row: dict) -
         cv.parse_requests(_requests([request_row]), {"claim"})
 
 
+@pytest.mark.parametrize(
+    "request_row",
+    [
+        {"op": "READ_BLOB", "claim_id": "claim", "path": "../secret",
+         "offset": 0, "max_bytes": 10},
+        {"op": "LIST_TREE", "claim_id": "claim", "prefix": "/absolute", "limit": 10},
+        {"op": "SEARCH_LITERAL", "claim_id": "claim", "pattern": "bad\ud800pattern",
+         "paths": [], "limit": 10},
+        {"op": "SEARCH_LITERAL", "claim_id": "claim", "pattern": "x",
+         "paths": ["nested/../../escape"], "limit": 10},
+        {"op": "HISTORY", "claim_id": "claim", "ref": "bad\ud800ref",
+         "path": "app.py", "limit": 10},
+        {"op": "HISTORY", "claim_id": "claim", "ref": "refs/heads/main",
+         "path": "../app.py", "limit": 10},
+        {"op": "RUN_ADAPTER", "claim_id": "claim", "adapter": "PYTHON_COMPILE",
+         "paths": ["/app.py"]},
+        {"op": "SEARCH_EXTERNAL", "claim_id": "claim", "query": "bad\ud800query",
+         "limit": 2},
+    ],
+)
+def test_request_scalars_are_utf8_and_repository_paths_are_relative(
+    request_row: dict,
+) -> None:
+    with pytest.raises(cv.EvidenceRequestError):
+        cv.parse_requests(_requests([request_row]), {"claim"})
+
+
 def test_one_budget_is_shared_across_phases_and_failed_fetch_attempts() -> None:
     budget = cv.EvidenceBudget()
     first = cv.EvidenceRequest("LIST_TREE", {

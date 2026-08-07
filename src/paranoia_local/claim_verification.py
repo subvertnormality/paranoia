@@ -7,6 +7,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping, Sequence
 
 from .evidence_store import EvidenceStore, EvidenceStoreError
@@ -159,8 +160,7 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
     ):
         raise EvidenceRequestError(f"{op}.limit is out of bounds")
     if op == "READ_BLOB":
-        if not isinstance(item.get("path"), str) or not item["path"]:
-            raise EvidenceRequestError("READ_BLOB.path is required")
+        _validate_repo_path(item.get("path"), field="READ_BLOB.path")
         size = item.get("max_bytes")
         if not isinstance(size, int) or isinstance(size, bool) or not 1 <= size <= 1 << 20:
             raise EvidenceRequestError("READ_BLOB.max_bytes is out of bounds")
@@ -168,37 +168,69 @@ def _validate_request(op: str, item: Mapping[str, Any]) -> None:
         if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
             raise EvidenceRequestError("READ_BLOB.offset is out of bounds")
     if op == "SEARCH_LITERAL":
-        if not isinstance(item.get("pattern"), str) or not item["pattern"] or len(item["pattern"]) > 256:
-            raise EvidenceRequestError("SEARCH_LITERAL.pattern is out of bounds")
+        _validate_utf8_scalar(
+            item.get("pattern"), field="SEARCH_LITERAL.pattern", max_bytes=256,
+        )
         if not isinstance(item.get("paths"), list) or len(item["paths"]) > 50 \
-                or any(not isinstance(path, str) or not path for path in item["paths"]):
+                or any(not _is_repo_path(path) for path in item["paths"]):
             raise EvidenceRequestError("SEARCH_LITERAL.paths is out of bounds")
-    if op == "LIST_TREE" and not isinstance(item.get("prefix"), str):
-        raise EvidenceRequestError("LIST_TREE.prefix must be a string")
+    if op == "LIST_TREE":
+        _validate_repo_path(
+            item.get("prefix"), field="LIST_TREE.prefix", allow_empty=True,
+        )
     if op == "SEARCH_EXTERNAL":
-        if not isinstance(item.get("query"), str) or not item["query"] or len(item["query"]) > 500:
-            raise EvidenceRequestError("SEARCH_EXTERNAL.query is out of bounds")
+        _validate_utf8_scalar(
+            item.get("query"), field="SEARCH_EXTERNAL.query", max_bytes=500,
+        )
         if limit > 10:
             raise EvidenceRequestError("SEARCH_EXTERNAL.limit is out of bounds")
     if op == "HISTORY":
-        if not isinstance(item.get("ref"), str) or not item["ref"]:
-            raise EvidenceRequestError("HISTORY.ref is required")
-        if not isinstance(item.get("path"), str) or not item["path"] or limit > 50:
-            raise EvidenceRequestError("HISTORY path/limit is out of bounds")
+        _validate_utf8_scalar(item.get("ref"), field="HISTORY.ref", max_bytes=1024)
+        _validate_repo_path(item.get("path"), field="HISTORY.path")
+        if limit > 50:
+            raise EvidenceRequestError("HISTORY.limit is out of bounds")
     if op == "RUN_ADAPTER":
         if item.get("adapter") != "PYTHON_COMPILE":
             raise EvidenceRequestError("RUN_ADAPTER supports only PYTHON_COMPILE")
         if not isinstance(item.get("paths"), list) or not 1 <= len(item["paths"]) <= 20 \
-                or any(not isinstance(path, str) or not path for path in item["paths"]):
+                or any(not _is_repo_path(path) for path in item["paths"]):
             raise EvidenceRequestError("RUN_ADAPTER.paths must contain 1..20 paths")
-    git_operands = [
-        item[key] for key in ("prefix", "path", "ref", "pattern")
-        if isinstance(item.get(key), str)
-    ]
-    if isinstance(item.get("paths"), list):
-        git_operands.extend(path for path in item["paths"] if isinstance(path, str))
-    if any("\0" in value for value in git_operands):
-        raise EvidenceRequestError(f"{op} Git operands may not contain NUL")
+
+
+def _validate_utf8_scalar(
+    value: object, *, field: str, max_bytes: int, allow_empty: bool = False,
+) -> str:
+    if not isinstance(value, str) or (not value and not allow_empty) or "\0" in value:
+        raise EvidenceRequestError(f"{field} is out of bounds")
+    try:
+        encoded = value.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise EvidenceRequestError(f"{field} must be valid UTF-8") from exc
+    if len(encoded) > max_bytes:
+        raise EvidenceRequestError(f"{field} is out of bounds")
+    return value
+
+
+def _is_repo_path(value: object, *, allow_empty: bool = False) -> bool:
+    try:
+        path = _validate_utf8_scalar(
+            value, field="repository path", max_bytes=4096, allow_empty=allow_empty,
+        )
+    except EvidenceRequestError:
+        return False
+    pure = PurePosixPath(path)
+    return (allow_empty and not path) or (
+        bool(path) and not pure.is_absolute() and ".." not in pure.parts
+    )
+
+
+def _validate_repo_path(
+    value: object, *, field: str, allow_empty: bool = False,
+) -> str:
+    if not _is_repo_path(value, allow_empty=allow_empty):
+        raise EvidenceRequestError(f"{field} must be a bounded relative repository path")
+    assert isinstance(value, str)
+    return value
 
 
 def collect_evidence(

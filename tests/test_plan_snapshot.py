@@ -212,6 +212,25 @@ def test_cleanup_does_not_follow_a_replaced_pin_directory(
     snap.close()
 
 
+def test_failed_ref_write_rolls_back_the_just_created_inode(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = ps.os.write
+
+    def fail_ref_write(fd: int, data: bytes) -> int:
+        if len(data) in {41, 65} and data.endswith(b"\n"):
+            raise OSError("injected ref write failure")
+        return original(fd, data)
+
+    monkeypatch.setattr(ps.os, "write", fail_ref_write)
+    with pytest.raises(SnapshotUnavailable, match="could not publish temporary ref"):
+        PlanRepositorySnapshot.create(repo, run_id="failed-ref-write")
+    namespace = repo / ".git" / "refs" / "paranoia"
+    assert not namespace.exists() or not any(
+        path.is_file() or path.is_symlink() for path in namespace.rglob("*")
+    )
+
+
 def test_history_reads_only_the_initial_server_pinned_ref_map(repo: Path) -> None:
     with PlanRepositorySnapshot.create(repo, run_id="round-history") as snap:
         rows = snap.history("refs/heads/main", "app.py", limit=5)

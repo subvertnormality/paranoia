@@ -430,23 +430,83 @@ def _write_owned_ref(common: Path, name: str, oid: str) -> None:
             os.O_WRONLY | os.O_CREAT | os.O_EXCL
             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
         )
+        ref_fd: int | None = None
+        created = False
+        created_identity: tuple[int, int] | None = None
         try:
             ref_fd = os.open(parts[-1], flags, 0o600, dir_fd=fd)
-            try:
-                payload = (oid + "\n").encode("ascii")
-                written = 0
-                while written < len(payload):
-                    written += os.write(ref_fd, payload[written:])
-                os.fsync(ref_fd)
-            finally:
-                os.close(ref_fd)
+            created = True
+            opened = os.fstat(ref_fd)
+            created_identity = (opened.st_dev, opened.st_ino)
+            payload = (oid + "\n").encode("ascii")
+            written = 0
+            while written < len(payload):
+                count = os.write(ref_fd, payload[written:])
+                if count <= 0:
+                    raise OSError("temporary ref write made no progress")
+                written += count
+            os.fsync(ref_fd)
+            closing_fd = ref_fd
+            ref_fd = None
+            os.close(closing_fd)
             os.fsync(fd)
         except FileExistsError as exc:
             raise SnapshotUnavailable(f"temporary ref already exists: {name}") from exc
-        except OSError as exc:
-            raise SnapshotUnavailable(f"could not publish temporary ref {name}: {exc}") from exc
+        except BaseException as exc:
+            if created and created_identity is None:
+                raise SnapshotCleanupError(
+                    f"temporary ref {name} was created but its identity could not be verified"
+                ) from exc
+            if created_identity is not None:
+                try:
+                    _rollback_created_ref(fd, parts[-1], created_identity)
+                except SnapshotCleanupError as cleanup:
+                    raise SnapshotCleanupError(
+                        f"temporary ref {name} failed during publication and rollback: {cleanup}"
+                    ) from exc
+            if isinstance(exc, SnapshotUnavailable):
+                raise
+            if isinstance(exc, OSError):
+                raise SnapshotUnavailable(
+                    f"could not publish temporary ref {name}: {exc}"
+                ) from exc
+            raise
+        finally:
+            if ref_fd is not None:
+                try:
+                    os.close(ref_fd)
+                except OSError as exc:
+                    if created_identity is not None:
+                        try:
+                            _rollback_created_ref(fd, parts[-1], created_identity)
+                        except SnapshotCleanupError as cleanup:
+                            raise SnapshotCleanupError(
+                                f"temporary ref {name} close and rollback failed: {cleanup}"
+                            ) from exc
+                    raise SnapshotUnavailable(
+                        f"could not close temporary ref {name}: {exc}"
+                    ) from exc
     finally:
         os.close(fd)
+
+
+def _rollback_created_ref(
+    parent_fd: int, filename: str, identity: tuple[int, int],
+) -> None:
+    """Remove only the exact inode created by this publication attempt."""
+    try:
+        current = os.stat(filename, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(current.st_mode) \
+                or (current.st_dev, current.st_ino) != identity:
+            raise SnapshotCleanupError("new temporary ref changed identity before rollback")
+        os.unlink(filename, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+    except FileNotFoundError:
+        return
+    except SnapshotCleanupError:
+        raise
+    except OSError as exc:
+        raise SnapshotCleanupError(f"could not roll back newly created ref: {exc}") from exc
 
 
 def _read_owned_ref(common: Path, name: str) -> str | None:
