@@ -101,6 +101,18 @@ def test_native_search_rejects_model_authority_labels_and_non_https_candidates()
         provider.search("query")
 
 
+def test_native_search_does_not_round_up_a_subsecond_deadline() -> None:
+    calls: list[int] = []
+    client = SafeHttpClient(resolver=lambda host: [], transport=FakeTransport())
+    provider = NativeSearchProvider(
+        lambda _prompt, timeout: calls.append(timeout) or "", client,
+    )
+
+    with pytest.raises(NetworkEvidenceError, match="less than one second"):
+        provider.search("query", limits=FetchLimits(total_timeout=0.5))
+    assert calls == []
+
+
 def test_dns_private_and_mixed_private_answers_are_rejected() -> None:
     transport = FakeTransport()
     client = SafeHttpClient(resolver=lambda host: ["93.184.216.34", "127.0.0.1"],

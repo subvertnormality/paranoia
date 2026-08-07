@@ -93,6 +93,19 @@ No UGC or secondary source authorized a transition. The result was
 `CLAIM-CLOSURE: DIAGNOSTIC-BLOCKED` because the contradicted premise correctly remained
 load-bearing, while the default rollout semantics left class convergence non-blocking.
 
+Sanitized, checked-in exports make the underlying results independently auditable:
+
+- [`native_web_codex_2026-08-07.json`](acceptance/native_web_codex_2026-08-07.json)
+- [`native_web_claude_2026-08-07.json`](acceptance/native_web_claude_2026-08-07.json)
+
+Each export contains the exact claim status and transition, evidence/content hashes, URL,
+source class and provenance method, passage offsets and hash, full displayed passage, and
+terminal closure lines. The Claude structural role registered a class claiming that quoted
+passages were absent because that role intentionally receives external metadata rather than
+remote bodies; the export shows the passages that were retained and sent to the verifier.
+The acceptance criterion concerns the persisted verified/contradicted claim outcomes, not a
+clear structural convergence verdict for this deliberately false plan.
+
 ## Interpretation and promotion
 
 This evidence proves that both supported reviewer integrations can discover, retrieve,

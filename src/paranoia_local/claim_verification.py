@@ -706,10 +706,15 @@ def _fetch_limits(budget: EvidenceBudget) -> FetchLimits:
     remaining = budget.remaining_bytes
     if remaining < 1:
         raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
+    timeout = budget.remaining_seconds(30.0)
+    if timeout < 1.0:
+        raise EvidenceBudgetExceeded(
+            "review round has less than one second remaining for external discovery"
+        )
     return FetchLimits(
         max_compressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
         max_decompressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
-        total_timeout=budget.remaining_seconds(30.0),
+        total_timeout=timeout,
     )
 
 

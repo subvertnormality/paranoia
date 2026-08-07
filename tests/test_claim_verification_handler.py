@@ -1717,6 +1717,10 @@ def test_round_deadline_caps_fetches_and_fails_closed_at_expiry() -> None:
     with pytest.raises(cv.EvidenceBudgetExceeded, match="480-second deadline"):
         budget.debit_fetch()
 
+    subsecond = cv.EvidenceBudget(deadline=20.5, clock=lambda: 20.0)
+    with pytest.raises(cv.EvidenceBudgetExceeded, match="external discovery"):
+        cv._fetch_limits(subsecond)
+
 
 def test_model_result_completed_after_deadline_is_rejected() -> None:
     now = [0.0]

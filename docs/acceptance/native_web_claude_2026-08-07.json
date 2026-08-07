@@ -1,0 +1,139 @@
+{
+  "claims": [
+    {
+      "claim": "1. RFC 9110 was published in June 2022.",
+      "claim_id": "2e79c2c99f593c711e0ca54b523855be",
+      "reason": "Both the RFC Editor (primary) and IETF Datatracker (authoritative) pages for RFC 9110 show a 'Published' field with datetime='2022-06' and visible text 'June 2022', directly entailing the claim.",
+      "status": "verified",
+      "transition": {
+        "claim_id": "2e79c2c99f593c711e0ca54b523855be",
+        "evidence_ids": [
+          "eff2030b059b03a57c749b148f33d59cb",
+          "ed050f52da1ab8ffc1fd7c369c59162e4"
+        ],
+        "op": "VERIFY",
+        "reason": "Both the RFC Editor (primary) and IETF Datatracker (authoritative) pages for RFC 9110 show a 'Published' field with datetime='2022-06' and visible text 'June 2022', directly entailing the claim."
+      },
+      "truth_evidence_ids": [
+        "eff2030b059b03a57c749b148f33d59cb",
+        "ed050f52da1ab8ffc1fd7c369c59162e4"
+      ]
+    },
+    {
+      "claim": "2. RFC 6585 defines HTTP status code 511 as Permanent Redirect.",
+      "claim_id": "a62e0e84f87c02f0d0b13758aeb63cd3",
+      "reason": "IETF Datatracker (primary) table of contents and body text list section 6 as '511 Network Authentication Required', and httpwg.org (primary) TOC lists the same '511 Network Authentication Required' heading; neither shows 'Permanent Redirect', directly conflicting with the claim.",
+      "status": "contradicted",
+      "transition": {
+        "claim_id": "a62e0e84f87c02f0d0b13758aeb63cd3",
+        "evidence_ids": [
+          "e36a1ad538eefcf8539bd43795bd40b1f",
+          "efba1a79fbc96195a2846d26b9623c5f5"
+        ],
+        "op": "CONTRADICT",
+        "reason": "IETF Datatracker (primary) table of contents and body text list section 6 as '511 Network Authentication Required', and httpwg.org (primary) TOC lists the same '511 Network Authentication Required' heading; neither shows 'Permanent Redirect', directly conflicting with the claim."
+      },
+      "truth_evidence_ids": [
+        "e36a1ad538eefcf8539bd43795bd40b1f",
+        "efba1a79fbc96195a2846d26b9623c5f5"
+      ]
+    }
+  ],
+  "cli_version": "2.1.197",
+  "closure_lines": [
+    "CLAIM-CLOSURE: DIAGNOSTIC-BLOCKED \u2014 1 load-bearing claim(s) unresolved",
+    "CONVERGENCE: BLOCKED \u2014 1 class(es)"
+  ],
+  "date": "2026-08-07",
+  "elapsed_seconds_approx": 262,
+  "engine": "claude",
+  "evidence": [
+    {
+      "blob_digest": "d431760660ea44e130f6e919dab216df2d0b3a490567a98089267523368fe1e5",
+      "claim_id": "2e79c2c99f593c711e0ca54b523855be",
+      "display_passage": "nformation\"></div>\n<div id=\"internal-metadata\" class=\"document-information\">\n<dl id=\"identifiers\">\n<dt class=\"label-stream\">Stream:</dt>\n<dd class=\"stream\">Internet Engineering Task Force (IETF)</dd>\n<dt class=\"label-rfc\">RFC:</dt>\n<dd class=\"rfc\"><a href=\"https://www.rfc-editor.org/rfc/rfc9110\" class=\"eref\">9110</a></dd>\n<dt class=\"label-std\">STD:</dt>\n<dd class=\"std\">97</dd>\n<dt class=\"label-obsoletes\">Obsoletes:</dt>\n<dd class=\"obsoletes\">\n<a href=\"https://www.rfc-editor.org/rfc/rfc2818\" class=\"eref\">2818</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7230\" class=\"eref\">7230</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7231\" class=\"eref\">7231</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7232\" class=\"eref\">7232</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7233\" class=\"eref\">7233</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7235\" class=\"eref\">7235</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7538\" class=\"eref\">7538</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7615\" class=\"eref\">7615</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7694\" class=\"eref\">7694</a> </dd>\n<dt class=\"label-updates\">Updates:</dt>\n<dd class=\"updates\">\n<a href=\"https://www.rfc-editor.org/rfc/rfc3864\" class=\"eref\">3864</a> </dd>\n<dt class=\"label-category\">Category:</dt>\n<dd class=\"category\">Standards Track</dd>\n<dt class=\"label-published\">Published:</dt>\n<dd class=\"published\">\n<time datetime=\"2022-06\" class=\"published\">June 2022</time>\n    </dd>\n<dt class=\"label-issn\">ISSN:</dt>\n<dd class=\"issn\">2070-1721</dd>\n<dt class=\"label-authors\">Authors:</dt>\n<dd class=\"authors\">\n<div class=\"author\">\n      <div class=\"author-name\">R. Fielding, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">Adobe</div>\n</div>\n<div class=\"author\">\n      <div class=\"author-name\">M. Nottingham, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">Fastly</div>\n</div>\n<div class=\"author\">\n      <div class=\"author-name\">J. Reschke, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">greenbytes</div>\n</div>\n</dd>\n</dl>\n</div>\n<h1 id=\"rfcnum\">RFC 9110</h1>\n<h1 id=\"title\">HTTP Semantics</h1>\n<section id=\"section-abstract\">\n      <h2 id=\"abstract\"><a href=\"#abstract\" class=\"selfRef\">Abstract</a></h2>\n<p id=\"section-abstract-1\">\n   The Hypertext Transfer Protocol (HTTP) is a stateless application-level\n   protocol for distributed, collaborative, hypertext information systems.\n   This document describes the overall architecture of HTTP, establishes common\n   terminology, and defines aspects of the protocol that are shared by all\n   versions. In this definition are core protocol elements, extensibility\n   mechanisms, and the \"http\" and \"https\" Uniform Resource Identifier (URI)\n   schemes.<a href=\"#section-abstract-1\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-abstract-2\">\n   This document updates RFC 3864 and\n   obsoletes RFCs 2818, 7231, 7232, 7233,\n   7235, 7538, 7615, 7694, and portions of 7230.<a href=\"#section-abstract-2\" class=\"pilcrow\">\u00b6</a></p>\n</section>\n<div id=\"status-of-memo\">\n<section id=\"section-boilerplate.1\">\n        <h2 id=\"name-status-of-this-memo\">\n<a href=\"#name-status-of-this-memo\" class=\"section-name selfRef\">Status of This Memo</a>\n        </h2>\n<p id=\"section-boilerplate.1-1\">\n            This is an Internet Standards Track document.<a href=\"#section-boilerplate.1-1\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-boilerplate.1-2\">\n            This document is a product of the Internet Engineering Task Force\n            (IETF).  It represents the consensus of the IETF community.  It has\n            received public review and has been approved for publication by\n            the Internet Engineering Steering Group (IESG).  Further\n            information on Internet Standards is available in Section 2 of \n            RFC 7841.<a href=\"#section-boilerplate.1-2\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-boilerplate.1-3\">\n            Information about the current status of this document, any\n            errata, and how to provide feedback on it may be obtained at\n            <span><a href=\"https://www.rfc-editor.org/info/rfc9110\">https://www.r",
+      "evidence_id": "eff2030b059b03a57c749b148f33d59cb",
+      "passage_end": 29006,
+      "passage_sha256": "437400002e6725ff0acf51f58a7f96b7d575372fffd2d399ec244d53fd61c4a7",
+      "passage_start": 24910,
+      "provenance": {
+        "http_status": 200,
+        "media_type": "text/html",
+        "provenance_method": "isolated-model-assessment",
+        "provenance_reason": "RFC Editor is the official publisher and registry of record for RFCs, hosting the canonical document itself, including its official publication metadata (June 2022).",
+        "publisher_domain": "www.rfc-editor.org",
+        "retrieved_at": "2026-08-07T13:57:16.943664+00:00",
+        "source_class": "primary"
+      },
+      "source": "https://www.rfc-editor.org/rfc/rfc9110.html",
+      "source_sha256": "d431760660ea44e130f6e919dab216df2d0b3a490567a98089267523368fe1e5",
+      "source_size": 1187554
+    },
+    {
+      "blob_digest": "87b6f0f44c37d274e6fb9a6c165820851158ef5baa09b2f73c391b3ce787b8de",
+      "claim_id": "2e79c2c99f593c711e0ca54b523855be",
+      "display_passage": "nformation\"></div>\n<div id=\"internal-metadata\" class=\"document-information\">\n<dl id=\"identifiers\">\n<dt class=\"label-stream\">Stream:</dt>\n<dd class=\"stream\">Internet Engineering Task Force (IETF)</dd>\n<dt class=\"label-rfc\">RFC:</dt>\n<dd class=\"rfc\"><a href=\"https://www.rfc-editor.org/rfc/rfc9110\" class=\"eref\">9110</a></dd>\n<dt class=\"label-std\">STD:</dt>\n<dd class=\"std\">97</dd>\n<dt class=\"label-obsoletes\">Obsoletes:</dt>\n<dd class=\"obsoletes\">\n<a href=\"https://www.rfc-editor.org/rfc/rfc2818\" class=\"eref\">2818</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7230\" class=\"eref\">7230</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7231\" class=\"eref\">7231</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7232\" class=\"eref\">7232</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7233\" class=\"eref\">7233</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7235\" class=\"eref\">7235</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7538\" class=\"eref\">7538</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7615\" class=\"eref\">7615</a>, <a href=\"https://www.rfc-editor.org/rfc/rfc7694\" class=\"eref\">7694</a> </dd>\n<dt class=\"label-updates\">Updates:</dt>\n<dd class=\"updates\">\n<a href=\"https://www.rfc-editor.org/rfc/rfc3864\" class=\"eref\">3864</a> </dd>\n<dt class=\"label-category\">Category:</dt>\n<dd class=\"category\">Standards Track</dd>\n<dt class=\"label-published\">Published:</dt>\n<dd class=\"published\">\n<time datetime=\"2022-06\" class=\"published\">June 2022</time>\n    </dd>\n<dt class=\"label-issn\">ISSN:</dt>\n<dd class=\"issn\">2070-1721</dd>\n<dt class=\"label-authors\">Authors:</dt>\n<dd class=\"authors\">\n<div class=\"author\">\n      <div class=\"author-name\">R. Fielding, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">Adobe</div>\n</div>\n<div class=\"author\">\n      <div class=\"author-name\">M. Nottingham, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">Fastly</div>\n</div>\n<div class=\"author\">\n      <div class=\"author-name\">J. Reschke, <span class=\"editor\">Ed.</span>\n</div>\n<div class=\"org\">greenbytes</div>\n</div>\n</dd>\n</dl>\n</div>\n<h1 id=\"rfcnum\">RFC 9110</h1>\n<h1 id=\"title\">HTTP Semantics</h1>\n<section id=\"section-abstract\">\n      <h2 id=\"abstract\"><a href=\"#abstract\" class=\"selfRef\">Abstract</a></h2>\n<p id=\"section-abstract-1\">\n   The Hypertext Transfer Protocol (HTTP) is a stateless application-level\n   protocol for distributed, collaborative, hypertext information systems.\n   This document describes the overall architecture of HTTP, establishes common\n   terminology, and defines aspects of the protocol that are shared by all\n   versions. In this definition are core protocol elements, extensibility\n   mechanisms, and the \"http\" and \"https\" Uniform Resource Identifier (URI)\n   schemes.<a href=\"#section-abstract-1\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-abstract-2\">\n   This document updates RFC 3864 and\n   obsoletes RFCs 2818, 7231, 7232, 7233,\n   7235, 7538, 7615, 7694, and portions of 7230.<a href=\"#section-abstract-2\" class=\"pilcrow\">\u00b6</a></p>\n</section>\n<div id=\"status-of-memo\">\n<section id=\"section-boilerplate.1\">\n        <h2 id=\"name-status-of-this-memo\">\n<a href=\"#name-status-of-this-memo\" class=\"section-name selfRef\">Status of This Memo</a>\n        </h2>\n<p id=\"section-boilerplate.1-1\">\n            This is an Internet Standards Track document.<a href=\"#section-boilerplate.1-1\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-boilerplate.1-2\">\n            This document is a product of the Internet Engineering Task Force\n            (IETF).  It represents the consensus of the IETF community.  It has\n            received public review and has been approved for publication by\n            the Internet Engineering Steering Group (IESG).  Further\n            information on Internet Standards is available in Section 2 of \n            RFC 7841.<a href=\"#section-boilerplate.1-2\" class=\"pilcrow\">\u00b6</a></p>\n<p id=\"section-boilerplate.1-3\">\n            Information about the current status of this document, any\n            errata, and how to provide feedback on it may be obtained at\n            <span><a href=\"https://www.rfc-editor.org/info/rfc9110\">https://www.r",
+      "evidence_id": "ed050f52da1ab8ffc1fd7c369c59162e4",
+      "passage_end": 37943,
+      "passage_sha256": "437400002e6725ff0acf51f58a7f96b7d575372fffd2d399ec244d53fd61c4a7",
+      "passage_start": 33847,
+      "provenance": {
+        "http_status": 200,
+        "media_type": "text/html",
+        "provenance_method": "isolated-model-assessment",
+        "provenance_reason": "IETF Datatracker is the IETF's own official document repository publishing RFC metadata including publication date",
+        "publisher_domain": "datatracker.ietf.org",
+        "retrieved_at": "2026-08-07T13:57:17.314456+00:00",
+        "source_class": "authoritative"
+      },
+      "source": "https://datatracker.ietf.org/doc/html/rfc9110",
+      "source_sha256": "87b6f0f44c37d274e6fb9a6c165820851158ef5baa09b2f73c391b3ce787b8de",
+      "source_size": 1231972
+    },
+    {
+      "blob_digest": "e1e5e9ff85e4252b083aa055ebdee14cc00c1c8ca7c0128ef06f82dcfbd62db2",
+      "claim_id": "a62e0e84f87c02f0d0b13758aeb63cd3",
+      "display_passage": "ist\">\n            \n                <a class=\"btn btn-primary btn-sm\"\n                   href=\"mailto:draft-nottingham-http-new-status@ietf.org?subject=Mail%20regarding%20rfc6585\">\n                    <i class=\"bi bi-envelope\">\n                    </i>\n                    Email authors\n                </a>\n            \n            \n            <a class=\"btn btn-primary btn-sm\"\n               href=\"/ipr/search/?submit=draft&amp;id=rfc6585\"\n               rel=\"nofollow\">\n                <i class=\"bi bi-lightning\">\n                </i>\n                IPR\n                \n            </a>\n            <a class=\"btn btn-primary btn-sm\"\n               href=\"/doc/rfc6585/references/\"\n               rel=\"nofollow\">\n                <i class=\"bi bi-arrow-left\">\n                </i>\n                References\n            </a>\n            <a class=\"btn btn-primary btn-sm\"\n               href=\"/doc/rfc6585/referencedby/\"\n               rel=\"nofollow\">\n                <i class=\"bi bi-arrow-right\">\n                </i>\n                Referenced by\n            </a>\n            \n            <a class=\"btn btn-primary btn-sm\"\n                href=\"https://mailarchive.ietf.org/arch/search?q=%22rfc6585%22\"\n                rel=\"nofollow\"\n                target=\"_blank\">\n                Search Lists\n            </a>\n            \n            \n        </div>\n        <div class=\"card mt-5\">\n            <div class=\"card-header\">\n                    RFC 6585\n            </div>\n            <div class=\"card-body\">\n                <pre>Internet Engineering Task Force (IETF)                     M. Nottingham\nRequest for Comments: 6585                                     Rackspace\nUpdates: 2616                                                R. Fielding\nCategory: Standards Track                                          Adobe\nISSN: 2070-1721                                               April 2012\n\n                      Additional HTTP Status Codes\n\n<span>Abstract</span>\n\n   This document specifies additional HyperText Transfer Protocol (HTTP)\n   status codes for a variety of common situations.\n\n<span>Status of This Memo</span>\n\n   This is an Internet Standards Track document.\n\n   This document is a product of the Internet Engineering Task Force\n   (IETF).  It represents the consensus of the IETF community.  It has\n   received public review and has been approved for publication by the\n   Internet Engineering Steering Group (IESG).  Further information on\n   Internet Standards is available in Section 2 of RFC 5741.\n\n   Information about the current status of this document, any errata,\n   and how to provide feedback on it may be obtained at\n   http://www.rfc-editor.org/info/rfc6585.\n\n<span>Copyright Notice</span>\n\n   Copyright (c) 2012 IETF Trust and the persons identified as the\n   document authors.  All rights reserved.\n\n   This document is subject to BCP 78 and the IETF Trust&#x27;s Legal\n   Provisions Relating to IETF Documents\n   (http://trustee.ietf.org/license-info) in effect on the date of\n   publication of this document.  Please review these documents\n   carefully, as they describe your rights and restrictions with respect\n   to this document.  Code Components extracted from this document must\n   include Simplified BSD License text as described in Section 4.e of\n   the Trust Legal Provisions and are provided without warranty as\n   described in the Simplified BSD License.\n\n<span>Nottingham &amp; Fielding        Standards Track                    [Page 1]</span>\n<span>RFC 6585              Additional HTTP Status Codes            April 2012</span>\n\n<span>Table of Contents</span>\n\n   1. Introduction ....................................................2\n   2. Requirements ....................................................2\n   3. 428 Precondition Required .......................................2\n   4. 429 Too Many Requests ...........................................3\n   5. 431 Request Header Fields Too Large .............................4\n   6. 511 Network Authentication Required .............................4\n   7. Security Considerations ............",
+      "evidence_id": "e36a1ad538eefcf8539bd43795bd40b1f",
+      "passage_end": 30038,
+      "passage_sha256": "86f0dc76dcba47bddf6dd90aaa8e87ba9827b33b1fe9b2b328b2b13739596d50",
+      "passage_start": 25942,
+      "provenance": {
+        "http_status": 200,
+        "media_type": "text/html",
+        "provenance_method": "isolated-model-assessment",
+        "provenance_reason": "IETF Datatracker page hosting the RFC 6585 text itself, the original standards-track document that defines status code 511 (as Network Authentication Required).",
+        "publisher_domain": "datatracker.ietf.org",
+        "retrieved_at": "2026-08-07T13:57:31.309038+00:00",
+        "source_class": "primary"
+      },
+      "source": "https://datatracker.ietf.org/doc/rfc6585/",
+      "source_sha256": "e1e5e9ff85e4252b083aa055ebdee14cc00c1c8ca7c0128ef06f82dcfbd62db2",
+      "source_size": 49823
+    },
+    {
+      "blob_digest": "7f0a4b42d8fe4a6fef4e72025fa7a079909417f734d5b750c0717682fbea0d1a",
+      "claim_id": "a62e0e84f87c02f0d0b13758aeb63cd3",
+      "display_passage": "ass=\"\"><div class=\"toc \"><ul><li><a href=\"#rfc.section.1\">1.</a>&nbsp;&nbsp;&nbsp;<a href=\"#rfc.section.1\">Introduction</a></li><li><a href=\"#rfc.section.2\">2.</a>&nbsp;&nbsp;&nbsp;<a href=\"#rfc.section.2\">Requirements</a></li><li><a href=\"#rfc.section.3\">3.</a>&nbsp;&nbsp;&nbsp;<a href=\"#status-428\">428 Precondition Required</a></li><li><a href=\"#rfc.section.4\">4.</a>&nbsp;&nbsp;&nbsp;<a href=\"#status-429\">429 Too Many Requests</a></li><li><a href=\"#rfc.section.5\">5.</a>&nbsp;&nbsp;&nbsp;<a href=\"#status-431\">431 Request Header Fields Too Large</a></li><li><a href=\"#rfc.section.6\">6.</a>&nbsp;&nbsp;&nbsp;<a href=\"#status-511\">511 Network Authentication Required</a></li><li><a href=\"#rfc.section.7\">7.</a>&nbsp;&nbsp;&nbsp;<a href=\"#security-considerations\">Security Considerations</a></li><li><a href=\"#rfc.section.8\">8.</a>&nbsp;&nbsp;&nbsp;<a href=\"#rfc.section.8\">IANA Considerations</a></li><li><a href=\"#rfc.section.9\">9.</a>&nbsp;&nbsp;&nbsp;<a href=\"#rfc.references\">References</a><ul><li class=\"excluded\"></li><li class=\"excluded\"></li></ul></li><li><a href=\"#rfc.section.A\">Appendix A.</a>&nbsp;&nbsp;&nbsp;<a href=\"#rfc.section.A\">Acknowledgements</a></li><li><a href=\"#rfc.section.B\">Appendix B.</a>&nbsp;&nbsp;&nbsp;<a href=\"#issues-511\">Issues Raised by Captive Portals</a></li><li><a href=\"#rfc.authors\">Authors' Addresses</a></li></ul></div></div></div></div><div class=\"col-lg-8 order-first main\" role=\"main\"><header><table class=\"table table-condensed header\" id=\"rfc.headerblock\"><tbody><tr><td class=\"text-left\">Internet Engineering Task Force (IETF)</td><td class=\"text-right\">M. Nottingham</td></tr><tr><td class=\"text-left\">Request for Comments: 6585</td><td class=\"text-right\">Rackspace</td></tr><tr><td class=\"text-left\">Updates: <a href=\"#RFC2616\">2616</a></td><td class=\"text-right\">R. Fielding</td></tr><tr><td class=\"text-left\">Category: Standards Track</td><td class=\"text-right\">Adobe</td></tr><tr><td class=\"text-left\">ISSN: 2070-1721</td><td class=\"text-right\">April 2012</td></tr></tbody></table><div id=\"rfc.title\"><h1>Additional HTTP Status Codes</h1></div></header><hr><h2 id=\"rfc.abstract\"><a href=\"#rfc.abstract\">Abstract</a></h2><div class=\"lead\"><div id=\"rfc.abstract.p.1\"><p>This document specifies additional HyperText Transfer Protocol (HTTP) status codes for a variety of common situations.</p></div></div><aside id=\"rfc.meta\" class=\"alert alert-info\"></aside><section id=\"rfc.status\"><h2><a href=\"#rfc.status\">Status of This Memo</a></h2><div id=\"rfc.boilerplate.1.p.1\"><p>This is an Internet Standards Track document.</p></div><div id=\"rfc.boilerplate.1.p.2\"><p>This document is a product of the Internet Engineering Task Force (IETF). It represents the consensus of the IETF community. It has received public review and has been approved for publication by the Internet Engineering Steering Group (IESG). Further information on Internet Standards is available in <a href=\"https://www.rfc-editor.org/rfc/rfc5741.html#section-2\">Section 2 of RFC 5741</a>.</p></div><div id=\"rfc.boilerplate.1.p.3\"><p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at <a href=\"http://www.rfc-editor.org/info/rfc6585\">http://www.rfc-editor.org/info/rfc6585</a>.</p></div></section><section id=\"rfc.copyrightnotice\"><h2><a href=\"#rfc.copyrightnotice\">Copyright Notice</a></h2><div id=\"rfc.boilerplate.2.p.1\"><p>Copyright (c) 2012 IETF Trust and the persons identified as the document authors. All rights reserved.</p></div><div id=\"rfc.boilerplate.2.p.2\"><p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (<a href=\"http://trustee.ietf.org/license-info\">http://trustee.ietf.org/license-info</a>) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in Section 4.e of the Trust Legal Provisions and are provided without w",
+      "evidence_id": "efba1a79fbc96195a2846d26b9623c5f5",
+      "passage_end": 15087,
+      "passage_sha256": "3222d9bc6d922f0f52f4edbf95e50d08ff408c064bdda078b654b73ade928c3f",
+      "passage_start": 10991,
+      "provenance": {
+        "http_status": 200,
+        "media_type": "text/html",
+        "provenance_method": "isolated-model-assessment",
+        "provenance_reason": "This is the httpwg.org-hosted text of RFC 6585 itself, the original standards document that defines status code 511, directly showing it as '511 Network Authentication Required' rather than 'Permanent Redirect'.",
+        "publisher_domain": "httpwg.org",
+        "retrieved_at": "2026-08-07T13:57:31.494035+00:00",
+        "source_class": "primary"
+      },
+      "source": "https://httpwg.org/specs/rfc6585.html",
+      "source_sha256": "7f0a4b42d8fe4a6fef4e72025fa7a079909417f734d5b750c0717682fbea0d1a",
+      "source_size": 37103
+    }
+  ],
+  "fixture": "internet-only true/hidden-false RFC facts; no endpoint, API key, source override, or supplied evidence",
+  "model": "sonnet",
+  "schema": "paranoia-local-native-web-acceptance-v1"
+}

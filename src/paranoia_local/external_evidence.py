@@ -6,7 +6,6 @@ import hashlib
 import http.client
 import ipaddress
 import json
-import math
 import multiprocessing
 import socket
 import ssl
@@ -468,8 +467,13 @@ class NativeSearchProvider:
         if on_attempt is not None:
             on_attempt()
         try:
+            timeout = int(limits.total_timeout)
+            if timeout < 1:
+                raise NetworkEvidenceError(
+                    "native web discovery has less than one second remaining"
+                )
             output = self.discover(
-                self._prompt(query, limit), max(1, math.ceil(limits.total_timeout)),
+                self._prompt(query, limit), timeout,
             )
         except NetworkEvidenceError:
             raise
