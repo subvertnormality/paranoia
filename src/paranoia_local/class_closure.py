@@ -714,7 +714,7 @@ def _mkdir_durable(path: Path) -> None:
 def mint_id(lineage_id: str, seq: int, invariant: str) -> str:
     """Server-assigned and stable for life. Never derived from the predicate: two
     distinct invariants expressible by one regex must stay two independent classes."""
-    return hashlib.sha256(f"{lineage_id}\0{seq}\0{invariant}".encode()).hexdigest()[:8]
+    return hashlib.sha256(f"{lineage_id}\0{seq}\0{invariant}".encode()).hexdigest()[:32]
 
 
 def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> list[str]:
@@ -769,6 +769,8 @@ def copy_lineage(lineage: Lineage) -> Lineage:
 def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
          pattern: str | None, pathspec: str | None, procedure: str | None) -> str:
     cid = mint_id(lineage.lineage_id, lineage.next_seq, invariant)
+    if cid in lineage.classes:
+        raise RegisterError("generated class ID collides with an existing class")
     lineage.next_seq += 1
     lineage.classes[cid] = TrackedClass(
         class_id=cid, invariant=invariant, severity=severity, first_round=round_no,

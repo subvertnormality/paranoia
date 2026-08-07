@@ -308,7 +308,7 @@ invariant, exempt that exact line:
 
 ```json
 "exempt": [{
-  "class_id": "3f2a91c4",
+  "class_id": "3f2a91c4d78ebca719f027abb63bc168",
   "path": "src/app.py",
   "line": 17,
   "line_text": "    legacy_open(state)"
@@ -677,14 +677,17 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   so closure-plan responses never advertise those internal session IDs for `rebut`.
   repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
   fetched only by bounded server code. All model-visible paths, sources, metadata, and
-  passages are JSON escaped; remote and repository bodies never share a role call. Git
-  alternates and symlinked object-store components are rejected, inherited object-database
-  settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
-  plan evidence. Before any repository-aware Git command, bounded no-follow metadata reads
-  construct a private server-configured Git directory; repository config/config.worktree
-  and their include paths are never inputs to those commands. Retained worktree, common-dir,
-  and object-store fds are inherited by Git through `/proc/self/fd` paths and remain live
-  through cleanup, so pathname replacement cannot redirect reads, object writes, or refs.
+  passages are JSON escaped; remote and repository bodies never share a role call.
+  Inherited object-database settings are cleared, and replacement objects/grafts and lazy
+  fetching are disabled for plan evidence. Before any repository-aware Git command, bounded
+  fd-relative no-follow reads materialize loose objects and pack files into a private object
+  database and construct a private server-configured Git directory; native alternates and
+  `objects/info` metadata are omitted, and repository config/config.worktree plus their
+  include paths are never inputs to those commands. Git uses the private object database
+  exclusively. Retained worktree and common-dir fds remain live through cleanup, so later
+  pathname or native object-descendant replacement cannot redirect reads, object writes,
+  or refs. Private loose objects are published back only through atomic fd-anchored writes
+  needed to make the durable native GC pin resolvable.
   Working-tree discovery is an fd-relative server walk; ignore matching uses only its
   explicit names and safely copied `.gitignore` files in a private worktree. Supplied loose refs are
   copied through bounded fd-anchored no-follow traversal; Git never receives the live ref
@@ -708,7 +711,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   changes the current verdict to blocked. Caller-supplied artifacts have their own
   untrusted verifier batch and receive the high-stakes independent-audit policy used for
   fetched evidence. A separate plan-only policy role receives no repository, external, or
-  supplied evidence and owns decision classification plus fresh-plan deferral. Repository-
+  supplied evidence and owns decision classification, fresh-plan deferral, and stale-claim
+  supersession. It sees the exact escaped prior proposition only for stale candidates and
+  can replace one only with a proposition anchored in current plan spans; the predecessor
+  clears only after the replacement fact is resolved or the replacement decision is
+  confirmed not-applicable. Repository-
   aware `ADD` events contain only server span anchors and enum labels; the server derives
   the durable proposition from exact anchored plan bytes, and the clean role receives only
   server-formatted candidate IDs/anchors rather than persisted or model-authored claim
@@ -749,9 +756,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   incomplete authorization slots before replay. Every temporary-ref cleanup exception is treated as
   ambiguous and retains recovery state. Git children share bounded deadline, kill, and
   reap handling so a termination-resistant subprocess becomes a recoverable blocked
-  result. Only symlinks in Git-resolvable object namespaces
-  are rejected; inert unrelated object-store names are ignored, including inert nested
-  names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
+  result. Required loose-object and pack directories/files reject symlinks; unrelated native
+  object-store names are ignored and native `objects/info` is never copied. Snapshot
+  path/ref discovery is streamed under explicit byte
   and record caps before its output is retained or decoded. Symlinked or nonregular loose-ref
   entries are skipped without traversal and disclosed as unavailable; unsafe ancestors in
   the server-owned temporary-pin namespace still fail closed. Dirty-tree files are opened

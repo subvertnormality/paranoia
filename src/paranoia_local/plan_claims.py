@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping, Sequence
 RESEARCH_ROLE = "research"
 VERIFIER_ROLE = "verifier"
 STRUCTURAL_ROLE = "structural"
+CLEAN_POLICY_ROLE = "clean-policy"
 
 FACT, DECISION = "fact", "decision"
 ASSERTED, ASSUMPTION, ESTIMATE = "asserted", "assumption", "estimate"
@@ -214,7 +215,8 @@ _SCHEMAS: dict[str, frozenset[str]] = {
 _ROLE_OPS = {
     RESEARCH_ROLE: frozenset({"ADD"}),
     STRUCTURAL_ROLE: frozenset({"ADD", "DISPUTE", "CONFIRM_KIND"}),
-    VERIFIER_ROLE: frozenset(_SCHEMAS) - {"ADD", "DISPUTE"},
+    CLEAN_POLICY_ROLE: frozenset({"CONFIRM_KIND", "DEFER", "SUPERSEDE"}),
+    VERIFIER_ROLE: frozenset(_SCHEMAS) - {"ADD", "DISPUTE", "SUPERSEDE"},
 }
 
 
@@ -230,7 +232,7 @@ def _no_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def _marker_for(role: str) -> str:
     if role == RESEARCH_ROLE:
         return RESEARCH_MARKER
-    if role == VERIFIER_ROLE:
+    if role in {VERIFIER_ROLE, CLEAN_POLICY_ROLE}:
         return VERIFICATION_MARKER
     if role == STRUCTURAL_ROLE:
         return PLAN_MARKER
@@ -461,8 +463,8 @@ def apply_events(
             claim.status = DEFERRED
             claim.deferral = deferral
         elif event.op == "SUPERSEDE":
-            if role != VERIFIER_ROLE:
-                raise ClaimTransitionError("only verifier may propose supersession")
+            if role != CLEAN_POLICY_ROLE:
+                raise ClaimTransitionError("only clean plan policy may propose supersession")
             replacement = data["replacement"]
             if not isinstance(replacement, dict):
                 raise ClaimTransitionError("SUPERSEDE replacement must be an ADD object")
@@ -472,7 +474,12 @@ def apply_events(
             local: dict[str, str] = {}
             _add_claim(state, replacement, role, spans, round_no, local, seen_temp)
             replacement_id = next(iter(local.values()))
-            state.claims[replacement_id].bearing = BLOCKING
+            replacement_claim = state.claims[replacement_id]
+            replacement_claim.kind_classification = CONFIRMED
+            replacement_claim.status = (
+                NOT_APPLICABLE if replacement_claim.kind == DECISION else UNVERIFIED
+            )
+            replacement_claim.bearing = BLOCKING
             claim.pending_replacement_id = replacement_id
             claim.reason = data["reason"]
         else:  # pragma: no cover - schema and role tables make this unreachable
@@ -572,7 +579,8 @@ def _authorize_independent(claim: Claim, event: Event, evidence_ids: list[str],
 def _complete_supersessions(state: ClaimState) -> None:
     for claim in state.claims.values():
         target = state.claims.get(claim.pending_replacement_id or "")
-        if target and target.status in {VERIFIED, DEFERRED} and target.kind_classification == CONFIRMED:
+        if target and target.status in {VERIFIED, DEFERRED, NOT_APPLICABLE} \
+                and target.kind_classification == CONFIRMED:
             claim.status, claim.superseded_by = SUPERSEDED, target.claim_id
 
 
@@ -799,13 +807,16 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
             raise ClaimRegisterError("confirmed persisted fact has unreachable status")
         if claim.status == SUPERSEDED:
             target = claims.get(claim.superseded_by or "")
+            target_is_clear = target is not None and (
+                (target.kind == FACT and target.status in {
+                    VERIFIED, DEFERRED, CONTRADICTED, DISPUTED, STALE,
+                })
+                or (target.kind == DECISION and target.status in {NOT_APPLICABLE, STALE})
+            )
             if claim.pending_replacement_id != claim.superseded_by or target is None \
                     or target.claim_id == claim.claim_id \
                     or target.kind_classification != CONFIRMED \
-                    or target.kind != FACT \
-                    or target.status not in {
-                        VERIFIED, DEFERRED, CONTRADICTED, DISPUTED, STALE,
-                    }:
+                    or not target_is_clear:
                 raise ClaimRegisterError("persisted supersession graph is inconsistent")
         elif claim.superseded_by is not None:
             raise ClaimRegisterError("active persisted claim has a superseded target")
@@ -841,7 +852,9 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
         raise ClaimRegisterError("persisted claim kind is malformed")
     if row.get("assertion_mode") not in {ASSERTED, ASSUMPTION, ESTIMATE}:
         raise ClaimRegisterError("persisted assertion mode is malformed")
-    if row.get("origin_role") not in {RESEARCH_ROLE, VERIFIER_ROLE, STRUCTURAL_ROLE}:
+    if row.get("origin_role") not in {
+        RESEARCH_ROLE, VERIFIER_ROLE, STRUCTURAL_ROLE, CLEAN_POLICY_ROLE,
+    }:
         raise ClaimRegisterError("persisted origin role is malformed")
     if row.get("bearing") not in {BLOCKING, ADVISORY}:
         raise ClaimRegisterError("persisted bearing is malformed")
@@ -1074,25 +1087,32 @@ def render_claim_summary(state: ClaimState) -> str:
 
 
 def render_clean_policy_candidates(state: ClaimState) -> str:
-    """Render only server-owned IDs/anchors for the plan-only policy role.
+    """Render server-owned candidate identity for the plan-only policy role.
 
-    Persisted claim prose and model-proposed labels are deliberately excluded.  The
-    clean role derives the proposition and its kind from the already supplied plan spans.
+    Model-proposed labels are excluded. Proposed claims expose only IDs/anchors; stale
+    claims additionally expose their exact escaped prior plan proposition so the clean
+    role can compare it with the already supplied current plan spans.
     """
     lines = ["=== PLAN-ONLY CLAIM CANDIDATES ==="]
     for claim in state.claims.values():
-        if claim.status == SUPERSEDED or claim.kind_classification != PROPOSED:
+        proposed = claim.kind_classification == PROPOSED
+        stale = claim.status == STALE and claim.pending_replacement_id is None
+        if claim.status == SUPERSEDED or not (proposed or stale):
             continue
+        record: dict[str, Any] = {
+            "claim_id": claim.claim_id,
+            "kind_classification": claim.kind_classification,
+            "plan_anchor": {
+                "first_span": claim.plan_anchor.first_span,
+                "last_span": claim.plan_anchor.last_span,
+            },
+        }
+        if stale:
+            record["status"] = claim.status
+            record["exact_prior_proposition"] = claim.claim
         lines.append(
             "CLAIM=" + json.dumps(
-                {
-                    "claim_id": claim.claim_id,
-                    "kind_classification": claim.kind_classification,
-                    "plan_anchor": {
-                        "first_span": claim.plan_anchor.first_span,
-                        "last_span": claim.plan_anchor.last_span,
-                    },
-                },
+                record,
                 sort_keys=True, separators=(",", ":"), ensure_ascii=True,
             )
         )

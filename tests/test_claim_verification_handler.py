@@ -122,6 +122,109 @@ def test_verified_claim_and_empty_class_register_produce_one_not_blocked_verdict
     assert "session_ref=" not in out and "to dispute a finding" not in out
 
 
+def test_edited_plan_can_supersede_a_stale_claim_through_real_handler(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class SupersedingEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "plan-only claim policy classifier" in prompt and '"status":"stale"' in prompt:
+                self.tool_less_prompts.append(prompt)
+                stale_id = re.search(
+                    r'CLAIM=.*?"claim_id":"([0-9a-f]{32})".*?"status":"stale"',
+                    prompt,
+                ).group(1)
+                event = {
+                    "op": "SUPERSEDE", "claim_id": stale_id,
+                    "reason": "the edited plan replaces the obsolete premise",
+                    "replacement": {
+                        "temp_id": "current-design", "kind": "decision",
+                        "assertion_mode": "asserted",
+                        "plan_anchor": {
+                            "first_span": "p000001", "last_span": "p000001",
+                        },
+                    },
+                }
+                return _review(
+                    "=== VERIFICATION REGISTER ===\nEVENTS-JSON: " + _json([event])
+                )
+            if "neutral evidence planner" in prompt and '"status":"not-applicable"' in prompt:
+                self.tool_less_prompts.append(prompt)
+                return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []")
+            if "neutral evidence verifier" in prompt and '"status":"not-applicable"' in prompt:
+                self.tool_less_prompts.append(prompt)
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = SupersedingEngine()
+    base = {
+        "repo_path": str(repo), "lineage": "real-supersession",
+    }
+    first = handlers.critique_plan(
+        {**base, "plan_text": "Use the existing greet function.\n", "round": 1},
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in first
+    second = handlers.critique_plan(
+        {**base, "plan_text": "Choose the replacement design.\n", "round": 2},
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in second
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "real-supersession", stamp="T3", mode=cc.PLAN_MODE,
+    )
+    state = pc.state_from_json("real-supersession", lineage.claim_state)
+    superseded = [claim for claim in state.claims.values() if claim.status == pc.SUPERSEDED]
+    replacement = [claim for claim in state.claims.values() if claim.status == pc.NOT_APPLICABLE]
+    assert len(superseded) == len(replacement) == 1
+    assert superseded[0].superseded_by == replacement[0].claim_id
+
+
+def test_class_id_collision_through_real_handler_preserves_lineage_atomically(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ClassEngine(ClaimEngine):
+        invariant = "first durable class"
+
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "adversarial reviewer of plans" not in prompt:
+                return super().run_toolless(prompt, model, effort, **kwargs)
+            self.tool_less_prompts.append(prompt)
+            return _review(
+                "## What works\n\nGrounded.\n\n## What doesn't work\n\nFinding.\n\n"
+                "## Risks\n\nNone.\n\n## Gaps\n\nNone.\n\n"
+                "## Improvements\n\nNone.\n\n=== PLAN REGISTER ===\nEVENTS-JSON: []\n"
+                "=== CLASS REGISTER ===\nCLASS: " + self.invariant + "\n"
+                "SEVERITY: BLOCKER\nPROCEDURE: inspect every affected path"
+            )
+
+    engine = ClassEngine()
+    args = {
+        "repo_path": str(repo), "plan_text": "Use the existing greet function.\n",
+        "lineage": "class-id-handler-collision", "round": 1,
+    }
+    handlers.critique_plan(
+        args, engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    before = cc.load_lineage(
+        cc.default_state_root(), args["lineage"], stamp="T2", mode=cc.PLAN_MODE,
+    )
+    occupied = next(iter(before.classes))
+    before_classes = dict(before.classes)
+    before_next_seq = before.next_seq
+    engine.invariant = "second nonidentical durable class"
+    monkeypatch.setattr(cc, "mint_id", lambda *_args: occupied)
+    out = handlers.critique_plan(
+        {**args, "round": 2, "refresh_claims": True},
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T3",
+    )
+    assert "CONVERGENCE: BLOCKED" in out and "collides" in out
+    after = cc.load_lineage(
+        cc.default_state_root(), args["lineage"], stamp="T4", mode=cc.PLAN_MODE,
+    )
+    assert after.classes == before_classes
+    assert after.next_seq == before_next_seq
+
+
 def test_toolless_capability_preflight_blocks_before_snapshot_and_latch(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

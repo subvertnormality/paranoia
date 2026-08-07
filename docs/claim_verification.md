@@ -43,18 +43,25 @@ One closure round performs these stages:
    Before the first repository-aware Git subprocess, the server reads approved Git-dir
    metadata with bounded no-follow file operations and builds a private Git control
    directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
-   metadata, an fd-anchored no-follow copy of loose refs, and inherited handles for the
-   approved worktree, common directory, and object store exposed as `/proc/self/fd/...`.
-   Those directory handles remain open through ref cleanup, so replacing `.git`, the common
-   directory, or `objects` after validation cannot redirect a subprocess or publication.
+   metadata, an fd-anchored no-follow copy of loose refs, inherited handles for the
+   approved worktree and common directory, and a server-owned materialized object database.
+   Loose objects and pack-family files are copied through retained directory handles with
+   pre/post identity checks, entry and byte caps, and no-follow opens. Native `objects/info`
+   metadata—including alternates—is never copied. Every Git read and snapshot-object write
+   uses only the private database, so creating an alternate or replacing native `pack`,
+   `info`, or a loose-object fanout later cannot affect the snapshot.
+   The worktree/common handles remain open through ref cleanup, so replacing `.git` or the
+   common directory cannot redirect a subprocess or publication.
    Temporary GC pins are published separately through fd-relative, no-follow operations;
    Git never traverses the repository-controlled loose-ref tree. Repository `config`,
    `config.worktree`, `include.path`, and `includeIf` content
    is never part of a repository-aware Git invocation; only repository/object format values
    are extracted from a bounded private copy with `git config --no-includes`.
-   Inherited Git environment is cleared, native linked-worktree object storage is the only
-   approved object database, alternates and symlinked object-store components are rejected,
-   and grafts/replacement objects are disabled for snapshot and history operations. Lazy
+   New loose snapshot objects are copied back to the native store only for durable GC pins:
+   publication uses retained directory handles, no-follow opens, an atomic temporary-file
+   link, and exact-content collision checks; Git never reads that mutable copy. Inherited
+   Git environment is cleared, and grafts/replacement objects are disabled for snapshot and
+   history operations. Lazy
    fetching is disabled, so a partial
    clone with missing objects fails closed instead of invoking a configured promisor remote.
    Working-tree names come from a server-owned fd-relative walk, never `git ls-files`
@@ -72,10 +79,13 @@ One closure round performs these stages:
    strict JSON immediately into a non-durable draft, and mints durable-style IDs before
    later roles need to refer to them.
 4. A fresh plan-only policy role receives escaped plan spans plus only server-formatted
-   candidate IDs and anchors. It never receives persisted claim prose, proposed kind
+   candidate IDs and anchors. For a stale claim only, it also receives the exact escaped
+   prior plan proposition, stale status, and prior server anchor alongside the current plan
+   spans. It never receives other persisted claim prose, proposed kind
    labels, repository paths/bytes/metadata, external results, or supplied artifacts. It
    derives each proposition from the anchored plan spans, alone may classify genuine plan
-   decisions, and may defer a newly confirmed unverified fact when the plan itself supplies
+   decisions, may replace a stale claim with a real proposition anchored in the current plan,
+   and may defer a newly confirmed unverified fact when the plan itself supplies
    the complete ordered verification contract. Every deferral follows the same independent
    authorization policy as evidence-role transitions; `independent_check: require` cannot
    publish it without accepted checks from both supported vendors.
@@ -155,7 +165,10 @@ ambiguous anchors become stale. Marking a claim stale atomically clears every pe
 transition and incomplete truth, bearing, dispute, or deferral authorization, so replay
 cannot overwrite the stale result. Deferred claims additionally invalidate when their plan
 ordering snapshot changes; pending deferrals are invalidated before replay under the same
-full-plan snapshot rule.
+full-plan snapshot rule. The clean plan-only role may emit `SUPERSEDE` for a stale claim only
+when it anchors a complete replacement in current plan spans. A replacement fact remains
+blocking until verified or safely deferred; a confirmed replacement decision is
+`not-applicable`. Only then does the predecessor become terminally superseded.
 
 ## Evidence
 
@@ -386,9 +399,11 @@ symlinked ancestor or ref file in the server-owned pin namespace. Directly
 read Git metadata must be small regular
 files opened with no-follow and nonblocking flags, then checked again by file identity and
 size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
-Within `.git/objects`, symlink rejection follows only exact Git-resolvable loose-object,
-pack/multi-pack-index, alternates, and commit-graph names; inert nested names even beneath
-`pack` or `info` do not invalidate a snapshot.
+The native object root and each copied loose-object/pack directory are opened fd-relative
+with no-follow semantics. Only exact loose-object and pack-family regular-file names are
+materialized; `objects/info`, multi-pack indexes, commit graphs, alternates, and inert names
+are omitted because Git can discover the copied packs directly. A symlink in a required
+directory or accepted file position fails closed, while unrelated native names are ignored.
 Every dirty-tree candidate is likewise opened relative to a verified repository-directory
 fd. Each ancestor is opened one component at a time with no-follow and pre/post-open inode
 checks, and the final lstat, symlink read, or regular-file open remains relative to that
@@ -396,19 +411,20 @@ anchored parent. Replacing an inspected ancestor with an external symlink theref
 without hashing or disclosing external bytes. The auxiliary unsupported-entry disclosure
 scan uses the same boundary: its queue owns already-open directory fds rather than pathnames,
 so a later rename/symlink replacement cannot redirect enumeration or disclose external names.
-All Git subprocesses inherit only the retained worktree/object handles plus server-owned
-control metadata. Temporary refs are created and removed through the retained common-dir
-handle, not a re-resolved pathname.
+All Git subprocesses receive the retained worktree handle, the private object database, and
+server-owned control metadata. Temporary refs are created and removed through the retained
+common-dir handle, not a re-resolved pathname.
 Network evidence is audit
 material and must be refreshed under the configured freshness policy before it can
 authorize a later transition.
 Any cached record discarded during validation disables the zero-research cache for that
 round, even if no claim directly depended on that record. Persisted supersession is also
 validated as a bounded graph: the replacement must exist, be confirmed, and already be
-verified or safely deferred. The loader requires the target to be a confirmed fact and
-accepts only the original clear states or factual post-clear invalidation states. Thus a
-not-applicable decision cannot invent a clear source, while later evidence loss may stale
-the factual replacement without resurrecting the terminally superseded source. Every
+either a verified/safely deferred fact or a not-applicable plan decision. The replacement
+is derived from a current server span anchor by the isolated clean role; evidence-facing
+roles cannot emit supersession. The loader also accepts a clear replacement that was later
+invalidated to contradicted, disputed, or stale; later evidence or plan loss cannot resurrect
+the terminally superseded source. Every
 persisted non-abstention record must retain its rooted
 content digest and exact CAS bytes.
 

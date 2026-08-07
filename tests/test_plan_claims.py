@@ -563,7 +563,7 @@ def test_inconsistent_persisted_supersession_is_rejected() -> None:
         pc.state_from_json("plan", pc.state_to_json(state))
 
 
-def test_persisted_supersession_requires_a_live_reachable_clear_target() -> None:
+def test_persisted_supersession_accepts_a_confirmed_plan_decision_target() -> None:
     state, claim_id, _spans = _state_with_confirmed_fact()
     source = state.claims[claim_id]
     target = copy.deepcopy(source)
@@ -586,8 +586,44 @@ def test_persisted_supersession_requires_a_live_reachable_clear_target() -> None
     source.pending_replacement_id = target.claim_id
     source.superseded_by = target.claim_id
     state.claims[target.claim_id] = target
-    with pytest.raises(pc.ClaimRegisterError, match="supersession graph"):
-        pc.state_from_json("plan", pc.state_to_json(state))
+    loaded = pc.state_from_json("plan", pc.state_to_json(state))
+    assert loaded.claims[claim_id].status == pc.SUPERSEDED
+
+
+def test_clean_policy_supersedes_stale_claim_with_current_anchored_decision() -> None:
+    old_spans = pc.segment_plan(b"Use the legacy premise.\n")
+    state = pc.ClaimState("supersession")
+    old_id = pc.apply_events(
+        state, [pc.Event("ADD", _add())],
+        role=pc.RESEARCH_ROLE, spans=old_spans,
+    )["new-1"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": old_id,
+            "kind": "fact", "reason": "premise",
+        })],
+        role=pc.CLEAN_POLICY_ROLE, spans=old_spans,
+    )
+    pc.mark_claim_stale(state.claims[old_id])
+    current_spans = pc.segment_plan(b"Choose the replacement design.\n")
+    event = pc.Event("SUPERSEDE", {
+        "op": "SUPERSEDE", "claim_id": old_id, "reason": "plan replaced premise",
+        "replacement": {
+            "temp_id": "replacement", "kind": "decision",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        },
+    })
+    pc.apply_events(
+        state, [event], role=pc.CLEAN_POLICY_ROLE, spans=current_spans,
+    )
+    source = state.claims[old_id]
+    target = state.claims[source.superseded_by or ""]
+    assert source.status == pc.SUPERSEDED
+    assert target.claim == "Choose the replacement design."
+    assert target.kind_classification == pc.CONFIRMED
+    assert target.status == pc.NOT_APPLICABLE
+    assert not pc.blocking_claims(state)
 
 
 def test_stale_confirmed_decision_remains_blocking_after_reload() -> None:

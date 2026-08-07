@@ -840,12 +840,15 @@ def _critique_plan_verified(
                     else f"parsed {len(research_events)}"
                 )
 
-                proposed_claims = any(
-                    claim.kind_classification == pc.PROPOSED
-                    and claim.status != pc.SUPERSEDED
+                policy_candidates = any(
+                    claim.status != pc.SUPERSEDED
+                    and (
+                        claim.kind_classification == pc.PROPOSED
+                        or (claim.status == pc.STALE and claim.pending_replacement_id is None)
+                    )
                     for claim in draft_claims.claims.values()
                 )
-                if proposed_claims:
+                if policy_candidates:
                     clean_policy_prompt = prompts.compose(
                         prompts.PLAN_CLEAN_POLICY_INSTRUCTIONS,
                         _prepend(calibration, "\n\n".join([
@@ -853,7 +856,8 @@ def _critique_plan_verified(
                             pc.render_clean_policy_candidates(draft_claims),
                             "Candidate claim IDs and span anchors are server-formatted. "
                             "Derive each proposition only from its anchored plan spans. "
-                            "No repository paths, bytes, prose, external results, or "
+                            "For STALE candidates, exact_prior_proposition is escaped prior "
+                            "plan data. No repository paths/bytes, external results, or "
                             "caller-supplied artifacts are available in this role.",
                         ])),
                     )
@@ -861,9 +865,9 @@ def _critique_plan_verified(
                     def validate_clean_policy(events: list[pc.Event]) -> None:
                         preview = draft_claims.copy()
                         for event in events:
-                            if event.op not in {"CONFIRM_KIND", "DEFER"}:
+                            if event.op not in {"CONFIRM_KIND", "DEFER", "SUPERSEDE"}:
                                 raise pc.ClaimTransitionError(
-                                    "plan-only policy role may emit only CONFIRM_KIND or DEFER"
+                                    "plan-only policy role may emit only CONFIRM_KIND, DEFER, or SUPERSEDE"
                                 )
                             claim = preview.claims.get(str(event.data.get("claim_id")))
                             if event.op == "DEFER" and (
@@ -872,14 +876,21 @@ def _critique_plan_verified(
                                 raise pc.ClaimTransitionError(
                                     "plan-only DEFER requires a newly confirmed unverified fact"
                                 )
+                            if event.op == "SUPERSEDE" and (
+                                claim is None or claim.status != pc.STALE
+                                or claim.pending_replacement_id is not None
+                            ):
+                                raise pc.ClaimTransitionError(
+                                    "plan-only SUPERSEDE requires a stale claim without a replacement"
+                                )
                             pc.apply_events(
-                                preview, [event], role=pc.VERIFIER_ROLE, spans=spans,
+                                preview, [event], role=pc.CLEAN_POLICY_ROLE, spans=spans,
                                 round_no=round_no,
                             )
 
                     _, clean_policy_events, _ = _role_register_call(
                         engine, clean_policy_prompt, model, effort,
-                        lambda text: pc.parse_role_register(text, pc.VERIFIER_ROLE),
+                        lambda text: pc.parse_role_register(text, pc.CLEAN_POLICY_ROLE),
                         on_progress, validate_clean_policy,
                     )
                     for event in clean_policy_events:
@@ -889,6 +900,13 @@ def _critique_plan_verified(
                         ):
                             raise pc.ClaimTransitionError(
                                 "plan-only DEFER requires a newly confirmed unverified fact"
+                            )
+                        if event.op == "SUPERSEDE" and (
+                            claim is None or claim.status != pc.STALE
+                            or claim.pending_replacement_id is not None
+                        ):
+                            raise pc.ClaimTransitionError(
+                                "plan-only SUPERSEDE requires a stale claim without a replacement"
                             )
                         required = _independent_required(
                             event, draft_claims, evidence_records,
@@ -902,7 +920,7 @@ def _critique_plan_verified(
                             budget=round_budget,
                         )
                         pc.apply_events(
-                            draft_claims, [event], role=pc.VERIFIER_ROLE, spans=spans,
+                            draft_claims, [event], role=pc.CLEAN_POLICY_ROLE, spans=spans,
                             round_no=round_no, independent_required=required,
                             vendor_checks=checks,
                         )

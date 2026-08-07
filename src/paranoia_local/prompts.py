@@ -135,8 +135,13 @@ candidate proposition only from the exact plan spans covered by its anchor, then
 whether it is a fact or a genuine plan decision. You may also defer a newly confirmed, previously
 unverified factual claim only when the plan itself names an exact verification step before
 every dependent step, plus objective completion evidence, failure condition, and stop
-action. Preserve uncertainty by emitting no event. Do not verify, contradict, dispute,
-change bearing, or supersede a claim.
+action. A STALE candidate includes its exact prior plan proposition as escaped data. You may
+SUPERSEDE it only when the current plan spans express a real replacement proposition; anchor
+that replacement exclusively in the current spans. The clean role's anchored kind is the
+replacement classification. A factual replacement must still be independently evidenced or
+safely deferred before supersession clears the stale claim; a genuine decision becomes
+not-applicable. Preserve uncertainty by emitting no event. Do not verify, contradict,
+dispute, or change bearing.
 
 End with exactly:
 === VERIFICATION REGISTER ===
@@ -145,6 +150,7 @@ EVENTS-JSON: <one-line JSON array>
 Allowed exact objects:
 {"op":"CONFIRM_KIND","claim_id":"...","kind":"fact|decision","reason":"..."}
 {"op":"DEFER","claim_id":"...","verification_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"},"dependent_anchors":[{"first_span":"pNNNNNN","last_span":"pNNNNNN"}],"completion_evidence":"...","failure_condition":"...","stop_action":"..."}
+{"op":"SUPERSEDE","claim_id":"...","replacement":{"temp_id":"local unique id","kind":"fact|decision","assertion_mode":"asserted|assumption|estimate","plan_anchor":{"first_span":"pNNNNNN","last_span":"pNNNNNN"}},"reason":"..."}
 Use [] when none."""
 
 PLAN_EVIDENCE_REQUEST_INSTRUCTIONS = """You are a neutral evidence planner with no tools.

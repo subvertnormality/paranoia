@@ -19,6 +19,8 @@ MAX_DISCOVERED_REFS = 4096
 MAX_REF_TREE_ENTRIES = 8192
 MAX_SNAPSHOT_PATHS = 100_000
 MAX_DISCOVERY_BYTES = 32 << 20
+MAX_OBJECT_STORE_ENTRIES = 200_000
+MAX_OBJECT_STORE_BYTES = 8 << 30
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 _GIT_ENV = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -378,6 +380,282 @@ def _read_small_regular_at(
         raise SnapshotUnavailable(f"repository ref is unavailable at {name!r}: {exc}") from exc
 
 
+def _copy_object_file(
+    source_fd: int, name: str, destination: Path, *, remaining_bytes: int,
+) -> int:
+    """Copy one object-store file through an owned directory descriptor.
+
+    The native object store is attacker-mutable.  Identity and metadata are checked
+    before and after the copy, and Git is given only the resulting server-owned file.
+    """
+    if remaining_bytes < 0:
+        raise SnapshotUnavailable("repository object store exceeds byte cap")
+    try:
+        before = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode):
+            raise SnapshotUnavailable(
+                f"repository object-store path must be a regular file: {name!r}"
+            )
+        if before.st_size > remaining_bytes:
+            raise SnapshotUnavailable("repository object store exceeds byte cap")
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=source_fd,
+        )
+        try:
+            opened = os.fstat(fd)
+            identity = (before.st_dev, before.st_ino, before.st_size)
+            if not stat.S_ISREG(opened.st_mode) \
+                    or (opened.st_dev, opened.st_ino, opened.st_size) != identity:
+                raise SnapshotUnavailable(
+                    f"repository object-store file changed while opening: {name!r}"
+                )
+            target_fd = os.open(
+                destination,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                0o400,
+            )
+            copied = 0
+            try:
+                while copied < opened.st_size:
+                    chunk = os.read(fd, min(1 << 20, opened.st_size - copied))
+                    if not chunk:
+                        raise SnapshotUnavailable(
+                            f"repository object-store file changed while copying: {name!r}"
+                        )
+                    written = 0
+                    while written < len(chunk):
+                        count = os.write(target_fd, chunk[written:])
+                        if count <= 0:
+                            raise OSError("object-store copy made no progress")
+                        written += count
+                    copied += len(chunk)
+                os.fsync(target_fd)
+            finally:
+                os.close(target_fd)
+            after = os.fstat(fd)
+            stable = (
+                after.st_dev == opened.st_dev
+                and after.st_ino == opened.st_ino
+                and after.st_size == opened.st_size
+                and after.st_mtime_ns == opened.st_mtime_ns
+                and after.st_ctime_ns == opened.st_ctime_ns
+            )
+            if not stable:
+                destination.unlink(missing_ok=True)
+                raise SnapshotUnavailable(
+                    f"repository object-store file changed while copying: {name!r}"
+                )
+            return copied
+        finally:
+            os.close(fd)
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(
+            f"repository object-store file is unavailable at {name!r}: {exc}"
+        ) from exc
+
+
+def _materialize_object_store(source_fd: int, destination: Path) -> None:
+    """Create a private object database without following native descendants.
+
+    Only loose objects and pack-family regular files participate in object lookup.
+    Native ``info`` metadata (especially alternates) and replacement maps are never
+    copied.  Later native mutations therefore cannot affect any Git process.
+    """
+    destination.mkdir(mode=0o700)
+    (destination / "info").mkdir(mode=0o700)
+    pack_target = destination / "pack"
+    pack_target.mkdir(mode=0o700)
+    entries = 0
+    copied_bytes = 0
+    loose_name = re.compile(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})$")
+    object_hex = r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})"
+    pack_name = re.compile(
+        rf"pack-{object_hex}\.(?:pack|idx|rev|bitmap|promisor|mtimes)$"
+    )
+
+    def count() -> None:
+        nonlocal entries
+        entries += 1
+        if entries > MAX_OBJECT_STORE_ENTRIES:
+            raise SnapshotUnavailable("repository object store exceeds entry cap")
+
+    try:
+        with os.scandir(source_fd) as roots:
+            for root_entry in roots:
+                count()
+                root_name = root_entry.name
+                if not (
+                    root_name == "pack" or re.fullmatch(r"[0-9a-fA-F]{2}", root_name)
+                ):
+                    continue
+                child_fd = _open_child_directory(source_fd, root_name, create=False)
+                try:
+                    target = pack_target if root_name == "pack" else destination / root_name
+                    if root_name != "pack":
+                        target.mkdir(mode=0o700)
+                    accepted = pack_name if root_name == "pack" else loose_name
+                    try:
+                        with os.scandir(child_fd) as children:
+                            for child_entry in children:
+                                count()
+                                name = child_entry.name
+                                if not accepted.fullmatch(name):
+                                    continue
+                                copied_bytes += _copy_object_file(
+                                    child_fd, name, target / name,
+                                    remaining_bytes=MAX_OBJECT_STORE_BYTES - copied_bytes,
+                                )
+                    except SnapshotUnavailable:
+                        raise
+                    except OSError as exc:
+                        raise SnapshotUnavailable(
+                            "could not enumerate repository object directory "
+                            f"{root_name!r}: {exc}"
+                        ) from exc
+                finally:
+                    os.close(child_fd)
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"could not enumerate repository object store: {exc}") from exc
+    for path in (pack_target, destination / "info", destination):
+        fd = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
+def _publish_private_loose_objects(private_objects: Path, common: Path) -> None:
+    """Copy content-addressed snapshot objects back for the durable native pin.
+
+    Git never reads this mutable tree. Publication uses retained directory handles and
+    no-follow opens so a swapped fanout cannot redirect writes. Existing object names
+    must contain the exact private bytes; a mismatch fails closed.
+    """
+    source_root = _open_directory(private_objects)
+    common_fd = _open_directory(common)
+    native_root: int | None = None
+    try:
+        native_root = _open_child_directory(common_fd, "objects", create=False)
+        for fanout in sorted(os.listdir(source_root), key=os.fsencode):
+            if not re.fullmatch(r"[0-9a-fA-F]{2}", fanout):
+                continue
+            source_dir = _open_child_directory(source_root, fanout, create=False)
+            native_dir = _open_child_directory(native_root, fanout, create=True)
+            try:
+                for name in sorted(os.listdir(source_dir), key=os.fsencode):
+                    if not re.fullmatch(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})", name):
+                        continue
+                    before = os.stat(name, dir_fd=source_dir, follow_symlinks=False)
+                    if not stat.S_ISREG(before.st_mode):
+                        raise SnapshotUnavailable("private object database became unsafe")
+                    source_fd = os.open(
+                        name,
+                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=source_dir,
+                    )
+                    try:
+                        opened = os.fstat(source_fd)
+                        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+                            before.st_dev, before.st_ino, before.st_size,
+                        ):
+                            raise SnapshotUnavailable("private object changed during publication")
+                        temp_name = (
+                            f"paranoia-tmp-{os.getpid()}-{time.monotonic_ns()}-{name[:12]}"
+                        )
+                        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL \
+                            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+                        try:
+                            temp_fd = os.open(temp_name, flags, 0o444, dir_fd=native_dir)
+                            try:
+                                while True:
+                                    chunk = os.read(source_fd, 1 << 20)
+                                    if not chunk:
+                                        break
+                                    written = 0
+                                    while written < len(chunk):
+                                        count = os.write(temp_fd, chunk[written:])
+                                        if count <= 0:
+                                            raise OSError(
+                                                "native object publication made no progress"
+                                            )
+                                        written += count
+                                os.fsync(temp_fd)
+                            finally:
+                                os.close(temp_fd)
+                            try:
+                                os.link(
+                                    temp_name, name,
+                                    src_dir_fd=native_dir, dst_dir_fd=native_dir,
+                                    follow_symlinks=False,
+                                )
+                            except FileExistsError:
+                                os.lseek(source_fd, 0, os.SEEK_SET)
+                                target_fd = os.open(
+                                    name,
+                                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                                    | getattr(os, "O_CLOEXEC", 0),
+                                    dir_fd=native_dir,
+                                )
+                                try:
+                                    target = os.fstat(target_fd)
+                                    if not stat.S_ISREG(target.st_mode) \
+                                            or target.st_size != opened.st_size:
+                                        raise SnapshotUnavailable(
+                                            "native object collision is not the expected regular file"
+                                        )
+                                    while True:
+                                        left = os.read(source_fd, 1 << 20)
+                                        right = os.read(target_fd, 1 << 20)
+                                        if left != right:
+                                            raise SnapshotUnavailable(
+                                                "native object collision has different content"
+                                            )
+                                        if not left:
+                                            break
+                                finally:
+                                    os.close(target_fd)
+                            finally:
+                                os.unlink(temp_name, dir_fd=native_dir)
+                            os.fsync(native_dir)
+                        except BaseException:
+                            try:
+                                os.unlink(temp_name, dir_fd=native_dir)
+                            except FileNotFoundError:
+                                pass
+                            except OSError as cleanup:
+                                raise SnapshotCleanupError(
+                                    f"could not remove temporary native object {temp_name}: {cleanup}"
+                                ) from cleanup
+                            raise
+                    finally:
+                        os.close(source_fd)
+            finally:
+                os.close(native_dir)
+                os.close(source_dir)
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"native object publication failed: {exc}") from exc
+    finally:
+        if native_root is not None:
+            os.close(native_root)
+        os.close(common_fd)
+        os.close(source_root)
+
+
 def _copy_loose_refs(common: Path, destination: Path) -> tuple[str, ...]:
     """Materialize supplied loose refs without following any tree component."""
     destination.mkdir(mode=0o700)
@@ -644,9 +922,10 @@ def _controlled_config_value(
 def _create_git_control(repo: Path) -> _GitControl:
     """Create a Git directory whose config is entirely server-owned.
 
-    Object and loose-ref storage remain in the approved native common directory, but
-    repository config, config.worktree, includes, HEAD, index, packed refs, and shallow
-    metadata are copied or replaced before any repository-aware Git command executes.
+    Loose refs remain in the approved native common directory solely for durable pin
+    publication. Repository objects, config, config.worktree, includes, HEAD, index,
+    packed refs, and shallow metadata are copied or replaced before any repository-aware
+    Git command executes.
     """
     git_dir, common = _approved_repository_dirs(repo)
     directory = Path(tempfile.mkdtemp(prefix="paranoia-plan-git-control-"))
@@ -661,7 +940,10 @@ def _create_git_control(repo: Path) -> _GitControl:
             os.set_inheritable(fd, True)
         stable_repo = Path(f"/proc/self/fd/{repo_fd}")
         stable_common = Path(f"/proc/self/fd/{common_fd}")
-        stable_objects = Path(f"/proc/self/fd/{objects_fd}")
+        private_objects = directory / "objects"
+        _materialize_object_store(objects_fd, private_objects)
+        os.close(objects_fd)
+        owned_fds.remove(objects_fd)
 
         def read_at(parent_fd: int, name: str, cap: int, *, missing_ok: bool) -> bytes:
             try:
@@ -712,7 +994,7 @@ def _create_git_control(repo: Path) -> _GitControl:
         environment = {
             "GIT_DIR": str(directory),
             "GIT_WORK_TREE": str(stable_repo),
-            "GIT_OBJECT_DIRECTORY": str(stable_objects),
+            "GIT_OBJECT_DIRECTORY": str(private_objects),
         }
         return _GitControl(
             directory, environment, stable_common, skipped_refs, tuple(owned_fds)
@@ -751,7 +1033,6 @@ class PlanRepositorySnapshot:
         before_pin: Callable[[list[tuple[str, str]]], None] | None = None,
     ) -> "PlanRepositorySnapshot":
         repo = Path(repo).resolve()
-        _validate_object_boundary(repo)
         control = _create_git_control(repo)
         try:
             git_env = control.environment
@@ -787,6 +1068,9 @@ class PlanRepositorySnapshot:
             commit = _run(
                 repo, commit_args, git_env=git_env, extra_env=_SNAPSHOT_IDENTITY,
             ).stdout.decode("ascii").strip()
+            _publish_private_loose_objects(
+                Path(git_env["GIT_OBJECT_DIRECTORY"]), control.common,
+            )
             token = _ref_token(run_id)
             wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
             raw_refs = _run_bounded_records(
@@ -1419,18 +1703,6 @@ def _snapshot_tree_without_filters(
         shutil.rmtree(index_dir, ignore_errors=True)
 
 
-def _validate_object_boundary(repo: Path) -> None:
-    _git_dir, common = _approved_repository_dirs(repo)
-    objects = common / "objects"
-    _validate_object_store_paths(objects)
-    for name in ("alternates", "http-alternates"):
-        path = objects / "info" / name
-        if _read_small_regular(path, missing_ok=True).strip():
-            raise SnapshotUnavailable(
-                f"repository object alternates are outside the approved snapshot boundary: {path}"
-            )
-
-
 def _approved_common_dir(repo: Path) -> Path:
     return _approved_repository_dirs(repo)[1]
 
@@ -1476,77 +1748,6 @@ def _approved_repository_dirs(repo: Path) -> tuple[Path, Path]:
             or backlink_path != dotgit.resolve():
         raise SnapshotUnavailable("gitfile is not a self-consistent native linked worktree")
     return git_dir, common
-
-
-def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -> None:
-    if objects.is_symlink() or not objects.is_dir():
-        raise SnapshotUnavailable("repository object-store root must be a real directory")
-    seen = 0
-
-    def scan(directory: Path, relevant: Callable[[str], bool]) -> list[Path]:
-        nonlocal seen
-        directories: list[Path] = []
-        try:
-            with os.scandir(directory) as entries:
-                for entry in entries:
-                    seen += 1
-                    if seen > max_entries:
-                        raise SnapshotUnavailable(
-                            "repository object-store metadata scan exceeds safety cap"
-                        )
-                    if not relevant(entry.name):
-                        continue
-                    if entry.is_symlink():
-                        raise SnapshotUnavailable(
-                            f"repository object-store path may not be a symlink: {entry.path}"
-                        )
-                    if entry.is_dir(follow_symlinks=False):
-                        directories.append(Path(entry.path))
-        except SnapshotUnavailable:
-            raise
-        except OSError as exc:
-            raise SnapshotUnavailable(
-                f"could not inspect repository object store: {exc}"
-            ) from exc
-        return directories
-
-    # Git resolves only loose-object fanout and explicit pack/info names. Arbitrary
-    # nested directories in those namespaces are inert and cannot redirect lookup.
-    roots = scan(
-        objects,
-        lambda name: name in {"pack", "info"}
-        or bool(re.fullmatch(r"[0-9a-fA-F]{2}", name)),
-    )
-    loose_name = re.compile(r"(?:[0-9a-fA-F]{38}|[0-9a-fA-F]{62})$")
-    object_hex = r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})"
-    pack_name = re.compile(
-        rf"(?:pack-{object_hex}\.(?:pack|idx|rev|bitmap|promisor|mtimes)"
-        rf"|multi-pack-index(?:-{object_hex}\.bitmap)?|multi-pack-index\.d)$"
-    )
-    info_name = re.compile(r"(?:alternates|http-alternates|packs|commit-graph|commit-graphs)$")
-    for directory in roots:
-        if re.fullmatch(r"[0-9a-fA-F]{2}", directory.name):
-            scan(directory, lambda name: bool(loose_name.fullmatch(name)))
-        elif directory.name == "pack":
-            nested = scan(directory, lambda name: bool(pack_name.fullmatch(name)))
-            for child in nested:
-                if child.name == "multi-pack-index.d":
-                    scan(
-                        child,
-                        lambda name: name == "multi-pack-index-chain"
-                        or bool(re.fullmatch(
-                            rf"multi-pack-index-{object_hex}\.midx", name
-                        )),
-                    )
-        elif directory.name == "info":
-            nested = scan(directory, lambda name: bool(info_name.fullmatch(name)))
-            for child in nested:
-                if child.name == "commit-graphs":
-                    scan(
-                        child,
-                        lambda name: name == "commit-graph-chain"
-                        or bool(re.fullmatch(rf"graph-{object_hex}\.graph", name)),
-                    )
 
 
 def _discover_worktree_paths(root_fd: int, *, max_entries: int) -> tuple[str, ...]:

@@ -302,7 +302,9 @@ def test_history_reads_only_the_initial_server_pinned_ref_map(repo: Path) -> Non
             snap.history("refs/heads/future", "app.py")
 
 
-def test_external_object_alternates_are_rejected(repo: Path, tmp_path: Path) -> None:
+def test_external_object_alternates_are_omitted_from_private_database(
+    repo: Path, tmp_path: Path,
+) -> None:
     common = subprocess.run(
         ["git", "rev-parse", "--git-common-dir"], cwd=repo, check=True,
         capture_output=True, text=True,
@@ -311,8 +313,11 @@ def test_external_object_alternates_are_rejected(repo: Path, tmp_path: Path) -> 
     info = common_path / "objects" / "info"
     info.mkdir(parents=True, exist_ok=True)
     (info / "alternates").write_text(str(tmp_path / "external-objects") + "\n")
-    with pytest.raises(SnapshotUnavailable, match="object alternates"):
-        PlanRepositorySnapshot.create(repo, run_id="alternate")
+    with PlanRepositorySnapshot.create(repo, run_id="alternate") as snapshot:
+        private = Path(snapshot._git_env["GIT_OBJECT_DIRECTORY"])
+        assert private.parent == snapshot._control_dir
+        assert not (private / "info" / "alternates").exists()
+        assert snapshot.read_blob("app.py").startswith(b'"""App module')
 
 
 @pytest.mark.parametrize("metadata_name", [".git", "commondir", "gitdir"])
@@ -344,7 +349,7 @@ def test_symlinked_object_store_root_is_rejected(repo: Path, tmp_path: Path) -> 
     external = tmp_path / "external-objects"
     objects.rename(external)
     objects.symlink_to(external, target_is_directory=True)
-    with pytest.raises(SnapshotUnavailable, match="object-store root"):
+    with pytest.raises(SnapshotUnavailable, match="directory is unsafe"):
         PlanRepositorySnapshot.create(repo, run_id="symlinked-objects")
 
 
@@ -383,7 +388,7 @@ def test_symlink_in_resolvable_object_namespace_is_rejected(
     if pack.exists():
         pack.rmdir()
     pack.symlink_to(tmp_path, target_is_directory=True)
-    with pytest.raises(SnapshotUnavailable, match="object-store path"):
+    with pytest.raises(SnapshotUnavailable, match="directory is unsafe"):
         PlanRepositorySnapshot.create(repo, run_id="pack-symlink")
 
 
@@ -440,9 +445,37 @@ def test_retained_git_and_object_roots_survive_path_replacement(
     assert not (external_git / "refs" / "paranoia").exists()
     assert observed_envs and all(
         env["GIT_WORK_TREE"].startswith("/proc/self/fd/")
-        and env["GIT_OBJECT_DIRECTORY"].startswith("/proc/self/fd/")
+        and Path(env["GIT_OBJECT_DIRECTORY"]).parent.name.startswith(
+            "paranoia-plan-git-control-"
+        )
         for env in observed_envs
     )
+
+
+def test_native_object_descendants_cannot_change_later_snapshot_reads(
+    repo: Path, tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "gc", "--prune=now"], cwd=repo, check=True)
+    objects = repo / ".git" / "objects"
+    external = tmp_path / "external-objects"
+    external.mkdir()
+    with PlanRepositorySnapshot.create(repo, run_id="immutable-object-copy") as snapshot:
+        (objects / "info" / "alternates").write_text(str(external) + "\n")
+        native_pack = objects / "pack"
+        native_pack.rename(objects / "pack-original")
+        native_pack.symlink_to(external, target_is_directory=True)
+        assert snapshot.read_blob("app.py").startswith(b'"""App module')
+        assert not Path(snapshot._git_env["GIT_OBJECT_DIRECTORY"]).is_symlink()
+
+
+def test_object_materialization_counts_inert_entries_before_retaining_them(
+    repo: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for index in range(3):
+        (repo / ".git" / "objects" / f"inert-{index}").mkdir()
+    monkeypatch.setattr(ps, "MAX_OBJECT_STORE_ENTRIES", 1)
+    with pytest.raises(SnapshotUnavailable, match="object store exceeds entry cap"):
+        PlanRepositorySnapshot.create(repo, run_id="object-entry-cap")
 
 
 def test_worktree_discovery_never_uses_git_directory_traversal(

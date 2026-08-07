@@ -166,6 +166,24 @@ def lineage_with(*specs: tuple[str, str, str | None]) -> cc.Lineage:
 
 
 class TestIdentityAndTransitions:
+    def test_generated_class_id_collision_is_rejected_atomically(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        lin = lineage_with(("first invariant", cc.MAJOR, None))
+        occupied = next(iter(lin.classes))
+        before = cc._to_json(lin)
+        monkeypatch.setattr(cc, "mint_id", lambda *_args: occupied)
+        with pytest.raises(cc.RegisterError, match="collides"):
+            cc.apply_register(
+                lin,
+                cc.Register(new_classes=(cc.NewClass(
+                    "different invariant", cc.BLOCKER, procedure="inspect it",
+                ),)),
+                round_no=2,
+            )
+        assert cc._to_json(lin) == before
+        assert len(occupied) == 32
+
     def test_two_records_sharing_a_predicate_get_independent_state(self) -> None:
         """Round 4's FATAL: dedup on (pattern, pathspec) collapsed distinct invariants."""
         lin = lineage_with(("first invariant", cc.MAJOR, "X"), ("second invariant", cc.MINOR, "X"))
