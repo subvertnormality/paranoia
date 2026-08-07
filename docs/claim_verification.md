@@ -14,6 +14,10 @@ premises verified, contradicted, safely deferred, or explicitly unresolved?
 | `diagnostic` | Default. Run and persist claim research, display claim closure, but let only class closure govern `CONVERGENCE` |
 | `blocking` | Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
 
+Diagnostic mode ignores unresolved claim findings for convergence; it never ignores an
+operationally incomplete round. Model-role failure, register debt, state failure, or an
+abandoned structural/class transaction blocks in every enabled mode.
+
 `diagnostic` is the required rollout stage. Promote a workflow to `blocking` only after its
 operators have measured latency, false-block rate, extraction quality, state growth, and
 recovery behavior on representative plans. `class_closure: false` remains the stateless
@@ -131,13 +135,17 @@ already have completed the source transition to `superseded`.
 
 ## Evidence and accuracy
 
-Every evidence record has a server-generated ID, exact content hash, claim binding, source
-kind, source identity, bounded passage, and completeness metadata. Evidence for one claim
-cannot authorize another.
+Every evidence record has a server-generated ID, exact full-content hash, claim binding,
+source kind, source identity, bounded passage, exact passage offsets, and completeness
+metadata. Evidence for one claim cannot authorize another. For a large external or supplied
+source, the server deterministically selects a claim/query-relevant window while retaining
+the complete source in the content-addressed journal.
 
-Incomplete tree, history, search, blob-range, or fetched records may provide context but
-cannot authorize a negative conclusion. Non-UTF-8 passages that require lossy display are
-also context-only. A citation is metadata, not proof.
+A visible bounded passage may authorize only a proposition directly entailed by those
+bytes. It cannot prove absence, exhaustive coverage, or an unshown source-wide property.
+Incomplete tree, history, and search scopes are context-only; an exact blob range may support
+a directly visible fact. Non-UTF-8 passages that require lossy display are also context-only.
+A citation is metadata, not proof.
 
 Repository cache validity depends on the snapshot commit and every recorded object/path
 identity. Empirical cache validity additionally depends on the fixed adapter, runtime, and
@@ -174,6 +182,8 @@ Known user-generated-content hosts—including Reddit, Stack Overflow/Stack Exch
 News, Quora, and common social/publishing platforms—are forced to `ugc`; a caller rule cannot
 promote them to primary or authoritative. UGC can expose leads, conflicts, or user-experience
 reports, but cannot authorize general API, standard, regulatory, historical, or product facts.
+Cached external URLs are reclassified against the current caller policy on every round; a
+removed or downgraded rule invalidates the record and stales every dependent active claim.
 
 Remote content and caller-supplied artifacts are untrusted data. They receive isolated
 verifier calls and cannot classify plan decisions, author evidence-free deferrals, or waive

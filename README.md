@@ -379,7 +379,7 @@ separate structural reviewer judges the design. See
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
-| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `diagnostic` | Verification runs by default; `diagnostic` reports/persists claims without governing convergence, while `blocking` combines both gates. Non-off modes require class closure |
+| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `diagnostic` | Verification runs by default; `diagnostic` reports/persists unresolved claims without letting those findings govern convergence, while `blocking` combines both gates. Operationally incomplete rounds block in either enabled mode. Non-off modes require class closure |
 | `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking, including required deferrals |
 | `stakes_level` | `low` \| `high` | high for any stated stakes | Explicit authorization-risk policy for `auto`; natural-language stakes are never parsed for opt-down words |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
@@ -738,10 +738,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   resolution, then invokes every missing vendor. Dispute resolution audits include the full
   pre-transition dependency set and evidence being displaced; repository, external,
   supplied, and local bodies are sent as separate packets that must all be accepted, and
-  authoring a transition never substitutes for that complete audit. The 4 KiB displayed
-  passage is authorization-complete only when it covers the entire source; longer
-  repository, empirical, external, and supplied records remain context-only. Non-UTF-8
-  bytes that require lossy replacement decoding are likewise context-only. Authorization
+  authoring a transition never substitutes for that complete audit. Each record exposes the
+  exact offsets of its at-most-4-KiB passage within the rooted full source. Large external
+  and supplied sources use a deterministic claim/query-relevant window. A bounded passage
+  can authorize only a fact directly entailed by visible bytes—not absence, exhaustive
+  coverage, or an unshown source-wide property. Non-UTF-8 bytes that require lossy
+  replacement decoding are likewise context-only. Authorization
   contract version 2 reblocks and reruns required version-1 provenance through both actual
   vendors before migration, including intrinsically audited advisory-bearing and dispute
   events under `auto`/low stakes. A completed dispute outcome is reauthorized in place

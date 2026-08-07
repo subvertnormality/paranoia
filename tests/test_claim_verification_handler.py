@@ -338,6 +338,45 @@ def test_toolless_capability_preflight_blocks_before_snapshot_and_latch(
     assert not pending.exists()
 
 
+def test_diagnostic_mode_blocks_post_preflight_operational_failure(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class FailingRoleEngine(ClaimEngine):
+        def run_toolless(self, *_args, **_kwargs) -> Review:
+            raise ToollessUnavailable("role sandbox disappeared after preflight")
+
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "diagnostic-role-failure", "round": 1,
+        },
+        engine=FailingRoleEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "[FATAL] Claim verification failed closed" in out
+    assert "CLAIM-CLOSURE: DIAGNOSTIC-BLOCKED" in out
+    assert out.count("CONVERGENCE:") == 1
+    assert "CONVERGENCE: BLOCKED" in out
+
+
+def test_audit_log_records_the_actual_diagnostic_mode(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logged: dict = {}
+
+    def capture(_log_dir, _op, _engine, _review, _now, extra):
+        logged.update(extra)
+
+    monkeypatch.setattr(handlers, "_log", capture)
+    handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "diagnostic-log-mode", "round": 1,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert logged["claim_verification"] == "diagnostic"
+
+
 def test_invalid_inline_unicode_preserves_closure_response_shape(
     repo: Path, tmp_path: Path,
 ) -> None:
@@ -922,7 +961,8 @@ def test_high_stakes_supplied_artifact_is_isolated_and_independently_authorized(
         if "CALLER-SUPPLIED UNTRUSTED EVIDENCE ONLY" in p
     )
     assert injected not in local and injected in supplied
-    assert "repository-blob" in local and "repository-blob" not in supplied
+    assert '"kind":"repository-blob"' in local
+    assert '"kind":"repository-blob"' not in supplied
     assert required == [False, True]
     assert "CONVERGENCE: NOT-BLOCKED" in out
 

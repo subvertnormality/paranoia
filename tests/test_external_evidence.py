@@ -275,11 +275,27 @@ def test_expired_truth_source_stales_claim_after_separate_bearing_evidence(
     )
     truth = cv._record(
         store, "separate-run", claim_id, "external", "https://truth.example/",
-        b"truth", {"retrieved_at": "2026-01-01T00:00:00+00:00"},
+        b"truth", {
+            "requested_url": "https://truth.example/",
+            "final_url": "https://truth.example/",
+            "retrieved_at": "2026-01-01T00:00:00+00:00",
+            "http_status": 200, "media_type": "text/plain", "redirects": [],
+            "publisher_domain": "truth.example",
+            "source_class": "unclassified-external",
+            "independence_groups": ["domain:truth.example"], "conflicts": [],
+        },
     )
     bearing = cv._record(
         store, "separate-run", claim_id, "external", "https://bearing.example/",
-        b"bearing", {"retrieved_at": "2026-01-09T00:00:00+00:00"},
+        b"bearing", {
+            "requested_url": "https://bearing.example/",
+            "final_url": "https://bearing.example/",
+            "retrieved_at": "2026-01-09T00:00:00+00:00",
+            "http_status": 200, "media_type": "text/plain", "redirects": [],
+            "publisher_domain": "bearing.example",
+            "source_class": "unclassified-external",
+            "independence_groups": ["domain:bearing.example"], "conflicts": [],
+        },
     )
     pc.apply_events(
         state,

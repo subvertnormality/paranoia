@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 from dataclasses import asdict, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -253,10 +254,10 @@ def test_read_blob_can_retrieve_a_bounded_passage_after_the_source_prefix(
     assert records[0].metadata["offset"] == 5000
     assert records[0].metadata["whole_size"] > 5000
     assert records[0].metadata["complete"] is False
-    assert records[0].evidence_id not in cv.evidence_bindings(records)
+    assert cv.evidence_bindings(records)[records[0].evidence_id] == "claim"
 
 
-def test_complete_blob_can_authorize_but_partial_prefix_cannot(
+def test_exact_blob_ranges_can_authorize_directly_visible_facts(
     repo: Path, tmp_path: Path,
 ) -> None:
     body = (repo / "app.py").read_bytes()
@@ -280,7 +281,7 @@ def test_complete_blob_can_authorize_but_partial_prefix_cannot(
     assert records[0].metadata["complete"] is True
     assert bindings[records[0].evidence_id] == "claim"
     assert records[1].metadata["complete"] is False
-    assert records[1].evidence_id not in bindings
+    assert bindings[records[1].evidence_id] == "other"
 
 
 @pytest.mark.parametrize(
@@ -292,22 +293,49 @@ def test_complete_blob_can_authorize_but_partial_prefix_cannot(
         ("supplied-artifact", {}),
     ],
 )
-def test_semantically_truncated_source_is_never_authorization_eligible(
+def test_cryptographically_bound_passage_can_authorize_a_visible_fact(
     kind: str, metadata: dict,
 ) -> None:
     digest = "a" * 64
-    passage_digest = hashlib.sha256(b"x").hexdigest()
+    passage = b"x" * cv.MAX_PASSAGE_BYTES
+    passage_digest = hashlib.sha256(passage).hexdigest()
     record = cv.EvidenceRecord(
         "e" + "1" * 32, "claim", kind, "source", digest, digest,
-        cv.MAX_PASSAGE_BYTES + 1, 0, cv.MAX_PASSAGE_BYTES, passage_digest, "x", metadata,
+        cv.MAX_PASSAGE_BYTES + 1, 1, cv.MAX_PASSAGE_BYTES + 1,
+        passage_digest, passage.decode(), metadata,
     )
-    assert cv.evidence_bindings([record]) == {}
+    assert cv.evidence_bindings([record]) == {record.evidence_id: "claim"}
 
+    one_digest = hashlib.sha256(b"x").hexdigest()
     complete = cv.EvidenceRecord(
         "e" + "2" * 32, "claim", kind, "source", digest, digest, 1,
-        0, 1, passage_digest, "x", metadata,
+        0, 1, one_digest, "x", metadata,
     )
     assert cv.evidence_bindings([complete]) == {complete.evidence_id: "claim"}
+
+
+def test_large_source_selects_a_claim_relevant_rooted_passage(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "passage-store")
+    store.begin("passage-run")
+    body = b"header\n" + b"x" * 9000 + b"authoritative portable marker\n" + b"y" * 5000
+    record = cv._record(
+        store, "passage-run", "claim", "external", "https://docs.example.com/x",
+        body, {}, passage_hint="portable marker behavior",
+    )
+    assert record.source_size == len(body)
+    assert record.passage_start > 0
+    assert "portable marker" in record.display_passage
+    assert record.passage_end - record.passage_start == cv.MAX_PASSAGE_BYTES
+    assert cv.evidence_bindings([record]) == {record.evidence_id: "claim"}
+    framed = json.loads(
+        next(
+            line.split("UNTRUSTED-EVIDENCE-RECORD-JSON=", 1)[1]
+            for line in cv.render_evidence([record], include_passages=True).splitlines()
+            if line.startswith("UNTRUSTED-EVIDENCE-RECORD-JSON=")
+        )
+    )
+    assert framed["passage_start"] == record.passage_start
+    assert framed["passage_complete"] is False
 
 
 @pytest.mark.parametrize(
@@ -376,6 +404,58 @@ def test_cached_derived_passage_fields_are_recomputed_from_rooted_bytes(
             [forged], snapshot=snapshot, store=store, state=pc.ClaimState("lineage"),
         )
     assert valid == []
+
+
+def test_cached_external_authority_is_revalidated_and_stales_dependents(
+    repo: Path, tmp_path: Path,
+) -> None:
+    spans = pc.segment_plan(b"Use the documented portable behavior.\n")
+    state = pc.ClaimState("source-policy-change")
+    claim_id = pc.apply_events(
+        state, [pc.Event("ADD", {
+            "op": "ADD", "temp_id": "docs", "kind": "fact",
+            "assertion_mode": "asserted",
+            "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+        })], role=pc.RESEARCH_ROLE, spans=spans,
+    )["docs"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "external premise",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    store = EvidenceStore(tmp_path / "source-policy-store")
+    store.begin("source-policy-run")
+    url = "https://docs.example.com/standard"
+    body = b"The portable behavior is supported."
+    record = cv._record(
+        store, "source-policy-run", claim_id, "external", url, body,
+        {
+            "requested_url": url, "final_url": url,
+            "retrieved_at": "2026-08-07T00:00:00+00:00", "http_status": 200,
+            "media_type": "text/plain", "redirects": [],
+            "publisher_domain": "docs.example.com", "source_class": "authoritative",
+            "independence_groups": ["domain:docs.example.com"], "conflicts": [],
+        },
+    )
+    store.adopt("source-policy-change", "source-policy-run", [record.blob_digest])
+    pc.apply_events(
+        state, [pc.Event("VERIFY", {
+            "op": "VERIFY", "claim_id": claim_id,
+            "evidence_ids": [record.evidence_id], "reason": "official documentation",
+        })], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={record.evidence_id: claim_id},
+    )
+
+    with PlanRepositorySnapshot.create(repo, run_id="source-policy-after") as snapshot:
+        valid = cv.validate_cached_records(
+            [record], snapshot=snapshot, store=store, state=state,
+            now=datetime(2026, 8, 7, tzinfo=timezone.utc),
+            external_source_policy=(),
+        )
+    assert valid == []
+    assert state.claims[claim_id].status == pc.STALE
+    assert pc.claim_blocks(state.claims[claim_id])
 
 
 def test_history_cache_is_invalidated_when_its_pinned_ref_moves(
@@ -501,6 +581,29 @@ def test_truncated_literal_search_records_exact_ranges_and_cannot_authorize(
         "path": "large.txt", "blob_oid": inspected[0]["blob_oid"],
         "start": 0, "end": 1 << 20, "whole_size": len(body), "complete": False,
     }]
+    assert record.evidence_id not in cv.evidence_bindings(records)
+
+
+def test_whole_tree_search_propagates_unavailable_snapshot_paths(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (repo / "capped.txt").write_bytes(b"hidden marker" * 8)
+    monkeypatch.setattr("paranoia_local.plan_snapshot.MAX_FILE_BYTES", 16)
+    request = cv.EvidenceRequest("SEARCH_LITERAL", {
+        "op": "SEARCH_LITERAL", "claim_id": "claim",
+        "pattern": "definitely absent", "paths": [], "limit": 10,
+    })
+    store = EvidenceStore(tmp_path / "whole-search-scope")
+    store.begin("whole-search-run")
+    with PlanRepositorySnapshot.create(repo, run_id="whole-search") as snapshot:
+        records = cv.collect_evidence(
+            [request], snapshot=snapshot, store=store, run_id="whole-search-run",
+        )
+    record = records[0]
+    assert "capped.txt" in record.metadata["candidate_paths"] or (
+        "capped.txt" in snapshot.unavailable_paths
+    )
+    assert record.metadata["complete"] is False
     assert record.evidence_id not in cv.evidence_bindings(records)
 
 

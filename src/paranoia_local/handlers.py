@@ -783,6 +783,7 @@ def _critique_plan_verified(
             evidence_records = cv.validate_cached_records(
                 evidence_records, snapshot=snapshot, store=store, state=state,
                 high_stakes=high_stakes, budget=round_budget,
+                external_source_policy=external_source_policy,
             )
             evidence_cache_intact = (
                 tuple(record.evidence_id for record in evidence_records)
@@ -1355,7 +1356,7 @@ def _critique_plan_verified(
         "grounded": True, "model": model, "round": round_no,
         "already_raised": already, "plan_digest": hashlib.sha256(raw_plan).hexdigest()[:16],
         "plan_text_digest": hashlib.sha256(plan_text.encode("utf-8", "surrogateescape")).hexdigest()[:16],
-        "plan_path": plan_path, "class_closure": True, "claim_verification": "blocking",
+        "plan_path": plan_path, "class_closure": True, "claim_verification": claim_mode,
         "lineage": lineage_id, "claim_register_status": research_status,
         "class_register_status": class_status,
         "register_status": class_status,
@@ -1792,13 +1793,15 @@ def _render_plan_convergence(
             )
         )
     claims_govern = claim_mode == "blocking"
+    # Claim findings are diagnostic until promotion, but register/pipeline debt means
+    # the round itself did not complete. Operational failure always governs convergence.
     blocked = bool(
-        class_debt or blocking_classes
-        or (claims_govern and (state.debt or blocking_claims))
+        state.debt or class_debt or blocking_classes
+        or (claims_govern and blocking_claims)
     )
     if blocked:
         reasons = []
-        if claims_govern and state.debt:
+        if state.debt:
             reasons.append("claim register debt")
         if class_debt:
             reasons.append("class register debt")

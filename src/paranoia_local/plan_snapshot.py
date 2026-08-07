@@ -408,25 +408,29 @@ def _decode_path(raw: bytes) -> str:
     return path
 
 
-def _index_entries(repo: Path, control: _GitControl) -> dict[str, tuple[str, str]]:
+def _index_entries(
+    repo: Path, control: _GitControl,
+) -> dict[str, tuple[str, str, bool]]:
     raw = _run_bounded_records(
         repo,
-        ["ls-files", "--stage", "-z"],
+        ["ls-files", "--stage", "-t", "-z"],
         max_records=MAX_SNAPSHOT_PATHS,
         git_env=control.discovery_environment,
     )
-    entries: dict[str, tuple[str, str]] = {}
+    entries: dict[str, tuple[str, str, bool]] = {}
     for row in raw.split(b"\0"):
         if not row:
             continue
-        metadata, tab, path_raw = row.partition(b"\t")
+        tag, separator, remainder = row.partition(b" ")
+        metadata, tab, path_raw = remainder.partition(b"\t")
         parts = metadata.decode("ascii", errors="strict").split()
-        if not tab or len(parts) != 3 or parts[2] != "0":
+        if not separator or tag not in {b"H", b"S"} \
+                or not tab or len(parts) != 3 or parts[2] != "0":
             raise SnapshotUnavailable("unmerged or malformed index entry is unsupported")
         path = _decode_path(path_raw)
         if path in entries:
             raise SnapshotUnavailable("duplicate index path is unsupported")
-        entries[path] = (parts[0], parts[1])
+        entries[path] = (parts[0], parts[1], tag == b"S")
     return entries
 
 
@@ -529,6 +533,10 @@ def _snapshot_tree(
         try:
             info = full_path.lstat()
         except FileNotFoundError:
+            # A skip-worktree entry is intentionally absent (normally sparse checkout),
+            # not deleted. Preserve its exact indexed object in the synthetic tree.
+            if indexed and indexed[2]:
+                rows.append((indexed[0], indexed[1], path))
             continue
         except OSError as exc:
             raise SnapshotUnavailable(f"snapshot path is unavailable: {path!r}: {exc}") from exc
@@ -832,7 +840,16 @@ class PlanRepositorySnapshot:
             for row in raw.split(b"\0")
             if row
         ]
-        return decoded[:limit], len(decoded) <= limit
+        def omitted_in_scope(path: str) -> bool:
+            if not prefix:
+                return True
+            normalized = prefix.rstrip("/")
+            return path == normalized or path.startswith(normalized + "/")
+
+        coverage_complete = not any(
+            omitted_in_scope(path) for path in self.unavailable_paths
+        )
+        return decoded[:limit], len(decoded) <= limit and coverage_complete
 
     def search_literal(
         self,

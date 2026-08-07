@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import urllib.parse
 from dataclasses import asdict, dataclass, field
@@ -386,7 +387,8 @@ def collect_evidence(
                                     and len(body) == whole_size}))
         elif request.op == "SEARCH_LITERAL":
             matches, scope = snapshot.search_literal_scoped(
-                data["pattern"], paths=data["paths"], limit=min(data["limit"], 50),
+                data["pattern"], paths=data["paths"] or None,
+                limit=min(data["limit"], 50),
                 debit_bytes=budget.debit_bytes,
                 remaining_bytes=lambda: budget.remaining_bytes,
             )
@@ -488,6 +490,7 @@ def collect_evidence(
                         ],
                         "conflicts": [],
                     },
+                    passage_hint=data["query"],
                 ))
     return records
 
@@ -528,15 +531,48 @@ def collect_supplied_evidence(
         records.append(_record(
             store, run_id, matches[0].claim_id, "supplied-artifact", source, body,
             {"source": source, "caller_supplied": True},
+            passage_hint=proposition,
         ))
     return records
 
 
-def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source: str,
-            body: bytes, metadata: dict[str, Any]) -> EvidenceRecord:
+def _passage_bounds(body: bytes, hint: str | None) -> tuple[int, int]:
+    """Choose one deterministic bounded window while retaining the full rooted source."""
+    if len(body) <= MAX_PASSAGE_BYTES:
+        return 0, len(body)
+    position: int | None = None
+    if hint:
+        tokens = sorted(
+            {
+                token.lower().encode("utf-8")
+                for token in re.findall(r"[\w.-]{4,}", hint, flags=re.UNICODE)
+                if len(token.encode("utf-8")) <= 128
+            },
+            key=len,
+            reverse=True,
+        )
+        lowered = body.lower()
+        found = [lowered.find(token) for token in tokens]
+        found = [value for value in found if value >= 0]
+        if found:
+            position = min(found)
+    if position is None:
+        return 0, MAX_PASSAGE_BYTES
+    start = max(0, position - MAX_PASSAGE_BYTES // 4)
+    start = min(start, len(body) - MAX_PASSAGE_BYTES)
+    return start, start + MAX_PASSAGE_BYTES
+
+
+def _record(
+    store: EvidenceStore, run_id: str, claim_id: str, kind: str, source: str,
+    body: bytes, metadata: dict[str, Any], *, passage_hint: str | None = None,
+) -> EvidenceRecord:
     digest = store.stage(run_id, body)
-    passage = body[:MAX_PASSAGE_BYTES]
-    identity = _evidence_identity(claim_id, kind, source, digest, metadata)
+    passage_start, passage_end = _passage_bounds(body, passage_hint)
+    passage = body[passage_start:passage_end]
+    identity = _evidence_identity(
+        claim_id, kind, source, digest, metadata, passage_start, passage_end,
+    )
     return EvidenceRecord(
         evidence_id="e" + identity,
         claim_id=claim_id,
@@ -545,8 +581,8 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
         blob_digest=digest,
         source_sha256=digest,
         source_size=len(body),
-        passage_start=0,
-        passage_end=len(passage),
+        passage_start=passage_start,
+        passage_end=passage_end,
         passage_sha256=hashlib.sha256(passage).hexdigest(),
         display_passage=passage.decode("utf-8", errors="replace"),
         metadata=metadata,
@@ -554,13 +590,17 @@ def _record(store: EvidenceStore, run_id: str, claim_id: str, kind: str, source:
 
 
 def _evidence_identity(
-    claim_id: str, kind: str, source: str, digest: str, metadata: Mapping[str, Any]
+    claim_id: str, kind: str, source: str, digest: str, metadata: Mapping[str, Any],
+    passage_start: int, passage_end: int,
 ) -> str:
     scope = json.dumps(
         metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=True
     )
     return hashlib.sha256(
-        (claim_id + "\0" + kind + "\0" + source + "\0" + digest + "\0" + scope).encode(
+        (
+            claim_id + "\0" + kind + "\0" + source + "\0" + digest + "\0"
+            + str(passage_start) + ":" + str(passage_end) + "\0" + scope
+        ).encode(
             "utf-8", errors="surrogateescape"
         )
     ).hexdigest()[:32]
@@ -606,6 +646,11 @@ def render_evidence(
             "source": record.source,
             "sha256": record.source_sha256,
             "bytes": record.source_size,
+            "passage_start": record.passage_start,
+            "passage_end": record.passage_end,
+            "passage_complete": (
+                record.passage_start == 0 and record.passage_end == record.source_size
+            ),
             "metadata": record.metadata,
         }
         if include_passages:
@@ -628,20 +673,22 @@ def records_to_json(records: Sequence[EvidenceRecord]) -> list[dict[str, Any]]:
 def evidence_bindings(records: Sequence[EvidenceRecord]) -> dict[str, str]:
     """Return only records safe to name in a truth/bearing transition.
 
-    Incomplete bounded repository queries remain visible as explicit abstention material,
-    but cannot authorize absence (or any stronger transition) by evidence ID.
+    A cryptographically rooted bounded passage may authorize only what its visible bytes
+    directly entail. Incomplete list/search/history scopes remain context-only.
     """
     return {
         record.evidence_id: record.claim_id
         for record in records
         if record.kind != "abstention"
-        and record.passage_start == 0
-        and record.passage_end == record.source_size
-        and len(record.display_passage.encode("utf-8")) == record.source_size
+        and record.passage_end > record.passage_start
+        and len(record.display_passage.encode("utf-8"))
+        == record.passage_end - record.passage_start
         and hashlib.sha256(record.display_passage.encode("utf-8")).hexdigest()
         == record.passage_sha256
         and not (
-            record.kind.startswith("repository")
+            record.kind in {
+                "repository-list", "repository-search", "repository-history",
+            }
             and record.metadata.get("complete") is not True
         )
     }
@@ -684,7 +731,9 @@ def records_from_json(rows: Sequence[Mapping[str, Any]]) -> list[EvidenceRecord]
         for key in ("source_size", "passage_start", "passage_end"):
             if not isinstance(row.get(key), int) or isinstance(row[key], bool) or row[key] < 0:
                 raise EvidenceRequestError(f"persisted evidence {key} is malformed")
-        if row["passage_start"] > row["passage_end"] or row["passage_end"] > row["source_size"]:
+        if row["passage_start"] > row["passage_end"] \
+                or row["passage_end"] > row["source_size"] \
+                or row["passage_end"] - row["passage_start"] > MAX_PASSAGE_BYTES:
             raise EvidenceRequestError("persisted evidence passage bounds are malformed")
         if not isinstance(row.get("metadata"), dict):
             raise EvidenceRequestError("persisted evidence metadata is malformed")
@@ -829,6 +878,7 @@ def validate_cached_records(
     records: Sequence[EvidenceRecord], *, snapshot: PlanRepositorySnapshot,
     store: EvidenceStore, state: pc.ClaimState, high_stakes: bool = False,
     now: datetime | None = None, budget: EvidenceBudget | None = None,
+    external_source_policy: Sequence[Mapping[str, str]] = (),
 ) -> list[EvidenceRecord]:
     """Revalidate identities/freshness and stale every claim that depended on a miss."""
     clock = now or datetime.now(timezone.utc)
@@ -844,16 +894,16 @@ def validate_cached_records(
                 body = store.read(record.blob_digest, max_bytes=record.source_size)
                 if hashlib.sha256(body).hexdigest() != record.source_sha256:
                     raise EvidenceRequestError("cached evidence source hash mismatch")
-                passage = body[:MAX_PASSAGE_BYTES]
+                passage = body[record.passage_start:record.passage_end]
                 if (
                     record.source_size != len(body)
-                    or record.passage_start != 0
-                    or record.passage_end != len(passage)
+                    or record.passage_end - record.passage_start != len(passage)
                     or record.passage_sha256 != hashlib.sha256(passage).hexdigest()
                     or record.display_passage != passage.decode("utf-8", errors="replace")
                     or record.evidence_id != "e" + _evidence_identity(
                         record.claim_id, record.kind, record.source,
                         record.source_sha256, record.metadata,
+                        record.passage_start, record.passage_end,
                     )
                 ):
                     raise EvidenceRequestError("cached evidence derived fields are inconsistent")
@@ -879,7 +929,7 @@ def validate_cached_records(
                     raise EvidenceRequestError("repository list result changed")
             elif record.kind == "repository-search":
                 matches, scope = snapshot.search_literal_scoped(
-                    record.metadata["pattern"], paths=record.metadata["paths"],
+                    record.metadata["pattern"], paths=record.metadata["paths"] or None,
                     limit=record.metadata["limit"], debit_bytes=budget.debit_bytes,
                     remaining_bytes=lambda: budget.remaining_bytes,
                 )
@@ -941,6 +991,11 @@ def validate_cached_records(
                     if hashlib.sha256(snapshot.read_blob(path)).hexdigest() != expected:
                         raise EvidenceRequestError("empirical adapter input changed")
             elif record.kind == "external":
+                current_class = classify_external_source(
+                    record.metadata["final_url"], external_source_policy,
+                )
+                if record.metadata.get("source_class") != current_class:
+                    raise EvidenceRequestError("external source authority policy changed")
                 stamp = datetime.fromisoformat(str(record.metadata["retrieved_at"]))
                 if stamp.tzinfo is None:
                     stamp = stamp.replace(tzinfo=timezone.utc)

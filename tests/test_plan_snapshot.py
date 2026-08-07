@@ -211,8 +211,31 @@ def test_snapshot_file_and_total_byte_caps_fail_toward_unavailable(
     monkeypatch.setattr(ps, "MAX_FILE_BYTES", 16)
     with PlanRepositorySnapshot.create(repo, run_id="bounded") as snapshot:
         assert "large.bin" in snapshot.unavailable_paths
+        paths, complete = snapshot.list_tree_scoped(limit=200)
+        assert "large.bin" not in paths and complete is False
+        matches, scope = snapshot.search_literal_scoped("absent", paths=None, limit=10)
+        assert matches == [] and scope["complete"] is False
         with pytest.raises(SnapshotUnavailable, match="not present"):
             snapshot.read_blob("large.bin")
+
+
+def test_skip_worktree_file_is_preserved_from_the_index(
+    repo: Path,
+) -> None:
+    hidden = repo / "sparse-only.txt"
+    hidden.write_text("indexed sparse content\n")
+    subprocess.run(["git", "add", "sparse-only.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "add sparse file"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "update-index", "--skip-worktree", "sparse-only.txt"],
+        cwd=repo, check=True,
+    )
+    hidden.unlink()
+
+    with PlanRepositorySnapshot.create(repo, run_id="skip-worktree") as snapshot:
+        paths, complete = snapshot.list_tree_scoped(limit=200)
+        assert complete is True and "sparse-only.txt" in paths
+        assert snapshot.read_blob("sparse-only.txt") == b"indexed sparse content\n"
 
 
 def test_bounded_git_output_enforces_local_and_shared_budgets(repo: Path) -> None:
