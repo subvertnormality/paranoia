@@ -228,17 +228,40 @@ def test_semantically_truncated_source_is_never_authorization_eligible(
     kind: str, metadata: dict,
 ) -> None:
     digest = "a" * 64
+    passage_digest = hashlib.sha256(b"x").hexdigest()
     record = cv.EvidenceRecord(
         "e" + "1" * 32, "claim", kind, "source", digest, digest,
-        cv.MAX_PASSAGE_BYTES + 1, 0, cv.MAX_PASSAGE_BYTES, digest, "x", metadata,
+        cv.MAX_PASSAGE_BYTES + 1, 0, cv.MAX_PASSAGE_BYTES, passage_digest, "x", metadata,
     )
     assert cv.evidence_bindings([record]) == {}
 
     complete = cv.EvidenceRecord(
         "e" + "2" * 32, "claim", kind, "source", digest, digest, 1,
-        0, 1, digest, "x", metadata,
+        0, 1, passage_digest, "x", metadata,
     )
     assert cv.evidence_bindings([complete]) == {complete.evidence_id: "claim"}
+
+
+@pytest.mark.parametrize(
+    ("kind", "metadata"),
+    [
+        ("repository-blob", {"complete": True}),
+        ("empirical", {}),
+        ("external", {}),
+        ("supplied-artifact", {}),
+    ],
+)
+def test_lossy_non_utf8_source_is_never_authorization_eligible(
+    tmp_path: Path, kind: str, metadata: dict,
+) -> None:
+    store = EvidenceStore(tmp_path / "non-utf8-store")
+    store.begin("non-utf8-run")
+    record = cv._record(
+        store, "non-utf8-run", "claim", kind, "source", b"yes\xffno", metadata,
+    )
+    assert record.passage_end == record.source_size
+    assert "\ufffd" in record.display_passage
+    assert cv.evidence_bindings([record]) == {}
 
 
 def test_python_adapter_charges_input_bytes_to_the_shared_aggregate_budget(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -879,6 +880,76 @@ def test_tightening_independent_policy_invalidates_cache_and_reauthorizes(
     )
     claim = next(iter(pc.state_from_json("policy-plan", lineage.claim_state).claims.values()))
     assert claim.truth_authorization["status"] == "complete"
+
+
+def test_authorization_contract_upgrade_reruns_both_persisted_vendor_checks(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_checks = handlers._independent_checks
+    calls: list[tuple[str, ...]] = []
+
+    def complete_checks(event, **_kwargs):
+        digest = pc.event_digest(event)
+        ids = tuple(event.data.get("evidence_ids", []))
+        calls.append(ids)
+        return [
+            pc.VendorCheck("codex", "m1", digest, ids, True, "T1"),
+            pc.VendorCheck("claude", "m2", digest, ids, True, "T1"),
+        ]
+
+    monkeypatch.setattr(handlers, "_independent_checks", complete_checks)
+    lineage_id = "authorization-contract-upgrade"
+    args = {
+        "repo_path": str(repo),
+        "plan_text": "Use the existing greet function.\n",
+        "lineage": lineage_id, "round": 1, "independent_check": "require",
+    }
+    handlers.critique_plan(
+        args, engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+    state = pc.state_from_json(lineage_id, lineage.claim_state)
+    state.authorization_policy["version"] = 1
+    lineage.claim_state = pc.state_to_json(state)
+    cc.save_lineage(cc.default_state_root(), lineage)
+
+    calls.clear()
+    monkeypatch.setattr(handlers, "_independent_checks", original_checks)
+
+    class Primary(ClaimEngine):
+        name = "codex"
+
+    class Secondary:
+        name = "claude"
+        default_model = "secondary-model"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            self.calls += 1
+            return _review("CHECK: ACCEPT")
+
+    secondary = Secondary()
+    monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: secondary)
+    primary = Primary()
+    args["round"] = 2
+    out = handlers.critique_plan(
+        args, engine=primary, log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    assert secondary.calls > 0
+    assert any(
+        "independent text-only evidence auditor" in prompt
+        for prompt in primary.tool_less_prompts
+    )
+    assert "cache-hit" not in out and "CONVERGENCE: NOT-BLOCKED" in out
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T3", mode=cc.PLAN_MODE,
+    )
+    state = pc.state_from_json(lineage_id, lineage.claim_state)
+    assert state.authorization_policy["version"] == 2
 
 
 def test_unknown_persisted_audit_vendor_is_quarantined_before_cache_reuse(
@@ -1879,14 +1950,16 @@ def test_pending_dispute_resolution_deduplicates_vendor_provenance_on_replay(
     )
     first_digest = "a" * 64
     second_digest = "b" * 64
+    first_passage_digest = hashlib.sha256(b"x").hexdigest()
+    second_passage_digest = hashlib.sha256(b"y").hexdigest()
     records = [
         cv.EvidenceRecord(
             "e1", claim_id, "external", "https://example.com/one",
-            first_digest, first_digest, 1, 0, 1, first_digest, "x", {},
+            first_digest, first_digest, 1, 0, 1, first_passage_digest, "x", {},
         ),
         cv.EvidenceRecord(
             "e2", claim_id, "external", "https://example.com/two",
-            second_digest, second_digest, 1, 0, 1, second_digest, "y", {},
+            second_digest, second_digest, 1, 0, 1, second_passage_digest, "y", {},
         ),
     ]
     pc.apply_events(

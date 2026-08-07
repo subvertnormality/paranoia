@@ -536,6 +536,9 @@ def evidence_bindings(records: Sequence[EvidenceRecord]) -> dict[str, str]:
         if record.kind != "abstention"
         and record.passage_start == 0
         and record.passage_end == record.source_size
+        and len(record.display_passage.encode("utf-8")) == record.source_size
+        and hashlib.sha256(record.display_passage.encode("utf-8")).hexdigest()
+        == record.passage_sha256
         and not (
             record.kind.startswith("repository")
             and record.metadata.get("complete") is not True

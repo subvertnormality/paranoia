@@ -164,7 +164,9 @@ The 4 KiB display passage is also an authorization boundary for every evidence k
 Repository, empirical, external, and supplied records whose source extends beyond the
 exposed passage remain context-only; their IDs are absent from transition bindings. A
 planner must obtain a complete bounded source whose conclusion-changing bytes are all
-exposed before any verifier or auditor can authorize from it.
+exposed before any verifier or auditor can authorize from it. Eligibility also requires
+the displayed UTF-8 text to encode back to the exact passage bytes and hash. Sources that
+needed replacement decoding remain visible as context but cannot authorize a transition.
 
 Bounded `LIST_TREE`, `READ_BLOB`, `SEARCH_LITERAL`, and `HISTORY` records state whether the
 entire requested source scope is complete. A partial blob range or other truncated result
@@ -310,7 +312,10 @@ clears that pending event and marks the claim stale before replay can reinterpre
 against different bytes.
 
 The persisted authorization-policy tuple includes the independent-check mode, stakes
-classification, and policy version. Any change invalidates the zero-research cache. A
+classification, and policy version. Authorization contract version 2 requires actual
+complete-packet calls to both vendors. Version-1 lineage remains loadable only so every
+required completed or pending transition can be reblocked, stripped of old checks, and
+replayed through both vendors before migration is published. Any policy change invalidates the zero-research cache. A
 stricter policy immediately reblocks an authorization whose persisted provenance is no
 longer sufficient; it cannot inherit an earlier weak-policy `NOT-BLOCKED` result.
 

@@ -727,7 +727,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   supplied, and local bodies are sent as separate packets that must all be accepted, and
   authoring a transition never substitutes for that complete audit. The 4 KiB displayed
   passage is authorization-complete only when it covers the entire source; longer
-  repository, empirical, external, and supplied records remain context-only. Cached
+  repository, empirical, external, and supplied records remain context-only. Non-UTF-8
+  bytes that require lossy replacement decoding are likewise context-only. Authorization
+  contract version 2 reblocks and reruns required version-1 provenance through both actual
+  vendors before migration. Cached
   CAS/repository reads and model-visible evidence rendering share the round byte budget,
   including evidence resent for a register correction; the same auditor packet is debited
   separately before each vendor launch. A CAS or snapshot I/O failure blocks the round

@@ -756,7 +756,7 @@ def _critique_plan_verified(
             round_budget = cv.EvidenceBudget()
             high_stakes = _is_high_stakes(stakes, stakes_level)
             current_policy = {
-                "version": 1,
+                "version": 2,
                 "independent_check": independent_policy,
                 "high_stakes": high_stakes,
             }
@@ -769,7 +769,10 @@ def _critique_plan_verified(
                 == persisted_evidence_ids
             )
             persisted_policy = state.authorization_policy
-            _reblock_for_policy(state, evidence_records, current_policy)
+            _reblock_for_policy(
+                state, evidence_records, current_policy,
+                persisted_policy=state.authorization_policy,
+            )
             state.authorization_policy = current_policy
             state.evidence_records = cv.records_to_json(evidence_records)
             _resume_pending_authorizations(
@@ -1410,8 +1413,27 @@ def _reblock_for_policy(
     state: pc.ClaimState,
     records: list[cv.EvidenceRecord],
     policy: dict[str, Any],
+    *,
+    persisted_policy: dict[str, Any] | None = None,
 ) -> None:
     """Invalidate cached authorizations when the current policy is stricter."""
+    authorization_contract_changed = (
+        persisted_policy is not None
+        and persisted_policy.get("version") != policy["version"]
+    )
+    if authorization_contract_changed:
+        for claim in state.claims.values():
+            pending_event = claim.pending_transition
+            if pending_event is None:
+                continue
+            for slot in (
+                "truth_authorization", "bearing_authorization",
+                "dispute_authorization", "deferral_authorization",
+            ):
+                authorization = getattr(claim, slot)
+                if authorization and authorization.get("event") == pending_event:
+                    authorization["status"] = "pending"
+                    authorization["checks"] = []
     untrusted_ids = {
         record.evidence_id for record in records
         if record.kind in {"external", "supplied-artifact"}
@@ -1442,18 +1464,27 @@ def _reblock_for_policy(
                 "evidence_ids": list(ids),
                 "checks": [],
             }
-        if claim.status in {pc.VERIFIED, pc.CONTRADICTED} \
-                and not (claim.truth_authorization or {}).get("required"):
+        if claim.status in {pc.VERIFIED, pc.CONTRADICTED} and (
+            authorization_contract_changed
+            or not (claim.truth_authorization or {}).get("required")
+        ):
             claim.truth_authorization = pending_from(
                 claim.truth_authorization, claim.truth_evidence_ids
             )
-        if claim.bearing == pc.ADVISORY \
-                and not (claim.bearing_authorization or {}).get("required"):
+            if (claim.truth_authorization or {}).get("event", {}).get("op") \
+                    == "RESOLVE_DISPUTE":
+                claim.dispute_authorization = dict(claim.truth_authorization)
+        if claim.bearing == pc.ADVISORY and (
+            authorization_contract_changed
+            or not (claim.bearing_authorization or {}).get("required")
+        ):
             claim.bearing_authorization = pending_from(
                 claim.bearing_authorization, claim.bearing_evidence_ids
             )
-        if claim.status == pc.DEFERRED \
-                and not (claim.deferral_authorization or {}).get("required"):
+        if claim.status == pc.DEFERRED and (
+            authorization_contract_changed
+            or not (claim.deferral_authorization or {}).get("required")
+        ):
             claim.deferral_authorization = pending_from(
                 claim.deferral_authorization, []
             )
