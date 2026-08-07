@@ -605,6 +605,32 @@ def test_cleanup_failure_retains_plan_latch_and_evidence_journal(
     assert list((state_root / "evidence" / "journals").glob("*.json"))
 
 
+def test_invalid_recovery_manifest_settles_as_recoverable_blocked_debt(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def invalid_journal(cls, *_args, **_kwargs):
+        raise handlers.EvidenceStoreError("evidence journal has an invalid schema")
+
+    monkeypatch.setattr(
+        handlers.EvidenceStore, "_read_journal", classmethod(invalid_journal),
+    )
+    lineage_id = "invalid-recovery-manifest-plan"
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": lineage_id, "round": 1,
+        },
+        engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "invalid schema" in out and "CONVERGENCE: BLOCKED" in out
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+    state = pc.state_from_json(lineage_id, lineage.claim_state)
+    assert state.debt and "invalid schema" in state.debt["reason"]
+    assert not (cc.lineage_dir(cc.default_state_root()) / f"{lineage_id}.pending").exists()
+
+
 def test_structural_role_receives_plan_bytes_only_as_escaped_span_data(
     repo: Path, tmp_path: Path,
 ) -> None:

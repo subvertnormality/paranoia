@@ -30,36 +30,63 @@ def test_cleanup_timeout_is_normalized_as_ambiguous_cleanup_failure(
     repo: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     snap = PlanRepositorySnapshot.create(repo, run_id="cleanup-timeout")
-    original = ps._run
+    original = ps._delete_owned_ref
 
-    def timeout(*_args, **_kwargs):
-        raise SnapshotUnavailable("git rev-parse exceeded hard deadline")
+    def timeout(*_args, **_kwargs) -> None:
+        raise SnapshotUnavailable("ref cleanup exceeded hard deadline")
 
-    monkeypatch.setattr(ps, "_run", timeout)
-    with pytest.raises(ps.SnapshotCleanupError, match="cleanup failed ambiguously"):
+    monkeypatch.setattr(ps, "_delete_owned_ref", timeout)
+    with pytest.raises(ps.SnapshotCleanupError, match="could not delete temporary snapshot refs"):
         snap.close()
     assert not snap._closed
-    monkeypatch.setattr(ps, "_run", original)
+    monkeypatch.setattr(ps, "_delete_owned_ref", original)
     snap.close()
 
 
 def test_cleanup_verification_nonzero_is_not_mistaken_for_an_absent_ref(
-    repo: Path, monkeypatch: pytest.MonkeyPatch,
+    repo: Path,
 ) -> None:
     snap = PlanRepositorySnapshot.create(repo, run_id="cleanup-verify-failure")
-    original = ps._run
-
-    def fail_verification(path, args, **kwargs):
-        if args[0] == "for-each-ref":
-            return subprocess.CompletedProcess(args, 1, b"", b"verification failed")
-        return original(path, args, **kwargs)
-
-    monkeypatch.setattr(ps, "_run", fail_verification)
-    with pytest.raises(ps.SnapshotCleanupError, match="could not verify ownership"):
+    ref_path = repo / ".git" / snap.wrapper_ref
+    original = ref_path.read_bytes()
+    ref_path.write_text("0" * 40 + "\n")
+    with pytest.raises(ps.SnapshotCleanupError, match="changed owner"):
         snap.close()
     assert not snap._closed
-    monkeypatch.setattr(ps, "_run", original)
+    ref_path.write_bytes(original)
     snap.close()
+
+
+def test_wait_timeout_kills_and_reaps_a_child_that_ignores_terminate() -> None:
+    class DefiantProcess:
+        def __init__(self) -> None:
+            self.terminated = False
+            self.killed = False
+            self.wait_timeouts: list[float | None] = []
+
+        def poll(self):
+            return None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self, timeout=None):
+            self.wait_timeouts.append(timeout)
+            if not self.killed:
+                raise subprocess.TimeoutExpired("git", timeout)
+            return -9
+
+    proc = DefiantProcess()
+    with pytest.raises(SnapshotUnavailable, match="exceeded hard deadline"):
+        ps._wait_and_reap(
+            proc, deadline=time.monotonic() + 0.01, terminate=True,
+            context="test child",
+        )
+    assert proc.terminated and proc.killed
+    assert all(timeout is not None for timeout in proc.wait_timeouts)
 
 
 def test_ignored_files_are_disclosed_but_not_readable(repo: Path) -> None:
@@ -136,6 +163,53 @@ def test_symlinked_repository_config_fails_before_git_runs(
     config.symlink_to(external)
     with pytest.raises(SnapshotUnavailable, match="small regular file"):
         PlanRepositorySnapshot.create(repo, run_id="symlinked-config")
+
+
+@pytest.mark.parametrize("kind", ["ancestor", "loose-ref"])
+def test_repository_ref_symlinks_are_rejected_without_touching_their_targets(
+    repo: Path, tmp_path: Path, kind: str,
+) -> None:
+    external = tmp_path / "external-refs"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_text("unchanged")
+    if kind == "ancestor":
+        (repo / ".git" / "refs" / "paranoia").symlink_to(
+            external, target_is_directory=True,
+        )
+    else:
+        target = external / "external-ref"
+        target.write_text(subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+            capture_output=True, text=True,
+        ).stdout)
+        (repo / ".git" / "refs" / "heads" / "external").symlink_to(target)
+    with pytest.raises(SnapshotUnavailable, match="ref path is unsafe"):
+        PlanRepositorySnapshot.create(repo, run_id=f"symlink-{kind}")
+    assert sentinel.read_text() == "unchanged"
+    assert sorted(path.name for path in external.iterdir()) == (
+        ["sentinel"] if kind == "ancestor" else ["external-ref", "sentinel"]
+    )
+
+
+def test_cleanup_does_not_follow_a_replaced_pin_directory(
+    repo: Path, tmp_path: Path,
+) -> None:
+    snap = PlanRepositorySnapshot.create(repo, run_id="cleanup-ref-ancestor")
+    token_dir = repo / ".git" / snap.wrapper_ref.rsplit("/", 1)[0]
+    saved = token_dir.with_name(token_dir.name + "-saved")
+    token_dir.rename(saved)
+    external = tmp_path / "external-cleanup"
+    external.mkdir()
+    sentinel = external / "wrapper"
+    sentinel.write_text(snap.commit_id + "\n")
+    token_dir.symlink_to(external, target_is_directory=True)
+    with pytest.raises(ps.SnapshotCleanupError, match="ref directory is unsafe"):
+        snap.close()
+    assert sentinel.read_text() == snap.commit_id + "\n"
+    token_dir.unlink()
+    saved.rename(token_dir)
+    snap.close()
 
 
 def test_history_reads_only_the_initial_server_pinned_ref_map(repo: Path) -> None:

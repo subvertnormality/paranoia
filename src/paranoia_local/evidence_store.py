@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -18,6 +19,9 @@ DEFAULT_LINEAGE_CAP = 100 << 20
 DEFAULT_GLOBAL_CAP = 1 << 30
 DEFAULT_ORPHAN_TTL = 7 * 24 * 60 * 60
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+MAX_MANIFEST_BYTES = 8 << 20
+MAX_MANIFEST_DIGESTS = 100_000
+MAX_SNAPSHOT_REFS = 4096
 
 
 class EvidenceStoreError(RuntimeError):
@@ -33,6 +37,16 @@ def _name(value: str) -> str:
     if rendered != value:
         rendered += "-" + hashlib.sha256(value.encode()).hexdigest()[:10]
     return rendered
+
+
+def _identity(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > 512 or "\0" in value:
+        raise EvidenceStoreError(f"evidence manifest {field} is invalid")
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise EvidenceStoreError(f"evidence manifest {field} is invalid") from exc
+    return value
 
 
 class EvidenceStore:
@@ -71,9 +85,11 @@ class EvidenceStore:
                     pass
 
     def _journal(self, run_id: str) -> Path:
+        _identity(run_id, field="run_id")
         return self.journals / f"{_name(run_id)}.json"
 
     def _root(self, lineage_id: str) -> Path:
+        _identity(lineage_id, field="lineage_id")
         return self.roots / f"{_name(lineage_id)}.json"
 
     def begin(self, run_id: str, *, metadata: dict[str, Any] | None = None,
@@ -83,12 +99,14 @@ class EvidenceStore:
             path = self._journal(run_id)
             if path.exists():
                 raise EvidenceStoreError(f"in-flight journal already exists for {run_id}")
-            self._atomic_json(path, {
+            manifest = {
                 "run_id": run_id,
                 "digests": [],
                 "created_at": time.time() if now is None else now,
                 "metadata": metadata or {},
-            })
+            }
+            self._validate_journal(manifest, path=path, expected_run_id=run_id)
+            self._atomic_json(path, manifest)
 
     def stage(self, run_id: str, data: bytes, *, now: float | None = None) -> str:
         digest = hashlib.sha256(data).hexdigest()
@@ -105,15 +123,17 @@ class EvidenceStore:
             elif self.read(digest) != data:
                 raise EvidenceStoreError("content-addressed evidence hash collision")
             journal_path = self._journal(run_id)
-            journal = self._read_manifest(
+            journal = self._read_journal(
                 journal_path,
                 missing={"run_id": run_id, "digests": [], "created_at": time.time(),
-                         "metadata": {}},
+                         "metadata": {}}, expected_run_id=run_id,
             )
-            if journal.get("run_id") != run_id:
-                raise EvidenceStoreError("in-flight journal run identity mismatch")
-            digests = list(dict.fromkeys([*journal.get("digests", []), digest]))
-            self._atomic_json(journal_path, {**journal, "run_id": run_id, "digests": digests})
+            digests = list(journal["digests"])
+            if digest not in digests:
+                digests.append(digest)
+            updated = {**journal, "run_id": run_id, "digests": digests}
+            self._validate_journal(updated, path=journal_path, expected_run_id=run_id)
+            self._atomic_json(journal_path, updated)
         return digest
 
     def read(self, digest: str, *, max_bytes: int | None = None) -> bytes:
@@ -174,13 +194,16 @@ class EvidenceStore:
         lineage latch. Callers retain the latch only for ambiguous publication.
         """
         with self.locked():
-            journal = self._read_manifest(self._journal(run_id))
-            staged = set(journal.get("digests", []))
-            requested = list(dict.fromkeys(digests))
-            existing = self._read_manifest(
-                self._root(lineage_id), missing={"lineage_id": lineage_id, "digests": []}
+            journal = self._read_journal(
+                self._journal(run_id), expected_run_id=run_id,
             )
-            previously_rooted = set(existing.get("digests", []))
+            staged = set(journal["digests"])
+            requested = list(dict.fromkeys(digests))
+            existing = self._read_root_manifest(
+                self._root(lineage_id), expected_lineage_id=lineage_id,
+                missing={"lineage_id": lineage_id, "run_id": run_id, "digests": []},
+            )
+            previously_rooted = set(existing["digests"])
             if any(digest not in staged and digest not in previously_rooted for digest in requested):
                 raise EvidenceStoreError(
                     "cannot adopt evidence outside the journal or prior lineage root"
@@ -192,9 +215,14 @@ class EvidenceStore:
             if size > self.lineage_cap:
                 raise EvidenceStoreError("lineage evidence cap would be exceeded")
             candidate = self.roots / f"{_name(lineage_id)}.candidate-{_name(run_id)}.json"
-            self._atomic_json(candidate, {
-                "lineage_id": lineage_id, "digests": roots,
-            })
+            root_manifest = {
+                "lineage_id": lineage_id, "run_id": run_id, "digests": roots,
+            }
+            self._validate_root(
+                root_manifest, path=candidate, expected_lineage_id=lineage_id,
+                expected_run_id=run_id, candidate=True,
+            )
+            self._atomic_json(candidate, root_manifest)
             try:
                 state_writer()
             except BaseException as exc:
@@ -230,12 +258,19 @@ class EvidenceStore:
     def quarantine(self, lineage_id: str) -> None:
         """Keep its last strict root and record that only repair/abandon may remove it."""
         with self.locked():
-            root = self._read_manifest(self._root(lineage_id))
-            self._atomic_json(self.quarantine_dir / f"{_name(lineage_id)}.json", {
+            root = self._read_root_manifest(
+                self._root(lineage_id), expected_lineage_id=lineage_id,
+            )
+            quarantine_path = self.quarantine_dir / f"{_name(lineage_id)}.json"
+            quarantine = {
                 "lineage_id": lineage_id, "root_digest": hashlib.sha256(
                     json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
                 ).hexdigest(),
-            })
+            }
+            self._validate_quarantine(
+                quarantine, path=quarantine_path, expected_lineage_id=lineage_id,
+            )
+            self._atomic_json(quarantine_path, quarantine)
 
     def gc(self, *, now: float | None = None) -> list[str]:
         clock = time.time() if now is None else now
@@ -243,10 +278,15 @@ class EvidenceStore:
             marked: set[str] = set()
             # A malformed manifest aborts the sweep. Treating it as empty is the unsafe
             # quarantine bug this store exists to prevent.
-            for directory in (self.roots, self.journals):
-                if directory.exists():
-                    for manifest in directory.glob("*.json"):
-                        marked.update(self._read_manifest(manifest).get("digests", []))
+            if self.roots.exists():
+                for manifest in self.roots.glob("*.json"):
+                    marked.update(self._read_root_manifest(manifest)["digests"])
+            if self.journals.exists():
+                for manifest in self.journals.glob("*.json"):
+                    marked.update(self._read_journal(manifest)["digests"])
+            if self.quarantine_dir.exists():
+                for manifest in self.quarantine_dir.glob("*.json"):
+                    self._read_quarantine(manifest)
             removed: list[str] = []
             if not self.blobs.exists():
                 return removed
@@ -291,19 +331,186 @@ class EvidenceStore:
         cls._atomic_bytes(path, json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
     @staticmethod
-    def _read_manifest(path: Path, *, missing: dict[str, Any] | None = None) -> dict[str, Any]:
-        if not path.exists() and missing is not None:
-            return missing
+    def _read_json_manifest(
+        path: Path, *, missing: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        fd: int | None = None
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            before = path.lstat()
+            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_MANIFEST_BYTES:
+                raise EvidenceStoreError(f"evidence manifest {path} is unsafe or oversized")
+            fd = os.open(
+                path,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            )
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode) \
+                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) \
+                    or opened.st_size > MAX_MANIFEST_BYTES:
+                raise EvidenceStoreError(f"evidence manifest {path} changed while opening")
+            chunks = bytearray()
+            while len(chunks) <= MAX_MANIFEST_BYTES:
+                chunk = os.read(fd, min(65536, MAX_MANIFEST_BYTES + 1 - len(chunks)))
+                if not chunk:
+                    break
+                chunks.extend(chunk)
+            if len(chunks) > MAX_MANIFEST_BYTES:
+                raise EvidenceStoreError(f"evidence manifest {path} exceeds its byte cap")
+            raw = json.loads(bytes(chunks).decode("utf-8", errors="strict"))
+        except FileNotFoundError:
+            if missing is not None:
+                return missing
+            raise EvidenceStoreError(f"evidence manifest {path} is unavailable") from None
+        except EvidenceStoreError:
+            raise
         except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
             raise EvidenceStoreError(f"evidence manifest {path} is unavailable: {exc}") from exc
-        if not isinstance(raw, dict) or not isinstance(raw.get("digests"), list):
+        finally:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        if not isinstance(raw, dict):
             raise EvidenceStoreError(f"evidence manifest {path} is malformed")
+        return raw
+
+    @staticmethod
+    def _validate_digests(raw: object, *, path: Path) -> list[str]:
+        if not isinstance(raw, list) or len(raw) > MAX_MANIFEST_DIGESTS:
+            raise EvidenceStoreError(f"evidence manifest {path} has invalid digests")
         if any(not isinstance(item, str) or not re.fullmatch(r"[0-9a-f]{64}", item)
-               for item in raw["digests"]):
+               for item in raw) or len(set(raw)) != len(raw):
             raise EvidenceStoreError(f"evidence manifest {path} has invalid digests")
         return raw
+
+    @staticmethod
+    def _validate_metadata(raw: object, *, path: Path) -> dict[str, Any]:
+        if not isinstance(raw, dict):
+            raise EvidenceStoreError(f"evidence manifest {path} has invalid metadata")
+        if not raw:
+            return raw
+        if set(raw) != {"repo", "lineage", "snapshot_refs"}:
+            raise EvidenceStoreError(f"evidence manifest {path} has invalid metadata")
+        repo = raw["repo"]
+        lineage = raw["lineage"]
+        refs = raw["snapshot_refs"]
+        if not isinstance(repo, str) or not repo or len(repo) > 4096 or "\0" in repo:
+            raise EvidenceStoreError(f"evidence manifest {path} has invalid repository metadata")
+        try:
+            repo.encode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise EvidenceStoreError(
+                f"evidence manifest {path} has invalid repository metadata"
+            ) from exc
+        _identity(lineage, field="metadata.lineage")
+        if not isinstance(refs, list) or len(refs) > MAX_SNAPSHOT_REFS:
+            raise EvidenceStoreError(f"evidence manifest {path} has invalid snapshot refs")
+        names: set[str] = set()
+        for ref in refs:
+            if not isinstance(ref, dict) or set(ref) != {"name", "oid"}:
+                raise EvidenceStoreError(f"evidence manifest {path} has invalid snapshot refs")
+            name, oid = ref["name"], ref["oid"]
+            if not isinstance(name, str) or not name.startswith(
+                "refs/paranoia/plan-snapshots/"
+            ) or len(name) > 1024 or "\0" in name or name in names:
+                raise EvidenceStoreError(f"evidence manifest {path} has invalid snapshot refs")
+            try:
+                name.encode("utf-8", errors="strict")
+            except UnicodeError as exc:
+                raise EvidenceStoreError(
+                    f"evidence manifest {path} has invalid snapshot refs"
+                ) from exc
+            if not isinstance(oid, str) or not re.fullmatch(
+                r"(?:[0-9a-f]{40}|[0-9a-f]{64})", oid
+            ):
+                raise EvidenceStoreError(f"evidence manifest {path} has invalid snapshot refs")
+            names.add(name)
+        return raw
+
+    @classmethod
+    def _validate_journal(
+        cls, raw: dict[str, Any], *, path: Path, expected_run_id: str | None = None,
+    ) -> dict[str, Any]:
+        if set(raw) != {"run_id", "digests", "created_at", "metadata"}:
+            raise EvidenceStoreError(f"evidence journal {path} has an invalid schema")
+        run_id = _identity(raw["run_id"], field="run_id")
+        if expected_run_id is not None and run_id != expected_run_id:
+            raise EvidenceStoreError("in-flight journal run identity mismatch")
+        if path.name != f"{_name(run_id)}.json":
+            raise EvidenceStoreError(f"evidence journal {path} has a filename identity mismatch")
+        created_at = raw["created_at"]
+        if isinstance(created_at, bool) or not isinstance(created_at, (int, float)) \
+                or not math.isfinite(created_at) or created_at < 0:
+            raise EvidenceStoreError(f"evidence journal {path} has an invalid timestamp")
+        cls._validate_digests(raw["digests"], path=path)
+        cls._validate_metadata(raw["metadata"], path=path)
+        return raw
+
+    @classmethod
+    def _read_journal(
+        cls, path: Path, *, missing: dict[str, Any] | None = None,
+        expected_run_id: str | None = None,
+    ) -> dict[str, Any]:
+        raw = cls._read_json_manifest(path, missing=missing)
+        return cls._validate_journal(raw, path=path, expected_run_id=expected_run_id)
+
+    @classmethod
+    def _validate_root(
+        cls, raw: dict[str, Any], *, path: Path,
+        expected_lineage_id: str | None = None, expected_run_id: str | None = None,
+        candidate: bool | None = None,
+    ) -> dict[str, Any]:
+        if set(raw) != {"lineage_id", "run_id", "digests"}:
+            raise EvidenceStoreError(f"evidence root {path} has an invalid schema")
+        lineage_id = _identity(raw["lineage_id"], field="lineage_id")
+        run_id = _identity(raw["run_id"], field="run_id")
+        if expected_lineage_id is not None and lineage_id != expected_lineage_id:
+            raise EvidenceStoreError("evidence root lineage identity mismatch")
+        if expected_run_id is not None and run_id != expected_run_id:
+            raise EvidenceStoreError("evidence root run identity mismatch")
+        if candidate is None:
+            is_candidate = path.name != f"{_name(lineage_id)}.json"
+        else:
+            is_candidate = candidate
+        expected_name = (
+            f"{_name(lineage_id)}.candidate-{_name(run_id)}.json"
+            if is_candidate else f"{_name(lineage_id)}.json"
+        )
+        if path.name != expected_name:
+            raise EvidenceStoreError(f"evidence root {path} has a filename identity mismatch")
+        cls._validate_digests(raw["digests"], path=path)
+        return raw
+
+    @classmethod
+    def _read_root_manifest(
+        cls, path: Path, *, missing: dict[str, Any] | None = None,
+        expected_lineage_id: str | None = None,
+    ) -> dict[str, Any]:
+        raw = cls._read_json_manifest(path, missing=missing)
+        return cls._validate_root(
+            raw, path=path, expected_lineage_id=expected_lineage_id,
+        )
+
+    @staticmethod
+    def _validate_quarantine(
+        raw: dict[str, Any], *, path: Path, expected_lineage_id: str | None = None,
+    ) -> dict[str, Any]:
+        if set(raw) != {"lineage_id", "root_digest"}:
+            raise EvidenceStoreError(f"evidence quarantine {path} has an invalid schema")
+        lineage_id = _identity(raw["lineage_id"], field="lineage_id")
+        if expected_lineage_id is not None and lineage_id != expected_lineage_id:
+            raise EvidenceStoreError("evidence quarantine lineage identity mismatch")
+        if path.name != f"{_name(lineage_id)}.json" or not isinstance(
+            raw["root_digest"], str
+        ) or not re.fullmatch(r"[0-9a-f]{64}", raw["root_digest"]):
+            raise EvidenceStoreError(f"evidence quarantine {path} is malformed")
+        return raw
+
+    @classmethod
+    def _read_quarantine(cls, path: Path) -> dict[str, Any]:
+        return cls._validate_quarantine(cls._read_json_manifest(path), path=path)
 
     @staticmethod
     def _fsync_dir(path: Path) -> None:

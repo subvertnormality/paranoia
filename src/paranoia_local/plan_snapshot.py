@@ -16,6 +16,7 @@ from typing import Callable
 
 MAX_PINNED_REFS = 1024
 MAX_DISCOVERED_REFS = 4096
+MAX_REF_TREE_ENTRIES = 8192
 MAX_SNAPSHOT_PATHS = 100_000
 MAX_DISCOVERY_BYTES = 32 << 20
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -47,6 +48,7 @@ _SNAPSHOT_IDENTITY = {
     "GIT_COMMITTER_DATE": "2000-01-01T00:00:00 +0000",
 }
 GIT_TIMEOUT_SECONDS = 30.0
+PROCESS_REAP_SECONDS = 2.0
 
 
 class SnapshotUnavailable(RuntimeError):
@@ -109,16 +111,16 @@ def _run_bounded(
             output.extend(chunk)
             if len(output) > max_bytes:
                 raise SnapshotUnavailable("bounded Git output exceeds byte cap")
-        if output.count(b"\0") >= stop_after_nuls:
-            proc.terminate()
-        returncode = proc.wait(timeout=10)
+        stopped_early = output.count(b"\0") >= stop_after_nuls
+        returncode = _wait_and_reap(
+            proc, deadline=deadline, terminate=stopped_early,
+            context="bounded Git command",
+        )
         if returncode not in {0, -15}:
             raise SnapshotUnavailable("bounded Git command failed")
         return bytes(output)
     finally:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
+        _kill_and_reap(proc, context="bounded Git command")
 
 
 def _run_bounded_records(
@@ -147,6 +149,55 @@ def _read_deadline(pipe: object, size: int, deadline: float) -> bytes:
     if remaining <= 0 or not select.select([pipe], [], [], remaining)[0]:
         raise SnapshotUnavailable("Git streaming read exceeded hard deadline")
     return os.read(pipe.fileno(), size)  # type: ignore[attr-defined]
+
+
+def _kill_and_reap(proc: subprocess.Popen[bytes], *, context: str) -> None:
+    """Bound cleanup even when a child ignores termination or wait is interrupted."""
+    if proc.poll() is not None:
+        return
+    kill_error: OSError | None = None
+    try:
+        proc.kill()
+    except ProcessLookupError:
+        pass
+    except OSError as exc:
+        kill_error = exc
+    try:
+        proc.wait(timeout=PROCESS_REAP_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise SnapshotUnavailable(f"{context} could not be reaped after kill") from exc
+    except OSError as exc:
+        raise SnapshotUnavailable(f"{context} could not be reaped: {exc}") from exc
+    if kill_error is not None:
+        raise SnapshotUnavailable(
+            f"{context} could not be killed: {kill_error}"
+        ) from kill_error
+
+
+def _wait_and_reap(
+    proc: subprocess.Popen[bytes], *, deadline: float, terminate: bool, context: str,
+) -> int:
+    """Wait only to the command deadline, then kill and reap under a second hard cap."""
+    if terminate and proc.poll() is None:
+        try:
+            proc.terminate()
+        except ProcessLookupError:
+            pass
+        except OSError as exc:
+            _kill_and_reap(proc, context=context)
+            raise SnapshotUnavailable(f"{context} could not be terminated: {exc}") from exc
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        _kill_and_reap(proc, context=context)
+        raise SnapshotUnavailable(f"{context} exceeded hard deadline")
+    try:
+        return proc.wait(timeout=remaining)
+    except subprocess.TimeoutExpired as exc:
+        _kill_and_reap(proc, context=context)
+        raise SnapshotUnavailable(f"{context} exceeded hard deadline") from exc
+    except OSError as exc:
+        _kill_and_reap(proc, context=context)
+        raise SnapshotUnavailable(f"{context} wait failed: {exc}") from exc
 
 
 def _read_small_regular(
@@ -197,6 +248,279 @@ def _read_small_regular(
     finally:
         if fd is not None:
             os.close(fd)
+
+
+def _open_directory(path: Path) -> int:
+    """Open an existing real directory and reject replacement with a link."""
+    try:
+        before = path.lstat()
+        if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+            raise SnapshotUnavailable(f"repository directory is unsafe: {path}")
+        fd = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        opened = os.fstat(fd)
+        if not stat.S_ISDIR(opened.st_mode) \
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            os.close(fd)
+            raise SnapshotUnavailable(f"repository directory changed while opening: {path}")
+        return fd
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"repository directory is unavailable at {path}: {exc}") from exc
+
+
+def _open_child_directory(parent_fd: int, name: str, *, create: bool) -> int:
+    """Open one fd-relative component without following a supplied link."""
+    if not name or name in {".", ".."} or "/" in name or "\0" in name:
+        raise SnapshotUnavailable("repository ref directory name is malformed")
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        if not create:
+            raise
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise SnapshotUnavailable(
+                f"could not create private ref directory {name!r}: {exc}"
+            ) from exc
+    except OSError as exc:
+        raise SnapshotUnavailable(f"could not inspect ref directory {name!r}: {exc}") from exc
+    if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+        raise SnapshotUnavailable(f"repository ref directory is unsafe: {name!r}")
+    try:
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        opened = os.fstat(fd)
+        if not stat.S_ISDIR(opened.st_mode) \
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            os.close(fd)
+            raise SnapshotUnavailable(f"repository ref directory changed: {name!r}")
+        return fd
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"could not open ref directory {name!r}: {exc}") from exc
+
+
+def _open_refs_root(common: Path, *, create: bool) -> int:
+    common_fd = _open_directory(common)
+    try:
+        return _open_child_directory(common_fd, "refs", create=create)
+    finally:
+        os.close(common_fd)
+
+
+def _read_small_regular_at(
+    parent_fd: int, name: str, *, max_bytes: int = 4096,
+) -> bytes:
+    if not name or name in {".", ".."} or "/" in name or "\0" in name:
+        raise SnapshotUnavailable("repository ref filename is malformed")
+    try:
+        before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > max_bytes:
+            raise SnapshotUnavailable(f"repository ref is unsafe or oversized: {name!r}")
+        fd = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=parent_fd,
+        )
+        try:
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode) \
+                    or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) \
+                    or opened.st_size > max_bytes:
+                raise SnapshotUnavailable(f"repository ref changed while opening: {name!r}")
+            data = bytearray()
+            while len(data) <= max_bytes:
+                chunk = os.read(fd, min(4096, max_bytes + 1 - len(data)))
+                if not chunk:
+                    break
+                data.extend(chunk)
+            if len(data) > max_bytes:
+                raise SnapshotUnavailable(f"repository ref exceeds byte cap: {name!r}")
+            return bytes(data)
+        finally:
+            os.close(fd)
+    except FileNotFoundError:
+        raise
+    except SnapshotUnavailable:
+        raise
+    except OSError as exc:
+        raise SnapshotUnavailable(f"repository ref is unavailable at {name!r}: {exc}") from exc
+
+
+def _copy_loose_refs(common: Path, destination: Path) -> None:
+    """Materialize supplied loose refs without following any tree component."""
+    destination.mkdir(mode=0o700)
+    root_fd = _open_refs_root(common, create=False)
+    entries = 0
+    copied_bytes = 0
+
+    def copy_directory(source_fd: int, target: Path, depth: int) -> None:
+        nonlocal entries, copied_bytes
+        if depth > 64:
+            raise SnapshotUnavailable("repository ref tree exceeds depth cap")
+        try:
+            names = sorted(os.listdir(source_fd), key=os.fsencode)
+        except OSError as exc:
+            raise SnapshotUnavailable(f"could not enumerate repository refs: {exc}") from exc
+        for name in names:
+            entries += 1
+            if entries > MAX_REF_TREE_ENTRIES:
+                raise SnapshotUnavailable("repository ref tree exceeds entry cap")
+            try:
+                info = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise SnapshotUnavailable(f"could not inspect repository ref {name!r}: {exc}") from exc
+            if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+                child_fd = _open_child_directory(source_fd, name, create=False)
+                child_target = target / name
+                child_target.mkdir(mode=0o700)
+                try:
+                    copy_directory(child_fd, child_target, depth + 1)
+                finally:
+                    os.close(child_fd)
+                continue
+            if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
+                raise SnapshotUnavailable(f"repository ref path is unsafe: {name!r}")
+            data = _read_small_regular_at(source_fd, name)
+            copied_bytes += len(data)
+            if copied_bytes > MAX_DISCOVERY_BYTES:
+                raise SnapshotUnavailable("repository loose refs exceed byte cap")
+            (target / name).write_bytes(data)
+
+    try:
+        copy_directory(root_fd, destination, 0)
+    finally:
+        os.close(root_fd)
+
+
+def _ref_parts(name: str) -> tuple[str, ...]:
+    parts = tuple(name.split("/"))
+    if len(parts) < 2 or parts[0] != "refs" or any(
+        not part or part in {".", ".."} or "\0" in part for part in parts
+    ):
+        raise SnapshotUnavailable("temporary ref name is malformed")
+    return parts[1:]
+
+
+def _write_owned_ref(common: Path, name: str, oid: str) -> None:
+    parts = _ref_parts(name)
+    if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", oid):
+        raise SnapshotUnavailable("temporary ref object identity is malformed")
+    fd = _open_refs_root(common, create=True)
+    try:
+        for component in parts[:-1]:
+            child = _open_child_directory(fd, component, create=True)
+            os.close(fd)
+            fd = child
+        flags = (
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            ref_fd = os.open(parts[-1], flags, 0o600, dir_fd=fd)
+            try:
+                payload = (oid + "\n").encode("ascii")
+                written = 0
+                while written < len(payload):
+                    written += os.write(ref_fd, payload[written:])
+                os.fsync(ref_fd)
+            finally:
+                os.close(ref_fd)
+            os.fsync(fd)
+        except FileExistsError as exc:
+            raise SnapshotUnavailable(f"temporary ref already exists: {name}") from exc
+        except OSError as exc:
+            raise SnapshotUnavailable(f"could not publish temporary ref {name}: {exc}") from exc
+    finally:
+        os.close(fd)
+
+
+def _read_owned_ref(common: Path, name: str) -> str | None:
+    parts = _ref_parts(name)
+    fd = _open_refs_root(common, create=False)
+    try:
+        for component in parts[:-1]:
+            try:
+                child = _open_child_directory(fd, component, create=False)
+            except FileNotFoundError:
+                return None
+            os.close(fd)
+            fd = child
+        try:
+            data = _read_small_regular_at(fd, parts[-1])
+        except FileNotFoundError:
+            return None
+        try:
+            return data.decode("ascii", errors="strict").strip()
+        except UnicodeError as exc:
+            raise SnapshotUnavailable(f"temporary ref {name} is malformed") from exc
+    finally:
+        os.close(fd)
+
+
+def _delete_owned_ref(common: Path, name: str, oid: str) -> None:
+    parts = _ref_parts(name)
+    fd = _open_refs_root(common, create=False)
+    try:
+        for component in parts[:-1]:
+            try:
+                child = _open_child_directory(fd, component, create=False)
+            except FileNotFoundError:
+                return
+            os.close(fd)
+            fd = child
+        try:
+            current = _read_small_regular_at(fd, parts[-1]).decode(
+                "ascii", errors="strict"
+            ).strip()
+        except FileNotFoundError:
+            return
+        except UnicodeError as exc:
+            raise SnapshotCleanupError(f"temporary ref {name} is malformed") from exc
+        if current != oid:
+            raise SnapshotCleanupError(f"temporary ref {name} changed owner")
+        try:
+            os.unlink(parts[-1], dir_fd=fd)
+            os.fsync(fd)
+        except OSError as exc:
+            raise SnapshotCleanupError(f"could not delete temporary ref {name}: {exc}") from exc
+    finally:
+        os.close(fd)
+
+
+def _publish_owned_refs(common: Path, refs: list[tuple[str, str]]) -> None:
+    created: list[tuple[str, str]] = []
+    try:
+        for name, oid in refs:
+            _write_owned_ref(common, name, oid)
+            created.append((name, oid))
+    except Exception as exc:
+        failures: list[str] = []
+        for name, oid in reversed(created):
+            try:
+                _delete_owned_ref(common, name, oid)
+            except SnapshotUnavailable as cleanup:
+                failures.append(str(cleanup))
+        if failures:
+            raise SnapshotCleanupError(
+                "temporary-ref publication failed and rollback was incomplete: "
+                + "; ".join(failures)
+            ) from exc
+        raise
 
 
 def _ref_token(run_id: str) -> str:
@@ -276,11 +600,7 @@ def _create_git_control(repo: Path) -> _GitControl:
             data = _read_small_regular(source, max_bytes=cap, missing_ok=True)
             if data:
                 (directory / name).write_bytes(data)
-        refs = common / "refs"
-        refs_info = refs.lstat()
-        if not stat.S_ISDIR(refs_info.st_mode) or stat.S_ISLNK(refs_info.st_mode):
-            raise SnapshotUnavailable("repository refs directory is outside the approved boundary")
-        os.symlink(refs, directory / "refs", target_is_directory=True)
+        _copy_loose_refs(common, directory / "refs")
         environment = {
             "GIT_DIR": str(directory),
             "GIT_WORK_TREE": str(repo),
@@ -305,6 +625,7 @@ class PlanRepositorySnapshot:
     unavailable_paths: tuple[str, ...]
     _git_env: dict[str, str] = field(default_factory=dict, repr=False)
     _control_dir: Path | None = field(default=None, repr=False)
+    _common_dir: Path | None = field(default=None, repr=False)
     _owned_refs: list[tuple[str, str]] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -383,10 +704,27 @@ class PlanRepositorySnapshot:
                 )
             if before_pin is not None:
                 before_pin(owned)
-            cls._create_refs(repo, owned, git_env=git_env)
+            _publish_owned_refs(common=Path(git_env["GIT_OBJECT_DIRECTORY"]).parent, refs=owned)
+            try:
+                cls._create_refs(repo, owned, git_env=git_env)
+            except Exception as exc:
+                failures: list[str] = []
+                common = Path(git_env["GIT_OBJECT_DIRECTORY"]).parent
+                for name, oid in reversed(owned):
+                    try:
+                        _delete_owned_ref(common, name, oid)
+                    except SnapshotUnavailable as cleanup:
+                        failures.append(str(cleanup))
+                if failures:
+                    raise SnapshotCleanupError(
+                        "private ref publication failed and real pin cleanup was incomplete: "
+                        + "; ".join(failures)
+                    ) from exc
+                raise
             return cls(
                 repo, head, tree, commit, wrapper_ref, history, ignored,
-                unavailable, git_env, control.directory, owned,
+                unavailable, git_env, control.directory,
+                Path(git_env["GIT_OBJECT_DIRECTORY"]).parent, owned,
             )
         except Exception:
             import shutil
@@ -414,32 +752,15 @@ class PlanRepositorySnapshot:
             return
         try:
             failures: list[str] = []
+            if self._common_dir is None:
+                failures.append("approved common Git directory is unavailable")
             for name, oid in self._owned_refs:
-                current = _run(
-                    self.repo,
-                    ["for-each-ref", "--format=%(objectname)", name],
-                    check=False, git_env=self._git_env,
-                )
-                if current.returncode:
-                    failures.append(
-                        f"{name}: could not verify ownership: "
-                        + current.stderr.decode("utf-8", errors="replace").strip()
-                    )
+                if self._common_dir is None:
                     continue
-                current_oid = current.stdout.decode("ascii").strip()
-                if not current_oid:
-                    continue
-                if current_oid != oid:
-                    failures.append(f"{name} changed owner")
-                    continue
-                result = _run(
-                    self.repo, ["update-ref", "-d", name, oid], check=False,
-                    git_env=self._git_env,
-                )
-                if result.returncode:
-                    failures.append(
-                        f"{name}: " + result.stderr.decode("utf-8", errors="replace").strip()
-                    )
+                try:
+                    _delete_owned_ref(self._common_dir, name, oid)
+                except SnapshotUnavailable as exc:
+                    failures.append(str(exc))
             if failures:
                 raise SnapshotCleanupError(
                     "could not delete temporary snapshot refs: " + "; ".join(failures)
@@ -462,6 +783,12 @@ class PlanRepositorySnapshot:
 
     def _verify_wrapper(self) -> None:
         _validate_object_boundary(self.repo)
+        _git_dir, current_common = _approved_repository_dirs(self.repo)
+        if self._common_dir is None or current_common != self._common_dir:
+            raise SnapshotUnavailable("repository Git metadata boundary changed")
+        if self._common_dir is None \
+                or _read_owned_ref(self._common_dir, self.wrapper_ref) != self.commit_id:
+            raise SnapshotUnavailable("pinned snapshot object/ref is missing or changed")
         result = _run(
             self.repo, ["rev-parse", "--verify", self.wrapper_ref + "^{commit}"],
             check=False, git_env=self._git_env,
@@ -545,7 +872,10 @@ class PlanRepositorySnapshot:
                     break
                 result.extend(chunk)
             if offset + wanted == size:
-                returncode = proc.wait(timeout=10)
+                returncode = _wait_and_reap(
+                    proc, deadline=deadline, terminate=False,
+                    context="git cat-file",
+                )
                 if returncode:
                     stderr = proc.stderr.read() if proc.stderr else b""
                     raise SnapshotUnavailable(
@@ -553,12 +883,14 @@ class PlanRepositorySnapshot:
                         + stderr.decode("utf-8", errors="replace").strip()
                     )
             else:
-                proc.terminate()
-                proc.wait(timeout=10)
+                returncode = _wait_and_reap(
+                    proc, deadline=deadline, terminate=True,
+                    context="git cat-file",
+                )
+                if returncode not in {0, -15}:
+                    raise SnapshotUnavailable("git cat-file failed during bounded read")
         finally:
-            if proc.poll() is None:
-                proc.kill()
-                proc.wait()
+            _kill_and_reap(proc, context="git cat-file")
         return bytes(result)
 
     def list_tree(

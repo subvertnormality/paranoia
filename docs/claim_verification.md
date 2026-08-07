@@ -43,8 +43,10 @@ One closure round performs these stages:
    Before the first repository-aware Git subprocess, the server reads approved Git-dir
    metadata with bounded no-follow file operations and builds a private Git control
    directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
-   metadata, the approved object directory, and a server-created loose-ref link used for
-   GC pins. Repository `config`, `config.worktree`, `include.path`, and `includeIf` content
+   metadata, an fd-anchored no-follow copy of loose refs, and the approved object directory.
+   Temporary GC pins are published separately through fd-relative, no-follow operations;
+   Git never traverses the repository-controlled loose-ref tree. Repository `config`,
+   `config.worktree`, `include.path`, and `includeIf` content
    is never part of a repository-aware Git invocation; only repository/object format values
    are extracted from a bounded private copy with `git config --no-includes`.
    Inherited Git environment is cleared, native linked-worktree object storage is the only
@@ -187,7 +189,10 @@ and decompression all share the same enforceable total deadline. With no endpoin
 explicitly abstains and an otherwise unresolved external premise blocks.
 
 Exact bodies live under `$PARANOIA_STATE_ROOT/evidence/sha256/`. In-flight journals and
-lineage root manifests are GC roots. A global file lock serializes reservation, blob
+lineage root manifests are GC roots. Journal, candidate-root, live-root, and quarantine
+manifests have distinct exact schemas, bounded no-follow reads, unique bounded digest sets,
+and filename-bound run/lineage identities; foreign, duplicate, unknown, oversized, or
+symlinked records fail closed before adoption or sweeping. A global file lock serializes reservation, blob
 write, exact live-root replacement, and sweep. Replaced files and their containing
 directory entries are fsynced before success is reported or journals/latches are cleared.
 Defaults are 100 MiB per lineage, 1 GiB globally, and a seven-day orphan TTL. Expired
@@ -284,8 +289,12 @@ Snapshot-discovery enumerations are likewise streamed before decoding or retenti
 a 100,000-path/32-MiB cap and a separate 4,096-total-ref discovery cap before the smaller
 pinned-history limit is applied. Directory scans count entries while iterating instead of
 materializing an attacker-sized directory first. Every snapshot Git process and pipe read
-also has a hard
-deadline and is killed/reaped on expiry; directly read Git metadata must be small regular
+also has a hard deadline; a shared termination path kills and reaps the child under a
+second bounded deadline and translates wait failures into recoverable snapshot errors.
+Loose refs are copied through fd-anchored, no-follow traversal under explicit entry, depth,
+per-file, and aggregate-byte caps. Temporary pin creation, verification, and deletion use
+the same fd-relative boundary and reject every symlinked ancestor or ref file. Directly
+read Git metadata must be small regular
 files opened with no-follow and nonblocking flags, then checked again by file identity and
 size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.
 Within `.git/objects`, symlink rejection follows only exact Git-resolvable loose-object,
@@ -353,6 +362,6 @@ published as durable blocking debt—even over an otherwise clear cache—and on
 valid replacement register clears it. Never repair state by deleting evidence roots first: preserve
 the last valid root until the lineage is repaired or explicitly abandoned.
 
-Every exception while verifying or deleting temporary snapshot refs—including command
-timeouts, decoding errors, nonzero exits, and filesystem failures—is normalized as
+Every exception while verifying or deleting temporary snapshot refs—including ownership,
+decoding, boundary, and filesystem failures—is normalized as
 ambiguous cleanup, so the journal and latch remain available for operator recovery.

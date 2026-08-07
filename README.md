@@ -681,7 +681,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
   plan evidence. Before any repository-aware Git command, bounded no-follow metadata reads
   construct a private server-configured Git directory; repository config/config.worktree
-  and their include paths are never inputs to those commands. Persisted evidence uses
+  and their include paths are never inputs to those commands. Supplied loose refs are
+  copied through bounded fd-anchored no-follow traversal; Git never receives the live ref
+  tree, and temporary GC pins are created, verified, and removed with fd-relative
+  no-follow operations. Persisted evidence journals, candidate/live roots, and quarantine
+  records use distinct exact schemas with bounded no-follow reads and filename-bound
+  run/lineage identities. Persisted evidence records use
   strict per-kind schemas; every retained claim
   dependency must still resolve to a valid same-claim record. Deeply nested or otherwise
   malformed model, network, and persisted JSON is converted to a recoverable blocked
@@ -697,7 +702,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   claim-state fields are corruption rather than defaults, invalidated claims reblock even
   if formerly advisory, and model-authored convergence lines are rejected so only one
   server-computed trailer is returned. Every temporary-ref cleanup exception is treated as
-  ambiguous and retains recovery state. Only symlinks in Git-resolvable object namespaces
+  ambiguous and retains recovery state. Git children share bounded deadline, kill, and
+  reap handling so a termination-resistant subprocess becomes a recoverable blocked
+  result. Only symlinks in Git-resolvable object namespaces
   are rejected; inert unrelated object-store names are ignored, including inert nested
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
   and record caps before its output is retained or decoded. Bounded tree, blob,

@@ -97,7 +97,73 @@ def test_deep_manifest_json_is_normalized_to_store_error(tmp_path: Path) -> None
     path = tmp_path / "deep.json"
     path.write_text("[" * 2000 + "0" + "]" * 2000)
     with pytest.raises(EvidenceStoreError, match="manifest"):
-        EvidenceStore._read_manifest(path)
+        EvidenceStore._read_json_manifest(path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda value: {**value, "unknown": True}, "schema"),
+        (lambda value: {**value, "run_id": "foreign-run"}, "identity mismatch"),
+        (lambda value: {**value, "digests": value["digests"] * 2}, "invalid digests"),
+        (lambda value: {**value, "created_at": float("inf")}, "timestamp"),
+        (lambda value: {**value, "metadata": {"unexpected": []}}, "metadata"),
+    ],
+)
+def test_journal_manifests_are_exact_and_identity_bound(
+    tmp_path: Path, mutation, message: str,
+) -> None:
+    store = EvidenceStore(tmp_path)
+    digest = store.stage("bound-run", b"evidence")
+    path = tmp_path / "journals" / "bound-run.json"
+    value = json.loads(path.read_text())
+    path.write_text(json.dumps(mutation(value)))
+    with pytest.raises(EvidenceStoreError, match=message):
+        store.stage("bound-run", b"more")
+    assert store.read(digest) == b"evidence"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda value: {**value, "unknown": True}, "schema"),
+        (lambda value: {**value, "lineage_id": "foreign"}, "identity mismatch"),
+        (lambda value: {**value, "run_id": ""}, "run_id"),
+        (lambda value: {**value, "digests": value["digests"] * 2}, "invalid digests"),
+    ],
+)
+def test_root_manifests_are_exact_and_identity_bound(
+    tmp_path: Path, mutation, message: str,
+) -> None:
+    store = EvidenceStore(tmp_path)
+    digest = store.stage("root-run", b"rooted")
+    store.adopt("bound-lineage", "root-run", [digest])
+    path = tmp_path / "roots" / "bound-lineage.json"
+    value = json.loads(path.read_text())
+    path.write_text(json.dumps(mutation(value)))
+    with pytest.raises(EvidenceStoreError, match=message):
+        store.gc()
+
+
+def test_candidate_root_filename_binds_both_lineage_and_run(tmp_path: Path) -> None:
+    path = tmp_path / "lineage.candidate-wrong.json"
+    path.write_text(json.dumps({
+        "lineage_id": "lineage", "run_id": "right", "digests": [],
+    }))
+    with pytest.raises(EvidenceStoreError, match="filename identity mismatch"):
+        EvidenceStore._read_root_manifest(path)
+
+
+def test_manifest_reads_do_not_follow_symlinks(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path)
+    store.stage("safe-run", b"safe")
+    journal = tmp_path / "journals" / "safe-run.json"
+    external = tmp_path / "external.json"
+    external.write_bytes(journal.read_bytes())
+    journal.unlink()
+    journal.symlink_to(external)
+    with pytest.raises(EvidenceStoreError, match="unsafe"):
+        store.gc()
 
 
 def test_new_root_replaces_dropped_evidence_instead_of_growing_forever(tmp_path: Path) -> None:
