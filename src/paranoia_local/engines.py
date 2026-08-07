@@ -304,7 +304,11 @@ class CodexEngine(Engine):
         native, auth = self._native_binary(), self._auth_file()
         if not auth.is_file():
             raise ToollessUnavailable("Codex auth file is unavailable for isolated role")
-        type(self)._audit_toolless_binary(native)
+        # Preflight builds both profiles before a round. Audit this trusted CLI binary
+        # once per engine instance rather than spending two fresh probes on every role.
+        if getattr(self, "_audited_toolless_native", None) != native:
+            type(self)._audit_toolless_binary(native)
+            self._audited_toolless_native = native
         argv = [
             bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net",
             "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
@@ -467,7 +471,7 @@ class ClaudeEngine(Engine):
         "--setting-sources", "--allowedTools", "--tools", "--strict-mcp-config",
         "--mcp-config", "--disallowedTools",
     })
-    DISCOVERY_REQUIRED_FLAGS = TOOLLESS_REQUIRED_FLAGS | {"--max-turns"}
+    DISCOVERY_REQUIRED_FLAGS = TOOLLESS_REQUIRED_FLAGS
 
     def _preflight_flags(
         self, required: frozenset[str], profile: str,
@@ -520,7 +524,7 @@ class ClaudeEngine(Engine):
             "claude", "-p", "--output-format", "json", "--model", model,
             "--effort", effort, "--permission-mode", "default",
             "--setting-sources", "", "--allowedTools", "WebSearch",
-            "--tools", "WebSearch", "--max-turns", "4", "--strict-mcp-config",
+            "--tools", "WebSearch", "--strict-mcp-config",
             "--mcp-config", '{"mcpServers":{}}',
             "--disallowedTools", ",".join(denied),
         ]

@@ -22,7 +22,9 @@ authority, or verify a claim.
 The server treats candidates as leads. It independently validates DNS, redirects, connected
 peers, HTTPS, response media, byte limits, and deadlines; fetches and hashes the page; selects
 a bounded passage; classifies publisher provenance in a fresh isolated role; and gives truth
-authority only to relevant `primary` or `authoritative` records. Known UGC hosts are forced
+authority only to relevant `primary` or `authoritative` records. A primary counter-source
+does not lose that class merely because it is a different artifact from one falsely named
+in the claim; the verifier separately decides what its visible passage establishes. Known UGC hosts are forced
 to `ugc` and cannot be promoted by the discovery or provenance model. Secondary, UGC, and
 unclassified pages may expose leads or conflicts but cannot clear a general factual claim.
 
@@ -48,7 +50,7 @@ The representative RFC fixture is:
 Prepare a standards research memo that determines the truth of exactly these two factual premises:
 
 1. RFC 9110 was published in June 2022.
-2. RFC 9110 defines HTTP status code 511 as Permanent Redirect.
+2. RFC 6585 defines HTTP status code 511 as Permanent Redirect.
 
 Research both premises now using authoritative public internet sources. Repository files and
 caller-supplied artifacts do not establish them. Record a premise as contradicted when the
@@ -69,19 +71,23 @@ convergence:
 | Codex empty-tool | Codex CLI 0.144.6 | Completed with the isolated no-tool profile |
 | Codex search-only | Codex CLI 0.144.6 | Returned the canonical RFC Editor candidate using native live search |
 | Claude search-only | Claude Code 2.1.197, Sonnet | Returned canonical RFC candidates with only `WebSearch` enabled |
+| Claude full RFC fixture | Claude Code 2.1.197, Sonnet | Completed accurately in about 262 seconds: true claim verified, hidden falsehood contradicted |
 | Claude configured default model | Claude Code 2.1.197, Fable | Account reported exhausted usage credits before a result; this is an external account limitation, not recorded as a successful model check |
 | Codex full RFC fixture | Codex CLI 0.144.6, `gpt-5.6-sol` | Completed accurately in about 234 seconds, inside the 480-second deadline |
 
-The full Codex fixture used no search endpoint, API key, source override, or supplied evidence.
-It produced four claims: two plan decisions classified `not-applicable`, the June 2022 fact
-`verified`, and the hidden 511/Permanent Redirect claim `contradicted`. The structural review
-also reported that RFC 9110 defines Permanent Redirect as 308 and RFC 6585 defines 511 as
-Network Authentication Required.
+Both full fixtures used no search endpoint, API key, source override, or supplied evidence.
+The Codex run used the sharper attribution claim “RFC 9110 defines 511 as Permanent Redirect”
+and correctly contradicted it by identifying 308 as Permanent Redirect and RFC 6585 as the
+definition of 511. The maintained fixture now names RFC 6585 directly so one primary artifact
+can visibly contradict the proposition without also asking the acceptance test to prove an
+absence from another named document. The Claude run verified the June 2022 fact and
+contradicted the maintained hidden falsehood from bounded primary passages.
 
 The truth-bearing records were fetched from the RFC Editor:
 
 - `https://www.rfc-editor.org/rfc/rfc9110.html` — `primary`, isolated provenance assessment;
-- `https://www.rfc-editor.org/rfc/rfc6585.html` — `primary`, isolated provenance assessment.
+- `https://www.rfc-editor.org/rfc/rfc6585.html`, IETF Datatracker, or the HTTP Working Group
+  rendering — `primary`, isolated provenance assessment.
 
 No UGC or secondary source authorized a transition. The result was
 `CLAIM-CLOSURE: DIAGNOSTIC-BLOCKED` because the contradicted premise correctly remained
@@ -89,11 +95,12 @@ load-bearing, while the default rollout semantics left class convergence non-blo
 
 ## Interpretation and promotion
 
-This evidence proves that the supported Codex path can discover, retrieve, classify, and
-accurately adjudicate a representative internet-only true/false pair out of the box. It also
-proves that the Claude search-only capability profile works with an available supported
-model. It does not yet establish representative false-block rates, broad project coverage,
-or successful full-pipeline completion on both configured default models.
+This evidence proves that both supported reviewer integrations can discover, retrieve,
+classify, and accurately adjudicate a representative internet-only true/false pair out of
+the box using available signed-in models. It does not yet establish representative
+false-block rates, broad project coverage, or successful full-pipeline completion on both
+configured default models; the configured Claude Fable model was unavailable because of the
+account's usage-credit state.
 
 Accordingly, verification is **on by default in `diagnostic` mode**. Promotion to
 blocking-by-default requires a broader recorded matrix of projects, source types, true and

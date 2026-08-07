@@ -45,9 +45,8 @@ structured critique.
   `0.146.0-alpha.3.1`. Other Codex versions remain usable for ordinary review paths but
   fail the claim-verification mode closed before snapshot or lineage work.
 - Claim-enabled `critique_plan` with Claude as reviewer runs a bounded `claude --help`
-  compatibility probe and requires every flag used by its empty-tool profile plus
-  `--max-turns` for the search-only profile. An older or incompatible installed CLI fails
-  before snapshot or lineage work.
+  compatibility probe and requires every flag used by its empty-tool and search-only
+  profiles. An older or incompatible installed CLI fails before snapshot or lineage work.
 
 **2. Install**
 
@@ -689,14 +688,16 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   repo, read-only.
 - **Plan evidence is server-mediated.** Claim-enabled `critique_plan` roles do not
   receive a repository worktree. Claude uses an empty tool allowlist; Codex uses a
-  `bwrap` namespace with no shell or repository mounts. Native web is disabled. Claude
-  roles also receive an empty tool-availability set and strict empty MCP configuration. Exact
+  `bwrap` namespace with no shell or repository mounts. Native web is disabled for every
+  plan role except the separate search-only discovery role; that role can return candidate
+  URLs but cannot fetch pages or classify authority. Claude's non-discovery roles also
+  receive an empty tool-availability set and strict empty MCP configuration. Exact
   Codex tool and agent feature schemas are explicitly disabled under strict configuration.
   The server preflights this capability boundary before snapshot construction or lineage
   latch acquisition. Codex roles are ephemeral and all plan roles are intentionally fresh,
   so closure-plan responses never advertise those internal session IDs for `rebut`.
-  repository bytes are hashed without Git filters/hooks, and configured HTTPS sources are
-  fetched only by bounded server code. All model-visible paths, sources, metadata, and
+  repository bytes are hashed without Git filters/hooks, and native-search HTTPS candidates
+  are fetched only by bounded server code. All model-visible paths, sources, metadata, and
   passages are JSON escaped; remote and repository bodies never share a role call.
   Inherited object-database settings are cleared, and replacement objects, grafts, lazy
   fetching, filters, hooks, fsmonitor, and signing are disabled for plan evidence. Snapshot

@@ -473,6 +473,27 @@ def test_passage_selection_prefers_specific_query_terms_over_early_generic_terms
     assert "published in June 2022" in record.display_passage
 
 
+def test_passage_selection_uses_whole_rare_numbers_and_multi_token_relevance(
+    tmp_path: Path,
+) -> None:
+    store = EvidenceStore(tmp_path / "numeric-passage-store")
+    store.begin("numeric-passage-run")
+    body = (
+        b"RFC 9110 HTTP definition, postal address 95110.\n" + b"x" * 9000
+        + b"The authoritative status code 511 is Network Authentication Required.\n"
+        + b"y" * 5000
+    )
+    record = cv._record(
+        store, "numeric-passage-run", "claim", "external",
+        "https://docs.example.com/status", body, {},
+        passage_hint="RFC 9110 HTTP status code 511 Permanent Redirect definition",
+    )
+
+    assert record.passage_start > 0
+    assert "status code 511" in record.display_passage
+    assert "postal address 95110" not in record.display_passage
+
+
 def test_followup_passage_selects_any_rooted_range_without_refetch(
     repo: Path, tmp_path: Path,
 ) -> None:

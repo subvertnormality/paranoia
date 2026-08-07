@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
 import sys
 import time
@@ -30,7 +29,7 @@ MAX_FETCHES = 8
 MAX_PER_CLAIM = 2
 MAX_AGGREGATE_BYTES = 16 << 20
 MAX_PASSAGE_BYTES = 4096
-MAX_EXTERNAL_RESPONSE_BYTES = 2 << 20
+MAX_EXTERNAL_RESPONSE_BYTES = 4 << 20
 MAX_ROUND_SECONDS = 8 * 60
 SOURCE_PROVENANCE_MARKER = "=== SOURCE PROVENANCE ==="
 SOURCE_PROVENANCE_PREFIX = "ASSESSMENTS-JSON: "
@@ -284,7 +283,12 @@ class EvidenceBudget:
 
     def subprocess_timeout(self, maximum: int) -> int:
         """Return an integer timeout without extending the shared deadline by a phase."""
-        return max(1, math.ceil(self.remaining_seconds(maximum)))
+        timeout = int(self.remaining_seconds(maximum))
+        if timeout < 1:
+            raise EvidenceBudgetExceeded(
+                "review round has less than one second remaining for a model role"
+            )
+        return timeout
 
     def debit_requests(self, requests: Sequence[EvidenceRequest]) -> None:
         self.remaining_seconds()
@@ -749,6 +753,30 @@ def _align_utf8_window(body: bytes, start: int, end: int) -> tuple[int, int]:
     return start, end
 
 
+_PASSAGE_STOPWORDS = frozenset({
+    "about", "against", "because", "current", "define", "defined", "definition",
+    "does", "from", "into", "that", "their", "these", "this", "using", "with",
+})
+
+
+def _bounded_token_positions(body: bytes, token: bytes, *, limit: int = 64) -> list[int]:
+    """Find bounded whole-token matches so 511 does not match a postal code like 95110."""
+    positions: list[int] = []
+    cursor = 0
+    while len(positions) < limit:
+        found = body.find(token, cursor)
+        if found < 0:
+            break
+        end = found + len(token)
+        before = body[found - 1] if found else None
+        after = body[end] if end < len(body) else None
+        if (before is None or not (chr(before).isalnum() or before == 95)) \
+                and (after is None or not (chr(after).isalnum() or after == 95)):
+            positions.append(found)
+        cursor = found + max(1, len(token))
+    return positions
+
+
 def _passage_bounds(
     body: bytes, hint: str | None, *, requested_start: int | None = None,
     max_bytes: int = MAX_PASSAGE_BYTES,
@@ -759,29 +787,48 @@ def _passage_bounds(
         return _align_utf8_window(body, start, min(len(body), start + max_bytes))
     if len(body) <= max_bytes:
         return 0, len(body)
-    position: int | None = None
     if hint:
-        tokens = sorted(
-            {
-                token.lower().encode("utf-8")
-                for token in re.findall(r"[\w.-]{4,}", hint, flags=re.UNICODE)
-                if len(token.encode("utf-8")) <= 128
-            },
-            key=lambda token: (-len(token), token),
-        )
         lowered = body.lower()
-        # Tokens are longest-first. Prefer the first match in that priority order
-        # rather than the earliest generic term in the document (for example, a
-        # title's "RFC 9110" over a later "published in June 2022" passage).
-        position = next(
-            (found for token in tokens if (found := lowered.find(token)) >= 0),
-            None,
-        )
-    if position is None:
-        return _align_utf8_window(body, 0, max_bytes)
-    start = max(0, position - max_bytes // 4)
-    start = min(start, len(body) - max_bytes)
-    return _align_utf8_window(body, start, start + max_bytes)
+        tokens = {
+            token.lower().encode("utf-8")
+            for token in re.findall(r"[^\W_]+(?:[.-][^\W_]+)*", hint, flags=re.UNICODE)
+            if (len(token) >= 3 or token.isdigit())
+            and token.lower() not in _PASSAGE_STOPWORDS
+            and len(token.encode("utf-8")) <= 128
+        }
+        matches = {
+            token: _bounded_token_positions(lowered, token)
+            for token in tokens
+        }
+        matches = {token: found for token, found in matches.items() if found}
+        candidates = {
+            max(0, min(found - max_bytes // 2, len(body) - max_bytes))
+            for positions in matches.values() for found in positions
+        }
+
+        def score(start: int) -> tuple[int, int, int, int, int]:
+            end = start + max_bytes
+            present = [
+                token for token, positions in matches.items()
+                if any(start <= found < end for found in positions)
+            ]
+            numeric_rarity = sum(
+                1_000_000 // len(matches[token])
+                for token in present if token.isdigit()
+            )
+            total_rarity = sum(1_000_000 // len(matches[token]) for token in present)
+            return (
+                numeric_rarity,
+                len(present),
+                total_rarity,
+                sum(len(token) for token in present),
+                -start,
+            )
+
+        if candidates:
+            start = max(candidates, key=score)
+            return _align_utf8_window(body, start, start + max_bytes)
+    return _align_utf8_window(body, 0, max_bytes)
 
 
 def _record(

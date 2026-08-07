@@ -64,6 +64,28 @@ def test_codex_discovery_profile_exposes_only_live_web_search(
     assert str(tmp_path / "scratch") not in joined
 
 
+def test_codex_isolation_binary_is_audited_once_per_engine_instance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = tmp_path / "codex-native"
+    native.write_bytes(b"binary")
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}")
+    engine = CodexEngine()
+    audits: list[Path] = []
+    monkeypatch.setattr(CodexEngine, "_native_binary", lambda self: native)
+    monkeypatch.setattr(CodexEngine, "_auth_file", lambda self: auth)
+    monkeypatch.setattr(
+        CodexEngine, "_audit_toolless_binary", lambda selected: audits.append(selected),
+    )
+
+    engine.build_toolless_argv(tmp_path, "gpt", "high")
+    engine.build_discovery_argv(tmp_path, "gpt", "high")
+    engine.build_toolless_argv(tmp_path, "gpt", "high")
+
+    assert audits == [native]
+
+
 def test_claude_discovery_profile_exposes_web_search_without_fetch_or_local_tools(
     tmp_path: Path,
 ) -> None:
@@ -76,7 +98,7 @@ def test_claude_discovery_profile_exposes_web_search_without_fetch_or_local_tool
     assert available == "WebSearch"
     assert "WebFetch" in denied
     assert "Read" in denied and "Bash" in denied and "Write" in denied
-    assert argv[argv.index("--max-turns") + 1] == "4"
+    assert "--max-turns" not in argv
     assert argv[argv.index("--setting-sources") + 1] == ""
     assert argv[argv.index("--mcp-config") + 1] == '{"mcpServers":{}}'
 
@@ -162,7 +184,7 @@ def test_claude_toolless_preflight_rejects_an_incompatible_installed_cli(
         ClaudeEngine().preflight_toolless("claude", "high")
 
 
-def test_claude_preflight_requires_max_turns_only_for_discovery(
+def test_claude_discovery_preflight_requires_only_its_advertised_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("paranoia_local.engines.shutil.which", lambda _name: "/cli/claude")
@@ -172,5 +194,4 @@ def test_claude_preflight_requires_max_turns_only_for_discovery(
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, help_text, ""),
     )
     ClaudeEngine().preflight_toolless("claude", "high")
-    with pytest.raises(ToollessUnavailable, match="--max-turns"):
-        ClaudeEngine().preflight_discovery("claude", "high")
+    ClaudeEngine().preflight_discovery("claude", "high")

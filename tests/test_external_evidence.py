@@ -78,6 +78,10 @@ def test_native_search_uses_bounded_strict_candidate_output_without_an_endpoint(
     assert timeouts == [30]
     assert "primary or authoritative" in prompts[0]
     assert "supporting and contradicting" in prompts[0]
+    assert "original artifact that actually defines the disputed item" in prompts[0]
+    assert "include its own compact canonical record" in prompts[0]
+    assert "distinct primary sources" in prompts[0]
+    assert "compact canonical HTML or plain-text" in prompts[0]
     assert "Search results are leads, not evidence" in prompts[0]
 
 

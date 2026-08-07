@@ -599,6 +599,8 @@ def _tool_less_call(
         raise _ClaimStageFailure(
             f"{engine.name} toolless role failed with exit {review.returncode}"
         )
+    # A process that finishes on the timeout boundary cannot publish a late result.
+    budget.remaining_seconds()
     # Injected engines may predate Engine.run_toolless's nonresumable contract.
     return Review(
         text=review.text,
@@ -653,7 +655,10 @@ def _role_register_call(
             retry_debit_bytes(retry_evidence_bytes)
         correction = (
             prompt + "\n\n=== CORRECTION REQUIRED ===\nYour prior terminal register was rejected: "
-            + str(first) + "\nReturn the complete required terminal register again."
+            + str(first)
+            + "\nReturn ONLY the complete required terminal register: no explanation, "
+            "preamble, markdown fence, or trailing text. Emit its required marker exactly "
+            "once and do not quote or mention that marker anywhere else."
         )
         retry = _tool_less_call(
             engine, correction, model, effort, on_progress, budget=budget,
@@ -1353,6 +1358,8 @@ def _run_plan_structural_phase(
     draft_classes.debt = None
     draft_classes.rounds += 1
 
+    # Never durably publish a result completed after the round deadline.
+    round_budget.remaining_seconds()
     _publish_plan_round(
         snapshot=snapshot, store=store, lineage_id=lineage_id, run_id=run_id,
         evidence_records=evidence_records, closure=closure,
@@ -1514,7 +1521,8 @@ def _critique_plan_verified(
             })
 
         with PlanRepositorySnapshot.create(
-            repo, run_id=run_id, before_pin=journal_snapshot
+            repo, run_id=run_id, before_pin=journal_snapshot,
+            deadline=round_budget.deadline,
         ) as snapshot:
             (
                 round_budget, high_stakes, current_policy, evidence_records,

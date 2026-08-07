@@ -360,6 +360,13 @@ def test_bounded_git_output_enforces_local_and_shared_budgets(repo: Path) -> Non
     assert sum(debits) == 3
 
 
+def test_expired_round_deadline_prevents_snapshot_git_work(repo: Path) -> None:
+    with pytest.raises(SnapshotUnavailable, match="round deadline"):
+        PlanRepositorySnapshot.create(
+            repo, run_id="expired-round", deadline=time.monotonic() - 1,
+        )
+
+
 def test_record_enumeration_rejects_first_excess_record(repo: Path) -> None:
     with pytest.raises(SnapshotUnavailable, match="record cap"):
         ps._run_bounded_records(

@@ -1683,9 +1683,11 @@ def test_register_retry_consumes_one_shared_round_deadline() -> None:
 
         def __init__(self) -> None:
             self.timeouts: list[int] = []
+            self.prompts: list[str] = []
 
-        def run_toolless(self, *_args, **kwargs) -> Review:
+        def run_toolless(self, prompt, *_args, **kwargs) -> Review:
             self.timeouts.append(kwargs["timeout"])
+            self.prompts.append(prompt)
             now[0] += 4.0
             return _review("bad" if len(self.timeouts) == 1 else "good")
 
@@ -1702,6 +1704,8 @@ def test_register_retry_consumes_one_shared_round_deadline() -> None:
     )  # type: ignore[arg-type]
     assert parsed == "good" and retry == "good"
     assert engine.timeouts == [10, 6]
+    assert "Return ONLY the complete required terminal register" in engine.prompts[1]
+    assert "Emit its required marker exactly once" in engine.prompts[1]
 
 
 def test_round_deadline_caps_fetches_and_fails_closed_at_expiry() -> None:
@@ -1712,6 +1716,29 @@ def test_round_deadline_caps_fetches_and_fails_closed_at_expiry() -> None:
     now[0] = 25.0
     with pytest.raises(cv.EvidenceBudgetExceeded, match="480-second deadline"):
         budget.debit_fetch()
+
+
+def test_model_result_completed_after_deadline_is_rejected() -> None:
+    now = [0.0]
+
+    class LateEngine:
+        name = "fake"
+
+        def run_toolless(self, *_args, **_kwargs) -> Review:
+            now[0] = 2.0
+            return _review("late result")
+
+    budget = cv.EvidenceBudget(deadline=1.5, clock=lambda: now[0])
+    with pytest.raises(cv.EvidenceBudgetExceeded, match="480-second deadline"):
+        handlers._tool_less_call(
+            LateEngine(), "prompt", "model", "high", None, budget=budget,
+        )  # type: ignore[arg-type]
+
+
+def test_subsecond_round_remainder_does_not_round_up_model_timeout() -> None:
+    budget = cv.EvidenceBudget(deadline=0.5, clock=lambda: 0.0)
+    with pytest.raises(cv.EvidenceBudgetExceeded, match="less than one second"):
+        budget.subprocess_timeout(600)
 
 
 def test_serialized_tree_listing_is_debited_before_model_transmission() -> None:

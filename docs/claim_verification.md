@@ -214,7 +214,8 @@ dot-segment paths remain unclassified. An unmatched page receives a fresh tool-l
 page-isolated provenance assessment bound to its claim and evidence ID:
 
 - `primary`: the original artifact, dataset, research, standard, release, repository, or
-  first-party record that owns the asserted fact;
+  first-party record that owns a material subject or value needed to test the claim,
+  including primary counterevidence to a false attribution;
 - `authoritative`: the publisher defines, operates, or controls the claimed behavior;
 - `secondary`: reporting, analysis, summaries, aggregators, or independent commentary;
 - `ugc`: community posts, forums, social media, Q&A, reviews, and user-authored reports;
@@ -278,7 +279,7 @@ Important bounds include:
 - individual dirty file: 32 MiB;
 - dirty-tree content retained for a snapshot: 256 MiB;
 - evidence records and requests: bounded per operation and by one shared round budget;
-- external work: at most 8 shared search/fetch attempts, 2 MiB compressed and decompressed
+- external work: at most 8 shared search/fetch attempts, 4 MiB compressed and decompressed
   per response within the 16 MiB round aggregate shared with repository evidence and model
   packets, bounded redirects, and one hard 480-second monotonic round deadline;
 - persisted evidence: 100 MiB per lineage and 1 GiB globally by default.

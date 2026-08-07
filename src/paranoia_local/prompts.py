@@ -177,6 +177,9 @@ publication/history, or other facts whose authority is outside this repository, 
 SEARCH_EXTERNAL directly unless the supplied records or visible tree identify a concrete
 local authoritative artifact. Do not spend repository-wide searches trying to answer an
 inherently external claim.
+An external query must preserve the claim's discriminating identifiers, numbers, named
+source or attribution, and contested value. "Neutral" means seek evidence on both sides;
+it does not mean replacing a falsifiable proposition with a generic topic lookup.
 Never treat a citation or model opinion as evidence. The repository may use any language,
 framework, file layout, or project domain. Prefer the language-neutral repository operations;
 request PYTHON_COMPILE only when the exact claim concerns Python source that is in the snapshot.
@@ -259,7 +262,10 @@ the publisher's relationship to the claim; do not decide whether the claim is tr
 not reward agreement with it.
 
 Use `primary` only for the original artifact, dataset, research paper, standard, release,
-repository, or first-party record that directly owns the asserted fact. Use `authoritative`
+repository, or first-party record that directly owns a material subject or value needed to
+test the claim. A primary counter-source does not become secondary merely because it is a
+different artifact from the one named in a false attribution; provenance is independent of
+agreement and truth. Use `authoritative`
 only when the publisher is the organization or project that defines, operates, or controls
 the claimed behavior. Use `secondary` for reporting, summaries, analysis, aggregators, and
 independent commentary. Use `ugc` for community posts, forums, social media, Q&A, reviews,
