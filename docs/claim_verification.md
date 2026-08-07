@@ -133,7 +133,9 @@ The important orthogonal fields are:
 Every new claim starts `proposed`, `blocking`, and `unchecked`, regardless of what the
 extractor proposed. The model selects server span IDs, while the server derives the stored
 proposition from those exact anchored plan bytes; repository-aware roles cannot author a
-free-form claim string for a later clean role. A different role must confirm its kind.
+free-form claim string for a later clean role. Durable claim IDs retain 128 bits of a
+server-generated SHA-256 identity, and an occupied generated key rejects the new `ADD`
+before its sequence or claim map can change. A different role must confirm its kind.
 Advisory bearing is reachable
 only through the verifier's evidence-bearing `SET_BEARING`; it cannot be set on `ADD`.
 Facts block until verified or safely deferred. Decisions become `not-applicable` only
@@ -203,6 +205,9 @@ hostname, port, and fragment must remain fixed under formatting, while credentia
 forbidden. The query is percent-encoded before substitution and the formatted origin is
 checked again before each request.
 Top-level and hit objects use exact schemas and reject duplicate or unknown JSON keys.
+Failed searches and fetches create round-local external abstentions, but abstentions are
+never sent to an evidence verifier and cannot share a packet with repository or supplied
+records. They remain visible only as non-authorizing failure context to the structural role.
 Formatting, encoding, numeric-conversion, and excessive-nesting errors are normalized to
 role-specific blocked failures, never raw exceptions; the same rule applies to every
 model register, evidence request, cached record, and persisted manifest. Fetching
@@ -376,7 +381,7 @@ LINEAGE: project-42-plan (rounds recorded: 3)
 CLAIM-REGISTER: parsed 2
 CLAIMS: verified=1, unverified=1
 CLAIM-CLOSURE: BLOCKED — 1 load-bearing claim(s) unresolved
-CLAIM-DATA-JSON={"claim":"Exact anchored plan text","claim_id":"0123456789","status":"unverified"}
+CLAIM-DATA-JSON={"claim":"Exact anchored plan text","claim_id":"0123456789abcdef0123456789abcdef","status":"unverified"}
 CLASS-REGISTER: NONE
 CLASS-CLOSURE: 0 open, 2 closed, 2 unmechanized
 CONVERGENCE: BLOCKED — 1 claim(s)

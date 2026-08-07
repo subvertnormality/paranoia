@@ -94,7 +94,34 @@ def test_every_add_is_server_minted_pending_and_blocking() -> None:
     assert claim.bearing == pc.BLOCKING
     assert claim.kind_classification == pc.PROPOSED
     assert claim.status == pc.UNCHECKED
+    assert len(claim.claim_id) == 32
     assert pc.blocking_claims(state) == [claim]
+
+
+def test_generated_claim_id_collision_is_rejected_without_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = pc.ClaimState(lineage_id="collision")
+    spans = pc.segment_plan(b"First.\nSecond.\n")
+    first = pc.Event("ADD", {
+        "op": "ADD", "temp_id": "first", "kind": "fact",
+        "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+    })
+    claim_id = pc.apply_events(
+        state, [first], role=pc.RESEARCH_ROLE, spans=spans,
+    )["first"]
+    before = pc.state_to_json(state)
+    monkeypatch.setattr(pc, "mint_claim_id", lambda *_args: claim_id)
+    second = pc.Event("ADD", {
+        "op": "ADD", "temp_id": "second", "kind": "fact",
+        "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000002", "last_span": "p000002"},
+    })
+    with pytest.raises(pc.ClaimTransitionError, match="collides"):
+        pc.apply_events(state, [second], role=pc.RESEARCH_ROLE, spans=spans)
+    assert pc.state_to_json(state) == before
+    assert list(state.claims) == [claim_id]
 
 
 def test_kind_confirmation_must_come_from_an_independent_role() -> None:
@@ -540,7 +567,7 @@ def test_persisted_supersession_requires_a_live_reachable_clear_target() -> None
     state, claim_id, _spans = _state_with_confirmed_fact()
     source = state.claims[claim_id]
     target = copy.deepcopy(source)
-    target.claim_id = "replacement"
+    target.claim_id = "f" * 32
     target.kind = pc.DECISION
     target.kind_classification = pc.CONFIRMED
     target.status = pc.NOT_APPLICABLE

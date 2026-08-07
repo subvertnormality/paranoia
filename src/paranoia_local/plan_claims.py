@@ -339,7 +339,8 @@ def _safe_model_string(value: Any) -> bool:
 
 
 def mint_claim_id(lineage_id: str, seq: int, proposition: str) -> str:
-    return hashlib.sha256(f"{lineage_id}\0{seq}\0{proposition}".encode()).hexdigest()[:10]
+    # IDs are model-visible capability keys, so retain 128 collision-resistant bits.
+    return hashlib.sha256(f"{lineage_id}\0{seq}\0{proposition}".encode()).hexdigest()[:32]
 
 
 def event_digest(event: Event) -> str:
@@ -501,6 +502,8 @@ def _add_claim(state: ClaimState, data: Mapping[str, Any], role: str,
     if not proposition:
         raise ClaimTransitionError("ADD plan_anchor must cover non-whitespace plan text")
     claim_id = mint_claim_id(state.lineage_id, state.next_seq, proposition)
+    if claim_id in state.claims:
+        raise ClaimTransitionError("generated claim ID collides with an existing claim")
     state.next_seq += 1
     state.claims[claim_id] = Claim(
         claim_id=claim_id, claim=proposition.strip(), kind=kind,
@@ -820,6 +823,10 @@ def _validate_persisted_claim(row: Mapping[str, Any]) -> None:
     for key in ("claim_id", "claim", "anchor_excerpt_b64", "origin_role"):
         if not isinstance(row.get(key), str) or (key != "anchor_excerpt_b64" and not row[key]):
             raise ClaimRegisterError(f"persisted claim {key} is malformed")
+    if len(row["claim_id"]) != 32 or any(
+        char not in "0123456789abcdef" for char in row["claim_id"]
+    ):
+        raise ClaimRegisterError("persisted claim claim_id is malformed")
     try:
         excerpt = base64.b64decode(row["anchor_excerpt_b64"], validate=True)
     except (ValueError, TypeError) as exc:

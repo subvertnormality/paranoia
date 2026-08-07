@@ -260,7 +260,8 @@ Repository reads are pinned to one exact dirty-tree snapshot. Models see server 
 bounded repository records, and no filesystem path. Plan bytes appear only as ordered,
 JSON-escaped span data, including for the structural reviewer. External passages only enter a
 command-incapable role; the structural reviewer receives their metadata, not remote bytes.
-Unavailable sources cause abstention and remain blocking. The full trust model, register
+Unavailable sources cause round-local abstention and remain blocking; abstentions are never
+sent to an evidence verifier or mixed with repository/supplied verifier packets. The full trust model, register
 grammar, evidence limits, caching, and recovery rules are in
 [`docs/claim_verification.md`](docs/claim_verification.md).
 

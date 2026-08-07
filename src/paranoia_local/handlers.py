@@ -948,7 +948,7 @@ def _critique_plan_verified(
                 evidence_ids = cv.evidence_bindings(evidence_records)
                 local_records = [
                     record for record in evidence_records
-                    if record.kind not in {"external", "supplied-artifact"}
+                    if record.kind not in {"external", "supplied-artifact", "abstention"}
                 ]
                 external_only = [record for record in evidence_records if record.kind == "external"]
                 supplied_only = [
