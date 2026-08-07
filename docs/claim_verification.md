@@ -78,6 +78,12 @@ A diagnostic or blocking round performs these stages:
 The extractor cannot clear its own claim. Omission in a later round never deletes a durable
 claim. Research output never edits the plan.
 
+The handler is a transaction coordinator over explicit phase owners: cached-state
+preparation, research/policy, evidence planning and collection, evidence verification,
+structural evidence, structural review, durable publication, and response rendering. No
+single phase combines model coordination, evidence I/O, policy transition, persistence, and
+verdict formatting.
+
 ## Fast repository snapshot
 
 `plan_snapshot.py` uses a server-owned temporary Git directory, index, and object directory.
