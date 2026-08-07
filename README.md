@@ -699,8 +699,9 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   dependency must still resolve to a valid same-claim record. Deeply nested or otherwise
   malformed model, network, and persisted JSON is converted to a recoverable blocked
   result, including model strings with non-UTF-8 surrogate code points. Evidence-request
-  paths, patterns, refs, and queries are validated as bounded strict UTF-8 (with
-  traversal-free relative repository paths) both for new requests and persisted records.
+  paths, patterns, refs, and queries are validated as bounded strict UTF-8 (with canonical,
+  traversal-free relative POSIX repository paths; the empty tree prefix denotes the root)
+  both for new requests and persisted records.
   Inline plan strings use strict UTF-8 preflight and retain the closure response shape on
   failure. Direct Git metadata
   is accepted only through bounded, no-follow regular-file

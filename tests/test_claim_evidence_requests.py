@@ -179,6 +179,17 @@ def test_request_scalars_are_utf8_and_repository_paths_are_relative(
         cv.parse_requests(_requests([request_row]), {"claim"})
 
 
+@pytest.mark.parametrize(
+    "prefix", [".", "./vendor/module/docs", "vendor//module/docs", "vendor/module/"],
+)
+def test_list_tree_rejects_noncanonical_prefix_aliases(prefix: str) -> None:
+    request = {
+        "op": "LIST_TREE", "claim_id": "claim", "prefix": prefix, "limit": 10,
+    }
+    with pytest.raises(cv.EvidenceRequestError, match="relative repository path"):
+        cv.parse_requests(_requests([request]), {"claim"})
+
+
 def test_one_budget_is_shared_across_phases_and_failed_fetch_attempts() -> None:
     budget = cv.EvidenceBudget()
     first = cv.EvidenceRequest("LIST_TREE", {
@@ -624,6 +635,35 @@ def test_truncated_tree_listing_discloses_scope_and_cannot_authorize(
     assert record.metadata["limit"] == 1 and record.metadata["complete"] is False
     assert record.evidence_id not in cv.evidence_bindings(records)
     assert '"complete":false' in cv.render_evidence(records, include_passages=True)
+
+
+def test_gitlink_descendant_listing_cannot_authorize_negative_evidence(
+    repo: Path, tmp_path: Path,
+) -> None:
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    (repo / "vendor" / "module").mkdir(parents=True)
+    subprocess.run(
+        ["git", "update-index", "--add", "--cacheinfo",
+         f"160000,{head},vendor/module"],
+        cwd=repo, check=True,
+    )
+    request = cv.EvidenceRequest("LIST_TREE", {
+        "op": "LIST_TREE", "claim_id": "claim",
+        "prefix": "vendor/module/docs", "limit": 20,
+    })
+    store = EvidenceStore(tmp_path / "gitlink-descendant")
+    store.begin("gitlink-descendant-run")
+    with PlanRepositorySnapshot.create(repo, run_id="gitlink-descendant") as snapshot:
+        records = cv.collect_evidence(
+            [request], snapshot=snapshot, store=store,
+            run_id="gitlink-descendant-run",
+        )
+    record = records[0]
+    assert record.display_passage == "[]" and record.metadata["complete"] is False
+    assert record.evidence_id not in cv.evidence_bindings(records)
 
 
 def test_truncated_literal_search_records_exact_ranges_and_cannot_authorize(

@@ -919,6 +919,8 @@ class PlanRepositorySnapshot:
             pure = PurePosixPath(prefix)
             if pure.is_absolute() or ".." in pure.parts:
                 raise SnapshotUnavailable("tree prefix escapes snapshot")
+            if prefix == "." or prefix != pure.as_posix():
+                raise SnapshotUnavailable("tree prefix must be canonical")
             args += ["--", ":(literal)" + prefix]
         raw = _run_bounded(
             self.repo,

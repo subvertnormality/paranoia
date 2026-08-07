@@ -358,7 +358,11 @@ def _is_repo_path(value: object, *, allow_empty: bool = False) -> bool:
         return False
     pure = PurePosixPath(path)
     return (allow_empty and not path) or (
-        bool(path) and not pure.is_absolute() and ".." not in pure.parts
+        bool(path)
+        and path != "."
+        and path == pure.as_posix()
+        and not pure.is_absolute()
+        and ".." not in pure.parts
     )
 
 

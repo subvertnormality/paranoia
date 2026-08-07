@@ -160,6 +160,11 @@ Incomplete tree, history, and search scopes are context-only; an exact blob rang
 a directly visible fact. Non-UTF-8 passages that require lossy display are also context-only.
 A citation is metadata, not proof.
 
+Repository operands use canonical relative POSIX paths. Root tree scope is the empty prefix;
+dot prefixes, leading or trailing separators, repeated separators, absolute paths, and parent
+traversal are rejected at both request validation and snapshot access. This keeps the scope Git
+reads identical to the scope used when deciding whether unavailable paths make evidence incomplete.
+
 Repository cache validity depends on the snapshot commit and every recorded object/path
 identity. Empirical cache validity additionally depends on the fixed adapter, runtime, and
 input hashes. External evidence carries retrieval and freshness metadata. Semantic source

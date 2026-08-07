@@ -68,6 +68,13 @@ def test_ignored_and_special_paths_are_disclosed_but_not_readable(repo: Path) ->
             snapshot.read_blob("events.pipe")
 
 
+@pytest.mark.parametrize("prefix", [".", "./vendor/module/docs", "vendor//module/docs"])
+def test_tree_prefix_rejects_noncanonical_aliases(repo: Path, prefix: str) -> None:
+    with PlanRepositorySnapshot.create(repo, run_id="tree-prefix-alias") as snapshot:
+        with pytest.raises(SnapshotUnavailable, match="canonical"):
+            snapshot.list_tree_scoped(prefix, limit=20)
+
+
 def test_path_traversal_symlinks_and_gitlinks_are_not_blob_evidence(
     repo: Path, tmp_path: Path,
 ) -> None:
