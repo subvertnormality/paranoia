@@ -7,14 +7,14 @@ import json
 import re
 import sys
 import urllib.parse
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping, Sequence
 
 from .evidence_store import EvidenceStore, EvidenceStoreError
 from .external_evidence import (
-    EndpointSearchProvider, FetchLimits, NetworkEvidenceError, SafeHttpClient,
+    FetchLimits, NetworkEvidenceError, SafeHttpClient, SearchProvider,
 )
 from .plan_snapshot import (
     PlanRepositorySnapshot, SnapshotContentUnavailable, SnapshotUnavailable,
@@ -26,8 +26,11 @@ REQUESTS_PREFIX = "REQUESTS-JSON: "
 MAX_REQUESTS = 20
 MAX_FETCHES = 8
 MAX_PER_CLAIM = 2
-MAX_AGGREGATE_BYTES = 5 << 20
+MAX_AGGREGATE_BYTES = 16 << 20
 MAX_PASSAGE_BYTES = 4096
+MAX_EXTERNAL_RESPONSE_BYTES = 2 << 20
+SOURCE_PROVENANCE_MARKER = "=== SOURCE PROVENANCE ==="
+SOURCE_PROVENANCE_PREFIX = "ASSESSMENTS-JSON: "
 
 
 class EvidenceRequestError(ValueError):
@@ -146,6 +149,84 @@ def classify_external_source(
     if not matches:
         return "unclassified-external"
     return max(matches, key=lambda rule: len(rule["path_prefix"]))["source_class"]
+
+
+def initial_external_provenance(
+    url: str, policy: Sequence[Mapping[str, str]],
+) -> tuple[str, str, str]:
+    """Return class, method, and reason before any isolated model assessment."""
+    source_class = classify_external_source(url, policy)
+    if source_class == "ugc":
+        return source_class, "known-ugc", "server-enforced known UGC origin"
+    if source_class != "unclassified-external":
+        return source_class, "caller-rule", "matched explicit caller host/path rule"
+    return source_class, "unassessed", "no explicit caller rule; assessment required"
+
+
+def parse_source_assessment(text: str, expected_evidence_id: str) -> dict[str, str]:
+    """Parse one source-isolated publisher-provenance judgment."""
+    if text.count(SOURCE_PROVENANCE_MARKER) != 1:
+        raise EvidenceRequestError("expected exactly one SOURCE PROVENANCE block")
+    tail = text.split(SOURCE_PROVENANCE_MARKER, 1)[1].lstrip("\n")
+    line, _, rest = tail.partition("\n")
+    if rest.strip() or not line.startswith(SOURCE_PROVENANCE_PREFIX):
+        raise EvidenceRequestError("source provenance block must be one terminal JSON line")
+    try:
+        raw = json.loads(line[len(SOURCE_PROVENANCE_PREFIX):], object_pairs_hook=_pairs)
+    except EvidenceRequestError:
+        raise
+    except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise EvidenceRequestError(f"ASSESSMENTS-JSON is invalid: {exc}") from exc
+    if not isinstance(raw, list) or len(raw) != 1 or not isinstance(raw[0], dict) \
+            or set(raw[0]) != {"evidence_id", "source_class", "reason"}:
+        raise EvidenceRequestError("source provenance must contain one exact assessment")
+    item = raw[0]
+    if item.get("evidence_id") != expected_evidence_id:
+        raise EvidenceRequestError("source provenance references unexpected evidence")
+    if item.get("source_class") not in EXTERNAL_SOURCE_CLASSES:
+        raise EvidenceRequestError("source provenance class is invalid")
+    reason = _validate_utf8_scalar(
+        item.get("reason"), field="source provenance reason", max_bytes=1000,
+    )
+    return {
+        "evidence_id": expected_evidence_id,
+        "source_class": str(item["source_class"]),
+        "reason": reason,
+    }
+
+
+def apply_source_assessment(
+    record: EvidenceRecord, assessment: Mapping[str, str],
+) -> EvidenceRecord:
+    """Bind a source assessment into evidence identity without allowing upgrades of
+    known UGC or explicit caller classifications."""
+    if record.kind != "external" or assessment.get("evidence_id") != record.evidence_id:
+        raise EvidenceRequestError("source assessment does not match external evidence")
+    method = record.metadata.get("provenance_method")
+    if method in {"known-ugc", "caller-rule"}:
+        return record
+    if method != "unassessed" \
+            or record.metadata.get("source_class") != "unclassified-external":
+        raise EvidenceRequestError("external evidence provenance state is invalid")
+    source_class = str(assessment.get("source_class"))
+    if _ugc_host(str(record.metadata.get("publisher_domain", ""))):
+        source_class = "ugc"
+        method = "known-ugc"
+        reason = "server-enforced known UGC origin"
+    else:
+        method = "isolated-model-assessment"
+        reason = str(assessment.get("reason", ""))[:1000]
+    metadata = {
+        **record.metadata,
+        "source_class": source_class,
+        "provenance_method": method,
+        "provenance_reason": reason,
+    }
+    identity = _evidence_identity(
+        record.claim_id, record.kind, record.source, record.source_sha256,
+        metadata, record.passage_start, record.passage_end,
+    )
+    return replace(record, evidence_id="e" + identity, metadata=metadata)
 
 
 @dataclass(frozen=True)
@@ -402,7 +483,7 @@ def collect_evidence(
     snapshot: PlanRepositorySnapshot,
     store: EvidenceStore,
     run_id: str,
-    search_provider: EndpointSearchProvider | None = None,
+    search_provider: SearchProvider | None = None,
     http_client: SafeHttpClient | None = None,
     budget: EvidenceBudget | None = None,
     external_source_policy: Sequence[Mapping[str, str]] = (),
@@ -532,6 +613,10 @@ def collect_evidence(
         else:
             if search_provider is None or http_client is None:
                 # Absence is explicit abstention, never a fabricated evidence record.
+                records.append(_abstention(
+                    claim_id, "external-search", data["query"],
+                    "native web discovery is disabled or unavailable",
+                ))
                 continue
             try:
                 hits = search_provider.search(
@@ -544,6 +629,11 @@ def collect_evidence(
             except NetworkEvidenceError as exc:
                 records.append(_abstention(claim_id, "external-search", data["query"], str(exc)))
                 continue
+            if not hits:
+                records.append(_abstention(
+                    claim_id, "external-search", data["query"],
+                    "native web discovery returned no candidates",
+                ))
             for hit in hits:
                 try:
                     response = http_client.fetch(
@@ -555,6 +645,11 @@ def collect_evidence(
                 except NetworkEvidenceError as exc:
                     records.append(_abstention(claim_id, "external-fetch", hit.url, str(exc)))
                     continue
+                source_class, provenance_method, provenance_reason = (
+                    initial_external_provenance(
+                        response.final_url, external_source_policy,
+                    )
+                )
                 records.append(_record(
                     store, run_id, claim_id, "external", response.final_url, response.body,
                     {
@@ -565,9 +660,9 @@ def collect_evidence(
                         "media_type": response.media_type,
                         "redirects": list(response.redirects),
                         "publisher_domain": _domain(response.final_url),
-                        "source_class": classify_external_source(
-                            response.final_url, external_source_policy,
-                        ),
+                        "source_class": source_class,
+                        "provenance_method": provenance_method,
+                        "provenance_reason": provenance_reason,
                         "independence_groups": [
                             "domain:" + _domain(response.final_url),
                             "content:" + response.sha256,
@@ -583,8 +678,8 @@ def _fetch_limits(remaining: int) -> FetchLimits:
     if remaining < 1:
         raise EvidenceRequestError("review evidence aggregate byte budget exceeded")
     return FetchLimits(
-        max_compressed_bytes=min(1 << 20, remaining),
-        max_decompressed_bytes=min(1 << 20, remaining),
+        max_compressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
+        max_decompressed_bytes=min(MAX_EXTERNAL_RESPONSE_BYTES, remaining),
     )
 
 
@@ -646,14 +741,16 @@ def _passage_bounds(
                 for token in re.findall(r"[\w.-]{4,}", hint, flags=re.UNICODE)
                 if len(token.encode("utf-8")) <= 128
             },
-            key=len,
-            reverse=True,
+            key=lambda token: (-len(token), token),
         )
         lowered = body.lower()
-        found = [lowered.find(token) for token in tokens]
-        found = [value for value in found if value >= 0]
-        if found:
-            position = min(found)
+        # Tokens are longest-first. Prefer the first match in that priority order
+        # rather than the earliest generic term in the document (for example, a
+        # title's "RFC 9110" over a later "published in June 2022" passage).
+        position = next(
+            (found for token in tokens if (found := lowered.find(token)) >= 0),
+            None,
+        )
     if position is None:
         return _align_utf8_window(body, 0, max_bytes)
     start = max(0, position - max_bytes // 4)
@@ -865,24 +962,44 @@ def _validate_metadata(kind: str, metadata: Mapping[str, Any]) -> None:
         },
         "external": {
             "requested_url", "final_url", "retrieved_at", "http_status", "media_type",
-            "redirects", "publisher_domain", "source_class", "independence_groups", "conflicts",
+            "redirects", "publisher_domain", "source_class", "provenance_method",
+            "provenance_reason", "independence_groups", "conflicts",
         },
         "supplied-artifact": {"source", "caller_supplied"},
         "abstention": {"stage", "reason"},
     }
     expected = schemas.get(kind)
+    legacy_external = {
+        "requested_url", "final_url", "retrieved_at", "http_status", "media_type",
+        "redirects", "publisher_domain", "source_class", "independence_groups", "conflicts",
+    }
+    if kind == "external" and set(metadata) == legacy_external:
+        # Read-only compatibility for records produced before native discovery.
+        # Their original metadata and evidence identity remain byte-for-byte intact.
+        expected = legacy_external
     if expected is None or set(metadata) != expected:
         raise EvidenceRequestError(f"persisted {kind} metadata has missing or unknown fields")
     string_fields = {
         "prefix", "snapshot_commit", "path", "blob_oid", "pattern", "ref", "history_oid",
         "runtime", "requested_url", "final_url", "retrieved_at", "media_type",
         "publisher_domain", "source_class", "source", "stage", "reason",
+        "provenance_method", "provenance_reason",
     }
     for key in expected.intersection(string_fields):
         if not isinstance(metadata.get(key), str):
             raise EvidenceRequestError(f"persisted {kind}.{key} must be a string")
     if kind == "external" and metadata.get("source_class") not in EXTERNAL_SOURCE_CLASSES:
         raise EvidenceRequestError("persisted external.source_class is invalid")
+    if kind == "external" and "provenance_method" in metadata \
+            and metadata.get("provenance_method") not in {
+        "known-ugc", "caller-rule", "unassessed", "isolated-model-assessment",
+    }:
+        raise EvidenceRequestError("persisted external.provenance_method is invalid")
+    if kind == "external" and "provenance_reason" in metadata and (
+        not metadata.get("provenance_reason")
+        or len(str(metadata["provenance_reason"]).encode("utf-8")) > 1000
+    ):
+        raise EvidenceRequestError("persisted external.provenance_reason is invalid")
     for key in expected.intersection({"whole_size", "offset", "length", "limit", "exit_status", "http_status"}):
         value = metadata.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -1097,7 +1214,14 @@ def validate_cached_records(
                 current_class = classify_external_source(
                     record.metadata["final_url"], external_source_policy,
                 )
-                if record.metadata.get("source_class") != current_class:
+                method = record.metadata.get("provenance_method")
+                if method == "isolated-model-assessment":
+                    # A later explicit rule or newly recognized UGC origin overrides a
+                    # prior model assessment. With no rule, retain it only for the same
+                    # bounded external-evidence TTL as the fetched bytes.
+                    if current_class != "unclassified-external":
+                        raise EvidenceRequestError("external source authority policy changed")
+                elif record.metadata.get("source_class") != current_class:
                     raise EvidenceRequestError("external source authority policy changed")
                 stamp = datetime.fromisoformat(str(record.metadata["retrieved_at"]))
                 if stamp.tzinfo is None:

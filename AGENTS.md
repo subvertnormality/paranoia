@@ -127,6 +127,14 @@ completion evidence before changing defaults.
 ## Review and delivery discipline
 
 - Use tests to reproduce accepted in-scope failures before changing production code.
+- Prove the primary user capability end to end before starting adversarial convergence. A
+  placeholder URL, hypothetical service, optional plugin, caller-supplied adapter, or unit
+  test around a fake is not an implementation of a required default path. For an external
+  integration, name the concrete generally available API or built-in mechanism, its auth
+  source, its failure behavior, and execute a live smoke test when credentials permit.
+- Treat acceptance failures as architectural evidence. A clean prose/code review cannot
+  compensate for a primary path that has never successfully run in its supported operating
+  environment.
 - Test class invariants and root causes, not only the latest example.
 - After a class fix, run one focused verification round to test that architectural decision;
   do not automatically begin another unbounded patch cycle.

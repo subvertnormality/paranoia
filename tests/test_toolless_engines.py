@@ -38,7 +38,47 @@ def test_codex_toolless_profile_exposes_native_binary_not_shell_or_repository(
     assert " /bin " not in joined and " /usr/bin " not in joined
     assert str(tmp_path / "scratch") not in joined, "scratch is an inner tmpfs, not host bind"
     assert "tools.web_search=false" in joined
+    assert "skill_search" not in joined
     assert "--ignore-user-config" in argv and "--ephemeral" in argv
+
+
+def test_codex_discovery_profile_exposes_only_live_web_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native = tmp_path / "codex-native"
+    native.write_bytes(b"binary")
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}")
+    monkeypatch.setattr(CodexEngine, "_native_binary", lambda self: native)
+    monkeypatch.setattr(CodexEngine, "_auth_file", lambda self: auth)
+    monkeypatch.setattr(CodexEngine, "_audit_toolless_binary", lambda self: None)
+
+    argv = CodexEngine().build_discovery_argv(tmp_path / "scratch", "gpt", "high")
+    joined = " ".join(argv)
+
+    assert " /codex --search exec " in joined
+    assert "tools.web_search=true" in joined
+    assert "--disable shell_tool" in joined
+    assert "--disable unified_exec" in joined
+    assert "--ignore-user-config" in argv and "--ephemeral" in argv
+    assert str(tmp_path / "scratch") not in joined
+
+
+def test_claude_discovery_profile_exposes_web_search_without_fetch_or_local_tools(
+    tmp_path: Path,
+) -> None:
+    argv = ClaudeEngine().build_discovery_argv(tmp_path, "claude", "high")
+    allowed = argv[argv.index("--allowedTools") + 1]
+    available = argv[argv.index("--tools") + 1]
+    denied = argv[argv.index("--disallowedTools") + 1]
+
+    assert allowed == "WebSearch"
+    assert available == "WebSearch"
+    assert "WebFetch" in denied
+    assert "Read" in denied and "Bash" in denied and "Write" in denied
+    assert argv[argv.index("--max-turns") + 1] == "4"
+    assert argv[argv.index("--setting-sources") + 1] == ""
+    assert argv[argv.index("--mcp-config") + 1] == '{"mcpServers":{}}'
 
 
 def test_codex_toolless_profile_fails_closed_without_auth(
@@ -73,6 +113,20 @@ def test_toolless_run_never_exposes_ephemeral_codex_thread_for_rebut(
 
 def test_codex_toolless_versions_are_an_exact_audited_set() -> None:
     assert CodexEngine.TOOLLESS_VERSIONS == {"0.144.6", "0.146.0-alpha.3.1"}
+
+
+def test_codex_isolation_audit_rejects_an_unadvertised_feature_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = iter([
+        subprocess.CompletedProcess([], 0, "codex-cli 0.144.6\n", ""),
+        subprocess.CompletedProcess([], 0, "shell_tool stable true\n", ""),
+    ])
+    monkeypatch.setattr(
+        "paranoia_local.engines.subprocess.run", lambda *args, **kwargs: next(calls),
+    )
+    with pytest.raises(ToollessUnavailable, match="unsupported feature controls"):
+        CodexEngine._audit_toolless_binary(tmp_path / "codex")
 
 
 def test_toolless_preflight_rejects_a_missing_cli_before_build(

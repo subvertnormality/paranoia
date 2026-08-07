@@ -18,6 +18,7 @@ from paranoia_local import (
     plan_snapshot as ps,
 )
 from paranoia_local.engines import Review, ToollessUnavailable
+from paranoia_local.external_evidence import RawResponse, SafeHttpClient
 
 
 def _verified_plan(arguments, **kwargs):
@@ -66,9 +67,20 @@ class ClaimEngine:
             request = {"op": "READ_BLOB", "claim_id": claim_id, "path": "app.py", "offset": 0,
                        "max_bytes": 1048576}
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request]))
+        if "source-provenance assessor" in prompt:
+            evidence = re.search(r'"evidence_id":"(e[0-9a-f]{32})"', prompt).group(1)
+            assessment = {
+                "evidence_id": evidence, "source_class": "authoritative",
+                "reason": "the publisher controls the documented behavior",
+            }
+            return _review(
+                "=== SOURCE PROVENANCE ===\nASSESSMENTS-JSON: " + _json([assessment])
+            )
         if "preparing bounded repository context" in prompt:
             return _review("=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: []")
         if "neutral evidence verifier" in prompt:
+            if "NONE — verification must abstain." in prompt:
+                return _review("=== VERIFICATION REGISTER ===\nEVENTS-JSON: []")
             claim_id = re.search(r'"claim_id":"([0-9a-f]{32})"', prompt).group(1)
             evidence = re.search(r'"evidence_id":"(e[0-9a-f]{32})"', prompt).group(1)
             events = []
@@ -105,20 +117,21 @@ def _json(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
-def test_claim_verification_is_diagnostic_by_default(
+def test_claim_verification_is_blocking_by_default(
     repo: Path, tmp_path: Path,
 ) -> None:
     engine = ClaimEngine()
     out = handlers.critique_plan(
         {
             "repo_path": str(repo), "plan_text": "Use greet.\n",
-            "lineage": "default-diagnostic", "round": 1,
+            "lineage": "default-blocking", "round": 1,
         },
         engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
     )
     assert engine.tool_less_prompts
     assert not engine.ordinary_prompts
-    assert "CLAIM-CLOSURE: DIAGNOSTIC-NOT-BLOCKED" in out
+    assert "CLAIM-CLOSURE: NOT-BLOCKED" in out
+    assert "CONVERGENCE: NOT-BLOCKED" in out
 
 
 def test_diagnostic_claims_are_reported_but_do_not_govern_convergence(
@@ -181,6 +194,91 @@ def test_authoritative_external_evidence_is_only_eligible_not_self_proving() -> 
     handlers._validate_verifier_batch_event(
         event, batch_ids={"e1"}, eligible_ids=eligible, untrusted=True,
     )
+
+
+def test_external_claim_uses_native_search_and_assesses_authority_without_env_config(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ExternalEngine(ClaimEngine):
+        def __init__(self) -> None:
+            super().__init__()
+            self.discovery_prompts: list[str] = []
+
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "neutral evidence planner" in prompt:
+                self.tool_less_prompts.append(prompt)
+                claim_id = re.search(r'"claim_id":"([0-9a-f]{32})"', prompt).group(1)
+                request = {
+                    "op": "SEARCH_EXTERNAL", "claim_id": claim_id,
+                    "query": "Example API current stable version", "limit": 1,
+                }
+                return _review(
+                    "=== EVIDENCE REQUESTS ===\nREQUESTS-JSON: " + _json([request])
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+        def run_discovery(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            self.discovery_prompts.append(prompt)
+            return _review(
+                "=== SEARCH CANDIDATES ===\nCANDIDATES-JSON: "
+                '[{"title":"Official API reference",'
+                '"url":"https://docs.example.com/reference"}]'
+            )
+
+    class Client:
+        _validate_url = staticmethod(SafeHttpClient._validate_url)
+
+        def fetch(self, url, limits=None, on_attempt=None, on_bytes=None,
+                  remaining_bytes=None):
+            if on_attempt is not None:
+                on_attempt()
+            body = b"The current stable Example API version is 7."
+            if on_bytes is not None:
+                on_bytes(len(body))
+            return RawResponse(
+                requested_url=url, final_url=url,
+                retrieved_at="2026-08-07T00:00:00+00:00", status=200,
+                media_type="text/plain", body=body,
+                sha256=hashlib.sha256(body).hexdigest(), size=len(body), redirects=(),
+            )
+
+    monkeypatch.delenv("PARANOIA_SEARCH_ENDPOINT", raising=False)
+    monkeypatch.setattr(handlers, "SafeHttpClient", Client)
+    engine = ExternalEngine()
+    out = _verified_plan(
+        {
+            "repo_path": str(repo),
+            "plan_text": "Use Example API version 7 because it is the current stable release.\n",
+            "lineage": "native-search-default", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+
+    assert engine.discovery_prompts
+    assert "CLAIM-CLOSURE: NOT-BLOCKED" in out
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "native-search-default", stamp="T2", mode=cc.PLAN_MODE,
+    )
+    state = pc.state_from_json("native-search-default", lineage.claim_state)
+    external = next(row for row in state.evidence_records if row["kind"] == "external")
+    assert external["metadata"]["source_class"] == "authoritative"
+    assert external["metadata"]["provenance_method"] == "isolated-model-assessment"
+
+
+def test_structural_evidence_role_has_a_self_contained_register_protocol() -> None:
+    instructions = handlers.prompts.PLAN_STRUCTURAL_EVIDENCE_INSTRUCTIONS
+    assert "=== EVIDENCE REQUESTS ===" in instructions
+    assert "REQUESTS-JSON:" in instructions
+    assert '"op":"SEARCH_LITERAL"' in instructions
+    assert '"pattern":"literal"' in instructions
+    assert "same exact schemas" not in instructions
+
+
+def test_evidence_planner_routes_inherently_external_claims_directly_to_search() -> None:
+    instructions = handlers.prompts.PLAN_EVIDENCE_REQUEST_INSTRUCTIONS
+    assert "standards, external APIs/libraries" in instructions
+    assert "request\nSEARCH_EXTERNAL directly" in instructions
+    assert "Do not spend repository-wide searches" in instructions
 
 
 def test_refinable_evidence_rotates_fairly_across_claims_and_sources() -> None:
@@ -391,6 +489,7 @@ def test_diagnostic_mode_blocks_post_preflight_operational_failure(
         {
             "repo_path": str(repo), "plan_text": "Use greet.\n",
             "lineage": "diagnostic-role-failure", "round": 1,
+            "claim_verification": "diagnostic",
         },
         engine=FailingRoleEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
     )
@@ -413,6 +512,7 @@ def test_audit_log_records_the_actual_diagnostic_mode(
         {
             "repo_path": str(repo), "plan_text": "Use greet.\n",
             "lineage": "diagnostic-log-mode", "round": 1,
+            "claim_verification": "diagnostic",
         },
         engine=ClaimEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
     )
@@ -1262,7 +1362,7 @@ def test_authorization_contract_upgrade_reruns_both_persisted_vendor_checks(
         cc.default_state_root(), lineage_id, stamp="T3", mode=cc.PLAN_MODE,
     )
     state = pc.state_from_json(lineage_id, lineage.claim_state)
-    assert state.authorization_policy["version"] == 2
+    assert state.authorization_policy["version"] == 3
 
 
 def test_authorization_upgrade_rechecks_completed_dispute_without_reapplying_edge(
@@ -1310,7 +1410,7 @@ def test_authorization_upgrade_rechecks_completed_dispute_without_reapplying_edg
         body_digest, 1, 0, 1, body_digest, "x",
         {"source": "result", "caller_supplied": True},
     )
-    policy = {"version": 2, "independent_check": "auto", "high_stakes": False}
+    policy = {"version": 3, "independent_check": "auto", "high_stakes": False}
     handlers._reblock_for_policy(
         state, [record], policy,
         persisted_policy={

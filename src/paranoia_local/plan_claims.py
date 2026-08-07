@@ -846,7 +846,7 @@ def state_from_json(lineage_id: str, raw: Mapping[str, Any] | None) -> ClaimStat
     if policy is not None and (
         not isinstance(policy, dict)
         or set(policy) != {"version", "independent_check", "high_stakes"}
-        or policy.get("version") not in {1, 2}
+        or policy.get("version") not in {1, 2, 3}
         or policy.get("independent_check") not in {"auto", "require"}
         or not isinstance(policy.get("high_stakes"), bool)
     ):

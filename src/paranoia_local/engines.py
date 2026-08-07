@@ -99,6 +99,9 @@ class Engine(ABC):
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
         raise ToollessUnavailable(f"{self.name} has no enforceable toolless profile")
 
+    def build_discovery_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        raise ToollessUnavailable(f"{self.name} has no enforceable web-discovery profile")
+
     def preflight_toolless(self, model: str, effort: str) -> None:
         """Validate the empty-capability boundary before caller state is acquired."""
         if not shutil.which(self.binary):
@@ -110,6 +113,19 @@ class Engine(ABC):
         except (OSError, subprocess.SubprocessError) as exc:
             raise ToollessUnavailable(
                 f"{self.name} toolless capability preflight failed: {exc}"
+            ) from exc
+
+    def preflight_discovery(self, model: str, effort: str) -> None:
+        """Validate the search-only capability boundary before a review starts."""
+        if not shutil.which(self.binary):
+            raise ToollessUnavailable(f"{self.binary} CLI is not installed")
+        try:
+            self.build_discovery_argv(Path(tempfile.gettempdir()), model, effort)
+        except ToollessUnavailable:
+            raise
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ToollessUnavailable(
+                f"{self.name} web-discovery capability preflight failed: {exc}"
             ) from exc
 
     def run_toolless(
@@ -132,6 +148,22 @@ class Engine(ABC):
             review = self._execute(argv, prompt, cwd, runner, timeout, on_progress)
             # These roles are intentionally fresh and, for Codex, explicitly ephemeral.
             # Never expose a token that ordinary `rebut` cannot safely resume.
+            return replace(review, session_ref=None)
+
+    def run_discovery(
+        self,
+        prompt: str,
+        model: str,
+        effort: str,
+        runner: Runner | None = None,
+        timeout: int | None = None,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> Review:
+        """Run a fresh role with native search as its only external capability."""
+        with tempfile.TemporaryDirectory(prefix=f"paranoia-{self.name}-web-only-") as raw:
+            cwd = Path(raw)
+            argv = self.build_discovery_argv(cwd, model, effort)
+            review = self._execute(argv, prompt, cwd, runner, timeout, on_progress)
             return replace(review, session_ref=None)
 
     def resume(
@@ -198,6 +230,13 @@ class CodexEngine(Engine):
     binary = "codex"
 
     TOOLLESS_VERSIONS = frozenset({"0.144.6", "0.146.0-alpha.3.1"})
+    ISOLATED_DISABLED_FEATURES = (
+        "shell_tool", "unified_exec", "multi_agent", "multi_agent_v2",
+        "apps", "browser_use", "computer_use", "code_mode", "code_mode_host",
+        "image_generation", "goals", "workspace_dependencies", "auth_elicitation",
+        "in_app_browser", "plugins", "plugin_sharing", "remote_plugin",
+        "skill_mcp_dependency_install", "tool_call_mcp_elicitation", "tool_suggest",
+    )
 
     @staticmethod
     def _is_elf(path: Path) -> bool:
@@ -243,11 +282,25 @@ class CodexEngine(Engine):
             raise ToollessUnavailable(
                 f"Codex {version or 'unknown'} has no audited empty-tool profile"
             )
+        features = subprocess.run(
+            [str(native), "features", "list"], capture_output=True, text=True, timeout=10,
+        )
+        advertised = {
+            line.split()[0] for line in features.stdout.splitlines() if line.split()
+        }
+        missing = sorted(set(CodexEngine.ISOLATED_DISABLED_FEATURES) - advertised)
+        if features.returncode or missing:
+            detail = ", ".join(missing) if missing else f"exit {features.returncode}"
+            raise ToollessUnavailable(
+                f"Codex isolated profile has unsupported feature controls ({detail})"
+            )
 
-    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+    def _build_isolated_argv(
+        self, cwd: Path, model: str, effort: str, *, discovery: bool,
+    ) -> list[str]:
         bwrap = shutil.which("bwrap")
         if not bwrap:
-            raise ToollessUnavailable("bwrap is required for Codex toolless roles")
+            raise ToollessUnavailable("bwrap is required for isolated Codex roles")
         native, auth = self._native_binary(), self._auth_file()
         if not auth.is_file():
             raise ToollessUnavailable("Codex auth file is unavailable for isolated role")
@@ -270,25 +323,28 @@ class CodexEngine(Engine):
         for source in ("/etc/ssl/certs", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf"):
             if Path(source).exists():
                 argv += ["--ro-bind", source, source]
-        argv += [
-            "--", "/codex", "exec", "--json", "--ephemeral", "--ignore-user-config",
+        codex_command = ["/codex"]
+        if discovery:
+            # The root --search flag selects live (not cached) native web search.
+            codex_command.append("--search")
+        codex_command += [
+            "exec", "--json", "--ephemeral", "--ignore-user-config",
             "--strict-config",
             "--skip-git-repo-check", "-s", "danger-full-access", "-C", "/work",
             "-m", model, "-c", f'model_reasoning_effort="{effort}"',
-            "-c", "tools.web_search=false",
-            "--disable", "shell_tool", "--disable", "unified_exec",
-            "--disable", "multi_agent", "--disable", "multi_agent_v2",
-            "--disable", "apps", "--disable", "browser_use",
-            "--disable", "computer_use", "--disable", "code_mode",
-            "--disable", "code_mode_host", "--disable", "image_generation",
-            "--disable", "goals", "--disable", "workspace_dependencies",
-            "--disable", "auth_elicitation", "--disable", "in_app_browser",
-            "--disable", "plugins", "--disable", "plugin_sharing",
-            "--disable", "remote_plugin", "--disable", "skill_search",
-            "--disable", "skill_mcp_dependency_install",
-            "--disable", "tool_call_mcp_elicitation", "--disable", "tool_suggest", "-",
+            "-c", f"tools.web_search={'true' if discovery else 'false'}",
         ]
+        for feature in self.ISOLATED_DISABLED_FEATURES:
+            codex_command += ["--disable", feature]
+        codex_command.append("-")
+        argv += ["--", *codex_command]
         return argv
+
+    def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        return self._build_isolated_argv(cwd, model, effort, discovery=False)
+
+    def build_discovery_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        return self._build_isolated_argv(cwd, model, effort, discovery=True)
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         argv = [
@@ -409,7 +465,7 @@ class ClaudeEngine(Engine):
     TOOLLESS_REQUIRED_FLAGS = frozenset({
         "--output-format", "--model", "--effort", "--permission-mode",
         "--setting-sources", "--allowedTools", "--tools", "--strict-mcp-config",
-        "--mcp-config", "--disallowedTools",
+        "--mcp-config", "--disallowedTools", "--max-turns",
     })
 
     def preflight_toolless(self, model: str, effort: str) -> None:
@@ -435,6 +491,10 @@ class ClaudeEngine(Engine):
             )
         self.build_toolless_argv(Path(tempfile.gettempdir()), model, effort)
 
+    def preflight_discovery(self, model: str, effort: str) -> None:
+        self.preflight_toolless(model, effort)
+        self.build_discovery_argv(Path(tempfile.gettempdir()), model, effort)
+
     def build_toolless_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
         denied = list(dict.fromkeys([*CLAUDE_RO_TOOLS, *CLAUDE_WEB_TOOLS, *CLAUDE_DENY_TOOLS]))
         return [
@@ -442,6 +502,19 @@ class ClaudeEngine(Engine):
             "--effort", effort, "--permission-mode", "default",
             "--setting-sources", "", "--allowedTools", "",
             "--tools", "", "--strict-mcp-config",
+            "--mcp-config", '{"mcpServers":{}}',
+            "--disallowedTools", ",".join(denied),
+        ]
+
+    def build_discovery_argv(self, cwd: Path, model: str, effort: str) -> list[str]:
+        denied = list(dict.fromkeys([
+            *CLAUDE_RO_TOOLS, "WebFetch", *CLAUDE_DENY_TOOLS,
+        ]))
+        return [
+            "claude", "-p", "--output-format", "json", "--model", model,
+            "--effort", effort, "--permission-mode", "default",
+            "--setting-sources", "", "--allowedTools", "WebSearch",
+            "--tools", "WebSearch", "--max-turns", "4", "--strict-mcp-config",
             "--mcp-config", '{"mcpServers":{}}',
             "--disallowedTools", ",".join(denied),
         ]

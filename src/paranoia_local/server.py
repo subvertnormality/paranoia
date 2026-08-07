@@ -246,12 +246,12 @@ TOOLS: list[Tool] = [
                 "claim_verification": {
                     "type": "string",
                     "enum": ["off", "diagnostic", "blocking"],
-                    "default": "diagnostic",
+                    "default": "blocking",
                     "description": (
                         "Plan claim verification rollout. 'off' preserves ordinary "
-                        "class-closure review. 'diagnostic' (the default) records and reports "
-                        "claim closure without letting it govern CONVERGENCE. 'blocking' "
-                        "combines claim and class gates. Non-off modes require class_closure."
+                        "class-closure review. 'blocking' (the default) combines claim and "
+                        "class gates. 'diagnostic' records and reports claim closure without "
+                        "letting it govern CONVERGENCE. Non-off modes require class_closure."
                     ),
                 },
                 "independent_check": {
@@ -310,9 +310,10 @@ TOOLS: list[Tool] = [
                         "additionalProperties": False,
                     },
                     "description": (
-                        "Trusted exact host/path provenance rules for fetched evidence. "
+                        "Optional trusted exact host/path provenance overrides for fetched "
+                        "evidence. Unmatched pages receive an isolated provenance assessment. "
                         "Only primary or authoritative records may authorize an external "
-                        "truth/bearing transition; unmatched and secondary pages are context."
+                        "truth/bearing transition; secondary and UGC pages are context."
                     ),
                 },
                 "refresh_claims": {

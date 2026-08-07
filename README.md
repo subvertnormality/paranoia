@@ -242,9 +242,9 @@ registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
 `critique_plan` can add fresh toolless roles that extract factual premises, request
 bounded server-owned repository/external evidence, and verify, contradict, defer, or
-abstain. The rollout is explicit: `diagnostic` is the default and records/reports claims
-without governing convergence, `blocking` combines the claim and class gates, and `off` is
-an explicit opt-out.
+abstain. `blocking` is the default and combines claim and class closure. `diagnostic`
+still runs and persists verification but does not let unresolved claim findings govern
+convergence; `off` is the explicit opt-out.
 Registered claims persist independently of defect classes; a later reviewer cannot make
 one disappear by omission.
 
@@ -265,6 +265,11 @@ database or publishing refs. Models see server span IDs and bounded repository r
 repository tools. Plan bytes appear only as ordered, JSON-escaped span data, including for
 the structural reviewer. External passages only enter a command-incapable role; the
 structural reviewer receives their metadata, not remote bytes.
+External discovery works through the selected signed-in reviewer CLI: Codex native live
+search or Claude `WebSearch`. No separate search API, endpoint, plugin, or API key is
+required. Search returns only candidate URLs. The server validates and fetches each page,
+then a fresh page-isolated role assesses publisher provenance before a separate verifier
+can use its bounded passage. Search rank and discovery-model labels have no authority.
 Unavailable sources cause round-local abstention and remain blocking; abstentions are never
 sent to an evidence verifier or mixed with repository/supplied verifier packets. The full trust model, register
 grammar, evidence limits, caching, and recovery rules are in
@@ -379,11 +384,11 @@ separate structural reviewer judges the design. See
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
-| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `diagnostic` | Verification runs by default; `diagnostic` reports/persists unresolved claims without letting those findings govern convergence, while `blocking` combines both gates. Operationally incomplete rounds block in either enabled mode. Non-off modes require class closure |
+| `claim_verification` | `off` \| `diagnostic` \| `blocking` | `blocking` | Verification runs and governs convergence by default. `diagnostic` reports/persists unresolved claims without letting those findings govern convergence. Operationally incomplete rounds block in either enabled mode. Non-off modes require class closure |
 | `independent_check` | `auto` \| `require` | `auto` | Distinct-vendor evidence audit policy; unavailable required checks stay blocking, including required deferrals |
 | `stakes_level` | `low` \| `high` | high for any stated stakes | Explicit authorization-risk policy for `auto`; natural-language stakes are never parsed for opt-down words |
 | `supplied_evidence` | array | `[]` | Up to 20 `{claim, source, content}` caller artifacts. The server hashes them; the verifier still decides what they establish |
-| `external_source_policy` | array | `[]` | Trusted exact `{host, path_prefix, source_class}` rules. Only `primary`/`authoritative` records may authorize truth; secondary, UGC (including Reddit-style hosts), and unmatched pages are context |
+| `external_source_policy` | array | `[]` | Optional trusted exact `{host, path_prefix, source_class}` overrides. Unmatched pages receive a fresh source-isolated provenance assessment. Only `primary`/`authoritative` records may authorize truth; secondary and UGC remain context |
 | `refresh_claims` | boolean | `false` | Bypass an otherwise valid zero-research cache hit for this round |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
 | `focus` | string | — | Narrow the review to a specific concern |
@@ -395,8 +400,8 @@ Claim-enabled plan review does not consult `.paranoia.toml` for any setting. Its
 effort, web policy, stakes, and other controls come only from call arguments and process
 defaults; checked-in repository bytes cannot become role instructions or weaken the gate.
 `class_closure: false` performs one ordinary review and emits no lineage state or
-`CONVERGENCE`. Keep new deployments in `diagnostic` until representative measurements
-justify promotion to `blocking`.
+`CONVERGENCE`. Use `diagnostic` deliberately when measuring extraction quality or tuning a
+workflow without enforcing claim closure; it is not the default safety posture.
 
 ### `query`
 
@@ -619,13 +624,14 @@ base_ref = "develop"
 stakes = "Internal booking API, single team, authenticated first-party callers, ~1k req/min."
 web_search = true
 isolate = true
-# Optional server-owned external discovery for critique_plan claim verification.
 ```
 
 Honoured keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
 `class_closure`, `max_packet_chars`, `model`, `effort`, and `web_search`.
-Set trusted process environment variable `PARANOIA_SEARCH_ENDPOINT` for the plan
-claim-verification fetch boundary. A reviewed repository cannot select an outbound host.
+Claim verification uses the configured reviewer CLI's built-in search with its existing
+subscription login. There is no search-endpoint environment variable. Closure-enabled plan
+reviews ignore repository configuration, so a reviewed repository cannot select a search
+provider or widen the search-only role.
 
 The loader accepts at most 64 KiB from a no-follow, nonblocking regular file and ignores
 symlinks, special files, oversized input, and files changed during the read. Closure-enabled
@@ -745,9 +751,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   can select any explicit bounded range from retained evidence without refetching it. A bounded passage
   can authorize only a fact directly entailed by visible bytes—not absence, exhaustive
   coverage, or an unshown source-wide property. Non-UTF-8 bytes that require lossy
-  replacement decoding are likewise context-only. Authorization
-  contract version 2 reblocks and reruns required version-1 provenance through both actual
-  vendors before migration, including intrinsically audited advisory-bearing and dispute
+  replacement decoding are likewise context-only. Authorization contract version 3
+  invalidates older cache policy when native discovery/provenance semantics must run;
+  version 2 reblocked and reran required version-1 provenance through both actual vendors,
+  including intrinsically audited advisory-bearing and dispute
   events under `auto`/low stakes. A completed dispute outcome is reauthorized in place
   without replaying its already-consumed state edge, and duplicate event evidence IDs are
   rejected before digest/audit persistence. Auditor packets contain the complete validated claim
@@ -773,9 +780,10 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   literal-search, and history evidence carries an explicit completeness result; searches bind
   candidate paths and inspected object/range identities. Incomplete query records remain
   visible as context but cannot authorize claim-state or bearing transitions, so truncation
-  cannot masquerade as proof of absence. Configured search endpoint placeholders are
-  restricted to path/query components and the fixed HTTPS origin is rechecked after
-  substitution. Independently audited events complete semantic validation before
+  cannot masquerade as proof of absence. Native web discovery runs in a fresh profile with
+  no repository, shell, MCP, app, browser, fetch, or local-file capability; it returns only
+  bounded public HTTPS candidates, which the server independently fetches and hashes.
+  Independently audited events complete semantic validation before
   authorization state is consulted, keeping invalid transitions inside the normal
   correction boundary. Existing plan lineage files require the exact schema-v2 envelope;
   missing claim state is quarantined instead of defaulting to an empty register, and
