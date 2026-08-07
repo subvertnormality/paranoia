@@ -795,8 +795,10 @@ def validate_cached_records(
             valid.append(record)
         except EvidenceBudgetExceeded:
             raise
-        except (EvidenceRequestError, EvidenceStoreError, SnapshotUnavailable,
-                KeyError, TypeError, ValueError):
+        # Semantic cache misses invalidate the record. Operational CAS/snapshot I/O
+        # failures are not evidence that the record is stale and must fail the round
+        # explicitly instead of silently permitting an unrelated NOT-BLOCKED verdict.
+        except (EvidenceRequestError, KeyError, TypeError, ValueError):
             invalid_ids.add(record.evidence_id)
     if invalid_ids:
         for claim in state.claims.values():
@@ -806,7 +808,7 @@ def validate_cached_records(
             if invalid_ids.intersection(pending_ids):
                 claim.pending_transition = None
             if invalid_ids.intersection(claim.evidence_ids):
-                claim.status = pc.STALE
+                pc.mark_claim_stale(claim)
             for field_name in (
                 "truth_authorization", "bearing_authorization", "dispute_authorization",
                 "deferral_authorization",
@@ -829,7 +831,7 @@ def validate_cached_records(
             if valid_bindings.get(evidence_id) != claim.claim_id
         }
         if missing:
-            claim.status = pc.STALE
+            pc.mark_claim_stale(claim)
             if missing.intersection(
                 (claim.pending_transition or {}).get("evidence_ids", [])
             ):

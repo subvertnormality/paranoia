@@ -361,14 +361,17 @@ def _read_small_regular_at(
         raise SnapshotUnavailable(f"repository ref is unavailable at {name!r}: {exc}") from exc
 
 
-def _copy_loose_refs(common: Path, destination: Path) -> None:
+def _copy_loose_refs(common: Path, destination: Path) -> tuple[str, ...]:
     """Materialize supplied loose refs without following any tree component."""
     destination.mkdir(mode=0o700)
     root_fd = _open_refs_root(common, create=False)
     entries = 0
     copied_bytes = 0
+    skipped: list[str] = []
 
-    def copy_directory(source_fd: int, target: Path, depth: int) -> None:
+    def copy_directory(
+        source_fd: int, target: Path, depth: int, relative: tuple[str, ...],
+    ) -> None:
         nonlocal entries, copied_bytes
         if depth > 64:
             raise SnapshotUnavailable("repository ref tree exceeds depth cap")
@@ -389,12 +392,13 @@ def _copy_loose_refs(common: Path, destination: Path) -> None:
                 child_target = target / name
                 child_target.mkdir(mode=0o700)
                 try:
-                    copy_directory(child_fd, child_target, depth + 1)
+                    copy_directory(child_fd, child_target, depth + 1, (*relative, name))
                 finally:
                     os.close(child_fd)
                 continue
             if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
-                raise SnapshotUnavailable(f"repository ref path is unsafe: {name!r}")
+                skipped.append("git-ref:" + "/".join((*relative, name)))
+                continue
             data = _read_small_regular_at(source_fd, name)
             copied_bytes += len(data)
             if copied_bytes > MAX_DISCOVERY_BYTES:
@@ -402,9 +406,10 @@ def _copy_loose_refs(common: Path, destination: Path) -> None:
             (target / name).write_bytes(data)
 
     try:
-        copy_directory(root_fd, destination, 0)
+        copy_directory(root_fd, destination, 0, ("refs",))
     finally:
         os.close(root_fd)
+    return tuple(skipped)
 
 
 def _ref_parts(name: str) -> tuple[str, ...]:
@@ -593,6 +598,7 @@ def _ref_token(run_id: str) -> str:
 class _GitControl:
     directory: Path
     environment: dict[str, str]
+    skipped_refs: tuple[str, ...] = ()
 
 
 def _controlled_config_value(
@@ -660,13 +666,13 @@ def _create_git_control(repo: Path) -> _GitControl:
             data = _read_small_regular(source, max_bytes=cap, missing_ok=True)
             if data:
                 (directory / name).write_bytes(data)
-        _copy_loose_refs(common, directory / "refs")
+        skipped_refs = _copy_loose_refs(common, directory / "refs")
         environment = {
             "GIT_DIR": str(directory),
             "GIT_WORK_TREE": str(repo),
             "GIT_OBJECT_DIRECTORY": str(common / "objects"),
         }
-        return _GitControl(directory, environment)
+        return _GitControl(directory, environment, skipped_refs)
     except Exception:
         import shutil
         shutil.rmtree(directory, ignore_errors=True)
@@ -723,7 +729,8 @@ class PlanRepositorySnapshot:
             )
             tree, unavailable = _snapshot_tree_without_filters(repo, git_env=git_env)
             unavailable = tuple(dict.fromkeys([
-                *unavailable, *_find_special_paths(repo, ignored_paths=ignored)
+                *unavailable, *control.skipped_refs,
+                *_find_special_paths(repo, ignored_paths=ignored)
             ]))
             commit_args = ["commit-tree", "--no-gpg-sign", tree]
             if has_head:

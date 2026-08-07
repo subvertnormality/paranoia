@@ -625,6 +625,19 @@ def blocking_claims(state: ClaimState) -> list[Claim]:
     return [claim for claim in state.claims.values() if claim_blocks(claim)]
 
 
+def mark_claim_stale(claim: Claim) -> None:
+    """Make stale terminal for every not-yet-authorized transition."""
+    claim.status = STALE
+    claim.pending_transition = None
+    for slot in (
+        "truth_authorization", "bearing_authorization",
+        "dispute_authorization", "deferral_authorization",
+    ):
+        authorization = getattr(claim, slot)
+        if authorization and authorization.get("status") == "pending":
+            setattr(claim, slot, None)
+
+
 def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> None:
     """Relocate exact claim excerpts; ambiguity or deletion invalidates safely."""
     current_plan_sha256 = sha256(raw)
@@ -634,7 +647,7 @@ def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> 
         try:
             excerpt = base64.b64decode(claim.anchor_excerpt_b64, validate=True)
         except (ValueError, TypeError):
-            claim.status = STALE
+            mark_claim_stale(claim)
             continue
         offsets: list[int] = []
         start = 0
@@ -647,12 +660,12 @@ def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> 
             if len(offsets) > 1:
                 break
         if len(offsets) != 1:
-            claim.status = STALE
+            mark_claim_stale(claim)
             continue
         begin, end = offsets[0], offsets[0] + len(excerpt)
         chosen = [span for span in spans if span.end > begin and span.start < end]
         if not chosen:
-            claim.status = STALE
+            mark_claim_stale(claim)
             continue
         claim.plan_anchor = ResolvedAnchor(
             chosen[0].span_id, chosen[-1].span_id, begin, end, sha256(excerpt)
@@ -663,15 +676,13 @@ def reconcile_plan(state: ClaimState, raw: bytes, spans: Sequence[PlanSpan]) -> 
             # Pending DEFER anchors use ordinal span IDs. Bind them to the exact plan
             # snapshot on which the event was selected; never reinterpret them after an
             # edit, even when the claim excerpt itself relocates uniquely.
-            claim.pending_transition = None
-            claim.deferral_authorization = None
-            claim.status = STALE
+            mark_claim_stale(claim)
             continue
         # Deferred dependencies have their own exact ordering contract. Until all of
         # those excerpts are independently relocatable, any plan edit invalidates them.
         if claim.status == DEFERRED and claim.deferral \
                 and claim.deferral.get("plan_sha256") != current_plan_sha256:
-            claim.status = STALE
+            mark_claim_stale(claim)
 
 
 def _anchor_bytes(anchor: ResolvedAnchor, spans: Sequence[PlanSpan]) -> bytes:

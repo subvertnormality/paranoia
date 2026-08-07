@@ -142,7 +142,9 @@ stale/disputed. Evidence disputes are accepted only for cross-role-confirmed fac
 claims. Omission never deletes a claim.
 
 Plan edits relocate a claim only when its exact anchored bytes occur uniquely. Missing or
-ambiguous anchors become stale. Deferred claims additionally invalidate when their plan
+ambiguous anchors become stale. Marking a claim stale atomically clears every pending
+transition and incomplete truth, bearing, dispute, or deferral authorization, so replay
+cannot overwrite the stale result. Deferred claims additionally invalidate when their plan
 ordering snapshot changes; pending deferrals are invalidated before replay under the same
 full-plan snapshot rule.
 
@@ -168,7 +170,10 @@ Persisted records have an exact per-kind metadata schema, including nested colle
 types and empirical input hashes. Before cache evaluation, every retained truth, bearing,
 dispute, deferral-authorization, or other claim dependency must resolve to one valid record
 bound to that exact claim. Missing, malformed, mismatched, or wrong-claim dependencies stale
-the claim and leave it blocking.
+the claim and leave it blocking. A missing dependency means that no retained manifest record
+exists; failure to open or read a named CAS blob or repository snapshot is instead an
+operational verification failure. It blocks the round without treating inaccessible bytes
+as proof that the record is semantically stale.
 `stale`, `disputed`, and `malformed` states override any earlier advisory-bearing
 authorization; invalidated evidence or plan bytes must be revalidated before the claim
 can become nonblocking again.
@@ -275,8 +280,10 @@ failure, the validated exact event still persists with incomplete checks as a pe
 blocking transition. At the start of a later round the server replays that stored event
 and its exact evidence bindings directly through authorization; no model is asked to
 guess or reconstruct hidden event fields. Replay reuses only accepted vendor provenance
-whose event digest and evidence tuple are identical; every missing vendor, including the
-current primary vendor when necessary, is actually invoked. A pending deferral is bound to
+whose event digest and evidence tuple are identical. Provenance copied into multiple
+authorization slots by one `RESOLVE_DISPUTE` event is deduplicated by vendor before replay,
+and the completed identical authorization is written back to both slots. Every missing
+vendor, including the current primary vendor when necessary, is actually invoked. A pending deferral is bound to
 the complete plan snapshot on which its ordinal span IDs were selected. Any plan edit
 clears that pending event and marks the claim stale before replay can reinterpret those IDs
 against different bytes.
@@ -312,6 +319,8 @@ and one correction retry per model register. Evidence is content-addressed and r
 the same budget begins before cache validation: retained CAS bytes are reserved before
 bounded no-follow reads, repository/history/adapter revalidation is charged as attempted,
 and evidence records are charged again when rendered into verifier or auditor prompts.
+An independent-auditor packet is reserved separately before each actual vendor launch;
+sending the same named evidence to both vendors therefore consumes two transmission debits.
 Serialized bounded tree listings are likewise charged before their first evidence-planner
 or structural-planner call, in addition to the raw Git bytes charged during enumeration.
 Ignored-untracked and unsupported-nonregular path disclosures are completeness-marked and
@@ -335,8 +344,10 @@ materializing an attacker-sized directory first. Every snapshot Git process and 
 also has a hard deadline; a shared termination path kills and reaps the child under a
 second bounded deadline and translates wait failures into recoverable snapshot errors.
 Loose refs are copied through fd-anchored, no-follow traversal under explicit entry, depth,
-per-file, and aggregate-byte caps. Temporary pin creation, verification, and deletion use
-the same fd-relative boundary and reject every symlinked ancestor or ref file. Directly
+per-file, and aggregate-byte caps. A symlinked or nonregular loose-ref entry is skipped,
+never opened, and disclosed as unavailable; safe sibling refs remain usable. Temporary pin
+creation, verification, and deletion use the same fd-relative boundary and reject every
+symlinked ancestor or ref file in the server-owned pin namespace. Directly
 read Git metadata must be small regular
 files opened with no-follow and nonblocking flags, then checked again by file identity and
 size before a bounded read; FIFOs, devices, symlinks, and replacement races are rejected.

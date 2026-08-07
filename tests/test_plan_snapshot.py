@@ -165,31 +165,39 @@ def test_symlinked_repository_config_fails_before_git_runs(
         PlanRepositorySnapshot.create(repo, run_id="symlinked-config")
 
 
-@pytest.mark.parametrize("kind", ["ancestor", "loose-ref"])
-def test_repository_ref_symlinks_are_rejected_without_touching_their_targets(
-    repo: Path, tmp_path: Path, kind: str,
+def test_repository_loose_ref_symlink_is_skipped_without_touching_its_target(
+    repo: Path, tmp_path: Path,
 ) -> None:
     external = tmp_path / "external-refs"
     external.mkdir()
     sentinel = external / "sentinel"
     sentinel.write_text("unchanged")
-    if kind == "ancestor":
-        (repo / ".git" / "refs" / "paranoia").symlink_to(
-            external, target_is_directory=True,
-        )
-    else:
-        target = external / "external-ref"
-        target.write_text(subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
-            capture_output=True, text=True,
-        ).stdout)
-        (repo / ".git" / "refs" / "heads" / "external").symlink_to(target)
-    with pytest.raises(SnapshotUnavailable, match="ref path is unsafe"):
-        PlanRepositorySnapshot.create(repo, run_id=f"symlink-{kind}")
+    target = external / "external-ref"
+    target.write_text(subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout)
+    (repo / ".git" / "refs" / "heads" / "external").symlink_to(target)
+    with PlanRepositorySnapshot.create(repo, run_id="symlink-loose-ref") as snapshot:
+        assert "git-ref:refs/heads/external" in snapshot.unavailable_paths
     assert sentinel.read_text() == "unchanged"
-    assert sorted(path.name for path in external.iterdir()) == (
-        ["sentinel"] if kind == "ancestor" else ["external-ref", "sentinel"]
+    assert sorted(path.name for path in external.iterdir()) == ["external-ref", "sentinel"]
+
+
+def test_repository_owned_ref_ancestor_symlink_fails_closed(
+    repo: Path, tmp_path: Path,
+) -> None:
+    external = tmp_path / "external-owned-refs"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_text("unchanged")
+    (repo / ".git" / "refs" / "paranoia").symlink_to(
+        external, target_is_directory=True,
     )
+    with pytest.raises(SnapshotUnavailable, match="ref directory is unsafe"):
+        PlanRepositorySnapshot.create(repo, run_id="symlink-owned-ancestor")
+    assert sentinel.read_text() == "unchanged"
+    assert [path.name for path in external.iterdir()] == ["sentinel"]
 
 
 def test_cleanup_does_not_follow_a_replaced_pin_directory(

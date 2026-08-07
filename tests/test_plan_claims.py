@@ -303,6 +303,63 @@ def test_pending_defer_is_invalidated_before_ordinal_spans_can_be_reinterpreted(
     assert pc.claim_blocks(claim)
 
 
+def test_deleted_anchor_cancels_pending_truth_replay() -> None:
+    state, claim_id, spans = _state_with_confirmed_fact()
+    event = pc.Event("VERIFY", {
+        "op": "VERIFY", "claim_id": claim_id,
+        "evidence_ids": ["e1"], "reason": "candidate evidence",
+    })
+    digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids={"e1": claim_id}, independent_required=True,
+        vendor_checks=[pc.VendorCheck("codex", "m1", digest, ("e1",), True, "t")],
+    )
+    claim = state.claims[claim_id]
+    assert claim.pending_transition == event.data
+
+    replacement = b"A completely different proposition.\n"
+    pc.reconcile_plan(state, replacement, pc.segment_plan(replacement))
+    assert claim.status == pc.STALE and pc.claim_blocks(claim)
+    assert claim.pending_transition is None and claim.truth_authorization is None
+
+
+def test_ambiguous_anchor_cancels_pending_deferral_replay() -> None:
+    raw = b"Assume service.\nVerify service.\nUse service.\n"
+    spans = pc.segment_plan(raw)
+    state = pc.ClaimState("ambiguous-pending")
+    claim_id = pc.apply_events(
+        state, pc.parse_role_register(_research([_add()]), pc.RESEARCH_ROLE),
+        role=pc.RESEARCH_ROLE, spans=spans,
+    )["new-1"]
+    pc.apply_events(
+        state, [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id,
+            "kind": "fact", "reason": "premise",
+        })], role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    event = pc.Event("DEFER", {
+        "op": "DEFER", "claim_id": claim_id,
+        "verification_anchor": {"first_span": "p000002", "last_span": "p000002"},
+        "dependent_anchors": [{"first_span": "p000003", "last_span": "p000003"}],
+        "completion_evidence": "success", "failure_condition": "failure",
+        "stop_action": "stop",
+    })
+    digest = pc.event_digest(event)
+    pc.apply_events(
+        state, [event], role=pc.VERIFIER_ROLE, spans=spans,
+        independent_required=True, vendor_checks=[
+            pc.VendorCheck("codex", "m1", digest, (), True, "t"),
+        ],
+    )
+    state.plan_sha256 = pc.sha256(raw)
+    duplicated = b"Assume service.\nAssume service.\nVerify service.\nUse service.\n"
+    pc.reconcile_plan(state, duplicated, pc.segment_plan(duplicated))
+    claim = state.claims[claim_id]
+    assert claim.status == pc.STALE and pc.claim_blocks(claim)
+    assert claim.pending_transition is None and claim.deferral_authorization is None
+
+
 def test_invalid_required_defer_is_rejected_before_authorization_or_pending_state() -> None:
     state, claim_id, spans = _state_with_confirmed_fact()
     event = pc.Event("DEFER", {

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from paranoia_local import claim_verification as cv, plan_claims as pc
-from paranoia_local.evidence_store import EvidenceStore
+from paranoia_local.evidence_store import EvidenceStore, EvidenceStoreError
 from paranoia_local.plan_snapshot import PlanRepositorySnapshot
 
 
@@ -500,6 +500,28 @@ def test_cached_body_is_budgeted_before_cas_read(
         )  # type: ignore[arg-type]
 
 
+def test_cached_cas_io_failure_is_not_silently_treated_as_invalidation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = b"rooted"
+    digest = hashlib.sha256(body).hexdigest()
+    record = cv.EvidenceRecord(
+        "e1", "unrelated", "supplied-artifact", "source", digest, digest, len(body),
+        0, len(body), digest, body.decode(),
+        {"source": "source", "caller_supplied": True},
+    )
+    store = EvidenceStore(tmp_path / "failing-cache-store")
+
+    def fail_read(*_args, **_kwargs):
+        raise EvidenceStoreError("CAS filesystem unavailable")
+
+    monkeypatch.setattr(store, "read", fail_read)
+    with pytest.raises(EvidenceStoreError, match="filesystem unavailable"):
+        cv.validate_cached_records(
+            [record], snapshot=None, store=store, state=pc.ClaimState("lineage"),
+        )  # type: ignore[arg-type]
+
+
 def test_cached_prompt_rendering_uses_the_same_byte_budget() -> None:
     record = cv.EvidenceRecord(
         "a1", "c1", "abstention", "source", None, "a" * 64, 0,
@@ -543,6 +565,10 @@ def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) 
         )
     store = EvidenceStore(tmp_path / "missing-store")
     store.begin("superseded-run")
+    invalid = cv._record(
+        store, "superseded-run", first_id, "supplied-artifact", "invalid", b"x",
+        {"source": "invalid", "caller_supplied": True},
+    )
     valid = cv._record(
         store, "superseded-run", replacement_id, "supplied-artifact", "valid", b"ok",
         {"source": "valid", "caller_supplied": True},
@@ -557,27 +583,22 @@ def test_invalid_evidence_does_not_resurrect_a_superseded_claim(tmp_path: Path) 
     pc.apply_events(
         state, [pc.Event("VERIFY", {
             "op": "VERIFY", "claim_id": first_id,
-            "evidence_ids": ["ebad"], "reason": "old evidence",
+            "evidence_ids": [invalid.evidence_id], "reason": "old evidence",
         })], role=pc.VERIFIER_ROLE, spans=spans,
-        evidence_ids={"ebad": first_id},
+        evidence_ids={invalid.evidence_id: first_id},
     )
     old = state.claims[first_id]
     old.status = pc.SUPERSEDED
     old.pending_replacement_id = replacement_id
     old.superseded_by = replacement_id
-    digest = "a" * 64
-    missing = cv.EvidenceRecord(
-        "ebad", first_id, "supplied-artifact", "missing", digest, digest, 1,
-        0, 1, digest, "x", {"source": "missing", "caller_supplied": True},
-    )
+    invalid = replace(invalid, display_passage="tampered")
     cv.validate_cached_records(
-        [missing, valid], snapshot=None, store=store, state=state,
+        [invalid, valid], snapshot=None, store=store, state=state,
     )  # type: ignore[arg-type]
     assert old.status == pc.SUPERSEDED and old.superseded_by == replacement_id
-    assert valid.blob_digest is not None
-    (store.blobs / valid.blob_digest).unlink()
     cv.validate_cached_records(
-        [valid], snapshot=None, store=store, state=state,
+        [replace(valid, display_passage="tampered")],
+        snapshot=None, store=store, state=state,
     )  # type: ignore[arg-type]
     assert old.status == pc.SUPERSEDED
     assert state.claims[replacement_id].status == pc.STALE
@@ -603,21 +624,22 @@ def test_invalidated_pending_evidence_allows_a_fresh_transition(
             "reason": "fact",
         })], role=pc.STRUCTURAL_ROLE, spans=spans,
     )
+    store = EvidenceStore(tmp_path / "pending-store")
+    store.begin("pending-run")
+    invalid = cv._record(
+        store, "pending-run", claim_id, "supplied-artifact", "old", b"x",
+        {"source": "old", "caller_supplied": True},
+    )
     pc.apply_events(
         state, [pc.Event("VERIFY", {
             "op": "VERIFY", "claim_id": claim_id,
-            "evidence_ids": ["eold"], "reason": "old",
+            "evidence_ids": [invalid.evidence_id], "reason": "old",
         })], role=pc.VERIFIER_ROLE, spans=spans,
-        evidence_ids={"eold": claim_id}, independent_required=True,
-    )
-    digest = "a" * 64
-    missing = cv.EvidenceRecord(
-        "eold", claim_id, "supplied-artifact", "old", digest, digest, 1,
-        0, 1, digest, "x", {"source": "old", "caller_supplied": True},
+        evidence_ids={invalid.evidence_id: claim_id}, independent_required=True,
     )
     cv.validate_cached_records(
-        [missing], snapshot=None, store=EvidenceStore(tmp_path / "pending-missing"),
-        state=state,
+        [replace(invalid, display_passage="tampered")], snapshot=None,
+        store=store, state=state,
     )  # type: ignore[arg-type]
     assert state.claims[claim_id].pending_transition is None
     pc.apply_events(

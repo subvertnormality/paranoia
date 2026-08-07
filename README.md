@@ -718,20 +718,26 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   validated transition as pending; a later round replays it server-side rather than asking
   a model to reconstruct it. Completed persisted audits accept exactly the
   server-owned `codex` and `claude` vendor identities; unknown or duplicate vendors are
-  corruption. Cached CAS/repository reads and model-visible evidence rendering share
-  the round byte budget, including evidence resent for a register correction. Missing
+  corruption. Replay deduplicates matching accepted vendor provenance copied across the
+  truth and dispute slots of one resolution, then invokes every missing vendor. Cached
+  CAS/repository reads and model-visible evidence rendering share the round byte budget,
+  including evidence resent for a register correction; the same auditor packet is debited
+  separately before each vendor launch. A CAS or snapshot I/O failure blocks the round
+  instead of being downgraded to semantic cache invalidation. Missing
   claim-state fields are corruption rather than defaults, invalidated claims reblock even
   if formerly advisory, and model-authored convergence lines are rejected so only one
   server-computed trailer is returned. Plan-derived claims and model-derived class,
   warning, and debt values appear only in one-line escaped `*-DATA-JSON` records. Pending
-  deferrals are bound to their complete plan snapshot, and replay invokes every missing
-  vendor instead of crediting it without a call. Every temporary-ref cleanup exception is treated as
+  deferrals are bound to their complete plan snapshot. Any stale transition clears all
+  incomplete authorization slots before replay. Every temporary-ref cleanup exception is treated as
   ambiguous and retains recovery state. Git children share bounded deadline, kill, and
   reap handling so a termination-resistant subprocess becomes a recoverable blocked
   result. Only symlinks in Git-resolvable object namespaces
   are rejected; inert unrelated object-store names are ignored, including inert nested
   names under `objects/info`. Snapshot path/ref discovery is streamed under explicit byte
-  and record caps before its output is retained or decoded. Bounded tree, blob,
+  and record caps before its output is retained or decoded. Symlinked or nonregular loose-ref
+  entries are skipped without traversal and disclosed as unavailable; unsafe ancestors in
+  the server-owned temporary-pin namespace still fail closed. Bounded tree, blob,
   literal-search, and history evidence carries an explicit completeness result; searches bind
   candidate paths and inspected object/range identities. Incomplete query records remain
   visible as context but cannot authorize claim-state or bearing transitions, so truncation

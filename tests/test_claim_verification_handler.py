@@ -1714,22 +1714,130 @@ def test_independent_auditor_receives_exact_proposition_and_claim_state(
 
         def __init__(self) -> None:
             self.prompt = ""
+            self.calls = 0
 
         def run_toolless(self, prompt, model, effort, **kwargs):
+            self.calls += 1
             self.prompt = prompt
             return _review("CHECK: ACCEPT")
 
+    class TrackingBudget:
+        def __init__(self) -> None:
+            self.debits: list[int] = []
+
+        def debit_bytes(self, count: int) -> None:
+            self.debits.append(count)
+
     auditor = Auditor()
+    budget = TrackingBudget()
     monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
     checks = handlers._independent_checks(
         event, required=True, primary_engine=ClaimEngine(), primary_model="fake-model",
         evidence_records=[record], claim_state=state, effort="high",
-        plan_context=pc.render_spans(spans), on_progress=None,
+        plan_context=pc.render_spans(spans), on_progress=None, budget=budget,
+        primary_authored=False,
     )
     assert len(checks) == 2
+    assert auditor.calls == 2
+    assert len(budget.debits) == 2
+    assert budget.debits[0] == budget.debits[1] > 0
     assert '"proposition":"Use it."' in auditor.prompt
     assert f'"claim_id":"{claim_id}"' in auditor.prompt
     assert '"status":"unchecked"' in auditor.prompt
+
+
+def test_pending_dispute_resolution_deduplicates_vendor_provenance_on_replay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = pc.segment_plan(b"Use it.\n")
+    state = pc.ClaimState("pending-dispute-resolution")
+    add = pc.Event("ADD", {
+        "op": "ADD", "temp_id": "one", "kind": "fact",
+        "assertion_mode": "asserted",
+        "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+    })
+    claim_id = pc.apply_events(
+        state, [add], role=pc.RESEARCH_ROLE, spans=spans,
+    )["one"]
+    pc.apply_events(
+        state,
+        [pc.Event("CONFIRM_KIND", {
+            "op": "CONFIRM_KIND", "claim_id": claim_id, "kind": "fact",
+            "reason": "confirmed by another role",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+    )
+    first_digest = "a" * 64
+    second_digest = "b" * 64
+    records = [
+        cv.EvidenceRecord(
+            "e1", claim_id, "external", "https://example.com/one",
+            first_digest, first_digest, 1, 0, 1, first_digest, "x", {},
+        ),
+        cv.EvidenceRecord(
+            "e2", claim_id, "external", "https://example.com/two",
+            second_digest, second_digest, 1, 0, 1, second_digest, "y", {},
+        ),
+    ]
+    pc.apply_events(
+        state,
+        [pc.Event("DISPUTE", {
+            "op": "DISPUTE", "claim_id": claim_id,
+            "evidence_ids": ["e1"], "reason": "conflicting evidence",
+        })],
+        role=pc.STRUCTURAL_ROLE, spans=spans,
+        evidence_ids=cv.evidence_bindings(records),
+    )
+    resolution = pc.Event("RESOLVE_DISPUTE", {
+        "op": "RESOLVE_DISPUTE", "claim_id": claim_id,
+        "outcome": pc.VERIFIED, "evidence_ids": ["e2"],
+        "reason": "new evidence resolves the conflict",
+    })
+    event_digest = pc.event_digest(resolution)
+    pc.apply_events(
+        state, [resolution], role=pc.VERIFIER_ROLE, spans=spans,
+        evidence_ids=cv.evidence_bindings(records), independent_required=True,
+        vendor_checks=[pc.VendorCheck(
+            "codex", "primary-model", event_digest, ("e2",), True, "T1",
+        )],
+    )
+    claim = state.claims[claim_id]
+    assert claim.pending_transition == resolution.data
+    assert claim.truth_authorization == claim.dispute_authorization
+
+    class Primary(ClaimEngine):
+        name = "codex"
+
+    class Auditor:
+        name = "claude"
+        default_model = "auditor-model"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run_toolless(self, prompt, model, effort, **kwargs):
+            self.calls += 1
+            return _review("CHECK: ACCEPT")
+
+    auditor = Auditor()
+    monkeypatch.setattr(handlers.eng, "get_engine", lambda _name: auditor)
+    handlers._resume_pending_authorizations(
+        state, records=records, policy="require", high_stakes=False,
+        engine=Primary(), model="primary-model", effort="high",
+        plan_context=pc.render_spans(spans), spans=spans, round_no=2,
+        on_progress=None, budget=cv.EvidenceBudget(),
+    )
+    assert auditor.calls == 1
+    assert claim.status == pc.VERIFIED and claim.pending_transition is None
+    for authorization in (claim.truth_authorization, claim.dispute_authorization):
+        assert authorization is not None and authorization["status"] == "complete"
+        assert [check["vendor"] for check in authorization["checks"]] == [
+            "codex", "claude",
+        ]
+
+    loaded = pc.state_from_json(state.lineage_id, pc.state_to_json(state))
+    loaded_claim = loaded.claims[claim_id]
+    assert loaded_claim.truth_authorization == loaded_claim.dispute_authorization
 
 
 @pytest.mark.parametrize("stage", ["research", "evidence", "verifier", "structural"])
