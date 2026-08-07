@@ -33,7 +33,9 @@ structured critique.
 
 **1. Prerequisites**
 
-- Python 3.11+ and `git` on `PATH`
+- Python 3.11+, `git` on `PATH`, and a POSIX environment (Linux or macOS). Native
+  Windows is not supported because durable lineage/evidence publication relies on POSIX
+  advisory locks and directory fsync; use WSL on Windows.
 - The reviewing agent's CLI, installed and signed in on a subscription:
   [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
   [Claude Code](https://code.claude.com) (`claude`)
@@ -677,10 +679,14 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   passages are JSON escaped; remote and repository bodies never share a role call. Git
   alternates and symlinked object-store components are rejected, inherited object-database
   settings are cleared, and replacement objects/grafts and lazy fetching are disabled for
-  plan evidence. Persisted evidence uses strict per-kind schemas; every retained claim
+  plan evidence. Before any repository-aware Git command, bounded no-follow metadata reads
+  construct a private server-configured Git directory; repository config/config.worktree
+  and their include paths are never inputs to those commands. Persisted evidence uses
+  strict per-kind schemas; every retained claim
   dependency must still resolve to a valid same-claim record. Deeply nested or otherwise
   malformed model, network, and persisted JSON is converted to a recoverable blocked
-  result. Direct Git metadata is accepted only through bounded, no-follow regular-file
+  result, including model strings with non-UTF-8 surrogate code points. Direct Git metadata
+  is accepted only through bounded, no-follow regular-file
   reads. Publication distinguishes failures before the lineage atomic replace from
   ambiguous failures at or after that boundary, retaining latches only for the latter.
   Latch release uses a separately recognized recovery marker and any durability failure

@@ -102,6 +102,42 @@ def test_snapshot_hashing_does_not_execute_repository_clean_filters(
     assert not marker.exists()
 
 
+def test_repository_config_includes_are_not_followed(repo: Path, tmp_path: Path) -> None:
+    external = tmp_path / "external-git-config"
+    external.write_text("[this is deliberately malformed")
+    subprocess.run(
+        ["git", "config", "--add", "include.path", str(external)],
+        cwd=repo, check=True,
+    )
+    with PlanRepositorySnapshot.create(repo, run_id="ignored-config-include") as snapshot:
+        assert snapshot.list_tree()
+
+
+def test_config_worktree_is_not_read_even_when_repository_enables_it(
+    repo: Path, tmp_path: Path,
+) -> None:
+    external = tmp_path / "external-worktree-config"
+    external.write_text("[this is deliberately malformed")
+    subprocess.run(
+        ["git", "config", "extensions.worktreeConfig", "true"], cwd=repo, check=True,
+    )
+    (repo / ".git" / "config.worktree").symlink_to(external)
+    with PlanRepositorySnapshot.create(repo, run_id="ignored-worktree-config") as snapshot:
+        assert snapshot.list_tree()
+
+
+def test_symlinked_repository_config_fails_before_git_runs(
+    repo: Path, tmp_path: Path,
+) -> None:
+    config = repo / ".git" / "config"
+    external = tmp_path / "external-config"
+    external.write_text(config.read_text())
+    config.unlink()
+    config.symlink_to(external)
+    with pytest.raises(SnapshotUnavailable, match="small regular file"):
+        PlanRepositorySnapshot.create(repo, run_id="symlinked-config")
+
+
 def test_history_reads_only_the_initial_server_pinned_ref_map(repo: Path) -> None:
     with PlanRepositorySnapshot.create(repo, run_id="round-history") as snap:
         rows = snap.history("refs/heads/main", "app.py", limit=5)

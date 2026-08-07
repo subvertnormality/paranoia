@@ -7,6 +7,9 @@
 - one-shot mode (`class_closure: false`): one ordinary structural review, no research,
   lineage state, terminal registers, or convergence trailer.
 
+paranoia-local requires a POSIX runtime (Linux or macOS; use WSL on Windows) because its
+durable lineage and evidence transactions use POSIX advisory locks and directory fsync.
+
 There is no closure-enabled off or shadow setting. `claim_verification` may be omitted or
 set to `blocking`; any explicit claim mode with `class_closure: false` is rejected.
 Closure mode ignores repository `.paranoia.toml` settings completely. Model, effort,
@@ -37,6 +40,13 @@ One closure round performs these stages:
    fsmonitor commands, filters, attributes, aliases, and pagers are disabled or bypassed.
    Synthetic commits explicitly disable signing, including repository-configured GPG
    programs.
+   Before the first repository-aware Git subprocess, the server reads approved Git-dir
+   metadata with bounded no-follow file operations and builds a private Git control
+   directory. Git receives only server-owned config, copied HEAD/index/packed-ref/shallow
+   metadata, the approved object directory, and a server-created loose-ref link used for
+   GC pins. Repository `config`, `config.worktree`, `include.path`, and `includeIf` content
+   is never part of a repository-aware Git invocation; only repository/object format values
+   are extracted from a bounded private copy with `git config --no-includes`.
    Inherited Git environment is cleared, native linked-worktree object storage is the only
    approved object database, alternates and symlinked object-store components are rejected,
    and grafts/replacement objects are disabled for snapshot and history operations. Lazy
@@ -331,7 +341,8 @@ relocation treats overlapping occurrences as ambiguous.
 
 Register syntax and semantic transition validation share the same single correction
 attempt; a syntactically valid event with an invalid span, evidence binding, role policy,
-or state transition is corrected before application. Malformed registers record debt. A
+state transition, or non-UTF-8 surrogate-bearing scalar is corrected before application.
+Malformed registers record debt. A
 failed snapshot-ref cleanup, ambiguous publication, or
 crash retains the journal and exclusive lineage latch for operator repair; it cannot fall
 through to a stale writer. Latch release first renames the owner marker to a `releasing`

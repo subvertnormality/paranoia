@@ -58,14 +58,14 @@ class SnapshotCleanupError(SnapshotUnavailable):
 
 
 def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
-         check: bool = True,
+         check: bool = True, git_env: dict[str, str] | None = None,
          extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         result = subprocess.run(
             ["git", *_GIT_CONFIG, *args], cwd=repo, input=input_bytes,
             capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
-            env={**ambient, **_GIT_ENV, **(extra_env or {})},
+            env={**ambient, **_GIT_ENV, **(git_env or {}), **(extra_env or {})},
         )
     except subprocess.TimeoutExpired as exc:
         raise SnapshotUnavailable(f"git {' '.join(args[:2])} exceeded hard deadline") from exc
@@ -79,6 +79,7 @@ def _run(repo: Path, args: list[str], *, input_bytes: bytes | None = None,
 
 def _run_bounded(
     repo: Path, args: list[str], *, max_bytes: int, stop_after_nuls: int,
+    git_env: dict[str, str] | None = None,
     debit_bytes: Callable[[int], None] | None = None,
     remaining_bytes: Callable[[], int] | None = None,
 ) -> bytes:
@@ -86,7 +87,7 @@ def _run_bounded(
     ambient = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     proc = subprocess.Popen(
         ["git", *_GIT_CONFIG, *args], cwd=repo, stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL, env={**ambient, **_GIT_ENV},
+        stderr=subprocess.DEVNULL, env={**ambient, **_GIT_ENV, **(git_env or {})},
     )
     output = bytearray()
     deadline = time.monotonic() + GIT_TIMEOUT_SECONDS
@@ -123,6 +124,7 @@ def _run_bounded(
 def _run_bounded_records(
     repo: Path, args: list[str], *, max_records: int,
     terminators_per_record: int = 1, max_bytes: int = MAX_DISCOVERY_BYTES,
+    git_env: dict[str, str] | None = None,
 ) -> bytes:
     """Stream a NUL-framed enumeration and reject the first excess record."""
     if max_records < 1 or terminators_per_record < 1:
@@ -130,6 +132,7 @@ def _run_bounded_records(
     output = _run_bounded(
         repo, args, max_bytes=max_bytes,
         stop_after_nuls=(max_records + 1) * terminators_per_record,
+        git_env=git_env,
     )
     terminators = output.count(b"\0")
     if terminators > max_records * terminators_per_record:
@@ -202,6 +205,94 @@ def _ref_token(run_id: str) -> str:
     return f"{safe}-{digest}"
 
 
+@dataclass(frozen=True)
+class _GitControl:
+    directory: Path
+    environment: dict[str, str]
+
+
+def _controlled_config_value(
+    directory: Path, source: Path, key: str,
+) -> str:
+    ambient = {name: value for name, value in os.environ.items() if not name.startswith("GIT_")}
+    try:
+        result = subprocess.run(
+            ["git", "config", "--file", str(source), "--no-includes", "--get", key],
+            cwd=directory, capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
+            env={**ambient, **_GIT_ENV},
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SnapshotUnavailable("controlled Git config parsing exceeded hard deadline") from exc
+    if result.returncode not in {0, 1}:
+        raise SnapshotUnavailable(
+            "repository format config is malformed: "
+            + result.stderr.decode("utf-8", errors="replace").strip()
+        )
+    return result.stdout.decode("utf-8", errors="strict").strip() if result.returncode == 0 else ""
+
+
+def _create_git_control(repo: Path) -> _GitControl:
+    """Create a Git directory whose config is entirely server-owned.
+
+    Object and loose-ref storage remain in the approved native common directory, but
+    repository config, config.worktree, includes, HEAD, index, packed refs, and shallow
+    metadata are copied or replaced before any repository-aware Git command executes.
+    """
+    git_dir, common = _approved_repository_dirs(repo)
+    directory = Path(tempfile.mkdtemp(prefix="paranoia-plan-git-control-"))
+    try:
+        source_config = directory / "source.config"
+        source_config.write_bytes(
+            _read_small_regular(common / "config", max_bytes=1 << 20, missing_ok=True)
+        )
+        version = _controlled_config_value(
+            directory, source_config, "core.repositoryformatversion"
+        ) or "0"
+        object_format = _controlled_config_value(
+            directory, source_config, "extensions.objectformat"
+        ) or "sha1"
+        ref_storage = _controlled_config_value(
+            directory, source_config, "extensions.refstorage"
+        ) or "files"
+        if version not in {"0", "1"} or object_format not in {"sha1", "sha256"} \
+                or ref_storage != "files":
+            raise SnapshotUnavailable("repository format is unsupported by the safe Git profile")
+        config_lines = [
+            "[core]", f"\trepositoryFormatVersion = {version}", "\tbare = false",
+            "\tlogAllRefUpdates = false",
+        ]
+        if object_format != "sha1":
+            config_lines += ["[extensions]", f"\tobjectFormat = {object_format}"]
+        (directory / "config").write_text("\n".join(config_lines) + "\n", encoding="ascii")
+        source_config.unlink()
+
+        head = _read_small_regular(git_dir / "HEAD", max_bytes=4096)
+        (directory / "HEAD").write_bytes(head)
+        for name, source, cap in (
+            ("index", git_dir / "index", 64 << 20),
+            ("packed-refs", common / "packed-refs", MAX_DISCOVERY_BYTES),
+            ("shallow", common / "shallow", MAX_DISCOVERY_BYTES),
+        ):
+            data = _read_small_regular(source, max_bytes=cap, missing_ok=True)
+            if data:
+                (directory / name).write_bytes(data)
+        refs = common / "refs"
+        refs_info = refs.lstat()
+        if not stat.S_ISDIR(refs_info.st_mode) or stat.S_ISLNK(refs_info.st_mode):
+            raise SnapshotUnavailable("repository refs directory is outside the approved boundary")
+        os.symlink(refs, directory / "refs", target_is_directory=True)
+        environment = {
+            "GIT_DIR": str(directory),
+            "GIT_WORK_TREE": str(repo),
+            "GIT_OBJECT_DIRECTORY": str(common / "objects"),
+        }
+        return _GitControl(directory, environment)
+    except Exception:
+        import shutil
+        shutil.rmtree(directory, ignore_errors=True)
+        raise
+
+
 @dataclass
 class PlanRepositorySnapshot:
     repo: Path
@@ -212,6 +303,8 @@ class PlanRepositorySnapshot:
     history_refs: dict[str, str]
     ignored_paths: tuple[str, ...]
     unavailable_paths: tuple[str, ...]
+    _git_env: dict[str, str] = field(default_factory=dict, repr=False)
+    _control_dir: Path | None = field(default=None, repr=False)
     _owned_refs: list[tuple[str, str]] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -222,72 +315,93 @@ class PlanRepositorySnapshot:
     ) -> "PlanRepositorySnapshot":
         repo = Path(repo).resolve()
         _validate_object_boundary(repo)
-        head_result = _run(repo, ["rev-parse", "--verify", "--quiet", "HEAD"], check=False)
-        has_head = head_result.returncode == 0
-        head = (
-            head_result.stdout.decode("ascii").strip()
-            if has_head
-            else _run(
-                repo, ["hash-object", "-t", "tree", "--stdin"], input_bytes=b""
-            ).stdout.decode("ascii").strip()
-        )
-        ignored_raw = _run_bounded_records(
-            repo,
-            ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"],
-            max_records=MAX_SNAPSHOT_PATHS,
-        )
-        ignored = tuple(
-            item.decode("utf-8", errors="surrogateescape")
-            for item in ignored_raw.split(b"\0") if item
-        )
-        tree, unavailable = _snapshot_tree_without_filters(repo)
-        unavailable = tuple(dict.fromkeys([
-            *unavailable, *_find_special_paths(repo, ignored_paths=ignored)
-        ]))
-        commit_args = ["commit-tree", "--no-gpg-sign", tree]
-        if has_head:
-            commit_args += ["-p", head]
-        commit_args += ["-m", "paranoia-plan-snapshot"]
-        commit = _run(
-            repo, commit_args, extra_env=_SNAPSHOT_IDENTITY
-        ).stdout.decode("ascii").strip()
-        token = _ref_token(run_id)
-        wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
-        raw_refs = _run_bounded_records(
-            repo,
-            ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
-            max_records=MAX_DISCOVERED_REFS, terminators_per_record=2,
-        )
-        history: dict[str, str] = {}
-        for line in raw_refs.splitlines():
-            name_raw, separator, oid_raw = line.partition(b"\0")
-            if not separator or not oid_raw.endswith(b"\0"):
-                raise SnapshotUnavailable("Git ref enumeration returned a malformed record")
-            name = name_raw.decode("utf-8", errors="surrogateescape")
-            oid = oid_raw[:-1].decode("ascii", errors="strict")
-            if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
-                continue
-            history[name] = oid
-        if len(history) + 1 > MAX_PINNED_REFS:
-            raise SnapshotUnavailable(
-                f"repository has {len(history)} refs; plan snapshot cap is {MAX_PINNED_REFS - 1}"
+        control = _create_git_control(repo)
+        try:
+            git_env = control.environment
+            head_result = _run(
+                repo, ["rev-parse", "--verify", "--quiet", "HEAD"],
+                check=False, git_env=git_env,
             )
-        owned: list[tuple[str, str]] = [(wrapper_ref, commit)]
-        for index, (name, oid) in enumerate(sorted(history.items()), 1):
-            suffix = hashlib.sha256(name.encode("utf-8", errors="surrogateescape")).hexdigest()[:16]
-            owned.append((f"refs/paranoia/plan-snapshots/{token}/history-{index:04d}-{suffix}", oid))
-        if before_pin is not None:
-            before_pin(owned)
-        cls._create_refs(repo, owned)
-        return cls(
-            repo, head, tree, commit, wrapper_ref, history, ignored,
-            unavailable, owned,
-        )
+            has_head = head_result.returncode == 0
+            head = (
+                head_result.stdout.decode("ascii").strip()
+                if has_head
+                else _run(
+                    repo, ["hash-object", "-t", "tree", "--stdin"], input_bytes=b"",
+                    git_env=git_env,
+                ).stdout.decode("ascii").strip()
+            )
+            ignored_raw = _run_bounded_records(
+                repo,
+                ["ls-files", "--others", "-i", "--exclude-standard", "--directory", "-z"],
+                max_records=MAX_SNAPSHOT_PATHS, git_env=git_env,
+            )
+            ignored = tuple(
+                item.decode("utf-8", errors="surrogateescape")
+                for item in ignored_raw.split(b"\0") if item
+            )
+            tree, unavailable = _snapshot_tree_without_filters(repo, git_env=git_env)
+            unavailable = tuple(dict.fromkeys([
+                *unavailable, *_find_special_paths(repo, ignored_paths=ignored)
+            ]))
+            commit_args = ["commit-tree", "--no-gpg-sign", tree]
+            if has_head:
+                commit_args += ["-p", head]
+            commit_args += ["-m", "paranoia-plan-snapshot"]
+            commit = _run(
+                repo, commit_args, git_env=git_env, extra_env=_SNAPSHOT_IDENTITY,
+            ).stdout.decode("ascii").strip()
+            token = _ref_token(run_id)
+            wrapper_ref = f"refs/paranoia/plan-snapshots/{token}/wrapper"
+            raw_refs = _run_bounded_records(
+                repo,
+                ["for-each-ref", "--format=%(refname)%00%(objectname)%00", "refs/"],
+                max_records=MAX_DISCOVERED_REFS, terminators_per_record=2,
+                git_env=git_env,
+            )
+            history: dict[str, str] = {}
+            for line in raw_refs.splitlines():
+                name_raw, separator, oid_raw = line.partition(b"\0")
+                if not separator or not oid_raw.endswith(b"\0"):
+                    raise SnapshotUnavailable("Git ref enumeration returned a malformed record")
+                name = name_raw.decode("utf-8", errors="surrogateescape")
+                oid = oid_raw[:-1].decode("ascii", errors="strict")
+                if name.startswith(("refs/paranoia/plan-snapshots/", "refs/replace/")):
+                    continue
+                history[name] = oid
+            if len(history) + 1 > MAX_PINNED_REFS:
+                raise SnapshotUnavailable(
+                    f"repository has {len(history)} refs; plan snapshot cap is {MAX_PINNED_REFS - 1}"
+                )
+            owned: list[tuple[str, str]] = [(wrapper_ref, commit)]
+            for index, (name, oid) in enumerate(sorted(history.items()), 1):
+                suffix = hashlib.sha256(
+                    name.encode("utf-8", errors="surrogateescape")
+                ).hexdigest()[:16]
+                owned.append(
+                    (f"refs/paranoia/plan-snapshots/{token}/history-{index:04d}-{suffix}", oid)
+                )
+            if before_pin is not None:
+                before_pin(owned)
+            cls._create_refs(repo, owned, git_env=git_env)
+            return cls(
+                repo, head, tree, commit, wrapper_ref, history, ignored,
+                unavailable, git_env, control.directory, owned,
+            )
+        except Exception:
+            import shutil
+            shutil.rmtree(control.directory, ignore_errors=True)
+            raise
 
     @staticmethod
-    def _create_refs(repo: Path, refs: list[tuple[str, str]]) -> None:
+    def _create_refs(
+        repo: Path, refs: list[tuple[str, str]], *, git_env: dict[str, str],
+    ) -> None:
         commands = ["start"] + [f"create {name} {oid}" for name, oid in refs] + ["prepare", "commit"]
-        _run(repo, ["update-ref", "--stdin"], input_bytes=("\n".join(commands) + "\n").encode())
+        _run(
+            repo, ["update-ref", "--stdin"],
+            input_bytes=("\n".join(commands) + "\n").encode(), git_env=git_env,
+        )
 
     def __enter__(self) -> "PlanRepositorySnapshot":
         return self
@@ -304,7 +418,7 @@ class PlanRepositorySnapshot:
                 current = _run(
                     self.repo,
                     ["for-each-ref", "--format=%(objectname)", name],
-                    check=False,
+                    check=False, git_env=self._git_env,
                 )
                 if current.returncode:
                     failures.append(
@@ -318,7 +432,10 @@ class PlanRepositorySnapshot:
                 if current_oid != oid:
                     failures.append(f"{name} changed owner")
                     continue
-                result = _run(self.repo, ["update-ref", "-d", name, oid], check=False)
+                result = _run(
+                    self.repo, ["update-ref", "-d", name, oid], check=False,
+                    git_env=self._git_env,
+                )
                 if result.returncode:
                     failures.append(
                         f"{name}: " + result.stderr.decode("utf-8", errors="replace").strip()
@@ -333,12 +450,22 @@ class PlanRepositorySnapshot:
             raise SnapshotCleanupError(
                 f"temporary snapshot-ref cleanup failed ambiguously: {exc}"
             ) from exc
+        if self._control_dir is not None:
+            import shutil
+            try:
+                shutil.rmtree(self._control_dir)
+            except OSError as exc:
+                raise SnapshotCleanupError(
+                    f"could not remove server-owned Git control directory: {exc}"
+                ) from exc
         self._closed = True
 
     def _verify_wrapper(self) -> None:
         _validate_object_boundary(self.repo)
-        result = _run(self.repo, ["rev-parse", "--verify", self.wrapper_ref + "^{commit}"],
-                      check=False)
+        result = _run(
+            self.repo, ["rev-parse", "--verify", self.wrapper_ref + "^{commit}"],
+            check=False, git_env=self._git_env,
+        )
         actual = result.stdout.decode().strip() if result.returncode == 0 else ""
         if actual != self.commit_id:
             raise SnapshotUnavailable("pinned snapshot object/ref is missing or changed")
@@ -353,7 +480,7 @@ class PlanRepositorySnapshot:
         literal = ":(literal)" + path
         out = _run_bounded_records(
             self.repo, ["ls-tree", "-z", self.commit_id, "--", literal],
-            max_records=1, max_bytes=16384,
+            max_records=1, max_bytes=16384, git_env=self._git_env,
         )
         rows = [row for row in out.split(b"\0") if row]
         if len(rows) != 1:
@@ -372,7 +499,9 @@ class PlanRepositorySnapshot:
             raise SnapshotUnavailable("gitlinks are unavailable without a supplied artifact")
         if kind != "blob":
             raise SnapshotUnavailable("repository evidence path is not a blob")
-        size_raw = _run(self.repo, ["cat-file", "-s", oid]).stdout.decode("ascii").strip()
+        size_raw = _run(
+            self.repo, ["cat-file", "-s", oid], git_env=self._git_env,
+        ).stdout.decode("ascii").strip()
         try:
             size = int(size_raw)
         except ValueError as exc:
@@ -394,7 +523,7 @@ class PlanRepositorySnapshot:
         proc = subprocess.Popen(
             ["git", *_GIT_CONFIG, "cat-file", "blob", oid], cwd=self.repo,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env={**ambient, **_GIT_ENV},
+            env={**ambient, **_GIT_ENV, **self._git_env},
         )
         assert proc.stdout is not None
         result = bytearray()
@@ -461,6 +590,7 @@ class PlanRepositorySnapshot:
             args += ["--", ":(literal)" + prefix]
         rows = _run_bounded(
             self.repo, args, max_bytes=1 << 20, stop_after_nuls=limit + 1,
+            git_env=self._git_env,
             debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         ).split(b"\0")
         decoded = [r.decode("utf-8", errors="surrogateescape") for r in rows if r]
@@ -568,7 +698,10 @@ class PlanRepositorySnapshot:
         pure = PurePosixPath(path)
         if not path or pure.is_absolute() or ".." in pure.parts:
             raise SnapshotUnavailable("history path escapes snapshot")
-        exists = _run(self.repo, ["cat-file", "-e", oid + "^{commit}"], check=False)
+        exists = _run(
+            self.repo, ["cat-file", "-e", oid + "^{commit}"], check=False,
+            git_env=self._git_env,
+        )
         if exists.returncode:
             raise SnapshotUnavailable("pinned history object is missing")
         output = _run_bounded(
@@ -576,6 +709,7 @@ class PlanRepositorySnapshot:
             ["log", f"-{limit + 1}", "--format=%H%x00%ct%x00%s%x00", oid, "--",
              ":(literal)" + path],
             max_bytes=1 << 20, stop_after_nuls=(limit + 1) * 3,
+            git_env=self._git_env,
             debit_bytes=debit_bytes, remaining_bytes=remaining_bytes,
         )
         tokens = output.decode("utf-8", errors="replace").split("\0")
@@ -597,7 +731,9 @@ class PlanRepositorySnapshot:
 
 
 
-def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
+def _snapshot_tree_without_filters(
+    repo: Path, *, git_env: dict[str, str],
+) -> tuple[str, tuple[str, ...]]:
     """Hash working-tree bytes without ``git add`` or repository-selected commands.
 
     Git supplies only the candidate path set and object database. File bytes are opened
@@ -607,6 +743,7 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
     """
     cached = _run_bounded_records(
         repo, ["ls-files", "-s", "-z"], max_records=MAX_SNAPSHOT_PATHS,
+        git_env=git_env,
     )
     index_entries: dict[str, tuple[str, str]] = {}
     for row in [item for item in cached.split(b"\0") if item]:
@@ -620,7 +757,7 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
 
     candidates = _run_bounded_records(
         repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        max_records=MAX_SNAPSHOT_PATHS,
+        max_records=MAX_SNAPSHOT_PATHS, git_env=git_env,
     )
     rows: list[tuple[str, str, str]] = []
     unavailable: list[str] = []
@@ -645,7 +782,10 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
             continue
         if stat.S_ISLNK(info.st_mode):
             body = os.readlink(target).encode("utf-8", errors="surrogateescape")
-            oid = _run(repo, ["hash-object", "-w", "--stdin"], input_bytes=body).stdout.decode().strip()
+            oid = _run(
+                repo, ["hash-object", "-w", "--stdin"], input_bytes=body,
+                git_env=git_env,
+            ).stdout.decode().strip()
             rows.append(("120000", oid, path))
             continue
         if not stat.S_ISREG(info.st_mode):
@@ -667,7 +807,7 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
                         ["git", *_GIT_CONFIG, "hash-object", "-w", "--stdin"],
                         cwd=repo, stdin=handle, capture_output=True,
                         timeout=GIT_TIMEOUT_SECONDS,
-                        env={**ambient, **_GIT_ENV},
+                        env={**ambient, **_GIT_ENV, **git_env},
                     )
                 except subprocess.TimeoutExpired as exc:
                     raise SnapshotUnavailable("git hash-object exceeded hard deadline") from exc
@@ -685,7 +825,10 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
     try:
         env_index = str(index_dir / "index")
         private_env = {"GIT_INDEX_FILE": env_index}
-        _run(repo, ["read-tree", "--empty"], extra_env=private_env)
+        _run(
+            repo, ["read-tree", "--empty"], git_env=git_env,
+            extra_env=private_env,
+        )
         payload = b"".join(
             f"{mode} {oid}\t".encode("ascii")
             + path.encode("utf-8", errors="surrogateescape") + b"\0"
@@ -695,9 +838,11 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
         )
         _run(
             repo, ["update-index", "-z", "--index-info"],
-            input_bytes=payload, extra_env=private_env,
+            input_bytes=payload, git_env=git_env, extra_env=private_env,
         )
-        tree = _run(repo, ["write-tree"], extra_env=private_env).stdout.decode("ascii").strip()
+        tree = _run(
+            repo, ["write-tree"], git_env=git_env, extra_env=private_env,
+        ).stdout.decode("ascii").strip()
         return tree, tuple(unavailable)
     finally:
         import shutil
@@ -705,17 +850,7 @@ def _snapshot_tree_without_filters(repo: Path) -> tuple[str, tuple[str, ...]]:
 
 
 def _validate_object_boundary(repo: Path) -> None:
-    approved = _approved_common_dir(repo)
-    common_raw = _run(repo, ["rev-parse", "--git-common-dir"]).stdout.decode(
-        "utf-8", errors="surrogateescape"
-    ).strip()
-    common = Path(common_raw)
-    if not common.is_absolute():
-        common = (repo / common).resolve()
-    else:
-        common = common.resolve()
-    if common != approved:
-        raise SnapshotUnavailable("Git common directory is outside the approved repository boundary")
+    _git_dir, common = _approved_repository_dirs(repo)
     objects = common / "objects"
     _validate_object_store_paths(objects)
     for name in ("alternates", "http-alternates"):
@@ -727,6 +862,10 @@ def _validate_object_boundary(repo: Path) -> None:
 
 
 def _approved_common_dir(repo: Path) -> Path:
+    return _approved_repository_dirs(repo)[1]
+
+
+def _approved_repository_dirs(repo: Path) -> tuple[Path, Path]:
     dotgit = repo / ".git"
     try:
         dotgit_info = dotgit.lstat()
@@ -735,7 +874,8 @@ def _approved_common_dir(repo: Path) -> Path:
     if stat.S_ISLNK(dotgit_info.st_mode):
         raise SnapshotUnavailable("repository .git may not be a symlink")
     if stat.S_ISDIR(dotgit_info.st_mode):
-        return dotgit.resolve()
+        resolved = dotgit.resolve()
+        return resolved, resolved
     try:
         marker = _read_small_regular(dotgit).decode("utf-8", errors="strict").strip()
     except UnicodeError as exc:
@@ -765,7 +905,7 @@ def _approved_common_dir(repo: Path) -> Path:
     if git_dir.parent.name != "worktrees" or git_dir.parent.parent != common \
             or backlink_path != dotgit.resolve():
         raise SnapshotUnavailable("gitfile is not a self-consistent native linked worktree")
-    return common
+    return git_dir, common
 
 
 def _validate_object_store_paths(objects: Path, *, max_entries: int = 200_000) -> None:

@@ -695,6 +695,39 @@ def test_semantic_register_failures_receive_one_correction_attempt(
     assert any("=== CORRECTION REQUIRED ===" in prompt for prompt in engine.tool_less_prompts)
 
 
+def test_surrogate_model_string_receives_the_register_correction_attempt(
+    repo: Path, tmp_path: Path,
+) -> None:
+    class SurrogateResearchEngine(ClaimEngine):
+        def run_toolless(self, prompt: str, model: str, effort: str, **kwargs) -> Review:
+            if "neutral claim extractor" in prompt \
+                    and "=== CORRECTION REQUIRED ===" not in prompt:
+                self.tool_less_prompts.append(prompt)
+                event = {
+                    "op": "ADD", "temp_id": "bad", "claim": "bad\ud800claim",
+                    "kind": "fact", "assertion_mode": "asserted",
+                    "plan_anchor": {"first_span": "p000001", "last_span": "p000001"},
+                }
+                return _review(
+                    "=== RESEARCH REGISTER ===\nEVENTS-JSON: " + _json([event])
+                )
+            return super().run_toolless(prompt, model, effort, **kwargs)
+
+    engine = SurrogateResearchEngine()
+    out = handlers.critique_plan(
+        {
+            "repo_path": str(repo), "plan_text": "Use greet.\n",
+            "lineage": "surrogate-retry", "round": 1,
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in out
+    assert any(
+        "=== CORRECTION REQUIRED ===" in prompt and "nonempty string" in prompt
+        for prompt in engine.tool_less_prompts
+    )
+
+
 def test_independently_required_invalid_defer_is_corrected_before_audit(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

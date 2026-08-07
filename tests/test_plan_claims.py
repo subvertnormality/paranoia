@@ -78,6 +78,12 @@ def test_deep_register_json_is_a_recoverable_register_error() -> None:
         pc.parse_role_register(text, pc.RESEARCH_ROLE)
 
 
+def test_lone_surrogate_in_model_string_is_a_correctable_register_error() -> None:
+    event = _add(claim="bad\ud800claim")
+    with pytest.raises(pc.ClaimRegisterError, match="nonempty string"):
+        pc.parse_role_register(_research([event]), pc.RESEARCH_ROLE)
+
+
 def test_every_add_is_server_minted_pending_and_blocking() -> None:
     state = pc.ClaimState(lineage_id="plan")
     spans = pc.segment_plan(b"Do it.\n")

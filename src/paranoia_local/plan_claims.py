@@ -295,12 +295,12 @@ def _validate_scalars(op: str, item: Mapping[str, Any]) -> None:
         if key in {"plan_anchor", "replacement", "dependent_anchors", "evidence_ids",
                    "verification_anchor"}:
             continue
-        if not isinstance(value, str) or not value.strip():
+        if not _safe_model_string(value):
             raise ClaimRegisterError(f"{op}.{key} must be a nonempty string")
     if "evidence_ids" in item and (
         not isinstance(item["evidence_ids"], list)
         or len(item["evidence_ids"]) > 1000
-        or any(not isinstance(v, str) or not v for v in item["evidence_ids"])
+        or any(not _safe_model_string(v) for v in item["evidence_ids"])
     ):
         raise ClaimRegisterError(f"{op}.evidence_ids must be a string array")
     if op == "ADD":
@@ -322,9 +322,19 @@ def _validate_scalars(op: str, item: Mapping[str, Any]) -> None:
 
 def _validate_model_anchor(value: Any, label: str) -> None:
     if not isinstance(value, Mapping) or set(value) != {"first_span", "last_span"} \
-            or any(not isinstance(value.get(key), str) or not value[key]
+            or any(not _safe_model_string(value.get(key))
                    for key in ("first_span", "last_span")):
         raise ClaimRegisterError(f"{label} must be an exact span-anchor object")
+
+
+def _safe_model_string(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def mint_claim_id(lineage_id: str, seq: int, proposition: str) -> str:
