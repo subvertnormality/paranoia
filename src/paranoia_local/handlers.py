@@ -621,7 +621,7 @@ def _verify_plan_claims(
                 f"malformed: {first.reason}",
             )
         retry = engine.resume(
-            review.session_ref, pc.retry_instructions(first, plan_text), repo,
+            review.session_ref, pc.retry_instructions(first, plan_text, prior_state), repo,
             model, effort, True, timeout=1800, **_progress_kwargs(on_progress),
         )
         if retry.error:

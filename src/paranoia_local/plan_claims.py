@@ -219,7 +219,7 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
     # Markdown frequently wraps one sentence across physical lines. Verbatim means the
     # same characters/tokens modulo whitespace, not identical line wrapping. Punctuation
     # and case remain exact, so this cannot recreate normalized identity collisions.
-    if anchor not in _collapse_whitespace(plan_text):
+    if not _anchor_in_plan(anchor, plan_text):
         raise ValueError(
             "anchor is not a verbatim substring of the current plan modulo whitespace"
         )
@@ -354,7 +354,7 @@ def reconcile(
             removable = bool(
                 disposition
                 and disposition["disposition"] == "removed"
-                and old_anchor not in plan_text
+                and not _anchor_in_plan(old_anchor, plan_text)
             )
             if removable:
                 retired.append({
@@ -545,6 +545,7 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
 def audit_instructions(plan_text: str, prior_state: Any, stakes: str | None) -> str:
     """Build the research prompt.  Concrete JSON literals avoid pseudo-enum failures."""
     prior = evidence_context(prior_state)
+    removals = _removal_candidates(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
     return f"""You are the factual-verification phase of an autonomous plan review.
 
@@ -591,6 +592,16 @@ a decision/requirement, edit away the old factual wording; do not merely relabel
 prior_claim_id is contextual only and cannot transfer identity to edited wording. Omission
 without a mechanically valid removal stays active and blocks.
 
+ABSENT PRIOR ANCHOR CANDIDATES (JSON):
+{removals}
+
+The server mechanically confirmed that each candidate's old verbatim anchor is absent
+from the current plan modulo whitespace. Do NOT re-emit an absent anchor as a claim. For
+each candidate, either add a removed disposition after confirming the old proposition is
+absent/superseded, or inventory the current edited assertion as a new claim AND disposition
+the old packet. These are candidates, not automatic retirement: you remain responsible for
+checking that removal does not hide a still-load-bearing current assertion.
+
 PRIOR EVIDENCE PACKETS (JSON):
 {prior}
 
@@ -609,7 +620,8 @@ Allowed relation literals: "supports_claim", "refutes_claim",
 {plan_text}"""
 
 
-def retry_instructions(error: AuditError, plan_text: str) -> str:
+def retry_instructions(error: AuditError, plan_text: str, prior_state: Any) -> str:
+    removals = _removal_candidates(prior_state, plan_text)
     return f"""Your claim audit was rejected and no new verdict was applied.
 
 Reason: {error.reason}
@@ -620,6 +632,12 @@ Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Preserve
 valid source packets, fix the structural error, and do not weaken evidence requirements.
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
+
+ABSENT PRIOR ANCHOR CANDIDATES (JSON):
+{removals}
+
+Do not re-emit these absent old anchors. Confirm and disposition each genuinely removed
+packet, and separately inventory any edited current assertion under its verbatim anchor.
 
 === PLAN ===
 {plan_text}"""
@@ -633,6 +651,23 @@ def _one_line(value: Any, name: str) -> str:
 
 def _collapse_whitespace(value: str) -> str:
     return " ".join(value.split())
+
+
+def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
+    return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
+
+
+def _removal_candidates(prior_state: Any, plan_text: str) -> str:
+    state = normalize_state(prior_state)
+    candidates = [
+        {"claim_id": claim_id, "anchor": claim.get("anchor")}
+        for claim_id, claim in state["claims"].items()
+        if isinstance(claim, dict)
+        and isinstance(claim.get("anchor"), str)
+        and claim["anchor"].strip()
+        and not _anchor_in_plan(claim["anchor"], plan_text)
+    ]
+    return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
 
 
 def _mint(lineage_id: str, seq: int, proposition: str) -> str:

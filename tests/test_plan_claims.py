@@ -189,6 +189,18 @@ class TestRetainedEvidence:
         assert second["retired"][-1]["claim_id"] == claim_id
         prompt = pc.audit_instructions(corrected_plan, first, "trusted local tool")
         assert claim_id in prompt and _source()["url"] in prompt
+        assert "ABSENT PRIOR ANCHOR CANDIDATES" in prompt
+        assert json.dumps({"claim_id": claim_id, "anchor": _claim()["anchor"]},
+                          separators=(",", ":")) in prompt
+
+    def test_wrapped_anchor_is_not_a_removal_candidate(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        wrapped = "# Rollout\n\nPython 3.11 was released\nin October 2022.\n"
+        prompt = pc.audit_instructions(wrapped, first, "trusted local tool")
+        assert "ABSENT PRIOR ANCHOR CANDIDATES (JSON):\n[]" in prompt
 
     def test_removed_claims_are_retired_and_do_not_consume_active_inventory(self) -> None:
         first = pc.reconcile(
