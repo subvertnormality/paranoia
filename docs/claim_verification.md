@@ -66,6 +66,10 @@ authoritative passage separately entails the complete replacement wording.
 Unsupported optional replacement wording is removed during validation while the valid
 refutation and source packet are retained. It does not invalidate unrelated claims in the
 same audit response.
+Authority, scope, and entailment mistakes are also localized: the questionable source
+is retained as context, the affected claim is server-demoted to blocking `unverified`,
+and independently valid claims in the response remain usable. Structural corruption
+such as malformed JSON or a non-verbatim anchor still fails the audit closed.
 
 ## Multi-round behavior
 

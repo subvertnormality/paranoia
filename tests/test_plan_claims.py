@@ -79,8 +79,26 @@ class TestAuditValidation:
 
     def test_reddit_is_never_upgraded_to_primary_by_model_output(self) -> None:
         reddit = _source(url="https://www.reddit.com/r/python/comments/x", kind="primary")
-        with pytest.raises(pc.AuditError, match="lacks claim-entailing authoritative"):
-            pc.parse_audit(_audit(_claim(evidence=[reddit])), PLAN)
+        claim = pc.parse_audit(_audit(_claim(evidence=[reddit])), PLAN).claims[0]
+        assert claim["verdict"] == "unverified"
+        assert claim["evidence"][0]["source_kind"] == "ugc"
+
+    def test_context_only_support_is_demoted_without_discarding_other_claims(self) -> None:
+        context_only = _source(relation="context")
+        audit = pc.parse_audit(_audit(
+            _claim(evidence=[context_only]),
+            _claim(proposition="Python 3.11 became available in October 2022."),
+        ), PLAN)
+        assert [claim["verdict"] for claim in audit.claims] == ["unverified", "supported"]
+        assert "Server demotion" in audit.claims[0]["rationale"]
+
+    def test_wrong_scope_source_is_context_and_claim_is_unverified(self) -> None:
+        wrong_scope = _source()
+        claim = pc.parse_audit(_audit(_claim(
+            scope="repository", evidence=[wrong_scope],
+        )), PLAN).claims[0]
+        assert claim["verdict"] == "unverified"
+        assert claim["evidence"][0]["relation"] == "context"
 
     def test_refutation_alone_keeps_packet_but_drops_unsupported_replacement(self) -> None:
         refuting = _source(relation="refutes_claim")

@@ -215,14 +215,22 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
     rationale = str(item.get("rationale", "")).strip()
 
     qualifying = [e for e in checked if _qualifying(e, scope)]
+    demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
-        raise ValueError("supported verdict lacks claim-entailing authoritative evidence")
+        demotion = "claimed support lacked claim-entailing authoritative evidence"
     if verdict == "refuted" and not any(e["relation"] == "refutes_claim" for e in qualifying):
-        raise ValueError("refuted verdict lacks claim-refuting authoritative evidence")
+        demotion = "claimed refutation lacked claim-refuting authoritative evidence"
+    if demotion:
+        # Model mistakes about authority or relation are local to one claim. Preserve
+        # its proposition and candidate sources, but make the server-owned verdict
+        # conservatively blocking instead of discarding every other valid packet.
+        verdict = "unverified"
+        replacement = None
+        rationale = f"{rationale} Server demotion: {demotion}.".strip()
     if replacement is not None:
-        if verdict != "refuted":
-            raise ValueError("replacement is permitted only for a refuted claim")
-        if not any(e["relation"] == "supports_replacement" for e in qualifying):
+        if verdict != "refuted" or not any(
+            e["relation"] == "supports_replacement" for e in qualifying
+        ):
             # A replacement is optional assistance, not part of the audited verdict.
             # Keep the valid refutation packet while refusing to expose wording that
             # its evidence does not entail.  One over-eager correction must not discard
@@ -250,14 +258,12 @@ def _validate_evidence(item: Any, scope: str) -> dict[str, str]:
         raise ValueError(f"source_kind must be one of {sorted(SOURCE_KINDS)}")
     if result["relation"] not in RELATIONS:
         raise ValueError(f"relation must be one of {sorted(RELATIONS)}")
+    host = (urlparse(result["url"]).hostname or "").lower()
     if scope == "repository":
         if result["source_kind"] != "repository" or not result["url"].startswith("repo://"):
-            raise ValueError("repository claims require source_kind repository and a repo:// URL")
-    elif result["source_kind"] == "repository":
-        raise ValueError("external claims cannot use repository evidence")
-    host = (urlparse(result["url"]).hostname or "").lower()
-    if scope == "external" and not host:
-        raise ValueError("external evidence needs an absolute web URL")
+            result["relation"] = "context"
+    elif result["source_kind"] == "repository" or not host:
+        result["relation"] = "context"
     if _is_ugc_host(host):
         # Normalize, rather than reject: the packet remains useful as a lead or conflict,
         # while verdict validation below refuses to let it close a claim.
@@ -267,8 +273,13 @@ def _validate_evidence(item: Any, scope: str) -> dict[str, str]:
 
 def _qualifying(evidence: dict[str, str], scope: str) -> bool:
     if scope == "repository":
-        return evidence["source_kind"] == "repository"
-    return evidence["source_kind"] in AUTHORITATIVE_KINDS
+        return (
+            evidence["source_kind"] == "repository"
+            and evidence["url"].startswith("repo://")
+        )
+    return bool(urlparse(evidence["url"]).hostname) and (
+        evidence["source_kind"] in AUTHORITATIVE_KINDS
+    )
 
 
 def reconcile(

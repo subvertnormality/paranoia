@@ -262,6 +262,10 @@ weaken, or research the assertion instead of inventing a correction.
 If a reviewer nevertheless proposes unsupported replacement text, the server drops
 that optional text and retains the valid verdict and evidence packet; it does not
 discard the rest of the claim batch.
+Likewise, a source that cannot govern the claim's declared scope, or evidence that
+does not entail the model's `supported`/`refuted` verdict, is retained only as
+context and that individual claim is forced to blocking `unverified`. Other valid
+claims in the same response are still registered.
 
 #### Fully autonomous correction loop
 
