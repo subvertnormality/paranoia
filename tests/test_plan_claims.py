@@ -177,6 +177,31 @@ class TestRetainedEvidence:
         assert len(second["claims"]) == 2
         assert pc.is_blocked(second)
 
+    def test_opposite_punctuation_propositions_never_share_identity(self) -> None:
+        old_plan = "# Check\n\nThe values satisfy A != B.\n"
+        old_claim = _claim(
+            anchor="The values satisfy A != B.",
+            proposition="The values satisfy A != B.",
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(old_claim), old_plan),
+            lineage_id="x-plan", round_no=1, plan_text=old_plan,
+        )
+        old_id = next(iter(first["claims"]))
+        both_plan = old_plan + "The values satisfy A == B.\n"
+        opposite = _claim(
+            anchor="The values satisfy A == B.",
+            proposition="The values satisfy A == B.",
+            prior_claim_id=old_id,
+        )
+        second = pc.reconcile(
+            first, pc.parse_audit(_audit(opposite), both_plan),
+            lineage_id="x-plan", round_no=2, plan_text=both_plan,
+        )
+        assert old_id in second["claims"]
+        assert second["claims"][old_id]["verdict"] == "unverified"
+        assert len(second["claims"]) == 2
+
     def test_nonfactual_is_not_an_accepted_disposition(self) -> None:
         with pytest.raises(pc.AuditError, match="must be removed"):
             pc.parse_audit(_audit(dispositions=[{

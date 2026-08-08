@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -143,7 +142,7 @@ def parse_audit(text: str, plan_text: str) -> Audit:
             claim = _validate_claim(item, plan_text)
         except ValueError as exc:
             raise AuditError(f"claim {index}: {exc}", text) from exc
-        identity = (_norm(claim["anchor"]), _norm(claim["proposition"]))
+        identity = (claim["anchor"], claim["proposition"])
         if identity in seen:
             raise AuditError(f"claim {index}: duplicate anchor and proposition", text)
         seen.add(identity)
@@ -277,13 +276,13 @@ def reconcile(
     by_prop: dict[str, str] = {}
     for claim_id, record in old.items():
         if isinstance(record, dict) and isinstance(record.get("proposition"), str):
-            by_prop.setdefault(_norm(record["proposition"]), claim_id)
+            by_prop.setdefault(record["proposition"], claim_id)
 
     next_seq = prior["next_seq"]
     used: set[str] = set()
     current: dict[str, Any] = {}
     for claim in audit.claims:
-        exact = by_prop.get(_norm(claim["proposition"]))
+        exact = by_prop.get(claim["proposition"])
         # Identity is server-owned and semantic only at the exact proposition seam.
         # A model-provided prior ID is useful context but cannot bind edited wording to
         # unrelated history.  Corrected propositions mint a new ID; the predecessor must
@@ -570,10 +569,6 @@ def _one_line(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
     return " ".join(value.split())
-
-
-def _norm(value: str) -> str:
-    return re.sub(r"\W+", " ", value.casefold()).strip()
 
 
 def _mint(lineage_id: str, seq: int, proposition: str) -> str:
