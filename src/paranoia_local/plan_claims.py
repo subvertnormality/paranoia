@@ -65,6 +65,7 @@ class Audit:
     claims: tuple[dict[str, Any], ...]
     coverage: dict[str, Any]
     dispositions: tuple[dict[str, str], ...]
+    assessments: tuple[dict[str, str], ...] = ()
     issues: tuple[str, ...] = ()
     raw_sha256: str = ""
     rejected_excerpt: str = ""
@@ -160,8 +161,9 @@ def parse_audit(text: str, plan_text: str, *, allow_partial: bool = False) -> Au
         seen.add(identity)
         validated.append(claim)
     dispositions = _validate_dispositions(coverage.get("prior_dispositions", []), text)
+    assessments = _validate_assessments(coverage.get("prior_assessments", []), text)
     return Audit(
-        tuple(validated), deepcopy(coverage), dispositions, tuple(issues),
+        tuple(validated), deepcopy(coverage), dispositions, assessments, tuple(issues),
         hashlib.sha256(text.encode("utf-8", "replace")).hexdigest(),
         _excerpt("\n".join(issues)),
     )
@@ -195,6 +197,37 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
             raise AuditError(f"duplicate disposition for prior claim {claim_id}", text)
         seen.add(claim_id)
         result.append({"claim_id": claim_id, "disposition": disposition, "reason": reason})
+    return tuple(result)
+
+
+def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
+    """Validate compact current-round judgements over retained exact claims."""
+    if not isinstance(raw, list):
+        raise AuditError("coverage.prior_assessments must be an array", text)
+    if len(raw) > MAX_ACTIVE_CLAIMS:
+        raise AuditError(
+            f"audit returned {len(raw)} retained assessments; safety ceiling is "
+            f"{MAX_ACTIVE_CLAIMS}", text,
+        )
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict) or set(item) != {"claim_id", "verdict", "rationale"}:
+            raise AuditError(
+                f"prior assessment {index} must contain exactly claim_id, verdict, and rationale",
+                text,
+            )
+        claim_id = _one_line(item["claim_id"], "assessment.claim_id")
+        verdict = _one_line(item["verdict"], "assessment.verdict")
+        rationale = _one_line(item["rationale"], "assessment.rationale")
+        if verdict not in VERDICTS:
+            raise AuditError(
+                f"prior assessment {index} verdict must be one of {sorted(VERDICTS)}", text,
+            )
+        if claim_id in seen:
+            raise AuditError(f"duplicate assessment for prior claim {claim_id}", text)
+        seen.add(claim_id)
+        result.append({"claim_id": claim_id, "verdict": verdict, "rationale": rationale})
     return tuple(result)
 
 
@@ -315,6 +348,7 @@ def reconcile(
     Prior evidence is retained only because it was supplied back to the reviewer as a
     candidate; no prior verdict is copied forward.
     """
+    validate_prior_coverage(prior_raw, audit, plan_text=plan_text)
     prior = normalize_state(prior_raw)
     old = prior["claims"]
     by_prop: dict[str, str] = {}
@@ -344,6 +378,32 @@ def reconcile(
         if isinstance(previous, dict) and previous.get("proposition") != record["proposition"]:
             record["previous_proposition"] = previous.get("proposition")
         current[claim_id] = record
+
+    # Exact retained claims use a compact current-round assessment. The reviewer has
+    # re-opened/re-entailled the retained packet, while the server owns the anchor,
+    # proposition, and evidence bytes. This avoids asking the model to reproduce large
+    # packets merely to prove it did not forget them.
+    for assessment in audit.assessments:
+        claim_id = assessment["claim_id"]
+        previous = old[claim_id]
+        record = deepcopy(previous)
+        record.update({
+            "claim_id": claim_id,
+            "verdict": assessment["verdict"],
+            "verified_round": round_no,
+            "rationale": assessment["rationale"],
+        })
+        if assessment["verdict"] != "refuted":
+            record["replacement"] = None
+        elif not any(
+            _qualifying(evidence, record.get("scope", ""))
+            and evidence.get("relation") == "supports_replacement"
+            for evidence in record.get("evidence", [])
+            if isinstance(evidence, dict)
+        ):
+            record["replacement"] = None
+        current[claim_id] = record
+        used.add(claim_id)
 
     retired = list(prior["retired"])
     dispositions = {item["claim_id"]: item for item in audit.dispositions}
@@ -405,6 +465,74 @@ def reconcile(
         "coverage": audit.coverage,
         "debt": debt,
     }
+
+
+def validate_prior_coverage(
+    prior_raw: Any, audit: Audit, *, plan_text: str, raw: str = "",
+) -> None:
+    """Require a current judgement for every retained exact claim still in the plan.
+
+    The governing inventory is server-owned. A stochastic extractor may discover new
+    facts, but it cannot decide which old facts deserve another assessment merely by
+    omitting them.
+    """
+    prior = normalize_state(prior_raw)
+    if len(audit.claims) + len(audit.assessments) > MAX_ACTIVE_CLAIMS:
+        raise AuditError(
+            f"audit returned {len(audit.claims)} full claims plus "
+            f"{len(audit.assessments)} retained assessments; active safety ceiling is "
+            f"{MAX_ACTIVE_CLAIMS}", raw,
+        )
+    old = prior["claims"]
+    by_prop = {
+        record.get("proposition"): claim_id
+        for claim_id, record in old.items()
+        if isinstance(record, dict) and isinstance(record.get("proposition"), str)
+    }
+    emitted = {
+        by_prop[claim["proposition"]]
+        for claim in audit.claims
+        if claim["proposition"] in by_prop
+    }
+    assessed = {item["claim_id"] for item in audit.assessments}
+    overlap = emitted & assessed
+    if overlap:
+        raise AuditError(
+            "retained claims were both fully emitted and compactly assessed: "
+            + ", ".join(sorted(overlap)), raw,
+        )
+    for item in audit.assessments:
+        claim_id = item["claim_id"]
+        record = old.get(claim_id)
+        if not isinstance(record, dict):
+            raise AuditError(f"assessment references unknown prior claim {claim_id}", raw)
+        if not _anchor_in_plan(record.get("anchor", ""), plan_text):
+            raise AuditError(
+                f"assessment references absent prior anchor {claim_id}; use a removal disposition",
+                raw,
+            )
+        evidence = [e for e in record.get("evidence", []) if isinstance(e, dict)]
+        qualifying = [e for e in evidence if _qualifying(e, record.get("scope", ""))]
+        relation = {
+            "supported": "supports_claim", "refuted": "refutes_claim",
+        }.get(item["verdict"])
+        if relation and not any(e.get("relation") == relation for e in qualifying):
+            raise AuditError(
+                f"assessment {claim_id} says {item['verdict']} but its retained packet "
+                f"has no qualifying {relation} evidence; emit a full current claim packet",
+                raw,
+            )
+    expected = {
+        claim_id for claim_id, record in old.items()
+        if isinstance(record, dict)
+        and _anchor_in_plan(record.get("anchor", ""), plan_text)
+    }
+    missing = expected - emitted - assessed
+    if missing:
+        raise AuditError(
+            "missing current assessments for retained claims: " + ", ".join(sorted(missing)),
+            raw,
+        )
 
 
 def with_debt(prior_raw: Any, error: AuditError, *, round_no: int, plan_text: str) -> dict[str, Any]:
@@ -546,6 +674,7 @@ def audit_instructions(plan_text: str, prior_state: Any, stakes: str | None) -> 
     """Build the research prompt.  Concrete JSON literals avoid pseudo-enum failures."""
     prior = evidence_context(prior_state)
     removals = _removal_candidates(prior_state, plan_text)
+    assessments = _assessment_candidates(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
     return f"""You are the factual-verification phase of an autonomous plan review.
 
@@ -583,14 +712,22 @@ the replacement itself; evidence that merely refutes the old wording is not enou
 
 Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or search
 each retained URL as needed and re-assess entailment against the CURRENT proposition.
-Set prior_claim_id only for the exact same atomic proposition; use null for edited wording.
-Unchanged verified claims should normally be quicker because their exact sources are here.
-Every prior claim must either reappear as the exact same atomic proposition or have one
-entry in coverage.prior_dispositions. The only disposition is "removed", and it is valid
-only when the old verbatim factual anchor is absent from the current plan. If a fact became
-a decision/requirement, edit away the old factual wording; do not merely relabel it.
-prior_claim_id is contextual only and cannot transfer identity to edited wording. Omission
-without a mechanically valid removal stays active and blocks.
+For every item in RETAINED EXACT CLAIMS, return exactly one compact entry in
+coverage.prior_assessments. Do not repeat that unchanged claim or its evidence in claims.
+The server owns its exact anchor, proposition, and retained packet; your compact verdict is
+the current-round re-entailment judgement. If retained evidence cannot support/refute the
+current verdict, return unverified, or emit a full claim packet with new current evidence
+instead of a compact assessment. The server rejects a missing retained ID in this same round.
+
+Use claims only for newly discovered or edited propositions. Set prior_claim_id only for the
+exact same atomic proposition; use null for edited wording. Every absent prior claim needs one
+entry in coverage.prior_dispositions. The only disposition is "removed", and it is valid only
+when the old verbatim factual anchor is absent from the current plan. If a fact became a
+decision/requirement, edit away the old factual wording; do not merely relabel it.
+prior_claim_id is contextual only and cannot transfer identity to edited wording.
+
+RETAINED EXACT CLAIMS REQUIRING ASSESSMENT (JSON):
+{assessments}
 
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
 {removals}
@@ -609,7 +746,7 @@ Reply with only the marker and one JSON object. Do not use markdown fences. Thes
 CONCRETE literals, not pipe-delimited pseudo-enums. The shape is:
 
 {AUDIT_MARKER}
-{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim plan text","proposition":"one atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the standard being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_dispositions":[],"notes":"brief coverage note"}}}}
+{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim plan text","proposition":"one new atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the standard being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_assessments":[{{"claim_id":"C-retained","verdict":"supported","rationale":"Retained exact passage still entails the unchanged proposition."}}],"prior_dispositions":[],"notes":"brief coverage note"}}}}
 
 Allowed verdict literals: "supported", "refuted", "unverified".
 Allowed scope literals: "external", "repository".
@@ -622,6 +759,8 @@ Allowed relation literals: "supports_claim", "refutes_claim",
 
 def retry_instructions(error: AuditError, plan_text: str, prior_state: Any) -> str:
     removals = _removal_candidates(prior_state, plan_text)
+    assessments = _assessment_candidates(prior_state, plan_text)
+    prior = evidence_context(prior_state)
     return f"""Your claim audit was rejected and no new verdict was applied.
 
 Reason: {error.reason}
@@ -633,11 +772,20 @@ literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Prese
 valid source packets, fix the structural error, and do not weaken evidence requirements.
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
 
+RETAINED EXACT CLAIMS REQUIRING ONE ASSESSMENT EACH (JSON):
+{assessments}
+
+Return each retained exact ID once in coverage.prior_assessments using exactly claim_id,
+verdict, and rationale. Do not repeat unchanged packets in claims. A missing ID is invalid.
+
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
 {removals}
 
 Do not re-emit these absent old anchors. Confirm and disposition each genuinely removed
 packet, and separately inventory any edited current assertion under its verbatim anchor.
+
+PRIOR EVIDENCE PACKETS (JSON):
+{prior}
 
 === PLAN ===
 {plan_text}"""
@@ -666,6 +814,23 @@ def _removal_candidates(prior_state: Any, plan_text: str) -> str:
         and isinstance(claim.get("anchor"), str)
         and claim["anchor"].strip()
         and not _anchor_in_plan(claim["anchor"], plan_text)
+    ]
+    return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+
+
+def _assessment_candidates(prior_state: Any, plan_text: str) -> str:
+    state = normalize_state(prior_state)
+    candidates = [
+        {
+            "claim_id": claim_id,
+            "anchor": claim.get("anchor"),
+            "proposition": claim.get("proposition"),
+        }
+        for claim_id, claim in state["claims"].items()
+        if isinstance(claim, dict)
+        and isinstance(claim.get("anchor"), str)
+        and claim["anchor"].strip()
+        and _anchor_in_plan(claim["anchor"], plan_text)
     ]
     return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
 

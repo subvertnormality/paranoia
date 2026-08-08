@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from paranoia_local import handlers, plan_claims as pc
+from paranoia_local import class_closure as cc, handlers, plan_claims as pc
 from paranoia_local.engines import Review
 
 
@@ -48,12 +48,14 @@ def _claim(**changes: object) -> dict[str, object]:
 
 
 def _audit(
-    *claims: dict[str, object], dispositions: list[dict[str, str]] | None = None
+    *claims: dict[str, object], dispositions: list[dict[str, str]] | None = None,
+    assessments: list[dict[str, str]] | None = None,
 ) -> str:
     payload = {
         "claims": list(claims),
         "coverage": {
             "sections_scanned": 1, "omitted_nonfacts": 1,
+            "prior_assessments": assessments or [],
             "prior_dispositions": dispositions or [], "notes": "complete",
         },
     }
@@ -220,19 +222,53 @@ class TestRetainedEvidence:
         assert not pc.is_blocked(second)
         assert "1 retired and excluded from active inventory" in pc.render_trailer(second)
 
-    def test_model_omission_cannot_clear_a_still_present_prior_claim(self) -> None:
+    def test_model_omission_is_rejected_before_it_can_churn_a_prior_claim(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        with pytest.raises(pc.AuditError, match=claim_id):
+            pc.reconcile(
+                first, pc.parse_audit(_audit(), PLAN),
+                lineage_id="x-plan", round_no=2, plan_text=PLAN,
+            )
+
+    def test_compact_assessment_reentails_retained_packet_without_repeating_it(self) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim()), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
         )
         claim_id = next(iter(first["claims"]))
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(), PLAN),
+            first, pc.parse_audit(_audit(assessments=[{
+                "claim_id": claim_id,
+                "verdict": "supported",
+                "rationale": "The retained official passage still entails the exact claim.",
+            }]), PLAN),
             lineage_id="x-plan", round_no=2, plan_text=PLAN,
         )
         assert list(second["claims"]) == [claim_id]
-        assert second["claims"][claim_id]["verdict"] == "unverified"
-        assert pc.is_blocked(second)
+        assert second["claims"][claim_id]["verdict"] == "supported"
+        assert second["claims"][claim_id]["verified_round"] == 2
+        assert second["claims"][claim_id]["evidence"] == first["claims"][claim_id]["evidence"]
+        assert not pc.is_blocked(second)
+
+    def test_compact_support_cannot_upgrade_a_nonqualifying_retained_packet(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim(evidence=[_source(relation="context")])), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        audit = pc.parse_audit(_audit(assessments=[{
+            "claim_id": claim_id,
+            "verdict": "supported",
+            "rationale": "The old context still looks plausible.",
+        }]), PLAN)
+        with pytest.raises(pc.AuditError, match="no qualifying supports_claim evidence"):
+            pc.reconcile(
+                first, audit, lineage_id="x-plan", round_no=2, plan_text=PLAN,
+            )
 
     def test_unrelated_prior_id_cannot_replace_the_old_claim(self) -> None:
         first = pc.reconcile(
@@ -247,13 +283,16 @@ class TestRetainedEvidence:
             prior_claim_id=old_id,
         )
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(unrelated), expanded_plan),
+            first, pc.parse_audit(_audit(unrelated, assessments=[{
+                "claim_id": old_id, "verdict": "supported",
+                "rationale": "The retained passage still entails the old exact claim.",
+            }]), expanded_plan),
             lineage_id="x-plan", round_no=2, plan_text=expanded_plan,
         )
         assert old_id in second["claims"]
-        assert second["claims"][old_id]["verdict"] == "unverified"
+        assert second["claims"][old_id]["verdict"] == "supported"
         assert len(second["claims"]) == 2
-        assert pc.is_blocked(second)
+        assert not pc.is_blocked(second)
 
     def test_opposite_punctuation_propositions_never_share_identity(self) -> None:
         old_plan = "# Check\n\nThe values satisfy A != B.\n"
@@ -273,11 +312,14 @@ class TestRetainedEvidence:
             prior_claim_id=old_id,
         )
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(opposite), both_plan),
+            first, pc.parse_audit(_audit(opposite, assessments=[{
+                "claim_id": old_id, "verdict": "supported",
+                "rationale": "The retained passage still entails the old exact claim.",
+            }]), both_plan),
             lineage_id="x-plan", round_no=2, plan_text=both_plan,
         )
         assert old_id in second["claims"]
-        assert second["claims"][old_id]["verdict"] == "unverified"
+        assert second["claims"][old_id]["verdict"] == "supported"
         assert len(second["claims"]) == 2
 
     def test_nonfactual_is_not_an_accepted_disposition(self) -> None:
@@ -402,6 +444,45 @@ class TestHandlerFlow:
         assert "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" in out
         assert "CLASS-CONVERGENCE: NOT-BLOCKED" in out
         assert out.count("\nCONVERGENCE:") == 1
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+
+    def test_missing_retained_id_gets_same_round_targeted_correction(
+        self, tmp_path: Path
+    ) -> None:
+        repo = _repo(tmp_path)
+        first_engine = ScriptedEngine(_audit(_claim()), STRUCTURAL_CLEAR)
+        handlers.critique_plan(
+            {
+                "plan_text": PLAN, "repo_path": str(repo),
+                "lineage": "retained-flow-plan", "round": 1,
+                "stakes": "single-user local tool; factual correctness is high impact",
+            },
+            engine=first_engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+        )
+        lineage = cc.load_lineage(
+            cc.default_state_root(), "retained-flow-plan", stamp="T1", mode="plan",
+        )
+        claim_id = next(iter(lineage.claim_state["claims"]))
+        assessment = {
+            "claim_id": claim_id,
+            "verdict": "supported",
+            "rationale": "The retained official passage still entails the exact claim.",
+        }
+        second_engine = ScriptedEngine(
+            _audit(), _audit(assessments=[assessment]), STRUCTURAL_CLEAR,
+        )
+        out = handlers.critique_plan(
+            {
+                "plan_text": PLAN, "repo_path": str(repo),
+                "lineage": "retained-flow-plan", "round": 2,
+                "stakes": "single-user local tool; factual correctness is high impact",
+            },
+            engine=second_engine, log_dir=tmp_path / "logs", now=lambda: "T2",
+        )
+        assert len(second_engine.prompts) == 3
+        assert f"missing current assessments for retained claims: {claim_id}" in second_engine.prompts[1]
+        assert "RETAINED EXACT CLAIMS REQUIRING ONE ASSESSMENT EACH" in second_engine.prompts[1]
+        assert "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" in out
         assert "CONVERGENCE: NOT-BLOCKED" in out
 
     def test_web_search_cannot_be_disabled_while_verification_is_on(self, tmp_path: Path) -> None:

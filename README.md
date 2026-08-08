@@ -281,8 +281,9 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
    `plan_text`) using only a proven replacement or a justified removal/qualification;
 3. increment `round` and call again **after the edit**;
 4. the verifier receives retained packets as candidate evidence and re-entails each
-   exact passage against the current wording; unchanged supported claims avoid blind
-   research from zero, while edited claims inherit no verdict;
+   exact passage against the current wording; every unchanged exact claim is a mandatory
+   compact assessment keyed by its server-owned ID, so its packet is not repeated and
+   stochastic omission is rejected in the same round; edited claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
 
@@ -300,6 +301,12 @@ absence is never an automatic retirement. The old packet remains active as `unve
 until then. The cold structural reviewer receives the complete evidence for every
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
+
+When old wording is still present, it is not rediscovered from scratch. The server supplies
+the exact ID, anchor, proposition, and retained packet as a mandatory checklist. The reviewer
+re-opens the source as needed and returns a compact current verdict for every ID. A missing
+ID makes the response invalid and triggers the one bounded correction request before state
+is committed; it never becomes a new full-plan round merely because the model forgot a row.
 
 ### `lineage` — which loop this round belongs to
 

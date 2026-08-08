@@ -72,13 +72,16 @@ state and reviewer-native capabilities meet the supported model.
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
-- Retained evidence is a candidate for re-entailment against edited wording, never an inherited
-  verdict. Removed/non-factual claims do not consume active context.
+- Retained evidence is never an inherited verdict. Every unchanged exact claim receives a
+  mandatory compact current-round assessment keyed by its server-owned ID; edited wording
+  requires a new full packet. Removed/non-factual claims do not consume active context.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and
   correction retry, but never auto-retire them. Do not provide a model-only `nonfactual`
-  escape. The cold structural reviewer must see complete evidence plus current retirements
+  escape. Reject a response that omits any still-present retained ID and name missing IDs in
+  the same-round correction prompt; never turn extractor sampling into another full review
+  round. The cold structural reviewer must see complete evidence plus current retirements
   before its success contributes to tracked-mode clearance; one-shot plan reviews emit no
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded

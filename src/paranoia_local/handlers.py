@@ -613,7 +613,8 @@ def _verify_plan_claims(
         return pc.with_debt(prior_state, error, round_no=round_no, plan_text=plan_text), "failed"
     try:
         audit = pc.parse_audit(review.text, plan_text)
-        status = f"parsed {len(audit.claims)}"
+        pc.validate_prior_coverage(prior_state, audit, plan_text=plan_text, raw=review.text)
+        status = f"parsed {len(audit.claims)} new + {len(audit.assessments)} retained"
     except pc.AuditError as first:
         if not review.session_ref or not hasattr(engine, "resume"):
             return (
@@ -637,7 +638,11 @@ def _verify_plan_claims(
             # The retry is the final model call. Localize any remaining invalid claim
             # so valid packets and dispositions survive with explicit blocking debt.
             audit = pc.parse_audit(retry.text, plan_text, allow_partial=True)
-            status = f"parsed after retry: {len(audit.claims)}"
+            pc.validate_prior_coverage(prior_state, audit, plan_text=plan_text, raw=retry.text)
+            status = (
+                f"parsed after retry: {len(audit.claims)} new + "
+                f"{len(audit.assessments)} retained"
+            )
             if audit.issues:
                 status += f"; {len(audit.issues)} localized invalid"
         except pc.AuditError as second_error:

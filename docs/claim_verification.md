@@ -77,8 +77,11 @@ debt while valid retry packets and dispositions persist for the next round.
 
 Each current claim has a server-minted ID. On a later edited plan, an exact proposition match
 or a validated `prior_claim_id` preserves identity. Removed claims move to bounded diagnostic
-history and leave active inventory. Every current verdict is newly parsed and validated;
-previous verdicts are never copied.
+history and leave active inventory. Previous verdicts are never copied. For an unchanged
+exact anchor/proposition, the reviewer returns a mandatory compact current-round assessment
+keyed by the server ID; the server reuses the retained packet bytes only after validating that
+the selected verdict has qualifying evidence in that packet. Edited propositions require a
+new full packet and inherit no verdict.
 
 A previously active claim cannot disappear merely because a later model omits it. Identity
 is reused only for the exact same proposition; model-supplied prior IDs cannot bind edited
@@ -94,9 +97,12 @@ every current-round retirement.
 
 Prior URLs and passages are included as candidate evidence in the next audit. The reviewer
 re-opens/searches them as needed and re-entails them against the current proposition. This
-makes unchanged rounds faster without treating stale evidence as truth. If the audit fails,
-old packets remain available but every old active verdict is demoted to `unverified` and the
-rejected output's reason, hash, and bounded excerpt become blocking debt.
+makes unchanged rounds faster without treating stale evidence as truth or asking the model to
+repeat every quote and URL. Every still-present ID is mechanically required. A missing ID
+rejects the audit and is named in the one bounded correction prompt before any state commit,
+rather than becoming stochastic next-round churn. If both attempts fail, old packets remain
+available but every old active verdict is demoted to `unverified` and the rejected output's
+reason, hash, and bounded excerpt become blocking debt.
 
 ## Autonomous correction contract
 

@@ -12,9 +12,8 @@
   hardening;
 - keep plan claim verification on by default with reviewer-native web search, official/primary
   evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
-  re-entailment;
+  re-entailment through mandatory compact assessments for every unchanged server-owned claim;
 - let the calling coding agent autonomously edit from those packets before the next round; no
   human is required, and an unchanged rerun is not a correction;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.
-
