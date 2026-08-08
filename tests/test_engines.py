@@ -43,6 +43,7 @@ class TestCodexArgv:
         argv = e.build_argv(cwd=Path("/repo"), model="gpt-5.6-sol", effort="high", web_search=True)
         assert argv[:2] == ["codex", "exec"]
         assert "--json" in argv
+        assert "--ignore-user-config" in argv
         joined = " ".join(argv)
         assert "-s read-only" in joined
         assert "-C /repo" in joined
@@ -65,6 +66,7 @@ class TestCodexArgv:
         # `codex exec resume` rejects -s and -C; they must not appear
         assert "-s" not in argv
         assert "-C" not in argv
+        assert "--ignore-user-config" in argv
 
     def test_parse_output_extracts_final_message_and_thread(self) -> None:
         e = engines.get_engine("codex")

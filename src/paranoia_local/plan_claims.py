@@ -192,8 +192,13 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
         raise ValueError(f"scope must be one of {sorted(SCOPES)}")
     anchor = _one_line(item["anchor"], "anchor")
     proposition = _one_line(item["proposition"], "proposition")
-    if anchor not in plan_text:
-        raise ValueError("anchor is not a verbatim substring of the current plan")
+    # Markdown frequently wraps one sentence across physical lines. Verbatim means the
+    # same characters/tokens modulo whitespace, not identical line wrapping. Punctuation
+    # and case remain exact, so this cannot recreate normalized identity collisions.
+    if anchor not in _collapse_whitespace(plan_text):
+        raise ValueError(
+            "anchor is not a verbatim substring of the current plan modulo whitespace"
+        )
     verdict = item["verdict"]
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
@@ -493,6 +498,10 @@ def audit_instructions(plan_text: str, prior_state: Any, stakes: str | None) -> 
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
     return f"""You are the factual-verification phase of an autonomous plan review.
 
+You ARE the verifier. Never invoke MCP review tools (including any registered paranoia
+server), plugins, other agents, or nested reviewers. Inspect the repository and use only
+your own built-in web search. Delegation would recurse and invalidate this phase.
+
 STAKES: {stakes_text}
 
 Read the entire plan and repository. Use your BUILT-IN web search for every external
@@ -560,6 +569,7 @@ Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 {AUDIT_MARKER} marker followed by one JSON object and nothing else. Every claim uses the
 literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Preserve
 valid source packets, fix the structural error, and do not weaken evidence requirements.
+Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
 
 === PLAN ===
 {plan_text}"""
@@ -568,6 +578,10 @@ valid source packets, fix the structural error, and do not weaken evidence requi
 def _one_line(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
+    return " ".join(value.split())
+
+
+def _collapse_whitespace(value: str) -> str:
     return " ".join(value.split())
 
 

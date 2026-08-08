@@ -156,6 +156,10 @@ class CodexEngine(Engine):
         argv = [
             "codex", "exec",
             "--json",
+            # Auth still comes from CODEX_HOME, but user config (especially registered
+            # MCP servers) must not widen a spawned reviewer into recursive delegation.
+            # Required model/effort/web capabilities are supplied explicitly below.
+            "--ignore-user-config",
             "--skip-git-repo-check",
             "-s", "read-only",
             "-C", str(cwd),
@@ -177,6 +181,7 @@ class CodexEngine(Engine):
         argv = [
             "codex", "exec", "resume", session_ref,
             "--json",
+            "--ignore-user-config",
             "--skip-git-repo-check",
             "-m", model,
             "-c", f'model_reasoning_effort="{effort}"',

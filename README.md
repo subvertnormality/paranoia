@@ -678,12 +678,16 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
   your code or run your test suite. Built-in web search is enabled by default and
   required for plan claim verification. The separate calling coding agent owns
   autonomous corrections.
-- **The audited repo cannot widen the reviewer.** The Claude engine is spawned
+- **Reviewer capability is hermetic.** Codex is spawned with `--ignore-user-config`:
+  authentication remains available, while registered MCP servers and user-configured tools
+  do not. This prevents a reviewer from recursively calling paranoia-local even when repo
+  instructions request it; model, reasoning effort, sandbox, and built-in web search are
+  supplied explicitly. Claude is spawned
   with `--setting-sources ""`, so it loads no `.claude` settings files — otherwise
   the reviewed repo's `.claude/settings.local.json` and your global settings would
   merge on top of the allowlist, and those routinely grant `Bash(python3:*)` and
   friends. This applies to the spawned reviewer subprocess only; it does not read,
-  write, or affect your interactive `claude` sessions. Codex is covered by its
+  write, or affect your interactive `claude` sessions. Codex also remains covered by its
   OS-level sandbox, which no repo setting can loosen.
 - **Isolated.** Committed reviews run inside a throwaway `git worktree` of the
   target ref, so they never collide with your working tree and can review a branch

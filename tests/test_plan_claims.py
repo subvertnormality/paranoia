@@ -69,6 +69,14 @@ class TestAuditValidation:
         assert not pc.is_blocked(state)
         assert next(iter(state["claims"].values()))["verdict"] == "supported"
 
+    def test_verbatim_anchor_may_cross_markdown_line_wrapping(self) -> None:
+        wrapped = "# Release\n\nPython 3.11 was released\nin October 2022.\n"
+        claim = _claim(
+            anchor="Python 3.11 was released in October 2022.",
+            proposition="Python 3.11 was released in October 2022.",
+        )
+        assert len(pc.parse_audit(_audit(claim), wrapped).claims) == 1
+
     def test_reddit_is_never_upgraded_to_primary_by_model_output(self) -> None:
         reddit = _source(url="https://www.reddit.com/r/python/comments/x", kind="primary")
         with pytest.raises(pc.AuditError, match="lacks claim-entailing authoritative"):
