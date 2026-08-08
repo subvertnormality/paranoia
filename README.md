@@ -259,6 +259,9 @@ Every contradicted or unresolved claim returns an **actionable source packet**:
 Evidence that refutes old wording does **not** prove replacement wording. When no
 authoritative passage entails a replacement, the packet explicitly says to remove,
 weaken, or research the assertion instead of inventing a correction.
+If a reviewer nevertheless proposes unsupported replacement text, the server drops
+that optional text and retains the valid verdict and evidence packet; it does not
+discard the rest of the claim batch.
 
 #### Fully autonomous correction loop
 

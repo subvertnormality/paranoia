@@ -82,13 +82,15 @@ class TestAuditValidation:
         with pytest.raises(pc.AuditError, match="lacks claim-entailing authoritative"):
             pc.parse_audit(_audit(_claim(evidence=[reddit])), PLAN)
 
-    def test_refutation_alone_cannot_authorize_replacement_wording(self) -> None:
+    def test_refutation_alone_keeps_packet_but_drops_unsupported_replacement(self) -> None:
         refuting = _source(relation="refutes_claim")
-        with pytest.raises(pc.AuditError, match="replacement lacks authoritative"):
-            pc.parse_audit(_audit(_claim(
-                verdict="refuted", evidence=[refuting],
-                replacement="Python 3.11 was released on 24 October 2022.",
-            )), PLAN)
+        audit = pc.parse_audit(_audit(_claim(
+            verdict="refuted", evidence=[refuting],
+            replacement="Python 3.11 was released on 24 October 2022.",
+        )), PLAN)
+        assert audit.claims[0]["verdict"] == "refuted"
+        assert audit.claims[0]["evidence"][0]["relation"] == "refutes_claim"
+        assert audit.claims[0]["replacement"] is None
 
     def test_decisions_never_enter_active_inventory(self) -> None:
         with pytest.raises(pc.AuditError, match='literal \\"fact\\"'):

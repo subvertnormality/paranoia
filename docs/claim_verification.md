@@ -63,6 +63,9 @@ even when model output calls them primary.
 Evidence is claim-specific. A passage qualifies only if it entails the exact proposition.
 A refuting passage can mark old wording refuted. It cannot authorize a replacement unless an
 authoritative passage separately entails the complete replacement wording.
+Unsupported optional replacement wording is removed during validation while the valid
+refutation and source packet are retained. It does not invalidate unrelated claims in the
+same audit response.
 
 ## Multi-round behavior
 

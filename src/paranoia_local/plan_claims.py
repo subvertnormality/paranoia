@@ -223,7 +223,11 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
         if verdict != "refuted":
             raise ValueError("replacement is permitted only for a refuted claim")
         if not any(e["relation"] == "supports_replacement" for e in qualifying):
-            raise ValueError("replacement lacks authoritative evidence that entails its wording")
+            # A replacement is optional assistance, not part of the audited verdict.
+            # Keep the valid refutation packet while refusing to expose wording that
+            # its evidence does not entail.  One over-eager correction must not discard
+            # every independently valid claim in the same model response.
+            replacement = None
 
     return {
         "kind": "fact", "scope": scope, "anchor": anchor,
