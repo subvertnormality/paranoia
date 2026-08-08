@@ -134,6 +134,19 @@ class TestAuditValidation:
         assert "This wording is not in the plan" in state["debt"]["rejected_excerpt"]
         assert pc.is_blocked(state)
 
+    def test_disposition_rationale_wire_alias_is_normalized_to_reason(self) -> None:
+        audit = pc.parse_audit(_audit(
+            _claim(),
+            dispositions=[{
+                "claim_id": "C-old", "disposition": "removed",
+                "rationale": "The old exact wording is absent.",
+            }],
+        ), PLAN)
+        assert audit.dispositions == ({
+            "claim_id": "C-old", "disposition": "removed",
+            "reason": "The old exact wording is absent.",
+        },)
+
 
 class TestRetainedEvidence:
     def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:

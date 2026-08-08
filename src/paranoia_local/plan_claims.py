@@ -173,14 +173,19 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
     result: list[dict[str, str]] = []
     seen: set[str] = set()
     for index, item in enumerate(raw):
-        if not isinstance(item, dict) or set(item) != {"claim_id", "disposition", "reason"}:
+        fields = set(item) if isinstance(item, dict) else set()
+        if fields not in (
+            {"claim_id", "disposition", "reason"},
+            {"claim_id", "disposition", "rationale"},
+        ):
             raise AuditError(
-                f"prior disposition {index} must contain exactly claim_id, disposition, reason",
+                f"prior disposition {index} must contain exactly claim_id, disposition, "
+                "and reason (rationale is accepted as its wire alias)",
                 text,
             )
         claim_id = _one_line(item["claim_id"], "disposition.claim_id")
         disposition = _one_line(item["disposition"], "disposition.disposition")
-        reason = _one_line(item["reason"], "disposition.reason")
+        reason = _one_line(item.get("reason", item.get("rationale")), "disposition.reason")
         if disposition != "removed":
             raise AuditError(f"prior disposition {index} must be removed", text)
         if claim_id in seen:
