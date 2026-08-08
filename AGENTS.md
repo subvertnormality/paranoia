@@ -76,9 +76,11 @@ state and reviewer-native capabilities meet the supported model.
   verdict. Removed/non-factual claims do not consume active context.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
-  disposition. Do not provide a model-only `nonfactual` escape. The cold structural reviewer
-  must see complete evidence plus current retirements before its success contributes to
-  tracked-mode clearance; one-shot plan reviews emit no computed convergence verdict.
+  disposition. Surface absent old anchors as removal candidates on both the initial audit and
+  correction retry, but never auto-retire them. Do not provide a model-only `nonfactual`
+  escape. The cold structural reviewer must see complete evidence plus current retirements
+  before its success contributes to tracked-mode clearance; one-shot plan reviews emit no
+  computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
 - The reviewer remains read-only. The calling coding agent autonomously validates packets,

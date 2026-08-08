@@ -293,7 +293,11 @@ or override the process, but is not required for ordinary convergence.
 A later audit cannot clear a prior claim by omitting it or attaching its ID to edited text.
 Exact propositions alone retain identity. Otherwise the old factual anchor must actually
 leave the plan and receive an explicit `removed` disposition; there is no model-only
-`nonfactual` escape. The old packet remains active as `unverified` until then. The cold structural reviewer receives the complete evidence for every
+`nonfactual` escape. To make that closure efficient, the server lists every prior anchor
+that is absent from the current plan as a removal candidate in both the initial audit and
+its correction retry. The reviewer must still confirm an explicit `removed` disposition;
+absence is never an automatic retirement. The old packet remains active as `unverified`
+until then. The cold structural reviewer receives the complete evidence for every
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
 

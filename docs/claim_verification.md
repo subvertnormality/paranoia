@@ -86,7 +86,11 @@ wording. Otherwise the audit must explicitly classify the predecessor `removed`,
 accepted only after its exact old anchor has left the plan. There is no model-only
 `nonfactual` escape: edit away the old factual wording. Missing or invalid dispositions keep
 the prior packet active as `unverified`; this blocks rather than converting sampling variance
-into clearance. The cold structural reviewer sees every current-round retirement.
+into clearance. On each initial audit and correction retry, the server identifies prior exact
+anchors that are absent from the current plan and presents them as removal candidates. This
+avoids rediscovering stale packets across rounds, but does not auto-retire them: the reviewer
+must validate and return an explicit `removed` disposition. The cold structural reviewer sees
+every current-round retirement.
 
 Prior URLs and passages are included as candidate evidence in the next audit. The reviewer
 re-opens/searches them as needed and re-entails them against the current proposition. This
