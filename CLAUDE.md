@@ -13,6 +13,9 @@
 - keep plan claim verification on by default with reviewer-native web search, official/primary
   evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
   re-entailment through mandatory compact assessments for every unchanged server-owned claim;
+- never infer that no plan or authority existed from one missing or late-added filename: inspect
+  alternative briefs/manifests/history at the relevant revision, separate existence from
+  profile/conformance/current reuse, and audit affected sibling cases together;
 - let the calling coding agent autonomously edit from those packets before the next round; no
   human is required, and an unchanged rerun is not a correction;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed

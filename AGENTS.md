@@ -72,6 +72,13 @@ state and reviewer-native capabilities meet the supported model.
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
+- Treat negative-existence and chronology inferences as their own claims. The absence or late
+  first-add of one named file proves only that fact about that path; it does not prove that no
+  equivalent plan, brief, manifest, issue record, tag, or historical Git object existed. Before
+  applying such a correction, inspect the relevant revision for alternative authoritative
+  surfaces, then separately assess source existence, declared process/profile, requirement
+  conformance, and current reusability. If one omitted source class affects sibling cases, audit
+  the whole sibling set once before the next round instead of discovering one case per round.
 - Retained evidence is never an inherited verdict. Every unchanged exact claim receives a
   mandatory compact current-round assessment keyed by its server-owned ID; edited wording
   requires a new full packet. Removed/non-factual claims do not consume active context.

@@ -279,6 +279,10 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
 1. call `critique_plan` with a stable `lineage`, explicit `stakes`, and `round: 1`;
 2. validate each blocking packet, then edit `plan_path` (or the source that produced
    `plan_text`) using only a proven replacement or a justified removal/qualification;
+   for an absence or chronology claim, first search the relevant revision for equivalent
+   authoritative surfaces—a named file's first-add date proves only that file's chronology,
+   not that no earlier brief, manifest, issue record, or Git object existed—and correct every
+   affected sibling case in the same pass;
 3. increment `round` and call again **after the edit**;
 4. the verifier receives retained packets as candidate evidence and re-entails each
    exact passage against the current wording; every unchanged exact claim is a mandatory

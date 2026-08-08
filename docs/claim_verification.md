@@ -112,6 +112,15 @@ and authority justify the action, edits the plan, increments `round`, and calls 
 the evidence-entailled replacement when present. Without one it removes, qualifies, or
 researches the assertion rather than guessing.
 
+Negative-existence and chronology corrections require one extra completeness check. A missing
+path or a named file's first-add commit establishes only that path-level fact; it does not entail
+that no equivalent executor brief, manifest, issue record, tag, or retained Git object existed.
+The caller inspects alternative authoritative surfaces at the relevant revision, separates
+source existence from declared process/profile, requirement conformance, and current
+reusability, and applies the finding across every affected sibling case before another round.
+This prevents a credible but incomplete packet from producing one newly discovered omission per
+round.
+
 There is no required human confirmation step. A calling agent must not rerun unchanged plan
 text merely hoping a different sample clears it, and must not declare plan convergence from
 class closure alone. It stops only when:
