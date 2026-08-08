@@ -122,6 +122,18 @@ class TestAuditValidation:
         assert len(caught.value.excerpt) <= pc.DIAGNOSTIC_CHARS + 40
         assert len(caught.value.raw_sha256) == 64
 
+    def test_final_retry_localizes_bad_anchor_and_retains_valid_packets(self) -> None:
+        bad = _claim(anchor="This wording is not in the plan.")
+        audit = pc.parse_audit(_audit(bad, _claim()), PLAN, allow_partial=True)
+        state = pc.reconcile(
+            {}, audit, lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        assert len(state["claims"]) == 1
+        assert next(iter(state["claims"].values()))["verdict"] == "supported"
+        assert "localized invalid claim" in state["debt"]["reason"]
+        assert "This wording is not in the plan" in state["debt"]["rejected_excerpt"]
+        assert pc.is_blocked(state)
+
 
 class TestRetainedEvidence:
     def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:

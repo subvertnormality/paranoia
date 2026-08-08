@@ -266,6 +266,10 @@ Likewise, a source that cannot govern the claim's declared scope, or evidence th
 does not entail the model's `supported`/`refuted` verdict, is retained only as
 context and that individual claim is forced to blocking `unverified`. Other valid
 claims in the same response are still registered.
+If the bounded correction retry still contains an unbindable anchor, that item is
+recorded as explicit blocking audit debt while the retry's valid claims and valid
+removal dispositions are persisted. The next round therefore repairs one item
+instead of researching the whole inventory again.
 
 #### Fully autonomous correction loop
 

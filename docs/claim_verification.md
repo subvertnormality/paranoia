@@ -69,7 +69,9 @@ same audit response.
 Authority, scope, and entailment mistakes are also localized: the questionable source
 is retained as context, the affected claim is server-demoted to blocking `unverified`,
 and independently valid claims in the response remain usable. Structural corruption
-such as malformed JSON or a non-verbatim anchor still fails the audit closed.
+such as malformed JSON still fails the audit closed. A non-verbatim anchor gets the
+single correction retry; if it remains invalid, that item becomes explicit blocking
+debt while valid retry packets and dispositions persist for the next round.
 
 ## Multi-round behavior
 

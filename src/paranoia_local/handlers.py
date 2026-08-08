@@ -634,8 +634,12 @@ def _verify_plan_claims(
                 prior_state, second, round_no=round_no, plan_text=plan_text
             ), "retry-failed"
         try:
-            audit = pc.parse_audit(retry.text, plan_text)
+            # The retry is the final model call. Localize any remaining invalid claim
+            # so valid packets and dispositions survive with explicit blocking debt.
+            audit = pc.parse_audit(retry.text, plan_text, allow_partial=True)
             status = f"parsed after retry: {len(audit.claims)}"
+            if audit.issues:
+                status += f"; {len(audit.issues)} localized invalid"
         except pc.AuditError as second_error:
             combined = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction invalid "

@@ -65,6 +65,9 @@ class Audit:
     claims: tuple[dict[str, Any], ...]
     coverage: dict[str, Any]
     dispositions: tuple[dict[str, str], ...]
+    issues: tuple[str, ...] = ()
+    raw_sha256: str = ""
+    rejected_excerpt: str = ""
 
 
 def empty_state() -> dict[str, Any]:
@@ -101,7 +104,7 @@ def normalize_state(raw: Any) -> dict[str, Any]:
     return state
 
 
-def parse_audit(text: str, plan_text: str) -> Audit:
+def parse_audit(text: str, plan_text: str, *, allow_partial: bool = False) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
     if text.count(AUDIT_MARKER) != 1:
         raise AuditError(
@@ -136,19 +139,32 @@ def parse_audit(text: str, plan_text: str) -> Audit:
         raise AuditError("coverage must be an object", text)
 
     validated: list[dict[str, Any]] = []
+    issues: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
         try:
             claim = _validate_claim(item, plan_text)
         except ValueError as exc:
-            raise AuditError(f"claim {index}: {exc}", text) from exc
+            reason = f"claim {index}: {exc}"
+            if not allow_partial:
+                raise AuditError(reason, text) from exc
+            issues.append(f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}")
+            continue
         identity = (claim["anchor"], claim["proposition"])
         if identity in seen:
-            raise AuditError(f"claim {index}: duplicate anchor and proposition", text)
+            reason = f"claim {index}: duplicate anchor and proposition"
+            if not allow_partial:
+                raise AuditError(reason, text)
+            issues.append(f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}")
+            continue
         seen.add(identity)
         validated.append(claim)
     dispositions = _validate_dispositions(coverage.get("prior_dispositions", []), text)
-    return Audit(tuple(validated), deepcopy(coverage), dispositions)
+    return Audit(
+        tuple(validated), deepcopy(coverage), dispositions, tuple(issues),
+        hashlib.sha256(text.encode("utf-8", "replace")).hexdigest(),
+        _excerpt("\n".join(issues)),
+    )
 
 
 def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
@@ -360,6 +376,17 @@ def reconcile(
     # History is diagnostic only and must not grow without bound or consume active prompt
     # inventory.  The active claims retain all evidence needed for the next round.
     retired = retired[-MAX_ACTIVE_CLAIMS:]
+    debt = None
+    if audit.issues:
+        debt = {
+            "round": round_no,
+            "reason": (
+                f"{len(audit.issues)} localized invalid claim(s); valid claims and "
+                "dispositions were retained: " + "; ".join(audit.issues)
+            )[:DIAGNOSTIC_CHARS],
+            "raw_sha256": audit.raw_sha256,
+            "rejected_excerpt": audit.rejected_excerpt,
+        }
     return {
         "version": 1,
         "rounds": prior["rounds"] + 1,
@@ -368,7 +395,7 @@ def reconcile(
         "claims": current,
         "retired": retired,
         "coverage": audit.coverage,
-        "debt": None,
+        "debt": debt,
     }
 
 
