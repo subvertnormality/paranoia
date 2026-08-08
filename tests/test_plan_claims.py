@@ -147,6 +147,19 @@ class TestAuditValidation:
             "reason": "The old exact wording is absent.",
         },)
 
+    def test_disposition_prior_claim_id_wire_alias_is_normalized(self) -> None:
+        audit = pc.parse_audit(_audit(
+            _claim(),
+            dispositions=[{
+                "prior_claim_id": "C-old", "disposition": "removed",
+                "rationale": "The old exact wording is absent.",
+            }],
+        ), PLAN)
+        assert audit.dispositions == ({
+            "claim_id": "C-old", "disposition": "removed",
+            "reason": "The old exact wording is absent.",
+        },)
+
 
 class TestRetainedEvidence:
     def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:
