@@ -41,7 +41,11 @@ _COMMON = {
     },
     "web_search": {
         "type": "boolean",
-        "description": "Allow the reviewer to cross-check external methodology/library claims on the web (default true).",
+        "description": (
+            "Use the selected reviewer's built-in web search (default true). For "
+            "critique_plan this is required while claim verification is enabled; there "
+            "is no custom search endpoint or API-key integration."
+        ),
     },
 }
 
@@ -226,6 +230,20 @@ TOOLS: list[Tool] = [
                         "call argument only; .paranoia.toml is not consulted for it, in "
                         "either direction, so a project's branch-review setting can neither "
                         "enable nor disable the plan gate."
+                    ),
+                },
+                "claim_verification": {
+                    "type": "boolean",
+                    "description": (
+                        "Verify load-bearing atomic factual claims before structural review "
+                        "using repository evidence and the selected reviewer's built-in web "
+                        "search (default TRUE for bundled Codex/Claude engines). Decisions, "
+                        "requirements and non-load-bearing observations are excluded from "
+                        "active inventory. External claims close only on primary or "
+                        "authoritative exact passages; known UGC such as Reddit can be a "
+                        "lead but never governing evidence. Retained source packets are "
+                        "re-entailled against edited wording in later rounds. Set false only "
+                        "for an explicit structural-only/legacy review."
                     ),
                 },
                 "lineage": {

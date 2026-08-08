@@ -50,6 +50,10 @@ class Engine(ABC):
     # arbitration cleaner and attester). Enforced where the engine layer can
     # enforce it; see the subclass notes.
     text_only: bool = False
+    #: Both bundled reviewers expose first-party web tools through their own CLI.  The
+    #: plan-claim phase keys off this capability so test/dummy engines are not silently
+    #: asked to perform a second protocol they do not implement.
+    native_web: bool = True
 
     @abstractmethod
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:

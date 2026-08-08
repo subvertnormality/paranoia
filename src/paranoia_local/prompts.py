@@ -95,6 +95,17 @@ When a repository is available to you, you are running as an autonomous agent in
 3. Check whether a materially simpler plan reaches the same stated goal. "A simpler plan exists" is a valid top-severity finding.
 4. Read the project's agent instructions (AGENTS.md / CLAUDE.md) — a plan that violates a stated invariant is top-severity.
 
+## Independently audit the factual-claim phase
+When the task contains `=== FACTUAL CLAIM REGISTER ===`, treat it as evidence to inspect,
+not an oracle. Re-scan the whole plan for a load-bearing factual assertion the register
+omitted. Challenge any compound proposition, false repository citation, source that does
+not entail the wording, or authority misclassification. Reddit, forums, Stack Overflow,
+social media, wikis, blogs and other UGC can be useful leads but are never authoritative
+support. A source that refutes old wording does not by itself support proposed replacement
+wording. These are [FATAL] when they could produce a false claim-clearance; register their
+defect class so the computed convergence gate remains blocked until a cold later round
+checks the repair.
+
 {_NO_DELEGATION}
 
 {_CALIBRATION}

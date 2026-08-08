@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import arbitration, class_closure as cc
-from . import logs, orientation, prompts
+from . import logs, orientation, plan_claims as pc, prompts
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
 from .worktree import worktree_at
@@ -438,6 +438,19 @@ def critique_plan(
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
+    # Verification is ON for the bundled engines.  Capability detection keeps injected
+    # test engines and third-party adapters backward-compatible unless a test/caller opts
+    # in explicitly.  A web-disabled verification run would defeat the feature's primary
+    # purpose, so it is rejected rather than quietly degrading to repository-only checks.
+    claim_verification = bool(arguments.get(
+        "claim_verification", getattr(engine, "native_web", False)
+    ))
+    if claim_verification and not web_search:
+        raise ValueError(
+            "claim verification requires the reviewer's built-in web search; "
+            "web_search: false is incompatible with claim_verification: true"
+        )
+
     # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A per-project
     # setting could never suffice anyway, since the lineage is inherently per-seam, and
     # sharing the branch key would give one name two meanings across two tools.
@@ -460,6 +473,55 @@ def critique_plan(
         state_root=cc.default_state_root(), stamp=now(),
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
+
+    claim_state: dict[str, Any] = (
+        closure.lineage.claim_state
+        if closure and closure.lineage is not None
+        else pc.empty_state()
+    )
+
+    claim_status = "disabled"
+    claim_duration_ms: int | None = None
+    if claim_verification:
+        claim_started = time.monotonic()
+        if closure and closure.unavailable:
+            claim_state = pc.with_debt(
+                claim_state,
+                pc.AuditError(f"lineage state unavailable: {closure.unavailable}"),
+                round_no=arguments.get("round") or 1,
+                plan_text=plan_text,
+            )
+            claim_status = "state-unavailable"
+        else:
+            try:
+                claim_state, claim_status = _verify_plan_claims(
+                    plan_text, claim_state, lineage_id=lineage_id or "one-shot-plan",
+                    round_no=arguments.get("round") or 1, stakes=stakes,
+                    engine=engine, repo=repo, model=model, effort=effort,
+                    on_progress=on_progress,
+                )
+            except BaseException:
+                # This is before the structural-review try/finally below, so release the
+                # already-open lineage latch here rather than stranding the seam.
+                if closure:
+                    closure.abandon()
+                    closure.release()
+                raise
+            if closure and closure.lineage is not None:
+                closure.lineage.claim_state = claim_state
+                # Persist useful evidence before the structural reviewer runs.  If that
+                # later CLI call fails, the next autonomous round reuses the completed
+                # research instead of starting over.  The existing pending latch still
+                # protects this same atomic lineage file.
+                try:
+                    cc.save_lineage(closure.state_root, closure.lineage)
+                except cc.StateUnavailable as exc:
+                    closure.unavailable = str(exc)
+        blocks.append(pc.review_context(claim_state))
+        claim_duration_ms = int((time.monotonic() - claim_started) * 1000)
+    if closure:
+        closure.claims_enabled = claim_verification
+        closure.claim_state = claim_state
 
     try:
         body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
@@ -491,6 +553,19 @@ def critique_plan(
         "class_closure": closure_on,
         "lineage": lineage_id if closure else None,
         "register_status": closure.register_status if closure else None,
+        "claim_verification": claim_verification,
+        "claim_status": claim_status,
+        "claim_duration_ms": claim_duration_ms,
+        "claim_model_calls": (
+            2 if claim_status.startswith("parsed after retry") or "retry" in claim_status
+            else 1
+        ) if claim_verification and claim_status != "state-unavailable" else 0,
+        "claim_counts": {
+            verdict: sum(
+                1 for claim in pc.normalize_state(claim_state)["claims"].values()
+                if claim.get("verdict") == verdict
+            ) for verdict in sorted(pc.VERDICTS)
+        } if claim_verification else None,
         # The retry's register is what actually changed durable state, so the original
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
@@ -499,7 +574,83 @@ def critique_plan(
     if closure and closure.retry_register:
         body_text += ("\n\n---\n_The register below was supplied on retry and is what this "
                       f"round applied:_\n\n{closure.retry_register.strip()}")
-    return f"{body_text}\n\n{trailer}" if trailer else body_text
+    if trailer:
+        return f"{body_text}\n\n{trailer}"
+    if claim_verification:
+        verdict = (
+            "BLOCKED — one or more factual claims lack current authoritative support"
+            if pc.is_blocked(claim_state)
+            else "NOT-BLOCKED — every active factual claim has current authoritative support"
+        )
+        return f"{body_text}\n\n{pc.render_trailer(claim_state)}\nCONVERGENCE: {verdict}"
+    return body_text
+
+
+def _verify_plan_claims(
+    plan_text: str,
+    prior_state: dict[str, Any],
+    *,
+    lineage_id: str,
+    round_no: int,
+    stakes: str | None,
+    engine: Engine,
+    repo: Path,
+    model: str,
+    effort: str,
+    on_progress: Callable[[str], None] | None,
+) -> tuple[dict[str, Any], str]:
+    """Run one complete research pass, with one bounded structural correction retry."""
+    if on_progress:
+        on_progress("verifying atomic factual claims against repository and web evidence")
+    prompt = pc.audit_instructions(plan_text, prior_state, stakes)
+    review = engine.run(
+        prompt, repo, model, effort, True, timeout=1800,
+        **_progress_kwargs(on_progress),
+    )
+    if review.error:
+        error = pc.AuditError(
+            f"claim-audit reviewer failed (exit {review.returncode})", review.raw or review.text
+        )
+        return pc.with_debt(prior_state, error, round_no=round_no, plan_text=plan_text), "failed"
+    try:
+        audit = pc.parse_audit(review.text, plan_text)
+        status = f"parsed {len(audit.claims)}"
+    except pc.AuditError as first:
+        if not review.session_ref or not hasattr(engine, "resume"):
+            return (
+                pc.with_debt(prior_state, first, round_no=round_no, plan_text=plan_text),
+                f"malformed: {first.reason}",
+            )
+        retry = engine.resume(
+            review.session_ref, pc.retry_instructions(first, plan_text), repo,
+            model, effort, True, timeout=1800, **_progress_kwargs(on_progress),
+        )
+        if retry.error:
+            second = pc.AuditError(
+                f"initial audit invalid ({first.reason}); correction call failed "
+                f"(exit {retry.returncode})",
+                (review.text or "") + "\n--- CORRECTION ---\n" + (retry.raw or retry.text),
+            )
+            return pc.with_debt(
+                prior_state, second, round_no=round_no, plan_text=plan_text
+            ), "retry-failed"
+        try:
+            audit = pc.parse_audit(retry.text, plan_text)
+            status = f"parsed after retry: {len(audit.claims)}"
+        except pc.AuditError as second_error:
+            combined = pc.AuditError(
+                f"initial audit invalid ({first.reason}); correction invalid "
+                f"({second_error.reason})",
+                (review.text or "") + "\n--- CORRECTION ---\n" + (retry.text or ""),
+            )
+            return pc.with_debt(
+                prior_state, combined, round_no=round_no, plan_text=plan_text
+            ), "retry-malformed"
+    state = pc.reconcile(
+        prior_state, audit, lineage_id=lineage_id, round_no=round_no,
+        plan_text=plan_text,
+    )
+    return state, status
 
 
 def _query_body(
@@ -696,7 +847,12 @@ class _ClosureRound:
         self.register_status = status
         if lineage.debt is None:
             self.retry_register = self._retry_candidate
-        return cc.render_trailer(lineage, register_status=status, minted=minted)
+        return self._render_trailer(lineage, register_status=status, minted=minted)
+
+    def _render_trailer(
+        self, lineage: cc.Lineage, *, register_status: str, minted: list[str]
+    ) -> str:
+        return cc.render_trailer(lineage, register_status=register_status, minted=minted)
 
     def abandon(self) -> None:
         """The round died before it could settle. Nothing was written, so the latch has
@@ -819,6 +975,36 @@ class _PlanClassClosure(_ClosureRound):
 
     mode = cc.PLAN_MODE
     allow_mechanized = False
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.claims_enabled = False
+        self.claim_state: dict[str, Any] = {}
+
+    def _render_trailer(
+        self, lineage: cc.Lineage, *, register_status: str, minted: list[str]
+    ) -> str:
+        if not self.claims_enabled:
+            return super()._render_trailer(
+                lineage, register_status=register_status, minted=minted
+            )
+        class_text = cc.render_trailer(
+            lineage, register_status=register_status, minted=minted
+        ).replace("CONVERGENCE:", "CLASS-CONVERGENCE:", 1)
+        claim_text = pc.render_trailer(self.claim_state)
+        blockers: list[str] = []
+        if lineage.debt or lineage.blocking():
+            blockers.append("class closure")
+        if pc.is_blocked(self.claim_state):
+            blockers.append("factual claim closure")
+        if blockers:
+            final = "CONVERGENCE: BLOCKED — " + " and ".join(blockers) + " remain open."
+        else:
+            final = (
+                "CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed and every "
+                "active factual claim is supported by current authoritative evidence."
+            )
+        return f"{claim_text}\n{class_text}\n{final}"
 
 
 def _lineage_id(repo: Path, base_ref: str, head_ref: str | None, is_dirty: bool,

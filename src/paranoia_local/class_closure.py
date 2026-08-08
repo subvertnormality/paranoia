@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import tempfile
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
@@ -315,6 +316,10 @@ class Lineage:
     classes: dict[str, TrackedClass] = field(default_factory=dict)
     exemptions: list[Exemption] = field(default_factory=list)
     debt: dict[str, Any] | None = None
+    #: Plan mode's factual-claim register.  It shares this already-atomic lineage file
+    #: instead of introducing a second store/transaction protocol.  Branch mode leaves
+    #: it empty and otherwise behaves byte-for-byte as before.
+    claim_state: dict[str, Any] = field(default_factory=dict)
     #: Which tool created this lineage. A plan lineage holds only unmechanized classes
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
@@ -419,6 +424,7 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         },
         exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
         debt=raw.get("debt"),
+        claim_state=deepcopy(raw.get("claim_state", {})),
     )
 
 
@@ -433,6 +439,7 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         ],
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
+        "claim_state": lineage.claim_state,
     }
 
 
@@ -531,7 +538,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
     return Lineage(
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
-        mode=lineage.mode,
+        mode=lineage.mode, claim_state=deepcopy(lineage.claim_state),
     )
 
 

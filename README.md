@@ -133,8 +133,8 @@ round 1 ──► review ──► fix ──► round 2 ──► review ──
              └── already_raised ────────────┴── already_raised ────► CONVERGENCE: NOT-BLOCKED
 ```
 
-Each round is a **fresh, cold reviewer** — it has no memory of the last one. You
-carry state forward with the arguments below.
+Each structural round is a **fresh, cold reviewer**. Durable lineage state carries
+classes and plan-claim evidence forward; the reviewer never relies on chat memory.
 
 ### `round` — the severity floor
 
@@ -226,6 +226,59 @@ detection.
 You cannot emit these yourself — ask for them in `focus`, e.g. *"class 3f2a91c4 is
 registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
+### Plan claim verification — evidence before critique
+
+`critique_plan` verifies factual premises **by default**, before the structural
+review. It uses the selected signed-in reviewer CLI's built-in web search and its
+read access to the repository. There is no `PARANOIA_SEARCH_ENDPOINT`, API key,
+plugin, or caller-supplied search adapter.
+
+The verifier scans the whole plan but retains only **load-bearing atomic factual
+claims**: assertions whose truth could change feasibility, ordering, dependencies,
+rationale, mappings, or acceptance. It splits conjunctions into independent
+propositions. Decisions, requirements, intentions, definitions, preferences,
+forecasts, and incidental facts are omitted; once classified out, they do not
+consume active inventory or later-round context.
+
+External claims close only when an exact passage from a primary or authoritative
+source entails that exact proposition. First-party documentation, standards,
+statutes/regulators, government data, original papers/datasets, and the relevant
+entity's records are preferred. Secondary material can corroborate or locate a
+source. Reddit, Stack Overflow, forums, social media, wikis, blogs, and other UGC
+can expose leads or conflicts, but the server prevents known UGC hosts from being
+treated as governing evidence even if the model labels them `primary`.
+
+Every contradicted or unresolved claim returns an **actionable source packet**:
+
+- the verbatim plan wording and atomic proposition;
+- the canonical URL or `repo://path#Lx-Ly` location;
+- publisher and authority class;
+- the exact supporting/refuting passage;
+- an evidence-entailled replacement when one is actually proven.
+
+Evidence that refutes old wording does **not** prove replacement wording. When no
+authoritative passage entails a replacement, the packet explicitly says to remove,
+weaken, or research the assertion instead of inventing a correction.
+
+#### Fully autonomous correction loop
+
+The spawned paranoia reviewer is deliberately read-only. “Autonomous” means the
+calling coding agent performs the edit/rerun loop without waiting for a human:
+
+1. call `critique_plan` with a stable `lineage`, explicit `stakes`, and `round: 1`;
+2. validate each blocking packet, then edit `plan_path` (or the source that produced
+   `plan_text`) using only a proven replacement or a justified removal/qualification;
+3. increment `round` and call again **after the edit**;
+4. the verifier receives retained packets as candidate evidence and re-entails each
+   exact passage against the current wording; unchanged supported claims avoid blind
+   research from zero, while edited claims inherit no verdict;
+5. repeat until the structural review says `CONVERGED` and the single computed trailer
+   says `CONVERGENCE: NOT-BLOCKED`.
+
+Do not rerun unchanged text expecting reviewer variance to fix a claim. Do not ask a
+human to translate evidence the packet already makes actionable. A human may inspect
+or override the process, but is not required for ordinary convergence.
+
 ### `lineage` — which loop this round belongs to
 
 Class state lives in `~/.paranoia/lineages/<lineage>.json`.
@@ -245,7 +298,8 @@ the other tool is refused rather than merged.
 
 The stop condition is **two-part**:
 
-1. the computed trailer reads `CONVERGENCE: NOT-BLOCKED`, **and**
+1. the computed trailer reads `CONVERGENCE: NOT-BLOCKED` (all active plan facts
+   supported and no blocking class open), **and**
 2. the round returns `CONVERGED`, or only `[MINOR]`/`[OUT-OF-SCOPE]` items.
 
 When the two disagree, **the trailer governs** — and says so in its own output.
@@ -331,11 +385,12 @@ five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
+| `claim_verification` | boolean | `true` | Verify load-bearing atomic facts against repository and authoritative built-in web evidence before structural review. Set `false` only for an explicit legacy structural-only review |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
 | `focus` | string | — | Narrow the review to a specific concern |
 | `stakes` | string | — | The scope boundary |
 | `already_raised` | array | `[]` | Claims already accepted from prior rounds |
-| `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+| `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | `web_search: false` is rejected while claim verification is enabled |
 
 `class_closure` and `lineage` are **call arguments only** here — `.paranoia.toml`
 is not consulted for either.
@@ -521,6 +576,28 @@ CONVERGENCE: BLOCKED — 1 class(es) unclosed:
 `NOT-BLOCKED` asserts only that no blocking class is unclosed. It never asserts the
 change is correct — the reviewer's findings still govern that.
 
+For verified plan reviews the claim gate and class gate are combined into one
+governing verdict:
+
+```
+CLAIM-REGISTER: 18 active factual claims; 7 retired and excluded from active inventory
+CLAIM-CLOSURE: 17 supported, 1 refuted, 0 unverified
+ACTIONABLE SOURCE PACKETS:
+- CLAIM C-4e2d… — REFUTED
+  Plan wording: …
+  Atomic proposition: …
+  Evidence-entailled replacement: …
+  Source 1: [primary/refutes_claim] …
+    Location: https://… (Section 4, table 2)
+    Exact passage: …
+CLASS-CONVERGENCE: NOT-BLOCKED — …
+CONVERGENCE: BLOCKED — factual claim closure remains open.
+```
+
+`CLAIM-AUDIT-DEBT` includes the validator reason, SHA-256, and a bounded rejected
+output excerpt. Malformed model JSON, a failed audit/retry, unsupported authority,
+or missing entailment blocks; it never becomes an empty successful register.
+
 ### `arbitrate` outcomes
 
 | Outcome | Meaning |
@@ -574,7 +651,7 @@ paranoia-local --engine {codex|claude} [--log-dir DIR]
 | Path | Contents |
 |---|---|
 | `~/.paranoia/logs/` | One JSON audit record per call: engine, model, round, `already_raised`, session ref, timings, and the review text |
-| `~/.paranoia/lineages/` | Class-closure state, one file per lineage |
+| `~/.paranoia/lineages/` | Atomic class + plan-claim state, one file per lineage. Retired/non-factual claims are excluded from active prompt inventory |
 
 Lineage state deliberately does **not** follow `--log-dir`, so moving your logs
 cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
@@ -583,11 +660,12 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 ## Safety model
 
-- **Read-only.** Codex runs under its OS sandbox (`--sandbox read-only`); Claude
+- **Read-only reviewer.** Codex runs under its OS sandbox (`--sandbox read-only`); Claude
   runs with a read-only tool allowlist (`Read`, `Grep`, `Glob`, scoped `git`
   reads, web search) and write tools explicitly denied. The reviewer cannot edit
-  your code, run your test suite, or reach the network except for opt-in web
-  search.
+  your code or run your test suite. Built-in web search is enabled by default and
+  required for plan claim verification. The separate calling coding agent owns
+  autonomous corrections.
 - **The audited repo cannot widen the reviewer.** The Claude engine is spawned
   with `--setting-sources ""`, so it loads no `.claude` settings files — otherwise
   the reviewed repo's `.claude/settings.local.json` and your global settings would
@@ -638,6 +716,7 @@ the real subprocess runner against fake `codex`/`claude` binaries on `PATH`.
 Design documents for the two non-obvious subsystems live in
 [`docs/`](docs/): [`class_closure_plan.md`](docs/class_closure_plan.md),
 [`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
+[`claim_verification.md`](docs/claim_verification.md), and
 [`arbitration_plan.md`](docs/arbitration_plan.md).
 
 ## License
