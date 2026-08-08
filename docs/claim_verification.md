@@ -27,6 +27,8 @@ Verification adds one focused module to the existing plan-review path:
    file. There is no second database, CAS, journal, or transaction protocol.
 4. The existing cold structural reviewer receives a concise claim inventory and independently
    checks omissions, atomicity, source authority, citation truth, and replacement entailment.
+   Its packet includes every URL, authority basis, location, exact passage, and relation; a
+   model-supplied `primary` label is not accepted as the only review of authority.
 5. One final computed verdict combines claim closure and class closure.
 
 The active ceiling is 500 factual claims and 20 evidence records per claim. These are
@@ -69,6 +71,12 @@ or a validated `prior_claim_id` preserves identity. Removed claims move to bound
 history and leave active inventory. Every current verdict is newly parsed and validated;
 previous verdicts are never copied.
 
+A previously active claim cannot disappear merely because a later model omits it. The audit
+must retain it or explicitly classify it `removed`/`nonfactual`. A `removed` disposition is
+accepted only after its exact old anchor has left the plan. Missing or invalid dispositions
+keep the prior packet active as `unverified`; this blocks rather than converting sampling
+variance into clearance. The cold structural reviewer sees every current-round retirement.
+
 Prior URLs and passages are included as candidate evidence in the next audit. The reviewer
 re-opens/searches them as needed and re-entails them against the current proposition. This
 makes unchanged rounds faster without treating stale evidence as truth. If the audit fails,
@@ -100,4 +108,3 @@ are listed outside JSON. One correction call receives the exact validation failu
 attempts fail, neither is applied and the bounded diagnostics remain visible. Research is
 persisted before structural review so a later structural CLI failure does not force successful
 evidence work to restart.
-

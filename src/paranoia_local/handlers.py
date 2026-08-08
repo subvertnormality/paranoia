@@ -577,11 +577,12 @@ def critique_plan(
     if trailer:
         return f"{body_text}\n\n{trailer}"
     if claim_verification:
-        verdict = (
-            "BLOCKED — one or more factual claims lack current authoritative support"
-            if pc.is_blocked(claim_state)
-            else "NOT-BLOCKED — every active factual claim has current authoritative support"
-        )
+        if review.error:
+            verdict = "BLOCKED — the mandatory structural reviewer failed"
+        elif pc.is_blocked(claim_state):
+            verdict = "BLOCKED — one or more factual claims lack current authoritative support"
+        else:
+            verdict = "NOT-BLOCKED — every active factual claim has current authoritative support"
         return f"{body_text}\n\n{pc.render_trailer(claim_state)}\nCONVERGENCE: {verdict}"
     return body_text
 

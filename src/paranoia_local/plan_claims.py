@@ -65,6 +65,7 @@ class AuditError(ValueError):
 class Audit:
     claims: tuple[dict[str, Any], ...]
     coverage: dict[str, Any]
+    dispositions: tuple[dict[str, str], ...]
 
 
 def empty_state() -> dict[str, Any]:
@@ -147,7 +148,33 @@ def parse_audit(text: str, plan_text: str) -> Audit:
             raise AuditError(f"claim {index}: duplicate anchor and proposition", text)
         seen.add(identity)
         validated.append(claim)
-    return Audit(tuple(validated), deepcopy(coverage))
+    dispositions = _validate_dispositions(coverage.get("prior_dispositions", []), text)
+    return Audit(tuple(validated), deepcopy(coverage), dispositions)
+
+
+def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
+    if not isinstance(raw, list):
+        raise AuditError("coverage.prior_dispositions must be an array", text)
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict) or set(item) != {"claim_id", "disposition", "reason"}:
+            raise AuditError(
+                f"prior disposition {index} must contain exactly claim_id, disposition, reason",
+                text,
+            )
+        claim_id = _one_line(item["claim_id"], "disposition.claim_id")
+        disposition = _one_line(item["disposition"], "disposition.disposition")
+        reason = _one_line(item["reason"], "disposition.reason")
+        if disposition not in {"removed", "nonfactual"}:
+            raise AuditError(
+                f"prior disposition {index} must be removed or nonfactual", text
+            )
+        if claim_id in seen:
+            raise AuditError(f"duplicate disposition for prior claim {claim_id}", text)
+        seen.add(claim_id)
+        result.append({"claim_id": claim_id, "disposition": disposition, "reason": reason})
+    return tuple(result)
 
 
 def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
@@ -275,13 +302,46 @@ def reconcile(
         current[claim_id] = record
 
     retired = list(prior["retired"])
+    dispositions = {item["claim_id"]: item for item in audit.dispositions}
     for claim_id, record in old.items():
         if claim_id not in used:
-            retired.append({
-                "claim_id": claim_id,
-                "proposition": record.get("proposition") if isinstance(record, dict) else None,
-                "retired_round": round_no,
-            })
+            disposition = dispositions.get(claim_id)
+            old_anchor = record.get("anchor", "") if isinstance(record, dict) else ""
+            removable = bool(
+                disposition
+                and (
+                    disposition["disposition"] == "nonfactual"
+                    or (
+                        disposition["disposition"] == "removed"
+                        and old_anchor not in plan_text
+                    )
+                )
+            )
+            if removable:
+                retired.append({
+                    "claim_id": claim_id,
+                    "anchor": old_anchor,
+                    "proposition": record.get("proposition") if isinstance(record, dict) else None,
+                    "disposition": disposition["disposition"],
+                    "reason": disposition["reason"],
+                    "retired_round": round_no,
+                })
+            else:
+                # Model omission is not deletion.  Preserve the exact prior packet as
+                # active but invalidate its verdict until the current audit either retains
+                # it or gives an independently reviewable disposition.
+                carried = deepcopy(record) if isinstance(record, dict) else {}
+                carried.update({
+                    "claim_id": claim_id,
+                    "verdict": "unverified",
+                    "replacement": None,
+                    "verified_round": round_no,
+                    "rationale": (
+                        "The current audit omitted this prior claim without a valid "
+                        "disposition; omission cannot clear governing inventory."
+                    ),
+                })
+                current[claim_id] = carried
     # History is diagnostic only and must not grow without bound or consume active prompt
     # inventory.  The active claims retain all evidence needed for the next round.
     retired = retired[-MAX_ACTIVE_CLAIMS:]
@@ -352,10 +412,31 @@ def review_context(state_raw: Any) -> str:
         "This inventory was independently researched before your structural review. Check the plan for any omitted load-bearing factual assertion; an omission is a blocking finding.",
     ]
     for claim_id, claim in state["claims"].items():
-        lines.append(
-            f"- {claim_id} [{claim.get('scope')}/{claim.get('verdict')}]: "
-            f"{claim.get('proposition')}"
-        )
+        lines.extend([
+            f"- CLAIM {claim_id} [{claim.get('scope')}/{claim.get('verdict')}]",
+            f"  Plan wording: {claim.get('anchor')}",
+            f"  Atomic proposition: {claim.get('proposition')}",
+            f"  Proposed replacement: {claim.get('replacement') or 'none'}",
+        ])
+        for index, evidence in enumerate(claim.get("evidence", []), 1):
+            lines.extend([
+                f"  Evidence {index}: [{evidence.get('source_kind')}/{evidence.get('relation')}] "
+                f"{evidence.get('title')} — {evidence.get('publisher')}",
+                f"    Authority basis: {evidence.get('authority_basis')}",
+                f"    Location: {evidence.get('url')} ({evidence.get('location')})",
+                f"    Exact passage: {evidence.get('quote')}",
+            ])
+    recent_retired = [
+        item for item in state.get("retired", [])
+        if item.get("retired_round") == state.get("rounds")
+    ]
+    if recent_retired:
+        lines.append("Claims retired by this audit — independently verify each disposition:")
+        for item in recent_retired:
+            lines.append(
+                f"- {item.get('claim_id')} [{item.get('disposition')}]: "
+                f"{item.get('anchor')} — {item.get('reason')}"
+            )
     if state.get("debt"):
         lines.append(f"- AUDIT DEBT: {state['debt'].get('reason')}")
     return "\n".join(lines)
@@ -449,6 +530,11 @@ Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or
 each retained URL as needed and re-assess entailment against the CURRENT proposition.
 If corrected wording corresponds to an old claim, set prior_claim_id to its claim_id.
 Unchanged verified claims should normally be quicker because their exact sources are here.
+Every prior claim must either appear in claims (normally with prior_claim_id) or have one
+entry in coverage.prior_dispositions. Use disposition "removed" only when its factual
+assertion is absent from the current plan, and "nonfactual" only when the current wording is
+a decision, requirement, intention, definition, preference, or other excluded statement.
+Omission without this explicit disposition stays active and blocks.
 
 PRIOR EVIDENCE PACKETS (JSON):
 {prior}
@@ -457,7 +543,7 @@ Reply with only the marker and one JSON object. Do not use markdown fences. Thes
 CONCRETE literals, not pipe-delimited pseudo-enums. The shape is:
 
 {AUDIT_MARKER}
-{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim plan text","proposition":"one atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the standard being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"notes":"brief coverage note"}}}}
+{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim plan text","proposition":"one atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the standard being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_dispositions":[],"notes":"brief coverage note"}}}}
 
 Allowed verdict literals: "supported", "refuted", "unverified".
 Allowed scope literals: "external", "repository".

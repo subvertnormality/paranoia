@@ -47,10 +47,15 @@ def _claim(**changes: object) -> dict[str, object]:
     return value
 
 
-def _audit(*claims: dict[str, object]) -> str:
+def _audit(
+    *claims: dict[str, object], dispositions: list[dict[str, str]] | None = None
+) -> str:
     payload = {
         "claims": list(claims),
-        "coverage": {"sections_scanned": 1, "omitted_nonfacts": 1, "notes": "complete"},
+        "coverage": {
+            "sections_scanned": 1, "omitted_nonfacts": 1,
+            "prior_dispositions": dispositions or [], "notes": "complete",
+        },
     }
     return pc.AUDIT_MARKER + "\n" + json.dumps(payload)
 
@@ -120,14 +125,43 @@ class TestRetainedEvidence:
             {}, pc.parse_audit(_audit(_claim()), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
         )
+        claim_id = next(iter(first["claims"]))
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(), "# Rollout\n\nUse Python.\n"),
+            first, pc.parse_audit(_audit(dispositions=[{
+                "claim_id": claim_id, "disposition": "removed",
+                "reason": "The release-date assertion is absent from the edited plan.",
+            }]), "# Rollout\n\nUse Python.\n"),
             lineage_id="x-plan", round_no=2, plan_text="# Rollout\n\nUse Python.\n",
         )
         assert second["claims"] == {}
         assert len(second["retired"]) == 1
         assert not pc.is_blocked(second)
         assert "1 retired and excluded from active inventory" in pc.render_trailer(second)
+
+    def test_model_omission_cannot_clear_a_still_present_prior_claim(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        second = pc.reconcile(
+            first, pc.parse_audit(_audit(), PLAN),
+            lineage_id="x-plan", round_no=2, plan_text=PLAN,
+        )
+        assert list(second["claims"]) == [claim_id]
+        assert second["claims"][claim_id]["verdict"] == "unverified"
+        assert pc.is_blocked(second)
+
+    def test_structural_context_contains_full_evidence_for_independent_audit(self) -> None:
+        state = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        context = pc.review_context(state)
+        source = _source()
+        assert source["url"] in context
+        assert source["quote"] in context
+        assert source["authority_basis"] in context
 
     def test_action_packet_returns_exact_passage_and_location(self) -> None:
         refuted = _claim(
@@ -153,17 +187,23 @@ class ScriptedEngine:
     default_model = "test-model"
     native_web = True
 
-    def __init__(self, *outputs: str) -> None:
+    def __init__(self, *outputs: object) -> None:
         self.outputs = list(outputs)
         self.prompts: list[str] = []
 
     def run(self, prompt, cwd, model, effort, web_search, **kwargs):
         self.prompts.append(prompt)
-        return Review(text=self.outputs.pop(0), session_ref="session", raw="")
+        output = self.outputs.pop(0)
+        if isinstance(output, Review):
+            return output
+        return Review(text=str(output), session_ref="session", raw="")
 
     def resume(self, session_ref, prompt, cwd, model, effort, web_search, **kwargs):
         self.prompts.append(prompt)
-        return Review(text=self.outputs.pop(0), session_ref=session_ref, raw="")
+        output = self.outputs.pop(0)
+        if isinstance(output, Review):
+            return output
+        return Review(text=str(output), session_ref=session_ref, raw="")
 
 
 STRUCTURAL_CLEAR = """## What works
@@ -239,3 +279,21 @@ class TestHandlerFlow:
                 },
                 engine=ScriptedEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
             )
+
+    def test_one_shot_structural_failure_cannot_emit_not_blocked(self, tmp_path: Path) -> None:
+        failure = Review(
+            text="structural reviewer timed out", session_ref=None, raw="timeout",
+            returncode=124, error=True,
+        )
+        out = handlers.critique_plan(
+            {
+                "plan_text": PLAN, "repo_path": str(_repo(tmp_path)),
+                "class_closure": False, "claim_verification": True,
+                "stakes": "single-user local tool; factual correctness is high impact",
+            },
+            engine=ScriptedEngine(_audit(_claim()), failure),
+            log_dir=tmp_path / "logs", now=lambda: "T1",
+        )
+        assert "REVIEW FAILED" in out
+        assert "CONVERGENCE: BLOCKED" in out
+        assert "CONVERGENCE: NOT-BLOCKED" not in out

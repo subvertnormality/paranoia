@@ -279,6 +279,12 @@ Do not rerun unchanged text expecting reviewer variance to fix a claim. Do not a
 human to translate evidence the packet already makes actionable. A human may inspect
 or override the process, but is not required for ordinary convergence.
 
+A later audit cannot clear a prior claim by omitting it. It must retain the claim or
+explicitly dispose it as removed/non-factual; otherwise the old packet remains active as
+`unverified`. The cold structural reviewer receives the complete evidence for every
+supported claim and every current-round disposition, so model-supplied authority and
+entailment labels are independently checked before the combined gate can clear.
+
 ### `lineage` — which loop this round belongs to
 
 Class state lives in `~/.paranoia/lineages/<lineage>.json`.

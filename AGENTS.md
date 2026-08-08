@@ -74,6 +74,9 @@ state and reviewer-native capabilities meet the supported model.
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
 - Retained evidence is a candidate for re-entailment against edited wording, never an inherited
   verdict. Removed/non-factual claims do not consume active context.
+- Model omission is not removal: every prior active claim must be retained or receive an
+  explicit current disposition, and the cold structural reviewer must see complete evidence
+  plus current retirements before its success can contribute to clearance.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
 - The reviewer remains read-only. The calling coding agent autonomously validates packets,
@@ -94,4 +97,3 @@ After implementation and docs pass locally, run Codex paranoia against the code 
 stakes. Accepted findings trigger one coherent change followed by a focused rerun; recurring
 classes trigger an architecture checkpoint, not endless patching. Do not open/merge a PR while
 real acceptance, tests, implementation convergence, or documented stakes remain unresolved.
-
