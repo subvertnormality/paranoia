@@ -577,13 +577,11 @@ def critique_plan(
     if trailer:
         return f"{body_text}\n\n{trailer}"
     if claim_verification:
-        if review.error:
-            verdict = "BLOCKED — the mandatory structural reviewer failed"
-        elif pc.is_blocked(claim_state):
-            verdict = "BLOCKED — one or more factual claims lack current authoritative support"
-        else:
-            verdict = "NOT-BLOCKED — every active factual claim has current authoritative support"
-        return f"{body_text}\n\n{pc.render_trailer(claim_state)}\nCONVERGENCE: {verdict}"
+        # One-shot mode deliberately has no computed convergence contract: without a
+        # parsed class register the server cannot mechanically incorporate a successful
+        # structural review's FATAL/MAJOR findings.  Evidence and prose remain useful,
+        # but only the tracked two-role path may issue governing combined clearance.
+        return f"{body_text}\n\n{pc.render_trailer(claim_state)}"
     return body_text
 
 

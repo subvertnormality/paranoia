@@ -166,10 +166,8 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
         claim_id = _one_line(item["claim_id"], "disposition.claim_id")
         disposition = _one_line(item["disposition"], "disposition.disposition")
         reason = _one_line(item["reason"], "disposition.reason")
-        if disposition not in {"removed", "nonfactual"}:
-            raise AuditError(
-                f"prior disposition {index} must be removed or nonfactual", text
-            )
+        if disposition != "removed":
+            raise AuditError(f"prior disposition {index} must be removed", text)
         if claim_id in seen:
             raise AuditError(f"duplicate disposition for prior claim {claim_id}", text)
         seen.add(claim_id)
@@ -285,9 +283,12 @@ def reconcile(
     used: set[str] = set()
     current: dict[str, Any] = {}
     for claim in audit.claims:
-        requested = claim.get("prior_claim_id")
         exact = by_prop.get(_norm(claim["proposition"]))
-        claim_id = requested if requested in old and requested not in used else exact
+        # Identity is server-owned and semantic only at the exact proposition seam.
+        # A model-provided prior ID is useful context but cannot bind edited wording to
+        # unrelated history.  Corrected propositions mint a new ID; the predecessor must
+        # separately satisfy the mechanically checked removal rule below.
+        claim_id = exact
         if not claim_id or claim_id in used:
             claim_id = _mint(lineage_id, next_seq, claim["proposition"])
             next_seq += 1
@@ -309,13 +310,8 @@ def reconcile(
             old_anchor = record.get("anchor", "") if isinstance(record, dict) else ""
             removable = bool(
                 disposition
-                and (
-                    disposition["disposition"] == "nonfactual"
-                    or (
-                        disposition["disposition"] == "removed"
-                        and old_anchor not in plan_text
-                    )
-                )
+                and disposition["disposition"] == "removed"
+                and old_anchor not in plan_text
             )
             if removable:
                 retired.append({
@@ -528,13 +524,14 @@ the replacement itself; evidence that merely refutes the old wording is not enou
 
 Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or search
 each retained URL as needed and re-assess entailment against the CURRENT proposition.
-If corrected wording corresponds to an old claim, set prior_claim_id to its claim_id.
+Set prior_claim_id only for the exact same atomic proposition; use null for edited wording.
 Unchanged verified claims should normally be quicker because their exact sources are here.
-Every prior claim must either appear in claims (normally with prior_claim_id) or have one
-entry in coverage.prior_dispositions. Use disposition "removed" only when its factual
-assertion is absent from the current plan, and "nonfactual" only when the current wording is
-a decision, requirement, intention, definition, preference, or other excluded statement.
-Omission without this explicit disposition stays active and blocks.
+Every prior claim must either reappear as the exact same atomic proposition or have one
+entry in coverage.prior_dispositions. The only disposition is "removed", and it is valid
+only when the old verbatim factual anchor is absent from the current plan. If a fact became
+a decision/requirement, edit away the old factual wording; do not merely relabel it.
+prior_claim_id is contextual only and cannot transfer identity to edited wording. Omission
+without a mechanically valid removal stays active and blocks.
 
 PRIOR EVIDENCE PACKETS (JSON):
 {prior}

@@ -74,9 +74,11 @@ state and reviewer-native capabilities meet the supported model.
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
 - Retained evidence is a candidate for re-entailment against edited wording, never an inherited
   verdict. Removed/non-factual claims do not consume active context.
-- Model omission is not removal: every prior active claim must be retained or receive an
-  explicit current disposition, and the cold structural reviewer must see complete evidence
-  plus current retirements before its success can contribute to clearance.
+- Model omission and ID reuse are not removal: exact propositions alone preserve identity;
+  every other predecessor requires old wording to be absent plus an explicit `removed`
+  disposition. Do not provide a model-only `nonfactual` escape. The cold structural reviewer
+  must see complete evidence plus current retirements before its success contributes to
+  tracked-mode clearance; one-shot plan reviews emit no computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
 - The reviewer remains read-only. The calling coding agent autonomously validates packets,

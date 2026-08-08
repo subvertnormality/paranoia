@@ -71,11 +71,13 @@ or a validated `prior_claim_id` preserves identity. Removed claims move to bound
 history and leave active inventory. Every current verdict is newly parsed and validated;
 previous verdicts are never copied.
 
-A previously active claim cannot disappear merely because a later model omits it. The audit
-must retain it or explicitly classify it `removed`/`nonfactual`. A `removed` disposition is
-accepted only after its exact old anchor has left the plan. Missing or invalid dispositions
-keep the prior packet active as `unverified`; this blocks rather than converting sampling
-variance into clearance. The cold structural reviewer sees every current-round retirement.
+A previously active claim cannot disappear merely because a later model omits it. Identity
+is reused only for the exact same proposition; model-supplied prior IDs cannot bind edited
+wording. Otherwise the audit must explicitly classify the predecessor `removed`, which is
+accepted only after its exact old anchor has left the plan. There is no model-only
+`nonfactual` escape: edit away the old factual wording. Missing or invalid dispositions keep
+the prior packet active as `unverified`; this blocks rather than converting sampling variance
+into clearance. The cold structural reviewer sees every current-round retirement.
 
 Prior URLs and passages are included as candidate evidence in the next audit. The reviewer
 re-opens/searches them as needed and re-entails them against the current proposition. This
@@ -100,6 +102,10 @@ class closure alone. It stops only when:
 - every active factual claim is supported by current qualifying evidence;
 - there is no claim-audit debt; and
 - the computed final line is `CONVERGENCE: NOT-BLOCKED`.
+
+This governing computed line exists only when class closure is enabled. A structural-only
+one-shot review still returns claim packets and reviewer prose, but deliberately emits no
+computed convergence verdict because its free-text FATAL/MAJOR findings are not parsed.
 
 ## Failure behavior
 

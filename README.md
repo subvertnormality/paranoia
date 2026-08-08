@@ -279,9 +279,10 @@ Do not rerun unchanged text expecting reviewer variance to fix a claim. Do not a
 human to translate evidence the packet already makes actionable. A human may inspect
 or override the process, but is not required for ordinary convergence.
 
-A later audit cannot clear a prior claim by omitting it. It must retain the claim or
-explicitly dispose it as removed/non-factual; otherwise the old packet remains active as
-`unverified`. The cold structural reviewer receives the complete evidence for every
+A later audit cannot clear a prior claim by omitting it or attaching its ID to edited text.
+Exact propositions alone retain identity. Otherwise the old factual anchor must actually
+leave the plan and receive an explicit `removed` disposition; there is no model-only
+`nonfactual` escape. The old packet remains active as `unverified` until then. The cold structural reviewer receives the complete evidence for every
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
 
@@ -315,6 +316,11 @@ When the two disagree, **the trailer governs** — and says so in its own output
 For a review with no loop behind it — a design sketch, a quick second opinion —
 pass `class_closure: false`. That is the single escape, and it also drops the
 `round` and `lineage` requirements.
+
+For plan reviews, one-shot mode still performs default factual verification and returns
+source packets, but emits **no computed `CONVERGENCE:` line**. Without a parsed class
+register the server cannot incorporate the structural review's free-text FATAL/MAJOR
+findings into a mechanical clearance. Use the default tracked mode for convergence.
 
 ```json
 { "repo_path": "/path/to/repo", "plan_text": "…", "class_closure": false }

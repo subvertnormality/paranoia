@@ -96,7 +96,7 @@ class TestAuditValidation:
 
 
 class TestRetainedEvidence:
-    def test_corrected_wording_reuses_identity_but_not_the_old_verdict(self) -> None:
+    def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim()), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
@@ -111,12 +111,16 @@ class TestRetainedEvidence:
             evidence=[_source(relation="context")],
         )
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(corrected), corrected_plan),
+            first, pc.parse_audit(_audit(corrected, dispositions=[{
+                "claim_id": claim_id, "disposition": "removed",
+                "reason": "The old date wording was replaced by the corrected assertion.",
+            }]), corrected_plan),
             lineage_id="x-plan", round_no=2, plan_text=corrected_plan,
         )
-        assert next(iter(second["claims"])) == claim_id
+        replacement_id = next(iter(second["claims"]))
+        assert replacement_id != claim_id
         assert pc.is_blocked(second)
-        assert second["claims"][claim_id]["previous_proposition"].endswith("2022.")
+        assert second["retired"][-1]["claim_id"] == claim_id
         prompt = pc.audit_instructions(corrected_plan, first, "trusted local tool")
         assert claim_id in prompt and _source()["url"] in prompt
 
@@ -151,6 +155,34 @@ class TestRetainedEvidence:
         assert list(second["claims"]) == [claim_id]
         assert second["claims"][claim_id]["verdict"] == "unverified"
         assert pc.is_blocked(second)
+
+    def test_unrelated_prior_id_cannot_replace_the_old_claim(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        old_id = next(iter(first["claims"]))
+        expanded_plan = PLAN + "SQLite 3.45.0 was released on 15 January 2024.\n"
+        unrelated = _claim(
+            anchor="SQLite 3.45.0 was released on 15 January 2024.",
+            proposition="SQLite 3.45.0 was released on 15 January 2024.",
+            prior_claim_id=old_id,
+        )
+        second = pc.reconcile(
+            first, pc.parse_audit(_audit(unrelated), expanded_plan),
+            lineage_id="x-plan", round_no=2, plan_text=expanded_plan,
+        )
+        assert old_id in second["claims"]
+        assert second["claims"][old_id]["verdict"] == "unverified"
+        assert len(second["claims"]) == 2
+        assert pc.is_blocked(second)
+
+    def test_nonfactual_is_not_an_accepted_disposition(self) -> None:
+        with pytest.raises(pc.AuditError, match="must be removed"):
+            pc.parse_audit(_audit(dispositions=[{
+                "claim_id": "C-old", "disposition": "nonfactual",
+                "reason": "The model changed its mind.",
+            }]), PLAN)
 
     def test_structural_context_contains_full_evidence_for_independent_audit(self) -> None:
         state = pc.reconcile(
@@ -280,7 +312,7 @@ class TestHandlerFlow:
                 engine=ScriptedEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
             )
 
-    def test_one_shot_structural_failure_cannot_emit_not_blocked(self, tmp_path: Path) -> None:
+    def test_one_shot_structural_review_emits_no_computed_clearance(self, tmp_path: Path) -> None:
         failure = Review(
             text="structural reviewer timed out", session_ref=None, raw="timeout",
             returncode=124, error=True,
@@ -295,5 +327,5 @@ class TestHandlerFlow:
             log_dir=tmp_path / "logs", now=lambda: "T1",
         )
         assert "REVIEW FAILED" in out
-        assert "CONVERGENCE: BLOCKED" in out
-        assert "CONVERGENCE: NOT-BLOCKED" not in out
+        assert "CONVERGENCE:" not in out
+        assert "CLAIM-CLOSURE: 1 supported" in out
