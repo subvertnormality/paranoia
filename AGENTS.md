@@ -79,16 +79,22 @@ state and reviewer-native capabilities meet the supported model.
   surfaces, then separately assess source existence, declared process/profile, requirement
   conformance, and current reusability. If one omitted source class affects sibling cases, audit
   the whole sibling set once before the next round instead of discovering one case per round.
-- Retained evidence is never an inherited verdict. Every unchanged exact claim receives a
-  mandatory compact current-round assessment keyed by its server-owned ID; edited wording
-  requires a new full packet. Removed/non-factual claims do not consume active context.
+- Round 1 is the exhaustive factual inventory. In later rounds, an exact unchanged supported
+  claim is frozen with its authoritative packet and requires no model call or web search;
+  repository packets additionally require their quoted bytes still to exist. Edited, new,
+  refuted, and unverified claims receive targeted verification and edited wording requires a
+  new full packet. Removed/non-factual claims do not consume active context. This optimization
+  applies only to factual verification: the structural FATAL/MAJOR review remains broad and
+  cold on every convergence round.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and
   correction retry, but never auto-retire them. Do not provide a model-only `nonfactual`
-  escape. Reject a response that omits any still-present retained ID and name missing IDs in
-  the same-round correction prompt; never turn extractor sampling into another full review
-  round. The cold structural reviewer must see complete evidence plus current retirements
+  escape. Reject a response that omits any still-present unresolved retained ID and name
+  missing IDs in the same-round correction prompt; never turn extractor sampling into another
+  full claim review round. A failed targeted audit must preserve frozen supported verdicts while
+  recording debt for the affected edit cone. The cold structural reviewer must see the complete
+  active register plus current retirements
   before its success contributes to tracked-mode clearance; one-shot plan reviews emit no
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded

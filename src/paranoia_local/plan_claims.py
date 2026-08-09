@@ -12,6 +12,8 @@ import hashlib
 import json
 from copy import deepcopy
 from dataclasses import dataclass
+from difflib import unified_diff
+from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
@@ -77,6 +79,7 @@ def empty_state() -> dict[str, Any]:
         "rounds": 0,
         "next_seq": 1,
         "plan_digest": None,
+        "plan_snapshot": None,
         "claims": {},
         "retired": [],
         "debt": None,
@@ -98,11 +101,82 @@ def normalize_state(raw: Any) -> dict[str, Any]:
         "rounds": max(0, int(raw.get("rounds", 0))),
         "next_seq": max(1, int(raw.get("next_seq", 1))),
         "plan_digest": raw.get("plan_digest"),
+        "plan_snapshot": (
+            raw.get("plan_snapshot")
+            if isinstance(raw.get("plan_snapshot"), str) else None
+        ),
         "claims": deepcopy(raw.get("claims", {})) if isinstance(raw.get("claims"), dict) else {},
         "retired": deepcopy(raw.get("retired", [])) if isinstance(raw.get("retired"), list) else [],
         "debt": deepcopy(raw.get("debt")),
     })
     return state
+
+
+def has_prior_snapshot(state_raw: Any) -> bool:
+    """Whether a later round can be scoped to edits from a successful prior audit."""
+    return normalize_state(state_raw).get("plan_snapshot") is not None
+
+
+def frozen_supported_ids(
+    state_raw: Any, plan_text: str, *, repo: Path | None = None,
+) -> frozenset[str]:
+    """Return exact supported claims that need no new model/web judgement.
+
+    External packets are immutable evidence captured by the exhaustive round. Repository
+    packets additionally have their quoted bytes checked against the current worktree, so a
+    local edit cannot silently inherit support. Edited/removed anchors and every unresolved
+    claim remain outside this set and therefore enter targeted remediation.
+    """
+    state = normalize_state(state_raw)
+    if state.get("plan_snapshot") is None:
+        return frozenset()
+    frozen: set[str] = set()
+    for claim_id, record in state["claims"].items():
+        if not isinstance(record, dict) or record.get("verdict") != "supported":
+            continue
+        if not _anchor_in_plan(record.get("anchor", ""), plan_text):
+            continue
+        evidence = [item for item in record.get("evidence", []) if isinstance(item, dict)]
+        supports = [
+            item for item in evidence
+            if _qualifying(item, record.get("scope", ""))
+            and item.get("relation") == "supports_claim"
+        ]
+        if not supports:
+            continue
+        if record.get("scope") == "repository":
+            if repo is None or not any(_repository_quote_present(item, repo) for item in supports):
+                continue
+        frozen.add(claim_id)
+    return frozenset(frozen)
+
+
+def changed_plan_text(state_raw: Any, plan_text: str) -> str:
+    """Render the exact edit cone used after the exhaustive round."""
+    previous = normalize_state(state_raw).get("plan_snapshot")
+    if not isinstance(previous, str):
+        return plan_text
+    if previous == plan_text:
+        return "(no textual changes)"
+    return "".join(unified_diff(
+        previous.splitlines(keepends=True), plan_text.splitlines(keepends=True),
+        fromfile="previous-plan", tofile="current-plan", n=4,
+    ))
+
+
+def _repository_quote_present(evidence: dict[str, str], repo: Path) -> bool:
+    raw = evidence.get("url", "")
+    if not raw.startswith("repo://"):
+        return False
+    relative = raw[len("repo://"):].split("#", 1)[0]
+    candidate = Path(relative)
+    if not relative or candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    try:
+        text = (repo / candidate).read_text(encoding="utf-8", errors="replace")
+    except (OSError, UnicodeError):
+        return False
+    return _collapse_whitespace(evidence.get("quote", "")) in _collapse_whitespace(text)
 
 
 def parse_audit(text: str, plan_text: str, *, allow_partial: bool = False) -> Audit:
@@ -341,14 +415,16 @@ def _qualifying(evidence: dict[str, str], scope: str) -> bool:
 
 def reconcile(
     prior_raw: Any, audit: Audit, *, lineage_id: str, round_no: int, plan_text: str,
+    frozen_ids: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Replace the active inventory with the current audit, retaining identity/evidence.
 
-    Every verdict in ``audit`` has just been re-entailled against the current proposition.
-    Prior evidence is retained only because it was supplied back to the reviewer as a
-    candidate; no prior verdict is copied forward.
+    Every verdict in ``audit`` has just been assessed against the current proposition.
+    ``frozen_ids`` are the narrow exception: exact unchanged supported propositions retain
+    their exhaustive-round packet without another model/web judgement.
     """
-    validate_prior_coverage(prior_raw, audit, plan_text=plan_text)
+    frozen = frozenset(frozen_ids)
+    validate_prior_coverage(prior_raw, audit, plan_text=plan_text, frozen_ids=frozen)
     prior = normalize_state(prior_raw)
     old = prior["claims"]
     by_prop: dict[str, str] = {}
@@ -359,6 +435,22 @@ def reconcile(
     next_seq = prior["next_seq"]
     used: set[str] = set()
     current: dict[str, Any] = {}
+    for claim_id in frozen:
+        previous = old.get(claim_id)
+        if not isinstance(previous, dict):
+            raise AuditError(f"frozen assessment references unknown prior claim {claim_id}")
+        if previous.get("verdict") != "supported":
+            raise AuditError(f"only supported prior claims may be frozen: {claim_id}")
+        if not _anchor_in_plan(previous.get("anchor", ""), plan_text):
+            raise AuditError(f"frozen prior anchor is absent from the current plan: {claim_id}")
+        record = deepcopy(previous)
+        record["retained_round"] = round_no
+        record["retention_basis"] = (
+            "Exact proposition and anchor are unchanged; the authoritative evidence packet "
+            "was frozen by the first exhaustive round."
+        )
+        current[claim_id] = record
+        used.add(claim_id)
     for claim in audit.claims:
         exact = by_prop.get(claim["proposition"])
         # Identity is server-owned and semantic only at the exact proposition seam.
@@ -379,8 +471,8 @@ def reconcile(
             record["previous_proposition"] = previous.get("proposition")
         current[claim_id] = record
 
-    # Exact retained claims use a compact current-round assessment. The reviewer has
-    # re-opened/re-entailled the retained packet, while the server owns the anchor,
+    # Unresolved exact retained claims use a compact current-round assessment. The reviewer
+    # has re-opened/re-entailled the retained packet, while the server owns the anchor,
     # proposition, and evidence bytes. This avoids asking the model to reproduce large
     # packets merely to prove it did not forget them.
     for assessment in audit.assessments:
@@ -460,6 +552,7 @@ def reconcile(
         "rounds": prior["rounds"] + 1,
         "next_seq": next_seq,
         "plan_digest": hashlib.sha256(plan_text.encode("utf-8", "surrogateescape")).hexdigest()[:16],
+        "plan_snapshot": plan_text,
         "claims": current,
         "retired": retired,
         "coverage": audit.coverage,
@@ -469,6 +562,7 @@ def reconcile(
 
 def validate_prior_coverage(
     prior_raw: Any, audit: Audit, *, plan_text: str, raw: str = "",
+    frozen_ids: Iterable[str] = (),
 ) -> None:
     """Require a current judgement for every retained exact claim still in the plan.
 
@@ -477,10 +571,12 @@ def validate_prior_coverage(
     omitting them.
     """
     prior = normalize_state(prior_raw)
-    if len(audit.claims) + len(audit.assessments) > MAX_ACTIVE_CLAIMS:
+    frozen = frozenset(frozen_ids)
+    if len(audit.claims) + len(audit.assessments) + len(frozen) > MAX_ACTIVE_CLAIMS:
         raise AuditError(
             f"audit returned {len(audit.claims)} full claims plus "
-            f"{len(audit.assessments)} retained assessments; active safety ceiling is "
+            f"{len(audit.assessments)} retained assessments plus {len(frozen)} frozen; "
+            "active safety ceiling is "
             f"{MAX_ACTIVE_CLAIMS}", raw,
         )
     old = prior["claims"]
@@ -500,6 +596,12 @@ def validate_prior_coverage(
         raise AuditError(
             "retained claims were both fully emitted and compactly assessed: "
             + ", ".join(sorted(overlap)), raw,
+        )
+    frozen_overlap = emitted & frozen
+    if frozen_overlap:
+        raise AuditError(
+            "frozen claims were re-emitted by the targeted audit: "
+            + ", ".join(sorted(frozen_overlap)), raw,
         )
     for item in audit.assessments:
         claim_id = item["claim_id"]
@@ -527,7 +629,12 @@ def validate_prior_coverage(
         if isinstance(record, dict)
         and _anchor_in_plan(record.get("anchor", ""), plan_text)
     }
-    missing = expected - emitted - assessed
+    unknown_frozen = frozen - expected
+    if unknown_frozen:
+        raise AuditError(
+            "frozen IDs are not exact current claims: " + ", ".join(sorted(unknown_frozen)), raw,
+        )
+    missing = expected - emitted - assessed - frozen
     if missing:
         raise AuditError(
             "missing current assessments for retained claims: " + ", ".join(sorted(missing)),
@@ -535,7 +642,10 @@ def validate_prior_coverage(
         )
 
 
-def with_debt(prior_raw: Any, error: AuditError, *, round_no: int, plan_text: str) -> dict[str, Any]:
+def with_debt(
+    prior_raw: Any, error: AuditError, *, round_no: int, plan_text: str,
+    frozen_ids: Iterable[str] = (),
+) -> dict[str, Any]:
     state = normalize_state(prior_raw)
     state["rounds"] += 1
     state["plan_digest"] = hashlib.sha256(
@@ -544,8 +654,12 @@ def with_debt(prior_raw: Any, error: AuditError, *, round_no: int, plan_text: st
     state["debt"] = error.debt(round_no)
     # Old verdicts are retained as evidence candidates, but cannot govern the changed
     # plan after a failed audit.
-    for record in state["claims"].values():
+    frozen = frozenset(frozen_ids)
+    for claim_id, record in state["claims"].items():
         if isinstance(record, dict):
+            if claim_id in frozen and record.get("verdict") == "supported":
+                record["retained_round"] = round_no
+                continue
             record["verdict"] = "unverified"
             record["verified_round"] = round_no
             record["replacement"] = None
@@ -566,12 +680,15 @@ def is_blocked(state_raw: Any) -> bool:
     )
 
 
-def evidence_context(state_raw: Any) -> str:
+def evidence_context(state_raw: Any, include_ids: Iterable[str] | None = None) -> str:
     """Compact prior evidence supplied for re-entailment, excluding retired inventory."""
     state = normalize_state(state_raw)
+    allowed = frozenset(include_ids) if include_ids is not None else None
     records = []
     for claim_id, claim in state["claims"].items():
         if not isinstance(claim, dict):
+            continue
+        if allowed is not None and claim_id not in allowed:
             continue
         records.append({
             "claim_id": claim_id,
@@ -757,10 +874,86 @@ Allowed relation literals: "supports_claim", "refutes_claim",
 {plan_text}"""
 
 
-def retry_instructions(error: AuditError, plan_text: str, prior_state: Any) -> str:
+def targeted_audit_instructions(
+    plan_text: str, prior_state: Any, stakes: str | None, frozen_ids: Iterable[str],
+) -> str:
+    """Build the post-round-1 verifier prompt over only the factual edit cone."""
+    frozen = frozenset(frozen_ids)
+    state = normalize_state(prior_state)
+    targeted_ids = set(state["claims"]) - frozen
+    prior = evidence_context(prior_state, targeted_ids)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(prior_state, plan_text)
-    prior = evidence_context(prior_state)
+    assessments = _assessment_candidates(prior_state, plan_text, exclude_ids=frozen)
+    changes = changed_plan_text(prior_state, plan_text)
+    stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
+    return f"""You are the targeted factual-remediation phase of an autonomous plan review.
+
+You ARE the verifier. Never invoke MCP review tools (including any registered paranoia
+server), plugins, other agents, or nested reviewers. Inspect the repository and use only
+your own built-in web search. Delegation would recurse and invalidate this phase.
+
+STAKES: {stakes_text}
+
+Round 1 already exhaustively scanned the complete plan. The server has frozen exact,
+unchanged SUPPORTED claims with authoritative packets. Do NOT reassess, search for, or emit
+those frozen claims. Audit only (a) added/edited factual wording in the diff below, (b) each
+retained refuted or unverified claim listed below, and (c) removed-anchor dispositions.
+Follow dependencies from an edited claim when necessary, but do not inventory unchanged
+settled prose again. This is a cost-control boundary, not a weaker authority rule.
+
+For every in-scope external claim, use built-in web search and prefer official/primary
+sources. Reddit, forums, Stack Overflow, social media, wikis, blogs and other UGC are leads
+only and can NEVER govern support or refutation. Require an exact passage, canonical
+location, publisher/authority basis, and a direct entailment relation. Split conjunctions
+and ranges into atomic propositions. A replacement is allowed only when authoritative
+evidence entails the replacement itself.
+
+OMIT decisions, policies, authorizations, requirements, definitions, intentions,
+instructions, preferences, forecasts, and incidental facts. They do not enter active
+inventory. Use claims only for new or edited factual propositions. Every absent prior claim
+needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
+identity or verdict.
+
+RETAINED UNRESOLVED EXACT CLAIMS REQUIRING ASSESSMENT (JSON):
+{assessments}
+
+ABSENT PRIOR ANCHOR CANDIDATES (JSON):
+{removals}
+
+PRIOR EVIDENCE PACKETS FOR THE TARGETED SET (JSON):
+{prior}
+
+CURRENT PLAN EDIT CONE (unified diff with context):
+{changes}
+
+Reply with only the marker and one JSON object; no markdown fence:
+
+{AUDIT_MARKER}
+{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim current-plan text","proposition":"one atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the fact being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":1,"omitted_nonfacts":1,"prior_assessments":[],"prior_dispositions":[],"notes":"targeted edit-cone audit"}}}}
+
+Allowed verdicts: "supported", "refuted", "unverified". Allowed scopes: "external",
+"repository". Allowed relations: "supports_claim", "refutes_claim",
+"supports_replacement", "context". The server validates anchors against the full current
+plan and rejects omission of any listed unresolved retained ID."""
+
+
+def retry_instructions(
+    error: AuditError, plan_text: str, prior_state: Any,
+    frozen_ids: Iterable[str] = (),
+) -> str:
+    frozen = frozenset(frozen_ids)
+    removals = _removal_candidates(prior_state, plan_text)
+    assessments = _assessment_candidates(prior_state, plan_text, exclude_ids=frozen)
+    targeted_ids = set(normalize_state(prior_state)["claims"]) - frozen
+    prior = evidence_context(prior_state, targeted_ids)
+    scope_label = "CURRENT PLAN EDIT CONE" if frozen else "PLAN"
+    scope_text = changed_plan_text(prior_state, plan_text) if frozen else plan_text
+    frozen_note = (
+        "This is a targeted later-round correction. Do not search for or emit the frozen "
+        "supported IDs below; correct only the edit cone and unresolved checklist.\n\n"
+        "FROZEN SUPPORTED IDS (JSON):\n"
+        + json.dumps(sorted(frozen), ensure_ascii=False, separators=(",", ":"))
+    ) if frozen else ""
     return f"""Your claim audit was rejected and no new verdict was applied.
 
 Reason: {error.reason}
@@ -771,6 +964,8 @@ Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Preserve
 valid source packets, fix the structural error, and do not weaken evidence requirements.
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
+
+{frozen_note}
 
 RETAINED EXACT CLAIMS REQUIRING ONE ASSESSMENT EACH (JSON):
 {assessments}
@@ -787,8 +982,8 @@ packet, and separately inventory any edited current assertion under its verbatim
 PRIOR EVIDENCE PACKETS (JSON):
 {prior}
 
-=== PLAN ===
-{plan_text}"""
+=== {scope_label} ===
+{scope_text}"""
 
 
 def _one_line(value: Any, name: str) -> str:
@@ -818,8 +1013,11 @@ def _removal_candidates(prior_state: Any, plan_text: str) -> str:
     return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
 
 
-def _assessment_candidates(prior_state: Any, plan_text: str) -> str:
+def _assessment_candidates(
+    prior_state: Any, plan_text: str, *, exclude_ids: Iterable[str] = (),
+) -> str:
     state = normalize_state(prior_state)
+    excluded = frozenset(exclude_ids)
     candidates = [
         {
             "claim_id": claim_id,
@@ -827,7 +1025,8 @@ def _assessment_candidates(prior_state: Any, plan_text: str) -> str:
             "proposition": claim.get("proposition"),
         }
         for claim_id, claim in state["claims"].items()
-        if isinstance(claim, dict)
+        if claim_id not in excluded
+        and isinstance(claim, dict)
         and isinstance(claim.get("anchor"), str)
         and claim["anchor"].strip()
         and _anchor_in_plan(claim["anchor"], plan_text)

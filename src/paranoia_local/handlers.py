@@ -557,7 +557,8 @@ def critique_plan(
         "claim_status": claim_status,
         "claim_duration_ms": claim_duration_ms,
         "claim_model_calls": (
-            2 if claim_status.startswith("parsed after retry") or "retry" in claim_status
+            0 if claim_status.startswith("reused ")
+            else 2 if claim_status.startswith("parsed after retry") or "retry" in claim_status
             else 1
         ) if claim_verification and claim_status != "state-unavailable" else 0,
         "claim_counts": {
@@ -598,10 +599,37 @@ def _verify_plan_claims(
     effort: str,
     on_progress: Callable[[str], None] | None,
 ) -> tuple[dict[str, Any], str]:
-    """Run one complete research pass, with one bounded structural correction retry."""
+    """Run exhaustive round 1, then verify only the factual edit cone."""
+    targeted = pc.has_prior_snapshot(prior_state)
+    frozen = (
+        pc.frozen_supported_ids(prior_state, plan_text, repo=repo)
+        if targeted else frozenset()
+    )
+    prior = pc.normalize_state(prior_state)
+    if (
+        targeted
+        and prior.get("plan_snapshot") == plan_text
+        and len(frozen) == len(prior["claims"])
+        and not prior.get("debt")
+    ):
+        state = pc.reconcile(
+            prior_state, pc.Audit((), {"notes": "unchanged frozen claim inventory"}, (), ()),
+            lineage_id=lineage_id, round_no=round_no, plan_text=plan_text,
+            frozen_ids=frozen,
+        )
+        return state, f"reused {len(frozen)} unchanged supported packets; no claim model call"
     if on_progress:
-        on_progress("verifying atomic factual claims against repository and web evidence")
-    prompt = pc.audit_instructions(plan_text, prior_state, stakes)
+        if targeted:
+            on_progress(
+                f"verifying the factual edit cone; {len(frozen)} unchanged supported "
+                "claims reuse frozen authoritative packets"
+            )
+        else:
+            on_progress("verifying atomic factual claims against repository and web evidence")
+    prompt = (
+        pc.targeted_audit_instructions(plan_text, prior_state, stakes, frozen)
+        if targeted else pc.audit_instructions(plan_text, prior_state, stakes)
+    )
     review = engine.run(
         prompt, repo, model, effort, True, timeout=1800,
         **_progress_kwargs(on_progress),
@@ -610,19 +638,31 @@ def _verify_plan_claims(
         error = pc.AuditError(
             f"claim-audit reviewer failed (exit {review.returncode})", review.raw or review.text
         )
-        return pc.with_debt(prior_state, error, round_no=round_no, plan_text=plan_text), "failed"
+        return pc.with_debt(
+            prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
+        ), "failed"
     try:
         audit = pc.parse_audit(review.text, plan_text)
-        pc.validate_prior_coverage(prior_state, audit, plan_text=plan_text, raw=review.text)
-        status = f"parsed {len(audit.claims)} new + {len(audit.assessments)} retained"
+        pc.validate_prior_coverage(
+            prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
+        )
+        status = (
+            f"parsed {len(audit.claims)} new + {len(audit.assessments)} targeted retained"
+            f" + {len(frozen)} frozen"
+        )
     except pc.AuditError as first:
         if not review.session_ref or not hasattr(engine, "resume"):
             return (
-                pc.with_debt(prior_state, first, round_no=round_no, plan_text=plan_text),
+                pc.with_debt(
+                    prior_state, first, round_no=round_no, plan_text=plan_text,
+                    frozen_ids=frozen,
+                ),
                 f"malformed: {first.reason}",
             )
         retry = engine.resume(
-            review.session_ref, pc.retry_instructions(first, plan_text, prior_state), repo,
+            review.session_ref, pc.retry_instructions(
+                first, plan_text, prior_state, frozen_ids=frozen,
+            ), repo,
             model, effort, True, timeout=1800, **_progress_kwargs(on_progress),
         )
         if retry.error:
@@ -632,16 +672,20 @@ def _verify_plan_claims(
                 (review.text or "") + "\n--- CORRECTION ---\n" + (retry.raw or retry.text),
             )
             return pc.with_debt(
-                prior_state, second, round_no=round_no, plan_text=plan_text
+                prior_state, second, round_no=round_no, plan_text=plan_text,
+                frozen_ids=frozen,
             ), "retry-failed"
         try:
             # The retry is the final model call. Localize any remaining invalid claim
             # so valid packets and dispositions survive with explicit blocking debt.
             audit = pc.parse_audit(retry.text, plan_text, allow_partial=True)
-            pc.validate_prior_coverage(prior_state, audit, plan_text=plan_text, raw=retry.text)
+            pc.validate_prior_coverage(
+                prior_state, audit, plan_text=plan_text, raw=retry.text,
+                frozen_ids=frozen,
+            )
             status = (
                 f"parsed after retry: {len(audit.claims)} new + "
-                f"{len(audit.assessments)} retained"
+                f"{len(audit.assessments)} targeted retained + {len(frozen)} frozen"
             )
             if audit.issues:
                 status += f"; {len(audit.issues)} localized invalid"
@@ -652,11 +696,12 @@ def _verify_plan_claims(
                 (review.text or "") + "\n--- CORRECTION ---\n" + (retry.text or ""),
             )
             return pc.with_debt(
-                prior_state, combined, round_no=round_no, plan_text=plan_text
+                prior_state, combined, round_no=round_no, plan_text=plan_text,
+                frozen_ids=frozen,
             ), "retry-malformed"
     state = pc.reconcile(
         prior_state, audit, lineage_id=lineage_id, round_no=round_no,
-        plan_text=plan_text,
+        plan_text=plan_text, frozen_ids=frozen,
     )
     return state, status
 
@@ -1010,7 +1055,7 @@ class _PlanClassClosure(_ClosureRound):
         else:
             final = (
                 "CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed and every "
-                "active factual claim is supported by current authoritative evidence."
+                "active factual claim is supported by frozen or current authoritative evidence."
             )
         return f"{claim_text}\n{class_text}\n{final}"
 

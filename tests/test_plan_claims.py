@@ -222,7 +222,7 @@ class TestRetainedEvidence:
         assert not pc.is_blocked(second)
         assert "1 retired and excluded from active inventory" in pc.render_trailer(second)
 
-    def test_model_omission_is_rejected_before_it_can_churn_a_prior_claim(self) -> None:
+    def test_model_omission_is_rejected_when_a_claim_is_not_frozen(self) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim()), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
@@ -233,6 +233,93 @@ class TestRetainedEvidence:
                 first, pc.parse_audit(_audit(), PLAN),
                 lineage_id="x-plan", round_no=2, plan_text=PLAN,
             )
+
+    def test_supported_exact_claim_is_frozen_out_of_targeted_inventory(
+        self, tmp_path: Path,
+    ) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        frozen = pc.frozen_supported_ids(first, PLAN, repo=tmp_path)
+        assert frozen == {claim_id}
+        prompt = pc.targeted_audit_instructions(PLAN, first, "trusted local tool", frozen)
+        assert claim_id not in prompt
+        assert "(no textual changes)" in prompt
+        second = pc.reconcile(
+            first, pc.parse_audit(_audit(), PLAN),
+            lineage_id="x-plan", round_no=2, plan_text=PLAN, frozen_ids=frozen,
+        )
+        assert second["claims"][claim_id]["verified_round"] == 1
+        assert second["claims"][claim_id]["retained_round"] == 2
+        assert not pc.is_blocked(second)
+
+    def test_failed_targeted_audit_does_not_invalidate_frozen_support(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        failed = pc.with_debt(
+            first, pc.AuditError("edited successor audit failed"),
+            round_no=2, plan_text=PLAN, frozen_ids={claim_id},
+        )
+        assert failed["claims"][claim_id]["verdict"] == "supported"
+        assert failed["debt"]["reason"] == "edited successor audit failed"
+        assert pc.is_blocked(failed)
+
+    def test_targeted_audit_cannot_reemit_a_frozen_claim(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        with pytest.raises(pc.AuditError, match="frozen claims were re-emitted"):
+            pc.reconcile(
+                first, pc.parse_audit(_audit(_claim()), PLAN),
+                lineage_id="x-plan", round_no=2, plan_text=PLAN,
+                frozen_ids={claim_id},
+            )
+
+    def test_targeted_round_verifies_edited_successor_and_freezes_unchanged_claim(self) -> None:
+        sqlite_old = "SQLite 3.45.0 was released on 15 January 2024."
+        first_plan = PLAN + sqlite_old + "\n"
+        sqlite_claim = _claim(anchor=sqlite_old, proposition=sqlite_old)
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim(), sqlite_claim), first_plan),
+            lineage_id="x-plan", round_no=1, plan_text=first_plan,
+        )
+        python_id = next(
+            claim_id for claim_id, claim in first["claims"].items()
+            if claim["proposition"].startswith("Python")
+        )
+        sqlite_id = next(claim_id for claim_id in first["claims"] if claim_id != python_id)
+        sqlite_new = "SQLite 3.45.0 was released on 15 January 2025."
+        second_plan = PLAN + sqlite_new + "\n"
+        frozen = pc.frozen_supported_ids(first, second_plan)
+        assert frozen == {python_id}
+        prompt = pc.targeted_audit_instructions(
+            second_plan, first, "trusted local tool", frozen,
+        )
+        assert python_id not in prompt
+        assert sqlite_id in prompt
+        assert "-SQLite 3.45.0 was released on 15 January 2024." in prompt
+        assert "+SQLite 3.45.0 was released on 15 January 2025." in prompt
+
+        successor = _claim(anchor=sqlite_new, proposition=sqlite_new)
+        audit = pc.parse_audit(_audit(successor, dispositions=[{
+            "claim_id": sqlite_id, "disposition": "removed",
+            "reason": "The old SQLite date wording was replaced.",
+        }]), second_plan)
+        second = pc.reconcile(
+            first, audit, lineage_id="x-plan", round_no=2,
+            plan_text=second_plan, frozen_ids=frozen,
+        )
+        assert second["claims"][python_id]["verified_round"] == 1
+        assert sqlite_id not in second["claims"]
+        assert any(item["claim_id"] == sqlite_id for item in second["retired"])
+        assert len(second["claims"]) == 2
 
     def test_compact_assessment_reentails_retained_packet_without_repeating_it(self) -> None:
         first = pc.reconcile(
@@ -446,7 +533,7 @@ class TestHandlerFlow:
         assert out.count("\nCONVERGENCE:") == 1
         assert "CONVERGENCE: NOT-BLOCKED" in out
 
-    def test_missing_retained_id_gets_same_round_targeted_correction(
+    def test_unchanged_supported_round_skips_claim_model_but_keeps_structural_review(
         self, tmp_path: Path
     ) -> None:
         repo = _repo(tmp_path)
@@ -459,18 +546,7 @@ class TestHandlerFlow:
             },
             engine=first_engine, log_dir=tmp_path / "logs", now=lambda: "T1",
         )
-        lineage = cc.load_lineage(
-            cc.default_state_root(), "retained-flow-plan", stamp="T1", mode="plan",
-        )
-        claim_id = next(iter(lineage.claim_state["claims"]))
-        assessment = {
-            "claim_id": claim_id,
-            "verdict": "supported",
-            "rationale": "The retained official passage still entails the exact claim.",
-        }
-        second_engine = ScriptedEngine(
-            _audit(), _audit(assessments=[assessment]), STRUCTURAL_CLEAR,
-        )
+        second_engine = ScriptedEngine(STRUCTURAL_CLEAR)
         out = handlers.critique_plan(
             {
                 "plan_text": PLAN, "repo_path": str(repo),
@@ -479,9 +555,9 @@ class TestHandlerFlow:
             },
             engine=second_engine, log_dir=tmp_path / "logs", now=lambda: "T2",
         )
-        assert len(second_engine.prompts) == 3
-        assert f"missing current assessments for retained claims: {claim_id}" in second_engine.prompts[1]
-        assert "RETAINED EXACT CLAIMS REQUIRING ONE ASSESSMENT EACH" in second_engine.prompts[1]
+        assert len(second_engine.prompts) == 1
+        assert "adversarial reviewer of plans" in second_engine.prompts[0]
+        assert "factual-verification phase" not in second_engine.prompts[0]
         assert "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" in out
         assert "CONVERGENCE: NOT-BLOCKED" in out
 

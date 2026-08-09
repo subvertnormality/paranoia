@@ -233,7 +233,7 @@ review. It uses the selected signed-in reviewer CLI's built-in web search and it
 read access to the repository. There is no `PARANOIA_SEARCH_ENDPOINT`, API key,
 plugin, or caller-supplied search adapter.
 
-The verifier scans the whole plan but retains only **load-bearing atomic factual
+On round 1 the verifier scans the whole plan but retains only **load-bearing atomic factual
 claims**: assertions whose truth could change feasibility, ordering, dependencies,
 rationale, mappings, or acceptance. It splits conjunctions into independent
 propositions. Decisions, requirements, intentions, definitions, preferences,
@@ -284,12 +284,18 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
    not that no earlier brief, manifest, issue record, or Git object existed—and correct every
    affected sibling case in the same pass;
 3. increment `round` and call again **after the edit**;
-4. the verifier receives retained packets as candidate evidence and re-entails each
-   exact passage against the current wording; every unchanged exact claim is a mandatory
-   compact assessment keyed by its server-owned ID, so its packet is not repeated and
-   stochastic omission is rejected in the same round; edited claims inherit no verdict;
+4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
+   its authoritative packet; repository packets are frozen only while their quoted bytes
+   still exist. The claim verifier receives only the edited/new factual wording plus retained
+   refuted or unverified claims, so settled claims cause no model call or web search. Edited
+   claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
+
+This changes only the factual phase. Every round still runs the complete cold structural
+FATAL/MAJOR review with the full plan, repository, active claim register, and class lineage.
+The structural reviewer can still find a missed load-bearing claim, a compound packet, weak
+authority, or a new architectural blocker alongside the evidence checker.
 
 Do not rerun unchanged text expecting reviewer variance to fix a claim. Do not ask a
 human to translate evidence the packet already makes actionable. A human may inspect
@@ -306,11 +312,13 @@ until then. The cold structural reviewer receives the complete evidence for ever
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
 
-When old wording is still present, it is not rediscovered from scratch. The server supplies
-the exact ID, anchor, proposition, and retained packet as a mandatory checklist. The reviewer
-re-opens the source as needed and returns a compact current verdict for every ID. A missing
-ID makes the response invalid and triggers the one bounded correction request before state
-is committed; it never becomes a new full-plan round merely because the model forgot a row.
+When unresolved old wording is still present, it is not rediscovered from scratch. The server
+supplies its exact ID, anchor, proposition, and retained packet as a mandatory targeted
+checklist. A missing unresolved ID makes the response invalid and triggers the one bounded
+correction request before state is committed. Exact unchanged supported IDs are server-frozen
+outside that prompt. A malformed targeted audit records blocking debt but does not invalidate
+those settled packets, so one edited assertion cannot turn hundreds of supported claims back
+into research work.
 
 ### `lineage` — which loop this round belongs to
 
@@ -737,6 +745,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 Reviews draw on your subscription's agentic-usage pool, and a convergence loop is
 many agent turns. Use `query` for quick checks and reserve multi-round
 `critique_branch` loops for changes that warrant them.
+
+For `critique_plan`, round 1 pays for the exhaustive factual inventory. Later rounds send
+only the factual edit cone and unresolved claims to the claim verifier; an unchanged plan
+whose active claims are all supported makes zero claim-model calls. The normal structural
+review still runs in every round and remains the dominant irreducible cost of convergence.
 
 `arbitrate` is the expensive one and the only tool that spends from **both**
 subscriptions in a single call: typically 4 agent turns, 8 at worst (a cleaning
