@@ -388,6 +388,32 @@ class TestAuditValidation:
         with pytest.raises(pc.AuditError, match="must contain one claim ID"):
             pc.parse_audit(_audit(_claim(), dispositions=[item]), PLAN)
 
+    @pytest.mark.parametrize("field", ["prior_dispositions", "prior_assessments"])
+    def test_governing_coverage_arrays_are_required(self, field: str) -> None:
+        payload = json.loads(_audit(_claim()).split("\n", 1)[1])
+        del payload["coverage"][field]
+        raw = pc.AUDIT_MARKER + "\n" + json.dumps(payload)
+        with pytest.raises(pc.AuditError, match=rf"coverage\.{field} is required"):
+            pc.parse_audit(raw, PLAN)
+
+    @pytest.mark.parametrize("section, field", [
+        ("prior_dispositions", "reason"),
+        ("prior_assessments", "rationale"),
+    ])
+    def test_null_governing_scalar_is_a_recoverable_audit_error(
+        self, section: str, field: str,
+    ) -> None:
+        payload = json.loads(_audit(_claim()).split("\n", 1)[1])
+        payload["coverage"][section] = [{
+            "claim_id": "C-old",
+            **({"disposition": "removed"} if section == "prior_dispositions"
+               else {"verdict": "supported"}),
+            field: None,
+        }]
+        raw = pc.AUDIT_MARKER + "\n" + json.dumps(payload)
+        with pytest.raises(pc.AuditError, match="must be a non-empty string"):
+            pc.parse_audit(raw, PLAN)
+
 
 class TestRetainedEvidence:
     def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:
@@ -835,6 +861,45 @@ def _repo(tmp_path: Path) -> Path:
 
 
 class TestHandlerFlow:
+    def test_invalid_disposition_scalar_gets_one_correction_and_recovers(
+        self, tmp_path: Path,
+    ) -> None:
+        invalid = _audit(_claim(), dispositions=[{
+            "claim_id": "C-old", "disposition": "removed", "reason": None,
+        }])
+        engine = ScriptedEngine(invalid, _audit(_claim()), STRUCTURAL_CLEAR)
+        out = handlers.critique_plan(
+            {
+                "plan_text": PLAN, "repo_path": str(_repo(tmp_path)),
+                "lineage": "scalar-retry-plan", "round": 1,
+                "stakes": "trusted local tool; convergence correctness matters",
+            },
+            engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+        )
+        assert len(engine.prompts) == 3
+        assert "disposition.reason must be a non-empty string" in engine.prompts[1]
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+
+    def test_missing_governing_array_twice_becomes_blocking_debt(
+        self, tmp_path: Path,
+    ) -> None:
+        payload = json.loads(_audit(_claim()).split("\n", 1)[1])
+        del payload["coverage"]["prior_dispositions"]
+        invalid = pc.AUDIT_MARKER + "\n" + json.dumps(payload)
+        engine = ScriptedEngine(invalid, invalid, STRUCTURAL_CLEAR)
+        out = handlers.critique_plan(
+            {
+                "plan_text": PLAN, "repo_path": str(_repo(tmp_path)),
+                "lineage": "missing-array-plan", "round": 1,
+                "stakes": "trusted local tool; convergence correctness matters",
+            },
+            engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+        )
+        assert len(engine.prompts) == 3
+        assert "coverage.prior_dispositions is required" in engine.prompts[1]
+        assert "CLAIM-AUDIT-DEBT: round 1: initial audit invalid" in out
+        assert "CONVERGENCE: BLOCKED" in out
+
     def test_refuted_claim_blocks_and_emits_a_packet_for_autonomous_correction(
         self, tmp_path: Path
     ) -> None:

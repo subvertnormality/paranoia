@@ -330,8 +330,11 @@ def parse_audit(
             continue
         seen.add(identity)
         validated.append(claim)
-    dispositions = _validate_dispositions(coverage.get("prior_dispositions", []), text)
-    assessments = _validate_assessments(coverage.get("prior_assessments", []), text)
+    for field in ("prior_dispositions", "prior_assessments"):
+        if field not in coverage:
+            raise AuditError(f"coverage.{field} is required", text)
+    dispositions = _validate_dispositions(coverage["prior_dispositions"], text)
+    assessments = _validate_assessments(coverage["prior_assessments"], text)
     return Audit(
         tuple(validated), deepcopy(coverage), dispositions, assessments, tuple(issues),
         hashlib.sha256(text.encode("utf-8", "replace")).hexdigest(),
@@ -358,9 +361,14 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
                 "and one reason (prior_claim_id and rationale are accepted as wire aliases)",
                 text,
             )
-        claim_id = _one_line(item[next(iter(id_fields))], "disposition.claim_id")
-        disposition = _one_line(item["disposition"], "disposition.disposition")
-        reason = _one_line(item.get("reason", item.get("rationale")), "disposition.reason")
+        try:
+            claim_id = _one_line(item[next(iter(id_fields))], "disposition.claim_id")
+            disposition = _one_line(item["disposition"], "disposition.disposition")
+            reason = _one_line(
+                item.get("reason", item.get("rationale")), "disposition.reason",
+            )
+        except ValueError as exc:
+            raise AuditError(f"prior disposition {index}: {exc}", text) from exc
         if disposition != "removed":
             raise AuditError(f"prior disposition {index} must be removed", text)
         if claim_id in seen:
@@ -387,9 +395,12 @@ def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
                 f"prior assessment {index} must contain exactly claim_id, verdict, and rationale",
                 text,
             )
-        claim_id = _one_line(item["claim_id"], "assessment.claim_id")
-        verdict = _one_line(item["verdict"], "assessment.verdict")
-        rationale = _one_line(item["rationale"], "assessment.rationale")
+        try:
+            claim_id = _one_line(item["claim_id"], "assessment.claim_id")
+            verdict = _one_line(item["verdict"], "assessment.verdict")
+            rationale = _one_line(item["rationale"], "assessment.rationale")
+        except ValueError as exc:
+            raise AuditError(f"prior assessment {index}: {exc}", text) from exc
         if verdict not in VERDICTS:
             raise AuditError(
                 f"prior assessment {index} verdict must be one of {sorted(VERDICTS)}", text,

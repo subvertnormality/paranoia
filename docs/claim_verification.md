@@ -138,7 +138,9 @@ as a wire alias), `disposition: "removed"`, and one reason (`reason`, with `rati
 as an alias). The parser normalizes those fields and ignores additional model-supplied metadata
 such as an old anchor. It still rejects missing fields, conflicting aliases, duplicate claim
 IDs, and any disposition other than `removed`; harmless explanatory metadata cannot strand an
-otherwise valid autonomous transition.
+otherwise valid autonomous transition. Both `prior_dispositions` and `prior_assessments` are
+required coverage arrays even when empty. Missing arrays or invalid required values enter the
+same bounded correction-and-debt path as other malformed claim-audit output.
 
 Prior URLs and passages for unresolved or edited assertions are included as candidate evidence
 in the targeted audit. Every still-present unresolved ID is mechanically required. A missing ID

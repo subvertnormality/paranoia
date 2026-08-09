@@ -330,7 +330,9 @@ supported claim and every current-round disposition, so model-supplied authority
 entailment labels are independently checked before the combined gate can clear.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
 harmless extra model metadata; required fields, unambiguous aliases, and transition validity
-remain strict.
+remain strict. Both governing coverage arrays remain required even when empty, and malformed
+required values receive the normal bounded correction attempt rather than escaping the audit
+failure path.
 
 When unresolved old wording is still present, it is not rediscovered from scratch. The server
 supplies its exact ID, anchor, proposition, and retained packet as a mandatory targeted
