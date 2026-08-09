@@ -12,7 +12,9 @@
   hardening;
 - keep plan claim verification on by default with reviewer-native web search, official/primary
   evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
-  freezing for exact unchanged supported claims after exhaustive round 1; target model/web work
+  freezing for exact unchanged supported claims after exhaustive round 1; require every
+  repository packet to resolve to current-file or historical Git-object bytes containing its
+  exact quote; target model/web work
   at edited, new, refuted, and unverified claims while preserving the full cold structural review;
 - never infer that no plan or authority existed from one missing or late-added filename: inspect
   alternative briefs/manifests/history at the relevant revision, separate existence from

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from paranoia_local.engines import Review
 
 
 PLAN = "# Rollout\n\nPython 3.11 was released in October 2022.\n"
+REPO_PLAN = "# Config\n\nThe setting is enabled.\n"
 
 
 def _source(
@@ -45,6 +47,29 @@ def _claim(**changes: object) -> dict[str, object]:
     }
     value.update(changes)
     return value
+
+
+def _repository_claim(*, url: str, quote: str = '"enabled": true') -> dict[str, object]:
+    return {
+        "kind": "fact",
+        "scope": "repository",
+        "anchor": "The setting is enabled.",
+        "proposition": "The repository setting is enabled.",
+        "prior_claim_id": None,
+        "verdict": "supported",
+        "evidence": [{
+            "url": url,
+            "title": "Settings",
+            "publisher": "Repository",
+            "source_kind": "repository",
+            "authority_basis": "The cited repository bytes define the setting.",
+            "location": "enabled field",
+            "quote": quote,
+            "relation": "supports_claim",
+        }],
+        "replacement": None,
+        "rationale": "The exact field is present.",
+    }
 
 
 def _audit(
@@ -101,6 +126,52 @@ class TestAuditValidation:
         )), PLAN).claims[0]
         assert claim["verdict"] == "unverified"
         assert claim["evidence"][0]["relation"] == "context"
+
+    def test_repository_support_must_resolve_to_exact_current_bytes(
+        self, tmp_path: Path,
+    ) -> None:
+        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
+        audit = pc.parse_audit(
+            _audit(_repository_claim(url="repo://settings.json#L1")),
+            REPO_PLAN, repo=tmp_path,
+        )
+        assert audit.claims[0]["verdict"] == "supported"
+
+        with pytest.raises(pc.AuditError, match="does not resolve to bytes"):
+            pc.parse_audit(
+                _audit(_repository_claim(url="repo://missing.json#L1")),
+                REPO_PLAN, repo=tmp_path,
+            )
+
+    def test_repository_support_resolves_historical_git_object(
+        self, tmp_path: Path,
+    ) -> None:
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
+        subprocess.run(["git", "add", "settings.json"], cwd=tmp_path, check=True)
+        subprocess.run([
+            "git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+            "-c", "commit.gpgsign=false", "commit", "-qm", "settings",
+        ], cwd=tmp_path, check=True)
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
+        url = f"repo://git/{revision}:settings.json"
+        audit = pc.parse_audit(
+            _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
+        )
+        assert audit.claims[0]["evidence"][0]["url"] == url
+
+    def test_repository_support_rejects_wrong_quote_and_traversal(
+        self, tmp_path: Path,
+    ) -> None:
+        (tmp_path / "settings.json").write_text('{"enabled": false}\n')
+        for url in ("repo://settings.json", "repo://../settings.json"):
+            with pytest.raises(pc.AuditError, match="does not resolve to bytes"):
+                pc.parse_audit(
+                    _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
+                )
 
     def test_refutation_alone_keeps_packet_but_drops_unsupported_replacement(self) -> None:
         refuting = _source(relation="refutes_claim")

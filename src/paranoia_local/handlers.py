@@ -642,7 +642,7 @@ def _verify_plan_claims(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
         ), "failed"
     try:
-        audit = pc.parse_audit(review.text, plan_text)
+        audit = pc.parse_audit(review.text, plan_text, repo=repo)
         pc.validate_prior_coverage(
             prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
         )
@@ -678,7 +678,9 @@ def _verify_plan_claims(
         try:
             # The retry is the final model call. Localize any remaining invalid claim
             # so valid packets and dispositions survive with explicit blocking debt.
-            audit = pc.parse_audit(retry.text, plan_text, allow_partial=True)
+            audit = pc.parse_audit(
+                retry.text, plan_text, allow_partial=True, repo=repo,
+            )
             pc.validate_prior_coverage(
                 prior_state, audit, plan_text=plan_text, raw=retry.text,
                 frozen_ids=frozen,

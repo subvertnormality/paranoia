@@ -50,9 +50,12 @@ mixes a decision with a factual rationale, verify the rationale only.
 
 ## Evidence and authority
 
-Repository facts require a `repo://path#Lx-Ly` location and an exact code passage. External
-facts require a canonical absolute URL, publisher, title, precise section/table/page, exact
-passage, and source class.
+Repository facts require a `repo://path#Lx-Ly` location and an exact code passage. Historical
+bytes may use `repo://git/<revision>:<path>`; a commit-level packet may use
+`repo://git/<revision>`. The server resolves the current file or Git object and requires its
+exact quoted passage before accepting the packet. A missing path, malformed revision, or quote
+absent from the resolved bytes invalidates that claim packet. External facts require a canonical
+absolute URL, publisher, title, precise section/table/page, exact passage, and source class.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and
 records, standards, legislation/regulators, government data, and original papers/datasets.
@@ -80,9 +83,9 @@ Round 1 is exhaustive: it scans the whole plan, establishes the atomic inventory
 authoritative packets. Each claim receives a server-minted ID. On later rounds, an exact
 unchanged claim that is already `supported` is frozen with that packet and omitted from the
 claim-model prompt. External evidence remains the captured authoritative passage for the
-convergence lineage. Repository evidence is frozen only while at least one qualifying quoted
-passage is still present in the current worktree. Edited propositions require a new full packet
-and inherit no verdict.
+convergence lineage. Repository evidence is frozen only while at least one qualifying location
+still resolves and its quoted passage remains present in the current file or historical Git
+object. Edited propositions require a new full packet and inherit no verdict.
 
 The later-round verifier receives a unified diff with context, every added or edited factual
 assertion, and every retained `refuted` or `unverified` claim. It follows dependencies from that

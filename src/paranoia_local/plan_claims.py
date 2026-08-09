@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import subprocess
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
@@ -164,22 +166,57 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
     ))
 
 
-def _repository_quote_present(evidence: dict[str, str], repo: Path) -> bool:
+_GIT_REV = re.compile(r"[0-9a-fA-F]{7,64}(?:(?:\^+)|(?:~[0-9]+))?")
+
+
+def _repository_source_text(evidence: dict[str, str], repo: Path) -> str | None:
     raw = evidence.get("url", "")
     if not raw.startswith("repo://"):
-        return False
+        return None
     relative = raw[len("repo://"):].split("#", 1)[0]
+    if relative.startswith("git/"):
+        spec = relative[len("git/"):]
+        if ":" in spec:
+            revision, relative = spec.split(":", 1)
+            candidate = Path(relative)
+            if (
+                not _GIT_REV.fullmatch(revision) or not relative
+                or candidate.is_absolute() or ".." in candidate.parts
+            ):
+                return None
+            command = ["git", "show", f"{revision}:{relative}"]
+        else:
+            if not _GIT_REV.fullmatch(spec):
+                return None
+            command = ["git", "show", "--stat", "--format=fuller", spec]
+        try:
+            completed = subprocess.run(
+                command, cwd=repo, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=30, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return completed.stdout if completed.returncode == 0 else None
     candidate = Path(relative)
     if not relative or candidate.is_absolute() or ".." in candidate.parts:
-        return False
+        return None
     try:
-        text = (repo / candidate).read_text(encoding="utf-8", errors="replace")
+        return (repo / candidate).read_text(encoding="utf-8", errors="replace")
     except (OSError, UnicodeError):
+        return None
+
+
+def _repository_quote_present(evidence: dict[str, str], repo: Path) -> bool:
+    text = _repository_source_text(evidence, repo)
+    if text is None:
         return False
     return _collapse_whitespace(evidence.get("quote", "")) in _collapse_whitespace(text)
 
 
-def parse_audit(text: str, plan_text: str, *, allow_partial: bool = False) -> Audit:
+def parse_audit(
+    text: str, plan_text: str, *, allow_partial: bool = False,
+    repo: Path | None = None,
+) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
     if text.count(AUDIT_MARKER) != 1:
         raise AuditError(
@@ -218,7 +255,7 @@ def parse_audit(text: str, plan_text: str, *, allow_partial: bool = False) -> Au
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
         try:
-            claim = _validate_claim(item, plan_text)
+            claim = _validate_claim(item, plan_text, repo=repo)
         except ValueError as exc:
             reason = f"claim {index}: {exc}"
             if not allow_partial:
@@ -305,7 +342,9 @@ def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
     return tuple(result)
 
 
-def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
+def _validate_claim(
+    item: Any, plan_text: str, *, repo: Path | None = None,
+) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("must be an object")
     required = {"kind", "scope", "anchor", "proposition", "verdict", "evidence", "replacement"}
@@ -336,7 +375,7 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
     evidence = item["evidence"]
     if not isinstance(evidence, list) or len(evidence) > MAX_EVIDENCE_PER_CLAIM:
         raise ValueError(f"evidence must be an array of at most {MAX_EVIDENCE_PER_CLAIM}")
-    checked = [_validate_evidence(e, scope) for e in evidence]
+    checked = [_validate_evidence(e, scope, repo=repo) for e in evidence]
     replacement = item["replacement"]
     if replacement is not None:
         replacement = _one_line(replacement, "replacement")
@@ -375,7 +414,9 @@ def _validate_claim(item: Any, plan_text: str) -> dict[str, Any]:
     }
 
 
-def _validate_evidence(item: Any, scope: str) -> dict[str, str]:
+def _validate_evidence(
+    item: Any, scope: str, *, repo: Path | None = None,
+) -> dict[str, str]:
     if not isinstance(item, dict):
         raise ValueError("each evidence item must be an object")
     required = {
@@ -393,6 +434,11 @@ def _validate_evidence(item: Any, scope: str) -> dict[str, str]:
     if scope == "repository":
         if result["source_kind"] != "repository" or not result["url"].startswith("repo://"):
             result["relation"] = "context"
+        elif repo is not None and not _repository_quote_present(result, repo):
+            raise ValueError(
+                "repository evidence URL does not resolve to bytes containing its exact quote: "
+                f"{result['url']}"
+            )
     elif result["source_kind"] == "repository" or not host:
         result["relation"] = "context"
     if _is_ugc_host(host):
@@ -821,7 +867,10 @@ change execution. They must not consume active inventory after classification.
 
 For every retained claim, decide supported, refuted, or unverified. A source verifies a
 claim only when the exact quoted passage entails that exact atomic proposition. For
-repository facts cite repo://path#Lx-Ly and quote the code. For external facts, record the
+repository facts cite repo://path#Lx-Ly and quote the exact bytes. Historical bytes use
+repo://git/<hex-revision>:<path>; commit-level evidence uses repo://git/<hex-revision>.
+Every repository URL must resolve in this repository and contain the exact quote or the server
+will reject the packet. For external facts, record the
 canonical absolute URL, title, publisher, precise section/table/page location, exact
 passage, and why that publisher is authoritative for this proposition. Label source_kind honestly as primary, authoritative, secondary, ugc, or
 repository. A proposed replacement is allowed only when an authoritative passage entails
@@ -907,6 +956,11 @@ only and can NEVER govern support or refutation. Require an exact passage, canon
 location, publisher/authority basis, and a direct entailment relation. Split conjunctions
 and ranges into atomic propositions. A replacement is allowed only when authoritative
 evidence entails the replacement itself.
+
+For repository evidence use repo://path#Lx-Ly for current bytes,
+repo://git/<hex-revision>:<path> for historical bytes, or repo://git/<hex-revision> for a
+commit-level packet. Every location must resolve and contain the exact quote; the server rejects
+malformed identifiers, missing paths, and invented or truncated passages.
 
 OMIT decisions, policies, authorizations, requirements, definitions, intentions,
 instructions, preferences, forecasts, and incidental facts. They do not enter active

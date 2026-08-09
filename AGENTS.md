@@ -81,7 +81,8 @@ state and reviewer-native capabilities meet the supported model.
   the whole sibling set once before the next round instead of discovering one case per round.
 - Round 1 is the exhaustive factual inventory. In later rounds, an exact unchanged supported
   claim is frozen with its authoritative packet and requires no model call or web search;
-  repository packets additionally require their quoted bytes still to exist. Edited, new,
+  repository packets additionally require a resolving current-file or historical Git-object
+  location whose exact quoted bytes still exist. Edited, new,
   refuted, and unverified claims receive targeted verification and edited wording requires a
   new full packet. Removed/non-factual claims do not consume active context. This optimization
   applies only to factual verification: the structural FATAL/MAJOR review remains broad and

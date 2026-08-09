@@ -251,7 +251,8 @@ treated as governing evidence even if the model labels them `primary`.
 Every contradicted or unresolved claim returns an **actionable source packet**:
 
 - the verbatim plan wording and atomic proposition;
-- the canonical URL or `repo://path#Lx-Ly` location;
+- the canonical URL, `repo://path#Lx-Ly` current-file location, or
+  `repo://git/<revision>:<path>` historical Git-object location;
 - publisher and authority class;
 - the exact supporting/refuting passage;
 - an evidence-entailled replacement when one is actually proven.
@@ -264,8 +265,10 @@ that optional text and retains the valid verdict and evidence packet; it does no
 discard the rest of the claim batch.
 Likewise, a source that cannot govern the claim's declared scope, or evidence that
 does not entail the model's `supported`/`refuted` verdict, is retained only as
-context and that individual claim is forced to blocking `unverified`. Other valid
-claims in the same response are still registered.
+context and that individual claim is forced to blocking `unverified`. Repository
+packets must also resolve to current-file or historical Git-object bytes containing
+their exact quote; malformed identifiers and missing passages cannot support a verdict.
+Other valid claims in the same response are still registered.
 If the bounded correction retry still contains an unbindable anchor, that item is
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item
@@ -285,8 +288,9 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
    affected sibling case in the same pass;
 3. increment `round` and call again **after the edit**;
 4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
-   its authoritative packet; repository packets are frozen only while their quoted bytes
-   still exist. The claim verifier receives only the edited/new factual wording plus retained
+   its authoritative packet; repository packets are frozen only while their location resolves
+   and quoted bytes still exist in the current file or historical Git object. The claim verifier
+   receives only the edited/new factual wording plus retained
    refuted or unverified claims, so settled claims cause no model call or web search. Edited
    claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
