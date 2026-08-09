@@ -28,9 +28,28 @@ round carries only repository regions read by the server. Consequently external 
 silently influence a vote but cannot become governed evidence, while choices that genuinely turn
 on an external standard, dependency behavior, method, or public fact can never converge honestly.
 
-The fix must preserve the protocol's central property: the two deciders differ in judgement and
-search path, not in framing or evidence. Independent unrecorded browsing by each decider is not a
-research phase because it gives them different, unaudited corpora.
+The fix must preserve the protocol's central property: the two deciders differ in judgement, not
+in framing or evidence. Independent browsing by each decider is not a research phase because it
+gives them different, unaudited corpora.
+
+## Verified external premises
+
+The implementation relies on exactly these provider behaviors, which plan verification must keep
+in its active external-claim inventory:
+
+- Codex CLI exposes live web search to a non-interactive `codex exec` session and supports
+  continuing that session with `codex exec resume <session-id>`.
+- Claude Code exposes `WebSearch` for source discovery in print mode and supports continuing a
+  print-mode session with `claude -p --resume <session-id>`.
+- Trafilatura downloads HTML and extracts normalized main text, while pages that require
+  JavaScript rendering can remain unavailable to it.
+
+These are current external capabilities, not guarantees made by this repository. Bind them to the
+official [Codex command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
+[Claude tools reference](https://code.claude.com/docs/en/tools-reference),
+[Claude sessions reference](https://code.claude.com/docs/en/sessions), and
+[Trafilatura documentation](https://trafilatura.readthedocs.io/en/stable/). No undocumented search
+backend, result ranking, or universal page-extraction behavior is assumed.
 
 ## Required behavior
 
@@ -38,9 +57,9 @@ research phase because it gives them different, unaudited corpora.
 
 Add `research`, default `true`, to `arbitrate`.
 
-- `research: true` requires `web_search: true`. It runs the bounded shared phase below and lets
-  deciders browse only to reopen and challenge the shared sources. New external material found by
-  a decider cannot substantiate a vote unless it is already a registered packet.
+- `research: true` requires `web_search: true` for the research agents only. It runs the bounded
+  shared phase below. Both voting rounds have web tools mechanically disabled: the normalized
+  packet is the complete external corpus available during voting.
 - `research: false` is explicit repository-only arbitration. Both decider calls run with web
   search disabled, and only existing repository citations can substantiate convergence.
 - `research: true, web_search: false` is rejected before any agent call. There is no quiet
@@ -56,7 +75,9 @@ After framing has been cleaned and cross-vendor attested, but before either deci
 cold research agent from each vendor in parallel. Both receive the same cleaned decision,
 context, stakes, hints, and option statements. One receives canonical option order and the other
 the reverse, without caller IDs. Neither is told the other exists and neither may select,
-recommend, rank, or name an option.
+recommend, compare, rank, or associate a proposition with a temporary option label. A proposition
+may and usually must name its real-world subject, including a dependency, API, platform, protocol,
+service, or runtime that also appears in an option statement. Naming the subject is not advocacy.
 
 Each researcher inventories only atomic, load-bearing propositions about the external world whose
 truth or authority could change the comparative result:
@@ -68,48 +89,78 @@ truth or authority could change the comparative result:
   runtime.
 
 Repository state, code behavior, internal history, project preferences, option advocacy,
-forecasts, and incidental facts are excluded. The researchers use their built-in web search and
-return only a concrete JSON record after a terminal marker. One bounded same-session correction
-is allowed for malformed output; a second failure fails arbitration visibly.
+forecasts, and incidental facts are excluded. Researchers use provider-native search to discover
+candidate authoritative URLs. Claude's research role receives `WebSearch` but not `WebFetch`;
+Codex's integrated search remains confined to the research role. Provider-returned page text is a
+lead, never governing evidence. Researchers return a concrete JSON record after a terminal marker.
+One bounded same-session correction is allowed for malformed output; a second failure fails
+arbitration visibly.
+
+The research-only call seam returns a structured result containing final text, raw CLI output,
+session reference, usage, duration, engine, and model. Its injected resume callback consumes the
+exact first-call session reference. This is separate from the existing string-returning decider
+callback, so malformed research can be corrected in-session and audited without widening the
+settled voting seam.
 
 ### 3. Authoritative source packets
 
-Each research claim contains one atomic proposition and evidence records with:
+Each research claim contains one atomic proposition and candidate evidence records with:
 
-- canonical HTTP(S) URL, title, publisher, precise location, and exact passage;
+- canonical HTTP(S) URL, title, publisher, precise location, and the exact passage reported by the
+  researcher;
 - `primary`, `authoritative`, `secondary`, or `ugc` source kind;
 - publisher authority basis;
 - `supports_claim`, `refutes_claim`, or `context` relation.
 
-Only primary or authoritative HTTP(S) evidence may govern a packet. Known UGC hosts—including
+Only primary or authoritative HTTP(S) evidence is structurally eligible to govern a packet. Known UGC hosts—including
 Reddit, forums, Stack Overflow, social media, wikis, and community publishing—are mechanically
 non-governing even when model-labelled `primary`. Secondary and UGC material remains context.
 The repository, local files, custom schemes, and the caller framing cannot evidence their own
 external assertions.
 
 Extract the small generic URL/source qualification rules currently used by plan verification into
-one shared module used by both plan claims and arbitration research. Do not duplicate authority
-policy or import private plan-lifecycle machinery into arbitration.
+one shared module used by both plan claims and arbitration research. Do not duplicate structural
+source policy or import private plan-lifecycle machinery into arbitration.
 
-The server validates shape and authority, preserves conflicting authoritative packets, drops
-non-governing relations from substantiation, assigns stable run-local IDs from packet content,
-deduplicates byte-identical packets, and takes the deterministic union of both researchers'
-valid results. It does not ask a model to merge or summarize them.
+For every candidate URL, the server performs a bounded HTTP(S) download and runs Trafilatura
+locally over the response. A candidate can enter the governing packet only when the request
+succeeds, its normalized reported passage occurs exactly after conservative Unicode/whitespace
+normalization in the extracted text, and the final public HTTP(S) URL remains eligible. Record
+final URL, status, content type, content digest, extracted-text digest, and the exact matched
+passage. Direct downloads have fixed connect/read timeouts, redirect and response-byte caps, and
+reject loopback, link-local, private, and non-HTTP(S) destinations. Run independent downloads with
+bounded concurrency. JavaScript-only, blocked, oversized, mismatching, and extraction-empty pages
+are visible non-governing failures; there is no silent fallback to provider summaries or a browser.
 
-Budgets are corruption/pathology guards, not sampling targets: at most 24 claims total, four
-evidence records per claim, 4,000 characters per quote, and 80,000 rendered packet characters.
-Exceeding a budget fails visibly rather than truncating evidence and calling the result complete.
+The server validates shape, captured passage provenance, URL scheme, known-UGC demotion, declared
+source kind, and relation; it does not pretend to infer a publisher's subject-matter authority
+from a hostname or researcher label. It preserves conflicting structurally eligible packets,
+drops mechanically non-governing relations from substantiation, assigns stable run-local IDs from
+packet content, deduplicates byte-identical packets, and takes the deterministic union of both
+researchers' valid results. It does not ask a model to merge or summarize them.
+
+Budgets are corruption/pathology guards, not sampling targets. Each researcher may return at most
+12 claims, two candidate records per claim, 2,000 characters per reported passage, and 40,000
+rendered characters. Their deterministic union may contain at most 24 claims, four records per
+normalized proposition, 4,000 characters per captured passage, and 80,000 rendered characters.
+Exceeding either a producer or union budget fails visibly rather than truncating evidence and
+calling the result complete. These producer caps make the union cap composable without assuming
+that independently worded claims deduplicate.
 
 ### 4. Identical evidence for both deciders
 
 Render the normalized union once, hash it, and include the exact same packet bytes in both
 decider prompts. Research output is untrusted evidence, not instruction: packets carry no option
-recommendation and the prompt requires each decider to reopen authoritative URLs as needed,
-check authority and entailment independently, and disregard irrelevant or contradicted packets.
+recommendation and the prompt requires each decider to judge publisher authority for the precise
+proposition, passage entailment, relevance, and contradictions independently. Deciders cannot
+browse or fetch; no external bytes outside the logged packet can affect a vote.
 
-The server rejects research output containing caller IDs, its temporary order labels, trailer
-field injection, or option recommendations. Final high-entropy decider labels are generated only
-after the packet exists, and the existing absence scan covers the packet as decider-visible text.
+The server rejects research output containing caller IDs, temporary order labels, or trailer-field
+injection. The prompt forbids selection, comparison, ranking, and recommendations, but the server
+does not use a brittle natural-language advocacy detector that would also reject a technology's
+name. Counterbalanced research presentations reduce residual research-framing bias. Final
+high-entropy decider labels are generated only after the packet exists, and the existing absence
+scan covers the packet as decider-visible text.
 
 ### 5. External evidence can substantiate a vote
 
@@ -119,11 +170,15 @@ Extend the decisive-evidence grammar from only `<path>:<line>` to exactly one of
 - `SOURCE:<packet-id>` referencing a qualifying shared packet.
 
 Represent this as an explicit tagged reference in the pure arbitration core rather than encoding
-source IDs as fake repository paths. A source reference resolves only when the ID exists in the
-shared normalized packet and has qualifying primary/authoritative evidence. Unknown, context-only,
-secondary-only, or UGC-only IDs are unsubstantiated. The vote's `CONSTRAINT` remains the decider's
-one-line statement of what the evidence establishes; semantic relevance is independently judged
-by both cold deciders, not asserted by the research model.
+source IDs as fake repository paths. A source reference resolves structurally only when the ID
+exists in the shared normalized packet and has server-captured eligible primary/authoritative
+evidence. Unknown, context-only, secondary-only, UGC-only, or uncaptured IDs are unsubstantiated.
+For every `SOURCE:` decisive reference the strict vote grammar also requires
+`PUBLISHER-AUTHORITY: YES|NO — <reason>` and `PASSAGE-ENTAILMENT: YES|NO — <reason>`. A
+source-backed vote is substantiated only when both are `YES`; each cold decider therefore makes
+and exposes its own authority and entailment judgement. For a repository decisive citation both
+fields must be `N/A`. The vote's `CONSTRAINT` remains the decider's one-line statement of what the
+evidence establishes.
 
 Supporting `CITATIONS` remain repository citations in this change. The decisive reference is the
 only field that affects substantiation, keeping the parser and reconciliation surface small.
@@ -143,6 +198,15 @@ the first-round preferences, expand cost, and make the evidence corpus outcome-d
 or inadequate external packets instead produce unsubstantiated votes and an honest unresolved
 result; the caller may improve the framing and start a new arbitration.
 
+Research agents run in parallel with a 180-second cap per attempt. Their one possible correction
+is another 180-second serial group. Server capture has a 120-second phase cap. The explicit worst
+path is therefore: cleaner initial/retry 600 seconds, attester initial/retry 600, research
+initial/correction 360, capture 120, decision round one 900, and decision round two 900 = 3,480
+seconds. Parallel vendors count once per group. This leaves 120 seconds of the existing
+3,600-second whole-call ceiling for validation, git materialization, logging, and teardown. The
+handler tracks one monotonic whole-run deadline and will not start a phase whose cap plus reserved
+teardown margin cannot fit; that produces a visible bounded failure rather than a client timeout.
+
 ### 7. Audit and progress
 
 Add progress events for shared research and validation. Add trailer fields:
@@ -150,21 +214,31 @@ Add progress events for shared research and validation. Add trailer fields:
 - `RESEARCH: complete <N> packets | repository-only`
 - `RESEARCH-DIGEST: <sha256> | none`
 
-The audit log records both raw research replies, correction replies if any, normalized packets,
-packet digest, research model names, call count, duration, and the exact shared bytes shown to
-each decider. The existing snapshot/ref movement, cleaner, attestation, order, label, vote, and
-round records remain intact.
+The audit log records both raw research replies, correction replies if any, every capture result,
+normalized packets, packet digest, research model names, call count, duration, and the exact shared
+bytes shown to each decider. The existing snapshot/ref movement, cleaner, attestation, order,
+label, vote, and round records remain intact.
 
 ## Code shape
 
-- Add a small `external_sources.py` for generic source schema, HTTP(S)/UGC qualification, and
-  normalized evidence records; migrate `plan_claims.py` to it without changing plan behavior.
+- Add Trafilatura as one pinned runtime dependency. Add a small `external_sources.py` for generic
+  source schema, bounded downloading, extraction, exact normalized passage matching, capture
+  metadata, HTTP(S)/UGC eligibility, and normalized evidence records.
+- Migrate `plan_claims.py` to that shared capture path. Provider search still discovers candidate
+  evidence, but a plan claim becomes supported only from a server-captured matching passage.
+  Retained evidence is recaptured when re-entailing edited claims; a failed or stale capture
+  becomes visible unverified evidence rather than being grandfathered. Keep capture injectable so
+  deterministic plan-claim tests do not perform network I/O.
 - Add pure research packet types, parsing, normalization, union, budgets, digesting, and tagged
   decisive-reference parsing to `arbitration.py` or one small `arbitration_research.py` module.
-- Keep orchestration in `arbitrate_handler.py`: parallel research calls, bounded correction,
-  identical packet injection, logging, and progress.
+- Keep orchestration in `arbitrate_handler.py`: a metadata-preserving research call/result and
+  resume seam, parallel research calls, bounded correction, one whole-run deadline, identical
+  packet injection, logging, and progress.
+- Extend the Claude engine's internal web capability from a boolean to the minimum role-specific
+  modes needed here: disabled, discovery (`WebSearch` only), and full (existing behavior). Do not
+  expose a provider abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
-- Add no persistent store, lineage, cache, daemon, transport, or third-party dependency.
+- Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
 
 ## Verification
 
@@ -172,8 +246,12 @@ round records remain intact.
 
 - research JSON parsing, exact literals, budgets, deterministic IDs/union/digest, and conflict
   retention;
-- primary/authoritative HTTP(S) qualification and hard UGC/non-web/self-context rejection shared
-  with plan claims;
+- bounded capture, redirect/size/timeout handling, Trafilatura extraction, exact normalized passage
+  match, digests, and hard UGC/non-web/self-context rejection shared with plan claims;
+- plan claims cannot become supported from provider-reported text that the shared capture path
+  cannot reproduce; retained evidence is recaptured before re-entailment;
+- unrelated non-UGC publishers falsely labelled `primary`, and publishers authoritative for a
+  different subject, remain unsubstantiated when deciders reject authority or entailment;
 - counterbalanced research framing and byte-identical normalized evidence for both deciders;
 - caller/order/decider-label leakage rejection;
 - repository and `SOURCE:` decisive-reference parsing, rendering, resolution, and substantiation;
@@ -181,7 +259,10 @@ round records remain intact.
 - source references never enter repository region reconciliation;
 - `research: false` disables web search and makes no research calls;
 - `research: true, web_search: false` fails before spend;
-- malformed research receives one correction and then fails closed;
+- malformed research retains the exact session reference, receives one resume correction, and
+  then fails closed; raw output, call count, usage, and durations remain auditable;
+- every phase cap composes below the whole-run deadline with reserved teardown margin, and a phase
+  that cannot fit is not started;
 - existing repository-only arbitration behavior and outcome computation remain compatible.
 
 ### Real acceptance before PR
@@ -190,8 +271,11 @@ Run signed-in Codex and Claude arbitration against a small pinned fixture where 
 choice depends on one authoritative external behavior or design principle not stated in repository
 lines. Record CLI/model versions, exact packet IDs and URLs, research/decider call counts, elapsed
 time, packet digest, both decisive source references, and computed convergence. Include one UGC
-lead and prove it cannot substantiate. Also run explicit `research: false` on a repository-settled
-fixture and prove both deciders receive web search disabled and converge from repository evidence.
+lead, one unrelated non-UGC publisher mislabelled primary, one passage mismatch, and prove none can
+substantiate. Separately run a real plan claim whose provider-returned exact passage is captured
+and matched by the shared Trafilatura path. Also run explicit `research: false` on a
+repository-settled fixture and prove both deciders receive web search disabled and converge from
+repository evidence.
 
 Run the complete local test suite, then Codex paranoia convergence over the implementation branch
 under the frozen stakes above. Open and merge a PR only after real acceptance, tests, documentation,
@@ -200,11 +284,12 @@ and computed code-review convergence are all clear.
 ## Acceptance criteria
 
 1. External research cannot influence a reported convergence without appearing in the shared,
-   logged, authoritative packet and being referenced by a converging vote.
+   logged, server-captured packet, being referenced by a converging vote, and receiving explicit
+   positive authority and entailment judgements from every source-relying decider.
 2. Both deciders receive byte-identical external packets and remain cold and independently judged.
 3. Repository-only mode performs no research and no web-enabled decider call.
-4. Weak, UGC, non-web, self-referential, malformed, over-budget, or unknown evidence cannot
-   substantiate a vote.
+4. Weak, UGC, non-web, self-referential, uncaptured, passage-mismatched, malformed, over-budget, or
+   unknown evidence cannot substantiate a vote or close a plan claim.
 5. Research is one bounded pre-vote phase; arbitration remains capped at one existing repository
    reconciliation round and has no persistent evidence lifecycle.
 6. Existing snapshot, ref-movement, cleaner/attester, counterbalancing, label, risk, authority,
