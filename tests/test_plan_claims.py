@@ -455,6 +455,42 @@ class TestRetainedEvidence:
         assert second["claims"][claim_id]["verdict"] == "unverified"
         assert "Server demotion" in second["claims"][claim_id]["rationale"]
 
+    def test_targeted_prompt_requires_full_packet_for_unverified_claim(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim(verdict="unverified", evidence=[])), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+
+        prompt = pc.targeted_audit_instructions(PLAN, first, "trusted local tool", set())
+
+        assert "RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS" in prompt
+        assert claim_id in prompt.split(
+            "RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT", 1
+        )[0]
+        assert '"prior_assessments":[]' in prompt
+
+    def test_targeted_prompt_requires_full_packet_for_nonfreezable_support(
+        self, tmp_path: Path,
+    ) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(
+                _audit(_repository_claim(url="repo://missing.json")), REPO_PLAN,
+            ),
+            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        frozen = pc.frozen_supported_ids(first, REPO_PLAN, repo=tmp_path)
+
+        prompt = pc.targeted_audit_instructions(
+            REPO_PLAN, first, "trusted local tool", frozen,
+        )
+
+        assert frozen == set()
+        assert claim_id in prompt.split(
+            "RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT", 1
+        )[0]
+
     def test_compact_support_cannot_upgrade_a_nonqualifying_retained_packet(self) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim(evidence=[_source(relation="context")])), PLAN),

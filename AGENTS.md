@@ -82,9 +82,10 @@ state and reviewer-native capabilities meet the supported model.
 - Round 1 is the exhaustive factual inventory. In later rounds, an exact unchanged supported
   claim is frozen with its authoritative packet and requires no model call or web search;
   repository packets additionally require a resolving current-file or historical Git-object
-  location whose exact quoted bytes still exist. Edited, new,
-  refuted, and unverified claims receive targeted verification and edited wording requires a
-  new full packet. Removed/non-factual claims do not consume active context. This optimization
+  location whose exact quoted bytes still exist. Edited, new, refuted, and unverified claims
+  receive targeted verification. Unverified or otherwise non-freezable claims require a full
+  replacement evidence packet rather than another compact verdict-only assessment; edited
+  wording also requires a new full packet. Removed/non-factual claims do not consume active context. This optimization
   applies only to factual verification: the structural FATAL/MAJOR review remains broad and
   cold on every convergence round.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;

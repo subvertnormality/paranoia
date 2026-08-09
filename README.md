@@ -293,9 +293,10 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
 4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
    its authoritative packet; repository packets are frozen only while their location resolves
    and quoted bytes still exist in the current file or historical Git object. The claim verifier
-   receives only the edited/new factual wording plus retained
-   refuted or unverified claims, so settled claims cause no model call or web search. Edited
-   claims inherit no verdict;
+   receives only the edited/new factual wording plus retained refuted or unverified claims.
+   Unverified or non-freezable claims require complete replacement evidence packets on the next
+   targeted round; they cannot churn through compact verdict-only assessments. Settled claims
+   cause no model call or web search. Edited claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
 

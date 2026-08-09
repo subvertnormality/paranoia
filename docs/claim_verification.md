@@ -61,6 +61,11 @@ cannot preserve a stale or malformed repository packet; the server locally demot
 `unverified` without discarding unrelated assessments. When an exact quote still exists but edits
 shifted its line, the server updates the line hint mechanically. A 64-hex whole-file SHA-256 quote
 is checked by hashing the resolved bytes rather than looking for the digest inside the file.
+On the following targeted round, an unverified or otherwise non-freezable retained claim is a
+mandatory full-packet research item, not a compact assessment. The verifier must return the exact
+proposition with replacement evidence; only a retained refutation whose packet remains usable may
+be re-entailled compactly. This prevents repeated verdict-only rounds from churning on evidence
+that the server has already shown cannot close the claim.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and
 records, standards, legislation/regulators, government data, and original papers/datasets.

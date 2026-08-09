@@ -1001,9 +1001,13 @@ def targeted_audit_instructions(
     frozen = frozenset(frozen_ids)
     state = normalize_state(prior_state)
     targeted_ids = set(state["claims"]) - frozen
+    full_packet_ids = _full_packet_candidate_ids(prior_state, plan_text, frozen)
     prior = evidence_context(prior_state, targeted_ids)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(prior_state, plan_text, exclude_ids=frozen)
+    assessments = _assessment_candidates(
+        prior_state, plan_text, exclude_ids=frozen | full_packet_ids,
+    )
+    full_packets = evidence_context(prior_state, full_packet_ids)
     changes = changed_plan_text(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
     return f"""You are the targeted factual-remediation phase of an autonomous plan review.
@@ -1033,13 +1037,23 @@ repo://git/<hex-revision>:<path> for historical bytes, or repo://git/<hex-revisi
 commit-level packet. Every location must resolve and contain the exact quote; the server rejects
 malformed identifiers, missing paths, and invented or truncated passages.
 
+Every item in RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS must be re-researched and
+returned in `claims` with its exact unchanged proposition and a current, complete evidence
+packet. Do not put these IDs in `prior_assessments`: their old packets were unverified or
+could not be frozen, so a compact verdict cannot repair them. The server preserves their
+identity by exact proposition. Items in RETAINED REFUTED CLAIMS may instead receive one
+compact current judgement in `coverage.prior_assessments` while their anchor remains.
+
 OMIT decisions, policies, authorizations, requirements, definitions, intentions,
 instructions, preferences, forecasts, and incidental facts. They do not enter active
 inventory. Use claims only for new or edited factual propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
 
-RETAINED UNRESOLVED EXACT CLAIMS REQUIRING ASSESSMENT (JSON):
+RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
+{full_packets}
+
+RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT (JSON):
 {assessments}
 
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
@@ -1067,10 +1081,15 @@ def retry_instructions(
     frozen_ids: Iterable[str] = (),
 ) -> str:
     frozen = frozenset(frozen_ids)
+    state = normalize_state(prior_state)
+    targeted_ids = set(state["claims"]) - frozen
+    full_packet_ids = _full_packet_candidate_ids(prior_state, plan_text, frozen)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(prior_state, plan_text, exclude_ids=frozen)
-    targeted_ids = set(normalize_state(prior_state)["claims"]) - frozen
+    assessments = _assessment_candidates(
+        prior_state, plan_text, exclude_ids=frozen | full_packet_ids,
+    )
     prior = evidence_context(prior_state, targeted_ids)
+    full_packets = evidence_context(prior_state, full_packet_ids)
     scope_label = "CURRENT PLAN EDIT CONE" if frozen else "PLAN"
     scope_text = changed_plan_text(prior_state, plan_text) if frozen else plan_text
     frozen_note = (
@@ -1092,7 +1111,13 @@ Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested review
 
 {frozen_note}
 
-RETAINED EXACT CLAIMS REQUIRING ONE ASSESSMENT EACH (JSON):
+RETAINED CLAIMS REQUIRING COMPLETE REPLACEMENT EVIDENCE PACKETS (JSON):
+{full_packets}
+
+Return each of these exact propositions as a full item in `claims`. Do not compactly
+assess them: their retained packets are unresolved or non-freezable and cannot govern.
+
+RETAINED REFUTED CLAIMS REQUIRING ONE ASSESSMENT EACH (JSON):
 {assessments}
 
 Return each retained exact ID once in coverage.prior_assessments using exactly claim_id,
@@ -1157,6 +1182,21 @@ def _assessment_candidates(
         and _anchor_in_plan(claim["anchor"], plan_text)
     ]
     return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+
+
+def _full_packet_candidate_ids(
+    prior_state: Any, plan_text: str, exclude_ids: Iterable[str] = (),
+) -> set[str]:
+    """Claims whose retained evidence cannot be repaired by a compact verdict."""
+    state = normalize_state(prior_state)
+    excluded = frozenset(exclude_ids)
+    return {
+        claim_id for claim_id, claim in state["claims"].items()
+        if claim_id not in excluded
+        and isinstance(claim, dict)
+        and claim.get("verdict") != "refuted"
+        and _anchor_in_plan(claim.get("anchor", ""), plan_text)
+    }
 
 
 def _mint(lineage_id: str, seq: int, proposition: str) -> str:
