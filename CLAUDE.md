@@ -20,6 +20,8 @@
 - never infer that no plan or authority existed from one missing or late-added filename: inspect
   alternative briefs/manifests/history at the relevant revision, separate existence from
   profile/conformance/current reuse, and audit affected sibling cases together;
+- never let the plan under review serve as evidence for its own assertions; bind claims to code,
+  data, Git objects, retained command output, or authoritative external sources;
 - let the calling coding agent autonomously edit from those packets before the next round; no
   human is required, and an unchanged rerun is not a correction;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed

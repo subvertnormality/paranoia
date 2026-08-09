@@ -121,6 +121,7 @@ def has_prior_snapshot(state_raw: Any) -> bool:
 
 def frozen_supported_ids(
     state_raw: Any, plan_text: str, *, repo: Path | None = None,
+    plan_repo_path: str | None = None,
 ) -> frozenset[str]:
     """Return exact supported claims that need no new model/web judgement.
 
@@ -143,6 +144,7 @@ def frozen_supported_ids(
             item for item in evidence
             if _qualifying(item, record.get("scope", ""))
             and item.get("relation") == "supports_claim"
+            and not _is_plan_self_evidence(item, plan_repo_path)
         ]
         if not supports:
             continue
@@ -258,7 +260,7 @@ def _canonicalize_repository_evidence(
 
 def parse_audit(
     text: str, plan_text: str, *, allow_partial: bool = False,
-    repo: Path | None = None,
+    repo: Path | None = None, plan_repo_path: str | None = None,
 ) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
     if text.count(AUDIT_MARKER) != 1:
@@ -298,7 +300,9 @@ def parse_audit(
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
         try:
-            claim = _validate_claim(item, plan_text, repo=repo)
+            claim = _validate_claim(
+                item, plan_text, repo=repo, plan_repo_path=plan_repo_path,
+            )
         except ValueError as exc:
             reason = f"claim {index}: {exc}"
             if not allow_partial:
@@ -387,6 +391,7 @@ def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
 
 def _validate_claim(
     item: Any, plan_text: str, *, repo: Path | None = None,
+    plan_repo_path: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("must be an object")
@@ -418,7 +423,12 @@ def _validate_claim(
     evidence = item["evidence"]
     if not isinstance(evidence, list) or len(evidence) > MAX_EVIDENCE_PER_CLAIM:
         raise ValueError(f"evidence must be an array of at most {MAX_EVIDENCE_PER_CLAIM}")
-    checked = [_validate_evidence(e, scope, repo=repo) for e in evidence]
+    checked = [
+        _validate_evidence(
+            e, scope, repo=repo, plan_repo_path=plan_repo_path,
+        )
+        for e in evidence
+    ]
     replacement = item["replacement"]
     if replacement is not None:
         replacement = _one_line(replacement, "replacement")
@@ -459,6 +469,7 @@ def _validate_claim(
 
 def _validate_evidence(
     item: Any, scope: str, *, repo: Path | None = None,
+    plan_repo_path: str | None = None,
 ) -> dict[str, str]:
     if not isinstance(item, dict):
         raise ValueError("each evidence item must be an object")
@@ -476,6 +487,10 @@ def _validate_evidence(
     host = (urlparse(result["url"]).hostname or "").lower()
     if scope == "repository":
         if result["source_kind"] != "repository" or not result["url"].startswith("repo://"):
+            result["relation"] = "context"
+        elif _is_plan_self_evidence(result, plan_repo_path):
+            # The document under review can identify its wording, but cannot be the
+            # independent evidence that makes that same wording true.
             result["relation"] = "context"
         elif repo is not None:
             valid, canonical = _repository_evidence_resolution(result, repo)
@@ -503,6 +518,14 @@ def _qualifying(evidence: dict[str, str], scope: str) -> bool:
     return bool(urlparse(evidence["url"]).hostname) and (
         evidence["source_kind"] in AUTHORITATIVE_KINDS
     )
+
+
+def _is_plan_self_evidence(
+    evidence: dict[str, Any], plan_repo_path: str | None,
+) -> bool:
+    if not plan_repo_path:
+        return False
+    return evidence.get("url", "").split("#", 1)[0] == f"repo://{plan_repo_path}"
 
 
 def reconcile(

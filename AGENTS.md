@@ -72,6 +72,8 @@ state and reviewer-native capabilities meet the supported model.
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
+  The plan under review is context, not evidence for its own assertions; require code, data,
+  Git objects, retained command output, or authoritative external sources instead.
 - Treat negative-existence and chronology inferences as their own claims. The absence or late
   first-add of one named file proves only that fact about that path; it does not prove that no
   equivalent plan, brief, manifest, issue record, tag, or historical Git object existed. Before

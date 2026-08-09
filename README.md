@@ -268,6 +268,8 @@ does not entail the model's `supported`/`refuted` verdict, is retained only as
 context and that individual claim is forced to blocking `unverified`. Repository
 packets must also resolve to current-file or historical Git-object bytes containing
 their exact quote; malformed identifiers and missing passages cannot support a verdict.
+The current plan cannot prove its own assertions: direct `repo://` citations to the plan file
+are retained only as context and cannot govern support or refutation.
 Shifted line hints are relocated from the exact passage. A 64-hex value present in the cited
 text remains an exact passage; otherwise a whole-file SHA-256 packet is checked by hashing the
 bytes. One stale compact packet is locally demoted rather than

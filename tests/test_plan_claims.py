@@ -209,6 +209,34 @@ class TestAuditValidation:
                     _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
                 )
 
+    def test_plan_cannot_be_authoritative_evidence_for_its_own_claim(
+        self, tmp_path: Path,
+    ) -> None:
+        (tmp_path / "PLAN.md").write_text(REPO_PLAN)
+        audit = pc.parse_audit(
+            _audit(_repository_claim(
+                url="repo://PLAN.md#L3", quote="The setting is enabled.",
+            )),
+            REPO_PLAN, repo=tmp_path, plan_repo_path="PLAN.md",
+        )
+        assert audit.claims[0]["verdict"] == "unverified"
+        assert audit.claims[0]["evidence"][0]["relation"] == "context"
+
+    def test_plan_self_citation_is_not_frozen(self, tmp_path: Path) -> None:
+        (tmp_path / "PLAN.md").write_text(REPO_PLAN)
+        first = pc.reconcile(
+            {}, pc.parse_audit(
+                _audit(_repository_claim(
+                    url="repo://PLAN.md#L3", quote="The setting is enabled.",
+                )),
+                REPO_PLAN, repo=tmp_path,
+            ),
+            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
+        )
+        assert not pc.frozen_supported_ids(
+            first, REPO_PLAN, repo=tmp_path, plan_repo_path="PLAN.md",
+        )
+
     def test_refutation_alone_keeps_packet_but_drops_unsupported_replacement(self) -> None:
         refuting = _source(relation="refutes_claim")
         audit = pc.parse_audit(_audit(_claim(

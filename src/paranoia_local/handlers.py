@@ -432,6 +432,12 @@ def critique_plan(
     # passed a repo, so this refuses nothing anyone actually does.
     repo = _require_repo(arguments)
     cwd = repo
+    plan_repo_path: str | None = None
+    if plan_path:
+        try:
+            plan_repo_path = Path(plan_path).resolve().relative_to(repo.resolve()).as_posix()
+        except ValueError:
+            pass
     cfg = load_repo_config(repo)
 
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
@@ -498,6 +504,7 @@ def critique_plan(
                     plan_text, claim_state, lineage_id=lineage_id or "one-shot-plan",
                     round_no=arguments.get("round") or 1, stakes=stakes,
                     engine=engine, repo=repo, model=model, effort=effort,
+                    plan_repo_path=plan_repo_path,
                     on_progress=on_progress,
                 )
             except BaseException:
@@ -597,12 +604,15 @@ def _verify_plan_claims(
     repo: Path,
     model: str,
     effort: str,
+    plan_repo_path: str | None,
     on_progress: Callable[[str], None] | None,
 ) -> tuple[dict[str, Any], str]:
     """Run exhaustive round 1, then verify only the factual edit cone."""
     targeted = pc.has_prior_snapshot(prior_state)
     frozen = (
-        pc.frozen_supported_ids(prior_state, plan_text, repo=repo)
+        pc.frozen_supported_ids(
+            prior_state, plan_text, repo=repo, plan_repo_path=plan_repo_path,
+        )
         if targeted else frozenset()
     )
     prior = pc.normalize_state(prior_state)
@@ -642,7 +652,9 @@ def _verify_plan_claims(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
         ), "failed"
     try:
-        audit = pc.parse_audit(review.text, plan_text, repo=repo)
+        audit = pc.parse_audit(
+            review.text, plan_text, repo=repo, plan_repo_path=plan_repo_path,
+        )
         pc.validate_prior_coverage(
             prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
             repo=repo,
@@ -681,6 +693,7 @@ def _verify_plan_claims(
             # so valid packets and dispositions survive with explicit blocking debt.
             audit = pc.parse_audit(
                 retry.text, plan_text, allow_partial=True, repo=repo,
+                plan_repo_path=plan_repo_path,
             )
             pc.validate_prior_coverage(
                 prior_state, audit, plan_text=plan_text, raw=retry.text,
