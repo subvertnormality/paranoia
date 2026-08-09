@@ -268,8 +268,9 @@ does not entail the model's `supported`/`refuted` verdict, is retained only as
 context and that individual claim is forced to blocking `unverified`. Repository
 packets must also resolve to current-file or historical Git-object bytes containing
 their exact quote; malformed identifiers and missing passages cannot support a verdict.
-Shifted line hints are relocated from the exact passage, whole-file SHA-256 packets are
-checked by hashing the bytes, and one stale compact packet is locally demoted rather than
+Shifted line hints are relocated from the exact passage. A 64-hex value present in the cited
+text remains an exact passage; otherwise a whole-file SHA-256 packet is checked by hashing the
+bytes. One stale compact packet is locally demoted rather than
 invalidating the rest of the audit.
 Other valid claims in the same response are still registered.
 If the bounded correction retry still contains an unbindable anchor, that item is

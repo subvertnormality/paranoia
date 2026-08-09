@@ -186,6 +186,19 @@ class TestAuditValidation:
         )
         assert audit.claims[0]["verdict"] == "supported"
 
+    def test_sha256_shaped_exact_passage_is_not_forced_to_be_the_file_digest(
+        self, tmp_path: Path,
+    ) -> None:
+        digest_passage = "e63ec234f5a4ba7986ff2759fe9526210d7a859784483bf4ba0332d163dca3c6"
+        (tmp_path / "checks.md").write_text(f"recorded digest:\n{digest_passage}\n")
+        audit = pc.parse_audit(
+            _audit(_repository_claim(
+                url="repo://checks.md#L1", quote=digest_passage,
+            )),
+            REPO_PLAN, repo=tmp_path,
+        )
+        assert audit.claims[0]["evidence"][0]["url"] == "repo://checks.md#L2"
+
     def test_repository_support_rejects_wrong_quote_and_traversal(
         self, tmp_path: Path,
     ) -> None:

@@ -214,12 +214,12 @@ def _repository_evidence_resolution(
     if source is None:
         return False, raw
     quote = evidence.get("quote", "").strip()
-    if re.fullmatch(r"[0-9a-fA-F]{64}", quote):
-        if hashlib.sha256(source).hexdigest() != quote.lower():
-            return False, raw
-        return True, raw.split("#", 1)[0]
     text = source.decode("utf-8", "replace")
-    if _collapse_whitespace(quote) not in _collapse_whitespace(text):
+    quote_is_text = _collapse_whitespace(quote) in _collapse_whitespace(text)
+    if not quote_is_text and re.fullmatch(r"[0-9a-fA-F]{64}", quote):
+        if hashlib.sha256(source).hexdigest() == quote.lower():
+            return True, raw.split("#", 1)[0]
+    if not quote_is_text:
         return False, raw
     # Commit-level packets cite rendered Git metadata rather than a path; keep their
     # URL stable. File packets get a mechanically accurate line hint when the exact

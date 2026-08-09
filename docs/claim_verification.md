@@ -59,8 +59,9 @@ absolute URL, publisher, title, precise section/table/page, exact passage, and s
 The same resolution check applies to compact later-round assessments: a `supported` assessment
 cannot preserve a stale or malformed repository packet; the server locally demotes that claim to
 `unverified` without discarding unrelated assessments. When an exact quote still exists but edits
-shifted its line, the server updates the line hint mechanically. A 64-hex whole-file SHA-256 quote
-is checked by hashing the resolved bytes rather than looking for the digest inside the file.
+shifted its line, the server updates the line hint mechanically. A 64-hex value that occurs in
+the resolved text is treated as an exact passage and gets a line hint; only when it is absent
+from that text may it serve as a whole-file SHA-256 quote, checked by hashing the resolved bytes.
 On the following targeted round, an unverified or otherwise non-freezable retained claim is a
 mandatory full-packet research item, not a compact assessment. The verifier must return the exact
 proposition with replacement evidence; only a retained refutation whose packet remains usable may
