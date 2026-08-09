@@ -65,36 +65,30 @@ state and reviewer-native capabilities meet the supported model.
 - Verification is on by default for real plan reviews and uses the selected reviewer CLI's
   built-in web search. No placeholder endpoint, optional plugin, or caller adapter may stand
   in for the primary path.
-- Retain only atomic, load-bearing factual propositions. Proposed decisions, policies,
-  requirements, intentions, definitions, preferences, forecasts, and incidental facts leave
-  active inventory once classified. Whether a requirement existed, was historically
-  bound/applicable, or was satisfied/violated is an empirical repository fact and stays when it
-  determines a grade, gate, safety conclusion, dependency, or remediation priority.
-- Preserve event, actor, date, modality, scope, and chronology in every packet. A dated report
-  event is not proved by the underlying condition alone; a card-base or contemporaneous rule
-  requires the exact historical Git blob or equivalently frozen source, not a later report.
+- The evidence register is mechanically external-only. Retain atomic, load-bearing external
+  facts; design principles/requirements issued by a governing external authority; and behavior
+  promised by an external API, dependency, platform, protocol, service, or runtime. Reject
+  repository state, code paths, internal history, implementation conformance, and internal
+  function bridges from claim inventory: the broad structural/code review and tests own them.
+  Project-authored choices do not become external design principles through labeling.
+- Preserve event, actor, date, modality, scope, and chronology in every packet. A dated external
+  report event is not proved by the underlying condition alone; an external rule asserted for a
+  past date requires a source authoritative for that date, not a later summary.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
-  The plan under review is context, not evidence for its own assertions; require code, data,
-  Git objects, retained command output, or authoritative external sources instead.
-- Treat negative-existence and chronology inferences as their own claims. The absence or late
-  first-add of one named file proves only that fact about that path; it does not prove that no
-  equivalent plan, brief, manifest, issue record, tag, or historical Git object existed. Before
-  applying such a correction, inspect the relevant revision for alternative authoritative
-  surfaces, then separately assess source existence, declared process/profile, requirement
-  conformance, and current reusability. If one omitted source class affects sibling cases, audit
-  the whole sibling set once before the next round instead of discovering one case per round.
-- Round 1 is the exhaustive factual inventory. In later rounds, an exact unchanged supported
-  claim is frozen with its authoritative packet and requires no model call or web search;
-  repository packets additionally require a resolving current-file or historical Git-object
-  location whose exact quoted bytes still exist. Edited, new, refuted, and unverified claims
+  The plan under review is context, not evidence for its own assertions; require authoritative
+  external sources.
+- Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.
+  In later rounds, an exact unchanged supported claim is frozen with its authoritative packet
+  and requires no model call or web search. Edited, new, refuted, and unverified claims
   receive targeted verification. Unverified or otherwise non-freezable claims require a full
   replacement evidence packet rather than another compact verdict-only assessment; edited
-  wording also requires a new full packet. Removed/non-factual claims do not consume active context. This optimization
-  applies only to factual verification: the structural FATAL/MAJOR review remains broad and
-  cold on every convergence round.
+  wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
+  consume active context. This optimization applies only to external verification: the
+  structural FATAL/MAJOR review remains broad and cold on every convergence round and must not
+  reopen evidence inventory for repository mechanics or “missing atomic bridges.”
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and

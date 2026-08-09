@@ -228,20 +228,23 @@ registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 
 ### Plan claim verification — evidence before critique
 
-`critique_plan` verifies factual premises **by default**, before the structural
-review. It uses the selected signed-in reviewer CLI's built-in web search and its
-read access to the repository. There is no `PARANOIA_SEARCH_ENDPOINT`, API key,
-plugin, or caller-supplied search adapter.
+`critique_plan` verifies external premises **by default**, before structural review. It uses
+the selected signed-in reviewer CLI's built-in web search. There is no
+`PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search adapter.
 
-On round 1 the verifier scans the whole plan but retains only **load-bearing atomic factual
-claims**: assertions whose truth could change feasibility, ordering, dependencies,
-rationale, mappings, or acceptance. It splits conjunctions into independent
-propositions. Proposed decisions, requirements, intentions, definitions,
-preferences, forecasts, and incidental facts are omitted; once classified out,
-they do not consume active inventory or later-round context. Assertions that a
-requirement existed, was bound or applicable at a historical revision, or was
-satisfied/violated are empirical repository facts and remain in inventory when
-they determine a grade, gate, safety conclusion, dependency, or remediation priority.
+The register is mechanically limited to load-bearing external propositions in three kinds:
+
+- `fact` — objective external-world state, event, quantity, identity, or history;
+- `design_principle` — a requirement, constraint, or recommended principle issued by the
+  external standard, regulator, protocol, platform, or vendor governing the plan;
+- `behavior` — behavior promised by an external API, dependency, platform, protocol, service,
+  or runtime on which the plan relies.
+
+All use `scope: "external"`. Repository state, code paths, internal history, implementation
+conformance, and internal function bridges are excluded from this register and remain the job
+of ordinary structural/code review and tests. Local decisions and project-authored preferences
+do not become external claims just because they are called “design principles.” Legacy
+repository claims are mechanically retired and stop consuming active inventory or prompts.
 
 External claims close only when an exact passage from a primary or authoritative
 source entails that exact proposition. First-party documentation, standards,
@@ -251,14 +254,13 @@ source. Reddit, Stack Overflow, forums, social media, wikis, blogs, and other UG
 can expose leads or conflicts, but the server prevents known UGC hosts from being
 treated as governing evidence even if the model labels them `primary`.
 
-Every contradicted or unresolved claim returns an **actionable source packet**:
+Every contradicted or unresolved external claim returns an **actionable source packet**:
 
 - the verbatim plan wording and atomic proposition;
-- the canonical URL, `repo://path#Lx-Ly` current-file location, or
-  `repo://git/<revision>:<path>` historical Git-object location;
+- the canonical web URL and precise section/table/page;
 - publisher and authority class;
 - the exact supporting/refuting passage;
-- an evidence-entailled replacement when one is actually proven.
+- an evidence-entailed replacement when one is actually proven.
 
 Evidence that refutes old wording does **not** prove replacement wording. When no
 authoritative passage entails a replacement, the packet explicitly says to remove,
@@ -266,17 +268,9 @@ weaken, or research the assertion instead of inventing a correction.
 If a reviewer nevertheless proposes unsupported replacement text, the server drops
 that optional text and retains the valid verdict and evidence packet; it does not
 discard the rest of the claim batch.
-Likewise, a source that cannot govern the claim's declared scope, or evidence that
-does not entail the model's `supported`/`refuted` verdict, is retained only as
-context and that individual claim is forced to blocking `unverified`. Repository
-packets must also resolve to current-file or historical Git-object bytes containing
-their exact quote; malformed identifiers and missing passages cannot support a verdict.
-The current plan cannot prove its own assertions: direct `repo://` citations to the plan file
-are retained only as context and cannot govern support or refutation.
-Shifted line hints are relocated from the exact passage. A 64-hex value present in the cited
-text remains an exact passage; otherwise a whole-file SHA-256 packet is checked by hashing the
-bytes. One stale compact packet is locally demoted rather than
-invalidating the rest of the audit.
+Likewise, evidence that does not entail the model's `supported`/`refuted` verdict is retained
+only as context and that individual claim is forced to blocking `unverified`. One bad packet
+does not invalidate the rest of the audit.
 Other valid claims in the same response are still registered.
 If the bounded correction retry still contains an unbindable anchor, that item is
 recorded as explicit blocking audit debt while the retry's valid claims and valid
@@ -294,32 +288,27 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
 1. call `critique_plan` with a stable `lineage`, explicit `stakes`, and `round: 1`;
 2. validate each blocking packet, then edit `plan_path` (or the source that produced
    `plan_text`) using only a proven replacement or a justified removal/qualification;
-   for an absence or chronology claim, first search the relevant revision for equivalent
-   authoritative surfaces—a named file's first-add date proves only that file's chronology,
-   not that no earlier brief, manifest, issue record, or Git object existed—and correct every
-   affected sibling case in the same pass;
 3. increment `round` and call again **after the edit**;
 4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
-   its authoritative packet; repository packets are frozen only while their location resolves
-   and quoted bytes still exist in the current file or historical Git object. The claim verifier
-   receives only the edited/new factual wording plus retained refuted or unverified claims.
+   its authoritative packet. The claim verifier receives only edited/new eligible external
+   wording plus retained refuted or unverified claims.
    Unverified or non-freezable claims require complete replacement evidence packets on the next
    targeted round; they cannot churn through compact verdict-only assessments. Settled claims
    cause no model call or web search. Edited claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
 
-This changes only the factual phase. Every round still runs the complete cold structural
+This changes only the external-evidence phase. Every round still runs the complete cold structural
 FATAL/MAJOR review with the full plan, repository, active claim register, and class lineage.
-The structural reviewer can still find a missed load-bearing claim, a compound packet, weak
-authority, or a new architectural blocker alongside the evidence checker.
+The structural reviewer can still find architectural and repository blockers, but it is told
+not to manufacture evidence-register claims for repository mechanics or missing atomic bridges.
 
 Do not rerun unchanged text expecting reviewer variance to fix a claim. Do not ask a
 human to translate evidence the packet already makes actionable. A human may inspect
 or override the process, but is not required for ordinary convergence.
 
 A later audit cannot clear a prior claim by omitting it or attaching its ID to edited text.
-Exact propositions alone retain identity. Otherwise the old factual anchor must actually
+Exact propositions alone retain identity. Otherwise the old external anchor must actually
 leave the plan and receive an explicit `removed` disposition; there is no model-only
 `nonfactual` escape. To make that closure efficient, the server lists every prior anchor
 that is absent from the current plan as a removal candidate in both the initial audit and
@@ -361,7 +350,7 @@ the other tool is refused rather than merged.
 
 The stop condition is **two-part**:
 
-1. the computed trailer reads `CONVERGENCE: NOT-BLOCKED` (all active plan facts
+1. the computed trailer reads `CONVERGENCE: NOT-BLOCKED` (all active external claims
    supported and no blocking class open), **and**
 2. the round returns `CONVERGED`, or only `[MINOR]`/`[OUT-OF-SCOPE]` items.
 
@@ -373,7 +362,7 @@ For a review with no loop behind it — a design sketch, a quick second opinion 
 pass `class_closure: false`. That is the single escape, and it also drops the
 `round` and `lineage` requirements.
 
-For plan reviews, one-shot mode still performs default factual verification and returns
+For plan reviews, one-shot mode still performs default external-claim verification and returns
 source packets, but emits **no computed `CONVERGENCE:` line**. Without a parsed class
 register the server cannot incorporate the structural review's free-text FATAL/MAJOR
 findings into a mechanical clearance. Use the default tracked mode for convergence.
@@ -453,7 +442,7 @@ five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
-| `claim_verification` | boolean | `true` | Verify load-bearing atomic facts against repository and authoritative built-in web evidence before structural review. Set `false` only for an explicit legacy structural-only review |
+| `claim_verification` | boolean | `true` | Verify load-bearing external facts, externally issued design principles, and promised external behaviors with authoritative built-in web evidence before structural review. Set `false` only for an explicit legacy structural-only review |
 | `context` | string | — | Background the reviewer needs to judge the plan fairly |
 | `focus` | string | — | Narrow the review to a specific concern |
 | `stakes` | string | — | The scope boundary |
@@ -648,18 +637,18 @@ For verified plan reviews the claim gate and class gate are combined into one
 governing verdict:
 
 ```
-CLAIM-REGISTER: 18 active factual claims; 7 retired and excluded from active inventory
+CLAIM-REGISTER: 18 active external claims; 7 retired and excluded from active inventory
 CLAIM-CLOSURE: 17 supported, 1 refuted, 0 unverified
 ACTIONABLE SOURCE PACKETS:
 - CLAIM C-4e2d… — REFUTED
   Plan wording: …
   Atomic proposition: …
-  Evidence-entailled replacement: …
+  Evidence-entailed replacement: …
   Source 1: [primary/refutes_claim] …
     Location: https://… (Section 4, table 2)
     Exact passage: …
 CLASS-CONVERGENCE: NOT-BLOCKED — …
-CONVERGENCE: BLOCKED — factual claim closure remains open.
+CONVERGENCE: BLOCKED — external claim closure remains open.
 ```
 
 `CLAIM-AUDIT-DEBT` includes the validator reason, SHA-256, and a bounded rejected
@@ -719,7 +708,7 @@ paranoia-local --engine {codex|claude} [--log-dir DIR]
 | Path | Contents |
 |---|---|
 | `~/.paranoia/logs/` | One JSON audit record per call: engine, model, round, `already_raised`, session ref, timings, and the review text |
-| `~/.paranoia/lineages/` | Atomic class + plan-claim state, one file per lineage. Retired/non-factual claims are excluded from active prompt inventory |
+| `~/.paranoia/lineages/` | Atomic class + external-claim state, one file per lineage. Retired and mechanically out-of-scope claims are excluded from active prompt inventory |
 
 Lineage state deliberately does **not** follow `--log-dir`, so moving your logs
 cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate it.
@@ -768,8 +757,8 @@ Reviews draw on your subscription's agentic-usage pool, and a convergence loop i
 many agent turns. Use `query` for quick checks and reserve multi-round
 `critique_branch` loops for changes that warrant them.
 
-For `critique_plan`, round 1 pays for the exhaustive factual inventory. Later rounds send
-only the factual edit cone and unresolved claims to the claim verifier; an unchanged plan
+For `critique_plan`, round 1 pays for the exhaustive external-claim inventory. Later rounds send
+only the external edit cone and unresolved claims to the claim verifier; an unchanged plan
 whose active claims are all supported makes zero claim-model calls. The normal structural
 review still runs in every round and remains the dominant irreducible cost of convergence.
 

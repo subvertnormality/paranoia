@@ -1,17 +1,15 @@
-"""Atomic factual-claim verification for plan reviews.
+"""Authoritative external-claim verification for plan reviews.
 
-This module deliberately has a small job: parse one model-produced claim audit,
-validate that its verdicts are backed by suitable evidence, reconcile it with the
-previous round, and render actionable packets.  The reviewer CLI supplies repository
-access and its built-in web search; there is no search-provider abstraction here.
+The claim register is deliberately narrower than the structural review.  It covers
+external-world facts, externally imposed design principles, and behavior promised by
+external systems.  Repository mechanics remain available to the ordinary code/structure
+review, but never enter this persistent evidence lifecycle.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
-import subprocess
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
@@ -26,10 +24,9 @@ MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
-SCOPES = frozenset({"external", "repository"})
-SOURCE_KINDS = frozenset(
-    {"primary", "authoritative", "secondary", "ugc", "repository"}
-)
+SCOPES = frozenset({"external"})
+CLAIM_KINDS = frozenset({"fact", "design_principle", "behavior"})
+SOURCE_KINDS = frozenset({"primary", "authoritative", "secondary", "ugc"})
 RELATIONS = frozenset(
     {"supports_claim", "refutes_claim", "supports_replacement", "context"}
 )
@@ -99,6 +96,33 @@ def normalize_state(raw: Any) -> dict[str, Any]:
         return state
     if raw.get("version") != 1:
         return state
+    claims = deepcopy(raw.get("claims", {})) if isinstance(raw.get("claims"), dict) else {}
+    retired = deepcopy(raw.get("retired", [])) if isinstance(raw.get("retired"), list) else []
+    # Version-1 lineages may contain repository assertions created by the old broad
+    # extractor.  Scope eligibility is server-owned, so retire these mechanically rather
+    # than asking another stochastic model round to disposition them.  This is what makes
+    # the external/repository boundary an invariant instead of prompt advice.
+    retired_ids = {
+        item.get("claim_id") for item in retired if isinstance(item, dict)
+    }
+    for claim_id, record in list(claims.items()):
+        if not isinstance(record, dict) or record.get("scope") != "external":
+            claims.pop(claim_id, None)
+            if claim_id not in retired_ids:
+                retired.append({
+                    "claim_id": claim_id,
+                    "anchor": record.get("anchor") if isinstance(record, dict) else None,
+                    "proposition": (
+                        record.get("proposition") if isinstance(record, dict) else None
+                    ),
+                    "disposition": "out_of_scope",
+                    "reason": (
+                        "Mechanically retired: repository/internal assertions belong to "
+                        "structural review and tests, not external evidence verification."
+                    ),
+                    "retired_round": max(0, int(raw.get("rounds", 0))),
+                })
+                retired_ids.add(claim_id)
     state.update({
         "rounds": max(0, int(raw.get("rounds", 0))),
         "next_seq": max(1, int(raw.get("next_seq", 1))),
@@ -107,8 +131,8 @@ def normalize_state(raw: Any) -> dict[str, Any]:
             raw.get("plan_snapshot")
             if isinstance(raw.get("plan_snapshot"), str) else None
         ),
-        "claims": deepcopy(raw.get("claims", {})) if isinstance(raw.get("claims"), dict) else {},
-        "retired": deepcopy(raw.get("retired", [])) if isinstance(raw.get("retired"), list) else [],
+        "claims": claims,
+        "retired": retired[-MAX_ACTIVE_CLAIMS:],
         "debt": deepcopy(raw.get("debt")),
     })
     return state
@@ -125,10 +149,9 @@ def frozen_supported_ids(
 ) -> frozenset[str]:
     """Return exact supported claims that need no new model/web judgement.
 
-    External packets are immutable evidence captured by the exhaustive round. Repository
-    packets additionally have their quoted bytes checked against the current worktree, so a
-    local edit cannot silently inherit support. Edited/removed anchors and every unresolved
-    claim remain outside this set and therefore enter targeted remediation.
+    External packets are immutable evidence captured by the exhaustive round. Edited or
+    removed anchors and every unresolved claim remain outside this set and therefore enter
+    targeted remediation.
     """
     state = normalize_state(state_raw)
     if state.get("plan_snapshot") is None:
@@ -144,13 +167,9 @@ def frozen_supported_ids(
             item for item in evidence
             if _qualifying(item, record.get("scope", ""))
             and item.get("relation") == "supports_claim"
-            and not _is_plan_self_evidence(item, plan_repo_path)
         ]
         if not supports:
             continue
-        if record.get("scope") == "repository":
-            if repo is None or not any(_repository_packet_current(item, repo) for item in supports):
-                continue
         frozen.add(claim_id)
     return frozenset(frozen)
 
@@ -166,108 +185,6 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
         previous.splitlines(keepends=True), plan_text.splitlines(keepends=True),
         fromfile="previous-plan", tofile="current-plan", n=4,
     ))
-
-
-_GIT_REV = re.compile(r"[0-9a-fA-F]{7,64}(?:(?:\^+)|(?:~[0-9]+))?")
-_HISTORICAL_REPOSITORY_ASSERTION = re.compile(
-    r"\b(?:at (?:the )?(?:card[- ]base(?: revision)?|parent(?: revision)?|revision)|"
-    r"(?:brief|blob|runbook|source|file) at (?:the )?card[- ]base|"
-    r"historical [^.]{0,80}\bblob at (?:the )?(?:parent|revision|commit)|"
-    r"pre[- ](?:code|change) (?:parent|runbook|blob|source|revision))\b",
-    re.IGNORECASE,
-)
-
-
-def _requires_historical_repository_object(anchor: str, proposition: str) -> bool:
-    """Whether repository chronology is part of the proposition itself."""
-    return bool(_HISTORICAL_REPOSITORY_ASSERTION.search(f"{anchor} {proposition}"))
-
-
-def _repository_source_bytes(evidence: dict[str, str], repo: Path) -> bytes | None:
-    raw = evidence.get("url", "")
-    if not raw.startswith("repo://"):
-        return None
-    relative = raw[len("repo://"):].split("#", 1)[0]
-    if relative.startswith("git/"):
-        spec = relative[len("git/"):]
-        if ":" in spec:
-            revision, relative = spec.split(":", 1)
-            candidate = Path(relative)
-            if (
-                not _GIT_REV.fullmatch(revision) or not relative
-                or candidate.is_absolute() or ".." in candidate.parts
-            ):
-                return None
-            command = ["git", "show", f"{revision}:{relative}"]
-        else:
-            if not _GIT_REV.fullmatch(spec):
-                return None
-            command = ["git", "show", "--stat", "--format=fuller", spec]
-        try:
-            completed = subprocess.run(
-                command, cwd=repo, capture_output=True, timeout=30, check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return completed.stdout if completed.returncode == 0 else None
-    candidate = Path(relative)
-    if not relative or candidate.is_absolute() or ".." in candidate.parts:
-        return None
-    try:
-        return (repo / candidate).read_bytes()
-    except OSError:
-        return None
-
-
-def _repository_evidence_resolution(
-    evidence: dict[str, str], repo: Path,
-) -> tuple[bool, str]:
-    """Resolve exact bytes and return an accurate canonical repository URL."""
-    raw = evidence.get("url", "")
-    source = _repository_source_bytes(evidence, repo)
-    if source is None:
-        return False, raw
-    quote = evidence.get("quote", "").strip()
-    text = source.decode("utf-8", "replace")
-    quote_is_text = _collapse_whitespace(quote) in _collapse_whitespace(text)
-    if not quote_is_text and re.fullmatch(r"[0-9a-fA-F]{64}", quote):
-        if hashlib.sha256(source).hexdigest() == quote.lower():
-            return True, raw.split("#", 1)[0]
-    if not quote_is_text:
-        return False, raw
-    # Commit-level packets cite rendered Git metadata rather than a path; keep their
-    # URL stable. File packets get a mechanically accurate line hint when the exact
-    # passage can be located without interpretation.
-    base = raw.split("#", 1)[0]
-    relative = base[len("repo://"):] if base.startswith("repo://") else ""
-    if relative.startswith("git/") and ":" not in relative[len("git/"):]:
-        return True, base
-    position = text.find(quote)
-    if position < 0:
-        return True, base
-    start = text.count("\n", 0, position) + 1
-    end = start + quote.count("\n")
-    suffix = f"#L{start}" if end == start else f"#L{start}-L{end}"
-    return True, base + suffix
-
-
-def _repository_quote_present(evidence: dict[str, str], repo: Path) -> bool:
-    return _repository_evidence_resolution(evidence, repo)[0]
-
-
-def _repository_packet_current(evidence: dict[str, str], repo: Path) -> bool:
-    valid, canonical = _repository_evidence_resolution(evidence, repo)
-    return valid and canonical == evidence.get("url")
-
-
-def _canonicalize_repository_evidence(
-    evidence: dict[str, Any], repo: Path,
-) -> dict[str, Any]:
-    result = deepcopy(evidence)
-    valid, canonical = _repository_evidence_resolution(result, repo)
-    if valid:
-        result["url"] = canonical
-    return result
 
 
 def parse_audit(
@@ -311,6 +228,12 @@ def parse_audit(
     issues: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
+        # Repository scope was valid in version 1. Treat an explicitly classified legacy
+        # repository row as out of scope, not malformed debt: it must consume neither the
+        # active register nor another correction round. Other unknown scopes remain errors
+        # so a typo cannot silently discard a genuinely external proposition.
+        if isinstance(item, dict) and item.get("scope") == "repository":
+            continue
         try:
             claim = _validate_claim(
                 item, plan_text, repo=repo, plan_repo_path=plan_repo_path,
@@ -424,13 +347,18 @@ def _validate_claim(
     missing = required - set(item)
     if missing or unknown:
         raise ValueError(f"fields mismatch; missing={sorted(missing)}, unknown={sorted(unknown)}")
-    # A concrete literal, not a pseudo-enum such as "fact|decision".  Decisions,
-    # intentions and non-load-bearing observations never enter active inventory.
-    if item["kind"] != "fact":
-        raise ValueError("kind must be the literal \"fact\"")
+    # Concrete literals make eligibility mechanically enforceable.  An externally
+    # published normative principle or promised behavior can be load-bearing even though
+    # it is not naturally described as a historical "fact".
+    if item["kind"] not in CLAIM_KINDS:
+        raise ValueError(f"kind must be one of {sorted(CLAIM_KINDS)}")
+    kind = item["kind"]
     scope = item["scope"]
     if scope not in SCOPES:
-        raise ValueError(f"scope must be one of {sorted(SCOPES)}")
+        raise ValueError(
+            "scope must be the literal \"external\"; repository/internal assertions "
+            "belong to structural review and tests"
+        )
     anchor = _one_line(item["anchor"], "anchor")
     proposition = _one_line(item["proposition"], "proposition")
     # Markdown frequently wraps one sentence across physical lines. Verbatim means the
@@ -452,19 +380,6 @@ def _validate_claim(
         )
         for e in evidence
     ]
-    historical_evidence_required = (
-        scope == "repository"
-        and _requires_historical_repository_object(anchor, proposition)
-    )
-    if historical_evidence_required:
-        for source in checked:
-            if (
-                source["relation"] != "context"
-                and not source["url"].startswith("repo://git/")
-            ):
-                # Current bytes and later reports may corroborate, but cannot establish
-                # what a historical/card-base repository object contained.
-                source["relation"] = "context"
     replacement = item["replacement"]
     if replacement is not None:
         replacement = _one_line(replacement, "replacement")
@@ -476,11 +391,7 @@ def _validate_claim(
     qualifying = [e for e in checked if _qualifying(e, scope)]
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
-        demotion = (
-            "historical/card-base repository claim lacked exact Git-object evidence"
-            if historical_evidence_required
-            else "claimed support lacked claim-entailing authoritative evidence"
-        )
+        demotion = "claimed support lacked claim-entailing authoritative evidence"
     if verdict == "refuted" and not any(e["relation"] == "refutes_claim" for e in qualifying):
         demotion = "claimed refutation lacked claim-refuting authoritative evidence"
     if demotion:
@@ -501,7 +412,7 @@ def _validate_claim(
             replacement = None
 
     return {
-        "kind": "fact", "scope": scope, "anchor": anchor,
+        "kind": kind, "scope": scope, "anchor": anchor,
         "proposition": proposition, "verdict": verdict, "evidence": checked,
         "replacement": replacement, "prior_claim_id": prior, "rationale": rationale,
     }
@@ -525,22 +436,7 @@ def _validate_evidence(
     if result["relation"] not in RELATIONS:
         raise ValueError(f"relation must be one of {sorted(RELATIONS)}")
     host = (urlparse(result["url"]).hostname or "").lower()
-    if scope == "repository":
-        if result["source_kind"] != "repository" or not result["url"].startswith("repo://"):
-            result["relation"] = "context"
-        elif _is_plan_self_evidence(result, plan_repo_path):
-            # The document under review can identify its wording, but cannot be the
-            # independent evidence that makes that same wording true.
-            result["relation"] = "context"
-        elif repo is not None:
-            valid, canonical = _repository_evidence_resolution(result, repo)
-            if not valid:
-                raise ValueError(
-                    "repository evidence URL does not resolve to bytes containing its exact "
-                    f"quote or matching whole-file SHA-256: {result['url']}"
-                )
-            result["url"] = canonical
-    elif result["source_kind"] == "repository" or not host:
+    if not host:
         result["relation"] = "context"
     if _is_ugc_host(host):
         # Normalize, rather than reject: the packet remains useful as a lead or conflict,
@@ -550,22 +446,9 @@ def _validate_evidence(
 
 
 def _qualifying(evidence: dict[str, str], scope: str) -> bool:
-    if scope == "repository":
-        return (
-            evidence["source_kind"] == "repository"
-            and evidence["url"].startswith("repo://")
-        )
-    return bool(urlparse(evidence["url"]).hostname) and (
+    return scope == "external" and bool(urlparse(evidence["url"]).hostname) and (
         evidence["source_kind"] in AUTHORITATIVE_KINDS
     )
-
-
-def _is_plan_self_evidence(
-    evidence: dict[str, Any], plan_repo_path: str | None,
-) -> bool:
-    if not plan_repo_path:
-        return False
-    return evidence.get("url", "").split("#", 1)[0] == f"repo://{plan_repo_path}"
 
 
 def reconcile(
@@ -631,8 +514,8 @@ def reconcile(
         current[claim_id] = record
 
     # Unresolved exact retained claims use a compact current-round assessment. The reviewer
-    # has re-opened/re-entailled the retained packet, while the server owns the anchor,
-    # proposition, and evidence bytes. This avoids asking the model to reproduce large
+    # has re-opened and rechecked entailment for the retained packet, while the server owns
+    # the anchor, proposition, and evidence bytes. This avoids asking the model to reproduce large
     # packets merely to prove it did not forget them.
     for assessment in audit.assessments:
         claim_id = assessment["claim_id"]
@@ -640,27 +523,6 @@ def reconcile(
         record = deepcopy(previous)
         verdict = assessment["verdict"]
         rationale = assessment["rationale"]
-        if repo is not None and record.get("scope") == "repository":
-            record["evidence"] = [
-                _canonicalize_repository_evidence(evidence, repo)
-                if isinstance(evidence, dict) else evidence
-                for evidence in record.get("evidence", [])
-            ]
-            relation = {
-                "supported": "supports_claim", "refuted": "refutes_claim",
-            }.get(verdict)
-            if relation and not any(
-                isinstance(evidence, dict)
-                and _qualifying(evidence, "repository")
-                and evidence.get("relation") == relation
-                and _repository_quote_present(evidence, repo)
-                for evidence in record.get("evidence", [])
-            ):
-                verdict = "unverified"
-                rationale = (
-                    f"{rationale} Server demotion: the retained repository packet no "
-                    "longer resolves to its exact bytes; emit a corrected full packet."
-                ).strip()
         record.update({
             "claim_id": claim_id,
             "verdict": verdict,
@@ -848,7 +710,7 @@ def with_debt(
             record["replacement"] = None
             record["rationale"] = (
                 "The current-plan audit failed; retained sources are candidates only and "
-                "must be re-entailled before correction."
+                "must have entailment rechecked before correction."
             )
     return state
 
@@ -883,15 +745,22 @@ def evidence_context(state_raw: Any, include_ids: Iterable[str] | None = None) -
 
 
 def review_context(state_raw: Any) -> str:
-    """Give the structural reviewer enough to detect omissions and use verified facts."""
+    """Give the structural reviewer external evidence without expanding its scope."""
     state = normalize_state(state_raw)
     lines = [
-        "=== FACTUAL CLAIM REGISTER ===",
-        "This inventory was independently researched before your structural review. Check the plan for any omitted load-bearing factual assertion; an omission is a blocking finding.",
+        "=== AUTHORITATIVE EXTERNAL CLAIM REGISTER ===",
+        (
+            "This register is limited to external-world facts, externally imposed design "
+            "principles, and behavior promised by external systems. Do not demand claim "
+            "packets for repository state, code paths, implementation conformance, internal "
+            "history, or function-to-function bridges; assess those normally in the structural "
+            "review and tests. An omission is claim-blocking only when the plan relies on an "
+            "eligible external proposition that authoritative web evidence can adjudicate."
+        ),
     ]
     for claim_id, claim in state["claims"].items():
         lines.extend([
-            f"- CLAIM {claim_id} [{claim.get('scope')}/{claim.get('verdict')}]",
+            f"- CLAIM {claim_id} [{claim.get('kind')}/{claim.get('verdict')}]",
             f"  Plan wording: {claim.get('anchor')}",
             f"  Atomic proposition: {claim.get('proposition')}",
             f"  Proposed replacement: {claim.get('replacement') or 'none'}",
@@ -907,6 +776,7 @@ def review_context(state_raw: Any) -> str:
     recent_retired = [
         item for item in state.get("retired", [])
         if item.get("retired_round") == state.get("rounds")
+        and item.get("disposition") == "removed"
     ]
     if recent_retired:
         lines.append("Claims retired by this audit — independently verify each disposition:")
@@ -925,7 +795,7 @@ def render_trailer(state_raw: Any) -> str:
     claims = list(state["claims"].values())
     counts = {verdict: sum(1 for c in claims if c.get("verdict") == verdict) for verdict in VERDICTS}
     lines = [
-        f"CLAIM-REGISTER: {len(claims)} active factual claims; "
+        f"CLAIM-REGISTER: {len(claims)} active external claims; "
         f"{len(state.get('retired', []))} retired and excluded from active inventory",
         f"CLAIM-CLOSURE: {counts['supported']} supported, {counts['refuted']} refuted, "
         f"{counts['unverified']} unverified",
@@ -954,7 +824,7 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         f"  Atomic proposition: {claim.get('proposition')}",
     ]
     if claim.get("replacement"):
-        lines.append(f"  Evidence-entailled replacement: {claim['replacement']}")
+        lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     else:
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
     if claim.get("rationale"):
@@ -976,58 +846,52 @@ def audit_instructions(plan_text: str, prior_state: Any, stakes: str | None) -> 
     removals = _removal_candidates(prior_state, plan_text)
     assessments = _assessment_candidates(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
-    return f"""You are the factual-verification phase of an autonomous plan review.
+    return f"""You are the authoritative external-claim phase of an autonomous plan review.
 
 You ARE the verifier. Never invoke MCP review tools (including any registered paranoia
-server), plugins, other agents, or nested reviewers. Inspect the repository and use only
-your own built-in web search. Delegation would recurse and invalidate this phase.
+server), plugins, other agents, or nested reviewers. Use only your own built-in web search.
+Delegation would recurse and invalidate this phase.
 
 STAKES: {stakes_text}
 
-Read the entire plan and repository. Use your BUILT-IN web search for every external
-claim. Prioritize external assertions; include repository-current-state facts only when
-they are genuinely load-bearing. Search official/primary sources first: first-party documentation, standards,
-statutes/regulators, government data, original papers/datasets, and the entity's own
-records. Secondary reporting may corroborate or locate a source. Reddit, forums,
-Stack Overflow, social media, wikis, blogs and other UGC are leads/conflict signals only;
-they can NEVER support or refute a governing verdict.
+Read the entire plan. Inventory only load-bearing propositions about the external world whose
+truth or authority could change feasibility, architecture, ordering, dependencies, rationale,
+or acceptance. Eligible kinds are mechanically limited to:
 
-Inventory ONLY load-bearing factual assertions: propositions whose truth could change
-whether a step, dependency, rationale, feasibility judgement, mapping or acceptance test
-is correct. Include explicit and necessary implied premises. Include current-repository
-claims and externally verifiable claims. Split conjunctions and ranges into atomic
-propositions. Scan every heading, paragraph, list item and table row.
+- `fact`: an objective external-world state, event, quantity, identity, or history;
+- `design_principle`: a requirement, constraint, or recommended principle issued by the
+  authoritative external standard, regulator, protocol, platform, or vendor that governs the
+  plan. A project team's chosen preference is not eligible merely because it is called a
+  principle;
+- `behavior`: documented or observable behavior promised by an external API, dependency,
+  platform, protocol, service, or runtime on which the plan relies.
 
-OMIT proposed decisions, chosen policies, authorizations, definitions, intentions,
-instructions, subjective preferences, pure forecasts, and incidental facts that cannot
-change execution. A requirement itself is normative, but an assertion that a requirement
-existed, was bound at a historical revision, applied to a step, or was satisfied/violated is
-an empirical repository claim. ALWAYS inventory those assertions when they determine a
-grade, gate, safety conclusion, dependency, or remediation priority. Likewise inventory
-the exact historical requirement text as an atomic repository fact when a conformance
-conclusion relies on it. Do not let a normative sentence consume inventory merely because
-the plan proposes it for future work.
+Every claim has scope `external`. Mechanically OMIT repository state, code paths, functions,
+internal implementation behavior, internal history, whether this repository conforms, and
+"missing atomic bridges" between internal steps. Those belong to the separate structural/code
+review and tests. Also omit proposed decisions, local policies, authorizations, definitions,
+intentions, instructions, subjective preferences, forecasts, and incidental observations.
+Split eligible conjunctions into atomic propositions, but do not decompose an internal design
+into a chain of repository-mechanical claims. Scan every heading, paragraph, list item, and
+table row for the three eligible external kinds.
+
+Use BUILT-IN web search for every retained claim. Search official/primary sources first:
+first-party documentation, standards, statutes/regulators, government data, original
+papers/datasets, and the entity's own records. Secondary reporting may corroborate or locate a
+source. Reddit, forums, Stack Overflow, social media, wikis, blogs, and other UGC are leads or
+conflict signals only; they can NEVER support or refute a governing verdict.
 
 For every retained claim, decide supported, refuted, or unverified. A source verifies a
 claim only when the exact quoted passage entails that exact atomic proposition. For
-repository facts cite repo://path#Lx-Ly and quote the exact bytes. Historical bytes use
-repo://git/<hex-revision>:<path>; commit-level evidence uses repo://git/<hex-revision>.
-Every repository URL must resolve in this repository and contain the exact quote or the server
-will reject the packet. For external facts, record the
-canonical absolute URL, title, publisher, precise section/table/page location, exact
-passage, and why that publisher is authoritative for this proposition. Label source_kind honestly as primary, authoritative, secondary, ugc, or
-repository. A proposed replacement is allowed only when an authoritative passage entails
+Every source must have a canonical absolute web URL, title, publisher, precise
+section/table/page location, exact passage, and an explanation of why that publisher governs
+this proposition. Label source_kind honestly as primary, authoritative, secondary, or ugc.
+A proposed replacement is allowed only when an authoritative passage entails
 the replacement itself; evidence that merely refutes the old wording is not enough.
 Preserve the original event, actor, date, modality, scope, and chronology when forming the
 atomic proposition. An anchor saying that a dated audit/report occurred is not verified by
-evidence that contains only the underlying defect. An anchor naming a card-base,
-pre-change, contemporaneous, or historical requirement must cite that exact historical
-Git blob or another source frozen at that time; a later certificate, report, or commit
-subject is context unless the proposition is explicitly only that the later source reports it.
-The current plan/dossier is the assertion under review, not evidence for itself. Never cite
-its `repo://` path to support or refute one of its claims. Replace any retained self-citation
-with direct code, data, Git-object, retained command-output, or authoritative web evidence;
-the server demotes direct current-plan citations to context.
+evidence that contains only the underlying condition. The current plan/dossier is the
+assertion under review, not evidence for itself.
 
 Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or search
 each retained URL as needed and re-assess entailment against the CURRENT proposition.
@@ -1041,8 +905,8 @@ instead of a compact assessment. The server rejects a missing retained ID in thi
 Use claims only for newly discovered or edited propositions. Set prior_claim_id only for the
 exact same atomic proposition; use null for edited wording. Every absent prior claim needs one
 entry in coverage.prior_dispositions. The only disposition is "removed", and it is valid only
-when the old verbatim factual anchor is absent from the current plan. If a fact became a
-decision/requirement, edit away the old factual wording; do not merely relabel it.
+when the old verbatim external anchor is absent from the current plan. If an eligible claim
+became a local decision, edit away the old externally asserted wording; do not merely relabel it.
 prior_claim_id is contextual only and cannot transfer identity to edited wording.
 
 RETAINED EXACT CLAIMS REQUIRING ASSESSMENT (JSON):
@@ -1065,10 +929,11 @@ Reply with only the marker and one JSON object. Do not use markdown fences. Thes
 CONCRETE literals, not pipe-delimited pseudo-enums. The shape is:
 
 {AUDIT_MARKER}
-{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim plan text","proposition":"one new atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the standard being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_assessments":[{{"claim_id":"C-retained","verdict":"supported","rationale":"Retained exact passage still entails the unchanged proposition."}}],"prior_dispositions":[],"notes":"brief coverage note"}}}}
+{{"claims":[{{"kind":"design_principle","scope":"external","anchor":"verbatim plan text","proposition":"one atomic externally issued design principle","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/standard","title":"Official standard","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issues the governing standard","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_assessments":[{{"claim_id":"C-retained","verdict":"supported","rationale":"Retained exact passage still entails the unchanged proposition."}}],"prior_dispositions":[],"notes":"brief coverage note"}}}}
 
 Allowed verdict literals: "supported", "refuted", "unverified".
-Allowed scope literals: "external", "repository".
+Allowed kind literals: "fact", "design_principle", "behavior".
+Allowed scope literal: "external".
 Allowed relation literals: "supports_claim", "refutes_claim",
 "supports_replacement", "context".
 
@@ -1079,7 +944,7 @@ Allowed relation literals: "supports_claim", "refutes_claim",
 def targeted_audit_instructions(
     plan_text: str, prior_state: Any, stakes: str | None, frozen_ids: Iterable[str],
 ) -> str:
-    """Build the post-round-1 verifier prompt over only the factual edit cone."""
+    """Build the post-round-1 verifier prompt over only the external edit cone."""
     frozen = frozenset(frozen_ids)
     state = normalize_state(prior_state)
     targeted_ids = set(state["claims"]) - frozen
@@ -1092,36 +957,38 @@ def targeted_audit_instructions(
     full_packets = evidence_context(prior_state, full_packet_ids)
     changes = changed_plan_text(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
-    return f"""You are the targeted factual-remediation phase of an autonomous plan review.
+    return f"""You are the targeted external-claim remediation phase of an autonomous plan review.
 
 You ARE the verifier. Never invoke MCP review tools (including any registered paranoia
-server), plugins, other agents, or nested reviewers. Inspect the repository and use only
-your own built-in web search. Delegation would recurse and invalidate this phase.
+server), plugins, other agents, or nested reviewers. Use only your own built-in web search.
+Delegation would recurse and invalidate this phase.
 
 STAKES: {stakes_text}
 
 Round 1 already exhaustively scanned the complete plan. The server has frozen exact,
 unchanged SUPPORTED claims with authoritative packets. Do NOT reassess, search for, or emit
-those frozen claims. Audit only (a) added/edited factual wording in the diff below, (b) each
+those frozen claims. Audit only (a) added/edited eligible external wording in the diff below, (b) each
 retained refuted or unverified claim listed below, and (c) removed-anchor dispositions.
 Follow dependencies from an edited claim when necessary, but do not inventory unchanged
 settled prose again. This is a cost-control boundary, not a weaker authority rule.
 
-For every in-scope external claim, use built-in web search and prefer official/primary
+Eligible external claims have exactly one of three kinds: `fact` for external-world states or
+history, `design_principle` for a requirement/constraint/principle issued by the governing
+external authority, and `behavior` for behavior promised by an external dependency, API,
+platform, protocol, service, or runtime. Every claim has scope `external`.
+
+Mechanically OMIT repository state, code paths, internal implementation behavior, internal
+history, conformance of this repository, and internal function-to-function or
+"missing atomic bridge" assertions. The separate structural/code review and tests own those.
+Also omit local decisions, preferences, and project-authored principles that do not assert an
+external authority.
+
+For every eligible claim, use built-in web search and prefer official/primary
 sources. Reddit, forums, Stack Overflow, social media, wikis, blogs and other UGC are leads
 only and can NEVER govern support or refutation. Require an exact passage, canonical
 location, publisher/authority basis, and a direct entailment relation. Split conjunctions
 and ranges into atomic propositions. A replacement is allowed only when authoritative
 evidence entails the replacement itself.
-
-For repository evidence use repo://path#Lx-Ly for current bytes,
-repo://git/<hex-revision>:<path> for historical bytes, or repo://git/<hex-revision> for a
-commit-level packet. Every location must resolve and contain the exact quote; the server rejects
-malformed identifiers, missing paths, and invented or truncated passages.
-The current plan/dossier cannot be authoritative evidence for its own assertion. Never cite
-its `repo://` path to support/refute a claim; replace retained self-citations with direct code,
-data, Git-object, retained command-output, or authoritative web evidence. The server demotes
-direct current-plan citations to context.
 
 Every item in RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS must be re-researched and
 returned in `claims` with its exact unchanged proposition and a current, complete evidence
@@ -1130,14 +997,9 @@ could not be frozen, so a compact verdict cannot repair them. The server preserv
 identity by exact proposition. Items in RETAINED REFUTED CLAIMS may instead receive one
 compact current judgement in `coverage.prior_assessments` while their anchor remains.
 
-OMIT proposed decisions, policies, authorizations, definitions, intentions, instructions,
-preferences, forecasts, and incidental facts. A requirement is normative, but the edited
-plan's assertion that a requirement existed, was historically bound/applicable, or was
-satisfied/violated is an empirical repository fact and MUST be inventoried when it affects
-a grade, gate, safety conclusion, dependency, or remediation priority. Preserve event,
-actor, date, modality, scope, and chronology: a later certificate/report cannot support a card-base or
-contemporaneous proposition, and evidence of an underlying condition does not prove that a
-dated audit/report event occurred. Use claims only for new or edited factual propositions. Every absent prior claim
+Preserve event, actor, date, modality, scope, and chronology: evidence of an underlying
+condition does not prove that a dated external audit/report event occurred. Use claims only
+for new or edited eligible external propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
 
@@ -1159,10 +1021,10 @@ CURRENT PLAN EDIT CONE (unified diff with context):
 Reply with only the marker and one JSON object; no markdown fence:
 
 {AUDIT_MARKER}
-{{"claims":[{{"kind":"fact","scope":"external","anchor":"verbatim current-plan text","proposition":"one atomic factual proposition","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/page","title":"Official title","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issued the fact being described","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":1,"omitted_nonfacts":1,"prior_assessments":[],"prior_dispositions":[],"notes":"targeted edit-cone audit"}}}}
+{{"claims":[{{"kind":"behavior","scope":"external","anchor":"verbatim current-plan text","proposition":"one atomic externally promised behavior","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/reference","title":"Official reference","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher defines the external system behavior","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":1,"omitted_nonfacts":1,"prior_assessments":[],"prior_dispositions":[],"notes":"targeted edit-cone audit"}}}}
 
-Allowed verdicts: "supported", "refuted", "unverified". Allowed scopes: "external",
-"repository". Allowed relations: "supports_claim", "refutes_claim",
+Allowed kinds: "fact", "design_principle", "behavior". Allowed verdicts: "supported",
+"refuted", "unverified". Allowed scope: "external". Allowed relations: "supports_claim", "refutes_claim",
 "supports_replacement", "context". The server validates anchors against the full current
 plan and rejects omission of any listed unresolved retained ID."""
 
@@ -1196,17 +1058,16 @@ Rejected payload sha256: {error.raw_sha256}
 
 Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 {AUDIT_MARKER} marker followed by one JSON object and nothing else. Every claim uses the
-literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Preserve
-valid source packets, fix the structural error, and do not weaken evidence requirements.
+literal kind `fact`, `design_principle`, or `behavior` and the literal scope `external`.
+Never write a pseudo-enum. Preserve valid source packets, fix the structural error, and do
+not weaken evidence requirements.
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
-Never use the current plan/dossier's own `repo://` path as evidence for its assertions;
-replace such a packet with direct code, data, Git-object, retained command-output, or
-authoritative web evidence.
-Treat historical-requirement assertions as empirical facts even though the underlying
-requirement is normative. When a claim names a card-base, pre-change, contemporaneous, or
-historical rule, require the exact historical Git blob (or an equivalently frozen source),
-not a later certificate/report. Preserve any claimed report event, date, actor, modality,
-scope, and chronology instead of weakening the proposition to the underlying condition.
+Repository state, code paths, internal history, implementation conformance, and internal
+function bridges are mechanically out of scope for this register; omit them because the
+structural/code review and tests own them. Do retain externally issued requirements/design
+principles and behavior promised by external systems, not only historical facts. Require
+authoritative web evidence and preserve any claimed event, date, actor, modality, scope, and
+chronology instead of weakening the proposition to an underlying condition.
 
 {frozen_note}
 

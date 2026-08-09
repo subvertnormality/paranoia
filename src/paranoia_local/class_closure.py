@@ -316,7 +316,7 @@ class Lineage:
     classes: dict[str, TrackedClass] = field(default_factory=dict)
     exemptions: list[Exemption] = field(default_factory=list)
     debt: dict[str, Any] | None = None
-    #: Plan mode's factual-claim register.  It shares this already-atomic lineage file
+    #: Plan mode's external-claim register. It shares this already-atomic lineage file
     #: instead of introducing a second store/transaction protocol.  Branch mode leaves
     #: it empty and otherwise behaves byte-for-byte as before.
     claim_state: dict[str, Any] = field(default_factory=dict)

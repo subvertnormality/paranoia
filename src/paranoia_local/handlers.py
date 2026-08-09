@@ -607,7 +607,7 @@ def _verify_plan_claims(
     plan_repo_path: str | None,
     on_progress: Callable[[str], None] | None,
 ) -> tuple[dict[str, Any], str]:
-    """Run exhaustive round 1, then verify only the factual edit cone."""
+    """Run exhaustive round 1, then verify only the external-claim edit cone."""
     targeted = pc.has_prior_snapshot(prior_state)
     frozen = (
         pc.frozen_supported_ids(
@@ -631,11 +631,14 @@ def _verify_plan_claims(
     if on_progress:
         if targeted:
             on_progress(
-                f"verifying the factual edit cone; {len(frozen)} unchanged supported "
+                f"verifying the external-claim edit cone; {len(frozen)} unchanged supported "
                 "claims reuse frozen authoritative packets"
             )
         else:
-            on_progress("verifying atomic factual claims against repository and web evidence")
+            on_progress(
+                "verifying external facts, design principles, and behaviors against "
+                "authoritative web evidence"
+            )
     prompt = (
         pc.targeted_audit_instructions(plan_text, prior_state, stakes, frozen)
         if targeted else pc.audit_instructions(plan_text, prior_state, stakes)
@@ -1068,13 +1071,13 @@ class _PlanClassClosure(_ClosureRound):
         if lineage.debt or lineage.blocking():
             blockers.append("class closure")
         if pc.is_blocked(self.claim_state):
-            blockers.append("factual claim closure")
+            blockers.append("external claim closure")
         if blockers:
             final = "CONVERGENCE: BLOCKED — " + " and ".join(blockers) + " remain open."
         else:
             final = (
                 "CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed and every "
-                "active factual claim is supported by frozen or current authoritative evidence."
+                "active external claim is supported by frozen or current authoritative evidence."
             )
         return f"{claim_text}\n{class_text}\n{final}"
 

@@ -236,14 +236,16 @@ TOOLS: list[Tool] = [
                 "claim_verification": {
                     "type": "boolean",
                     "description": (
-                        "Verify load-bearing atomic factual claims before structural review "
-                        "using repository evidence and the selected reviewer's built-in web "
-                        "search (default TRUE for bundled Codex/Claude engines). Decisions, "
-                        "requirements and non-load-bearing observations are excluded from "
-                        "active inventory. External claims close only on primary or "
+                        "Verify load-bearing external facts, externally issued design "
+                        "principles/requirements, and promised external-system behaviors "
+                        "before structural review using the selected reviewer's built-in web "
+                        "search (default TRUE for bundled Codex/Claude engines). Repository "
+                        "mechanics and local decisions remain in structural/code review and "
+                        "tests, not claim inventory. External claims close only on primary or "
                         "authoritative exact passages; known UGC such as Reddit can be a "
                         "lead but never governing evidence. Retained source packets are "
-                        "re-entailled against edited wording in later rounds. Set false only "
+                        "rechecked for entailment against edited wording in later rounds. "
+                        "Set false only "
                         "for an explicit structural-only/legacy review."
                     ),
                 },

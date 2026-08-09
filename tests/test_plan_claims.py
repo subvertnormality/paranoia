@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import hashlib
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,7 +10,6 @@ from paranoia_local.engines import Review
 
 
 PLAN = "# Rollout\n\nPython 3.11 was released in October 2022.\n"
-REPO_PLAN = "# Config\n\nThe setting is enabled.\n"
 
 
 def _source(
@@ -48,29 +45,6 @@ def _claim(**changes: object) -> dict[str, object]:
     }
     value.update(changes)
     return value
-
-
-def _repository_claim(*, url: str, quote: str = '"enabled": true') -> dict[str, object]:
-    return {
-        "kind": "fact",
-        "scope": "repository",
-        "anchor": "The setting is enabled.",
-        "proposition": "The repository setting is enabled.",
-        "prior_claim_id": None,
-        "verdict": "supported",
-        "evidence": [{
-            "url": url,
-            "title": "Settings",
-            "publisher": "Repository",
-            "source_kind": "repository",
-            "authority_basis": "The cited repository bytes define the setting.",
-            "location": "enabled field",
-            "quote": quote,
-            "relation": "supports_claim",
-        }],
-        "replacement": None,
-        "rationale": "The exact field is present.",
-    }
 
 
 def _audit(
@@ -120,184 +94,23 @@ class TestAuditValidation:
         assert [claim["verdict"] for claim in audit.claims] == ["unverified", "supported"]
         assert "Server demotion" in audit.claims[0]["rationale"]
 
-    def test_wrong_scope_source_is_context_and_claim_is_unverified(self) -> None:
-        wrong_scope = _source()
-        claim = pc.parse_audit(_audit(_claim(
-            scope="repository", evidence=[wrong_scope],
-        )), PLAN).claims[0]
-        assert claim["verdict"] == "unverified"
-        assert claim["evidence"][0]["relation"] == "context"
-
-    def test_repository_support_must_resolve_to_exact_current_bytes(
-        self, tmp_path: Path,
-    ) -> None:
-        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
+    def test_repository_scope_is_mechanically_excluded_without_debt(self) -> None:
         audit = pc.parse_audit(
-            _audit(_repository_claim(url="repo://settings.json#L1")),
-            REPO_PLAN, repo=tmp_path,
+            _audit(_claim(scope="repository"), _claim()), PLAN,
         )
-        assert audit.claims[0]["verdict"] == "supported"
+        assert len(audit.claims) == 1
+        assert audit.claims[0]["scope"] == "external"
+        assert audit.issues == ()
 
-        with pytest.raises(pc.AuditError, match="does not resolve to bytes"):
-            pc.parse_audit(
-                _audit(_repository_claim(url="repo://missing.json#L1")),
-                REPO_PLAN, repo=tmp_path,
-            )
+    def test_unknown_scope_typo_is_not_silently_discarded(self) -> None:
+        with pytest.raises(pc.AuditError, match='scope must be the literal \\"external\\"'):
+            pc.parse_audit(_audit(_claim(scope="externl")), PLAN)
 
-    def test_repository_support_resolves_historical_git_object(
-        self, tmp_path: Path,
-    ) -> None:
-        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
-        subprocess.run(["git", "add", "settings.json"], cwd=tmp_path, check=True)
-        subprocess.run([
-            "git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-            "-c", "commit.gpgsign=false", "commit", "-qm", "settings",
-        ], cwd=tmp_path, check=True)
-        revision = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True,
-            capture_output=True, text=True,
-        ).stdout.strip()
-        url = f"repo://git/{revision}:settings.json"
-        audit = pc.parse_audit(
-            _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
-        )
-        assert audit.claims[0]["evidence"][0]["url"] == url + "#L1"
-
-    def test_card_base_claim_requires_historical_git_object(
-        self, tmp_path: Path,
-    ) -> None:
-        plan = "# Gate\n\nAt the card-base revision, the setting is enabled.\n"
-        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
-        current = _repository_claim(url="repo://settings.json#L1")
-        current.update({
-            "anchor": "At the card-base revision, the setting is enabled.",
-            "proposition": "At the card-base revision, the setting was enabled.",
-        })
-
-        audit = pc.parse_audit(_audit(current), plan, repo=tmp_path)
-
-        assert audit.claims[0]["verdict"] == "unverified"
-        assert audit.claims[0]["evidence"][0]["relation"] == "context"
-        assert "exact Git-object evidence" in audit.claims[0]["rationale"]
-
-    def test_card_base_claim_accepts_exact_historical_git_object(
-        self, tmp_path: Path,
-    ) -> None:
-        plan = "# Gate\n\nAt the card-base revision, the setting is enabled.\n"
-        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
-        subprocess.run(["git", "add", "settings.json"], cwd=tmp_path, check=True)
-        subprocess.run([
-            "git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-            "-c", "commit.gpgsign=false", "commit", "-qm", "settings",
-        ], cwd=tmp_path, check=True)
-        revision = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True,
-            capture_output=True, text=True,
-        ).stdout.strip()
-        historical = _repository_claim(url=f"repo://git/{revision}:settings.json")
-        historical.update({
-            "anchor": "At the card-base revision, the setting is enabled.",
-            "proposition": "At the card-base revision, the setting was enabled.",
-        })
-
-        audit = pc.parse_audit(_audit(historical), plan, repo=tmp_path)
-
-        assert audit.claims[0]["verdict"] == "supported"
-        assert audit.claims[0]["evidence"][0]["url"].startswith(
-            f"repo://git/{revision}:settings.json#L1"
-        )
-
-    @pytest.mark.parametrize("anchor", [
-        "The retained Git search reports first addition in commit abc1234.",
-        "The contract header records card base abc1234.",
-    ])
-    def test_retained_report_about_history_can_use_current_retained_bytes(
-        self, tmp_path: Path, anchor: str,
-    ) -> None:
-        plan = f"# History\n\n{anchor}\n"
-        (tmp_path / "history.txt").write_text("abc1234\n")
-        claim = _repository_claim(url="repo://history.txt#L1", quote="abc1234")
-        claim.update({"anchor": anchor, "proposition": anchor})
-
-        audit = pc.parse_audit(_audit(claim), plan, repo=tmp_path)
-
-        assert audit.claims[0]["verdict"] == "supported"
-        assert audit.claims[0]["evidence"][0]["relation"] == "supports_claim"
-
-    def test_repository_location_is_repaired_from_the_exact_quote(
-        self, tmp_path: Path,
-    ) -> None:
-        (tmp_path / "settings.json").write_text('first\nsecond\n{"enabled": true}\n')
-        audit = pc.parse_audit(
-            _audit(_repository_claim(url="repo://settings.json#L1")),
-            REPO_PLAN, repo=tmp_path,
-        )
-        assert audit.claims[0]["evidence"][0]["url"] == "repo://settings.json#L3"
-
-    def test_whole_file_sha256_is_verified_as_computed_byte_evidence(
-        self, tmp_path: Path,
-    ) -> None:
-        content = b'{"enabled": true}\n'
-        (tmp_path / "settings.json").write_bytes(content)
-        digest = hashlib.sha256(content).hexdigest()
-        audit = pc.parse_audit(
-            _audit(_repository_claim(url="repo://settings.json", quote=digest)),
-            REPO_PLAN, repo=tmp_path,
-        )
-        assert audit.claims[0]["verdict"] == "supported"
-
-    def test_sha256_shaped_exact_passage_is_not_forced_to_be_the_file_digest(
-        self, tmp_path: Path,
-    ) -> None:
-        digest_passage = "e63ec234f5a4ba7986ff2759fe9526210d7a859784483bf4ba0332d163dca3c6"
-        (tmp_path / "checks.md").write_text(f"recorded digest:\n{digest_passage}\n")
-        audit = pc.parse_audit(
-            _audit(_repository_claim(
-                url="repo://checks.md#L1", quote=digest_passage,
-            )),
-            REPO_PLAN, repo=tmp_path,
-        )
-        assert audit.claims[0]["evidence"][0]["url"] == "repo://checks.md#L2"
-
-    def test_repository_support_rejects_wrong_quote_and_traversal(
-        self, tmp_path: Path,
-    ) -> None:
-        (tmp_path / "settings.json").write_text('{"enabled": false}\n')
-        for url in ("repo://settings.json", "repo://../settings.json"):
-            with pytest.raises(pc.AuditError, match="does not resolve to bytes"):
-                pc.parse_audit(
-                    _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
-                )
-
-    def test_plan_cannot_be_authoritative_evidence_for_its_own_claim(
-        self, tmp_path: Path,
-    ) -> None:
-        (tmp_path / "PLAN.md").write_text(REPO_PLAN)
-        audit = pc.parse_audit(
-            _audit(_repository_claim(
-                url="repo://PLAN.md#L3", quote="The setting is enabled.",
-            )),
-            REPO_PLAN, repo=tmp_path, plan_repo_path="PLAN.md",
-        )
-        assert audit.claims[0]["verdict"] == "unverified"
-        assert audit.claims[0]["evidence"][0]["relation"] == "context"
-
-    def test_plan_self_citation_is_not_frozen(self, tmp_path: Path) -> None:
-        (tmp_path / "PLAN.md").write_text(REPO_PLAN)
-        first = pc.reconcile(
-            {}, pc.parse_audit(
-                _audit(_repository_claim(
-                    url="repo://PLAN.md#L3", quote="The setting is enabled.",
-                )),
-                REPO_PLAN, repo=tmp_path,
-            ),
-            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
-        )
-        assert not pc.frozen_supported_ids(
-            first, REPO_PLAN, repo=tmp_path, plan_repo_path="PLAN.md",
-        )
+    @pytest.mark.parametrize("kind", ["fact", "design_principle", "behavior"])
+    def test_all_external_claim_kinds_are_eligible(self, kind: str) -> None:
+        claim = pc.parse_audit(_audit(_claim(kind=kind)), PLAN).claims[0]
+        assert claim["kind"] == kind
+        assert claim["scope"] == "external"
 
     def test_refutation_alone_keeps_packet_but_drops_unsupported_replacement(self) -> None:
         refuting = _source(relation="refutes_claim")
@@ -310,7 +123,7 @@ class TestAuditValidation:
         assert audit.claims[0]["replacement"] is None
 
     def test_decisions_never_enter_active_inventory(self) -> None:
-        with pytest.raises(pc.AuditError, match='literal \\"fact\\"'):
+        with pytest.raises(pc.AuditError, match="kind must be one of"):
             pc.parse_audit(_audit(_claim(kind="decision")), PLAN)
 
     def test_the_incident_pseudo_enum_is_rejected_with_bounded_raw_diagnostics(self) -> None:
@@ -623,25 +436,25 @@ class TestRetainedEvidence:
         assert second["claims"][claim_id]["evidence"] == first["claims"][claim_id]["evidence"]
         assert not pc.is_blocked(second)
 
-    def test_compact_support_cannot_retain_a_nonresolving_repository_packet(
-        self, tmp_path: Path,
-    ) -> None:
-        legacy = pc.reconcile(
-            {}, pc.parse_audit(_audit(_repository_claim(url="repo://wrong-id.json")), REPO_PLAN),
-            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
-        )
-        claim_id = next(iter(legacy["claims"]))
-        assessment = pc.parse_audit(_audit(assessments=[{
-            "claim_id": claim_id,
-            "verdict": "supported",
-            "rationale": "The old packet still looks plausible.",
-        }]), REPO_PLAN)
-        second = pc.reconcile(
-            legacy, assessment, lineage_id="x-plan", round_no=2,
-            plan_text=REPO_PLAN, repo=tmp_path,
-        )
-        assert second["claims"][claim_id]["verdict"] == "unverified"
-        assert "Server demotion" in second["claims"][claim_id]["rationale"]
+    def test_legacy_repository_claims_are_mechanically_retired(self) -> None:
+        legacy = pc.empty_state()
+        legacy["claims"] = {
+            "C-repo": {
+                "kind": "fact", "scope": "repository",
+                "anchor": "The setting is enabled.",
+                "proposition": "The repository setting is enabled.",
+                "verdict": "supported", "evidence": [],
+            },
+            "C-external": {
+                **_claim(), "claim_id": "C-external",
+            },
+        }
+
+        normalized = pc.normalize_state(legacy)
+
+        assert set(normalized["claims"]) == {"C-external"}
+        assert normalized["retired"][-1]["claim_id"] == "C-repo"
+        assert normalized["retired"][-1]["disposition"] == "out_of_scope"
 
     def test_targeted_prompt_requires_full_packet_for_unverified_claim(self) -> None:
         first = pc.reconcile(
@@ -657,9 +470,11 @@ class TestRetainedEvidence:
             "RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT", 1
         )[0]
         assert '"prior_assessments":[]' in prompt
-        assert "cannot be authoritative evidence for its own assertion" in prompt
+        assert "Mechanically OMIT repository state" in prompt
 
-    def test_prompts_inventory_grade_driving_historical_requirements(self) -> None:
+    def test_prompts_include_external_principles_and_behaviors_but_exclude_repo_claims(
+        self,
+    ) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim()), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
@@ -672,42 +487,22 @@ class TestRetainedEvidence:
         )
 
         for prompt in (exhaustive, targeted, retry):
-            assert "requirement" in prompt
-            assert "historical" in prompt
-            assert "card-base" in prompt
-            assert "later certificate" in prompt
-        assert "ALWAYS inventory" in exhaustive
-        assert "MUST be inventoried" in targeted
+            assert "design_principle" in prompt
+            assert "behavior" in prompt
+            assert "repository" in prompt.lower()
+            assert "structural" in prompt and "review" in prompt
+        assert "Every claim has scope `external`" in exhaustive
+        assert '"scope":"external"' in targeted
+        assert 'Allowed scope: "external"' in targeted
 
     def test_prompts_preserve_report_event_and_chronology(self) -> None:
         exhaustive = pc.audit_instructions(PLAN, {}, "trusted local tool")
         targeted = pc.targeted_audit_instructions(PLAN, {}, "trusted local tool", set())
 
         for prompt in (exhaustive, targeted):
-            assert "dated audit/report" in prompt
+            assert "audit/report" in prompt
             assert "underlying" in prompt
             assert "chronology" in prompt
-
-    def test_targeted_prompt_requires_full_packet_for_nonfreezable_support(
-        self, tmp_path: Path,
-    ) -> None:
-        first = pc.reconcile(
-            {}, pc.parse_audit(
-                _audit(_repository_claim(url="repo://missing.json")), REPO_PLAN,
-            ),
-            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
-        )
-        claim_id = next(iter(first["claims"]))
-        frozen = pc.frozen_supported_ids(first, REPO_PLAN, repo=tmp_path)
-
-        prompt = pc.targeted_audit_instructions(
-            REPO_PLAN, first, "trusted local tool", frozen,
-        )
-
-        assert frozen == set()
-        assert claim_id in prompt.split(
-            "RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT", 1
-        )[0]
 
     def test_compact_support_cannot_upgrade_a_nonqualifying_retained_packet(self) -> None:
         first = pc.reconcile(
@@ -794,6 +589,9 @@ class TestRetainedEvidence:
         assert source["url"] in context
         assert source["quote"] in context
         assert source["authority_basis"] in context
+        assert "function-to-function bridges" in context
+        assert "Do not demand claim packets for repository state" in context
+        assert "omitted load-bearing factual assertion" not in context
 
     def test_action_packet_returns_exact_passage_and_location(self) -> None:
         refuted = _claim(
@@ -809,7 +607,7 @@ class TestRetainedEvidence:
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
         )
         packet = pc.render_trailer(state)
-        assert "Evidence-entailled replacement" in packet
+        assert "Evidence-entailed replacement" in packet
         assert "Release page, first paragraph" in packet
         assert "The release date was October 24, 2022." in packet
 
@@ -919,9 +717,11 @@ class TestHandlerFlow:
         )
         assert "CLAIM-CLOSURE: 0 supported, 1 refuted" in out
         assert "ACTIONABLE SOURCE PACKETS" in out
-        assert "CONVERGENCE: BLOCKED — factual claim closure" in out
+        assert "CONVERGENCE: BLOCKED — external claim closure" in out
         assert "BUILT-IN web search" in engine.prompts[0]
-        assert "FACTUAL CLAIM REGISTER" in engine.prompts[1]
+        assert "AUTHORITATIVE EXTERNAL CLAIM REGISTER" in engine.prompts[1]
+        assert "Never demand claim packets" in engine.prompts[1]
+        assert "missing atomic bridge" in engine.prompts[1]
 
     def test_supported_claim_and_closed_classes_produce_one_governing_clearance(
         self, tmp_path: Path
