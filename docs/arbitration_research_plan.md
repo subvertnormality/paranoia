@@ -38,12 +38,14 @@ The implementation relies on exactly these provider behaviors, which plan verifi
 in its active external-claim inventory:
 
 - Codex CLI's `web_search` configuration has explicit `live`, `cached`, and `disabled` modes;
-  non-interactive `codex exec` supports live search and `codex exec resume <session-id>` continues
-  that session.
+  `disabled` removes the search tool, non-interactive `codex exec` supports live search, and
+  `codex exec resume <session-id>` continues that session. `--ignore-user-config` excludes the
+  user config but trusted-project `.codex/config.toml` is loaded separately and may register MCP
+  servers.
 - Claude Code's `WebSearch` returns candidate source titles and URLs for discovery in print mode,
   and `claude -p --resume <session-id>` continues a print-mode session. Claude's `--tools`
-  restricts built-in tools but not MCP tools; `--strict-mcp-config` makes only explicitly supplied
-  MCP configuration available.
+  with an empty value disables all built-in tools but does not restrict MCP tools;
+  `--strict-mcp-config` makes only explicitly supplied MCP configuration available.
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
@@ -64,7 +66,9 @@ Add `research`, default `true`, to `arbitrate`.
 
 - `research: true` requires `web_search: true` for the research agents only. It runs the bounded
   shared phase below. Both voting rounds have web tools mechanically disabled: the normalized
-  packet is the complete external corpus available during voting.
+  packet is the complete registered web-derived corpus available during voting. Repository bytes
+  and the model's pre-existing knowledge remain inputs under the trusted-local stakes; no
+  repository or user configuration may add a live external tool.
 - `research: false` is explicit repository-only arbitration. Both decider calls run with web
   search disabled, and only existing repository citations can substantiate convergence.
 - `research: true, web_search: false` is rejected before any agent call. There is no quiet
@@ -81,6 +85,16 @@ structural reviewer runs with Codex `disabled` or no Claude built-in/MCP tools. 
 captured claim register in its prompt. Claude `WebFetch` is never enabled in the plan-verification
 path. `claim_verification: false` remains the explicit legacy/structural-only escape and makes no
 claim-support guarantee.
+
+Every evidence-isolated Codex role starts from a trusted empty temporary launch root, never from
+the reviewed repository. When repository access is required, the pinned materialized worktree is
+exposed beneath `repository/`; the prompt defines that directory as the citation root and the
+server strips exactly that prefix before resolving citations against the pinned snapshot. The
+project's `.codex/config.toml`, plugins, rules, and instructions remain readable as ordinary files
+under `repository/` but are not in Codex's startup ancestry and therefore cannot configure the
+session. The wrapper itself contains no project configuration. Research/binding sessions retain
+their launch root until the final resume completes, then remove it. This is an orchestration
+boundary, not a new container or provider abstraction.
 
 ### 2. Balanced research fan-out
 
@@ -161,14 +175,16 @@ packet content, deduplicates byte-identical packets, and takes the deterministic
 researchers' valid results. It does not ask a model to merge or summarize them.
 
 Budgets are corruption/pathology guards, not sampling targets. Each researcher may return at most
-12 unique normalized propositions and two candidate records per proposition; duplicate normalized
-propositions within one producer are rejected. Each captured document is at most 40,000 extracted
-characters and each producer's binding input is at most 240,000 rendered characters. A bound
-passage is at most 2,000 characters. The deterministic union may contain at most 24 propositions,
-four records per normalized proposition, 4,000 characters per captured passage, and 80,000
-rendered packet characters. Exceeding a producer, capture, binding-input, or union budget fails
-visibly rather than truncating evidence and calling the result complete. These limits compose
-without assuming that independently worded claims deduplicate.
+12 unique normalized propositions and one candidate record per proposition; duplicate normalized
+propositions within one producer are rejected. Bound fields are: proposition 1,200 characters,
+URL 2,048, title 400, publisher 200, authority basis 600, location 400, and exact passage 1,200.
+Each captured document is at most 40,000 extracted characters and each producer's binding input is
+at most 400,000 rendered characters. The deterministic two-producer union may contain at most 24
+propositions, two records per normalized proposition, and 200,000 rendered packet characters.
+The maximum accepted field payload plus fixed rendering overhead is below that union limit.
+Exceeding a producer, field, capture, binding-input, or union budget fails visibly rather than
+truncating evidence and calling the result complete. These limits compose without assuming that
+independently worded claims deduplicate.
 
 ### 4. Identical evidence for both deciders
 
@@ -225,11 +241,12 @@ the first-round preferences, expand cost, and make the evidence corpus outcome-d
 or inadequate external packets instead produce unsubstantiated votes and an honest unresolved
 result; the caller may improve the framing and start a new arbitration.
 
-Cleaner and attester calls use 240-second caps. Discovery and binding calls use 120-second caps;
-each may have one 120-second same-session correction. Server capture has a 120-second phase cap.
-The explicit worst path is therefore: cleaner initial/retry 480 seconds, attester initial/retry
-480, discovery initial/correction 240, capture 120, binding initial/correction 240, decision round
-one 900, and decision round two 900 = 3,360 seconds. Parallel vendors count once per group. This
+Cleaner and attester calls use 210-second caps. Discovery calls use 120-second caps and binding
+calls use 180-second caps; each may have one same-session correction at the same cap. Server
+capture has a 120-second phase cap. The explicit worst path is therefore: cleaner initial/retry
+420 seconds, attester initial/retry 420, discovery initial/correction 240, capture 120, binding
+initial/correction 360, decision round one 900, and decision round two 900 = 3,360 seconds.
+Parallel vendors count once per group. This
 leaves 240 seconds of the existing 3,600-second whole-call ceiling for validation, git
 materialization, logging, and teardown. The handler tracks one monotonic whole-run deadline and
 will not start a phase whose cap plus reserved teardown margin cannot fit; that produces a visible
@@ -260,12 +277,16 @@ attestation, order, label, vote, and round records remain intact.
   deterministic plan-claim tests do not perform network I/O.
 - Add pure research packet types, parsing, normalization, union, budgets, digesting, and tagged
   decisive-reference parsing to `arbitration.py` or one small `arbitration_research.py` module.
-- Keep orchestration in `arbitrate_handler.py`: a metadata-preserving research call/result and
-  resume seam, parallel research calls, bounded correction, one whole-run deadline, identical
-  packet injection, logging, and progress.
+- Add one small shared context manager for sanitized Codex launch roots and retained resume roots;
+  use it from `handlers.py` for verified plan reviews and from `arbitrate_handler.py`. Keep the
+  metadata-preserving research call/result and resume seam, repository-prefix citation mapping,
+  parallel research calls, bounded correction, whole-run deadline, identical packet injection,
+  logging, and progress in the relevant handler.
 - Extend both engine implementations to the minimum explicit internal role modes needed here.
   Codex research passes `web_search="live"`; all voting, repository-only arbitration, and verified
-  plan-structure calls pass `web_search="disabled"`, never omission/cached. Claude discovery
+  plan-structure calls pass `web_search="disabled"`, never omission/cached. Codex roles also keep
+  `--ignore-user-config` and start outside the project so user and project configuration are both
+  absent from the effective tool inventory. Claude discovery
   passes role-specific `--tools WebSearch`; binding, voting, repository-only, and verified
   plan-structure roles pass an empty `--tools`. Every evidence-isolated Claude role also passes
   `--strict-mcp-config` with no MCP configuration, so configured MCP tools cannot bypass the
@@ -298,6 +319,9 @@ attestation, order, label, vote, and round records remain intact.
 - engine argv tests prove Codex researchers use explicit `live`, Codex voters/repository-only and
   verified plan-structure reviewers use explicit `disabled`; Claude discovery exposes only
   `WebSearch`; and Claude binding/voting/verified-plan roles expose no built-in or MCP tools;
+- sanitized-root tests place sentinel MCP/plugin configuration under `repository/.codex`, prove it
+  is readable as evidence but absent from fresh and resumed Codex tool inventories, and prove
+  `repository/` citations normalize to the pinned repository path before resolution;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
@@ -313,9 +337,11 @@ lines. Record CLI/model versions, exact packet IDs and URLs, research/decider ca
 time, packet digest, both decisive source references, and computed convergence. Include one UGC
 lead, one unrelated non-UGC publisher mislabelled primary, one passage mismatch, and prove none can
 substantiate. Separately run a real plan claim whose discovered URL is captured and whose exact
-passage is bound in-session from the shared Trafilatura output. Also run explicit `research: false` on a
-repository-settled fixture and prove both deciders receive web search disabled and converge from
-repository evidence.
+passage is bound in-session from the shared Trafilatura output. Also run explicit `research: false`
+on a repository-settled fixture and prove both deciders receive web search disabled and converge from
+repository evidence. In the real Codex fixtures, put a harmless sentinel MCP under project
+`.codex/config.toml`; prove it is neither started nor listed in fresh voting/plan-structure roles
+or the resumed binding role.
 
 Run the complete local test suite, then Codex paranoia convergence over the implementation branch
 under the frozen stakes above. Open and merge a PR only after real acceptance, tests, documentation,
