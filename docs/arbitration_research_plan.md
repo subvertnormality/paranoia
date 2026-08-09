@@ -41,7 +41,9 @@ in its active external-claim inventory:
   non-interactive `codex exec` supports live search and `codex exec resume <session-id>` continues
   that session.
 - Claude Code's `WebSearch` returns candidate source titles and URLs for discovery in print mode,
-  and `claude -p --resume <session-id>` continues a print-mode session.
+  and `claude -p --resume <session-id>` continues a print-mode session. Claude's `--tools`
+  restricts built-in tools but not MCP tools; `--strict-mcp-config` makes only explicitly supplied
+  MCP configuration available.
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
@@ -49,7 +51,8 @@ in its active external-claim inventory:
 These are current external capabilities, not guarantees made by this repository. Bind them to the
 official [Codex command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
 [Claude tools reference](https://code.claude.com/docs/en/tools-reference),
-[Claude sessions reference](https://code.claude.com/docs/en/sessions), and
+[Claude sessions reference](https://code.claude.com/docs/en/sessions),
+[Claude CLI reference](https://code.claude.com/docs/en/cli-reference), and
 [Trafilatura documentation](https://trafilatura.readthedocs.io/en/stable/). No undocumented search
 backend, result ranking, or universal page-extraction behavior is assumed.
 
@@ -73,10 +76,11 @@ avoid its cost explicitly.
 
 For `critique_plan` with default claim verification, the same modes are mechanical: the claim
 research call uses Codex `live` or Claude `WebSearch`-only discovery, the server captures candidate
-pages, and the subsequent structural reviewer runs with Codex `disabled` or no Claude web tools.
-It receives the captured claim register in its prompt. Claude `WebFetch` is never enabled in the
-plan-verification path. `claim_verification: false` remains the explicit legacy/structural-only
-escape and makes no claim-support guarantee.
+pages, the same research session binds exact passages from those captures, and the subsequent
+structural reviewer runs with Codex `disabled` or no Claude built-in/MCP tools. It receives the
+captured claim register in its prompt. Claude `WebFetch` is never enabled in the plan-verification
+path. `claim_verification: false` remains the explicit legacy/structural-only escape and makes no
+claim-support guarantee.
 
 ### 2. Balanced research fan-out
 
@@ -99,24 +103,32 @@ truth or authority could change the comparative result:
 
 Repository state, code behavior, internal history, project preferences, option advocacy,
 forecasts, and incidental facts are excluded. Researchers use provider-native search to discover
-candidate authoritative URLs. Claude's research role receives `WebSearch` but not `WebFetch`;
-Codex's integrated search remains confined to the research role. Provider-returned page text is a
-lead, never governing evidence. Researchers return a concrete JSON record after a terminal marker.
-One bounded same-session correction is allowed for malformed output; a second failure fails
-arbitration visibly.
+candidate authoritative URLs. Claude's discovery role receives `WebSearch` but not `WebFetch`;
+Codex's integrated search remains confined to discovery. Provider-returned page text is a lead,
+never governing evidence. Researchers first return propositions and candidate metadata/URLs in a
+concrete JSON record after a terminal marker. One bounded same-session correction is allowed for
+malformed discovery output; a second failure fails arbitration visibly.
+
+After server capture, resume each exact discovery session with only its own normalized candidate
+records and server-extracted, line-numbered main text. Web, repository, and MCP tools are disabled.
+The binding reply chooses a precise location and exact supporting/refuting passage for each usable
+candidate, or marks it unusable; it cannot add a URL, proposition, or source. The server requires
+the selected passage to occur exactly after conservative Unicode/whitespace normalization in the
+corresponding captured text. Binding has the same one-resume correction rule for malformed output.
+This makes Claude `WebSearch` sufficient for discovery without trusting `WebFetch` or asking the
+model to guess text it has not read.
 
 The research-only call seam returns a structured result containing final text, raw CLI output,
 session reference, usage, duration, engine, and model. Its injected resume callback consumes the
-exact first-call session reference. This is separate from the existing string-returning decider
-callback, so malformed research can be corrected in-session and audited without widening the
-settled voting seam.
+exact preceding session reference for discovery correction, capture binding, and binding
+correction. This is separate from the existing string-returning decider callback, so research can
+continue in-session and remain auditable without widening the settled voting seam.
 
 ### 3. Authoritative source packets
 
-Each research claim contains one atomic proposition and candidate evidence records with:
+Each discovery claim contains one atomic proposition and candidate evidence records with:
 
-- canonical HTTP(S) URL, title, publisher, precise location, and the exact passage reported by the
-  researcher;
+- canonical HTTP(S) URL, title, and publisher;
 - `primary`, `authoritative`, `secondary`, or `ugc` source kind;
 - publisher authority basis;
 - `supports_claim`, `refutes_claim`, or `context` relation.
@@ -132,14 +144,14 @@ one shared module used by both plan claims and arbitration research. Do not dupl
 source policy or import private plan-lifecycle machinery into arbitration.
 
 For every candidate URL, the server performs a bounded HTTP(S) download and runs Trafilatura
-locally over the response. A candidate can enter the governing packet only when the request
-succeeds, its normalized reported passage occurs exactly after conservative Unicode/whitespace
-normalization in the extracted text, and the final public HTTP(S) URL remains eligible. Record
-final URL, status, content type, content digest, extracted-text digest, and the exact matched
-passage. Direct downloads have fixed connect/read timeouts, redirect and response-byte caps, and
-reject loopback, link-local, private, and non-HTTP(S) destinations. Run independent downloads with
-bounded concurrency. JavaScript-only, blocked, oversized, mismatching, and extraction-empty pages
-are visible non-governing failures; there is no silent fallback to provider summaries or a browser.
+locally over the response. Record final URL, status, content type, content digest, extracted-text
+digest, and line-numbered extracted text for the binding turn. A candidate enters the governing
+packet only when capture succeeds, the binder returns an exact matching passage and location, and
+the final public HTTP(S) URL remains eligible. Direct downloads have fixed connect/read timeouts,
+redirect and response-byte caps, and reject loopback, link-local, private, and non-HTTP(S)
+destinations. Run independent downloads with bounded concurrency. JavaScript-only, blocked,
+oversized, mismatching, and extraction-empty pages are visible non-governing failures; there is no
+silent fallback to provider summaries or a browser.
 
 The server validates shape, captured passage provenance, URL scheme, known-UGC demotion, declared
 source kind, and relation; it does not pretend to infer a publisher's subject-matter authority
@@ -149,12 +161,14 @@ packet content, deduplicates byte-identical packets, and takes the deterministic
 researchers' valid results. It does not ask a model to merge or summarize them.
 
 Budgets are corruption/pathology guards, not sampling targets. Each researcher may return at most
-12 claims, two candidate records per claim, 2,000 characters per reported passage, and 40,000
-rendered characters. Their deterministic union may contain at most 24 claims, four records per
-normalized proposition, 4,000 characters per captured passage, and 80,000 rendered characters.
-Exceeding either a producer or union budget fails visibly rather than truncating evidence and
-calling the result complete. These producer caps make the union cap composable without assuming
-that independently worded claims deduplicate.
+12 unique normalized propositions and two candidate records per proposition; duplicate normalized
+propositions within one producer are rejected. Each captured document is at most 40,000 extracted
+characters and each producer's binding input is at most 240,000 rendered characters. A bound
+passage is at most 2,000 characters. The deterministic union may contain at most 24 propositions,
+four records per normalized proposition, 4,000 characters per captured passage, and 80,000
+rendered packet characters. Exceeding a producer, capture, binding-input, or union budget fails
+visibly rather than truncating evidence and calling the result complete. These limits compose
+without assuming that independently worded claims deduplicate.
 
 ### 4. Identical evidence for both deciders
 
@@ -211,14 +225,15 @@ the first-round preferences, expand cost, and make the evidence corpus outcome-d
 or inadequate external packets instead produce unsubstantiated votes and an honest unresolved
 result; the caller may improve the framing and start a new arbitration.
 
-Research agents run in parallel with a 180-second cap per attempt. Their one possible correction
-is another 180-second serial group. Server capture has a 120-second phase cap. The explicit worst
-path is therefore: cleaner initial/retry 600 seconds, attester initial/retry 600, research
-initial/correction 360, capture 120, decision round one 900, and decision round two 900 = 3,480
-seconds. Parallel vendors count once per group. This leaves 120 seconds of the existing
-3,600-second whole-call ceiling for validation, git materialization, logging, and teardown. The
-handler tracks one monotonic whole-run deadline and will not start a phase whose cap plus reserved
-teardown margin cannot fit; that produces a visible bounded failure rather than a client timeout.
+Cleaner and attester calls use 240-second caps. Discovery and binding calls use 120-second caps;
+each may have one 120-second same-session correction. Server capture has a 120-second phase cap.
+The explicit worst path is therefore: cleaner initial/retry 480 seconds, attester initial/retry
+480, discovery initial/correction 240, capture 120, binding initial/correction 240, decision round
+one 900, and decision round two 900 = 3,360 seconds. Parallel vendors count once per group. This
+leaves 240 seconds of the existing 3,600-second whole-call ceiling for validation, git
+materialization, logging, and teardown. The handler tracks one monotonic whole-run deadline and
+will not start a phase whose cap plus reserved teardown margin cannot fit; that produces a visible
+bounded failure rather than a client timeout.
 
 ### 7. Audit and progress
 
@@ -227,10 +242,10 @@ Add progress events for shared research and validation. Add trailer fields:
 - `RESEARCH: complete <N> packets | repository-only`
 - `RESEARCH-DIGEST: <sha256> | none`
 
-The audit log records both raw research replies, correction replies if any, every capture result,
-normalized packets, packet digest, research model names, call count, duration, and the exact shared
-bytes shown to each decider. The existing snapshot/ref movement, cleaner, attestation, order,
-label, vote, and round records remain intact.
+The audit log records raw discovery, correction, binding, and binding-correction replies; every
+capture result; normalized packets; packet digest; research model names; call count; duration; and
+the exact shared bytes shown to each decider. The existing snapshot/ref movement, cleaner,
+attestation, order, label, vote, and round records remain intact.
 
 ## Code shape
 
@@ -238,7 +253,8 @@ label, vote, and round records remain intact.
   source schema, bounded downloading, extraction, exact normalized passage matching, capture
   metadata, HTTP(S)/UGC eligibility, and normalized evidence records.
 - Migrate `plan_claims.py` to that shared capture path. Provider search still discovers candidate
-  evidence, but a plan claim becomes supported only from a server-captured matching passage.
+  URLs, then the same engine session binds exact passages from server-captured text with web and
+  MCP disabled. A plan claim becomes supported only from a server-captured matching passage.
   Retained evidence is recaptured when re-entailing edited claims; a failed or stale capture
   becomes visible unverified evidence rather than being grandfathered. Keep capture injectable so
   deterministic plan-claim tests do not perform network I/O.
@@ -250,8 +266,11 @@ label, vote, and round records remain intact.
 - Extend both engine implementations to the minimum explicit internal role modes needed here.
   Codex research passes `web_search="live"`; all voting, repository-only arbitration, and verified
   plan-structure calls pass `web_search="disabled"`, never omission/cached. Claude discovery
-  allows `WebSearch` only and those later roles allow no web tools. Existing full mode remains for
-  other tools. Do not expose a provider abstraction or search-endpoint configuration.
+  passes role-specific `--tools WebSearch`; binding, voting, repository-only, and verified
+  plan-structure roles pass an empty `--tools`. Every evidence-isolated Claude role also passes
+  `--strict-mcp-config` with no MCP configuration, so configured MCP tools cannot bypass the
+  built-in tool restriction. Existing full mode remains for other tools. Do not expose a provider
+  abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
 - Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
 
@@ -259,8 +278,8 @@ label, vote, and round records remain intact.
 
 ### Focused deterministic tests
 
-- research JSON parsing, exact literals, budgets, deterministic IDs/union/digest, and conflict
-  retention;
+- discovery and binding JSON parsing, exact literals, duplicate-proposition rejection, composable
+  budgets, deterministic IDs/union/digest, and conflict retention;
 - bounded capture, redirect/size/timeout handling, Trafilatura extraction, exact normalized passage
   match, digests, and hard UGC/non-web/self-context rejection shared with plan claims;
 - plan claims cannot become supported from provider-reported text that the shared capture path
@@ -277,10 +296,11 @@ label, vote, and round records remain intact.
 - `research: false` disables web search and makes no research calls;
 - `research: true, web_search: false` fails before spend;
 - engine argv tests prove Codex researchers use explicit `live`, Codex voters/repository-only and
-  verified plan-structure reviewers use explicit `disabled`, and Claude evidence roles never
-  allow `WebFetch`;
-- malformed research retains the exact session reference, receives one resume correction, and
-  then fails closed; raw output, call count, usage, and durations remain auditable;
+  verified plan-structure reviewers use explicit `disabled`; Claude discovery exposes only
+  `WebSearch`; and Claude binding/voting/verified-plan roles expose no built-in or MCP tools;
+- malformed discovery or binding retains the exact preceding session reference, receives one
+  resume correction, and then fails closed; capture binding itself resumes the discovery session;
+  raw output, call count, usage, and durations remain auditable;
 - every phase cap composes below the whole-run deadline with reserved teardown margin, and a phase
   that cannot fit is not started;
 - existing repository-only arbitration behavior and outcome computation remain compatible.
@@ -292,8 +312,8 @@ choice depends on one authoritative external behavior or design principle not st
 lines. Record CLI/model versions, exact packet IDs and URLs, research/decider call counts, elapsed
 time, packet digest, both decisive source references, and computed convergence. Include one UGC
 lead, one unrelated non-UGC publisher mislabelled primary, one passage mismatch, and prove none can
-substantiate. Separately run a real plan claim whose provider-returned exact passage is captured
-and matched by the shared Trafilatura path. Also run explicit `research: false` on a
+substantiate. Separately run a real plan claim whose discovered URL is captured and whose exact
+passage is bound in-session from the shared Trafilatura output. Also run explicit `research: false` on a
 repository-settled fixture and prove both deciders receive web search disabled and converge from
 repository evidence.
 
