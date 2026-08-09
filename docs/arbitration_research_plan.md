@@ -35,7 +35,7 @@ gives them different, unaudited corpora.
 ## Verified external premises
 
 The first implementation supports the installed, acceptance-tested CLI profiles Codex 0.144.6 and
-Claude Code 2.1.169. A different version fails evidence-mode preflight with an upgrade instruction;
+Claude Code 2.1.197. A different version fails evidence-mode preflight with an upgrade instruction;
 adding a profile requires rerunning the inventory and real acceptance fixtures. The implementation
 relies on exactly these provider behaviors, which plan verification must keep in its active
 external-claim inventory:
@@ -129,12 +129,15 @@ fresh and resumed commands. It disables `apps`, `browser_use`, `browser_use_exte
 verified plan-structure roles set `web_search="disabled"`. Preflight requires the exact supported
 CLI profile and confirms every named flag exists; it does not claim `codex features list` is a
 complete tool inventory. The allow surface is the read-only shell capability already required by
-review, under the CLI's network-restricted sandbox, not an open-ended feature default.
+review, under the CLI's network-restricted sandbox, not an open-ended feature default. Fresh and
+resumed calls also set `approval_policy="never"`: permitted read-only inspection runs unattended,
+while any operation needing escalation fails instead of waiting for a human. Real profile
+acceptance, not an unsupported cross-version promise, must demonstrate unattended `rg`/`sed` reads.
 
 Every Claude evidence role adds `--safe-mode`, `--setting-sources ""`, `--strict-mcp-config` with no
 supplied MCP config, and its exact `--tools` set. Discovery exposes only `WebSearch`;
 binding exposes no built-in tools; repository-reading voting and plan-structure roles expose only
-the existing read-only file/git allowlist. Resume repeats the same role flags instead
+`Read`, `Grep`, `Glob`, `LS`, and `NotebookRead`. Resume repeats the same role flags instead
 of assuming the original session's inventory remains narrowed.
 
 ### 2. Balanced research fan-out
@@ -245,6 +248,13 @@ construction; this plan does not claim that counterbalancing eliminates or measu
 model bias. Final high-entropy decider labels are generated only after the packet exists, and the
 existing absence scan covers the packet as decider-visible text.
 
+The protocol does not claim to prove what internal model knowledge causally produced a vote.
+Pretraining is a declared input. Its proportionate semantic control is two cold deciders who see
+the same registered live corpus and independently expose relevance reasons; adding a third LLM
+would move, not mechanize, that judgement. A wrong unanimous relevance assessment remains residual
+model error, as it does for repository-citation relevance, rather than evidence of an unlogged live
+source path.
+
 ### 5. External evidence can substantiate a vote
 
 Extend the decisive-evidence grammar from only `<path>:<line>` to exactly one of:
@@ -316,7 +326,12 @@ attestation, order, label, vote, and round records remain intact.
   metadata, HTTP(S)/UGC eligibility, and normalized evidence records.
 - Migrate `plan_claims.py` to that shared capture path. Provider search still discovers candidate
   URLs, then the same engine session binds exact passages from server-captured text with web and
-  MCP disabled. A plan claim becomes supported only from a server-captured matching passage.
+  MCP disabled. Before state transition, start one cold evidence attester with all external and
+  repository tools disabled. It receives only the atomic claim, publisher/authority metadata,
+  capture metadata, and exact passage, and returns strict independent
+  `PUBLISHER-AUTHORITY` and `PASSAGE-ENTAILMENT` verdicts with reasons. A plan claim becomes
+  supported only from a server-captured matching passage with both cold verdicts `YES`; researcher
+  labels and the absence of a UGC hostname are never sufficient.
   Retained evidence is recaptured when re-entailing edited claims; a failed or stale capture
   becomes visible unverified evidence rather than being grandfathered. Keep capture injectable so
   deterministic plan-claim tests do not perform network I/O.
@@ -333,12 +348,13 @@ attestation, order, label, vote, and round records remain intact.
 - Extend both engine implementations to the minimum explicit internal role modes needed here.
   The supported-version preflight selects a fixed profile rather than inferring completeness from
   feature flags. Codex discovery passes `web_search="live"`; all binding, voting, repository-only arbitration,
-  and verified plan-structure calls pass `web_search="disabled"`, never omission/cached. Fresh and
+  and verified plan-structure calls pass `web_search="disabled"`, never omission/cached, and set
+  `approval_policy="never"`. Fresh and
   resumed Codex roles repeat the complete external-feature deny profile, keep
   `--ignore-user-config`, and start outside the project. Claude evidence roles repeat `--safe-mode`,
   `--setting-sources ""`, `--strict-mcp-config`, and role-specific `--tools`; discovery gets
-  only `WebSearch`, binding gets none, and repository roles get the existing read-only allowlist
-  without web. Existing full mode remains for unrelated tools. Do not expose a provider
+  only `WebSearch`, binding gets none, and repository roles get exactly `Read`, `Grep`, `Glob`,
+  `LS`, and `NotebookRead` without Bash or web. Existing full mode remains for unrelated tools. Do not expose a provider
   abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
 - Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
@@ -352,7 +368,9 @@ attestation, order, label, vote, and round records remain intact.
 - bounded capture, redirect/size/timeout handling, Trafilatura extraction, exact normalized passage
   match, digests, and hard UGC/non-web/self-context rejection shared with plan claims;
 - plan claims cannot become supported from provider-reported text that the shared capture path
-  cannot reproduce; retained evidence is recaptured before re-entailment;
+  cannot reproduce; retained evidence is recaptured before re-entailment; unrelated or
+  wrong-subject publishers labelled `primary` remain unverified unless the cold plan-evidence
+  attester independently accepts publisher authority and passage entailment;
 - unrelated non-UGC publishers falsely labelled `primary`, and publishers authoritative for a
   different subject, remain unsubstantiated when deciders reject authority or entailment;
 - counterbalanced research framing and byte-identical normalized evidence for both deciders;
@@ -381,6 +399,8 @@ attestation, order, label, vote, and round records remain intact.
   browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
   delegation tools are absent; an unsupported CLI version fails preflight before either provider
   call without claiming that feature flags enumerate all future tools;
+- the supported Codex profile runs `rg` and `sed` against the inert tree unattended with
+  `approval_policy="never"`, while a write/network/escalation attempt fails without prompting;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
