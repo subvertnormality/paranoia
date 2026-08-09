@@ -34,8 +34,11 @@ gives them different, unaudited corpora.
 
 ## Verified external premises
 
-The implementation relies on exactly these provider behaviors, which plan verification must keep
-in its active external-claim inventory:
+The first implementation supports the installed, acceptance-tested CLI profiles Codex 0.144.6 and
+Claude Code 2.1.169. A different version fails evidence-mode preflight with an upgrade instruction;
+adding a profile requires rerunning the inventory and real acceptance fixtures. The implementation
+relies on exactly these provider behaviors, which plan verification must keep in its active
+external-claim inventory:
 
 - Codex CLI's `web_search` configuration has explicit `live`, `cached`, and `disabled` modes;
   `disabled` removes the search tool, non-interactive `codex exec` supports live search, and
@@ -45,10 +48,11 @@ in its active external-claim inventory:
   directory. Fresh and resumed `codex exec` accept explicit `--disable <feature>` overrides.
 - Claude Code's `WebSearch` returns candidate source titles and URLs for discovery in print mode,
   and `claude -p --resume <session-id>` continues a print-mode session. Claude's `--tools`
-  with an empty value disables all built-in tools but does not restrict MCP tools;
-  `--strict-mcp-config` makes only explicitly supplied MCP configuration available, and
-  `--safe-mode` disables user/project customizations including settings, skills, plugins, hooks,
-  MCP servers, custom commands, and agents while preserving built-in tools and permissions.
+  with an empty value removes all built-ins when no MCP tools remain; `--strict-mcp-config` with no
+  supplied config establishes that condition. `--setting-sources ""` loads no user, project, or
+  local settings sources. `--safe-mode` disables documented customizations including skills,
+  plugins, hooks, MCP servers, custom commands, and agents while preserving built-in tools and
+  permissions.
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
@@ -90,7 +94,7 @@ path. `claim_verification: false` remains the explicit legacy/structural-only es
 claim-support guarantee.
 
 Every evidence-isolated Codex role starts from a trusted empty temporary launch root, never from
-the reviewed repository. When repository access is required, the pinned materialized worktree is
+the reviewed repository. When repository access is required, the pinned inert evidence tree is
 exposed beneath `repository/`; the prompt defines that directory as the citation root and the
 server strips exactly that prefix before resolving citations against the pinned snapshot. The
 project's `.codex/config.toml`, plugins, rules, and instructions remain readable as ordinary files
@@ -99,19 +103,36 @@ session. The wrapper itself contains no project configuration. Research/binding 
 their launch root until the final resume completes, then remove it. This is an orchestration
 boundary, not a new container or provider abstraction.
 
-Every Codex evidence role also applies one explicit, version-checked feature deny profile on both
+Do not create that evidence tree with `git worktree`, checkout, archive filters, or any model-run
+Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
+`git ls-tree -rz --full-tree` enumerates entries and `git cat-file blob <oid>` reads raw blobs,
+under `GIT_CONFIG_NOSYSTEM=1`, an empty global config, and command-line config that disables hooks,
+external diff, textconv, and optional locks. It writes ordinary files itself; executable bits are
+recorded in a manifest but not made executable, symlinks are rendered as inert target-text records,
+and gitlinks are rendered as submodule-OID records. No checkout/filter/process driver runs.
+
+Evidence-isolated model roles receive no Git commands. Claude's repository allowlist is reduced to
+`Read`, `Grep`, `Glob`, `LS`, and `NotebookRead`; Codex keeps its read-only network-restricted shell
+inside the inert non-Git tree for `rg`, `sed`, and similar reads. When history is useful, the server
+renders a bounded metadata-only `git log --format=...` record under the same empty-config
+environment; it never renders patches through diff/textconv. Arbitration citation resolution still
+uses the original pinned blobs, while the inert manifest makes exceptional symlink/gitlink entries
+explicit. The same inert tree grounds verified plan structure. This replaces, rather than wraps,
+the config-bearing worktree path for evidence-isolated roles.
+
+Every Codex evidence role also applies one explicit profile tested against the supported version on both
 fresh and resumed commands. It disables `apps`, `browser_use`, `browser_use_external`,
 `browser_use_full_cdp_access`, `computer_use`, `in_app_browser`, `plugins`, `remote_plugin`,
 `plugin_sharing`, `enable_mcp_apps`, `image_generation`, `multi_agent`, `workspace_dependencies`,
 `auth_elicitation`, `tool_call_mcp_elicitation`, `skill_mcp_dependency_install`, `hooks`, and
 `tool_suggest`. Discovery alone sets `web_search="live"`; binding, voting, repository-only, and
-verified plan-structure roles set `web_search="disabled"`. Preflight parses `codex features list`
-and fails before spend if an expected feature or mode is absent or the installed CLI introduces an
-enabled external-capable tool outside the audited profile. The allow surface is the read-only
-repository/shell capability already required by review, not an open-ended feature default.
+verified plan-structure roles set `web_search="disabled"`. Preflight requires the exact supported
+CLI profile and confirms every named flag exists; it does not claim `codex features list` is a
+complete tool inventory. The allow surface is the read-only shell capability already required by
+review, under the CLI's network-restricted sandbox, not an open-ended feature default.
 
-Every Claude evidence role adds `--safe-mode`, `--strict-mcp-config` with no supplied MCP config,
-`--disable-slash-commands`, and its exact `--tools` set. Discovery exposes only `WebSearch`;
+Every Claude evidence role adds `--safe-mode`, `--setting-sources ""`, `--strict-mcp-config` with no
+supplied MCP config, and its exact `--tools` set. Discovery exposes only `WebSearch`;
 binding exposes no built-in tools; repository-reading voting and plan-structure roles expose only
 the existing read-only file/git allowlist. Resume repeats the same role flags instead
 of assuming the original session's inventory remains narrowed.
@@ -237,9 +258,11 @@ exists in the shared normalized packet and has server-captured eligible primary/
 evidence. Unknown, context-only, secondary-only, UGC-only, or uncaptured IDs are unsubstantiated.
 For every `SOURCE:` decisive reference the strict vote grammar also requires
 `PUBLISHER-AUTHORITY: YES|NO — <reason>` and `PASSAGE-ENTAILMENT: YES|NO — <reason>`. A
-source-backed vote is substantiated only when both are `YES`; each cold decider therefore makes
-and exposes its own authority and entailment judgement. For a repository decisive citation both
-fields must be `N/A`. For a source reference, `CONSTRAINT` must equal the referenced packet's exact
+source vote also requires `DECISION-RELEVANCE: YES|NO — <reason>`. It is substantiated only when all
+three judgements are `YES`; each cold decider therefore exposes authority, entailment, and why the
+registered proposition materially supports its selected option under the frozen stakes. For a
+repository decisive citation all three fields must be `N/A`. For a source reference, `CONSTRAINT`
+must equal the referenced packet's exact
 normalized atomic proposition; the parser rejects any mismatch before outcome computation. For a
 repository citation it remains the decider's one-line statement of what the repository evidence
 establishes. This binds the registered source, asserted decisive proposition, and substantiation
@@ -299,17 +322,21 @@ attestation, order, label, vote, and round records remain intact.
   deterministic plan-claim tests do not perform network I/O.
 - Add pure research packet types, parsing, normalization, union, budgets, digesting, and tagged
   decisive-reference parsing to `arbitration.py` or one small `arbitration_research.py` module.
+- Add a small inert snapshot materializer beside `worktree.py`; use raw tree/blob plumbing, inert
+  symlink/gitlink records, and bounded metadata-only history. Evidence-isolated arbitration and
+  verified-plan roles use it instead of `worktree_at` and receive no model-visible Git commands.
 - Add one small shared context manager for sanitized Codex launch roots and retained resume roots;
   use it from `handlers.py` for verified plan reviews and from `arbitrate_handler.py`. Keep the
   metadata-preserving research call/result and resume seam, repository-prefix citation mapping,
   parallel research calls, bounded correction, whole-run deadline, identical packet injection,
   logging, and progress in the relevant handler.
 - Extend both engine implementations to the minimum explicit internal role modes needed here.
-  Codex discovery passes `web_search="live"`; all binding, voting, repository-only arbitration,
+  The supported-version preflight selects a fixed profile rather than inferring completeness from
+  feature flags. Codex discovery passes `web_search="live"`; all binding, voting, repository-only arbitration,
   and verified plan-structure calls pass `web_search="disabled"`, never omission/cached. Fresh and
   resumed Codex roles repeat the complete external-feature deny profile, keep
   `--ignore-user-config`, and start outside the project. Claude evidence roles repeat `--safe-mode`,
-  `--strict-mcp-config`, `--disable-slash-commands`, and role-specific `--tools`; discovery gets
+  `--setting-sources ""`, `--strict-mcp-config`, and role-specific `--tools`; discovery gets
   only `WebSearch`, binding gets none, and repository roles get the existing read-only allowlist
   without web. Existing full mode remains for unrelated tools. Do not expose a provider
   abstraction or search-endpoint configuration.
@@ -331,8 +358,11 @@ attestation, order, label, vote, and round records remain intact.
 - counterbalanced research framing and byte-identical normalized evidence for both deciders;
 - caller/order/decider-label leakage rejection;
 - repository and `SOURCE:` decisive-reference parsing, rendering, resolution, and substantiation;
-- an otherwise eligible unrelated packet with both judgement fields `YES` remains unsubstantiated
+- an otherwise eligible unrelated packet with all three judgement fields `YES` remains unsubstantiated
   when `CONSTRAINT` differs from its exact normalized proposition;
+- an eligible packet with an exactly copied proposition and positive authority/entailment remains
+  unsubstantiated when `DECISION-RELEVANCE` is `NO`; require the real acceptance deciders to explain
+  the causal comparison rather than merely restate the packet;
 - unknown or non-governing source IDs cannot converge;
 - source references never enter repository region reconciliation;
 - `research: false` disables web search and makes no research calls;
@@ -344,10 +374,13 @@ attestation, order, label, vote, and round records remain intact.
 - sanitized-root tests place sentinel MCP/plugin configuration under `repository/.codex`, prove it
   is readable as evidence but absent from fresh and resumed Codex tool inventories, and prove
   `repository/` citations normalize to the pinned repository path before resolution;
-- supported-version acceptance captures the complete fresh/resumed Codex tool inventory and proves
+- inert-materialization fixtures define smudge/process filters, textconv, external diff, hooks,
+  executable files, symlinks, and gitlinks; marker helpers never run during materialization or
+  reviewer reads, while raw expected bytes/manifests remain visible;
+- supported-version acceptance captures the expected fresh/resumed Codex tool inventory and proves
   browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
-  delegation tools are absent; an unexpected installed feature inventory fails preflight before
-  either provider call;
+  delegation tools are absent; an unsupported CLI version fails preflight before either provider
+  call without claiming that feature flags enumerate all future tools;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
@@ -367,7 +400,7 @@ passage is bound in-session from the shared Trafilatura output. Also run explici
 on a repository-settled fixture and prove both deciders receive web search disabled and converge from
 repository evidence. In the real Codex fixtures, put a harmless sentinel MCP under project
 `.codex/config.toml`; prove it is neither started nor listed in fresh voting/plan-structure roles
-or the resumed binding role. Also have those roles attempt the browser, app/connector,
+or the resumed binding role. Include inert Git-helper markers and prove none executes. Also have those roles attempt the browser, app/connector,
 computer-use, plugin, and native-search paths and prove the CLI exposes none. Record the exact
 Codex/Claude versions and effective fresh/resumed tool inventories with the acceptance artifact.
 
@@ -379,7 +412,8 @@ and computed code-review convergence are all clear.
 
 1. External research cannot influence a reported convergence without appearing in the shared,
    logged, server-captured packet, being referenced by a converging vote, and receiving explicit
-   positive authority and entailment judgements from every source-relying decider.
+   positive authority, entailment, and decision-relevance judgements from every source-relying
+   decider.
 2. Both deciders receive byte-identical external packets and remain cold and independently judged.
 3. Repository-only mode performs no research and no web-enabled decider call.
 4. Weak, UGC, non-web, self-referential, uncaptured, passage-mismatched, malformed, over-budget, or
@@ -388,3 +422,5 @@ and computed code-review convergence are all clear.
    reconciliation round and has no persistent evidence lifecycle.
 6. Existing snapshot, ref-movement, cleaner/attester, counterbalancing, label, risk, authority,
    new-option, and deterministic-outcome guarantees remain intact.
+7. Evidence materialization and model-visible reads execute no repository-selected Git helper;
+   supported CLI profiles expose no live external tool outside the discovery phase.
