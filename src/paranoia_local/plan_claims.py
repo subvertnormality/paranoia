@@ -170,9 +170,10 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
 
 _GIT_REV = re.compile(r"[0-9a-fA-F]{7,64}(?:(?:\^+)|(?:~[0-9]+))?")
 _HISTORICAL_REPOSITORY_ASSERTION = re.compile(
-    r"\b(?:card[- ]base|pre[- ]change|pre[- ]code|contemporaneous|"
-    r"historical (?:git|revision|blob)|at (?:the )?(?:parent|revision|commit)|"
-    r"in commit|before (?:the )?[^.]{0,80}\bcommit)\b",
+    r"\b(?:at (?:the )?(?:card[- ]base(?: revision)?|parent(?: revision)?|revision)|"
+    r"(?:brief|blob|runbook|source|file) at (?:the )?card[- ]base|"
+    r"historical [^.]{0,80}\bblob at (?:the )?(?:parent|revision|commit)|"
+    r"pre[- ](?:code|change) (?:parent|runbook|blob|source|revision))\b",
     re.IGNORECASE,
 )
 

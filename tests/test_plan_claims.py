@@ -209,6 +209,23 @@ class TestAuditValidation:
             f"repo://git/{revision}:settings.json#L1"
         )
 
+    @pytest.mark.parametrize("anchor", [
+        "The retained Git search reports first addition in commit abc1234.",
+        "The contract header records card base abc1234.",
+    ])
+    def test_retained_report_about_history_can_use_current_retained_bytes(
+        self, tmp_path: Path, anchor: str,
+    ) -> None:
+        plan = f"# History\n\n{anchor}\n"
+        (tmp_path / "history.txt").write_text("abc1234\n")
+        claim = _repository_claim(url="repo://history.txt#L1", quote="abc1234")
+        claim.update({"anchor": anchor, "proposition": anchor})
+
+        audit = pc.parse_audit(_audit(claim), plan, repo=tmp_path)
+
+        assert audit.claims[0]["verdict"] == "supported"
+        assert audit.claims[0]["evidence"][0]["relation"] == "supports_claim"
+
     def test_repository_location_is_repaired_from_the_exact_quote(
         self, tmp_path: Path,
     ) -> None:
