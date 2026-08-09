@@ -82,7 +82,9 @@ state and reviewer-native capabilities meet the supported model.
   external sources.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.
   In later rounds, an exact unchanged supported claim is frozen with its authoritative packet
-  and requires no model call or web search. Edited, new, refuted, and unverified claims
+  and requires no model call or web search. Bind “unchanged” to the same assertion-bearing
+  Markdown context and heading, not substring presence; quotation, negation, or relocation must
+  re-enter verification. Edited, new, refuted, and unverified claims
   receive targeted verification. Unverified or otherwise non-freezable claims require a full
   replacement evidence packet rather than another compact verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not

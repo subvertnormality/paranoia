@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
@@ -156,11 +157,14 @@ def frozen_supported_ids(
     state = normalize_state(state_raw)
     if state.get("plan_snapshot") is None:
         return frozenset()
+    previous_plan = state["plan_snapshot"]
     frozen: set[str] = set()
     for claim_id, record in state["claims"].items():
         if not isinstance(record, dict) or record.get("verdict") != "supported":
             continue
-        if not _anchor_in_plan(record.get("anchor", ""), plan_text):
+        if not _assertion_binding_unchanged(
+            record.get("anchor", ""), previous_plan, plan_text,
+        ):
             continue
         evidence = [item for item in record.get("evidence", []) if isinstance(item, dict)]
         supports = [
@@ -228,12 +232,6 @@ def parse_audit(
     issues: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
-        # Repository scope was valid in version 1. Treat an explicitly classified legacy
-        # repository row as out of scope, not malformed debt: it must consume neither the
-        # active register nor another correction round. Other unknown scopes remain errors
-        # so a typo cannot silently discard a genuinely external proposition.
-        if isinstance(item, dict) and item.get("scope") == "repository":
-            continue
         try:
             claim = _validate_claim(
                 item, plan_text, repo=repo, plan_repo_path=plan_repo_path,
@@ -1108,6 +1106,57 @@ def _collapse_whitespace(value: str) -> str:
 
 def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
+
+
+def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bool:
+    """Whether an anchor still occurs in the same assertion-bearing document context.
+
+    Substring presence alone freezes quoted, negated, or relocated wording.  Markdown
+    blocks plus their heading path are a conservative occurrence identity: wrapping can
+    change without invalidation, while an edited assertion or section move is re-audited.
+    """
+    if not isinstance(anchor, str) or not anchor.strip():
+        return False
+    return bool(
+        _assertion_contexts(previous, anchor) & _assertion_contexts(current, anchor)
+    )
+
+
+def _assertion_contexts(plan_text: str, anchor: str) -> set[tuple[str, str]]:
+    needle = _collapse_whitespace(anchor)
+    contexts: set[tuple[str, str]] = set()
+    heading_path: list[str] = []
+    block: list[str] = []
+
+    def flush() -> None:
+        if not block:
+            return
+        body = _collapse_whitespace(" ".join(block))
+        sentences = re.split(r'''(?<=[.!?])\s+(?=[A-Z0-9#>*`"'])''', body)
+        for sentence in sentences:
+            if needle in sentence:
+                contexts.add((" / ".join(heading_path), sentence))
+        block.clear()
+
+    for raw_line in plan_text.splitlines():
+        stripped = raw_line.strip()
+        heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading:
+            flush()
+            level = len(heading.group(1))
+            heading_path[level - 1:] = [_collapse_whitespace(heading.group(2))]
+            continue
+        if not stripped:
+            flush()
+            continue
+        if stripped.startswith("|") or re.match(r"^(?:[-*+] |\d+[.)] )", stripped):
+            flush()
+            block.append(stripped)
+            flush()
+            continue
+        block.append(stripped)
+    flush()
+    return contexts
 
 
 def _removal_candidates(prior_state: Any, plan_text: str) -> str:

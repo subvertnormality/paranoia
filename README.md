@@ -245,6 +245,8 @@ conformance, and internal function bridges are excluded from this register and r
 of ordinary structural/code review and tests. Local decisions and project-authored preferences
 do not become external claims just because they are called “design principles.” Legacy
 repository claims are mechanically retired and stop consuming active inventory or prompts.
+Fresh model output mislabeled `repository` is rejected into bounded correction/debt rather than
+silently discarded, because it could actually be an eligible external premise.
 
 External claims close only when an exact passage from a primary or authoritative
 source entails that exact proposition. First-party documentation, standards,
@@ -292,6 +294,8 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
 4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
    its authoritative packet. The claim verifier receives only edited/new eligible external
    wording plus retained refuted or unverified claims.
+   Freeze identity includes the assertion-bearing Markdown block and heading path, so quoting,
+   negating, or relocating old words cannot preserve stale support;
    Unverified or non-freezable claims require complete replacement evidence packets on the next
    targeted round; they cannot churn through compact verdict-only assessments. Settled claims
    cause no model call or web search. Edited claims inherit no verdict;
@@ -784,6 +788,8 @@ Design documents for the two non-obvious subsystems live in
 [`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
 [`claim_verification.md`](docs/claim_verification.md), and
 [`arbitration_plan.md`](docs/arbitration_plan.md).
+The latest real Codex verification evidence is recorded in
+[`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 
 ## License
 

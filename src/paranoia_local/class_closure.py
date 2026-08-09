@@ -449,7 +449,13 @@ def open_latch(root: Path, lineage_id: str) -> None:
     _, pending = _paths(root, lineage_id)
     try:
         pending.parent.mkdir(parents=True, exist_ok=True)
-        pending.write_text("pending\n", encoding="utf-8")
+        fd = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("pending\n")
+    except FileExistsError as exc:
+        raise StateUnavailable(
+            f"a round already owns the pending latch at {pending}"
+        ) from exc
     except OSError as exc:
         # Same treatment as a failed lineage save: block, but never prevent the review
         # from running or discard its text over a storage fault.

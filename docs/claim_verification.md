@@ -36,11 +36,12 @@ preferences, forecasts, and incidental observations. They remain fully reviewabl
 ordinary structural/code review and tests; they simply do not enter the persistent web-evidence
 lifecycle. Calling an internal preference a “design principle” does not make it external.
 
-The parser discards explicitly repository-scoped rows without creating debt, rejects other
-unknown scopes and claim kinds, and accepts only the three literals above. Existing version-1
-repository claims are mechanically moved to retired diagnostic history and immediately stop
-consuming active inventory, prompts, or convergence. This server-owned rule prevents model
-phrasing or reviewer stakes from widening the register.
+The parser rejects every fresh row whose scope is not `external`, so a model cannot silently
+discard an eligible external premise by mislabeling it `repository`; the bounded correction and
+debt path governs that error. Existing version-1 repository claims are different: normalization
+mechanically moves those already-persisted rows to retired diagnostic history, where they stop
+consuming active inventory, prompts, or convergence. This server-owned distinction prevents
+both old repository churn and new false-empty clearance.
 
 ## Architecture
 
@@ -87,7 +88,10 @@ Round 1 scans the complete plan for all three eligible external kinds and gather
 packets. It splits compound external assertions into atomic propositions, but does not atomize
 an internal design into repository-mechanical hops. Each claim receives a server-owned ID.
 
-Later rounds freeze every exact unchanged `supported` claim with its captured packet. The
+Later rounds freeze every exact unchanged `supported` claim with its captured packet. “Unchanged”
+requires the anchor to remain in the same normalized Markdown assertion block and heading path,
+not merely to occur as a substring; quotation, negation, relocation, or surrounding assertion
+edits force re-verification while harmless line wrapping remains stable. The
 verifier receives only added or edited eligible wording, retained `refuted` or `unverified`
 claims, and removal candidates. An unchanged, fully supported register causes no evidence-model
 call or web search. This optimization applies only to claim verification: the full cold
@@ -123,3 +127,11 @@ Audit JSON uses concrete literals, never pseudo-enums. One bounded correction ca
 exact validation failure. If correction still fails, diagnostics include the reason, output
 hash, and bounded excerpt. Frozen supported packets remain usable and successful evidence work
 is persisted before structural review, so a later structural failure does not restart research.
+
+## Recorded real acceptance
+
+The current Codex acceptance record is
+[`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
+It covers a known false internet-only claim, an external fact, an RFC design principle, an
+external-library behavior, an internal bridge that must stay out of inventory, retained-packet
+reuse, and a fresh 102 KB real dossier that converged in two rounds with seven external claims.

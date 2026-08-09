@@ -94,13 +94,9 @@ class TestAuditValidation:
         assert [claim["verdict"] for claim in audit.claims] == ["unverified", "supported"]
         assert "Server demotion" in audit.claims[0]["rationale"]
 
-    def test_repository_scope_is_mechanically_excluded_without_debt(self) -> None:
-        audit = pc.parse_audit(
-            _audit(_claim(scope="repository"), _claim()), PLAN,
-        )
-        assert len(audit.claims) == 1
-        assert audit.claims[0]["scope"] == "external"
-        assert audit.issues == ()
+    def test_fresh_repository_scope_enters_correction_instead_of_disappearing(self) -> None:
+        with pytest.raises(pc.AuditError, match="repository/internal assertions"):
+            pc.parse_audit(_audit(_claim(scope="repository")), PLAN)
 
     def test_unknown_scope_typo_is_not_silently_discarded(self) -> None:
         with pytest.raises(pc.AuditError, match='scope must be the literal \\"external\\"'):
@@ -349,6 +345,27 @@ class TestRetainedEvidence:
         assert second["claims"][claim_id]["verified_round"] == 1
         assert second["claims"][claim_id]["retained_round"] == 2
         assert not pc.is_blocked(second)
+
+    @pytest.mark.parametrize("changed", [
+        '# Rollout\n\nThe statement "Python 3.11 was released in October 2022." is rejected.\n',
+        '# Rollout\n\nPython 3.11 was not released in October 2022.\n',
+        '# Quotation\n\n> Python 3.11 was released in October 2022.\n',
+        '# Historical notes\n\nPython 3.11 was released in October 2022.\n',
+    ])
+    def test_changed_assertion_context_is_not_frozen(self, changed: str) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        assert not pc.frozen_supported_ids(first, changed)
+
+    def test_markdown_wrapping_keeps_the_same_assertion_binding(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        wrapped = "# Rollout\n\nPython 3.11 was released\nin October 2022.\n"
+        assert pc.frozen_supported_ids(first, wrapped) == set(first["claims"])
 
     def test_failed_targeted_audit_does_not_invalidate_frozen_support(self) -> None:
         first = pc.reconcile(

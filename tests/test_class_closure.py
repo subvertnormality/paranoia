@@ -539,6 +539,12 @@ class TestLineageState:
         cc.clear_latch(tmp_path, "test")
         assert cc.load_lineage(tmp_path, "test", stamp="s").rounds == 0
 
+    def test_pending_latch_has_exactly_one_owner(self, tmp_path: Path) -> None:
+        cc.open_latch(tmp_path, "test")
+        with pytest.raises(cc.StateUnavailable, match="already owns"):
+            cc.open_latch(tmp_path, "test")
+        cc.clear_latch(tmp_path, "test")
+
     def test_state_is_replaced_atomically(self, tmp_path: Path) -> None:
         lin = lineage_with(("inv", cc.MAJOR, "X"))
         cc.save_lineage(tmp_path, lin)
