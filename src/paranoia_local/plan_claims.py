@@ -1199,23 +1199,61 @@ def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
         )
         block.clear()
 
-    for raw_line in plan_text.splitlines():
+    lines = plan_text.splitlines()
+    in_fence: tuple[str, int] | None = None
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
         stripped = raw_line.strip()
+        fence = re.match(r"^ {0,3}(`{3,}|~{3,})", raw_line)
+        if in_fence:
+            closing = re.match(
+                rf"^ {{0,3}}{re.escape(in_fence[0])}{{{in_fence[1]},}}\s*$",
+                raw_line,
+            )
+            if closing:
+                in_fence = None
+            index += 1
+            continue
+        if fence:
+            flush()
+            in_fence = (fence.group(1)[0], len(fence.group(1)))
+            index += 1
+            continue
+        if raw_line.startswith("\t") or len(raw_line) - len(raw_line.lstrip(" ")) >= 4:
+            flush()
+            index += 1
+            continue
+        if (
+            stripped
+            and index + 1 < len(lines)
+            and re.match(r"^ {0,3}(=+|-+)\s*$", lines[index + 1])
+        ):
+            flush()
+            underline = lines[index + 1].lstrip()
+            level = 1 if underline.startswith("=") else 2
+            heading_path[level - 1:] = [_collapse_whitespace(stripped)]
+            index += 2
+            continue
         heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading:
             flush()
             level = len(heading.group(1))
             heading_path[level - 1:] = [_collapse_whitespace(heading.group(2))]
+            index += 1
             continue
         if not stripped:
             flush()
+            index += 1
             continue
         if stripped.startswith("|") or re.match(r"^(?:[-*+] |\d+[.)] )", stripped):
             flush()
             block.append(stripped)
             flush()
+            index += 1
             continue
         block.append(stripped)
+        index += 1
     flush()
     return contexts
 

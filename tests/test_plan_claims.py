@@ -364,6 +364,7 @@ class TestRetainedEvidence:
         '# Rollout\n\nThe statement "Python 3.11 was released in October 2022." is rejected.\n',
         '# Rollout\n\nPython 3.11 was not released in October 2022.\n',
         '# Quotation\n\n> Python 3.11 was released in October 2022.\n',
+        '# Example\n\n```text\nPython 3.11 was released in October 2022.\n```\n',
         '# Historical notes\n\nPython 3.11 was released in October 2022.\n',
     ])
     def test_changed_assertion_context_is_not_frozen(self, changed: str) -> None:
@@ -385,6 +386,30 @@ class TestRetainedEvidence:
             PLAN.rstrip() + " This statement is false and must not be relied on.\n"
         )
         assert not pc.frozen_supported_ids(first, retracted)
+
+    def test_setext_heading_relocation_forces_reverification(self) -> None:
+        original = (
+            "Rollout\n=======\n\nPython 3.11 was released in October 2022.\n"
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), original),
+            lineage_id="x-plan", round_no=1, plan_text=original,
+        )
+        relocated = (
+            "Historical notes\n================\n\n"
+            "Python 3.11 was released in October 2022.\n"
+        )
+        assert not pc.frozen_supported_ids(first, relocated)
+
+    def test_indented_code_occurrence_cannot_freeze_asserted_prose(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        code_only = (
+            "# Rollout\n\n    Python 3.11 was released in October 2022.\n"
+        )
+        assert not pc.frozen_supported_ids(first, code_only)
 
     def test_duplicate_assertion_and_quotation_cannot_freeze_ambiguously(self) -> None:
         mixed = (
