@@ -215,7 +215,10 @@ def frozen_supported_ids(
         evidence = [item for item in record.get("evidence", []) if isinstance(item, dict)]
         supports = [
             item for item in evidence
-            if _qualifying(item, record.get("scope", ""))
+            if _qualifying(
+                item, record.get("scope", ""), repo=repo,
+                plan_repo_path=plan_repo_path,
+            )
             and item.get("relation") == "supports_claim"
         ]
         if not supports:
@@ -432,7 +435,10 @@ def _validate_claim(
         prior = _one_line(prior, "prior_claim_id")
     rationale = str(item.get("rationale", "")).strip()
 
-    qualifying = [e for e in checked if _qualifying(e, scope)]
+    qualifying = [
+        e for e in checked
+        if _qualifying(e, scope, repo=repo, plan_repo_path=plan_repo_path)
+    ]
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
         demotion = "claimed support lacked claim-entailing authoritative evidence"
@@ -494,13 +500,21 @@ def _validate_evidence(
     return result
 
 
-def _qualifying(evidence: dict[str, str], scope: str) -> bool:
+def _qualifying(
+    evidence: dict[str, str], scope: str, *, repo: Path | None = None,
+    plan_repo_path: str | None = None,
+) -> bool:
     parsed = urlparse(evidence["url"])
     return (
         scope == "external"
         and parsed.scheme in {"https", "http"}
         and bool(parsed.hostname)
         and evidence["source_kind"] in AUTHORITATIVE_KINDS
+        and not (
+            repo is not None
+            and plan_repo_path
+            and _is_plan_self_url(evidence["url"], repo, plan_repo_path)
+        )
     )
 
 
@@ -555,6 +569,7 @@ def _canonical_remote_repo(repo_path: str) -> tuple[str, str] | None:
 def reconcile(
     prior_raw: Any, audit: Audit, *, lineage_id: str, round_no: int, plan_text: str,
     frozen_ids: Iterable[str] = (), repo: Path | None = None,
+    plan_repo_path: str | None = None,
     allow_missing: bool = False,
 ) -> dict[str, Any]:
     """Replace the active inventory with the current audit, retaining identity/evidence.
@@ -566,7 +581,7 @@ def reconcile(
     frozen = frozenset(frozen_ids)
     validate_prior_coverage(
         prior_raw, audit, plan_text=plan_text, frozen_ids=frozen, repo=repo,
-        allow_missing=allow_missing,
+        plan_repo_path=plan_repo_path, allow_missing=allow_missing,
     )
     prior = normalize_state(prior_raw)
     old = prior["claims"]
@@ -633,7 +648,10 @@ def reconcile(
         if verdict != "refuted":
             record["replacement"] = None
         elif not any(
-            _qualifying(evidence, record.get("scope", ""))
+            _qualifying(
+                evidence, record.get("scope", ""), repo=repo,
+                plan_repo_path=plan_repo_path,
+            )
             and evidence.get("relation") == "supports_replacement"
             for evidence in record.get("evidence", [])
             if isinstance(evidence, dict)
@@ -708,6 +726,7 @@ def reconcile(
 def validate_prior_coverage(
     prior_raw: Any, audit: Audit, *, plan_text: str, raw: str = "",
     frozen_ids: Iterable[str] = (), repo: Path | None = None,
+    plan_repo_path: str | None = None,
     allow_missing: bool = False,
 ) -> None:
     """Require a current judgement for every retained exact claim still in the plan.
@@ -769,7 +788,13 @@ def validate_prior_coverage(
                 raw,
             )
         evidence = [e for e in record.get("evidence", []) if isinstance(e, dict)]
-        qualifying = [e for e in evidence if _qualifying(e, record.get("scope", ""))]
+        qualifying = [
+            e for e in evidence
+            if _qualifying(
+                e, record.get("scope", ""), repo=repo,
+                plan_repo_path=plan_repo_path,
+            )
+        ]
         relation = {
             "supported": "supports_claim", "refuted": "refutes_claim",
         }.get(item["verdict"])

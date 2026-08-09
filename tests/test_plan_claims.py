@@ -131,6 +131,53 @@ class TestAuditValidation:
         ).claims[0]
         assert claim["verdict"] == "supported"
 
+    def test_persisted_plan_self_evidence_cannot_freeze_after_upgrade(
+        self, repo: Path,
+    ) -> None:
+        self_source = _source(
+            url="https://github.com/example/project/blob/main/docs/plan.md",
+            kind="primary",
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim(evidence=[self_source])), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:example/project.git"],
+            cwd=repo, check=True,
+        )
+        assert not pc.frozen_supported_ids(
+            first, PLAN, repo=repo, plan_repo_path="docs/plan.md",
+        )
+
+    def test_persisted_plan_self_evidence_cannot_govern_compact_assessment(
+        self, repo: Path,
+    ) -> None:
+        self_source = _source(
+            url="https://github.com/example/project/blob/main/docs/plan.md",
+            kind="primary", relation="refutes_claim",
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim(
+                verdict="refuted", evidence=[self_source],
+            )), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:example/project.git"],
+            cwd=repo, check=True,
+        )
+        assessment = pc.parse_audit(_audit(assessments=[{
+            "claim_id": claim_id, "verdict": "refuted",
+            "rationale": "The old packet still contradicts the claim.",
+        }]), PLAN)
+        with pytest.raises(pc.AuditError, match="no qualifying refutes_claim evidence"):
+            pc.reconcile(
+                first, assessment, lineage_id="x-plan", round_no=2,
+                plan_text=PLAN, repo=repo, plan_repo_path="docs/plan.md",
+            )
+
     def test_context_only_support_is_demoted_without_discarding_other_claims(self) -> None:
         context_only = _source(relation="context")
         audit = pc.parse_audit(_audit(

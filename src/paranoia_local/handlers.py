@@ -625,7 +625,7 @@ def _verify_plan_claims(
         state = pc.reconcile(
             prior_state, pc.Audit((), {"notes": "unchanged frozen claim inventory"}, (), ()),
             lineage_id=lineage_id, round_no=round_no, plan_text=plan_text,
-            frozen_ids=frozen, repo=repo,
+            frozen_ids=frozen, repo=repo, plan_repo_path=plan_repo_path,
         )
         return state, f"reused {len(frozen)} unchanged supported packets; no claim model call"
     if on_progress:
@@ -661,7 +661,7 @@ def _verify_plan_claims(
         )
         pc.validate_prior_coverage(
             prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
-            repo=repo,
+            repo=repo, plan_repo_path=plan_repo_path,
         )
         status = (
             f"parsed {len(audit.claims)} new + {len(audit.assessments)} targeted retained"
@@ -701,7 +701,8 @@ def _verify_plan_claims(
             )
             pc.validate_prior_coverage(
                 prior_state, audit, plan_text=plan_text, raw=retry.text,
-                frozen_ids=frozen, repo=repo, allow_missing=True,
+                frozen_ids=frozen, repo=repo, plan_repo_path=plan_repo_path,
+                allow_missing=True,
             )
             allow_missing = True
             status = (
@@ -723,6 +724,7 @@ def _verify_plan_claims(
     state = pc.reconcile(
         prior_state, audit, lineage_id=lineage_id, round_no=round_no,
         plan_text=plan_text, frozen_ids=frozen, repo=repo,
+        plan_repo_path=plan_repo_path,
         allow_missing=allow_missing,
     )
     return state, status
