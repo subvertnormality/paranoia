@@ -7,23 +7,23 @@
     "web_capability": "built-in tools.web_search=true",
     "authentication": "signed-in ChatGPT account"
   },
-  "implementation_commit": "81abbc4",
+  "implementation_commit": "3edda33",
   "representative_acceptance": {
-    "lineage": "final-external-acceptance-81abbc4-plan",
+    "lineage": "final-external-acceptance-3edda33-plan",
     "fixture": "Fresh external fact, RFC design principle, urllib.parse.urljoin behavior, one intentionally false internet-only SQLite release date, and an internal function-call bridge.",
     "rounds": [
       {
         "round": 1,
         "claim_status": "parsed 4 new + 0 targeted retained + 0 frozen",
         "claim_model_calls": 1,
-        "claim_duration_ms": 73676,
-        "result": "Three supported categories; hidden 2025 SQLite date refuted by the official release log and chronology with an exact 2024 replacement; internal function bridge excluded."
+        "claim_duration_ms": 56980,
+        "result": "Three supported categories; hidden 2025 SQLite date refuted by the official release log with an exact 2024 replacement; internal function bridge and plan self-evidence excluded."
       },
       {
         "round": 2,
         "claim_status": "parsed 1 new + 0 targeted retained + 3 frozen",
         "claim_model_calls": 1,
-        "claim_duration_ms": 25387,
+        "claim_duration_ms": 23479,
         "result": "Evidence-entailed correction supported; three unchanged packets reused; CLAIM-CLOSURE 4 supported, 0 refuted, 0 unverified; CONVERGENCE: NOT-BLOCKED."
       },
       {
