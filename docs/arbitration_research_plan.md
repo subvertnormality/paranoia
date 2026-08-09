@@ -37,12 +37,14 @@ gives them different, unaudited corpora.
 The implementation relies on exactly these provider behaviors, which plan verification must keep
 in its active external-claim inventory:
 
-- Codex CLI exposes live web search to a non-interactive `codex exec` session and supports
-  continuing that session with `codex exec resume <session-id>`.
-- Claude Code exposes `WebSearch` for source discovery in print mode and supports continuing a
-  print-mode session with `claude -p --resume <session-id>`.
-- Trafilatura downloads HTML and extracts normalized main text, while pages that require
-  JavaScript rendering can remain unavailable to it.
+- Codex CLI's `web_search` configuration has explicit `live`, `cached`, and `disabled` modes;
+  non-interactive `codex exec` supports live search and `codex exec resume <session-id>` continues
+  that session.
+- Claude Code's `WebSearch` returns candidate source titles and URLs for discovery in print mode,
+  and `claude -p --resume <session-id>` continues a print-mode session.
+- Trafilatura extracts a downloaded page's main content as plain text, while pages that require
+  JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
+  normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
 
 These are current external capabilities, not guarantees made by this repository. Bind them to the
 official [Codex command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
@@ -68,6 +70,13 @@ Add `research`, default `true`, to `arbitrate`.
 This removes the current halfway state. Research remains on by default because arbitration is a
 general technical decision tool, but callers with a genuinely repository-settled question can
 avoid its cost explicitly.
+
+For `critique_plan` with default claim verification, the same modes are mechanical: the claim
+research call uses Codex `live` or Claude `WebSearch`-only discovery, the server captures candidate
+pages, and the subsequent structural reviewer runs with Codex `disabled` or no Claude web tools.
+It receives the captured claim register in its prompt. Claude `WebFetch` is never enabled in the
+plan-verification path. `claim_verification: false` remains the explicit legacy/structural-only
+escape and makes no claim-support guarantee.
 
 ### 2. Balanced research fan-out
 
@@ -158,9 +167,10 @@ browse or fetch; no external bytes outside the logged packet can affect a vote.
 The server rejects research output containing caller IDs, temporary order labels, or trailer-field
 injection. The prompt forbids selection, comparison, ranking, and recommendations, but the server
 does not use a brittle natural-language advocacy detector that would also reject a technology's
-name. Counterbalanced research presentations reduce residual research-framing bias. Final
-high-entropy decider labels are generated only after the packet exists, and the existing absence
-scan covers the packet as decider-visible text.
+name. Canonical/reversed research presentations make option-order exposure symmetric by
+construction; this plan does not claim that counterbalancing eliminates or measurably reduces
+model bias. Final high-entropy decider labels are generated only after the packet exists, and the
+existing absence scan covers the packet as decider-visible text.
 
 ### 5. External evidence can substantiate a vote
 
@@ -177,8 +187,11 @@ For every `SOURCE:` decisive reference the strict vote grammar also requires
 `PUBLISHER-AUTHORITY: YES|NO — <reason>` and `PASSAGE-ENTAILMENT: YES|NO — <reason>`. A
 source-backed vote is substantiated only when both are `YES`; each cold decider therefore makes
 and exposes its own authority and entailment judgement. For a repository decisive citation both
-fields must be `N/A`. The vote's `CONSTRAINT` remains the decider's one-line statement of what the
-evidence establishes.
+fields must be `N/A`. For a source reference, `CONSTRAINT` must equal the referenced packet's exact
+normalized atomic proposition; the parser rejects any mismatch before outcome computation. For a
+repository citation it remains the decider's one-line statement of what the repository evidence
+establishes. This binds the registered source, asserted decisive proposition, and substantiation
+bit rather than trusting two unrelated free-text fields.
 
 Supporting `CITATIONS` remain repository citations in this change. The decisive reference is the
 only field that affects substantiation, keeping the parser and reconciliation surface small.
@@ -234,9 +247,11 @@ label, vote, and round records remain intact.
 - Keep orchestration in `arbitrate_handler.py`: a metadata-preserving research call/result and
   resume seam, parallel research calls, bounded correction, one whole-run deadline, identical
   packet injection, logging, and progress.
-- Extend the Claude engine's internal web capability from a boolean to the minimum role-specific
-  modes needed here: disabled, discovery (`WebSearch` only), and full (existing behavior). Do not
-  expose a provider abstraction or search-endpoint configuration.
+- Extend both engine implementations to the minimum explicit internal role modes needed here.
+  Codex research passes `web_search="live"`; all voting, repository-only arbitration, and verified
+  plan-structure calls pass `web_search="disabled"`, never omission/cached. Claude discovery
+  allows `WebSearch` only and those later roles allow no web tools. Existing full mode remains for
+  other tools. Do not expose a provider abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
 - Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
 
@@ -255,10 +270,15 @@ label, vote, and round records remain intact.
 - counterbalanced research framing and byte-identical normalized evidence for both deciders;
 - caller/order/decider-label leakage rejection;
 - repository and `SOURCE:` decisive-reference parsing, rendering, resolution, and substantiation;
+- an otherwise eligible unrelated packet with both judgement fields `YES` remains unsubstantiated
+  when `CONSTRAINT` differs from its exact normalized proposition;
 - unknown or non-governing source IDs cannot converge;
 - source references never enter repository region reconciliation;
 - `research: false` disables web search and makes no research calls;
 - `research: true, web_search: false` fails before spend;
+- engine argv tests prove Codex researchers use explicit `live`, Codex voters/repository-only and
+  verified plan-structure reviewers use explicit `disabled`, and Claude evidence roles never
+  allow `WebFetch`;
 - malformed research retains the exact session reference, receives one resume correction, and
   then fails closed; raw output, call count, usage, and durations remain auditable;
 - every phase cap composes below the whole-run deadline with reserved teardown margin, and a phase
