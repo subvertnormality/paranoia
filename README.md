@@ -328,6 +328,9 @@ absence is never an automatic retirement. The old packet remains active as `unve
 until then. The cold structural reviewer receives the complete evidence for every
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
+The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
+harmless extra model metadata; required fields, unambiguous aliases, and transition validity
+remain strict.
 
 When unresolved old wording is still present, it is not rediscovered from scratch. The server
 supplies its exact ID, anchor, proposition, and retained packet as a mandatory targeted

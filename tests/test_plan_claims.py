@@ -359,6 +359,35 @@ class TestAuditValidation:
             "reason": "The old exact wording is absent.",
         },)
 
+    def test_disposition_ignores_harmless_model_metadata(self) -> None:
+        audit = pc.parse_audit(_audit(
+            _claim(),
+            dispositions=[{
+                "claim_id": "C-old", "disposition": "removed",
+                "reason": "The old exact wording is absent.",
+                "anchor": "Old wording from the prior plan.",
+            }],
+        ), PLAN)
+        assert audit.dispositions == ({
+            "claim_id": "C-old", "disposition": "removed",
+            "reason": "The old exact wording is absent.",
+        },)
+
+    @pytest.mark.parametrize("extra", [
+        {"prior_claim_id": "C-other"},
+        {"rationale": "A second reason."},
+    ])
+    def test_disposition_still_rejects_ambiguous_wire_aliases(
+        self, extra: dict[str, str],
+    ) -> None:
+        item = {
+            "claim_id": "C-old", "disposition": "removed",
+            "reason": "The old exact wording is absent.",
+            **extra,
+        }
+        with pytest.raises(pc.AuditError, match="must contain one claim ID"):
+            pc.parse_audit(_audit(_claim(), dispositions=[item]), PLAN)
+
 
 class TestRetainedEvidence:
     def test_corrected_wording_gets_new_identity_and_re_entails_retained_evidence(self) -> None:

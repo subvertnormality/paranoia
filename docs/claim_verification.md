@@ -133,6 +133,13 @@ avoids rediscovering stale packets across rounds, but does not auto-retire them:
 must validate and return an explicit `removed` disposition. The cold structural reviewer sees
 every current-round retirement.
 
+A removal disposition consumes only one claim ID (`claim_id`, with `prior_claim_id` accepted
+as a wire alias), `disposition: "removed"`, and one reason (`reason`, with `rationale` accepted
+as an alias). The parser normalizes those fields and ignores additional model-supplied metadata
+such as an old anchor. It still rejects missing fields, conflicting aliases, duplicate claim
+IDs, and any disposition other than `removed`; harmless explanatory metadata cannot strand an
+otherwise valid autonomous transition.
+
 Prior URLs and passages for unresolved or edited assertions are included as candidate evidence
 in the targeted audit. Every still-present unresolved ID is mechanically required. A missing ID
 rejects the audit and is named in the one bounded correction prompt before any state commit,

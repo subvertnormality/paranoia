@@ -351,11 +351,11 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
         if (
             len(id_fields) != 1
             or len(reason_fields) != 1
-            or fields != id_fields | reason_fields | {"disposition"}
+            or "disposition" not in fields
         ):
             raise AuditError(
-                f"prior disposition {index} must contain exactly claim_id, disposition, "
-                "and reason (prior_claim_id and rationale are accepted as wire aliases)",
+                f"prior disposition {index} must contain one claim ID, disposition, "
+                "and one reason (prior_claim_id and rationale are accepted as wire aliases)",
                 text,
             )
         claim_id = _one_line(item[next(iter(id_fields))], "disposition.claim_id")
