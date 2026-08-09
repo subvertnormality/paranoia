@@ -43,6 +43,13 @@ mechanically moves those already-persisted rows to retired diagnostic history, w
 consuming active inventory, prompts, or convergence. This server-owned distinction prevents
 both old repository churn and new false-empty clearance.
 
+The replaced, versionless claim-array schema cannot be safely guessed into this register. If it
+contains active predecessor rows or debt, normalization preserves their IDs and statuses in
+explicit blocking migration debt, omits a reusable plan snapshot, and forces one exhaustive
+external-claim audit. A successful audit then writes the current versioned schema. Empty legacy
+inventory needs no migration work. This prevents an upgrade from treating unknown old rows as
+an empty, verified register.
+
 ## Architecture
 
 1. The selected reviewer CLI scans the plan and uses its built-in web search. There is no
@@ -68,6 +75,10 @@ exact passage, evidence relation, and an explanation of why that publisher gover
 proposition. The passage must entail the atomic proposition while preserving actor, event,
 date, modality, scope, and chronology. Evidence of an underlying condition does not prove that
 a named external report occurred.
+
+Only canonical `https://` or `http://` locations with a host can govern a verdict. Repository,
+file, and custom-scheme locations may be retained as context but can never count as primary or
+authoritative web evidence.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and records,
 standards, legislation/regulators, government data, and original papers/datasets. Secondary
@@ -98,7 +109,9 @@ call or web search. This optimization applies only to claim verification: the fu
 structural review still runs each round.
 
 An edited proposition inherits no verdict. An unresolved or otherwise non-freezable claim must
-return as a complete evidence packet; it cannot churn through compact verdict-only assessments.
+return as a complete current evidence packet; a compact assessment is rejected even if it says
+`supported`. Compact retained-packet judgements are limited to exact still-present refuted
+claims; they cannot repair missing, changed, ambiguous, unverified, or stale support.
 A prior claim cannot disappear through model omission or ID reuse. Its old anchor must leave the
 plan and receive an explicit `removed` disposition. If the bounded correction retry still omits
 a required ID, valid packets are applied and only that claim remains `unverified`.

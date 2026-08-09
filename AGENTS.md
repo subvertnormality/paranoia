@@ -76,6 +76,9 @@ state and reviewer-native capabilities meet the supported model.
   past date requires a source authoritative for that date, not a later summary.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
+- Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
+  schemes are context only. Active versionless predecessor state must become blocking migration
+  debt and force one exhaustive audit, never normalize to an empty verified register.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
   The plan under review is context, not evidence for its own assertions; require authoritative

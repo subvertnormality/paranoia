@@ -85,6 +85,15 @@ class TestAuditValidation:
         assert claim["verdict"] == "unverified"
         assert claim["evidence"][0]["source_kind"] == "ugc"
 
+    @pytest.mark.parametrize("url", [
+        "repo://docs/plan.md", "file:///tmp/evidence.txt", "custom://authority/item",
+    ])
+    def test_non_web_locations_cannot_govern_external_verdicts(self, url: str) -> None:
+        source = _source(url=url, kind="primary")
+        claim = pc.parse_audit(_audit(_claim(evidence=[source])), PLAN).claims[0]
+        assert claim["verdict"] == "unverified"
+        assert claim["evidence"][0]["relation"] == "context"
+
     def test_context_only_support_is_demoted_without_discarding_other_claims(self) -> None:
         context_only = _source(relation="context")
         audit = pc.parse_audit(_audit(
@@ -298,9 +307,14 @@ class TestRetainedEvidence:
     def test_final_retry_localizes_a_missing_retained_claim(self) -> None:
         sqlite = "SQLite 3.45.0 was released on 15 January 2024."
         plan = PLAN + sqlite + "\n"
+        refuting = [_source(relation="refutes_claim")]
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(
-                _claim(), _claim(anchor=sqlite, proposition=sqlite),
+                _claim(verdict="refuted", evidence=refuting),
+                _claim(
+                    anchor=sqlite, proposition=sqlite, verdict="refuted",
+                    evidence=refuting,
+                ),
             ), plan),
             lineage_id="x-plan", round_no=1, plan_text=plan,
         )
@@ -311,8 +325,8 @@ class TestRetainedEvidence:
         sqlite_id = next(claim_id for claim_id in first["claims"] if claim_id != python_id)
         retry = pc.parse_audit(_audit(assessments=[{
             "claim_id": python_id,
-            "verdict": "supported",
-            "rationale": "The retained official passage still entails the claim.",
+            "verdict": "refuted",
+            "rationale": "The retained official passage still contradicts the claim.",
         }]), plan)
 
         second = pc.reconcile(
@@ -320,7 +334,7 @@ class TestRetainedEvidence:
             allow_missing=True,
         )
 
-        assert second["claims"][python_id]["verdict"] == "supported"
+        assert second["claims"][python_id]["verdict"] == "refuted"
         assert second["claims"][sqlite_id]["verdict"] == "unverified"
         assert "omitted this prior claim" in second["claims"][sqlite_id]["rationale"]
         assert second["debt"] is None
@@ -358,6 +372,40 @@ class TestRetainedEvidence:
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
         )
         assert not pc.frozen_supported_ids(first, changed)
+
+    def test_duplicate_assertion_and_quotation_cannot_freeze_ambiguously(self) -> None:
+        mixed = (
+            PLAN + '\n## Quotation\n\n'
+            '> Python 3.11 was released in October 2022.\n'
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), mixed),
+            lineage_id="x-plan", round_no=1, plan_text=mixed,
+        )
+        quotation_only = (
+            '# Rollout\n\nThe assertion was removed.\n\n## Quotation\n\n'
+            '> Python 3.11 was released in October 2022.\n'
+        )
+        assert not pc.frozen_supported_ids(first, quotation_only)
+
+    def test_nonfreezable_claim_rejects_compact_support(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        claim_id = next(iter(first["claims"]))
+        quoted = (
+            '# Rollout\n\nThe statement "Python 3.11 was released in October 2022." '
+            'is rejected.\n'
+        )
+        audit = pc.parse_audit(_audit(assessments=[{
+            "claim_id": claim_id, "verdict": "supported",
+            "rationale": "The old packet is unchanged.",
+        }]), quoted)
+        with pytest.raises(pc.AuditError, match="require full current evidence packets"):
+            pc.reconcile(
+                first, audit, lineage_id="x-plan", round_no=2, plan_text=quoted,
+            )
 
     def test_markdown_wrapping_keeps_the_same_assertion_binding(self) -> None:
         first = pc.reconcile(
@@ -433,25 +481,28 @@ class TestRetainedEvidence:
         assert any(item["claim_id"] == sqlite_id for item in second["retired"])
         assert len(second["claims"]) == 2
 
-    def test_compact_assessment_reentails_retained_packet_without_repeating_it(self) -> None:
+    def test_compact_assessment_rechecks_retained_refutation_without_repeating_it(self) -> None:
+        refuting = [_source(relation="refutes_claim")]
         first = pc.reconcile(
-            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            {}, pc.parse_audit(_audit(_claim(
+                verdict="refuted", evidence=refuting,
+            )), PLAN),
             lineage_id="x-plan", round_no=1, plan_text=PLAN,
         )
         claim_id = next(iter(first["claims"]))
         second = pc.reconcile(
             first, pc.parse_audit(_audit(assessments=[{
                 "claim_id": claim_id,
-                "verdict": "supported",
-                "rationale": "The retained official passage still entails the exact claim.",
+                "verdict": "refuted",
+                "rationale": "The retained official passage still contradicts the exact claim.",
             }]), PLAN),
             lineage_id="x-plan", round_no=2, plan_text=PLAN,
         )
         assert list(second["claims"]) == [claim_id]
-        assert second["claims"][claim_id]["verdict"] == "supported"
+        assert second["claims"][claim_id]["verdict"] == "refuted"
         assert second["claims"][claim_id]["verified_round"] == 2
         assert second["claims"][claim_id]["evidence"] == first["claims"][claim_id]["evidence"]
-        assert not pc.is_blocked(second)
+        assert pc.is_blocked(second)
 
     def test_legacy_repository_claims_are_mechanically_retired(self) -> None:
         legacy = pc.empty_state()
@@ -472,6 +523,26 @@ class TestRetainedEvidence:
         assert set(normalized["claims"]) == {"C-external"}
         assert normalized["retired"][-1]["claim_id"] == "C-repo"
         assert normalized["retired"][-1]["disposition"] == "out_of_scope"
+
+    def test_parent_schema_with_unresolved_claims_migrates_to_blocking_debt(self) -> None:
+        legacy = {
+            "next_seq": 4,
+            "claims": [{
+                "claim_id": "a" * 32,
+                "claim": "An external premise remains unresolved.",
+                "status": "UNVERIFIED",
+            }],
+            "debt": None,
+            "evidence_records": [],
+            "plan_sha256": "b" * 64,
+            "authorization_policy": None,
+        }
+        normalized = pc.normalize_state(legacy)
+        assert pc.is_blocked(normalized)
+        assert normalized["claims"] == {}
+        assert "1 active predecessor" in normalized["debt"]["reason"]
+        assert "a" * 32 in normalized["debt"]["reason"]
+        assert not pc.has_prior_snapshot(normalized)
 
     def test_targeted_prompt_requires_full_packet_for_unverified_claim(self) -> None:
         first = pc.reconcile(
@@ -532,7 +603,7 @@ class TestRetainedEvidence:
             "verdict": "supported",
             "rationale": "The old context still looks plausible.",
         }]), PLAN)
-        with pytest.raises(pc.AuditError, match="no qualifying supports_claim evidence"):
+        with pytest.raises(pc.AuditError, match="require full current evidence packets"):
             pc.reconcile(
                 first, audit, lineage_id="x-plan", round_no=2, plan_text=PLAN,
             )
@@ -550,11 +621,9 @@ class TestRetainedEvidence:
             prior_claim_id=old_id,
         )
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(unrelated, assessments=[{
-                "claim_id": old_id, "verdict": "supported",
-                "rationale": "The retained passage still entails the old exact claim.",
-            }]), expanded_plan),
+            first, pc.parse_audit(_audit(unrelated), expanded_plan),
             lineage_id="x-plan", round_no=2, plan_text=expanded_plan,
+            frozen_ids={old_id},
         )
         assert old_id in second["claims"]
         assert second["claims"][old_id]["verdict"] == "supported"
@@ -579,11 +648,9 @@ class TestRetainedEvidence:
             prior_claim_id=old_id,
         )
         second = pc.reconcile(
-            first, pc.parse_audit(_audit(opposite, assessments=[{
-                "claim_id": old_id, "verdict": "supported",
-                "rationale": "The retained passage still entails the old exact claim.",
-            }]), both_plan),
+            first, pc.parse_audit(_audit(opposite), both_plan),
             lineage_id="x-plan", round_no=2, plan_text=both_plan,
+            frozen_ids={old_id},
         )
         assert old_id in second["claims"]
         assert second["claims"][old_id]["verdict"] == "supported"

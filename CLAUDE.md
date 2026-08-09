@@ -17,7 +17,8 @@
   external-system behaviors; leave repository mechanics, internal history, implementation
   conformance, and function bridges to structural/code review and tests; target model/web work
   at edited, new, refuted, and unverified external claims, requiring a full replacement packet
-  for unverified or non-freezable claims instead of compact-verdict churn;
+  for unverified or non-freezable claims instead of compact-verdict churn; accept only canonical
+  HTTP(S) sources as governing evidence and fail closed over active legacy state;
 - never let the plan under review serve as evidence for its own assertions; bind claims to
   authoritative external sources;
 - let the calling coding agent autonomously edit from those packets before the next round; no

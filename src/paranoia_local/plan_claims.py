@@ -95,8 +95,10 @@ def normalize_state(raw: Any) -> dict[str, Any]:
     state = empty_state()
     if not isinstance(raw, dict):
         return state
-    if raw.get("version") != 1:
+    if not raw:
         return state
+    if raw.get("version") != 1:
+        return _migration_blocked_state(raw)
     claims = deepcopy(raw.get("claims", {})) if isinstance(raw.get("claims"), dict) else {}
     retired = deepcopy(raw.get("retired", [])) if isinstance(raw.get("retired"), list) else []
     # Version-1 lineages may contain repository assertions created by the old broad
@@ -136,6 +138,48 @@ def normalize_state(raw: Any) -> dict[str, Any]:
         "retired": retired[-MAX_ACTIVE_CLAIMS:],
         "debt": deepcopy(raw.get("debt")),
     })
+    return state
+
+
+def _migration_blocked_state(raw: dict[str, Any]) -> dict[str, Any]:
+    """Fail closed over the pre-replacement claim schema until one exhaustive audit.
+
+    Current main persisted a versionless claim array with different evidence and anchor
+    types. Guessing those rows into the external-only schema would either retain internal
+    debt or silently lose unresolved claims. Preserve their identity as migration debt;
+    absence of a plan snapshot forces the next successful call through exhaustive audit.
+    """
+    state = empty_state()
+    rows = raw.get("claims")
+    identifiers: list[str] = []
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if row.get("status") in {"NOT_APPLICABLE", "SUPERSEDED"}:
+                continue
+            claim_id = row.get("claim_id")
+            status = row.get("status")
+            if isinstance(claim_id, str):
+                identifiers.append(f"{claim_id}:{status}")
+    prior_debt = raw.get("debt")
+    if identifiers or prior_debt is not None or "claims" not in raw:
+        digest = hashlib.sha256(
+            json.dumps(raw, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        preview = ", ".join(identifiers[:20]) or "unrecognized versioned state"
+        state["debt"] = {
+            "round": 1,
+            "reason": (
+                "Legacy claim state requires one exhaustive external-claim audit before "
+                f"clearance; {len(identifiers)} active predecessor(s): {preview}; "
+                f"legacy-state sha256 {digest}."
+            )[:DIAGNOSTIC_CHARS],
+            "raw_sha256": digest,
+            "rejected_excerpt": "",
+        }
+    if isinstance(raw.get("next_seq"), int) and raw["next_seq"] > 0:
+        state["next_seq"] = raw["next_seq"]
     return state
 
 
@@ -433,8 +477,9 @@ def _validate_evidence(
         raise ValueError(f"source_kind must be one of {sorted(SOURCE_KINDS)}")
     if result["relation"] not in RELATIONS:
         raise ValueError(f"relation must be one of {sorted(RELATIONS)}")
-    host = (urlparse(result["url"]).hostname or "").lower()
-    if not host:
+    parsed = urlparse(result["url"])
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"https", "http"} or not host:
         result["relation"] = "context"
     if _is_ugc_host(host):
         # Normalize, rather than reject: the packet remains useful as a lead or conflict,
@@ -444,8 +489,12 @@ def _validate_evidence(
 
 
 def _qualifying(evidence: dict[str, str], scope: str) -> bool:
-    return scope == "external" and bool(urlparse(evidence["url"]).hostname) and (
-        evidence["source_kind"] in AUTHORITATIVE_KINDS
+    parsed = urlparse(evidence["url"])
+    return (
+        scope == "external"
+        and parsed.scheme in {"https", "http"}
+        and bool(parsed.hostname)
+        and evidence["source_kind"] in AUTHORITATIVE_KINDS
     )
 
 
@@ -634,6 +683,15 @@ def validate_prior_coverage(
         if claim["proposition"] in by_prop
     }
     assessed = {item["claim_id"] for item in audit.assessments}
+    full_packet_required = _full_packet_candidate_ids(
+        prior_raw, plan_text, frozen,
+    )
+    invalid_compact = assessed & full_packet_required
+    if invalid_compact:
+        raise AuditError(
+            "non-freezable claims require full current evidence packets, not compact "
+            "assessments: " + ", ".join(sorted(invalid_compact)), raw,
+        )
     overlap = emitted & assessed
     if overlap:
         raise AuditError(
@@ -1117,14 +1175,18 @@ def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bo
     """
     if not isinstance(anchor, str) or not anchor.strip():
         return False
-    return bool(
-        _assertion_contexts(previous, anchor) & _assertion_contexts(current, anchor)
+    previous_contexts = _assertion_contexts(previous, anchor)
+    current_contexts = _assertion_contexts(current, anchor)
+    return (
+        len(previous_contexts) == 1
+        and len(current_contexts) == 1
+        and previous_contexts == current_contexts
     )
 
 
-def _assertion_contexts(plan_text: str, anchor: str) -> set[tuple[str, str]]:
+def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
     needle = _collapse_whitespace(anchor)
-    contexts: set[tuple[str, str]] = set()
+    contexts: list[tuple[str, str]] = []
     heading_path: list[str] = []
     block: list[str] = []
 
@@ -1134,8 +1196,9 @@ def _assertion_contexts(plan_text: str, anchor: str) -> set[tuple[str, str]]:
         body = _collapse_whitespace(" ".join(block))
         sentences = re.split(r'''(?<=[.!?])\s+(?=[A-Z0-9#>*`"'])''', body)
         for sentence in sentences:
-            if needle in sentence:
-                contexts.add((" / ".join(heading_path), sentence))
+            contexts.extend(
+                [(" / ".join(heading_path), sentence)] * sentence.count(needle)
+            )
         block.clear()
 
     for raw_line in plan_text.splitlines():

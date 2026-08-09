@@ -255,6 +255,8 @@ entity's records are preferred. Secondary material can corroborate or locate a
 source. Reddit, Stack Overflow, forums, social media, wikis, blogs, and other UGC
 can expose leads or conflicts, but the server prevents known UGC hosts from being
 treated as governing evidence even if the model labels them `primary`.
+Only canonical HTTP(S) web locations with a host can govern a verdict; repository,
+file, and custom-scheme locations remain context only.
 
 Every contradicted or unresolved external claim returns an **actionable source packet**:
 
@@ -326,6 +328,11 @@ harmless extra model metadata; required fields, unambiguous aliases, and transit
 remain strict. Both governing coverage arrays remain required even when empty, and malformed
 required values receive the normal bounded correction attempt rather than escaping the audit
 failure path.
+
+On upgrade, active rows from the replaced versionless claim-array schema become explicit
+blocking migration debt and force one exhaustive external audit; they are never interpreted as
+an empty verified register. Empty legacy inventory migrates without work. This is separate from
+version-1 repository rows, which are known mechanically out of scope and retire from inventory.
 
 When unresolved old wording is still present, it is not rediscovered from scratch. The server
 supplies its exact ID, anchor, proposition, and retained packet as a mandatory targeted
