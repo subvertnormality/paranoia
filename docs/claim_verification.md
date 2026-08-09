@@ -57,8 +57,10 @@ exact quoted passage before accepting the packet. A missing path, malformed revi
 absent from the resolved bytes invalidates that claim packet. External facts require a canonical
 absolute URL, publisher, title, precise section/table/page, exact passage, and source class.
 The same resolution check applies to compact later-round assessments: a `supported` assessment
-cannot preserve a stale or malformed repository packet; it must provide a corrected full packet
-or remain `unverified`.
+cannot preserve a stale or malformed repository packet; the server locally demotes that claim to
+`unverified` without discarding unrelated assessments. When an exact quote still exists but edits
+shifted its line, the server updates the line hint mechanically. A 64-hex whole-file SHA-256 quote
+is checked by hashing the resolved bytes rather than looking for the digest inside the file.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and
 records, standards, legislation/regulators, government data, and original papers/datasets.

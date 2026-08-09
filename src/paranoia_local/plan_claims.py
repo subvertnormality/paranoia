@@ -147,7 +147,7 @@ def frozen_supported_ids(
         if not supports:
             continue
         if record.get("scope") == "repository":
-            if repo is None or not any(_repository_quote_present(item, repo) for item in supports):
+            if repo is None or not any(_repository_packet_current(item, repo) for item in supports):
                 continue
         frozen.add(claim_id)
     return frozenset(frozen)
@@ -169,7 +169,7 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
 _GIT_REV = re.compile(r"[0-9a-fA-F]{7,64}(?:(?:\^+)|(?:~[0-9]+))?")
 
 
-def _repository_source_text(evidence: dict[str, str], repo: Path) -> str | None:
+def _repository_source_bytes(evidence: dict[str, str], repo: Path) -> bytes | None:
     raw = evidence.get("url", "")
     if not raw.startswith("repo://"):
         return None
@@ -191,8 +191,7 @@ def _repository_source_text(evidence: dict[str, str], repo: Path) -> str | None:
             command = ["git", "show", "--stat", "--format=fuller", spec]
         try:
             completed = subprocess.run(
-                command, cwd=repo, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=30, check=False,
+                command, cwd=repo, capture_output=True, timeout=30, check=False,
             )
         except (OSError, subprocess.SubprocessError):
             return None
@@ -201,16 +200,60 @@ def _repository_source_text(evidence: dict[str, str], repo: Path) -> str | None:
     if not relative or candidate.is_absolute() or ".." in candidate.parts:
         return None
     try:
-        return (repo / candidate).read_text(encoding="utf-8", errors="replace")
-    except (OSError, UnicodeError):
+        return (repo / candidate).read_bytes()
+    except OSError:
         return None
 
 
+def _repository_evidence_resolution(
+    evidence: dict[str, str], repo: Path,
+) -> tuple[bool, str]:
+    """Resolve exact bytes and return an accurate canonical repository URL."""
+    raw = evidence.get("url", "")
+    source = _repository_source_bytes(evidence, repo)
+    if source is None:
+        return False, raw
+    quote = evidence.get("quote", "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]{64}", quote):
+        if hashlib.sha256(source).hexdigest() != quote.lower():
+            return False, raw
+        return True, raw.split("#", 1)[0]
+    text = source.decode("utf-8", "replace")
+    if _collapse_whitespace(quote) not in _collapse_whitespace(text):
+        return False, raw
+    # Commit-level packets cite rendered Git metadata rather than a path; keep their
+    # URL stable. File packets get a mechanically accurate line hint when the exact
+    # passage can be located without interpretation.
+    base = raw.split("#", 1)[0]
+    relative = base[len("repo://"):] if base.startswith("repo://") else ""
+    if relative.startswith("git/") and ":" not in relative[len("git/"):]:
+        return True, base
+    position = text.find(quote)
+    if position < 0:
+        return True, base
+    start = text.count("\n", 0, position) + 1
+    end = start + quote.count("\n")
+    suffix = f"#L{start}" if end == start else f"#L{start}-L{end}"
+    return True, base + suffix
+
+
 def _repository_quote_present(evidence: dict[str, str], repo: Path) -> bool:
-    text = _repository_source_text(evidence, repo)
-    if text is None:
-        return False
-    return _collapse_whitespace(evidence.get("quote", "")) in _collapse_whitespace(text)
+    return _repository_evidence_resolution(evidence, repo)[0]
+
+
+def _repository_packet_current(evidence: dict[str, str], repo: Path) -> bool:
+    valid, canonical = _repository_evidence_resolution(evidence, repo)
+    return valid and canonical == evidence.get("url")
+
+
+def _canonicalize_repository_evidence(
+    evidence: dict[str, Any], repo: Path,
+) -> dict[str, Any]:
+    result = deepcopy(evidence)
+    valid, canonical = _repository_evidence_resolution(result, repo)
+    if valid:
+        result["url"] = canonical
+    return result
 
 
 def parse_audit(
@@ -434,11 +477,14 @@ def _validate_evidence(
     if scope == "repository":
         if result["source_kind"] != "repository" or not result["url"].startswith("repo://"):
             result["relation"] = "context"
-        elif repo is not None and not _repository_quote_present(result, repo):
-            raise ValueError(
-                "repository evidence URL does not resolve to bytes containing its exact quote: "
-                f"{result['url']}"
-            )
+        elif repo is not None:
+            valid, canonical = _repository_evidence_resolution(result, repo)
+            if not valid:
+                raise ValueError(
+                    "repository evidence URL does not resolve to bytes containing its exact "
+                    f"quote or matching whole-file SHA-256: {result['url']}"
+                )
+            result["url"] = canonical
     elif result["source_kind"] == "repository" or not host:
         result["relation"] = "context"
     if _is_ugc_host(host):
@@ -527,13 +573,36 @@ def reconcile(
         claim_id = assessment["claim_id"]
         previous = old[claim_id]
         record = deepcopy(previous)
+        verdict = assessment["verdict"]
+        rationale = assessment["rationale"]
+        if repo is not None and record.get("scope") == "repository":
+            record["evidence"] = [
+                _canonicalize_repository_evidence(evidence, repo)
+                if isinstance(evidence, dict) else evidence
+                for evidence in record.get("evidence", [])
+            ]
+            relation = {
+                "supported": "supports_claim", "refuted": "refutes_claim",
+            }.get(verdict)
+            if relation and not any(
+                isinstance(evidence, dict)
+                and _qualifying(evidence, "repository")
+                and evidence.get("relation") == relation
+                and _repository_quote_present(evidence, repo)
+                for evidence in record.get("evidence", [])
+            ):
+                verdict = "unverified"
+                rationale = (
+                    f"{rationale} Server demotion: the retained repository packet no "
+                    "longer resolves to its exact bytes; emit a corrected full packet."
+                ).strip()
         record.update({
             "claim_id": claim_id,
-            "verdict": assessment["verdict"],
+            "verdict": verdict,
             "verified_round": round_no,
-            "rationale": assessment["rationale"],
+            "rationale": rationale,
         })
-        if assessment["verdict"] != "refuted":
+        if verdict != "refuted":
             record["replacement"] = None
         elif not any(
             _qualifying(evidence, record.get("scope", ""))
@@ -628,30 +697,6 @@ def validate_prior_coverage(
             f"{MAX_ACTIVE_CLAIMS}", raw,
         )
     old = prior["claims"]
-    if repo is not None:
-        for assessment in audit.assessments:
-            if assessment["verdict"] == "unverified":
-                continue
-            record = old.get(assessment["claim_id"])
-            if not isinstance(record, dict) or record.get("scope") != "repository":
-                continue
-            relation = (
-                "supports_claim" if assessment["verdict"] == "supported"
-                else "refutes_claim"
-            )
-            if not any(
-                isinstance(evidence, dict)
-                and _qualifying(evidence, "repository")
-                and evidence.get("relation") == relation
-                and _repository_quote_present(evidence, repo)
-                for evidence in record.get("evidence", [])
-            ):
-                raise AuditError(
-                    "compact assessment cannot retain a non-resolving repository packet: "
-                    f"{assessment['claim_id']}; emit a full corrected packet or mark it "
-                    "unverified",
-                    raw,
-                )
     by_prop = {
         record.get("proposition"): claim_id
         for claim_id, record in old.items()

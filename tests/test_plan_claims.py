@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -161,7 +162,29 @@ class TestAuditValidation:
         audit = pc.parse_audit(
             _audit(_repository_claim(url=url)), REPO_PLAN, repo=tmp_path,
         )
-        assert audit.claims[0]["evidence"][0]["url"] == url
+        assert audit.claims[0]["evidence"][0]["url"] == url + "#L1"
+
+    def test_repository_location_is_repaired_from_the_exact_quote(
+        self, tmp_path: Path,
+    ) -> None:
+        (tmp_path / "settings.json").write_text('first\nsecond\n{"enabled": true}\n')
+        audit = pc.parse_audit(
+            _audit(_repository_claim(url="repo://settings.json#L1")),
+            REPO_PLAN, repo=tmp_path,
+        )
+        assert audit.claims[0]["evidence"][0]["url"] == "repo://settings.json#L3"
+
+    def test_whole_file_sha256_is_verified_as_computed_byte_evidence(
+        self, tmp_path: Path,
+    ) -> None:
+        content = b'{"enabled": true}\n'
+        (tmp_path / "settings.json").write_bytes(content)
+        digest = hashlib.sha256(content).hexdigest()
+        audit = pc.parse_audit(
+            _audit(_repository_claim(url="repo://settings.json", quote=digest)),
+            REPO_PLAN, repo=tmp_path,
+        )
+        assert audit.claims[0]["verdict"] == "supported"
 
     def test_repository_support_rejects_wrong_quote_and_traversal(
         self, tmp_path: Path,
@@ -425,11 +448,12 @@ class TestRetainedEvidence:
             "verdict": "supported",
             "rationale": "The old packet still looks plausible.",
         }]), REPO_PLAN)
-        with pytest.raises(pc.AuditError, match="non-resolving repository packet"):
-            pc.reconcile(
-                legacy, assessment, lineage_id="x-plan", round_no=2,
-                plan_text=REPO_PLAN, repo=tmp_path,
-            )
+        second = pc.reconcile(
+            legacy, assessment, lineage_id="x-plan", round_no=2,
+            plan_text=REPO_PLAN, repo=tmp_path,
+        )
+        assert second["claims"][claim_id]["verdict"] == "unverified"
+        assert "Server demotion" in second["claims"][claim_id]["rationale"]
 
     def test_compact_support_cannot_upgrade_a_nonqualifying_retained_packet(self) -> None:
         first = pc.reconcile(
