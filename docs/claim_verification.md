@@ -1,315 +1,157 @@
 # Plan claim verification
 
-Plan claim verification is an integrated research-and-verify phase for `critique_plan`.
-It answers a narrower question than structural review: are the registered load-bearing
-premises verified, contradicted, safely deferred, or explicitly unresolved?
+## Purpose and stakes
 
-## Rollout modes
+Plan verification stops a structurally persuasive plan from converging on an unsupported
+external premise. The supported operating model is a single-user local MCP on a trusted OS.
+Incorrect claim closure, weak authority presented as authoritative, or evidence bound to the
+wrong proposition is high impact; a recoverable blocked run is acceptable. Formal
+natural-language completeness proofs, multi-tenant hardening, hostile same-user races, and
+recovery from deliberately corrupted state are outside the contract.
 
-`claim_verification` has three modes:
+The priorities are accurate verdicts, useful ordinary-run latency, autonomous correction, a
+small maintainable architecture, and then security hardening within that model.
 
-| Mode | Effect |
-|---|---|
-| `off` | Opt out and preserve ordinary class-closure plan review; do not run or persist claim research |
-| `diagnostic` | **Default.** Run and persist claim research and display claim closure, but let only class closure govern `CONVERGENCE` |
-| `blocking` | Combine unresolved claims, claim debt, class debt, and blocking classes into `CONVERGENCE` |
+## Mechanical scope boundary
 
-Diagnostic mode ignores unresolved claim findings for convergence; it never ignores an
-operationally incomplete round. Model-role failure, register debt, state failure, or an
-abandoned structural/class transaction blocks in every enabled mode.
+The evidence register covers load-bearing propositions about the external world. A proposition
+is eligible only when its truth or authority could change feasibility, architecture, ordering,
+dependencies, rationale, or acceptance, and it has exactly one of these kinds:
 
-`diagnostic` is the out-of-box rollout stage: verification is running, cached, visible, and
-measurable without prematurely changing the merge verdict. Select `blocking` explicitly
-when the workflow has representative completion, latency, and false-block measurements.
-`class_closure: false` is the stateless one-shot review and accepts only
-`claim_verification: off`.
+- `fact`: an objective external-world state, event, quantity, identity, or history;
+- `design_principle`: a requirement, constraint, or recommended principle issued by the
+  external standard, regulator, protocol, platform, or vendor that governs the plan;
+- `behavior`: documented or observable behavior promised by an external API, dependency,
+  platform, protocol, service, or runtime on which the plan relies.
 
-## Stakes and trust model
+All three use `scope: "external"` and require authoritative web evidence. Design principles and
+behaviors are not excluded merely because they are normative or forward-looking: if the plan
+claims that an external authority requires a design or an external system behaves a certain
+way, that external proposition is verifiable and belongs here.
 
-The initial implementation is a single-user local MCP tool:
+The following are mechanically ineligible: repository state, code paths, function behavior in
+the project, internal history, implementation conformance, internal function-to-function
+bridges, local decisions, project-authored principles, permissions, intentions, instructions,
+preferences, forecasts, and incidental observations. They remain fully reviewable by the
+ordinary structural/code review and tests; they simply do not enter the persistent web-evidence
+lifecycle. Calling an internal preference a “design principle” does not make it external.
 
-- the operator, OS, filesystem implementation, and other local processes are trusted;
-- plan bytes, repository content, Git configuration, supplied artifacts, persisted records,
-  and fetched pages are untrusted data;
-- no hostile local process is assumed to rename or replace repository path components while
-  a round is running;
-- ordinary edits may occur and must cause an explicit unavailable/stale result rather than a
-  false clear;
-- repository configuration must not select hooks, filters, signing programs, lazy fetches,
-  alternate object databases, or inherited Git behavior used by evidence collection;
-- model-visible untrusted values remain escaped data and cannot become role instructions;
-- false `NOT-BLOCKED`, cross-claim evidence reuse, stale evidence reuse, and silent durable
-  state loss are in scope;
-- defending against a compromised OS, a hostile process with concurrent filesystem write
-  access, or deliberate mutation of server-owned state by another local principal is out of
-  scope for this rollout.
+The parser rejects every fresh row whose scope is not `external`, so a model cannot silently
+discard an eligible external premise by mislabeling it `repository`; the bounded correction and
+debt path governs that error. Existing version-1 repository claims are different: normalization
+mechanically moves those already-persisted rows to retired diagnostic history, where they stop
+consuming active inventory, prompts, or convergence. This server-owned distinction prevents
+both old repository churn and new false-empty clearance.
 
-“Malicious repository” in this document means malicious static bytes and configuration. It
-does not mean an active process racing `open(2)`. Expanding that threat model requires a new
-architecture decision and performance budget; it is not an incremental hardening task.
+The replaced, versionless claim-array schema cannot be safely guessed into this register. If it
+contains active predecessor rows or debt, normalization preserves their IDs and statuses in
+explicit blocking migration debt, omits a reusable plan snapshot, and forces one exhaustive
+external-claim audit. A successful audit then writes the current versioned schema. Empty legacy
+inventory needs no migration work. This prevents an upgrade from treating unknown old rows as
+an empty, verified register.
 
-## What the gate proves
+## Architecture
 
-For the registered claim set, claim closure proves that no active load-bearing claim is
-unchecked, unverified, contradicted, disputed, malformed, stale, or missing a required
-authorization. It also verifies that every evidence dependency still resolves to a valid
-record bound to that claim.
+1. The selected reviewer CLI scans the plan and uses its built-in web search. There is no
+   search endpoint, API key, plugin, or provider abstraction.
+2. `plan_claims.py` parses the audit, enforces scope, authority, and entailment, freezes exact
+   unchanged supported packets after round 1, targets later work at the external edit cone and
+   unresolved claims, and renders actionable packets.
+3. Claim state and structural-class state share the existing atomic lineage JSON. There is no
+   second database, CAS protocol, or journal.
+4. The cold structural reviewer receives the evidence register, but is explicitly forbidden
+   from demanding claim packets for repository mechanics or “missing atomic bridges.” It still
+   performs the complete ordinary FATAL/MAJOR review over the plan and repository every round.
+5. The computed verdict combines external-claim closure and structural-class closure.
 
-It does not prove that extraction found every premise, that a primary source is truthful,
-that semantic entailment is mathematically certain, or that two models cannot share a
-mistake. `NOT-BLOCKED` is a gate result, not approval of the plan.
+The active ceiling is 500 external claims and 20 evidence records per claim. These are
+pathology/corruption guards, not pagination limits. Exceeding one creates visible audit debt and
+blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-## Round topology
+## Evidence and authority
 
-A diagnostic or blocking round performs these stages:
+Every source needs a canonical absolute URL, publisher, title, precise section/table/page,
+exact passage, evidence relation, and an explanation of why that publisher governs the exact
+proposition. The passage must entail the atomic proposition while preserving actor, event,
+date, modality, scope, and chronology. Evidence of an underlying condition does not prove that
+a named external report occurred.
 
-1. Read at most 1 MiB of exact UTF-8 plan bytes and divide them into server-owned span IDs.
-2. Build an ephemeral dirty-tree repository snapshot without running repository filters,
-   hooks, signing commands, lazy fetches, or inherited Git configuration.
-3. Ask a fresh plan-only extractor to register candidate load-bearing claims by span anchor.
-4. Ask a separate clean policy role to confirm fact/decision classification and any complete
-   plan-authored deferral contract.
-5. Ask a toolless evidence planner for bounded repository, empirical, external, or supplied
-   records. The server executes those requests.
-6. For each unmatched external page, ask a fresh page-isolated role to classify the
-   publisher's relationship to that claim, without judging claim truth.
-7. Ask source-isolated verifier roles what each complete evidence record establishes.
-8. Run a separate structural reviewer using the plan and bounded evidence context.
-9. Validate both registers, atomically persist the lineage/evidence roots, and compute the
-   claim and class trailers in Python.
+Only canonical `https://` or `http://` locations with a host can govern a verdict. Repository,
+file, and custom-scheme locations may be retained as context but can never count as primary or
+authoritative web evidence. When the plan is a repository file and its origin remote is known,
+the plan's own canonical blob/raw HTTP(S) URL is also mechanically demoted to context: publishing
+the assertion does not make it evidence for itself.
 
-The extractor cannot clear its own claim. Omission in a later round never deletes a durable
-claim. Research output never edits the plan.
+Primary and authoritative sources can govern a verdict: first-party documentation and records,
+standards, legislation/regulators, government data, and original papers/datasets. Secondary
+sources may corroborate or locate primary evidence. UGC—including Reddit, forums, Stack
+Overflow, social media, wikis, and community publishing—can provide leads or conflicts but can
+never support or refute closure. Known UGC hosts are downgraded in server code even if the model
+labels them `primary`.
 
-The handler is a transaction coordinator over explicit phase owners: cached-state
-preparation, research/policy, evidence planning and collection, evidence verification,
-structural evidence, structural review, durable publication, and response rendering. No
-single phase combines model coordination, evidence I/O, policy transition, persistence, and
-verdict formatting.
+Evidence is claim-specific. A refuting passage can refute old wording, but it cannot authorize
+a replacement unless authoritative evidence separately entails the complete replacement.
+Unsupported replacement text is removed while the valid refutation packet is retained.
+Authority or entailment mistakes are localized: the source remains context, the affected claim
+becomes blocking `unverified`, and unrelated valid packets remain usable.
 
-## Fast repository snapshot
+## Multi-round behavior
 
-`plan_snapshot.py` uses a server-owned temporary Git directory, index, and object directory.
-It copies only bounded ref metadata, points Git at the native object directory through an
-explicit server-selected alternate, and writes dirty/untracked blob objects into the
-temporary object directory. One batched index update and `write-tree` create the exact
-dirty-tree snapshot commit.
+Round 1 scans the complete plan for all three eligible external kinds and gathers authoritative
+packets. It splits compound external assertions into atomic propositions, but does not atomize
+an internal design into repository-mechanical hops. Each claim receives a server-owned ID.
 
-This avoids copying the repository's complete object database and avoids one Git process per
-worktree file. The native repository is not given temporary refs and its index is not
-modified. The temporary directory keeps the synthetic objects alive for the round.
+Later rounds freeze every exact unchanged `supported` claim with its captured packet. “Unchanged”
+requires the anchor to remain in one unique normalized Markdown assertion block with the same
+structured heading levels and list-ancestor chain, not merely to occur as a substring;
+quotation, code, negation, relocation, parent-list changes, or surrounding assertion edits force
+re-verification while harmless line wrapping remains stable. The
+verifier receives only added or edited eligible wording, retained `refuted` or `unverified`
+claims, and removal candidates. An unchanged, fully supported register causes no evidence-model
+call or web search. This optimization applies only to claim verification: the full cold
+structural review still runs each round.
 
-The snapshot boundary retains these protections:
+An edited proposition inherits no verdict. An unresolved or otherwise non-freezable claim must
+return as a complete current evidence packet; a compact assessment is rejected even if it says
+`supported`. Compact retained-packet judgements are limited to exact still-present refuted
+claims; they cannot repair missing, changed, ambiguous, unverified, or stale support.
+A prior claim cannot disappear through model omission or ID reuse. Its old anchor must leave the
+plan and receive an explicit `removed` disposition. If the bounded correction retry still omits
+a required ID, valid packets are applied and only that claim remains `unverified`.
 
-- inherited `GIT_*` settings are removed;
-- hooks, fsmonitor, signing, replacement objects, grafts, lazy fetches, and filters are not
-  used by snapshot construction;
-- repository config includes and `config.worktree` are not loaded into evidence commands;
-- native `objects/info/alternates` is rejected rather than followed;
-- path, record, per-file, total snapshot, output, and subprocess-time limits are enforced;
-- dirty regular files are read with pre/open/post identity checks, and bounded repository-wide
-  pre/post manifests compare candidate paths, index entries, special paths, file identities,
-  HEAD, and the bounded ref map, so ordinary edits or ref maintenance spanning construction
-  fail explicitly;
-- ignored files and unsupported nonregular paths are disclosed but are not evidence blobs;
-  their presence makes a containing list/search scope incomplete and unable to prove absence;
-- history refs are copied into the private control directory at snapshot creation, so later
-  ref movement does not change their identity.
+## Autonomous correction contract
 
-The snapshot does not defend against an active process replacing the repository root,
-ancestors, native object files, or temporary directory while the round runs. If ordinary
-maintenance removes a captured native object, the later evidence operation fails explicitly.
+The paranoia reviewer is read-only; the calling coding agent is the autonomous operator:
 
-## Claim state
+1. call `critique_plan` with a stable lineage, explicit proportionate stakes, and `round: 1`;
+2. inspect each `ACTIONABLE SOURCE PACKET` and confirm that its authority and exact passage
+   justify the action;
+3. edit the plan using the evidence-entailed replacement, or remove/qualify/research the claim
+   when no replacement is proven;
+4. increment `round` and rerun only after making the correction;
+5. stop only when the structural review has no in-scope blocker, class debt is clear, every
+   active external claim is supported, claim debt is clear, and the computed line is
+   `CONVERGENCE: NOT-BLOCKED`.
 
-Claims persist in schema version 2 of the plan lineage envelope. The main fields are:
+No human confirmation is required. Rerunning unchanged text in hope of reviewer variance is not
+a correction. The exact passage and location are returned specifically so an autonomous caller
+can apply a justified correction before the next round.
 
-- kind: `fact | decision`;
-- assertion mode: `asserted | assumption | estimate`;
-- kind classification: `proposed | confirmed`;
-- bearing: `blocking | advisory`;
-- status: `unchecked | unverified | verified | contradicted | disputed | deferred | stale |
-  malformed | not-applicable | superseded`.
+## Failure behavior
 
-New claims begin proposed, blocking, and unchecked. A separate role must confirm kind.
-Facts remain blocking until verified, safely deferred, or independently authorized as
-advisory. Decisions become nonblocking only as confirmed `not-applicable` decisions.
+Audit JSON uses concrete literals, never pseudo-enums. One bounded correction call receives the
+exact validation failure. If correction still fails, diagnostics include the reason, output
+hash, and bounded excerpt. Frozen supported packets remain usable and successful evidence work
+is persisted before structural review, so a later structural failure does not restart research.
 
-Truth, bearing, dispute, and deferral authorizations occupy separate slots. Tightening the
-current authorization policy reblocks an applied transition until its required checks
-complete. An advisory bearing never bypasses pending or invalid truth authorization.
+## Recorded real acceptance
 
-Plan edits relocate claims only when their exact anchored bytes still occur uniquely.
-Otherwise they become stale. A clean plan-only role may supersede a stale claim with a
-replacement anchored in the current plan. Persisted active replacement edges are accepted
-only from a stale source to an existing confirmed non-clear target; a clear target must
-already have completed the source transition to `superseded`.
-
-## Evidence and accuracy
-
-Every evidence record has a server-generated ID, exact full-content hash, claim binding,
-source kind, source identity, bounded passage, exact passage offsets, and completeness
-metadata. Evidence for one claim cannot authorize another. For a large external or supplied
-source, the server deterministically selects a claim/query-relevant window while retaining
-the complete source in the content-addressed journal. If that initial window is insufficient,
-a later round can issue `SELECT_PASSAGE` for any explicit at-most-4-KiB byte range of the
-already rooted source; the server enforces the claim binding and aligns UTF-8 boundaries.
-Refinable records are surfaced fairly—one least-refined source per least-refined blocking
-claim—so bounded prompt limits rotate rather than permanently hiding later claims or sources.
-
-A visible bounded passage may authorize only a proposition directly entailed by those
-bytes. It cannot prove absence, exhaustive coverage, or an unshown source-wide property.
-Incomplete tree, history, and search scopes are context-only; an exact blob range may support
-a directly visible fact. Non-UTF-8 passages that require lossy display are also context-only.
-A citation is metadata, not proof.
-
-Repository operands use canonical relative POSIX paths. Root tree scope is the empty prefix;
-dot prefixes, leading or trailing separators, repeated separators, absolute paths, and parent
-traversal are rejected at both request validation and snapshot access. This keeps the scope Git
-reads identical to the scope used when deciding whether unavailable paths make evidence incomplete.
-
-Repository cache validity depends on the snapshot commit and every recorded object/path
-identity. Empirical cache validity additionally depends on the fixed adapter, runtime, and
-input hashes. External evidence carries retrieval and freshness metadata. Semantic source
-changes invalidate the record and stale the claim; an operational read failure blocks the
-round without pretending that the source changed.
-
-The initial empirical adapter is `PYTHON_COMPILE`: a bounded compile-only check over pinned
-Python blobs. It is optional and is requested only for claims specifically about Python
-source. All snapshot, tree, blob, literal-search, history, supplied-evidence, external-source,
-claim-state, and convergence behavior is language-, framework-, and project-domain-neutral.
-Models cannot submit arbitrary shell commands. Projects using other languages still receive
-the complete generic verification flow; they simply have no language-specific empirical
-adapter until one is deliberately added.
-
-## External and supplied evidence
-
-External discovery uses the selected reviewer's normal, already-authenticated native search:
-
-- Codex runs live `--search` in a fresh bubblewrap profile;
-- Claude runs with `WebSearch` as its only available tool.
-
-No extra API key, search service, endpoint, plugin, or repository setting is required. The
-discovery role has no repository, shell, local-file, MCP, app, browser, or direct page-fetch
-capability. It receives one neutral query and may return only a bounded list of public HTTPS
-URL/title candidates. The server then fetches every candidate independently. Redirects,
-DNS answers, connected peers, response media, compressed/decompressed bytes, and the shared
-round deadline and byte/fetch budgets are validated by server code. `web_search: false`
-explicitly disables this path; a load-bearing internet-only claim then remains unresolved.
-
-These are fixed product integrations, not a provider interface exposed to callers. Codex's
-API is its signed-in CLI `--search` capability; Claude's API is the signed-in Claude Code
-`WebSearch` tool. There is deliberately no `PARANOIA_SEARCH_ENDPOINT`: requiring a fictional
-or operator-hosted service would make the default verification path incomplete. Both CLI
-profiles are capability-preflighted before snapshot or lineage state is acquired.
-
-Search rank is not source authority, and the discovery role cannot assign source class.
-Callers may provide `external_source_policy` rules
-with an exact lowercase host, URL path prefix, and `primary`, `authoritative`, `secondary`,
-or `ugc`
-classification. The longest exact-host/path match governs; subdomains do not inherit a rule.
-Authority rules apply only to HTTPS's default origin (effective port 443). Path prefixes
-match complete path segments; alternate ports and ambiguous percent-encoded, backslash, or
-dot-segment paths remain unclassified. An unmatched page receives a fresh tool-less,
-page-isolated provenance assessment bound to its claim and evidence ID:
-
-- `primary`: the original artifact, dataset, research, standard, release, repository, or
-  first-party record that owns a material subject or value needed to test the claim,
-  including primary counterevidence to a false attribution;
-- `authoritative`: the publisher defines, operates, or controls the claimed behavior;
-- `secondary`: reporting, analysis, summaries, aggregators, or independent commentary;
-- `ugc`: community posts, forums, social media, Q&A, reviews, and user-authored reports;
-- `unclassified-external`: the bounded record cannot establish the publisher relationship.
-
-The assessment changes the evidence identity and persists its method and rationale. It is a
-bounded model judgment, not proof that the source is honest or that the claim is true. Only
-primary and authoritative records may
-authorize an external truth or bearing transition. Secondary and unclassified records may
-guide structural critique but cannot clear a load-bearing claim. The verifier still judges
-whether an eligible passage actually entails the proposition; server classification does
-not make irrelevant official material evidence.
-
-Known user-generated-content hosts—including Reddit, Stack Overflow/Stack Exchange, Hacker
-News, Quora, and common social/publishing platforms—are forced to `ugc`; a caller rule cannot
-promote them to primary or authoritative. UGC can expose leads, conflicts, or user-experience
-reports, but cannot authorize general API, standard, regulatory, historical, or product facts.
-The provenance model also cannot promote them, regardless of its output. Exact caller rules
-can classify or downgrade other origins before model assessment. Cached external URLs are
-reclassified against current hard UGC rules and caller policy on every round; a new, removed,
-or changed rule invalidates the record and stales every dependent active claim.
-Model-assessed provenance is retained only with the same bounded fetched-content TTL.
-
-Remote content and caller-supplied artifacts are untrusted data. They receive isolated
-verifier calls and cannot classify plan decisions, author evidence-free deferrals, or waive
-claims. Unavailable sources produce an abstention and leave a load-bearing claim unresolved.
-
-## Independent authorization
-
-`independent_check` is `auto` or `require`. Required authorization uses the fixed vendor
-identities `codex` and `claude`. `auto` applies it to higher-risk transitions including
-external high-stakes evidence, contradiction reversal, dispute resolution, and a change
-from blocking to advisory. When an external class came from isolated model assessment, the
-independent high-stakes auditor must also accept the publisher relationship; it rejects UGC
-or secondary material mislabeled as primary/authoritative.
-
-The exact event, evidence IDs, claim state, vendor/model identities, and checks persist.
-Unavailable checks remain pending and are replayed from the stored event in a later round.
-Duplicate evidence IDs, unknown vendors, mismatched event digests, or incomplete provenance
-cannot clear a claim.
-
-## Persistence and recovery
-
-Exact evidence bytes live in the content-addressed evidence store beneath
-`$PARANOIA_STATE_ROOT/evidence/`. Lineage publication and evidence roots use atomic replace,
-advisory locking, and explicit recovery journals. Malformed persisted structures are
-quarantined or reported as blocked; they are never defaulted to empty state.
-
-Operational failures before an unambiguous publication boundary release the lineage latch.
-Ambiguous failures at or after publication retain recovery state for the next operator or
-round. The ephemeral repository snapshot itself owns no native refs, so snapshot cleanup is
-limited to removing its temporary directory.
-
-## Limits and performance
-
-Important bounds include:
-
-- plan: 1 MiB;
-- paths: 100,000;
-- path enumeration: 32 MiB;
-- individual dirty file: 32 MiB;
-- dirty-tree content retained for a snapshot: 256 MiB;
-- evidence records and requests: bounded per operation and by one shared round budget;
-- external work: at most 8 shared search/fetch attempts, 4 MiB compressed and decompressed
-  per response within the 16 MiB round aggregate shared with repository evidence and model
-  packets, bounded redirects, and one hard 480-second monotonic round deadline;
-- persisted evidence: 100 MiB per lineage and 1 GiB globally by default.
-
-Snapshot latency is measured separately from model latency. On the development repository,
-the refactored snapshot dropped from roughly 17.2 seconds to roughly 0.23 seconds. This is a
-local benchmark, not a universal guarantee. Native discovery adds one bounded search-only
-model call per external query, and provenance adds one fresh call per unmatched fetched page
-(at most the shared external-fetch budget).
-
-The 480-second deadline begins after input and CLI capability preflight and governs snapshot
-work, every model role and register retry, discovery, retrieval, provenance, verification,
-independent audits, and structural review. Each subprocess or HTTP request receives only the
-time still remaining; no phase resets the clock. Expiry is an explicit blocked round, never
-an abstention that can clear a claim.
-
-## Diagnostic and rollback criteria
-
-Use explicit `diagnostic` while evaluating a workflow when:
-
-- representative plans show useful claim extraction with an acceptable false-block rate;
-- snapshot and non-model overhead meet the workflow's latency budget;
-- cached rounds avoid unnecessary research calls;
-- malformed, stale, interrupted, and unavailable cases recover without manual state edits;
-- operators understand that the gate covers only registered claims.
-
-Promote a workflow to explicit `blocking` mode once those measurements are acceptable. Use
-`off` only when the operator explicitly accepts ordinary structural review without claim
-verification. Changing modes does not delete lineage evidence; it only changes whether the
-claim gate runs or governs future verdicts.
-
-The maintained live-integration evidence and release procedure are in
-[`native_web_acceptance.md`](native_web_acceptance.md).
+The current Codex acceptance record is
+[`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
+It covers a known false internet-only claim, an external fact, an RFC design principle, an
+external-library behavior, an internal bridge that must stay out of inventory, retained-packet
+reuse, and a fresh current-snapshot convergence: round 2 closed four corrected claims and
+unchanged round 3 reused all four in 1 ms with no evidence-model call. The same record separately
+identifies the earlier implementation commit used for the fresh 102 KB real-dossier run, which
+converged in two rounds with seven external claims; it does not present that older run as evidence
+for later parser changes.

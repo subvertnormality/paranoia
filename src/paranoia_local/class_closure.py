@@ -19,7 +19,7 @@ import hashlib
 import json
 import os
 import tempfile
-import copy
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
@@ -49,8 +49,6 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
-MAX_PERSISTED_CLASSES = 1000
-MAX_EXEMPTIONS = 1000
 PER_CLASS_TIMEOUT = 10     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
 
@@ -216,8 +214,6 @@ def _parse_block(block: str) -> dict[str, str]:
         line = line.rstrip()
         if not line.strip():
             continue
-        if "\0" in line:
-            raise RegisterError("register fields may not contain NUL")
         if line.lstrip().startswith("#"):
             continue
         if ":" not in line:
@@ -300,8 +296,6 @@ def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
 def _reject_pathspec_magic(pathspec: str) -> None:
     """A leading `:` is git pathspec magic. Verified: `-- ':(exclude)src'` is accepted
     and silently changes the result set, so a model-authored pathspec must not carry it."""
-    if "\0" in pathspec:
-        raise RegisterError("pathspec may not contain NUL")
     if pathspec.startswith(":"):
         raise RegisterError(
             f"pathspec magic is not allowed (leading ':') — {pathspec!r}"
@@ -322,9 +316,10 @@ class Lineage:
     classes: dict[str, TrackedClass] = field(default_factory=dict)
     exemptions: list[Exemption] = field(default_factory=list)
     debt: dict[str, Any] | None = None
-    #: Version-2 plan-only claim envelope. Branch lineages leave this ``None`` so their
-    #: persisted representation and renderer remain backwards compatible.
-    claim_state: dict[str, Any] | None = None
+    #: Plan mode's external-claim register. It shares this already-atomic lineage file
+    #: instead of introducing a second store/transaction protocol.  Branch mode leaves
+    #: it empty and otherwise behaves byte-for-byte as before.
+    claim_state: dict[str, Any] = field(default_factory=dict)
     #: Which tool created this lineage. A plan lineage holds only unmechanized classes
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
@@ -340,12 +335,6 @@ class Lineage:
 class StateUnavailable(RuntimeError):
     """Lineage state could not be read or written. Blocks; never silently starts fresh —
     a storage fault must not become a false all-clear (plan §2.7)."""
-
-
-class StatePublicationAmbiguous(StateUnavailable):
-    """The lineage atomic-replace boundary was entered, so its outcome needs repair."""
-
-    publication_ambiguous = True
 
 
 #: Where lineage state lives. Deliberately NOT derived from `log_dir`: `--log-dir` is
@@ -371,12 +360,8 @@ def _paths(root: Path, lineage_id: str) -> tuple[Path, Path]:
     return d / f"{lineage_id}.json", d / f"{lineage_id}.pending"
 
 
-def _release_path(root: Path, lineage_id: str) -> Path:
-    return lineage_dir(root) / f"{lineage_id}.releasing"
-
-
 def load_lineage(root: Path, lineage_id: str, *, stamp: str,
-                 mode: str = BRANCH_MODE, latch_owned: bool = False) -> Lineage:
+                 mode: str = BRANCH_MODE) -> Lineage:
     """`mode` is the tool asking. Opening a lineage created by the other tool is
     REFUSED, not merged: a plan round that loaded a branch lineage would either sweep
     mechanized predicates with no reviewed snapshot, or skip the sweep and carry a
@@ -384,23 +369,16 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
     `lineage` is used verbatim as the filename, so the collision is one typo away, and
     the remedy is a mode-qualified key (`…-plan` / `…-branch`)."""
     state_path, pending = _paths(root, lineage_id)
-    releasing = _release_path(root, lineage_id)
     quarantined = sorted(lineage_dir(root).glob(f"{lineage_id}.corrupt-*.json"))
     if quarantined:
         raise StateUnavailable(
             f"lineage {lineage_id} has quarantined state — repair or delete "
             f"{quarantined[-1]} before this lineage can be used again"
         )
-    if latch_owned:
-        if not pending.exists() or releasing.exists():
-            raise StateUnavailable(
-                f"lineage {lineage_id} ownership latch is missing or releasing"
-            )
-    elif pending.exists() or releasing.exists():
-        marker = pending if pending.exists() else releasing
+    if pending.exists():
         raise StateUnavailable(
-            f"a previous round left a pending write latch at {marker}; its state write "
-            "or durable release may not have completed. Inspect and remove it to continue."
+            f"a previous round left a pending write latch at {pending}; its state write "
+            "may not have completed. Inspect and remove it to continue."
         )
     if not state_path.exists():
         return Lineage(lineage_id, mode=mode)
@@ -408,12 +386,11 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
         raw = json.loads(state_path.read_text(encoding="utf-8"))
         lineage = _from_json(lineage_id, raw)
     except Exception as exc:  # noqa: BLE001 — any unreadable state blocks, none is repaired silently
-        # Use the same crash-durable operation as post-load semantic quarantine.
-        # A rename or directory-fsync failure is reported as a quarantine failure;
-        # never claim that the live malformed entry was safely moved when it was not.
-        dest = quarantine_lineage(
-            root, lineage_id, stamp=stamp, reason=f"state did not parse: {exc}",
-        )
+        dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
+        try:
+            state_path.replace(dest)
+        except OSError:
+            dest = state_path
         raise StateUnavailable(
             f"lineage state at {state_path} did not parse ({exc}); quarantined to {dest}. "
             "Repair or delete it and re-run."
@@ -428,138 +405,31 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
 
 
 def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
-    if not isinstance(raw, dict):
-        raise StateUnavailable("lineage state must be an object")
-    mode = raw.get("mode", BRANCH_MODE)
-    base_fields = {"mode", "rounds", "next_seq", "classes", "exemptions", "debt"}
-    if mode == PLAN_MODE:
-        if set(raw) != base_fields | {"schema_version", "claim_state"}:
-            raise StateUnavailable(
-                "plan lineage has missing or unknown schema-v2 envelope fields"
-            )
-        if raw["schema_version"] != 2 or not isinstance(raw["claim_state"], dict):
-            raise StateUnavailable("plan lineage schema version or claim state is malformed")
-    elif "schema_version" in raw or "claim_state" in raw:
-        raise StateUnavailable("non-plan lineage cannot contain a plan claim envelope")
-    rounds, next_seq = raw.get("rounds", 0), raw.get("next_seq", 1)
-    if not isinstance(rounds, int) or isinstance(rounds, bool) or rounds < 0:
-        raise StateUnavailable("lineage rounds must be a nonnegative integer")
-    if not isinstance(next_seq, int) or isinstance(next_seq, bool) or next_seq < 1:
-        raise StateUnavailable("lineage next_seq must be a positive integer")
-    classes = _classes_from_json(raw.get("classes", []), mode=mode)
-    exemptions = _exemptions_from_json(raw.get("exemptions", []), classes=classes)
-    debt = raw.get("debt")
-    if debt is not None and (
-        not isinstance(debt, dict) or set(debt) != {"round", "reason"}
-        or not isinstance(debt.get("round"), int) or isinstance(debt.get("round"), bool)
-        or debt["round"] < 1 or not isinstance(debt.get("reason"), str)
-        or not debt["reason"]
-    ):
-        raise StateUnavailable("lineage debt is malformed")
     return Lineage(
         lineage_id=lineage_id,
         # Absent means branch: every lineage that existed before plan mode was one, so
         # this needs no migration and cannot mistake old state for plan state.
-        mode=mode,
-        rounds=rounds,
-        next_seq=next_seq,
-        classes=classes,
-        exemptions=exemptions,
-        debt=debt,
-        claim_state=raw.get("claim_state"),
+        mode=raw.get("mode", BRANCH_MODE),
+        rounds=int(raw.get("rounds", 0)),
+        next_seq=int(raw.get("next_seq", 1)),
+        classes={
+            c["class_id"]: TrackedClass(
+                class_id=c["class_id"], invariant=c["invariant"], severity=c["severity"],
+                first_round=int(c["first_round"]), status=c["status"],
+                pattern=c.get("pattern"), pathspec=c.get("pathspec"),
+                procedure=c.get("procedure"), superseded_by=c.get("superseded_by"),
+                detail=c.get("detail"), matches=tuple(c.get("matches", ())),
+            )
+            for c in raw.get("classes", [])
+        },
+        exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
+        debt=raw.get("debt"),
+        claim_state=deepcopy(raw.get("claim_state", {})),
     )
 
 
-def _classes_from_json(raw: Any, *, mode: str) -> dict[str, TrackedClass]:
-    required = {"class_id", "invariant", "severity", "first_round", "status", "matches"}
-    optional = {"pattern", "pathspec", "procedure", "superseded_by", "detail"}
-    if not isinstance(raw, list) or len(raw) > MAX_PERSISTED_CLASSES:
-        raise StateUnavailable("lineage classes must be a bounded array")
-    classes: dict[str, TrackedClass] = {}
-    for item in raw:
-        if not isinstance(item, dict) or not required.issubset(item) \
-                or not set(item).issubset(required | optional):
-            raise StateUnavailable("persisted class has missing or unknown fields")
-        class_id, invariant = item["class_id"], item["invariant"]
-        first_round, status = item["first_round"], item["status"]
-        if not isinstance(class_id, str) or not class_id or class_id in classes \
-                or not isinstance(invariant, str) or not invariant:
-            raise StateUnavailable("persisted class identity is malformed or duplicated")
-        if item["severity"] not in SEVERITIES or status not in {
-            OPEN, CLOSED, OVER_BROAD, MALFORMED, UNCHECKED, SUPERSEDED,
-        }:
-            raise StateUnavailable("persisted class severity or status is malformed")
-        if not isinstance(first_round, int) or isinstance(first_round, bool) or first_round < 1:
-            raise StateUnavailable("persisted class first_round is malformed")
-        for key in optional:
-            if key in item and (not isinstance(item[key], str) or not item[key]):
-                raise StateUnavailable(f"persisted class {key} is malformed")
-        pattern, pathspec, procedure = (
-            item.get("pattern"), item.get("pathspec"), item.get("procedure")
-        )
-        if (pattern is None) != (pathspec is None) or (pattern is None) == (procedure is None):
-            raise StateUnavailable("persisted class mechanism is malformed")
-        if mode == PLAN_MODE and procedure is None:
-            raise StateUnavailable("plan lineage cannot persist a mechanized class")
-        if any("\0" in value for value in (pattern, pathspec, procedure) if value is not None) \
-                or (pathspec is not None and pathspec.startswith(":")):
-            raise StateUnavailable("persisted class mechanism contains an unsafe operand")
-        matches = item["matches"]
-        if not isinstance(matches, list) or len(matches) > MAX_MATCHES:
-            raise StateUnavailable("persisted class matches must be a bounded array")
-        for match in matches:
-            expected = {"path", "line", "text"}
-            if not isinstance(match, dict) or frozenset(match) not in {
-                frozenset(expected), frozenset(expected | {"binary"}),
-            }:
-                raise StateUnavailable("persisted class match has invalid fields")
-            if not isinstance(match["path"], str) or not isinstance(match["text"], str) \
-                    or not isinstance(match["line"], int) or isinstance(match["line"], bool) \
-                    or match["line"] < 0 or ("binary" in match and match["binary"] is not True):
-                raise StateUnavailable("persisted class match is malformed")
-        classes[class_id] = TrackedClass(
-            class_id=class_id, invariant=invariant, severity=item["severity"],
-            first_round=first_round, status=status, pattern=pattern, pathspec=pathspec,
-            procedure=procedure, superseded_by=item.get("superseded_by"),
-            detail=item.get("detail"), matches=tuple(matches),
-        )
-    if len([item for item in classes.values() if item.status != SUPERSEDED]) \
-            > MAX_ACTIVE_CLASSES:
-        raise StateUnavailable("lineage exceeds the active class cap")
-    for item in classes.values():
-        if item.status == SUPERSEDED:
-            target = classes.get(item.superseded_by or "")
-            if target is None or target.class_id == item.class_id or target.status == SUPERSEDED:
-                raise StateUnavailable("persisted class supersession graph is malformed")
-        elif item.superseded_by is not None:
-            raise StateUnavailable("active persisted class has a superseded target")
-    return classes
-
-
-def _exemptions_from_json(
-    raw: Any, *, classes: dict[str, TrackedClass],
-) -> list[Exemption]:
-    if not isinstance(raw, list) or len(raw) > MAX_EXEMPTIONS:
-        raise StateUnavailable("lineage exemptions must be a bounded array")
-    exemptions: list[Exemption] = []
-    for item in raw:
-        if not isinstance(item, dict) or set(item) != {"class_id", "path", "line", "fingerprint"}:
-            raise StateUnavailable("persisted exemption has invalid fields")
-        identity = (item["class_id"], item["path"], item["line"])
-        if not isinstance(identity[0], str) or identity[0] not in classes \
-                or not isinstance(identity[1], str) or not identity[1] \
-                or not isinstance(identity[2], int) or isinstance(identity[2], bool) \
-                or identity[2] < 1 \
-                or not isinstance(item["fingerprint"], str) \
-                or len(item["fingerprint"]) != 16 \
-                or any(char not in "0123456789abcdef" for char in item["fingerprint"]):
-            raise StateUnavailable("persisted exemption is malformed")
-        exemptions.append(Exemption(**item))
-    return exemptions
-
-
 def _to_json(lineage: Lineage) -> dict[str, Any]:
-    payload = {
+    return {
         "mode": lineage.mode,
         "rounds": lineage.rounds,
         "next_seq": lineage.next_seq,
@@ -569,35 +439,22 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         ],
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
+        "claim_state": lineage.claim_state,
     }
-    if lineage.mode == PLAN_MODE:
-        if lineage.claim_state is None:
-            raise StateUnavailable("plan lineage cannot be written without claim state")
-        payload["schema_version"] = 2
-        payload["claim_state"] = lineage.claim_state
-    return payload
 
 
 def open_latch(root: Path, lineage_id: str) -> None:
     """Written before the engine call, cleared only once the round has finished writing.
     Without it a *failed* write leaves no marker and the next round starts empty."""
     _, pending = _paths(root, lineage_id)
-    releasing = _release_path(root, lineage_id)
     try:
-        _mkdir_durable(pending.parent)
-        if releasing.exists():
-            raise StateUnavailable(
-                f"a previous round owns the releasing lineage latch at {releasing}"
-            )
-        fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(b"pending\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        _fsync_dir(pending.parent)
+        pending.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("pending\n")
     except FileExistsError as exc:
         raise StateUnavailable(
-            f"another round owns the pending lineage latch at {pending}"
+            f"a round already owns the pending latch at {pending}"
         ) from exc
     except OSError as exc:
         # Same treatment as a failed lineage save: block, but never prevent the review
@@ -606,106 +463,31 @@ def open_latch(root: Path, lineage_id: str) -> None:
 
 
 def clear_latch(root: Path, lineage_id: str) -> None:
-    """Durably clear the latch or leave a live recovery marker and report failure."""
+    """Best-effort by design, and the ONE place in this module where that is right.
+
+    A latch that cannot be removed leaves the next round `STATE-UNAVAILABLE`, which is
+    exactly the fail-closed outcome the latch exists to produce. Raising here instead would
+    destroy a completed, paid review over a file that could not be unlinked.
+    """
     _, pending = _paths(root, lineage_id)
-    releasing = _release_path(root, lineage_id)
     try:
-        if not pending.exists() and not releasing.exists():
-            return
-        if pending.exists():
-            os.replace(pending, releasing)
-            _fsync_dir(pending.parent)
-        releasing.unlink()
-        _fsync_dir(pending.parent)
-    except OSError as exc:
-        # If unlink succeeded but its directory fsync failed, recreate a marker in the
-        # live namespace before returning. This makes the next round block even though
-        # crash durability could not be established on the failing filesystem.
-        marker_error: OSError | None = None
-        if not pending.exists() and not releasing.exists():
-            try:
-                fd = os.open(releasing, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                with os.fdopen(fd, "wb") as handle:
-                    handle.write(b"release-ambiguous\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                _fsync_dir(releasing.parent)
-            except OSError as recovery_exc:
-                marker_error = recovery_exc
-        detail = f"; recovery marker error: {marker_error}" if marker_error else ""
-        raise StateUnavailable(
-            f"could not durably clear pending latch at {pending}: {exc}{detail}"
-        ) from exc
+        pending.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def save_lineage(root: Path, lineage: Lineage) -> None:
     state_path, _ = _paths(root, lineage.lineage_id)
-    tmp: str | None = None
-    publication_started = False
+    state_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        _mkdir_durable(state_path.parent)
         fd, tmp = tempfile.mkstemp(dir=str(state_path.parent), suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(_to_json(lineage), fh, indent=2, default=str)
-            fh.flush()
-            os.fsync(fh.fileno())
-        # An error returned by replace cannot prove which directory entry is visible.
-        # From this point the caller must retain its recovery latch and evidence roots.
-        publication_started = True
         os.replace(tmp, state_path)
-        tmp = None
-        _fsync_dir(state_path.parent)
-    except (OSError, TypeError, ValueError, RecursionError) as exc:
-        error_type = StatePublicationAmbiguous if publication_started else StateUnavailable
-        raise error_type(
-            f"could not write lineage state under {state_path.parent}: {exc}"
-        ) from exc
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp)
-            except FileNotFoundError:
-                pass
-            except OSError:
-                # The primary publication result is authoritative. A stale temporary
-                # file is never a live state candidate and cannot make it ambiguous.
-                pass
-
-
-def quarantine_lineage(root: Path, lineage_id: str, *, stamp: str, reason: str) -> Path:
-    """Move a loaded-but-invalid lineage aside before a latch is acquired."""
-    state_path, _ = _paths(root, lineage_id)
-    dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
-    try:
-        os.replace(state_path, dest)
-        _fsync_dir(dest.parent)
     except OSError as exc:
         raise StateUnavailable(
-            f"lineage state at {state_path} is invalid ({reason}) and could not be "
-            f"quarantined: {exc}"
+            f"could not write lineage state under {state_path.parent}: {exc}"
         ) from exc
-    return dest
-
-
-def _fsync_dir(path: Path) -> None:
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-
-
-def _mkdir_durable(path: Path) -> None:
-    missing: list[Path] = []
-    cursor = path
-    while not cursor.exists():
-        missing.append(cursor)
-        if cursor.parent == cursor:
-            break
-        cursor = cursor.parent
-    path.mkdir(parents=True, exist_ok=True)
-    for created in reversed(missing):
-        _fsync_dir(created.parent)
 
 
 # ── applying a register ───────────────────────────────────────────────────────
@@ -714,7 +496,7 @@ def _mkdir_durable(path: Path) -> None:
 def mint_id(lineage_id: str, seq: int, invariant: str) -> str:
     """Server-assigned and stable for life. Never derived from the predicate: two
     distinct invariants expressible by one regex must stay two independent classes."""
-    return hashlib.sha256(f"{lineage_id}\0{seq}\0{invariant}".encode()).hexdigest()[:32]
+    return hashlib.sha256(f"{lineage_id}\0{seq}\0{invariant}".encode()).hexdigest()[:8]
 
 
 def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> list[str]:
@@ -762,15 +544,13 @@ def copy_lineage(lineage: Lineage) -> Lineage:
     return Lineage(
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
-        mode=lineage.mode, claim_state=copy.deepcopy(lineage.claim_state),
+        mode=lineage.mode, claim_state=deepcopy(lineage.claim_state),
     )
 
 
 def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
          pattern: str | None, pathspec: str | None, procedure: str | None) -> str:
     cid = mint_id(lineage.lineage_id, lineage.next_seq, invariant)
-    if cid in lineage.classes:
-        raise RegisterError("generated class ID collides with an existing class")
     lineage.next_seq += 1
     lineage.classes[cid] = TrackedClass(
         class_id=cid, invariant=invariant, severity=severity, first_round=round_no,
@@ -1144,7 +924,7 @@ def render_trailer(lineage: Lineage, *, register_status: str,
     )
     lines = [
         f"LINEAGE: {lineage.lineage_id} (rounds recorded: {lineage.rounds})",
-        "CLASS-REGISTER: " + json.dumps(register_status, ensure_ascii=True)[1:-1],
+        f"CLASS-REGISTER: {register_status}",
         f"CLASS-CLOSURE: {counts}",
     ]
     # A predicate can be wrong in the SAFE direction — too narrow, matching none of the
@@ -1156,25 +936,17 @@ def render_trailer(lineage: Lineage, *, register_status: str,
         and lineage.classes[c].mechanized
     ]
     if born_closed:
-        lines.extend(
-            "CLASS-CLOSURE-WARNING-DATA-JSON=" + json.dumps(
-                {
-                    "class_id": c.class_id,
-                    "invariant": c.invariant,
-                    "warning": "closed in the round it was registered; verify its predicate",
-                },
-                sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        lines.append(
+            "CLASS-CLOSURE-WARNING: " + "; ".join(
+                f"{c.class_id} closed in the round it was registered — verify its predicate "
+                f"actually matches the violation it describes ({display(c.invariant)})"
+                for c in born_closed
             )
-            for c in born_closed
         )
     if lineage.debt:
         lines.append(
-            "CLASS-DEBT-DATA-JSON=" + json.dumps(
-                lineage.debt, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-            )
-        )
-        lines.append(
-            f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}"
+            f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}: "
+            f"{lineage.debt.get('reason')}"
         )
     elif blocking:
         lines.append(f"CONVERGENCE: BLOCKED — {len(blocking)} class(es) unclosed:")
@@ -1183,16 +955,7 @@ def render_trailer(lineage: Lineage, *, register_status: str,
                    else "unmechanized: awaiting reviewer CLOSED or RECLASSIFY")
             if c.status in (MALFORMED, OVER_BROAD, UNCHECKED):
                 how = f"{c.status}: {display(c.detail or 'closure not proven')}"
-            lines.append(
-                "CLASS-DATA-JSON=" + json.dumps(
-                    {
-                        "class_id": c.class_id,
-                        "invariant": c.invariant,
-                        "closure": how,
-                    },
-                    sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-                )
-            )
+            lines.append(f"  {c.class_id} {display(c.invariant)} ({how})")
         lines.append(
             "  Any `CONVERGED` in the review text above is VOID: it is the reviewer's "
             "judgement about new findings, not a statement about these classes."
@@ -1200,7 +963,4 @@ def render_trailer(lineage: Lineage, *, register_status: str,
     else:
         lines.append("CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed; advisory "
                      "classes may remain open. Reviewer findings still govern.")
-    rendered = "\n".join(lines)
-    if sum(line.startswith("CONVERGENCE:") for line in rendered.splitlines()) != 1:
-        raise AssertionError("class convergence trailer must contain exactly one verdict line")
-    return rendered
+    return "\n".join(lines)

@@ -1,0 +1,75 @@
+{
+  "date": "2026-08-09",
+  "reviewer": {
+    "engine": "codex",
+    "cli_version": "codex-cli 0.144.6",
+    "model": "gpt-5.6-sol",
+    "web_capability": "built-in tools.web_search=true",
+    "authentication": "signed-in ChatGPT account"
+  },
+  "implementation_commit": "a1b2580",
+  "representative_acceptance": {
+    "lineage": "final-external-acceptance-3edda33-plan",
+    "fixture": "Fresh external fact, RFC design principle, urllib.parse.urljoin behavior, one intentionally false internet-only SQLite release date, and an internal function-call bridge.",
+    "rounds": [
+      {
+        "round": 1,
+        "claim_status": "parsed 4 new + 0 targeted retained + 0 frozen",
+        "claim_model_calls": 1,
+        "claim_duration_ms": 56980,
+        "result": "Three supported categories; hidden 2025 SQLite date refuted by the official release log with an exact 2024 replacement; internal function bridge and plan self-evidence excluded."
+      },
+      {
+        "round": 2,
+        "claim_status": "parsed 1 new + 0 targeted retained + 3 frozen",
+        "claim_model_calls": 1,
+        "claim_duration_ms": 23479,
+        "result": "Evidence-entailed correction supported; three unchanged packets reused; CLAIM-CLOSURE 4 supported, 0 refuted, 0 unverified; CONVERGENCE: NOT-BLOCKED."
+      },
+      {
+        "round": 3,
+        "claim_status": "reused 4 unchanged supported packets; no claim model call",
+        "claim_model_calls": 0,
+        "claim_duration_ms": 1,
+        "result": "CONVERGENCE: NOT-BLOCKED; four supported external packets, zero internal bridge packets, and no repeated evidence search."
+      },
+      {
+        "round": 4,
+        "claim_status": "reused 4 unchanged supported packets; no claim model call",
+        "claim_model_calls": 0,
+        "claim_duration_ms": 1,
+        "result": "Post-hardening acceptance on a1b2580 exercised retained qualification after plan-self evidence rejection was extended to persisted packets; CONVERGENCE: NOT-BLOCKED."
+      }
+    ]
+  },
+  "real_dossier_acceptance": {
+    "implementation_commit": "ee1db2f",
+    "lineage": "completed-cards-dossier-external-v1-plan",
+    "input_size_bytes": 102382,
+    "rounds": [
+      {
+        "round": 1,
+        "claim_status": "parsed 7 new + 0 targeted retained + 0 frozen",
+        "claim_model_calls": 1,
+        "claim_duration_ms": 301136,
+        "result": "Seven supported external claims; two material structural grading defects returned with exact repository evidence."
+      },
+      {
+        "round": 2,
+        "claim_status": "parsed 0 new + 0 targeted retained + 7 frozen",
+        "claim_model_calls": 1,
+        "claim_duration_ms": 16092,
+        "result": "Blocking structural class closed; CLAIM-CLOSURE 7 supported, 0 refuted, 0 unverified; CONVERGENCE: NOT-BLOCKED."
+      }
+    ]
+  },
+  "authority_checks": {
+    "ugc_governing_evidence": false,
+    "primary_sources_observed": [
+      "https://www.python.org/downloads/release/python-3110/",
+      "https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.1",
+      "https://docs.python.org/3.11/library/urllib.parse.html#urllib.parse.urljoin",
+      "https://www.sqlite.org/releaselog/3_45_0.html"
+    ]
+  }
+}

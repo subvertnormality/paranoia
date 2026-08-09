@@ -38,8 +38,3 @@ packages = ["src/paranoia_local"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
-
-[tool.mutmut]
-source_paths = ["src/paranoia_local"]
-only_mutate = ["src/paranoia_local/plan_claims.py"]
-pytest_add_cli_args_test_selection = ["tests/test_plan_claims.py"]

@@ -309,15 +309,12 @@ review clears it, and that is a review the operator was going to run anyway.
 corrected predicate minted a new class and the old one blocked forever, and
 unmechanized classes had no id at all yet were required to close by id.*
 
-The server assigns `class_id` (32 hex chars, retaining 128 SHA-256 bits) at first
-registration and it never
+The server assigns `class_id` (8 hex chars) at first registration and it never
 changes. Reviewer-authored text never determines identity, so it does not matter
 that round 7 called the class "escalations" and round 9 "unresolved starts" — a
 label match would never have connected them anyway.
 
-**Every new-class record gets its own id. There is no deduplication.** An occupied
-generated ID rejects the entire register before `next_seq`, transitions, or the class map
-can change. Existing persisted eight-character IDs remain readable for compatibility.
+**Every new-class record gets its own id. There is no deduplication.**
 
 *Round 2 [MAJOR] asked for a dedup conflict rule and revision 3 gave one — max
 severity, both invariant texts retained. Round 4 [FATAL] then showed that dedup
@@ -700,9 +697,9 @@ A **second** reserved block lists every unmechanized class the lineage holds,
 
 ```
 === UNMECHANIZED CLASSES — no predicate; you are the check ===
-[3f2a91c4d78ebca719f027abb63bc168, MAJOR, open, first raised round 7] <invariant>
+[3f2a91c4, MAJOR, open, first raised round 7] <invariant>
   procedure: <procedure>
-[91b0e77d7d2c5d2831e8fcb53175ae73, MAJOR, closed at round 9] <invariant>
+[91b0e77d, MAJOR, closed at round 9] <invariant>
   procedure: <procedure>
 ```
 

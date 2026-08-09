@@ -1,150 +1,130 @@
 # Repository agent instructions
 
-These rules govern planning, implementation, and adversarial convergence work in this
-repository. They supplement the user request; they do not broaden it.
+These instructions govern work in paranoia-local. User instructions take precedence but do
+not silently expand scope.
 
-## Treat stakes as a specification
+## Freeze proportionate stakes
 
-Before starting a review loop, write one stable stakes statement. It must be concrete
-enough to decide whether a proposed failure is in scope. Cover every relevant dimension:
+Before any convergence loop, state one concrete, stable operating model: deployment,
+operators, trusted actors, untrusted inputs, active adversary capabilities, concurrency,
+network boundary, expected files/claims/rounds/latency, consequences of false clear versus
+false block, and explicit exclusions. Avoid vague labels such as “production”, “malicious
+repository”, or “high stakes”. Distinguish untrusted static bytes from repository-selected
+code execution, a hostile local process racing paths, a compromised OS, and hostile web
+content. A material stakes change requires user direction and retriage; never strengthen
+stakes merely to keep a review loop generating work.
 
-- deployment and operators: local CLI/MCP, service, CI, single user, or multi-tenant;
-- trusted actors: operator, OS, other local processes, repository owner, callers;
-- untrusted inputs: plan text, repository bytes, Git configuration, supplied artifacts,
-  fetched content, persisted state;
-- active adversaries: state explicitly whether an attacker can execute code or mutate the
-  repository, its parent directories, process environment, network, or state directory
-  while a review is running;
-- concurrency and mutation: distinguish ordinary edits from adversarial race attempts;
-- network boundary: configured endpoints, redirects, DNS, proxies, and credential access;
-- scale and budgets: approximate files, bytes, claims, users, rounds, and acceptable latency;
-- consequences: what a false `NOT-BLOCKED`, false block, data disclosure, state loss, or
-  availability failure actually costs;
-- exclusions: name plausible but unsupported threat capabilities that are not being built
-  for.
+Default local-tool calibration unless the task says otherwise: trusted single user and OS;
+plan/repository/fetched content untrusted as data; no hostile local race; ordinary edits must
+block/retry; tens to low hundreds of claims; evidence useful within minutes; false
+`NOT-BLOCKED`, authority errors, and wrong evidence binding high impact; recoverable blocking
+acceptable. Formal proof, multi-tenancy, hostile same-user races, and deliberately corrupted
+state recovery are not implied.
 
-Do not use vague stakes such as "malicious repository", "production", "high stakes", or
-"security-sensitive" without defining attacker capabilities. In particular, distinguish:
+## Review the right artifact
 
-1. static malicious repository content or configuration;
-2. repository-selected code execution;
-3. an active local process racing filesystem operations;
-4. a compromised OS or filesystem;
-5. malicious network content or an active network attacker;
-6. corrupted state caused by a crash versus state deliberately tampered with by an attacker.
+Do a plan review to validate the design, then implement it. Once implementation begins,
+paranoia convergence reviews the **code branch/diff**, not the old plan, unless the user
+explicitly asks to reopen plan design. Never spend repeated rounds polishing a plan while
+reporting implementation progress. Label every run in commentary as PLAN or CODE.
 
-A proportionate local-tool statement looks like this:
+Before review, update public documentation and these agent instructions. Before opening a PR,
+run the primary capability end to end; fake-backed tests alone do not establish usability.
 
-> Single-user local MCP operated by a trusted user on a trusted OS. Plan bytes, repository
-> content and Git configuration, supplied artifacts, and fetched pages are untrusted data.
-> No hostile local process can mutate the repository or its ancestors during a round;
-> ordinary user edits may occur and must produce an explicit retry/block, not a false clear.
-> Native search uses only the selected signed-in reviewer CLI; the server retrieves candidate
-> pages over public HTTPS without sending page-bound credentials. Expected scale is about
-> 1,000 files, tens of claims, eight search/fetch attempts, and an eight-minute hard round
-> limit. A false `NOT-BLOCKED` is high impact; a recoverable blocked round is acceptable.
+## Classes are architectural hypotheses
 
-If hostile concurrent mutation is intended, say so separately and name the writable paths:
+An open class is not a patch instruction. Triage all open/reopened classes together: concrete
+reachable failure, required actor capabilities, user/public invariant, shared root cause,
+proportionate disposition, and smallest coherent remedy. Stop patching and hold an architecture
+checkpoint when a class recurs, a late round opens an architectural class, two fix cycles do
+not reduce blockers, a fix adds a subsystem/trust boundary/persistence protocol, or the change
+budget is materially exceeded. Choose refactor, narrower contract, staged rollout, or no-go.
 
-> Another untrusted local process may rename or replace the repository and its parent-path
-> components during snapshot construction; namespace TOCTOU attacks are in scope.
+At a checkpoint, do not “fix every class” line by line. Re-read the request, group patterns,
+measure current diff/runtime, and simplify. A clean review means no in-scope blocking class
+under frozen stakes—not defense against every imaginable environment.
 
-Freeze the stakes for a convergence lineage. Do not silently strengthen them in response to
-a finding. A material stakes change requires an explicit user/design decision, updated
-acceptance criteria, and retriage of every open class.
+## Optimize for a workable product
 
-Documentation must describe the approved threat model. Do not turn an incidental hardening
-patch into a new public security guarantee. Conversely, do not dismiss a finding as out of
-scope when the public documentation already promises the affected behaviour; first decide
-whether to keep the guarantee or narrow the documentation.
+Priority order:
 
-## Classes are architectural hypotheses, not a patch queue
+1. accurate domain behavior and verdicts;
+2. reliable ordinary operation and recoverable failures;
+3. useful latency and bounded resources;
+4. maintainable, small architecture;
+5. security against actors explicitly in scope;
+6. excluded hardening.
 
-An open or reopened class proposes an invariant. It is not automatic authorization to edit
-code. Before implementing any class-driven change, triage the class against the frozen
-stakes and record:
+Never improve speed by dropping a load-bearing claim, accepting weak authority, reusing a stale
+verdict, weakening evidence-to-claim entailment, or falsely clearing debt. Do not add CAS,
+journals, custom transports, all-pair protocols, or hostile-race defenses when existing atomic
+state and reviewer-native capabilities meet the supported model.
 
-- the concrete failure scenario and required actor capabilities;
-- evidence that the scenario is reachable in the current implementation;
-- whether the invariant is required by the user request, public contract, or accepted design;
-- the root architectural responsibility and every related open class;
-- one disposition: `ACCEPT`, `NARROW/SUPERSEDE`, `ADVISORY/OUT-OF-SCOPE`, or `REJECT`;
-- the smallest coherent remedy and its expected code, latency, compatibility, and test cost.
+## Claim-verification invariants
 
-Review all open and reopened classes as a set. Look for a shared design error before fixing
-individual manifestations. Use the class register's supported closure, narrowing, or
-supersession mechanism when a class is too broad; do not write code merely to make the
-register green.
+- Verification is on by default for real plan reviews and uses the selected reviewer CLI's
+  built-in web search. No placeholder endpoint, optional plugin, or caller adapter may stand
+  in for the primary path.
+- The evidence register is mechanically external-only. Retain atomic, load-bearing external
+  facts; design principles/requirements issued by a governing external authority; and behavior
+  promised by an external API, dependency, platform, protocol, service, or runtime. Reject
+  repository state, code paths, internal history, implementation conformance, and internal
+  function bridges from claim inventory: the broad structural/code review and tests own them.
+  Project-authored choices do not become external design principles through labeling.
+- Preserve event, actor, date, modality, scope, and chronology in every packet. A dated external
+  report event is not proved by the underlying condition alone; an external rule asserted for a
+  past date requires a source authoritative for that date, not a later summary.
+- Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
+  Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
+- Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
+  schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
+  not evidence. Active versionless predecessor state must become blocking migration debt and
+  force one exhaustive audit, never normalize to an empty verified register.
+- Return exact passage, canonical location, publisher/authority, relation, and a replacement
+  only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
+  The plan under review is context, not evidence for its own assertions; require authoritative
+  external sources.
+- Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.
+  In later rounds, an exact unchanged supported claim is frozen with its authoritative packet
+  and requires no model call or web search. Bind “unchanged” to the same assertion-bearing
+  Markdown block, structured heading levels, and list ancestry, not substring presence;
+  quotation, code, negation, parent changes, or relocation must re-enter verification. Edited,
+  new, refuted, and unverified claims
+  receive targeted verification. Unverified or otherwise non-freezable claims require a full
+  replacement evidence packet rather than another compact verdict-only assessment; edited
+  wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
+  consume active context. This optimization applies only to external verification: the
+  structural FATAL/MAJOR review remains broad and cold on every convergence round and must not
+  reopen evidence inventory for repository mechanics or “missing atomic bridges.”
+- Model omission and ID reuse are not removal: exact propositions alone preserve identity;
+  every other predecessor requires old wording to be absent plus an explicit `removed`
+  disposition. Surface absent old anchors as removal candidates on both the initial audit and
+  correction retry, but never auto-retire them. Do not provide a model-only `nonfactual`
+  escape. Reject an initial response that omits any still-present unresolved retained ID and
+  name missing IDs in the same-round correction prompt. If the final bounded retry still omits
+  one, apply its other valid packets and carry only the omitted claim as `unverified`; never turn
+  extractor sampling into another full claim review round. A failed targeted audit must preserve frozen supported verdicts while
+  recording debt for the affected edit cone. The cold structural reviewer must see the complete
+  active register plus current retirements
+  before its success contributes to tracked-mode clearance; one-shot plan reviews emit no
+  computed convergence verdict.
+- Malformed model output and required-role failure produce visible blocking debt with bounded
+  diagnostics; they never become an empty register or false clear.
+- The reviewer remains read-only. The calling coding agent autonomously validates packets,
+  edits the plan before round 2, increments the round, and reruns. No human is required for
+  ordinary convergence, and unchanged-input reviewer churn is not correction.
+- Material plan convergence requires both claim closure and class closure plus the governing
+  computed `CONVERGENCE: NOT-BLOCKED` line.
 
-The following events require an architecture checkpoint before further production edits:
+## Delivery discipline
 
-- a class recurs after its proposed fix;
-- a round at or above the severity floor opens a new architectural class;
-- two consecutive review/fix cycles do not reduce the in-scope blocking-class set;
-- a fix introduces a new subsystem, trust boundary, persistence protocol, or public guarantee;
-- the implementation materially exceeds the approved plan's component or performance budget.
+Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
+invariants and the real model-facing schema. Model JSON examples must contain concrete valid
+literals—never `"fact|decision"` or similar pseudo-enums—and correction prompts must name the
+actual validation error. Record production diff size, largest modules, model-call count, and
+real elapsed time.
 
-At the checkpoint, stop the patch loop. Re-read the original request, restate the intended
-operating model, group findings by root cause, and choose among refactoring, narrowing the
-contract, staged rollout, or a documented no-go. Obtain user direction when that choice
-materially changes scope or guarantees.
-
-## Control architectural growth
-
-Use this priority order when performance, simplicity, and hardening compete:
-
-1. accurate domain behaviour and verdicts;
-2. reliable operation and recoverable ordinary failures;
-3. bounded runtime, resource use, and maintainable architecture;
-4. security against the actors and inputs explicitly included in the stakes;
-5. hardening against excluded actors or hypothetical environments.
-
-Never improve speed by allowing a false `NOT-BLOCKED`, dropping a load-bearing claim,
-reusing invalid evidence, weakening source/claim binding, or accepting malformed durable
-state. Conversely, do not retain expensive isolation, copying, durability, or race-defense
-machinery solely for an actor the frozen stakes exclude. Prefer a simpler mechanism when it
-preserves the same in-scope functional invariant.
-
-Before the first implementation and after every architecture checkpoint, record a compact
-change budget using `git diff --stat` plus relevant runtime measurements. Track:
-
-- production lines and files changed;
-- new modules and durable schemas;
-- largest orchestration/state-machine components;
-- duplicated infrastructure or policy;
-- snapshot/review latency, model calls, network calls, and persisted-state growth;
-- rollout mode and rollback path.
-
-Passing tests does not by itself justify added architecture. Refactor or reduce scope when
-one orchestration function owns several phases, one module combines schema validation,
-state transitions, I/O and rendering, or a security adapter duplicates a general repository
-abstraction. Prefer stable seams with explicit inputs and outcomes over more conditional
-branches in a central handler.
-
-Do not make a safety gate default-blocking before the approved rollout reaches that stage.
-When the plan calls for shadow or diagnostic operation, preserve that stage and collect its
-completion evidence before changing defaults.
-
-## Review and delivery discipline
-
-- Use tests to reproduce accepted in-scope failures before changing production code.
-- Prove the primary user capability end to end before starting adversarial convergence. A
-  placeholder URL, hypothetical service, optional plugin, caller-supplied adapter, or unit
-  test around a fake is not an implementation of a required default path. For an external
-  integration, name the concrete generally available API or built-in mechanism, its auth
-  source, its failure behavior, and execute a live smoke test when credentials permit.
-- Record the supported environment, CLI versions, exact capability profile, representative
-  true/false outcome, elapsed time, and any account/network limitation for a default external
-  integration. Keep diagnostic as the default until that evidence is broad enough to justify
-  promotion; a fake-backed unit test or one convenient success is not rollout evidence.
-- Treat acceptance failures as architectural evidence. A clean prose/code review cannot
-  compensate for a primary path that has never successfully run in its supported operating
-  environment.
-- Test class invariants and root causes, not only the latest example.
-- After a class fix, run one focused verification round to test that architectural decision;
-  do not automatically begin another unbounded patch cycle.
-- Report performance and complexity regressions alongside correctness results.
-- Do not open or merge a PR while an architecture checkpoint is unresolved, the documented
-  threat model differs from the reviewed stakes, or the rollout stage is being skipped.
-- A clean review means no in-scope blocking class remains under the frozen stakes. It does
-  not mean hardening against every imaginable actor or failure mode.
+After implementation and docs pass locally, run Codex paranoia against the code with the frozen
+stakes. Accepted findings trigger one coherent change followed by a focused rerun; recurring
+classes trigger an architecture checkpoint, not endless patching. Do not open/merge a PR while
+real acceptance, tests, implementation convergence, or documented stakes remain unresolved.

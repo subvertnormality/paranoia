@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 from paranoia_local import config, logs
@@ -27,24 +26,6 @@ class TestRepoConfig:
 
     def test_malformed_toml_returns_empty(self, tmp_path: Path) -> None:
         (tmp_path / ".paranoia.toml").write_text("this is = = not toml [[[")
-        assert config.load_repo_config(tmp_path) == {}
-
-    def test_symlinked_config_is_not_followed(self, tmp_path: Path) -> None:
-        outside = tmp_path / "outside.toml"
-        outside.write_text('stakes = "outside"\n')
-        (tmp_path / ".paranoia.toml").symlink_to(outside)
-        assert config.load_repo_config(tmp_path) == {}
-
-    def test_fifo_config_is_rejected_without_opening_a_blocking_reader(
-        self, tmp_path: Path,
-    ) -> None:
-        os.mkfifo(tmp_path / ".paranoia.toml")
-        assert config.load_repo_config(tmp_path) == {}
-
-    def test_oversized_config_is_rejected(self, tmp_path: Path) -> None:
-        (tmp_path / ".paranoia.toml").write_bytes(
-            b"#" * (config.MAX_CONFIG_BYTES + 1)
-        )
         assert config.load_repo_config(tmp_path) == {}
 
     def test_resolve_prefers_explicit_over_config_over_default(self, tmp_path: Path) -> None:

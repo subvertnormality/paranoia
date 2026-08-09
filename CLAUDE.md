@@ -2,22 +2,26 @@
 
 @AGENTS.md
 
-`AGENTS.md` is the canonical repository-wide instruction set and must be followed in full.
-In particular:
+`AGENTS.md` is canonical and must be followed in full. In particular:
 
-- Write explicit, proportionate stakes before review. "Malicious repository" is ambiguous:
-  say whether only its static bytes/configuration are untrusted or whether an active local
-  process may race filesystem operations.
-- Treat every defect class as an architectural hypothesis to triage, not as an automatic
-  patch request.
-- Stop for an architecture checkpoint when a class recurs, a late round opens a new
-  architectural class, or two review/fix cycles fail to reduce blocking classes.
-- Do not expand public guarantees to justify a patch, skip an approved shadow rollout, or
-  equate a passing test suite with acceptable architectural growth.
-- Preserve accurate claim/evidence state and verdicts ahead of speed, but do not retain
-  expensive hardening solely for attacker capabilities that the frozen stakes exclude.
-- Do not call a placeholder endpoint, optional plugin, or caller-supplied adapter a completed
-  default integration. Exercise the primary capability end to end before convergence, and
-  treat a live acceptance failure as an architecture-checkpoint input.
-- Keep verification enabled in the approved diagnostic rollout by default. Record live
-  true/false, latency, version, and failure evidence before proposing blocking-by-default.
+- write explicit, proportionate, frozen stakes rather than vague “high stakes” language;
+- after plan approval, review the implementation branch—not the plan—unless design is explicitly
+  reopened, and label runs PLAN versus CODE;
+- treat recurring classes as an architecture checkpoint, not permission for another patch;
+- prioritize accurate, fast, workable behavior and a small architecture over out-of-scope
+  hardening;
+- keep plan claim verification on by default with reviewer-native web search, official/primary
+  evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
+  freezing for exact unchanged supported claims after exhaustive round 1; mechanically limit
+  inventory to external facts, externally issued design principles/requirements, and promised
+  external-system behaviors; leave repository mechanics, internal history, implementation
+  conformance, and function bridges to structural/code review and tests; target model/web work
+  at edited, new, refuted, and unverified external claims, requiring a full replacement packet
+  for unverified or non-freezable claims instead of compact-verdict churn; accept only canonical
+  HTTP(S) sources as governing evidence and fail closed over active legacy state;
+- never let the plan under review serve as evidence for its own assertions; bind claims to
+  authoritative external sources;
+- let the calling coding agent autonomously edit from those packets before the next round; no
+  human is required, and an unchanged rerun is not a correction;
+- require claim closure, class closure, real acceptance, updated docs, and a governing computed
+  `CONVERGENCE: NOT-BLOCKED` before delivery.

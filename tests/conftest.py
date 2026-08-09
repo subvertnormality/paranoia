@@ -11,14 +11,6 @@ def _isolate_class_closure_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     """Class closure is on by default, so without this every test that reviews a branch
     would write a lineage into the operator's real ~/.paranoia."""
     monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
-    # Direct Git subprocesses in behavioural tests must not inherit the operator's
-    # signing, hooks, includes, or identity configuration.
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "test")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.com")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "test")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.com")
 
 _GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",

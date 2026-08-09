@@ -41,7 +41,11 @@ _COMMON = {
     },
     "web_search": {
         "type": "boolean",
-        "description": "Allow the reviewer to cross-check external methodology/library claims on the web (default true).",
+        "description": (
+            "Use the selected reviewer's built-in web search (default true). For "
+            "critique_plan this is required while claim verification is enabled; there "
+            "is no custom search endpoint or API-key integration."
+        ),
     },
 }
 
@@ -191,29 +195,15 @@ TOOLS: list[Tool] = [
     Tool(
         name="critique_plan",
         description=(
-            "Research and verify a plan's registered load-bearing claims against one "
-            "pinned repository snapshot and bounded server evidence, then adversarially "
-            "review the plan. With closure enabled, Python combines claim closure and "
-            "defect-class closure into one CONVERGENCE verdict."
+            "Adversarially review a plan or design doc. The reviewer reads the actual "
+            "code to test the plan's premises about current behaviour — a plan built on an inverted "
+            "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags."
         ),
         inputSchema={
             "type": "object",
             "properties": {
-                "plan_text": {
-                    "type": "string", "minLength": 1,
-                    "maxLength": handlers.MAX_PLAN_BYTES,
-                    "description": (
-                        "The plan as markdown (1 MiB maximum). Provide this OR plan_path, "
-                        "never both."
-                    ),
-                },
-                "plan_path": {
-                    "type": "string", "minLength": 1, "maxLength": 4096,
-                    "description": (
-                        "Absolute path to a stable regular markdown file no larger than "
-                        "1 MiB. Provide this OR plan_text, never both."
-                    ),
-                },
+                "plan_text": {"type": "string", "description": "The plan as markdown. Provide this OR plan_path, never both."},
+                "plan_path": {"type": "string", "description": "Absolute path to a markdown plan file. Provide this OR plan_text, never both."},
                 "context": {"type": "string", "description": "Background the reviewer needs to judge the plan fairly."},
                 "repo_path": {"type": "string", "description": "REQUIRED. The repo the plan concerns. Testing the plan's premises against the real code is the reviewer's highest-value job — a plan that asserts 'X currently does Y' when the code shows otherwise is the most dangerous kind — and an ungrounded review cannot do it."},
                 "focus": {"type": "string", "description": "Narrow the review to a specific concern."},
@@ -226,14 +216,14 @@ TOOLS: list[Tool] = [
                         "Track defect CLASSES across plan rounds (default TRUE, as for "
                         "critique_branch). Requires `lineage` and `round`. Pass FALSE for a "
                         "ONE-SHOT review — a design sketch with no convergence loop behind "
-                        "it — which is the single explicit escape and also drops the `round` "
-                        "requirement. The reviewer registers "
+                        "it — which is the single explicit escape, drops the `round` "
+                        "requirement, and emits no computed CONVERGENCE verdict (claim "
+                        "packets and structural prose are still returned). The reviewer registers "
                         "each class with a PROCEDURE (never a regex: over prose a predicate "
                         "would close the moment the wording changed, which is what a rewrite "
                         "that keeps the defect looks like). Every later round is shown the "
-                        "class and must re-verify it. In plan mode the computed trailer "
-                        "combines this gate with blocking claim verification and reports "
-                        "BLOCKED until every required claim and class closes — for "
+                        "class and must re-verify it, and a computed CONVERGENCE trailer "
+                        "reports BLOCKED until a reviewer explicitly emits `CLOSED` — for "
                         "OPEN classes of severity FATAL or MAJOR only; MINOR and "
                         "OUT-OF-SCOPE ones are tracked, advisory, and never block. The "
                         "guarantee is non-forgetting plus explicit closure — NOT the "
@@ -244,85 +234,19 @@ TOOLS: list[Tool] = [
                     ),
                 },
                 "claim_verification": {
-                    "type": "string",
-                    "enum": ["off", "diagnostic", "blocking"],
-                    "default": "diagnostic",
-                    "description": (
-                        "Plan claim verification rollout. 'diagnostic' (the default) runs, "
-                        "records, and reports claim closure without letting unresolved claim "
-                        "findings govern CONVERGENCE. 'blocking' combines claim and class "
-                        "gates after representative rollout evidence. 'off' is the explicit "
-                        "opt-out. Non-off modes require class_closure."
-                    ),
-                },
-                "independent_check": {
-                    "type": "string",
-                    "enum": ["auto", "require"],
-                    "default": "auto",
-                    "description": (
-                        "Require a distinct-vendor text-only evidence audit for every "
-                        "truth/bearing transition, or use auto for high-stakes external "
-                        "claims, contradiction reversal, dispute resolution, and bearing "
-                        "downgrades. Unavailability remains pending and blocks."
-                    ),
-                },
-                "stakes_level": {
-                    "type": "string",
-                    "enum": ["low", "high"],
-                    "description": (
-                        "Explicit authorization-risk classification for auto independent "
-                        "checks. When omitted, any nonempty stakes description is treated "
-                        "as high; natural-language stakes are never parsed for low-risk words."
-                    ),
-                },
-                "supplied_evidence": {
-                    "type": "array",
-                    "maxItems": 20,
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "claim": {"type": "string"},
-                            "source": {"type": "string"},
-                            "content": {"type": "string", "maxLength": 1048576},
-                        },
-                        "required": ["claim", "source", "content"],
-                        "additionalProperties": False,
-                    },
-                    "description": (
-                        "Optional bounded caller artifact text, bound by an exact unique "
-                        "registered claim proposition and hashed by the server. It is "
-                        "evidence input, not a verified status."
-                    ),
-                },
-                "external_source_policy": {
-                    "type": "array",
-                    "maxItems": 50,
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "host": {"type": "string", "maxLength": 253},
-                            "path_prefix": {"type": "string", "maxLength": 1024},
-                            "source_class": {
-                                "type": "string",
-                                "enum": ["primary", "authoritative", "secondary", "ugc"],
-                            },
-                        },
-                        "required": ["host", "path_prefix", "source_class"],
-                        "additionalProperties": False,
-                    },
-                    "description": (
-                        "Optional trusted exact host/path provenance overrides for fetched "
-                        "evidence. Unmatched pages receive an isolated provenance assessment. "
-                        "Only primary or authoritative records may authorize an external "
-                        "truth/bearing transition; secondary and UGC pages are context."
-                    ),
-                },
-                "refresh_claims": {
                     "type": "boolean",
-                    "default": False,
                     "description": (
-                        "Force fresh extraction/evidence planning even when the exact plan "
-                        "and all cached evidence remain valid."
+                        "Verify load-bearing external facts, externally issued design "
+                        "principles/requirements, and promised external-system behaviors "
+                        "before structural review using the selected reviewer's built-in web "
+                        "search (default TRUE for bundled Codex/Claude engines). Repository "
+                        "mechanics and local decisions remain in structural/code review and "
+                        "tests, not claim inventory. External claims close only on primary or "
+                        "authoritative exact passages; known UGC such as Reddit can be a "
+                        "lead but never governing evidence. Retained source packets are "
+                        "rechecked for entailment against edited wording in later rounds. "
+                        "Set false only "
+                        "for an explicit structural-only/legacy review."
                     ),
                 },
                 "lineage": {
@@ -451,18 +375,14 @@ TOOLS: list[Tool] = [
     Tool(
         name="rebut",
         description=(
-            "Dispute a specific finding from a prior resumable review whose footer printed "
-            "session_ref. Resumes the SAME reviewer session with counter-evidence. Fresh "
-            "toolless closure-plan roles are nonresumable and do not print a session_ref."
+            "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
+            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations."
         ),
         inputSchema={
             "type": "object",
             "properties": {
                 "repo_path": {"type": "string", "description": "Absolute path to the git repo (same one the review ran against)."},
-                "session_ref": {
-                    "type": "string",
-                    "description": "The session_ref printed in a prior resumable review footer.",
-                },
+                "session_ref": {"type": "string", "description": "The session_ref printed in the prior review's footer."},
                 "rebuttal": {"type": "string", "description": "Your counter-evidence for the disputed finding."},
                 **_COMMON,
             },
