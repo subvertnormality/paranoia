@@ -41,11 +41,14 @@ in its active external-claim inventory:
   `disabled` removes the search tool, non-interactive `codex exec` supports live search, and
   `codex exec resume <session-id>` continues that session. `--ignore-user-config` excludes the
   user config but trusted-project `.codex/config.toml` is loaded separately and may register MCP
-  servers.
+  servers. Project configuration is discovered from the project root through the current working
+  directory. Fresh and resumed `codex exec` accept explicit `--disable <feature>` overrides.
 - Claude Code's `WebSearch` returns candidate source titles and URLs for discovery in print mode,
   and `claude -p --resume <session-id>` continues a print-mode session. Claude's `--tools`
   with an empty value disables all built-in tools but does not restrict MCP tools;
-  `--strict-mcp-config` makes only explicitly supplied MCP configuration available.
+  `--strict-mcp-config` makes only explicitly supplied MCP configuration available, and
+  `--safe-mode` disables user/project customizations including settings, skills, plugins, hooks,
+  MCP servers, custom commands, and agents while preserving built-in tools and permissions.
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
@@ -95,6 +98,23 @@ under `repository/` but are not in Codex's startup ancestry and therefore cannot
 session. The wrapper itself contains no project configuration. Research/binding sessions retain
 their launch root until the final resume completes, then remove it. This is an orchestration
 boundary, not a new container or provider abstraction.
+
+Every Codex evidence role also applies one explicit, version-checked feature deny profile on both
+fresh and resumed commands. It disables `apps`, `browser_use`, `browser_use_external`,
+`browser_use_full_cdp_access`, `computer_use`, `in_app_browser`, `plugins`, `remote_plugin`,
+`plugin_sharing`, `enable_mcp_apps`, `image_generation`, `multi_agent`, `workspace_dependencies`,
+`auth_elicitation`, `tool_call_mcp_elicitation`, `skill_mcp_dependency_install`, `hooks`, and
+`tool_suggest`. Discovery alone sets `web_search="live"`; binding, voting, repository-only, and
+verified plan-structure roles set `web_search="disabled"`. Preflight parses `codex features list`
+and fails before spend if an expected feature or mode is absent or the installed CLI introduces an
+enabled external-capable tool outside the audited profile. The allow surface is the read-only
+repository/shell capability already required by review, not an open-ended feature default.
+
+Every Claude evidence role adds `--safe-mode`, `--strict-mcp-config` with no supplied MCP config,
+`--disable-slash-commands`, and its exact `--tools` set. Discovery exposes only `WebSearch`;
+binding exposes no built-in tools; repository-reading voting and plan-structure roles expose only
+the existing read-only file/git allowlist. Resume repeats the same role flags instead
+of assuming the original session's inventory remains narrowed.
 
 ### 2. Balanced research fan-out
 
@@ -192,7 +212,9 @@ Render the normalized union once, hash it, and include the exact same packet byt
 decider prompts. Research output is untrusted evidence, not instruction: packets carry no option
 recommendation and the prompt requires each decider to judge publisher authority for the precise
 proposition, passage entailment, relevance, and contradictions independently. Deciders cannot
-browse or fetch; no external bytes outside the logged packet can affect a vote.
+use provider search, browser, app/connector, computer-use, plugin, MCP, or shell-network paths;
+no live external bytes outside the logged packet can enter a vote. Repository bytes and model
+pretraining remain the explicitly stated non-web inputs.
 
 The server rejects research output containing caller IDs, temporary order labels, or trailer-field
 injection. The prompt forbids selection, comparison, ranking, and recommendations, but the server
@@ -283,14 +305,13 @@ attestation, order, label, vote, and round records remain intact.
   parallel research calls, bounded correction, whole-run deadline, identical packet injection,
   logging, and progress in the relevant handler.
 - Extend both engine implementations to the minimum explicit internal role modes needed here.
-  Codex research passes `web_search="live"`; all voting, repository-only arbitration, and verified
-  plan-structure calls pass `web_search="disabled"`, never omission/cached. Codex roles also keep
-  `--ignore-user-config` and start outside the project so user and project configuration are both
-  absent from the effective tool inventory. Claude discovery
-  passes role-specific `--tools WebSearch`; binding, voting, repository-only, and verified
-  plan-structure roles pass an empty `--tools`. Every evidence-isolated Claude role also passes
-  `--strict-mcp-config` with no MCP configuration, so configured MCP tools cannot bypass the
-  built-in tool restriction. Existing full mode remains for other tools. Do not expose a provider
+  Codex discovery passes `web_search="live"`; all binding, voting, repository-only arbitration,
+  and verified plan-structure calls pass `web_search="disabled"`, never omission/cached. Fresh and
+  resumed Codex roles repeat the complete external-feature deny profile, keep
+  `--ignore-user-config`, and start outside the project. Claude evidence roles repeat `--safe-mode`,
+  `--strict-mcp-config`, `--disable-slash-commands`, and role-specific `--tools`; discovery gets
+  only `WebSearch`, binding gets none, and repository roles get the existing read-only allowlist
+  without web. Existing full mode remains for unrelated tools. Do not expose a provider
   abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
 - Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
@@ -317,11 +338,16 @@ attestation, order, label, vote, and round records remain intact.
 - `research: false` disables web search and makes no research calls;
 - `research: true, web_search: false` fails before spend;
 - engine argv tests prove Codex researchers use explicit `live`, Codex voters/repository-only and
-  verified plan-structure reviewers use explicit `disabled`; Claude discovery exposes only
-  `WebSearch`; and Claude binding/voting/verified-plan roles expose no built-in or MCP tools;
+  verified plan-structure reviewers use explicit `disabled`; every named external Codex feature is
+  disabled on fresh and resume; Claude discovery exposes only `WebSearch`; Claude binding exposes
+  nothing; and Claude voting/verified-plan roles expose only the read-only repository allowlist;
 - sanitized-root tests place sentinel MCP/plugin configuration under `repository/.codex`, prove it
   is readable as evidence but absent from fresh and resumed Codex tool inventories, and prove
   `repository/` citations normalize to the pinned repository path before resolution;
+- supported-version acceptance captures the complete fresh/resumed Codex tool inventory and proves
+  browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
+  delegation tools are absent; an unexpected installed feature inventory fails preflight before
+  either provider call;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
@@ -341,7 +367,9 @@ passage is bound in-session from the shared Trafilatura output. Also run explici
 on a repository-settled fixture and prove both deciders receive web search disabled and converge from
 repository evidence. In the real Codex fixtures, put a harmless sentinel MCP under project
 `.codex/config.toml`; prove it is neither started nor listed in fresh voting/plan-structure roles
-or the resumed binding role.
+or the resumed binding role. Also have those roles attempt the browser, app/connector,
+computer-use, plugin, and native-search paths and prove the CLI exposes none. Record the exact
+Codex/Claude versions and effective fresh/resumed tool inventories with the acceptance artifact.
 
 Run the complete local test suite, then Codex paranoia convergence over the implementation branch
 under the frozen stakes above. Open and merge a PR only after real acceptance, tests, documentation,
