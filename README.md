@@ -236,9 +236,12 @@ plugin, or caller-supplied search adapter.
 On round 1 the verifier scans the whole plan but retains only **load-bearing atomic factual
 claims**: assertions whose truth could change feasibility, ordering, dependencies,
 rationale, mappings, or acceptance. It splits conjunctions into independent
-propositions. Decisions, requirements, intentions, definitions, preferences,
-forecasts, and incidental facts are omitted; once classified out, they do not
-consume active inventory or later-round context.
+propositions. Proposed decisions, requirements, intentions, definitions,
+preferences, forecasts, and incidental facts are omitted; once classified out,
+they do not consume active inventory or later-round context. Assertions that a
+requirement existed, was bound or applicable at a historical revision, or was
+satisfied/violated are empirical repository facts and remain in inventory when
+they determine a grade, gate, safety conclusion, dependency, or remediation priority.
 
 External claims close only when an exact passage from a primary or authoritative
 source entails that exact proposition. First-party documentation, standards,

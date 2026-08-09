@@ -43,10 +43,13 @@ ordering, a dependency, rationale, mapping, implementation premise, or acceptanc
 Scan headings, prose, lists, and tables; include necessary implied premises; split compound
 assertions into atomic propositions.
 
-Do not retain decisions, selected policies, permissions, requirements, definitions,
-intentions, instructions, preferences, pure forecasts, or incidental facts. They are omitted
-from active inventory immediately, not carried forever as `not-applicable` rows. If a statement
-mixes a decision with a factual rationale, verify the rationale only.
+Do not retain proposed decisions, selected policies, permissions, requirements,
+definitions, intentions, instructions, preferences, pure forecasts, or incidental facts.
+They are omitted from active inventory immediately, not carried forever as `not-applicable`
+rows. Whether a requirement existed, was bound/applicable at a historical revision, or was
+satisfied/violated is an empirical repository fact; retain it when it determines a grade,
+gate, safety conclusion, dependency, or remediation priority. If a statement mixes a decision
+with a factual rationale, verify the rationale only.
 
 ## Evidence and authority
 
@@ -59,6 +62,11 @@ absolute URL, publisher, title, precise section/table/page, exact passage, and s
 The current plan file is context, never independent evidence for its own assertions: a direct
 `repo://` citation to that file cannot govern support or refutation. Historical Git objects,
 code, data, retained command output, and authoritative external sources remain eligible.
+Evidence must preserve the original event, actor, date, modality, scope, and chronology. A
+dated report claim needs evidence of that report event, not merely the underlying condition.
+A card-base, pre-change, contemporaneous, or historical requirement needs the exact historical
+Git blob or equivalently frozen source; a later certificate/report is context unless the claim
+is explicitly about what that later source reports.
 The same resolution check applies to compact later-round assessments: a `supported` assessment
 cannot preserve a stale or malformed repository packet; the server locally demotes that claim to
 `unverified` without discarding unrelated assessments. When an exact quote still exists but edits

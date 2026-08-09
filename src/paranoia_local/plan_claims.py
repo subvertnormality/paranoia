@@ -169,6 +169,17 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
 
 
 _GIT_REV = re.compile(r"[0-9a-fA-F]{7,64}(?:(?:\^+)|(?:~[0-9]+))?")
+_HISTORICAL_REPOSITORY_ASSERTION = re.compile(
+    r"\b(?:card[- ]base|pre[- ]change|pre[- ]code|contemporaneous|"
+    r"historical (?:git|revision|blob)|at (?:the )?(?:parent|revision|commit)|"
+    r"in commit|before (?:the )?[^.]{0,80}\bcommit)\b",
+    re.IGNORECASE,
+)
+
+
+def _requires_historical_repository_object(anchor: str, proposition: str) -> bool:
+    """Whether repository chronology is part of the proposition itself."""
+    return bool(_HISTORICAL_REPOSITORY_ASSERTION.search(f"{anchor} {proposition}"))
 
 
 def _repository_source_bytes(evidence: dict[str, str], repo: Path) -> bytes | None:
@@ -429,6 +440,19 @@ def _validate_claim(
         )
         for e in evidence
     ]
+    historical_evidence_required = (
+        scope == "repository"
+        and _requires_historical_repository_object(anchor, proposition)
+    )
+    if historical_evidence_required:
+        for source in checked:
+            if (
+                source["relation"] != "context"
+                and not source["url"].startswith("repo://git/")
+            ):
+                # Current bytes and later reports may corroborate, but cannot establish
+                # what a historical/card-base repository object contained.
+                source["relation"] = "context"
     replacement = item["replacement"]
     if replacement is not None:
         replacement = _one_line(replacement, "replacement")
@@ -440,7 +464,11 @@ def _validate_claim(
     qualifying = [e for e in checked if _qualifying(e, scope)]
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
-        demotion = "claimed support lacked claim-entailing authoritative evidence"
+        demotion = (
+            "historical/card-base repository claim lacked exact Git-object evidence"
+            if historical_evidence_required
+            else "claimed support lacked claim-entailing authoritative evidence"
+        )
     if verdict == "refuted" and not any(e["relation"] == "refutes_claim" for e in qualifying):
         demotion = "claimed refutation lacked claim-refuting authoritative evidence"
     if demotion:
@@ -958,9 +986,15 @@ is correct. Include explicit and necessary implied premises. Include current-rep
 claims and externally verifiable claims. Split conjunctions and ranges into atomic
 propositions. Scan every heading, paragraph, list item and table row.
 
-OMIT decisions, chosen policies, authorizations, requirements, definitions, intentions,
+OMIT proposed decisions, chosen policies, authorizations, definitions, intentions,
 instructions, subjective preferences, pure forecasts, and incidental facts that cannot
-change execution. They must not consume active inventory after classification.
+change execution. A requirement itself is normative, but an assertion that a requirement
+existed, was bound at a historical revision, applied to a step, or was satisfied/violated is
+an empirical repository claim. ALWAYS inventory those assertions when they determine a
+grade, gate, safety conclusion, dependency, or remediation priority. Likewise inventory
+the exact historical requirement text as an atomic repository fact when a conformance
+conclusion relies on it. Do not let a normative sentence consume inventory merely because
+the plan proposes it for future work.
 
 For every retained claim, decide supported, refuted, or unverified. A source verifies a
 claim only when the exact quoted passage entails that exact atomic proposition. For
@@ -972,6 +1006,12 @@ canonical absolute URL, title, publisher, precise section/table/page location, e
 passage, and why that publisher is authoritative for this proposition. Label source_kind honestly as primary, authoritative, secondary, ugc, or
 repository. A proposed replacement is allowed only when an authoritative passage entails
 the replacement itself; evidence that merely refutes the old wording is not enough.
+Preserve the original event, actor, date, modality, scope, and chronology when forming the
+atomic proposition. An anchor saying that a dated audit/report occurred is not verified by
+evidence that contains only the underlying defect. An anchor naming a card-base,
+pre-change, contemporaneous, or historical requirement must cite that exact historical
+Git blob or another source frozen at that time; a later certificate, report, or commit
+subject is context unless the proposition is explicitly only that the later source reports it.
 The current plan/dossier is the assertion under review, not evidence for itself. Never cite
 its `repo://` path to support or refute one of its claims. Replace any retained self-citation
 with direct code, data, Git-object, retained command-output, or authoritative web evidence;
@@ -1078,9 +1118,14 @@ could not be frozen, so a compact verdict cannot repair them. The server preserv
 identity by exact proposition. Items in RETAINED REFUTED CLAIMS may instead receive one
 compact current judgement in `coverage.prior_assessments` while their anchor remains.
 
-OMIT decisions, policies, authorizations, requirements, definitions, intentions,
-instructions, preferences, forecasts, and incidental facts. They do not enter active
-inventory. Use claims only for new or edited factual propositions. Every absent prior claim
+OMIT proposed decisions, policies, authorizations, definitions, intentions, instructions,
+preferences, forecasts, and incidental facts. A requirement is normative, but the edited
+plan's assertion that a requirement existed, was historically bound/applicable, or was
+satisfied/violated is an empirical repository fact and MUST be inventoried when it affects
+a grade, gate, safety conclusion, dependency, or remediation priority. Preserve event,
+actor, date, modality, scope, and chronology: a later certificate/report cannot support a card-base or
+contemporaneous proposition, and evidence of an underlying condition does not prove that a
+dated audit/report event occurred. Use claims only for new or edited factual propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
 
@@ -1145,6 +1190,11 @@ Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested review
 Never use the current plan/dossier's own `repo://` path as evidence for its assertions;
 replace such a packet with direct code, data, Git-object, retained command-output, or
 authoritative web evidence.
+Treat historical-requirement assertions as empirical facts even though the underlying
+requirement is normative. When a claim names a card-base, pre-change, contemporaneous, or
+historical rule, require the exact historical Git blob (or an equivalently frozen source),
+not a later certificate/report. Preserve any claimed report event, date, actor, modality,
+scope, and chronology instead of weakening the proposition to the underlying condition.
 
 {frozen_note}
 

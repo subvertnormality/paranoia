@@ -65,9 +65,14 @@ state and reviewer-native capabilities meet the supported model.
 - Verification is on by default for real plan reviews and uses the selected reviewer CLI's
   built-in web search. No placeholder endpoint, optional plugin, or caller adapter may stand
   in for the primary path.
-- Retain only atomic, load-bearing factual propositions. Decisions, policies, requirements,
-  intentions, definitions, preferences, forecasts, and incidental facts leave active inventory
-  once classified.
+- Retain only atomic, load-bearing factual propositions. Proposed decisions, policies,
+  requirements, intentions, definitions, preferences, forecasts, and incidental facts leave
+  active inventory once classified. Whether a requirement existed, was historically
+  bound/applicable, or was satisfied/violated is an empirical repository fact and stays when it
+  determines a grade, gate, safety conclusion, dependency, or remediation priority.
+- Preserve event, actor, date, modality, scope, and chronology in every packet. A dated report
+  event is not proved by the underlying condition alone; a card-base or contemporaneous rule
+  requires the exact historical Git blob or equivalently frozen source, not a later report.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement

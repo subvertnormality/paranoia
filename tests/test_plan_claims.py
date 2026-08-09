@@ -164,6 +164,51 @@ class TestAuditValidation:
         )
         assert audit.claims[0]["evidence"][0]["url"] == url + "#L1"
 
+    def test_card_base_claim_requires_historical_git_object(
+        self, tmp_path: Path,
+    ) -> None:
+        plan = "# Gate\n\nAt the card-base revision, the setting is enabled.\n"
+        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
+        current = _repository_claim(url="repo://settings.json#L1")
+        current.update({
+            "anchor": "At the card-base revision, the setting is enabled.",
+            "proposition": "At the card-base revision, the setting was enabled.",
+        })
+
+        audit = pc.parse_audit(_audit(current), plan, repo=tmp_path)
+
+        assert audit.claims[0]["verdict"] == "unverified"
+        assert audit.claims[0]["evidence"][0]["relation"] == "context"
+        assert "exact Git-object evidence" in audit.claims[0]["rationale"]
+
+    def test_card_base_claim_accepts_exact_historical_git_object(
+        self, tmp_path: Path,
+    ) -> None:
+        plan = "# Gate\n\nAt the card-base revision, the setting is enabled.\n"
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        (tmp_path / "settings.json").write_text('{"enabled": true}\n')
+        subprocess.run(["git", "add", "settings.json"], cwd=tmp_path, check=True)
+        subprocess.run([
+            "git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+            "-c", "commit.gpgsign=false", "commit", "-qm", "settings",
+        ], cwd=tmp_path, check=True)
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
+        historical = _repository_claim(url=f"repo://git/{revision}:settings.json")
+        historical.update({
+            "anchor": "At the card-base revision, the setting is enabled.",
+            "proposition": "At the card-base revision, the setting was enabled.",
+        })
+
+        audit = pc.parse_audit(_audit(historical), plan, repo=tmp_path)
+
+        assert audit.claims[0]["verdict"] == "supported"
+        assert audit.claims[0]["evidence"][0]["url"].startswith(
+            f"repo://git/{revision}:settings.json#L1"
+        )
+
     def test_repository_location_is_repaired_from_the_exact_quote(
         self, tmp_path: Path,
     ) -> None:
@@ -541,6 +586,35 @@ class TestRetainedEvidence:
         )[0]
         assert '"prior_assessments":[]' in prompt
         assert "cannot be authoritative evidence for its own assertion" in prompt
+
+    def test_prompts_inventory_grade_driving_historical_requirements(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+
+        exhaustive = pc.audit_instructions(PLAN, {}, "trusted local tool")
+        targeted = pc.targeted_audit_instructions(PLAN, first, "trusted local tool", set())
+        retry = pc.retry_instructions(
+            pc.AuditError("bad packet"), PLAN, first,
+        )
+
+        for prompt in (exhaustive, targeted, retry):
+            assert "requirement" in prompt
+            assert "historical" in prompt
+            assert "card-base" in prompt
+            assert "later certificate" in prompt
+        assert "ALWAYS inventory" in exhaustive
+        assert "MUST be inventoried" in targeted
+
+    def test_prompts_preserve_report_event_and_chronology(self) -> None:
+        exhaustive = pc.audit_instructions(PLAN, {}, "trusted local tool")
+        targeted = pc.targeted_audit_instructions(PLAN, {}, "trusted local tool", set())
+
+        for prompt in (exhaustive, targeted):
+            assert "dated audit/report" in prompt
+            assert "underlying" in prompt
+            assert "chronology" in prompt
 
     def test_targeted_prompt_requires_full_packet_for_nonfreezable_support(
         self, tmp_path: Path,
