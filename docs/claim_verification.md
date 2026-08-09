@@ -90,6 +90,9 @@ and independently valid claims in the response remain usable. Structural corrupt
 such as malformed JSON still fails the audit closed. A non-verbatim anchor gets the
 single correction retry; if it remains invalid, that item becomes explicit blocking
 debt while valid retry packets and dispositions persist for the next round.
+An omitted retained ID rejects the initial response and is named in that correction prompt.
+If the final bounded retry still omits it, the server applies every valid corrected packet and
+carries only the omitted claim forward as `unverified`; omission can never clear or retire it.
 
 ## Multi-round behavior
 

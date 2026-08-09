@@ -279,6 +279,9 @@ If the bounded correction retry still contains an unbindable anchor, that item i
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item
 instead of researching the whole inventory again.
+Likewise, a missing retained ID rejects the initial response and is named on retry. If the
+final retry still omits it, valid corrected packets are applied and only that retained claim
+is carried forward as blocking `unverified`; one omission does not invalidate the edit cone.
 
 #### Fully autonomous correction loop
 

@@ -651,6 +651,7 @@ def _verify_plan_claims(
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
         ), "failed"
+    allow_missing = False
     try:
         audit = pc.parse_audit(
             review.text, plan_text, repo=repo, plan_repo_path=plan_repo_path,
@@ -697,8 +698,9 @@ def _verify_plan_claims(
             )
             pc.validate_prior_coverage(
                 prior_state, audit, plan_text=plan_text, raw=retry.text,
-                frozen_ids=frozen, repo=repo,
+                frozen_ids=frozen, repo=repo, allow_missing=True,
             )
+            allow_missing = True
             status = (
                 f"parsed after retry: {len(audit.claims)} new + "
                 f"{len(audit.assessments)} targeted retained + {len(frozen)} frozen"
@@ -718,6 +720,7 @@ def _verify_plan_claims(
     state = pc.reconcile(
         prior_state, audit, lineage_id=lineage_id, round_no=round_no,
         plan_text=plan_text, frozen_ids=frozen, repo=repo,
+        allow_missing=allow_missing,
     )
     return state, status
 

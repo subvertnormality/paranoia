@@ -94,9 +94,10 @@ state and reviewer-native capabilities meet the supported model.
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and
   correction retry, but never auto-retire them. Do not provide a model-only `nonfactual`
-  escape. Reject a response that omits any still-present unresolved retained ID and name
-  missing IDs in the same-round correction prompt; never turn extractor sampling into another
-  full claim review round. A failed targeted audit must preserve frozen supported verdicts while
+  escape. Reject an initial response that omits any still-present unresolved retained ID and
+  name missing IDs in the same-round correction prompt. If the final bounded retry still omits
+  one, apply its other valid packets and carry only the omitted claim as `unverified`; never turn
+  extractor sampling into another full claim review round. A failed targeted audit must preserve frozen supported verdicts while
   recording debt for the affected edit cone. The cold structural reviewer must see the complete
   active register plus current retirements
   before its success contributes to tracked-mode clearance; one-shot plan reviews emit no

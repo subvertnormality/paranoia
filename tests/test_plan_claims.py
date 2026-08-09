@@ -369,6 +369,36 @@ class TestRetainedEvidence:
                 lineage_id="x-plan", round_no=2, plan_text=PLAN,
             )
 
+    def test_final_retry_localizes_a_missing_retained_claim(self) -> None:
+        sqlite = "SQLite 3.45.0 was released on 15 January 2024."
+        plan = PLAN + sqlite + "\n"
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(
+                _claim(), _claim(anchor=sqlite, proposition=sqlite),
+            ), plan),
+            lineage_id="x-plan", round_no=1, plan_text=plan,
+        )
+        python_id = next(
+            claim_id for claim_id, claim in first["claims"].items()
+            if claim["proposition"].startswith("Python")
+        )
+        sqlite_id = next(claim_id for claim_id in first["claims"] if claim_id != python_id)
+        retry = pc.parse_audit(_audit(assessments=[{
+            "claim_id": python_id,
+            "verdict": "supported",
+            "rationale": "The retained official passage still entails the claim.",
+        }]), plan)
+
+        second = pc.reconcile(
+            first, retry, lineage_id="x-plan", round_no=2, plan_text=plan,
+            allow_missing=True,
+        )
+
+        assert second["claims"][python_id]["verdict"] == "supported"
+        assert second["claims"][sqlite_id]["verdict"] == "unverified"
+        assert "omitted this prior claim" in second["claims"][sqlite_id]["rationale"]
+        assert second["debt"] is None
+
     def test_supported_exact_claim_is_frozen_out_of_targeted_inventory(
         self, tmp_path: Path,
     ) -> None:

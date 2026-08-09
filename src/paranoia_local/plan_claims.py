@@ -531,6 +531,7 @@ def _is_plan_self_evidence(
 def reconcile(
     prior_raw: Any, audit: Audit, *, lineage_id: str, round_no: int, plan_text: str,
     frozen_ids: Iterable[str] = (), repo: Path | None = None,
+    allow_missing: bool = False,
 ) -> dict[str, Any]:
     """Replace the active inventory with the current audit, retaining identity/evidence.
 
@@ -541,6 +542,7 @@ def reconcile(
     frozen = frozenset(frozen_ids)
     validate_prior_coverage(
         prior_raw, audit, plan_text=plan_text, frozen_ids=frozen, repo=repo,
+        allow_missing=allow_missing,
     )
     prior = normalize_state(prior_raw)
     old = prior["claims"]
@@ -703,6 +705,7 @@ def reconcile(
 def validate_prior_coverage(
     prior_raw: Any, audit: Audit, *, plan_text: str, raw: str = "",
     frozen_ids: Iterable[str] = (), repo: Path | None = None,
+    allow_missing: bool = False,
 ) -> None:
     """Require a current judgement for every retained exact claim still in the plan.
 
@@ -775,7 +778,7 @@ def validate_prior_coverage(
             "frozen IDs are not exact current claims: " + ", ".join(sorted(unknown_frozen)), raw,
         )
     missing = expected - emitted - assessed - frozen
-    if missing:
+    if missing and not allow_missing:
         raise AuditError(
             "missing current assessments for retained claims: " + ", ".join(sorted(missing)),
             raw,
