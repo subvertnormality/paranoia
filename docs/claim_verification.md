@@ -147,4 +147,8 @@ The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an
 external-library behavior, an internal bridge that must stay out of inventory, retained-packet
-reuse, and a fresh 102 KB real dossier that converged in two rounds with seven external claims.
+reuse, and a fresh current-snapshot convergence: round 2 closed four corrected claims and
+unchanged round 3 reused all four in 1 ms with no evidence-model call. The same record separately
+identifies the earlier implementation commit used for the fresh 102 KB real-dossier run, which
+converged in two rounds with seven external claims; it does not present that older run as evidence
+for later parser changes.

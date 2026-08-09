@@ -7,35 +7,36 @@
     "web_capability": "built-in tools.web_search=true",
     "authentication": "signed-in ChatGPT account"
   },
-  "implementation_commit": "ee1db2f",
+  "implementation_commit": "81abbc4",
   "representative_acceptance": {
-    "lineage": "external-boundary-acceptance-plan",
-    "fixture": "External fact, RFC design principle, urllib.parse.urljoin behavior, one intentionally false SQLite release date, and an internal function-call bridge.",
+    "lineage": "final-external-acceptance-81abbc4-plan",
+    "fixture": "Fresh external fact, RFC design principle, urllib.parse.urljoin behavior, one intentionally false internet-only SQLite release date, and an internal function-call bridge.",
     "rounds": [
       {
         "round": 1,
-        "claim_status": "parsed 5 new + 0 targeted retained + 0 frozen",
+        "claim_status": "parsed 4 new + 0 targeted retained + 0 frozen",
         "claim_model_calls": 1,
-        "claim_duration_ms": 214408,
-        "result": "Hidden 2025 SQLite date refuted from the official 2024 release log; internal function bridge excluded."
+        "claim_duration_ms": 73676,
+        "result": "Three supported categories; hidden 2025 SQLite date refuted by the official release log and chronology with an exact 2024 replacement; internal function bridge excluded."
       },
       {
         "round": 2,
-        "claim_status": "parsed 4 new + 0 targeted retained + 2 frozen",
+        "claim_status": "parsed 1 new + 0 targeted retained + 3 frozen",
         "claim_model_calls": 1,
-        "claim_duration_ms": 61338,
-        "result": "All corrected external claims supported; substantive structural classes closed."
+        "claim_duration_ms": 25387,
+        "result": "Evidence-entailed correction supported; three unchanged packets reused; CLAIM-CLOSURE 4 supported, 0 refuted, 0 unverified; CONVERGENCE: NOT-BLOCKED."
       },
       {
         "round": 3,
-        "claim_status": "reused 6 unchanged supported packets; no claim model call",
+        "claim_status": "reused 4 unchanged supported packets; no claim model call",
         "claim_model_calls": 0,
         "claim_duration_ms": 1,
-        "result": "CONVERGENCE: NOT-BLOCKED; six supported external packets and zero internal bridge packets."
+        "result": "CONVERGENCE: NOT-BLOCKED; four supported external packets, zero internal bridge packets, and no repeated evidence search."
       }
     ]
   },
   "real_dossier_acceptance": {
+    "implementation_commit": "ee1db2f",
     "lineage": "completed-cards-dossier-external-v1-plan",
     "input_size_bytes": 102382,
     "rounds": [
