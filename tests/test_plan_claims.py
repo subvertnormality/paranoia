@@ -412,6 +412,25 @@ class TestRetainedEvidence:
         assert second["claims"][claim_id]["evidence"] == first["claims"][claim_id]["evidence"]
         assert not pc.is_blocked(second)
 
+    def test_compact_support_cannot_retain_a_nonresolving_repository_packet(
+        self, tmp_path: Path,
+    ) -> None:
+        legacy = pc.reconcile(
+            {}, pc.parse_audit(_audit(_repository_claim(url="repo://wrong-id.json")), REPO_PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=REPO_PLAN,
+        )
+        claim_id = next(iter(legacy["claims"]))
+        assessment = pc.parse_audit(_audit(assessments=[{
+            "claim_id": claim_id,
+            "verdict": "supported",
+            "rationale": "The old packet still looks plausible.",
+        }]), REPO_PLAN)
+        with pytest.raises(pc.AuditError, match="non-resolving repository packet"):
+            pc.reconcile(
+                legacy, assessment, lineage_id="x-plan", round_no=2,
+                plan_text=REPO_PLAN, repo=tmp_path,
+            )
+
     def test_compact_support_cannot_upgrade_a_nonqualifying_retained_packet(self) -> None:
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim(evidence=[_source(relation="context")])), PLAN),

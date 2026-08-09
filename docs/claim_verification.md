@@ -56,6 +56,9 @@ bytes may use `repo://git/<revision>:<path>`; a commit-level packet may use
 exact quoted passage before accepting the packet. A missing path, malformed revision, or quote
 absent from the resolved bytes invalidates that claim packet. External facts require a canonical
 absolute URL, publisher, title, precise section/table/page, exact passage, and source class.
+The same resolution check applies to compact later-round assessments: a `supported` assessment
+cannot preserve a stale or malformed repository packet; it must provide a corrected full packet
+or remain `unverified`.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and
 records, standards, legislation/regulators, government data, and original papers/datasets.

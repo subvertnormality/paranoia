@@ -461,7 +461,7 @@ def _qualifying(evidence: dict[str, str], scope: str) -> bool:
 
 def reconcile(
     prior_raw: Any, audit: Audit, *, lineage_id: str, round_no: int, plan_text: str,
-    frozen_ids: Iterable[str] = (),
+    frozen_ids: Iterable[str] = (), repo: Path | None = None,
 ) -> dict[str, Any]:
     """Replace the active inventory with the current audit, retaining identity/evidence.
 
@@ -470,7 +470,9 @@ def reconcile(
     their exhaustive-round packet without another model/web judgement.
     """
     frozen = frozenset(frozen_ids)
-    validate_prior_coverage(prior_raw, audit, plan_text=plan_text, frozen_ids=frozen)
+    validate_prior_coverage(
+        prior_raw, audit, plan_text=plan_text, frozen_ids=frozen, repo=repo,
+    )
     prior = normalize_state(prior_raw)
     old = prior["claims"]
     by_prop: dict[str, str] = {}
@@ -608,7 +610,7 @@ def reconcile(
 
 def validate_prior_coverage(
     prior_raw: Any, audit: Audit, *, plan_text: str, raw: str = "",
-    frozen_ids: Iterable[str] = (),
+    frozen_ids: Iterable[str] = (), repo: Path | None = None,
 ) -> None:
     """Require a current judgement for every retained exact claim still in the plan.
 
@@ -626,6 +628,30 @@ def validate_prior_coverage(
             f"{MAX_ACTIVE_CLAIMS}", raw,
         )
     old = prior["claims"]
+    if repo is not None:
+        for assessment in audit.assessments:
+            if assessment["verdict"] == "unverified":
+                continue
+            record = old.get(assessment["claim_id"])
+            if not isinstance(record, dict) or record.get("scope") != "repository":
+                continue
+            relation = (
+                "supports_claim" if assessment["verdict"] == "supported"
+                else "refutes_claim"
+            )
+            if not any(
+                isinstance(evidence, dict)
+                and _qualifying(evidence, "repository")
+                and evidence.get("relation") == relation
+                and _repository_quote_present(evidence, repo)
+                for evidence in record.get("evidence", [])
+            ):
+                raise AuditError(
+                    "compact assessment cannot retain a non-resolving repository packet: "
+                    f"{assessment['claim_id']}; emit a full corrected packet or mark it "
+                    "unverified",
+                    raw,
+                )
     by_prop = {
         record.get("proposition"): claim_id
         for claim_id, record in old.items()

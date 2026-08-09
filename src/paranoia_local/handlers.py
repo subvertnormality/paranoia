@@ -615,7 +615,7 @@ def _verify_plan_claims(
         state = pc.reconcile(
             prior_state, pc.Audit((), {"notes": "unchanged frozen claim inventory"}, (), ()),
             lineage_id=lineage_id, round_no=round_no, plan_text=plan_text,
-            frozen_ids=frozen,
+            frozen_ids=frozen, repo=repo,
         )
         return state, f"reused {len(frozen)} unchanged supported packets; no claim model call"
     if on_progress:
@@ -645,6 +645,7 @@ def _verify_plan_claims(
         audit = pc.parse_audit(review.text, plan_text, repo=repo)
         pc.validate_prior_coverage(
             prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
+            repo=repo,
         )
         status = (
             f"parsed {len(audit.claims)} new + {len(audit.assessments)} targeted retained"
@@ -683,7 +684,7 @@ def _verify_plan_claims(
             )
             pc.validate_prior_coverage(
                 prior_state, audit, plan_text=plan_text, raw=retry.text,
-                frozen_ids=frozen,
+                frozen_ids=frozen, repo=repo,
             )
             status = (
                 f"parsed after retry: {len(audit.claims)} new + "
@@ -703,7 +704,7 @@ def _verify_plan_claims(
             ), "retry-malformed"
     state = pc.reconcile(
         prior_state, audit, lineage_id=lineage_id, round_no=round_no,
-        plan_text=plan_text, frozen_ids=frozen,
+        plan_text=plan_text, frozen_ids=frozen, repo=repo,
     )
     return state, status
 
