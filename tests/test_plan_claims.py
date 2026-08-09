@@ -373,6 +373,19 @@ class TestRetainedEvidence:
         )
         assert not pc.frozen_supported_ids(first, changed)
 
+    def test_adjacent_retraction_in_the_same_block_forces_reverification(self) -> None:
+        original = (
+            PLAN.rstrip() + " The official release date governs this rollout.\n"
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), original),
+            lineage_id="x-plan", round_no=1, plan_text=original,
+        )
+        retracted = (
+            PLAN.rstrip() + " This statement is false and must not be relied on.\n"
+        )
+        assert not pc.frozen_supported_ids(first, retracted)
+
     def test_duplicate_assertion_and_quotation_cannot_freeze_ambiguously(self) -> None:
         mixed = (
             PLAN + '\n## Quotation\n\n'
@@ -444,7 +457,7 @@ class TestRetainedEvidence:
 
     def test_targeted_round_verifies_edited_successor_and_freezes_unchanged_claim(self) -> None:
         sqlite_old = "SQLite 3.45.0 was released on 15 January 2024."
-        first_plan = PLAN + sqlite_old + "\n"
+        first_plan = PLAN + "\n" + sqlite_old + "\n"
         sqlite_claim = _claim(anchor=sqlite_old, proposition=sqlite_old)
         first = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim(), sqlite_claim), first_plan),
@@ -456,7 +469,7 @@ class TestRetainedEvidence:
         )
         sqlite_id = next(claim_id for claim_id in first["claims"] if claim_id != python_id)
         sqlite_new = "SQLite 3.45.0 was released on 15 January 2025."
-        second_plan = PLAN + sqlite_new + "\n"
+        second_plan = PLAN + "\n" + sqlite_new + "\n"
         frozen = pc.frozen_supported_ids(first, second_plan)
         assert frozen == {python_id}
         prompt = pc.targeted_audit_instructions(

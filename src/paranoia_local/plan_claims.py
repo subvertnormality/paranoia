@@ -1194,11 +1194,9 @@ def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
         if not block:
             return
         body = _collapse_whitespace(" ".join(block))
-        sentences = re.split(r'''(?<=[.!?])\s+(?=[A-Z0-9#>*`"'])''', body)
-        for sentence in sentences:
-            contexts.extend(
-                [(" / ".join(heading_path), sentence)] * sentence.count(needle)
-            )
+        contexts.extend(
+            [(" / ".join(heading_path), body)] * body.count(needle)
+        )
         block.clear()
 
     for raw_line in plan_text.splitlines():
