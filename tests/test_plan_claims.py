@@ -510,6 +510,7 @@ class TestRetainedEvidence:
             "RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT", 1
         )[0]
         assert '"prior_assessments":[]' in prompt
+        assert "cannot be authoritative evidence for its own assertion" in prompt
 
     def test_targeted_prompt_requires_full_packet_for_nonfreezable_support(
         self, tmp_path: Path,

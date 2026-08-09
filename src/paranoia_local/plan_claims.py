@@ -969,6 +969,10 @@ canonical absolute URL, title, publisher, precise section/table/page location, e
 passage, and why that publisher is authoritative for this proposition. Label source_kind honestly as primary, authoritative, secondary, ugc, or
 repository. A proposed replacement is allowed only when an authoritative passage entails
 the replacement itself; evidence that merely refutes the old wording is not enough.
+The current plan/dossier is the assertion under review, not evidence for itself. Never cite
+its `repo://` path to support or refute one of its claims. Replace any retained self-citation
+with direct code, data, Git-object, retained command-output, or authoritative web evidence;
+the server demotes direct current-plan citations to context.
 
 Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or search
 each retained URL as needed and re-assess entailment against the CURRENT proposition.
@@ -1059,6 +1063,10 @@ For repository evidence use repo://path#Lx-Ly for current bytes,
 repo://git/<hex-revision>:<path> for historical bytes, or repo://git/<hex-revision> for a
 commit-level packet. Every location must resolve and contain the exact quote; the server rejects
 malformed identifiers, missing paths, and invented or truncated passages.
+The current plan/dossier cannot be authoritative evidence for its own assertion. Never cite
+its `repo://` path to support/refute a claim; replace retained self-citations with direct code,
+data, Git-object, retained command-output, or authoritative web evidence. The server demotes
+direct current-plan citations to context.
 
 Every item in RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS must be re-researched and
 returned in `claims` with its exact unchanged proposition and a current, complete evidence
@@ -1131,6 +1139,9 @@ Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 literal "kind":"fact"; never write "fact|decision" or another pseudo-enum. Preserve
 valid source packets, fix the structural error, and do not weaken evidence requirements.
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
+Never use the current plan/dossier's own `repo://` path as evidence for its assertions;
+replace such a packet with direct code, data, Git-object, retained command-output, or
+authoritative web evidence.
 
 {frozen_note}
 
