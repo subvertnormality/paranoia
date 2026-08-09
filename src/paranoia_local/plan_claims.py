@@ -1184,20 +1184,29 @@ def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bo
     )
 
 
-def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
+def _assertion_contexts(
+    plan_text: str, anchor: str,
+) -> list[tuple[tuple[tuple[int, str], ...], str]]:
     needle = _collapse_whitespace(anchor)
-    contexts: list[tuple[str, str]] = []
-    heading_path: list[str] = []
+    contexts: list[tuple[tuple[tuple[int, str], ...], str]] = []
+    heading_path: list[tuple[int, str]] = []
     block: list[str] = []
+    block_kind: str | None = None
 
     def flush() -> None:
+        nonlocal block_kind
         if not block:
             return
         body = _collapse_whitespace(" ".join(block))
         contexts.extend(
-            [(" / ".join(heading_path), body)] * body.count(needle)
+            [(tuple(heading_path), body)] * body.count(needle)
         )
         block.clear()
+        block_kind = None
+
+    def set_heading(level: int, text: str) -> None:
+        heading_path[:] = [item for item in heading_path if item[0] < level]
+        heading_path.append((level, _collapse_whitespace(text)))
 
     lines = plan_text.splitlines()
     in_fence: tuple[str, int] | None = None
@@ -1220,7 +1229,8 @@ def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
             in_fence = (fence.group(1)[0], len(fence.group(1)))
             index += 1
             continue
-        if raw_line.startswith("\t") or len(raw_line) - len(raw_line.lstrip(" ")) >= 4:
+        leading = len(raw_line) - len(raw_line.lstrip(" "))
+        if raw_line.startswith("\t") or (leading and block_kind != "list"):
             flush()
             index += 1
             continue
@@ -1232,26 +1242,40 @@ def _assertion_contexts(plan_text: str, anchor: str) -> list[tuple[str, str]]:
             flush()
             underline = lines[index + 1].lstrip()
             level = 1 if underline.startswith("=") else 2
-            heading_path[level - 1:] = [_collapse_whitespace(stripped)]
+            set_heading(level, stripped)
             index += 2
             continue
         heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading:
             flush()
             level = len(heading.group(1))
-            heading_path[level - 1:] = [_collapse_whitespace(heading.group(2))]
+            set_heading(level, heading.group(2))
             index += 1
             continue
         if not stripped:
             flush()
             index += 1
             continue
-        if stripped.startswith("|") or re.match(r"^(?:[-*+] |\d+[.)] )", stripped):
+        if re.match(r"^(?:[-*+] |\d+[.)] )", stripped):
             flush()
-            block.append(stripped)
-            flush()
+            block_kind = "list"
+            block.append(f"<list-indent:{leading}>{stripped}")
             index += 1
             continue
+        if block_kind == "list":
+            block.append(f"<list-indent:{leading}>{stripped}")
+            index += 1
+            continue
+        if stripped.startswith("|"):
+            if block_kind != "table":
+                flush()
+                block_kind = "table"
+            block.append(stripped)
+            index += 1
+            continue
+        if block_kind == "table":
+            flush()
+        block_kind = "plain"
         block.append(stripped)
         index += 1
     flush()

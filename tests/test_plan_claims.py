@@ -411,6 +411,41 @@ class TestRetainedEvidence:
         )
         assert not pc.frozen_supported_ids(first, code_only)
 
+    @pytest.mark.parametrize("relocated", [
+        '# A\n\n## B\n\nPython 3.11 was released in October 2022.\n',
+        '# A / B\n\nPython 3.11 was released in October 2022.\n',
+    ])
+    def test_heading_structure_collisions_force_reverification(self, relocated: str) -> None:
+        original = (
+            '# A\n\n### B\n\nPython 3.11 was released in October 2022.\n'
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), original),
+            lineage_id="x-plan", round_no=1, plan_text=original,
+        )
+        assert not pc.frozen_supported_ids(first, relocated)
+
+    def test_list_parent_cannot_be_lost_from_assertion_identity(self) -> None:
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="x-plan", round_no=1, plan_text=PLAN,
+        )
+        rejected_list = (
+            '# Rollout\n\n- The following claim is rejected:\n'
+            '  Python 3.11 was released in October 2022.\n'
+        )
+        assert not pc.frozen_supported_ids(first, rejected_list)
+
+    def test_unchanged_list_assertion_can_reuse_its_packet(self) -> None:
+        listed = (
+            '# Rollout\n\n- Python 3.11 was released in October 2022.\n'
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), listed),
+            lineage_id="x-plan", round_no=1, plan_text=listed,
+        )
+        assert pc.frozen_supported_ids(first, listed) == set(first["claims"])
+
     def test_duplicate_assertion_and_quotation_cannot_freeze_ambiguously(self) -> None:
         mixed = (
             PLAN + '\n## Quotation\n\n'
