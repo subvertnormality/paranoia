@@ -11,12 +11,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
@@ -481,6 +483,10 @@ def _validate_evidence(
     host = (parsed.hostname or "").lower()
     if parsed.scheme not in {"https", "http"} or not host:
         result["relation"] = "context"
+    if repo is not None and plan_repo_path and _is_plan_self_url(
+        result["url"], repo, plan_repo_path,
+    ):
+        result["relation"] = "context"
     if _is_ugc_host(host):
         # Normalize, rather than reject: the packet remains useful as a lead or conflict,
         # while verdict validation below refuses to let it close a claim.
@@ -496,6 +502,54 @@ def _qualifying(evidence: dict[str, str], scope: str) -> bool:
         and bool(parsed.hostname)
         and evidence["source_kind"] in AUTHORITATIVE_KINDS
     )
+
+
+def _is_plan_self_url(url: str, repo: Path, plan_repo_path: str) -> bool:
+    """Whether an HTTP(S) URL resolves to the reviewed plan in this repository."""
+    remote = _canonical_remote_repo(str(repo.resolve()))
+    if remote is None:
+        return False
+    remote_host, remote_path = remote
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    path = unquote(parsed.path).strip("/")
+    plan_path = unquote(plan_repo_path).strip("/")
+    if not plan_path or not path.endswith("/" + plan_path):
+        return False
+    if host == remote_host and path.startswith(remote_path + "/"):
+        middle = path[len(remote_path) + 1: -len(plan_path)].strip("/")
+        return middle.startswith("blob/") or middle.startswith("raw/") or "/blob/" in middle
+    if remote_host == "github.com" and host == "raw.githubusercontent.com":
+        return path.startswith(remote_path + "/")
+    return False
+
+
+@lru_cache(maxsize=128)
+def _canonical_remote_repo(repo_path: str) -> tuple[str, str] | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", repo_path, "config", "--get", "remote.origin.url"],
+            check=False, capture_output=True, text=True, timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    remote = completed.stdout.strip() if completed.returncode == 0 else ""
+    if not remote:
+        return None
+    if "://" not in remote:
+        scp = re.match(r"^(?:[^@]+@)?([^:]+):(.+)$", remote)
+        if not scp:
+            return None
+        host, path = scp.group(1).lower(), scp.group(2)
+    else:
+        parsed = urlparse(remote)
+        host, path = (parsed.hostname or "").lower(), parsed.path
+    normalized = path.strip("/")
+    if normalized.endswith(".git"):
+        normalized = normalized[:-4]
+    if not host or not normalized:
+        return None
+    return host, normalized
 
 
 def reconcile(
@@ -1186,27 +1240,35 @@ def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bo
 
 def _assertion_contexts(
     plan_text: str, anchor: str,
-) -> list[tuple[tuple[tuple[int, str], ...], str]]:
+) -> list[
+    tuple[tuple[tuple[int, str], ...], tuple[tuple[int, str], ...], str]
+]:
     needle = _collapse_whitespace(anchor)
-    contexts: list[tuple[tuple[tuple[int, str], ...], str]] = []
+    contexts: list[
+        tuple[tuple[tuple[int, str], ...], tuple[tuple[int, str], ...], str]
+    ] = []
     heading_path: list[tuple[int, str]] = []
+    list_ancestors: list[tuple[int, str]] = []
     block: list[str] = []
     block_kind: str | None = None
+    block_list_path: tuple[tuple[int, str], ...] = ()
 
     def flush() -> None:
-        nonlocal block_kind
+        nonlocal block_kind, block_list_path
         if not block:
             return
         body = _collapse_whitespace(" ".join(block))
         contexts.extend(
-            [(tuple(heading_path), body)] * body.count(needle)
+            [(tuple(heading_path), block_list_path, body)] * body.count(needle)
         )
         block.clear()
         block_kind = None
+        block_list_path = ()
 
     def set_heading(level: int, text: str) -> None:
         heading_path[:] = [item for item in heading_path if item[0] < level]
         heading_path.append((level, _collapse_whitespace(text)))
+        list_ancestors.clear()
 
     lines = plan_text.splitlines()
     in_fence: tuple[str, int] | None = None
@@ -1258,7 +1320,12 @@ def _assertion_contexts(
             continue
         if re.match(r"^(?:[-*+] |\d+[.)] )", stripped):
             flush()
+            list_ancestors[:] = [
+                item for item in list_ancestors if item[0] < leading
+            ]
+            list_ancestors.append((leading, stripped))
             block_kind = "list"
+            block_list_path = tuple(list_ancestors)
             block.append(f"<list-indent:{leading}>{stripped}")
             index += 1
             continue
@@ -1275,6 +1342,7 @@ def _assertion_contexts(
             continue
         if block_kind == "table":
             flush()
+        list_ancestors.clear()
         block_kind = "plain"
         block.append(stripped)
         index += 1

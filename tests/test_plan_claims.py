@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,42 @@ class TestAuditValidation:
         claim = pc.parse_audit(_audit(_claim(evidence=[source])), PLAN).claims[0]
         assert claim["verdict"] == "unverified"
         assert claim["evidence"][0]["relation"] == "context"
+
+    @pytest.mark.parametrize("url", [
+        "https://github.com/example/project/blob/main/docs/plan.md",
+        "https://raw.githubusercontent.com/example/project/main/docs/plan.md",
+    ])
+    def test_plan_repository_web_url_cannot_govern_its_own_claim(
+        self, repo: Path, url: str,
+    ) -> None:
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:example/project.git"],
+            cwd=repo, check=True,
+        )
+        source = _source(url=url, kind="primary")
+        claim = pc.parse_audit(
+            _audit(_claim(evidence=[source])), PLAN,
+            repo=repo, plan_repo_path="docs/plan.md",
+        ).claims[0]
+        assert claim["verdict"] == "unverified"
+        assert claim["evidence"][0]["relation"] == "context"
+
+    def test_other_same_repository_web_page_is_not_mistaken_for_the_plan(
+        self, repo: Path,
+    ) -> None:
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/example/project.git"],
+            cwd=repo, check=True,
+        )
+        source = _source(
+            url="https://github.com/example/project/blob/main/docs/source.md",
+            kind="primary",
+        )
+        claim = pc.parse_audit(
+            _audit(_claim(evidence=[source])), PLAN,
+            repo=repo, plan_repo_path="docs/plan.md",
+        ).claims[0]
+        assert claim["verdict"] == "supported"
 
     def test_context_only_support_is_demoted_without_discarding_other_claims(self) -> None:
         context_only = _source(relation="context")
@@ -435,6 +472,21 @@ class TestRetainedEvidence:
             '  Python 3.11 was released in October 2022.\n'
         )
         assert not pc.frozen_supported_ids(first, rejected_list)
+
+    def test_nested_assertion_cannot_move_between_list_parents(self) -> None:
+        original = (
+            '# Rollout\n\n- Accepted premises:\n'
+            '  - Python 3.11 was released in October 2022.\n'
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), original),
+            lineage_id="x-plan", round_no=1, plan_text=original,
+        )
+        rejected = (
+            '# Rollout\n\n- Rejected premises:\n'
+            '  - Python 3.11 was released in October 2022.\n'
+        )
+        assert not pc.frozen_supported_ids(first, rejected)
 
     def test_unchanged_list_assertion_can_reuse_its_packet(self) -> None:
         listed = (

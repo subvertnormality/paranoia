@@ -78,7 +78,9 @@ a named external report occurred.
 
 Only canonical `https://` or `http://` locations with a host can govern a verdict. Repository,
 file, and custom-scheme locations may be retained as context but can never count as primary or
-authoritative web evidence.
+authoritative web evidence. When the plan is a repository file and its origin remote is known,
+the plan's own canonical blob/raw HTTP(S) URL is also mechanically demoted to context: publishing
+the assertion does not make it evidence for itself.
 
 Primary and authoritative sources can govern a verdict: first-party documentation and records,
 standards, legislation/regulators, government data, and original papers/datasets. Secondary
@@ -100,9 +102,10 @@ packets. It splits compound external assertions into atomic propositions, but do
 an internal design into repository-mechanical hops. Each claim receives a server-owned ID.
 
 Later rounds freeze every exact unchanged `supported` claim with its captured packet. “Unchanged”
-requires the anchor to remain in the same normalized Markdown assertion block and heading path,
-not merely to occur as a substring; quotation, negation, relocation, or surrounding assertion
-edits force re-verification while harmless line wrapping remains stable. The
+requires the anchor to remain in one unique normalized Markdown assertion block with the same
+structured heading levels and list-ancestor chain, not merely to occur as a substring;
+quotation, code, negation, relocation, parent-list changes, or surrounding assertion edits force
+re-verification while harmless line wrapping remains stable. The
 verifier receives only added or edited eligible wording, retained `refuted` or `unverified`
 claims, and removal candidates. An unchanged, fully supported register causes no evidence-model
 call or web search. This optimization applies only to claim verification: the full cold

@@ -77,8 +77,9 @@ state and reviewer-native capabilities meet the supported model.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
 - Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
-  schemes are context only. Active versionless predecessor state must become blocking migration
-  debt and force one exhaustive audit, never normalize to an empty verified register.
+  schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
+  not evidence. Active versionless predecessor state must become blocking migration debt and
+  force one exhaustive audit, never normalize to an empty verified register.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
   The plan under review is context, not evidence for its own assertions; require authoritative
@@ -86,8 +87,9 @@ state and reviewer-native capabilities meet the supported model.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.
   In later rounds, an exact unchanged supported claim is frozen with its authoritative packet
   and requires no model call or web search. Bind “unchanged” to the same assertion-bearing
-  Markdown context and heading, not substring presence; quotation, negation, or relocation must
-  re-enter verification. Edited, new, refuted, and unverified claims
+  Markdown block, structured heading levels, and list ancestry, not substring presence;
+  quotation, code, negation, parent changes, or relocation must re-enter verification. Edited,
+  new, refuted, and unverified claims
   receive targeted verification. Unverified or otherwise non-freezable claims require a full
   replacement evidence packet rather than another compact verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not

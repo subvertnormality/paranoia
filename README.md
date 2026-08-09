@@ -256,7 +256,8 @@ source. Reddit, Stack Overflow, forums, social media, wikis, blogs, and other UG
 can expose leads or conflicts, but the server prevents known UGC hosts from being
 treated as governing evidence even if the model labels them `primary`.
 Only canonical HTTP(S) web locations with a host can govern a verdict; repository,
-file, and custom-scheme locations remain context only.
+file, and custom-scheme locations remain context only. A repository plan's own canonical
+blob/raw HTTP(S) URL is also context, never evidence for its own assertions.
 
 Every contradicted or unresolved external claim returns an **actionable source packet**:
 
@@ -296,8 +297,9 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
 4. after exhaustive round 1, the server freezes every exact unchanged supported claim with
    its authoritative packet. The claim verifier receives only edited/new eligible external
    wording plus retained refuted or unverified claims.
-   Freeze identity includes the assertion-bearing Markdown block and heading path, so quoting,
-   negating, or relocating old words cannot preserve stale support;
+   Freeze identity includes the assertion-bearing Markdown block, structured heading levels,
+   and list-parent chain, so quoting, negating, moving into code, changing list ownership, or
+   relocating old words cannot preserve stale support;
    Unverified or non-freezable claims require complete replacement evidence packets on the next
    targeted round; they cannot churn through compact verdict-only assessments. Settled claims
    cause no model call or web search. Edited claims inherit no verdict;
