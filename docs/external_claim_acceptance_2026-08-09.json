@@ -7,7 +7,7 @@
     "web_capability": "built-in tools.web_search=true",
     "authentication": "signed-in ChatGPT account"
   },
-  "implementation_commit": "3edda33",
+  "implementation_commit": "a1b2580",
   "representative_acceptance": {
     "lineage": "final-external-acceptance-3edda33-plan",
     "fixture": "Fresh external fact, RFC design principle, urllib.parse.urljoin behavior, one intentionally false internet-only SQLite release date, and an internal function-call bridge.",
@@ -32,6 +32,13 @@
         "claim_model_calls": 0,
         "claim_duration_ms": 1,
         "result": "CONVERGENCE: NOT-BLOCKED; four supported external packets, zero internal bridge packets, and no repeated evidence search."
+      },
+      {
+        "round": 4,
+        "claim_status": "reused 4 unchanged supported packets; no claim model call",
+        "claim_model_calls": 0,
+        "claim_duration_ms": 1,
+        "result": "Post-hardening acceptance on a1b2580 exercised retained qualification after plan-self evidence rejection was extended to persisted packets; CONVERGENCE: NOT-BLOCKED."
       }
     ]
   },
