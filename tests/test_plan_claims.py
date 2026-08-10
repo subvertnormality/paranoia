@@ -1323,7 +1323,7 @@ def test_plan_capture_aggregate_ceiling_blocks_before_network(
         adapter.close()
 
 
-def test_plan_binding_aggregate_batch_ceiling_is_visible_debt(
+def test_plan_binding_aggregate_batch_ceiling_raises_before_model_calls(
     tmp_path: Path,
 ) -> None:
     count = handlers.MAX_PLAN_BINDING_BATCHES * 10 + 1
@@ -1351,6 +1351,60 @@ def test_plan_binding_aggregate_batch_ceiling_is_visible_debt(
             adapter._binding_batches(audit, captures)
     finally:
         adapter.close()
+
+
+def test_plan_evidence_model_call_budget_refuses_another_phase(tmp_path: Path) -> None:
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        deadline=float("inf"),
+    )
+    adapter.model_calls = handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS
+    try:
+        with pytest.raises(pc.AuditError, match="model-call ceiling"):
+            adapter._next_model_timeout()
+    finally:
+        adapter.close()
+
+
+def test_evidence_deadline_debt_is_persisted_before_structural_review(
+    repo: Path, tmp_path: Path, monkeypatch,
+) -> None:
+    lineage_id = "deadline-debt-plan"
+    observed: dict[str, float | None] = {}
+
+    def deadline_debt(plan_text, prior_state, **kwargs):
+        observed["deadline"] = kwargs["deadline"]
+        return pc.with_debt(
+            prior_state, pc.AuditError("evidence deadline exhausted"),
+            round_no=kwargs["round_no"], plan_text=plan_text,
+        ), "failed"
+
+    def structural_review(self, *args, **kwargs):
+        observed["structural_timeout"] = kwargs.get("timeout")
+        return Review(text=STRUCTURAL_CLEAR, session_ref="structural", raw="structural")
+
+    monkeypatch.setattr(handlers, "_verify_plan_claims", deadline_debt)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "run", structural_review,
+    )
+
+    result = handlers.critique_plan(
+        {
+            "plan_text": PLAN, "repo_path": str(repo), "lineage": lineage_id,
+            "round": 1, "stakes": "trusted local plan; correctness is high impact",
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+
+    assert observed["deadline"] is not None
+    assert observed["structural_timeout"] == handlers.PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC
+    assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
+    assert "CLAIM-AUDIT-DEBT" in result
 
 
 def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:

@@ -43,17 +43,30 @@ def run(
     input_bytes: bytes | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> bytes:
-    result = subprocess.run(
+    result = invoke(
+        repo, args, input_bytes=input_bytes, extra_env=extra_env,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"{' '.join(argv(args))} failed: {detail}")
+    return result.stdout
+
+
+def invoke(
+    repo: Path,
+    args: Sequence[str],
+    *,
+    input_bytes: bytes | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run inert Git and return its status for callers with nonzero semantics."""
+    return subprocess.run(
         argv(args),
         cwd=repo,
         env=environment(extra_env),
         input=input_bytes,
         capture_output=True,
     )
-    if result.returncode != 0:
-        detail = result.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"{' '.join(argv(args))} failed: {detail}")
-    return result.stdout
 
 
 def text(

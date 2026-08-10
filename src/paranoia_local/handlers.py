@@ -33,6 +33,12 @@ from .worktree import worktree_at
 Clock = Callable[[], str]
 
 PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
+PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 3000
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 3540
+PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 1200
+PLAN_REGISTER_RETRY_TIMEOUT_SEC = 300
+PLAN_TEARDOWN_RESERVE_SEC = 60
+MAX_PLAN_EVIDENCE_MODEL_CALLS = 7
 PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 MAX_PLAN_CAPTURE_SOURCES = 200
@@ -502,6 +508,12 @@ def critique_plan(
         else pc.empty_state()
     )
 
+    verified_profile = (
+        claim_verification and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+    )
+    plan_deadline = (
+        time.monotonic() + PLAN_REVIEW_TOTAL_TIMEOUT_SEC if verified_profile else None
+    )
     claim_status = "disabled"
     claim_duration_ms: int | None = None
     if claim_verification:
@@ -522,6 +534,13 @@ def critique_plan(
                     engine=engine, repo=repo, model=model, effort=effort,
                     plan_repo_path=plan_repo_path,
                     on_progress=on_progress,
+                    deadline=(
+                        min(
+                            plan_deadline - PLAN_TEARDOWN_RESERVE_SEC,
+                            claim_started + PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC,
+                        )
+                        if plan_deadline is not None else None
+                    ),
                 )
             except BaseException:
                 # This is before the structural-review try/finally below, so release the
@@ -569,10 +588,27 @@ def critique_plan(
                     "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                     "prefix as the project root; no live Git or web tools are available."
                 )
-                review = reviewer.run(
-                    isolated_prompt, review_cwd, model, effort, False,
-                    **_progress_kwargs(on_progress),
-                )
+                if plan_deadline is not None and (
+                    time.monotonic() + PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC
+                    + PLAN_TEARDOWN_RESERVE_SEC > plan_deadline
+                ):
+                    review = Review(
+                        text=(
+                            "[paranoia-local error] verified evidence work completed and was "
+                            "persisted, but the whole-plan deadline leaves insufficient time "
+                            "for the bounded structural review; rerun to reuse frozen claims"
+                        ),
+                        session_ref=None, raw="plan deadline exhausted",
+                        returncode=124, error=True,
+                    )
+                else:
+                    review = reviewer.run(
+                        isolated_prompt, review_cwd, model, effort, False,
+                        timeout=PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC,
+                        **_progress_kwargs(on_progress),
+                    )
+                if closure:
+                    closure.deadline = plan_deadline
                 trailer = closure.settle(
                     review, reviewer, review_cwd, model, effort, False, on_progress,
                 ) if closure else None
@@ -646,6 +682,7 @@ def _verify_plan_claims(
     effort: str,
     plan_repo_path: str | None,
     on_progress: Callable[[str], None] | None,
+    deadline: float | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Run exhaustive round 1, then verify only the external-claim edit cone."""
     targeted = pc.has_prior_snapshot(prior_state)
@@ -690,7 +727,7 @@ def _verify_plan_claims(
     if server_capture_required:
         captured_engine = _CapturedClaimEngine(
             engine, plan_text=plan_text, repo=repo, plan_repo_path=plan_repo_path,
-            prior_state=prior_state, frozen_ids=frozen,
+            prior_state=prior_state, frozen_ids=frozen, deadline=deadline,
         )
         claim_engine = captured_engine
     review = claim_engine.run(
@@ -793,6 +830,7 @@ class _CapturedClaimEngine:
         self, engine: Engine, *, plan_text: str, repo: Path,
         plan_repo_path: str | None, prior_state: dict[str, Any] | None = None,
         frozen_ids: frozenset[str] = frozenset(),
+        deadline: float | None = None,
     ) -> None:
         self.engine = engine
         self.plan_text = plan_text
@@ -800,6 +838,8 @@ class _CapturedClaimEngine:
         self.plan_repo_path = plan_repo_path
         self.prior_state = prior_state or {}
         self.frozen_ids = frozen_ids
+        self.deadline = deadline
+        self.model_calls = 0
         self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
         self.binding_engine: Engine | None = None
         self.last_session: str | None = None
@@ -818,7 +858,10 @@ class _CapturedClaimEngine:
         **kwargs: Any,
     ) -> Review:
         discovery_kwargs = dict(kwargs)
-        discovery_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        try:
+            discovery_kwargs["timeout"] = self._next_model_timeout()
+        except pc.AuditError as error:
+            return self._deadline_failure(error)
         discoverer = self.engine.for_role(eng.ROLE_DISCOVERY)
         first = discoverer.run(
             prompt, self.launch, model, effort, True, **discovery_kwargs,
@@ -829,6 +872,10 @@ class _CapturedClaimEngine:
         try:
             discovery = self._parse_discovery(first.text)
         except pc.AuditError as error:
+            try:
+                discovery_kwargs["timeout"] = self._next_model_timeout()
+            except pc.AuditError as deadline_error:
+                return self._deadline_failure(deadline_error, first.session_ref, raw_parts)
             corrected = discoverer.resume(
                 first.session_ref,
                 pc.retry_instructions(
@@ -884,6 +931,32 @@ class _CapturedClaimEngine:
             duration_ms=last_binding.duration_ms,
         )
 
+    def _next_model_timeout(self) -> int:
+        if self.model_calls >= MAX_PLAN_EVIDENCE_MODEL_CALLS:
+            raise pc.AuditError(
+                f"plan evidence model-call ceiling is {MAX_PLAN_EVIDENCE_MODEL_CALLS}"
+            )
+        if self.deadline is not None and (
+            time.monotonic() + PLAN_EVIDENCE_PHASE_TIMEOUT_SEC > self.deadline
+        ):
+            raise pc.AuditError(
+                "plan evidence deadline leaves insufficient time for another bounded "
+                f"{PLAN_EVIDENCE_PHASE_TIMEOUT_SEC}-second model call"
+            )
+        self.model_calls += 1
+        return PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+
+    @staticmethod
+    def _deadline_failure(
+        error: pc.AuditError, session_ref: str | None = None,
+        raw_parts: list[str] | None = None,
+    ) -> Review:
+        return Review(
+            text=f"[paranoia-local error] evidence budget exhausted: {error}",
+            session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts or []),
+            returncode=124, error=True,
+        )
+
     def _parse_discovery(self, text: str) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""
         audit = pc.parse_audit(
@@ -903,7 +976,10 @@ class _CapturedClaimEngine:
     ) -> Review:
         role = self.binding_engine or self.engine.for_role(eng.ROLE_BINDING)
         binding_kwargs = dict(kwargs)
-        binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        try:
+            binding_kwargs["timeout"] = self._next_model_timeout()
+        except pc.AuditError as error:
+            return self._deadline_failure(error, session_ref)
         corrected = role.resume(
             session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
         )
@@ -1020,9 +1096,11 @@ class _CapturedClaimEngine:
                 '"location":"section/table/page","passage":"exact captured passage"}]}\n\n'
                 + rendered
             )
+            call_kwargs = dict(binding_kwargs)
+            call_kwargs["timeout"] = self._next_model_timeout()
             review = self.binding_engine.resume(
                 current_session, instruction, self.launch, model, effort, False,
-                **binding_kwargs,
+                **call_kwargs,
             )
             reviews.append(review)
             if review.error or not review.session_ref:
@@ -1030,11 +1108,12 @@ class _CapturedClaimEngine:
             try:
                 parsed = self._parse_indexed_binding(review.text, batch, captures)
             except pc.AuditError as first:
+                call_kwargs["timeout"] = self._next_model_timeout()
                 correction = self.binding_engine.resume(
                     review.session_ref,
                     f"Your indexed binding was rejected: {first}. Return one corrected "
                     f"{PLAN_BINDING_MARKER} object for exactly this batch.\n\n{rendered}",
-                    self.launch, model, effort, False, **binding_kwargs,
+                    self.launch, model, effort, False, **call_kwargs,
                 )
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
@@ -1192,7 +1271,13 @@ class _CapturedClaimEngine:
             + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
         )
         attester = self.engine.for_role(eng.ROLE_TEXT)
-        review = attester.run(prompt, self.launch, model, effort, False, timeout=300)
+        try:
+            timeout = self._next_model_timeout()
+        except pc.AuditError as error:
+            return self._deadline_failure(error)
+        review = attester.run(
+            prompt, self.launch, model, effort, False, timeout=timeout,
+        )
         self.attestation_raw = review.raw
         if review.error:
             return review
@@ -1410,6 +1495,7 @@ class _ClosureRound:
         self._retry_candidate: str | None = None
         self.retry_register: str | None = None
         self.register_status: str | None = None
+        self.deadline: float | None = None
         self._latched = False
         self._settled = False
 
@@ -1529,9 +1615,20 @@ class _ClosureRound:
                 # exists). Retrying either would raise and replace the paid review with
                 # an error — the one outcome this path must never produce.
                 raise first
+            if self.deadline is not None and (
+                time.monotonic() + PLAN_REGISTER_RETRY_TIMEOUT_SEC
+                + PLAN_TEARDOWN_RESERVE_SEC > self.deadline
+            ):
+                raise cc.RegisterError(
+                    "whole-plan deadline leaves insufficient time for the bounded "
+                    "class-register retry"
+                ) from first
+            retry_kwargs = _progress_kwargs(on_progress)
+            if self.deadline is not None:
+                retry_kwargs["timeout"] = PLAN_REGISTER_RETRY_TIMEOUT_SEC
             retry = engine.resume(
                 review.session_ref, prompts.register_retry(str(first)), repo, model, effort,
-                web_search, **_progress_kwargs(on_progress))
+                web_search, **retry_kwargs)
             self._retry_candidate = retry.text
             if retry.error:
                 # A failed CLI still returns text, and that text can contain a parseable

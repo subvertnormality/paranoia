@@ -17,9 +17,9 @@ Four jobs:
 from __future__ import annotations
 
 import hashlib
-import subprocess
 from pathlib import Path
 
+from . import inert_git
 from .arbitration import ArbitrationError, Citation, Region, digest_lines
 
 # Modes are the only way to tell a symlink from a file in a tree listing;
@@ -43,7 +43,7 @@ def _git(args: list[str], cwd: Path, *, check: bool = True, raw: bool = False) -
     (`orientation.py`). No caller- or model-supplied string can contain a lone
     surrogate, so such a path simply never matches rather than matching the wrong file.
     """
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
+    r = inert_git.invoke(cwd, args)
     if r.returncode != 0:
         if not check:
             return ""
@@ -139,7 +139,7 @@ def _symlink_target(repo: Path, commit: str, path: str) -> str:
     `" real.py "` and `real.py` tracked, a stripped target resolves the citation to
     the wrong file — the decider reads one and substantiation checks the other.
     """
-    r = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", f"{commit}:{path}"])
     if r.returncode != 0:
         return ""
     return r.stdout.decode("utf-8", errors="surrogateescape")
@@ -239,10 +239,7 @@ def scan_for_tokens(repo: Path, commit: str, tokens: list[str]) -> list[str]:
         if token in paths or token in messages:
             hits.add(token)
             continue
-        r = subprocess.run(
-            ["git", "grep", "-F", "-l", "-e", token, commit],
-            cwd=repo, capture_output=True,
-        )
+        r = inert_git.invoke(repo, ["grep", "-F", "-l", "-e", token, commit])
         # rc 0 = found, 1 = not found, >1 = a real failure we must not read as "clear"
         if r.returncode == 0:
             hits.add(token)
@@ -264,10 +261,10 @@ def _blob(repo: Path, commit: str, path: str) -> str | None:
     `commit <sha>`. Either would be carried into round 2 as though it were source.
     """
     spec = f"{commit}:{path}"
-    t = subprocess.run(["git", "cat-file", "-t", spec], cwd=repo, capture_output=True)
+    t = inert_git.invoke(repo, ["cat-file", "-t", spec])
     if t.returncode != 0 or t.stdout.decode().strip() != "blob":
         return None
-    r = subprocess.run(["git", "show", spec], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", spec])
     if r.returncode != 0:
         return None
     return r.stdout.decode("utf-8", errors="replace")
@@ -301,9 +298,8 @@ class LinkResolver:
     def oid(self, rev: str) -> str | None:
         """`rev` as its full commit id, or None if it does not resolve."""
         if rev not in self._oids:
-            r = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-                cwd=self._repo, capture_output=True,
+            r = inert_git.invoke(
+                self._repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
             )
             out = r.stdout.decode("utf-8", errors="replace").strip()
             self._oids[rev] = out if r.returncode == 0 and out else None

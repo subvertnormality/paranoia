@@ -345,6 +345,11 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
+The complete evidence phase also has a 3,000-second monotonic deadline and seven model calls
+maximum. The full verified plan call is bounded to 3,540 seconds: evidence state is persisted
+first, and the 1,200-second structural phase starts only if its complete cap still fits. Otherwise
+the result is blocked and the next round reuses frozen supported claims instead of repeating
+research. A class-register correction has its own 300-second cap under the same deadline.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
 harmless extra model metadata; required fields, unambiguous aliases, and transition validity
 remain strict. Both governing coverage arrays remain required even when empty, and malformed
@@ -537,6 +542,9 @@ What it does, in order:
    gitlinks, and lazy-fetch helpers are never executed as part of evidence presentation.
    Initialized submodules contribute their currently checked-out commit; uninitialized
    submodules retain the pinned superproject gitlink.
+   Every Git evidence read—including citation resolution, label scans, refs, trees, symlinks,
+   and blobs—uses the shared inert launcher with lazy fetching disabled, so a missing promised
+   object cannot execute a repository-configured transport.
    Git refs and the reflog are digested before and after; if anything moved, the
    run returns `FAILED` rather than reporting agreement it cannot describe.
 2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options

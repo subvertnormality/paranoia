@@ -22,7 +22,8 @@
   cold-attested packet for every non-freezable claim instead of compact-verdict churn; accept
   only canonical HTTP(S) sources as governing evidence; validate retained inventory before
   capture; attest exact replacement wording independently; compose per-claim limits with
-  aggregate capture/binding budgets; and fail closed over active legacy state;
+  aggregate capture/binding and whole-plan monotonic budgets; persist evidence debt before the
+  structural phase; and fail closed over active legacy state;
 - never let the plan under review serve as evidence for its own assertions; bind claims to
   authoritative external sources;
 - let the calling coding agent autonomously edit from those packets before the next round; no
@@ -31,5 +32,7 @@
   packet and no live web, caller IDs are rejected across the complete rendered packet, and
   initialized submodule snapshots record their checked-out commit, while `research: false` is
   explicitly repository-only;
+- route snapshotting, materialization, refs, labels, citations, trees, symlinks, and blob reads
+  through the shared inert Git launcher so missing promised objects cannot lazy-fetch;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.

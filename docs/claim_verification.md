@@ -86,11 +86,20 @@ from turning into hours of model/network work. Exceeding one creates visible aud
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
 Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
-discovery and each binding batch allow at most one correction. These limits let a large real
-plan complete useful research without making any individual model call unbounded.
+discovery and each binding batch allow at most one correction. The complete evidence phase has
+a 3,000-second monotonic deadline and at most seven model calls, including corrections. These
+limits let a large real plan complete useful research without making either a call sequence or
+an individual model call unbounded.
 Captured sources are downloaded with up to 16 workers, then bound in deterministic indexed
 batches in the same corrected discovery session. One oversized source, a sixth batch, or a
-failed batch becomes visible blocking debt rather than silently truncating the inventory.
+failed batch becomes visible blocking state rather than silently truncating the inventory.
+
+The complete verified plan call has a 3,540-second deadline, leaving a 60-second teardown
+reserve within the documented 3,600-second MCP client timeout. After evidence state is persisted,
+the cold structural review starts only when its full 1,200-second cap still fits. If it does not,
+the round returns blocked and the next invocation reuses frozen supported claims rather than
+repeating research. A malformed class register gets one 300-second retry only when that cap also
+fits the same deadline.
 
 ## Evidence and authority
 

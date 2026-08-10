@@ -168,6 +168,9 @@ only where Git needs object-store/promisor metadata, but neither an fsmonitor ho
 promisor transport may execute: missing objects fail the checked plumbing call. None of the chosen
 plumbing commands invokes ordinary Git hooks, diff, or textconv, so the plan does not add redundant
 settings for those unrelated surfaces. No evidence path calls Git outside this launcher.
+Citation resolution, label scanning, tree/symlink reads, ref/reflog digests, blob reads, and
+snapshot-retention ref writes use the same launcher. A promised missing object therefore fails
+closed under `GIT_NO_LAZY_FETCH=1`; it cannot start a repository-configured promisor transport.
 
 Do not create the later evidence tree with `git worktree`, checkout, archive filters, or any
 model-run Git command. Add an inert server materializer that reads the pinned commit with plumbing only:

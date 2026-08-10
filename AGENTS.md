@@ -74,6 +74,8 @@ state and reviewer-native capabilities meet the supported model.
   Validate retained inventory before capture; attest replacement wording as its own exact
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.
+  Bound the full verified plan call below the documented MCP timeout, persist claim debt before
+  structural review, and start each model phase only when its full cap fits the monotonic deadline.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -92,6 +94,8 @@ state and reviewer-native capabilities meet the supported model.
   Reject caller IDs across the complete rendered packet before either decider runs. Working-tree
   snapshots use the checked-out commit of each initialized submodule, not a stale superproject
   gitlink.
+  Route every Git evidence read through the shared inert launcher; promised missing objects must
+  fail closed without lazy-fetching through a repository-configured transport.
 - Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
   schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
   not evidence. Active versionless predecessor state must become blocking migration debt and

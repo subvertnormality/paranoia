@@ -18,6 +18,33 @@ def snapshot(repo: Path) -> str:
     return orientation.wrap_commit(repo, tree, head)
 
 
+def test_missing_promised_blob_does_not_run_repository_transport(
+    repo: Path, tmp_path: Path,
+) -> None:
+    commit = orientation.resolve_head(repo)
+    blob = git(["rev-parse", f"{commit}:app.py"], repo).strip()
+    object_path = repo / ".git" / "objects" / blob[:2] / blob[2:]
+    assert object_path.exists()
+    object_path.unlink()
+    marker = tmp_path / "promisor-ran"
+    helper = tmp_path / "promisor-helper"
+    helper.write_text(f"#!/bin/sh\n: > '{marker}'\nexit 1\n")
+    helper.chmod(0o755)
+    git(["config", "extensions.partialClone", "origin"], repo)
+    git(["config", "remote.origin.promisor", "true"], repo)
+    git(["config", "remote.origin.partialclonefilter", "blob:none"], repo)
+    git(["config", "protocol.ext.allow", "always"], repo)
+    git(["config", "remote.origin.url", f"ext::{helper}"], repo)
+
+    resolved = evidence.resolve_citation(
+        repo, Citation("app.py", 1), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=1,
+    )
+
+    assert resolved is None
+    assert not marker.exists()
+
+
 # --- ref movement -----------------------------------------------------------
 
 
