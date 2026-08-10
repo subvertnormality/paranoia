@@ -9,8 +9,8 @@ Proposed for implementation after tracked plan convergence.
 `paranoia-local` is a trusted-single-user local MCP on a trusted OS. The caller, repository,
 framing, and fetched web text are untrusted data, but no repository-selected code is executed and
 no hostile local process races files or refs. Both signed-in reviewer CLIs are available. An
-ordinary arbitration has 2–4 options, a repository small enough for the existing pinned-snapshot
-workflow, 0–12 decision-critical external claims, and must remain useful within minutes and below
+ordinary arbitration has 2–4 options, Git 2.36 or newer, a repository small enough for the existing
+pinned-snapshot workflow, 0–12 decision-critical external claims, and must remain useful within minutes and below
 the existing one-hour whole-call ceiling. A false `CONVERGED`, weak authority treated as
 governing, unequal evidence shown to the deciders, or external research that cannot be audited is
 high impact. A visible `UNRESOLVED` or failed run is recoverable.
@@ -35,7 +35,8 @@ gives them different, unaudited corpora.
 ## Verified external premises
 
 The first implementation supports the installed, acceptance-tested CLI profiles Codex 0.144.6 and
-Claude Code 2.1.197. A different version fails evidence-mode preflight with an upgrade instruction;
+Claude Code 2.1.197, and Git 2.36 or newer. A different provider version or older Git fails
+evidence-mode preflight with an upgrade instruction;
 adding a profile requires rerunning the inventory and real acceptance fixtures. The implementation
 relies on exactly these provider behaviors, which plan verification must keep in its active
 external-claim inventory:
@@ -67,8 +68,10 @@ backend, result ranking, or universal page-extraction behavior is assumed.
 
 ### Inert evidence premises
 
-Git `ls-tree -r` recursively lists a named tree object, `--full-tree` makes paths relative to the
-tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file -t <object>` reports
+Git `ls-tree -r` recursively lists a named tree object. Its `--full-tree` option does not limit the
+listing to the current working directory and implies `--full-name`, so emitted paths are relative
+to the tree root. Its `-z` option does not quote filenames and terminates each output record with
+NUL. Git `cat-file -t <object>` reports
 the named object's actual type. After the server has required that type to be `blob`,
 `git cat-file blob <object>` prints its raw, uncompressed contents; the separate type check avoids
 the typed form's documented trivial dereferencing behavior. These are the raw enumeration/read
@@ -78,9 +81,13 @@ fetching missing objects. These assertions bind to the official
 [`git-cat-file`](https://git-scm.com/docs/git-cat-file), [`git`](https://git-scm.com/docs/git), and
 [`git-config`](https://git-scm.com/docs/git-config) references.
 
-Git `update-index --index-info` removes a path when its input record has mode zero. Command-scope
+Git 2.36 and newer understands boolean `core.fsmonitor` values; the official compatibility note
+states that Git 2.35.1 and earlier instead treat `true` and `false` as hook pathnames. Evidence mode
+therefore preflights Git 2.36 or newer before any snapshot command. Git `update-index --index-info`
+removes a path when its input record has mode zero. Command-scope
 configuration supplied with `git -c` overrides worktree, local, global, and system values for that
-command, and `core.fsmonitor=false` disables the fsmonitor extension and hook. On `git log`,
+command. Within the supported Git range, `core.fsmonitor=false` disables the fsmonitor extension
+and hook. On `git log`,
 `--no-patch` suppresses diff output and `--format=...` formats the selected commit metadata. These
 are the only repository-configured
 execution controls and metadata-history semantics on which the inert launcher relies; they bind to
@@ -472,6 +479,9 @@ attestation, order, label, vote, and round records remain intact.
   browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
   delegation tools are absent; an unsupported CLI version fails preflight before either provider
   call without claiming that feature flags enumerate all future tools;
+- evidence-mode preflight accepts Git 2.36 and the installed Git 2.50.1, rejects a simulated 2.35.1
+  before snapshotting, and the supported minimum-version fixture proves `core.fsmonitor=false`
+  does not execute a configured `false` hook pathname;
 - the supported Codex profile runs `rg` and `sed` against the inert tree unattended from its
   disposable `workspace-write` root with `approval_policy="never"`, while evidence-tree mutation
   and network/escalation attempts fail without prompting; captured sandbox policy proves both temp
