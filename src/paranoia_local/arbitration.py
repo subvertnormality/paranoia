@@ -515,8 +515,12 @@ class Region:
         return None
 
 
-def digest_lines(lines: Iterable[str]) -> tuple[str, ...]:
-    return tuple(hashlib.sha256(line.encode("utf-8", "replace")).hexdigest()[:16] for line in lines)
+def digest_lines(lines: Iterable[str | bytes]) -> tuple[str, ...]:
+    return tuple(
+        hashlib.sha256(line if isinstance(line, bytes) else line.encode("utf-8", "replace"))
+        .hexdigest()[:16]
+        for line in lines
+    )
 
 
 def to_region(

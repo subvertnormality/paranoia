@@ -231,6 +231,25 @@ def test_citation_reads_the_cited_lines(repo: Path):
     assert "def greet(name):" in body
 
 
+@pytest.mark.parametrize("separator", [b"\v", b"\f", b"\x85", b"\r"])
+def test_citation_line_numbers_split_only_on_lf(repo: Path, separator: bytes):
+    (repo / "controls.txt").write_bytes(b"alpha" + separator + b"decisive\nother\n")
+    commit_all(repo, "control separator")
+    commit = snapshot(repo)
+    got = evidence.resolve_citation(
+        repo, Citation("controls.txt", 2), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=0,
+    )
+    assert got is not None
+    region, body = got
+    assert (region.lo, region.hi, region.anchor) == (2, 2, 2)
+    assert body.endswith("other")
+    assert evidence.resolve_citation(
+        repo, Citation("controls.txt", 3), snapshot=commit,
+        links=evidence.LinkResolver(repo, commit), context=0,
+    ) is None
+
+
 def test_alias_citation_is_rejected_because_inert_tree_shows_a_marker(repo: Path):
     (repo / "alias.py").symlink_to("app.py")
     commit_all(repo, "alias")

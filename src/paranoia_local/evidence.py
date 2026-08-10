@@ -253,7 +253,7 @@ def scan_for_tokens(repo: Path, commit: str, tokens: list[str]) -> list[str]:
 # --- citation reads ---------------------------------------------------------
 
 
-def _blob(repo: Path, commit: str, path: str) -> str | None:
+def _blob(repo: Path, commit: str, path: str) -> bytes | None:
     """The file's contents, or None unless `path` is a regular blob at `commit`.
 
     The type check is load-bearing, not defensive: `git show <commit>:<dir>`
@@ -267,7 +267,15 @@ def _blob(repo: Path, commit: str, path: str) -> str | None:
     r = inert_git.invoke(repo, ["show", spec])
     if r.returncode != 0:
         return None
-    return r.stdout.decode("utf-8", errors="replace")
+    return r.stdout
+
+
+def _lf_lines(data: bytes) -> list[bytes]:
+    """Match the line numbering of the unchanged bytes in the inert workspace."""
+    lines = data.split(b"\n")
+    if lines and lines[-1] == b"":
+        lines.pop()
+    return lines
 
 
 class LinkResolver:
@@ -359,10 +367,10 @@ def resolve_citation(
     # `f.py` are different strings and would key as different regions.
     if path is None or path not in resolver.paths(commit):
         return None
-    text = _blob(repo, commit, path)
-    if text is None:
+    data = _blob(repo, commit, path)
+    if data is None:
         return None
-    lines = text.splitlines()
+    lines = _lf_lines(data)
     eof = len(lines)
     if eof == 0 or not (1 <= citation.line <= eof):
         return None
@@ -385,15 +393,18 @@ def read_region(repo: Path, region: Region) -> str | None:
     substantiation is checked against the merged bounds, so a citation inside the
     merged span but outside what was actually sent would count as carried evidence.
     """
-    text = _blob(repo, region.commit, region.path)
-    if text is None:
+    data = _blob(repo, region.commit, region.path)
+    if data is None:
         return None
-    lines = text.splitlines()
+    lines = _lf_lines(data)
     lo = max(1, region.lo)
     hi = min(len(lines), region.hi)
     if lo > hi:
         return None
-    return "\n".join(f"{n:>6}  {lines[n - 1]}" for n in range(lo, hi + 1))
+    return "\n".join(
+        f"{n:>6}  {lines[n - 1].decode('utf-8', errors='replace')}"
+        for n in range(lo, hi + 1)
+    )
 
 
 def validate_hints(repo: Path, commit: str, hints: list[dict]) -> list[dict]:
