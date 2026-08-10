@@ -86,7 +86,14 @@ def _staged_call(
         retry = engine.resume(
             review.session_ref,
             "Your staged JSON was rejected: " + str(first) +
-            "\nFix exactly that. Return only the required marker and complete JSON object.",
+            "\nFix every schema violation in the complete object, not only the first one. "
+            "Finding rows have exactly id,severity,summary,evidence,remedy (never class_id). "
+            "Debt rows have exactly id,finding_id,status. Debt updates have exactly "
+            "id,status,evidence. Class records are operations: close/reopen have only "
+            "op,class_id; reclassify adds severity; new/replace use the exact invariant, "
+            "severity and mode-specific procedure or pattern/pathspec shape from the original "
+            "prompt. They never contain status,finding_ids,debt_ids. Return only the required "
+            "marker and complete JSON object.",
             cwd, model, effort, False, timeout=min(300, timeout),
             **_progress_kwargs(on_progress),
         )

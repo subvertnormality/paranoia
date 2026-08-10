@@ -277,6 +277,39 @@ def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
     assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
 
 
+def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path):
+    invalid = payload(settlement())
+    invalid["findings"][0].pop("remedy")
+    invalid["findings"][0]["class_id"] = "wrong"
+    invalid["class_records"] = [{
+        "class_id":"wrong", "status":"open", "finding_ids":["C1"],
+        "debt_ids":["D1"],
+    }]
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, invalid)
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert "missing ['remedy']" in prompt
+            assert "Finding rows have exactly id,severity,summary,evidence,remedy" in prompt
+            assert "They never contain status,finding_ids,debt_ids" in prompt
+            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+        model="m", effort="high", timeout=10, on_progress=None,
+        parser=lambda text: rc.parse_settlement(
+            text, source_ids=["domain-1"], assessment_ids=[],
+        ),
+    )
+    assert parsed["findings"][0]["remedy"] == "fix it"
+    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+
+
 def test_violated_class_cannot_be_replaced_at_lower_severity():
     value = payload(settlement())
     value.update(

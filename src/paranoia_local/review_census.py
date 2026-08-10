@@ -489,7 +489,14 @@ def _list(obj: dict[str, Any], key: str) -> list[Any]:
 
 
 def _exact(row: Any, keys: set[str], label: str) -> None:
-    if not isinstance(row, dict) or set(row) != keys: raise CensusError(f"invalid {label} fields")
+    if not isinstance(row, dict):
+        raise CensusError(f"invalid {label} fields: expected an object with {sorted(keys)}")
+    actual = set(row)
+    if actual != keys:
+        raise CensusError(
+            f"invalid {label} fields: missing {sorted(keys - actual)}, "
+            f"unexpected {sorted(actual - keys)}; expected exactly {sorted(keys)}"
+        )
 
 
 def _bounded(value: Any, cap: int, label: str) -> str:
