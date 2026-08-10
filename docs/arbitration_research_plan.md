@@ -56,21 +56,6 @@ external-claim inventory:
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
-- Git `ls-tree -r` recursively lists a named tree object, `--full-tree` makes paths relative to the
-  tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file <type> <object>`
-  reports the named object only when it exists and has that type, and prints its contents; these
-  are the raw enumeration/read semantics used by the inert materializer. `GIT_NO_LAZY_FETCH=1`
-  prevents commands from lazily fetching missing objects. Git's `core.fsmonitor` may name a hook
-  that Git runs to identify changed paths, so inert invocations must override it rather than merely
-  ignoring global and system configuration.
-- Codex `workspace-write` permits reads outside its writable roots but confines writes to the
-  current working directory and configured writable roots; `/tmp` and the directory named by
-  `TMPDIR` remain writable unless their two documented exclusions are enabled. This documented
-  sandbox behavior is why the wrapper can inspect an out-of-root evidence target while both temp
-  exclusions prevent that target from becoming implicitly writable. Absence of every external
-  tool in the complete pinned-version deny profile is an empirical supported-profile condition,
-  not a broader documented Codex guarantee: preflight and signed-in fresh/resume acceptance must
-  establish it before evidence mode is usable.
 
 These are current external capabilities, not guarantees made by this repository. Bind them to the
 official [Codex command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
@@ -79,11 +64,29 @@ official [Codex command reference](https://learn.chatgpt.com/docs/developer-comm
 [Claude CLI reference](https://code.claude.com/docs/en/cli-reference), and
 [Trafilatura documentation](https://trafilatura.readthedocs.io/en/stable/). No undocumented search
 backend, result ranking, or universal page-extraction behavior is assumed.
-The Git assertions above bind to the official [`git-ls-tree`](https://git-scm.com/docs/git-ls-tree),
-[`git-cat-file`](https://git-scm.com/docs/git-cat-file),
-[`git`](https://git-scm.com/docs/git), and
-[`git-config`](https://git-scm.com/docs/git-config) references. The Codex sandbox assertion binds
-to the official [Codex security and approvals documentation](https://developers.openai.com/codex/security/).
+
+### Inert evidence premises
+
+Git `ls-tree -r` recursively lists a named tree object, `--full-tree` makes paths relative to the
+tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file <type> <object>`
+reports the named object only when it exists and has that type, and prints its contents; these are
+the raw enumeration/read semantics used by the inert materializer. `GIT_NO_LAZY_FETCH=1` prevents
+commands from lazily fetching missing objects. Git's `core.fsmonitor` may name a hook that Git runs
+to identify changed paths, so inert invocations must override it rather than merely ignoring
+global and system configuration. These assertions bind to the official
+[`git-ls-tree`](https://git-scm.com/docs/git-ls-tree),
+[`git-cat-file`](https://git-scm.com/docs/git-cat-file), [`git`](https://git-scm.com/docs/git), and
+[`git-config`](https://git-scm.com/docs/git-config) references.
+
+Codex `workspace-write` permits reads outside its writable roots but confines writes to the
+current working directory and configured writable roots; `/tmp` and the directory named by
+`TMPDIR` remain writable unless their two documented exclusions are enabled. This documented
+sandbox behavior is why the wrapper can inspect an out-of-root evidence target while both temp
+exclusions prevent that target from becoming implicitly writable. This assertion binds to the
+official [Codex security and approvals documentation](https://developers.openai.com/codex/security/).
+Absence of every external tool in the complete pinned-version deny profile is an empirical
+supported-profile condition, not a broader documented Codex guarantee: preflight and signed-in
+fresh/resume acceptance must establish it before evidence mode is usable.
 
 ## Required behavior
 
@@ -383,6 +386,10 @@ attestation, order, label, vote, and round records remain intact.
   Retained evidence is recaptured when re-entailing edited claims; a failed or stale capture
   becomes visible unverified evidence rather than being grandfathered. Keep capture injectable so
   deterministic plan-claim tests do not perform network I/O.
+  While touching retained-evidence binding, remove line-layout marker text from assertion-body
+  matching: heading and list ancestry still identify the assertion, but a Markdown reflow that
+  leaves an exact anchor and proposition unchanged must retain its frozen packet instead of
+  forcing unrelated web research.
 - Add pure research packet types, parsing, normalization, union, budgets, digesting, and tagged
   decisive-reference parsing to `arbitration.py` or one small `arbitration_research.py` module.
 - Add a small inert snapshot materializer beside `worktree.py`; use raw tree/blob plumbing, inert
@@ -443,7 +450,7 @@ attestation, order, label, vote, and round records remain intact.
   is readable as evidence but absent from fresh and resumed Codex tool inventories, and prove
   `repository/` citations normalize to the pinned repository path before resolution;
 - inert-materialization fixtures define smudge/process filters, textconv, external diff, hooks,
-  an executable `core.fsmonitor`, executable files, symlinks, and gitlinks; marker helpers never run during materialization or
+  executable files, symlinks, and gitlinks; marker helpers never run during materialization or
   reviewer reads, while raw expected bytes/manifests remain visible; the fixture starts before the
   shared dirty-tree snapshot and proves the markers also remain absent during snapshot creation.
   A partial-clone fixture with a missing promised blob and executable `ext::` promisor remote
@@ -464,6 +471,11 @@ attestation, order, label, vote, and round records remain intact.
 - every phase cap composes below the whole-run deadline with reserved teardown margin, and a phase
   that cannot fit is not started;
 - existing repository-only arbitration behavior and outcome computation remain compatible.
+- a dedicated inert-launcher fixture configures an executable `core.fsmonitor` and an executable
+  `ext::` promisor remote before snapshotting, then proves neither marker runs during snapshot,
+  materialization, metadata-history rendering, or reviewer reads.
+- assertion-binding tests prove wrapping or unwrapping a list item's unchanged sentence retains
+  its frozen packet, while negation, relocation to another list item, or proposition edits stale it.
 
 ### Real acceptance before PR
 
