@@ -179,17 +179,14 @@ def parse_settlement(
         if source_severity and rank[by_id[row["governing_id"]]["severity"]] < rank[source_severity]:
             raise CensusError("governing severity cannot downgrade a source finding")
     for item in debt:
-        _exact(item, {"id", "finding_id", "severity", "summary", "evidence", "status"}, "debt")
+        _exact(item, {"id", "finding_id", "status"}, "debt")
         if item["finding_id"] not in finding_ids or item["status"] not in {"open", "closed"}:
             raise CensusError("invalid debt mapping")
-        if item["severity"] != by_id[item["finding_id"]]["severity"]:
-            raise CensusError("debt severity must equal governing finding severity")
-        if (
-            item["summary"] != by_id[item["finding_id"]]["summary"]
-            or item["evidence"] != by_id[item["finding_id"]]["evidence"]
-        ):
-            raise CensusError("debt summary and evidence must equal its governing finding")
-        _anchors(item["evidence"])
+        governing = by_id[item["finding_id"]]
+        item.update(
+            severity=governing["severity"], summary=governing["summary"],
+            evidence=list(governing["evidence"]),
+        )
     updates = _list(obj, "debt_updates")
     seen_updates: set[str] = set()
     for item in updates:

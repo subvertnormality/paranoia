@@ -307,7 +307,7 @@ class_id; reclassify additionally has severity. Use these exact row shapes:
 source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
 assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
 findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
-debt=[{"id":"D1","finding_id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"status":"open"}];
+debt=[{"id":"D1","finding_id":"G1","status":"open"}];
 debt_updates=[]; class_records=[]. Do not emit prose."""
 
 

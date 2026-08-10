@@ -30,8 +30,7 @@ def settlement(**overrides):
         "source_dispositions": [{"source_id": "domain-1", "governing_id": "C1"}],
         "assessment_dispositions": [],
         "findings": [finding("C1")],
-        "debt": [{"id": "D1", "finding_id": "C1", "severity": "MAJOR",
-                  "summary": "broken", "evidence": ["a.py:1"], "status": "open"}],
+        "debt": [{"id": "D1", "finding_id": "C1", "status": "open"}],
         "debt_updates": [], "class_records": [],
     }
     value.update(overrides)
@@ -85,17 +84,20 @@ def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
         rc.parse_settlement(settlement(debt=[]), source_ids=["domain-1"], assessment_ids=[])
 
 
-def test_settlement_cannot_downgrade_source_or_debt_severity():
+def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
     value = payload(settlement())
     value["findings"][0]["severity"] = "MINOR"
     value["debt"] = []
     with pytest.raises(rc.CensusError, match="downgrade"):
         rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"],
                             source_severities={"domain-1": "MAJOR"}, assessment_ids=[])
-    value = payload(settlement())
-    value["debt"][0]["severity"] = "MINOR"
-    with pytest.raises(rc.CensusError, match="debt severity"):
-        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[])
+    parsed = rc.parse_settlement(
+        settlement(), source_ids=["domain-1"], assessment_ids=[],
+    )
+    assert parsed["debt"][0] == {
+        "id":"D1", "finding_id":"C1", "status":"open", "severity":"MAJOR",
+        "summary":"broken", "evidence":["a.py:1"],
+    }
 
 
 def test_correction_cannot_clear_without_updating_every_existing_debt():
@@ -126,7 +128,9 @@ def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
         rc.normalize_state({}, stakes="s", snapshot="p"), first,
         phase="census", snapshot="p", round_no=1,
     )
-    duplicate = payload(settlement())
+    duplicate = rc.parse_settlement(
+        settlement(), source_ids=["domain-1"], assessment_ids=[],
+    )
     duplicate.update(source_dispositions=[], findings=[finding("C2")])
     duplicate["debt"][0].update(finding_id="C2")
     with pytest.raises(rc.CensusError, match="reuses durable id"):
@@ -197,10 +201,7 @@ def test_violated_class_cannot_be_replaced_at_lower_severity():
         }],
     )
     value["findings"] = [finding("C1", "MAJOR")]
-    value["debt"] = [{
-        "id":"D1", "finding_id":"C1", "severity":"MAJOR", "summary":"broken",
-        "evidence":["a.py:1"], "status":"open",
-    }]
+    value["debt"] = [{"id":"D1", "finding_id":"C1", "status":"open"}]
     with pytest.raises(rc.CensusError, match="cannot be downgraded"):
         rc.parse_settlement(
             wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
@@ -365,10 +366,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
                     "id":"G1", "severity":"MAJOR", "summary":"repair the plan",
                     "evidence":["plan:1"], "remedy":"edit the plan",
                 }],
-                "debt":[{
-                    "id":"D1", "finding_id":"G1", "severity":"MAJOR",
-                    "summary":"repair the plan", "evidence":["plan:1"], "status":"open",
-                }],
+                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
                 "debt_updates":[], "class_records":[],
             })
         elif '"role": "correction"' in prompt:
