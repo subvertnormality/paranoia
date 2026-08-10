@@ -99,6 +99,14 @@ def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
         "summary":"broken", "evidence":["a.py:1"],
     }
 
+    fatal = payload(settlement())
+    fatal["findings"][0]["severity"] = "BLOCKER"
+    with pytest.raises(rc.CensusError, match="downgrade"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, fatal), source_ids=["domain-1"],
+            source_severities={"domain-1": "FATAL"}, assessment_ids=[],
+        )
+
 
 def test_correction_cannot_clear_without_updating_every_existing_debt():
     value = payload(settlement())
@@ -413,9 +421,16 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert third.count("## What works") == 1
     audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
+    assert audit["staged_settlement"]["source_dispositions"] == [
+        {"source_id":"domain:F1", "governing_id":"G1"},
+    ]
     assert [row["role"] for row in audit["attempt_ledger"]] == [
         "census-domain", "census-execution", "census-integrity", "consolidation",
     ]
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "three-phase-plan", stamp="T4", mode=cc.PLAN_MODE,
+    )
+    assert lineage.review_state["debt"][0]["source_ids"] == ["domain:F1"]
 
 
 def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_path, monkeypatch):

@@ -173,7 +173,9 @@ def parse_settlement(
             if len(matches) != 1:
                 raise CensusError("each blocking finding needs exactly one open debt record")
     by_id = {f["id"]: f for f in findings}
-    rank = {cc.OUT_OF_SCOPE: 0, cc.MINOR: 1, cc.MAJOR: 2, cc.BLOCKER: 3, cc.FATAL: 3}
+    # FATAL and BLOCKER both block, but they are not interchangeable labels: a
+    # plan-level impossibility must not be hidden by consolidating it as BLOCKER.
+    rank = {cc.OUT_OF_SCOPE: 0, cc.MINOR: 1, cc.MAJOR: 2, cc.BLOCKER: 3, cc.FATAL: 4}
     for row in source_rows:
         source_severity = (source_severities or {}).get(row["source_id"])
         if source_severity and rank[by_id[row["governing_id"]]["severity"]] < rank[source_severity]:

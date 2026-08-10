@@ -361,11 +361,13 @@ blocking debt; the server never starts a multiplicative hours-long tail or trunc
 false closure.
 The complete evidence phase also has a 3,000-second monotonic deadline and nine model calls
 maximum. That fits discovery, five maximum-size binding batches, cold attestation, and one
-correction in both discovery and binding. The full verified plan call is bounded to 3,540
-seconds: evidence state is persisted
-first, and the 1,200-second structural phase starts only if its complete cap still fits. Otherwise
-the result is blocked and the next round reuses frozen supported claims instead of repeating
-research. A class-register correction has its own 300-second cap under the same deadline.
+correction in both discovery and binding. The full verified plan call is bounded to 3,540 seconds.
+Evidence state is persisted first. A staged census starts only when its full 2,160-second
+lane/consolidation/retry reserve still fits; correction and final use a 1,560-second reserve. If the
+reserve no longer fits, the result is visibly pending and the next round reuses frozen supported
+claims instead of repeating research. Individual structural calls retain their 900/600/1,200 and
+300-second role limits. A legacy class-register correction has its own 300-second cap under the
+same deadline.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
 harmless extra model metadata; required fields, unambiguous aliases, and transition validity
 remain strict. Both governing coverage arrays remain required even when empty, and malformed
@@ -711,8 +713,8 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 The legacy one-shot/injected-engine trailer retains `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and
 unmechanized-class detail.
 
-`NOT-BLOCKED` asserts only that no blocking class is unclosed. It never asserts the
-change is correct — the reviewer's findings still govern that.
+`NOT-BLOCKED` asserts only that the computed structural-debt, class, and (for verified plans)
+external-claim gates are clear. It is a review result, not a proof that the change is correct.
 
 For verified plan reviews the claim gate and class gate are combined into one
 governing verdict:
