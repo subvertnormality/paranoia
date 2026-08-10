@@ -92,7 +92,7 @@ class DeciderFanOutError(ArbitrationError):
         self.failures = tuple(failures)
 
 
-class InvalidDeciderReply(ArbitrationError):
+class DeciderAttemptFailure(ArbitrationError):
     def __init__(self, message: str, attempts: Sequence[DeciderAttempt]) -> None:
         super().__init__(message)
         self.attempts = tuple(attempts)
@@ -1480,19 +1480,30 @@ def _fan_out(
             attempt_body = body
             attempts: list[DeciderAttempt] = []
             for attempt in range(2):
-                text = agent(
-                    engine_name=engine.name,
-                    model=models.get(engine.name) or engine.default_model,
-                    instructions=prompts.ARBITRATE_INSTRUCTIONS,
-                    body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
-                    timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
-                )
+                try:
+                    text = agent(
+                        engine_name=engine.name,
+                        model=models.get(engine.name) or engine.default_model,
+                        instructions=prompts.ARBITRATE_INSTRUCTIONS,
+                        body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
+                        timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
+                    )
+                except Exception as exc:
+                    if attempts:
+                        attempts.append(DeciderAttempt(
+                            attempt_body, "", f"execution failure: {type(exc).__name__}: {exc}",
+                        ))
+                        raise DeciderAttemptFailure(
+                            f"correction execution failed after a rejected reply: "
+                            f"{type(exc).__name__}: {exc}", attempts,
+                        ) from exc
+                    raise
                 try:
                     vote = arb.parse_verdict(text, presentation)
                 except ArbitrationError as exc:
                     attempts.append(DeciderAttempt(attempt_body, text, str(exc)))
                     if attempt == 1:
-                        raise InvalidDeciderReply(
+                        raise DeciderAttemptFailure(
                             f"reply remained invalid after one correction: {exc}", attempts,
                         ) from exc
                     attempt_body = (

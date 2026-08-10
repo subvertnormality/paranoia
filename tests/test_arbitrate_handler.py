@@ -306,6 +306,40 @@ def test_decider_execution_failure_is_not_retried(repo: Path, tmp_path: Path):
     assert claude_calls == 1
 
 
+def test_correction_execution_failure_preserves_the_rejected_reply(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+    claude_calls = 0
+
+    def failed_correction(**kwargs):
+        nonlocal claude_calls
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            claude_calls += 1
+            if claude_calls == 2:
+                raise RuntimeError("provider unavailable during correction")
+        text = scripted(**kwargs)
+        return (
+            "AUTHORITY: duplicated too early\n" + text
+            if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude"
+            else text
+        )
+
+    report = run(repo, failed_correction, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "correction execution failed after a rejected reply" in report
+    assert claude_calls == 2
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    failure = record["failed_round"]["deciders"]["claude"]
+    assert len(failure["attempts"]) == 2
+    assert "reply mentions AUTHORITY:" in failure["attempts"][0]["rejection"]
+    assert "FORMAT CORRECTION" in failure["attempts"][1]["body"]
+    assert failure["attempts"][1]["raw"] == ""
+    assert "execution failure" in failure["attempts"][1]["rejection"]
+    assert record["failed_round"]["deciders"]["codex"]["selected"] == "opt-decimal"
+
+
 def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
     repo: Path, tmp_path: Path, monkeypatch,
 ):
