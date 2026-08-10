@@ -833,8 +833,9 @@ review still runs in every round and remains the dominant irreducible cost of co
 subscriptions in a single call. Research is on unless `research: false` explicitly
 selects repository-only mode. A parser-rejected decider reply receives one
 complete correction attempt while the sibling result and completed cleaning/research
-work are retained; execution failures are not retried. Every attempt remains subject
-to the phase cap and 3,600-second whole-call deadline.
+work are retained. If correction still fails, the audit records both rejected replies,
+the completed sibling, and the actual phase provenance; execution failures are not
+retried. Every attempt remains subject to the phase cap and 3,600-second whole-call deadline.
 
 ---
 

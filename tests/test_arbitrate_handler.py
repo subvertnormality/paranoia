@@ -221,6 +221,42 @@ def test_malformed_decider_reply_gets_one_full_correction(
     assert "FORMAT CORRECTION" in claude["attempts"][1]["body"]
 
 
+def test_terminal_decider_failure_preserves_default_research_provenance(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+
+    def researcher(**kwargs):
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (), (), (),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    def always_bad_claude(**kwargs):
+        text = scripted(**kwargs)
+        return (
+            "AUTHORITY: duplicated too early\n" + text
+            if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude"
+            else text
+        )
+
+    args = {k: v for k, v in BASE.items() if k != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo), "clean": False},
+        log_dir=tmp_path / "logs", engines=ENGINES, run_agent=always_bad_claude,
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "RESEARCH") == "complete 0 packets"
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["research"]["enabled"] is True
+    assert len(record["research"]["runs"]) == 2
+    assert record["failed_round"]["deciders"]["codex"]["selected"] == "opt-decimal"
+    assert len(record["failed_round"]["deciders"]["claude"]["attempts"]) == 2
+
+
 def test_decider_reply_fails_after_exactly_one_correction(
     repo: Path, tmp_path: Path,
 ):
@@ -241,6 +277,15 @@ def test_decider_reply_fails_after_exactly_one_correction(
     decider_calls = [call for call in scripted.calls if call["cwd"] is not None]
     assert [call["engine"] for call in decider_calls].count("codex") == 1
     assert [call["engine"] for call in decider_calls].count("claude") == 2
+    assert trailer_field(report, "CLEANING") == "skipped"
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert trailer_field(report, "ROUNDS") == "0"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["failed_round"]["number"] == 1
+    assert record["failed_round"]["deciders"]["codex"]["selected"] == "opt-decimal"
+    failed = record["failed_round"]["deciders"]["claude"]
+    assert failed["status"] == "failed"
+    assert len(failed["attempts"]) == 2
 
 
 def test_decider_execution_failure_is_not_retried(repo: Path, tmp_path: Path):

@@ -74,6 +74,30 @@ class Cast:
     attempts: tuple[DeciderAttempt, ...] = ()
 
 
+@dataclass(frozen=True)
+class DeciderFailure:
+    engine: str
+    error: str
+    attempts: tuple[DeciderAttempt, ...] = ()
+
+
+class DeciderFanOutError(ArbitrationError):
+    """A failed fan-out whose completed peer and rejected replies remain auditable."""
+
+    def __init__(
+        self, message: str, *, casts: Sequence[Cast], failures: Sequence[DeciderFailure],
+    ) -> None:
+        super().__init__(message)
+        self.casts = tuple(casts)
+        self.failures = tuple(failures)
+
+
+class InvalidDeciderReply(ArbitrationError):
+    def __init__(self, message: str, attempts: Sequence[DeciderAttempt]) -> None:
+        super().__init__(message)
+        self.attempts = tuple(attempts)
+
+
 @dataclass
 class Packet:
     """The cleaned, attested framing every decider sees identically."""
@@ -759,11 +783,23 @@ def _arbitrate(
 
     engine_names = [p.engine for p in presentations]
     progress(f"round 1: {', '.join(engine_names)}")
-    casts1 = _fan_out(
-        agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
-        presentations=presentations, packet=packet, carried={}, models=models,
-        effort=effort, web_search=web_search,
-    )
+    try:
+        casts1 = _fan_out(
+            agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
+            presentations=presentations, packet=packet, carried={}, models=models,
+            effort=effort, web_search=web_search,
+        )
+    except DeciderFanOutError as exc:
+        return _failed_decision_report(
+            failure=exc, completed=[], repo=repo, snapshot=snapshot, seed=seed,
+            refs_before=refs_before, cleaning_note=cleaning_note, packet=packet,
+            research_runs=research_runs, presentations=presentations,
+            label_attempts=attempts, log_dir=log_dir,
+            now=now, raw_input={
+                "decision": decision, "stakes": stakes, "context": context,
+                "options": originals, "files": hints,
+            },
+        )
     round1 = [c.vote for c in casts1]
 
     def resolve_region(citation: Citation) -> Region | None:
@@ -800,11 +836,23 @@ def _arbitrate(
             # cannot be the evidence a vote was reconciled by.
             sent = [region for region, _ in carried_bodies]
             carried = {v.engine: carried_bodies for v in round1}
-            casts2 = _fan_out(
-                agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
-                presentations=presentations, packet=packet, carried=carried,
-                models=models, effort=effort, web_search=web_search,
-            )
+            try:
+                casts2 = _fan_out(
+                    agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
+                    presentations=presentations, packet=packet, carried=carried,
+                    models=models, effort=effort, web_search=web_search,
+                )
+            except DeciderFanOutError as exc:
+                return _failed_decision_report(
+                    failure=exc, completed=[casts1], repo=repo, snapshot=snapshot,
+                    seed=seed, refs_before=refs_before, cleaning_note=cleaning_note,
+                    packet=packet, research_runs=research_runs,
+                    presentations=presentations, label_attempts=attempts,
+                    log_dir=log_dir, now=now, raw_input={
+                        "decision": decision, "stakes": stakes, "context": context,
+                        "options": originals, "files": hints,
+                    },
+                )
             round2 = [c.vote for c in casts2]
             transcripts.append(casts2)
             per_round.append({v.engine: v for v in round2})
@@ -865,24 +913,7 @@ def _arbitrate(
             "label_attempts": attempts,
             "cleaning": cleaning_note,
             "attestation": packet.attestation,
-            "research": {
-                "enabled": do_research,
-                "digest": research_core.digest(packet.research_packets) if do_research else None,
-                "packets": packet.research_text if do_research else None,
-                "runs": [
-                    {
-                        "engine": run.engine,
-                        "model": run.model,
-                        "discovery_raw": run.discovery_raw,
-                        "binding_raw": run.binding_raw,
-                        "calls": run.calls,
-                        "usage": run.usage,
-                        "durations_ms": run.durations_ms,
-                        "captures": [asdict(capture) for capture in run.captures],
-                    }
-                    for run in research_runs
-                ],
-            },
+            "research": _research_record(packet, research_runs),
             "raw_input": {
                 "decision": decision, "stakes": stakes, "context": context,
                 "options": originals, "files": hints,
@@ -898,12 +929,7 @@ def _arbitrate(
             # does not hold them, the run is unauditable once that happens.
             "rounds": [
                 {
-                    cast.vote.engine: {
-                        **_vote_record(cast.vote),
-                        "prompt": cast.body,
-                        "reply": cast.raw,
-                        "attempts": [asdict(attempt) for attempt in cast.attempts],
-                    }
+                    cast.vote.engine: _cast_record(cast)
                     for cast in casts
                 }
                 for casts in transcripts
@@ -931,6 +957,119 @@ def _arbitrate(
     )
 
 
+def _research_record(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, Any]:
+    return {
+        "enabled": packet.research_enabled,
+        "digest": (
+            research_core.digest(packet.research_packets)
+            if packet.research_enabled else None
+        ),
+        "packets": packet.research_text if packet.research_enabled else None,
+        "runs": [
+            {
+                "engine": run.engine,
+                "model": run.model,
+                "discovery_raw": run.discovery_raw,
+                "binding_raw": run.binding_raw,
+                "calls": run.calls,
+                "usage": run.usage,
+                "durations_ms": run.durations_ms,
+                "captures": [asdict(capture) for capture in run.captures],
+            }
+            for run in runs
+        ],
+    }
+
+
+def _failed_decision_report(
+    *,
+    failure: DeciderFanOutError,
+    completed: Sequence[Sequence[Cast]],
+    repo: Path,
+    snapshot: str,
+    seed: str,
+    refs_before: str,
+    cleaning_note: str,
+    packet: Packet,
+    research_runs: Sequence[ResearchRun],
+    presentations: Sequence[Presentation],
+    label_attempts: int,
+    raw_input: Mapping[str, Any],
+    log_dir: Path,
+    now: Clock,
+) -> str:
+    """Report a failed decider round without erasing work completed before it."""
+    refs_moved = evidence.refs_digest(repo) != refs_before
+    partial = {cast.vote.engine: _cast_record(cast) for cast in failure.casts}
+    partial.update({
+        item.engine: {
+            "status": "failed",
+            "error": item.error,
+            "attempts": [asdict(attempt) for attempt in item.attempts],
+        }
+        for item in failure.failures
+    })
+    audit = logs.write_log(
+        log_dir,
+        tool="arbitrate",
+        record={
+            "repo": str(repo),
+            "snapshot": snapshot,
+            "order_seed": seed,
+            "label_attempts": label_attempts,
+            "cleaning": cleaning_note,
+            "attestation": packet.attestation,
+            "research": _research_record(packet, research_runs),
+            "raw_input": dict(raw_input),
+            "cleaned": {
+                "decision": packet.decision,
+                "context": packet.context,
+                "statements": packet.statements,
+            },
+            "label_maps": {p.engine: dict(p.label_to_id) for p in presentations},
+            "rounds": [
+                {cast.vote.engine: _cast_record(cast) for cast in casts}
+                for casts in completed
+            ],
+            "failed_round": {
+                "number": len(completed) + 1,
+                "deciders": partial,
+            },
+            "outcome": arb.FAILED,
+            "selected": None,
+            "reason": str(failure),
+            "refs_moved": refs_moved,
+        },
+        timestamp=now(),
+    )
+    research = (
+        f"complete {len(packet.research_packets)} packets"
+        if packet.research_enabled else "repository-only"
+    )
+    digest = (
+        research_core.digest(packet.research_packets)
+        if packet.research_enabled else "none"
+    )
+    return "\n".join([
+        "# Arbitration: FAILED",
+        "",
+        str(failure),
+        "",
+        render_trailer(
+            arb.Outcome(arb.FAILED, None, str(failure)),
+            advisory="none",
+            cleaning=cleaning_note,
+            snapshot=snapshot,
+            seed=seed,
+            refs_moved=refs_moved,
+            audit=str(audit) if audit else "none",
+            rounds=len(completed),
+            research=research,
+            research_digest=digest,
+        ),
+    ])
+
+
 def _cited(vote: Vote) -> list[Citation]:
     """Every citation a vote offers — decisive plus supporting. Used to build the
     carried union; substantiation still looks only at the decisive one."""
@@ -951,6 +1090,15 @@ def _vote_record(vote: Vote) -> dict[str, Any]:
         "constraint": vote.constraint,
         "decisive": vote.decisive.render() if vote.decisive else None,
         "citations": [c.render() for c in vote.citations],
+    }
+
+
+def _cast_record(cast: Cast) -> dict[str, Any]:
+    return {
+        **_vote_record(cast.vote),
+        "prompt": cast.body,
+        "reply": cast.raw,
+        "attempts": [asdict(attempt) for attempt in cast.attempts],
     }
 
 
@@ -1344,8 +1492,8 @@ def _fan_out(
                 except ArbitrationError as exc:
                     attempts.append(DeciderAttempt(attempt_body, text, str(exc)))
                     if attempt == 1:
-                        raise ArbitrationError(
-                            f"reply remained invalid after one correction: {exc}"
+                        raise InvalidDeciderReply(
+                            f"reply remained invalid after one correction: {exc}", attempts,
                         ) from exc
                     attempt_body = (
                         body
@@ -1366,13 +1514,21 @@ def _fan_out(
         futures = {engine.name: pool.submit(one, engine) for engine in deciders}
     casts: list[Cast] = []
     errors: list[str] = []
+    failures: list[DeciderFailure] = []
     for name, future in futures.items():
         try:
             casts.append(future.result())
         except Exception as exc:  # noqa: BLE001 — name the engine that failed
             errors.append(f"{name}: {type(exc).__name__}: {exc}")
+            failures.append(DeciderFailure(
+                engine=name,
+                error=f"{type(exc).__name__}: {exc}",
+                attempts=getattr(exc, "attempts", ()),
+            ))
     if errors:
-        raise ArbitrationError("decider failure — " + "; ".join(errors))
+        raise DeciderFanOutError(
+            "decider failure — " + "; ".join(errors), casts=casts, failures=failures,
+        )
     return casts
 
 
