@@ -56,6 +56,21 @@ external-claim inventory:
 - Trafilatura extracts a downloaded page's main content as plain text, while pages that require
   JavaScript rendering can remain unavailable to it. Conservative Unicode and whitespace
   normalization for exact passage matching is Paranoia's behavior, not Trafilatura's promise.
+- Git `ls-tree -r` recursively lists a named tree object, `--full-tree` makes paths relative to the
+  tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file <type> <object>`
+  reports the named object only when it exists and has that type, and prints its contents; these
+  are the raw enumeration/read semantics used by the inert materializer. `GIT_NO_LAZY_FETCH=1`
+  prevents commands from lazily fetching missing objects. Git's `core.fsmonitor` may name a hook
+  that Git runs to identify changed paths, so inert invocations must override it rather than merely
+  ignoring global and system configuration.
+- Codex `workspace-write` permits reads outside its writable roots but confines writes to the
+  current working directory and configured writable roots; `/tmp` and the directory named by
+  `TMPDIR` remain writable unless their two documented exclusions are enabled. This documented
+  sandbox behavior is why the wrapper can inspect an out-of-root evidence target while both temp
+  exclusions prevent that target from becoming implicitly writable. Absence of every external
+  tool in the complete pinned-version deny profile is an empirical supported-profile condition,
+  not a broader documented Codex guarantee: preflight and signed-in fresh/resume acceptance must
+  establish it before evidence mode is usable.
 
 These are current external capabilities, not guarantees made by this repository. Bind them to the
 official [Codex command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
@@ -64,6 +79,11 @@ official [Codex command reference](https://learn.chatgpt.com/docs/developer-comm
 [Claude CLI reference](https://code.claude.com/docs/en/cli-reference), and
 [Trafilatura documentation](https://trafilatura.readthedocs.io/en/stable/). No undocumented search
 backend, result ranking, or universal page-extraction behavior is assumed.
+The Git assertions above bind to the official [`git-ls-tree`](https://git-scm.com/docs/git-ls-tree),
+[`git-cat-file`](https://git-scm.com/docs/git-cat-file),
+[`git`](https://git-scm.com/docs/git), and
+[`git-config`](https://git-scm.com/docs/git-config) references. The Codex sandbox assertion binds
+to the official [Codex security and approvals documentation](https://developers.openai.com/codex/security/).
 
 ## Required behavior
 
@@ -116,6 +136,14 @@ which untracked paths belong in the snapshot, but repository attributes, hooks, 
 filters, external diff, textconv, and checkout machinery are never evaluated. Preserve the current
 working-tree semantics, including tracked-but-ignored files, deletions, executable modes, symlinks,
 and inert gitlink records; do not narrow arbitration to committed-only input.
+
+Put every Git invocation in snapshotting, inert materialization, and metadata-only history behind
+one shared inert-plumbing launcher. It sets `GIT_CONFIG_NOSYSTEM=1`, an empty global configuration,
+`GIT_NO_LAZY_FETCH=1`, and `GIT_OPTIONAL_LOCKS=0`, and passes command-line overrides including
+`core.fsmonitor=false`, `core.hooksPath=/dev/null`, and disabled external diff/textconv. Local
+repository configuration remains readable only where Git needs object-store/promisor metadata,
+but neither an fsmonitor hook nor a configured promisor transport may execute: missing objects
+fail the checked plumbing call. No evidence path calls Git outside this launcher.
 
 Do not create the later evidence tree with `git worktree`, checkout, archive filters, or any
 model-run Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
@@ -415,7 +443,7 @@ attestation, order, label, vote, and round records remain intact.
   is readable as evidence but absent from fresh and resumed Codex tool inventories, and prove
   `repository/` citations normalize to the pinned repository path before resolution;
 - inert-materialization fixtures define smudge/process filters, textconv, external diff, hooks,
-  executable files, symlinks, and gitlinks; marker helpers never run during materialization or
+  an executable `core.fsmonitor`, executable files, symlinks, and gitlinks; marker helpers never run during materialization or
   reviewer reads, while raw expected bytes/manifests remain visible; the fixture starts before the
   shared dirty-tree snapshot and proves the markers also remain absent during snapshot creation.
   A partial-clone fixture with a missing promised blob and executable `ext::` promisor remote
