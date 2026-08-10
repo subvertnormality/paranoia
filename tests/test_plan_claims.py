@@ -1050,12 +1050,15 @@ class _RoleScript:
     name = "codex"
     default_model = "test"
 
-    def __init__(self, outputs: dict[str, list[str]]) -> None:
+    def __init__(
+        self, outputs: dict[str, list[str]], calls: list[tuple[str, str]] | None = None,
+    ) -> None:
         self.outputs = outputs
         self.role = "default"
+        self.calls = calls if calls is not None else []
 
     def for_role(self, role: str):
-        child = _RoleScript(self.outputs)
+        child = _RoleScript(self.outputs, self.calls)
         child.role = role
         return child
 
@@ -1065,9 +1068,11 @@ class _RoleScript:
         )
 
     def run(self, *args, **kwargs):
+        self.calls.append((self.role, args[0]))
         return self._next()
 
     def resume(self, *args, **kwargs):
+        self.calls.append((self.role, args[1]))
         return self._next()
 
 
@@ -1084,7 +1089,7 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         source["quote"],
     )
     monkeypatch.setattr(
-        handlers.external_sources, "capture_all", lambda candidates: [capture],
+        handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
     )
     valid = _audit(_claim())
     changed = _audit(_claim(evidence=[_source(url="https://example.com/changed")]))
@@ -1145,6 +1150,125 @@ def test_only_server_attested_supported_packets_freeze() -> None:
     )) == 1
 
 
+def test_negative_attestation_removes_exact_replacement_but_keeps_refutation(
+    tmp_path: Path,
+) -> None:
+    replacement = "Python 3.11.0 was released on October 24, 2022."
+    evidence = [
+        _source(relation="refutes_claim"),
+        _source(
+            url="https://docs.python.org/3.11/whatsnew/3.11.html",
+            relation="supports_replacement",
+        ),
+    ]
+    audit = pc.parse_audit(_audit(_claim(
+        verdict="refuted", evidence=evidence, replacement=replacement,
+    )), PLAN)
+    attestation = (
+        '=== EVIDENCE ATTESTATION JSON ===\n'
+        '{"attestations":['
+        '{"claim_index":0,"evidence_index":0,"publisher_authority":true,'
+        '"authority_reason":"official release owner","passage_entailment":true,'
+        '"entailment_reason":"refutes the old wording"},'
+        '{"claim_index":0,"evidence_index":1,"publisher_authority":true,'
+        '"authority_reason":"official release owner","passage_entailment":false,'
+        '"entailment_reason":"does not entail the proposed replacement"}]}'
+    )
+    engine = _RoleScript({"evidence-text": [attestation]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    for evidence_index, item in enumerate(audit.claims[0]["evidence"]):
+        candidate = external_sources.CandidateSource(
+            item["url"], item["title"], item["publisher"], item["source_kind"],
+            item["authority_basis"], item["relation"],
+        )
+        adapter.captures[(0, evidence_index)] = external_sources.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64,
+            chr(ord("b") + evidence_index) * 64, item["quote"],
+        )
+    try:
+        result = adapter._attest(audit, "m", "high")
+        assert isinstance(result, pc.Audit)
+        assert result.claims[0]["verdict"] == "refuted"
+        assert result.claims[0]["replacement"] is None
+        attester_prompt = next(
+            prompt for role, prompt in engine.calls if role == "evidence-text"
+        )
+        assert f'"proposition":"{replacement}"' in attester_prompt
+    finally:
+        adapter.close()
+
+
+def test_retained_inventory_is_corrected_before_capture(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    second_anchor = "SQLite 3.45.0 was released on January 15, 2024."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    first_claim = _claim(verdict="unverified", evidence=[])
+    second_claim = _claim(
+        anchor=second_anchor, proposition=second_anchor, verdict="unverified", evidence=[],
+    )
+    prior = pc.reconcile(
+        {}, pc.parse_audit(_audit(first_claim, second_claim), plan),
+        lineage_id="inventory", round_no=1, plan_text=plan,
+    )
+    complete_first = _claim()
+    complete_second = _claim(anchor=second_anchor, proposition=second_anchor)
+    discovery_omission = _audit(complete_first)
+    discovery_corrected = _audit(complete_first, complete_second)
+    binding = (
+        handlers.PLAN_BINDING_MARKER
+        + '\n{"bindings":['
+        '{"claim_index":0,"evidence_index":0,"usable":true,'
+        '"location":"release record","passage":"'
+        + complete_first["evidence"][0]["quote"]
+        + '"},{"claim_index":1,"evidence_index":0,"usable":true,'
+        '"location":"release record","passage":"'
+        + complete_second["evidence"][0]["quote"]
+        + '"}]}'
+    )
+    attestation = (
+        '=== EVIDENCE ATTESTATION JSON ===\n{"attestations":['
+        '{"claim_index":0,"evidence_index":0,"publisher_authority":true,'
+        '"authority_reason":"official owner","passage_entailment":true,'
+        '"entailment_reason":"direct statement"},'
+        '{"claim_index":1,"evidence_index":0,"publisher_authority":true,'
+        '"authority_reason":"official owner","passage_entailment":true,'
+        '"entailment_reason":"direct statement"}]}'
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [discovery_omission, discovery_corrected],
+        "evidence-binding": [binding],
+        "evidence-text": [attestation],
+    })
+    capture_sizes: list[int] = []
+
+    def capture_all(candidates, **kwargs):
+        rows = list(candidates)
+        capture_sizes.append(len(rows))
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                f"{index + 1:064x}", complete_first["evidence"][0]["quote"],
+            )
+            for index, candidate in enumerate(rows)
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+        prior_state=prior, frozen_ids=frozenset(),
+    )
+    try:
+        result = adapter.run("audit", tmp_path, "m", "high", True)
+        assert not result.error
+        assert capture_sizes == [2]
+        assert [role for role, _ in engine.calls].count("evidence-discovery") == 2
+    finally:
+        adapter.close()
+
+
 def test_plan_binding_batches_large_ordinary_inventory(tmp_path: Path) -> None:
     lines = [f"External behavior {index} is guaranteed." for index in range(11)]
     plan = "# Plan\n\n" + "\n".join(lines)
@@ -1170,6 +1294,61 @@ def test_plan_binding_batches_large_ordinary_inventory(tmp_path: Path) -> None:
         batches = adapter._binding_batches(audit, captures)
         assert len(batches) == 2
         assert sum(map(len, batches)) == 11
+    finally:
+        adapter.close()
+
+
+def test_plan_capture_aggregate_ceiling_blocks_before_network(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    lines = [
+        f"External behavior {index} is guaranteed."
+        for index in range(handlers.MAX_PLAN_CAPTURE_SOURCES + 1)
+    ]
+    plan = "# Plan\n\n" + "\n".join(lines)
+    audit = pc.parse_audit(_audit(*[
+        _claim(anchor=line, proposition=line) for line in lines
+    ]), plan)
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all",
+        lambda candidates, **kwargs: pytest.fail("capture must not start past the ceiling"),
+    )
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    try:
+        with pytest.raises(pc.AuditError, match="aggregate capture ceiling"):
+            adapter._capture(audit)
+    finally:
+        adapter.close()
+
+
+def test_plan_binding_aggregate_batch_ceiling_is_visible_debt(
+    tmp_path: Path,
+) -> None:
+    count = handlers.MAX_PLAN_BINDING_BATCHES * 10 + 1
+    lines = [f"External behavior {index} is guaranteed." for index in range(count)]
+    plan = "# Plan\n\n" + "\n".join(lines)
+    audit = pc.parse_audit(_audit(*[
+        _claim(anchor=line, proposition=line) for line in lines
+    ]), plan)
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    captures = {}
+    for claim_index, claim in enumerate(audit.claims):
+        item = claim["evidence"][0]
+        candidate = external_sources.CandidateSource(
+            item["url"], item["title"], item["publisher"], item["source_kind"],
+            item["authority_basis"], item["relation"],
+        )
+        captures[(claim_index, 0)] = external_sources.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            "x" * external_sources.MAX_EXTRACTED_CHARS,
+        )
+    try:
+        with pytest.raises(pc.AuditError, match="aggregate ceiling"):
+            adapter._binding_batches(audit, captures)
     finally:
         adapter.close()
 

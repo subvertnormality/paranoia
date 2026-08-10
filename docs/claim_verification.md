@@ -55,35 +55,42 @@ an empty, verified register.
 1. The selected reviewer CLI scans the plan and uses Codex live search or Claude `WebSearch`
    only to discover candidate public URLs. Claude `WebFetch` is not enabled. There is no search
    endpoint, API key, plugin, or provider abstraction.
-2. The server downloads each candidate directly under bounded HTTP(S), redirect, response-size,
+2. Before any download, the server validates the complete retained-claim inventory. Its one
+   bounded correction therefore repairs omissions while discovery search is still available;
+   only the corrected complete inventory proceeds to capture.
+3. The server downloads each candidate directly under bounded HTTP(S), redirect, response-size,
    and extracted-text limits, then extracts main text with Trafilatura. The same reviewer session
    is resumed with web and repository access disabled and may bind exact passages only from those
    captures. Search snippets, provider summaries, and provider-fetched page bodies never count.
-3. A fresh tool-free attester receives only each atomic proposition, declared publisher and
+4. A fresh tool-free attester receives only each atomic proposition, declared publisher and
    authority basis, capture metadata, relation, location, and exact passage. A source governs
-   only when the attester independently accepts publisher authority and passage entailment.
-4. `plan_claims.py` parses the resulting audit, enforces scope, authority, and entailment, freezes exact
+   only when the attester independently accepts publisher authority and passage entailment. A
+   proposed replacement is attested against the exact replacement proposition separately from
+   the refuted claim; negative replacement attestation removes only the proposed wording.
+5. `plan_claims.py` parses the resulting audit, enforces scope, authority, and entailment, freezes exact
    unchanged supported packets after round 1, targets later work at the external edit cone and
    unresolved claims, and renders actionable packets.
-5. Claim state and structural-class state share the existing atomic lineage JSON. There is no
+6. Claim state and structural-class state share the existing atomic lineage JSON. There is no
    second database, CAS protocol, or journal.
-6. The cold structural reviewer receives the evidence register and an inert raw-tree repository
+7. The cold structural reviewer receives the evidence register and an inert raw-tree repository
    materialization, with live web and Git-helper execution unavailable. It is explicitly forbidden
    from demanding claim packets for repository mechanics or “missing atomic bridges.” It still
    performs the complete ordinary FATAL/MAJOR review over the plan and repository every round.
-7. The computed verdict combines external-claim closure and structural-class closure.
+8. The computed verdict combines external-claim closure and structural-class closure.
 
-The active ceiling is 500 external claims and 20 evidence records per claim. These are
-pathology/corruption guards, not pagination limits. Exceeding one creates visible audit debt and
+The active inventory ceiling is 500 external claims and 20 evidence records per claim. The
+composed execution budget additionally allows at most 200 source captures and five binding
+batches of 400,000 characters in one audit. These are pathology/corruption guards, not
+pagination limits. They cover ordinary large plans while preventing the multiplicative maxima
+from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
 Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
 discovery and each binding batch allow at most one correction. These limits let a large real
 plan complete useful research without making any individual model call unbounded.
-Captured sources are bound in deterministic indexed batches of at most 400,000 characters in
-the same discovery session. The limit applies per batch, not to the whole claim inventory;
-one oversized source or a failed batch becomes visible blocking debt rather than aborting the
-plan handler.
+Captured sources are downloaded with up to 16 workers, then bound in deterministic indexed
+batches in the same corrected discovery session. One oversized source, a sixth batch, or a
+failed batch becomes visible blocking debt rather than silently truncating the inventory.
 
 ## Evidence and authority
 

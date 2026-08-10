@@ -35,6 +35,8 @@ Clock = Callable[[], str]
 PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
 PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
+MAX_PLAN_CAPTURE_SOURCES = 200
+MAX_PLAN_BINDING_BATCHES = 5
 
 
 def _default_clock() -> str:
@@ -688,6 +690,7 @@ def _verify_plan_claims(
     if server_capture_required:
         captured_engine = _CapturedClaimEngine(
             engine, plan_text=plan_text, repo=repo, plan_repo_path=plan_repo_path,
+            prior_state=prior_state, frozen_ids=frozen,
         )
         claim_engine = captured_engine
     review = claim_engine.run(
@@ -788,12 +791,15 @@ class _CapturedClaimEngine:
 
     def __init__(
         self, engine: Engine, *, plan_text: str, repo: Path,
-        plan_repo_path: str | None,
+        plan_repo_path: str | None, prior_state: dict[str, Any] | None = None,
+        frozen_ids: frozenset[str] = frozenset(),
     ) -> None:
         self.engine = engine
         self.plan_text = plan_text
         self.repo = repo
         self.plan_repo_path = plan_repo_path
+        self.prior_state = prior_state or {}
+        self.frozen_ids = frozen_ids
         self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
         self.binding_engine: Engine | None = None
         self.last_session: str | None = None
@@ -820,27 +826,22 @@ class _CapturedClaimEngine:
         if first.error or not first.session_ref:
             return first
         raw_parts = [first.raw]
-        discovery_corrected = False
         try:
-            discovery = pc.parse_audit(
-                first.text, self.plan_text, repo=self.repo,
-                plan_repo_path=self.plan_repo_path,
-            )
+            discovery = self._parse_discovery(first.text)
         except pc.AuditError as error:
             corrected = discoverer.resume(
                 first.session_ref,
-                pc.retry_instructions(error, self.plan_text, {}),
+                pc.retry_instructions(
+                    error, self.plan_text, self.prior_state,
+                    frozen_ids=self.frozen_ids,
+                ),
                 self.launch, model, effort, True, **discovery_kwargs,
             )
             raw_parts.append(corrected.raw)
-            discovery_corrected = True
             if corrected.error or not corrected.session_ref:
                 return corrected
             try:
-                discovery = pc.parse_audit(
-                    corrected.text, self.plan_text, repo=self.repo,
-                    plan_repo_path=self.plan_repo_path,
-                )
+                discovery = self._parse_discovery(corrected.text)
             except pc.AuditError as second:
                 return Review(
                     text=f"[paranoia-local error] discovery audit invalid: {second}",
@@ -852,48 +853,13 @@ class _CapturedClaimEngine:
         else:
             session_ref = first.session_ref
 
-        if discovery.assessments:
-            if discovery_corrected:
-                return Review(
-                    text="[paranoia-local error] corrected audit still used compact assessments",
-                    session_ref=session_ref,
-                    raw="\n--- phase ---\n".join(raw_parts), error=True,
-                )
-            corrected = discoverer.resume(
-                session_ref,
-                "Compact retained assessments cannot cross the server-capture boundary. "
-                "Return one complete corrected claim audit with every retained current claim "
-                "as a full claim/evidence packet and coverage.prior_assessments empty.",
-                self.launch, model, effort, True, **discovery_kwargs,
-            )
-            raw_parts.append(corrected.raw)
-            if corrected.error or not corrected.session_ref:
-                return corrected
-            try:
-                discovery = pc.parse_audit(
-                    corrected.text, self.plan_text, repo=self.repo,
-                    plan_repo_path=self.plan_repo_path,
-                )
-            except pc.AuditError as error:
-                return Review(
-                    text=f"[paranoia-local error] corrected full-packet audit invalid: {error}",
-                    session_ref=corrected.session_ref,
-                    raw="\n--- phase ---\n".join(raw_parts), error=True,
-                )
-            if discovery.assessments:
-                return Review(
-                    text="[paranoia-local error] corrected audit still used compact assessments",
-                    session_ref=corrected.session_ref,
-                    raw="\n--- phase ---\n".join(raw_parts), error=True,
-                )
-            session_ref = corrected.session_ref
-        captures = self._capture(discovery)
-        self.discovery = discovery
-        self.captures = captures
-        self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)
-        binding_kwargs = dict(kwargs)
-        binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
         try:
+            captures = self._capture(discovery)
+            self.discovery = discovery
+            self.captures = captures
+            self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)
+            binding_kwargs = dict(kwargs)
+            binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
             audit, binding_reviews = self._bind_indexed(
                 session_ref, discovery, captures, model, effort, binding_kwargs,
             )
@@ -917,6 +883,19 @@ class _CapturedClaimEngine:
             usage=last_binding.usage,
             duration_ms=last_binding.duration_ms,
         )
+
+    def _parse_discovery(self, text: str) -> pc.Audit:
+        """Validate governing inventory before any URL is captured."""
+        audit = pc.parse_audit(
+            text, self.plan_text, repo=self.repo,
+            plan_repo_path=self.plan_repo_path,
+        )
+        pc.validate_prior_coverage(
+            self.prior_state, audit, plan_text=self.plan_text, raw=text,
+            frozen_ids=self.frozen_ids, repo=self.repo,
+            plan_repo_path=self.plan_repo_path,
+        )
+        return audit
 
     def resume(
         self, session_ref: str, prompt: str, cwd: Path, model: str, effort: str,
@@ -960,7 +939,12 @@ class _CapturedClaimEngine:
                 )
                 candidates.append(candidate)
                 keys.append((claim_index, evidence_index))
-        captured = external_sources.capture_all(candidates)
+        if len(candidates) > MAX_PLAN_CAPTURE_SOURCES:
+            raise pc.AuditError(
+                f"plan audit proposed {len(candidates)} sources; aggregate capture ceiling is "
+                f"{MAX_PLAN_CAPTURE_SOURCES}"
+            )
+        captured = external_sources.capture_all(candidates, workers=16)
         return dict(zip(keys, captured, strict=True))
 
     def _binding_batches(
@@ -1007,6 +991,12 @@ class _CapturedClaimEngine:
             current_chars += row_chars
         if current:
             batches.append(current)
+        if len(batches) > MAX_PLAN_BINDING_BATCHES:
+            raise pc.AuditError(
+                f"captured evidence requires {len(batches)} binding batches; aggregate ceiling "
+                f"is {MAX_PLAN_BINDING_BATCHES} batches of "
+                f"{MAX_PLAN_BINDING_BATCH_CHARS} characters"
+            )
         return batches
 
     def _bind_indexed(
@@ -1164,11 +1154,18 @@ class _CapturedClaimEngine:
                     continue
                 if item["relation"] not in {"supports_claim", "refutes_claim", "supports_replacement"}:
                     continue
+                if item["relation"] == "supports_replacement" and not claim.get("replacement"):
+                    continue
                 capture = self.captures.get((claim_index, evidence_index))
+                attested_proposition = (
+                    claim["replacement"]
+                    if item["relation"] == "supports_replacement"
+                    else claim["proposition"]
+                )
                 items.append({
                     "claim_index": claim_index,
                     "evidence_index": evidence_index,
-                    "proposition": claim["proposition"],
+                    "proposition": attested_proposition,
                     "publisher": item["publisher"],
                     "authority_basis": item["authority_basis"],
                     "relation": item["relation"],
@@ -1266,6 +1263,18 @@ class _CapturedClaimEngine:
                 claim["rationale"] = (
                     str(claim.get("rationale", ""))
                     + " Cold evidence attestation did not accept both publisher authority and passage entailment."
+                ).strip()
+            if claim.get("replacement") and not any(
+                item["relation"] == "supports_replacement"
+                and (decision := decisions.get((index, evidence_index))) is not None
+                and decision["publisher_authority"] is True
+                and decision["passage_entailment"] is True
+                for evidence_index, item in enumerate(claim["evidence"])
+            ):
+                claim["replacement"] = None
+                claim["rationale"] = (
+                    str(claim.get("rationale", ""))
+                    + " Cold evidence attestation did not accept the exact replacement."
                 ).strip()
         return pc.Audit(
             tuple(claims), audit.coverage, audit.dispositions, audit.assessments,

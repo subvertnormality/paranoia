@@ -82,6 +82,29 @@ class TestSnapshotTree:
         mode = _read_git(["ls-tree", tree, "app.py"], repo).split()[0]
         assert mode == "100644"
 
+    def test_initialized_submodule_uses_its_checked_out_commit(
+        self, repo: Path, tmp_path: Path,
+    ) -> None:
+        upstream = tmp_path / "submodule-upstream"
+        upstream.mkdir()
+        git(["init", "-q", "-b", "main"], upstream)
+        (upstream / "value.txt").write_text("one\n")
+        commit_all(upstream, "submodule one")
+        git([
+            "-c", "protocol.file.allow=always", "submodule", "add", "-q",
+            str(upstream), "deps/sub",
+        ], repo)
+        commit_all(repo, "add submodule")
+        submodule = repo / "deps/sub"
+        (submodule / "value.txt").write_text("two\n")
+        commit_all(submodule, "submodule two")
+        checked_out = _read_git(["rev-parse", "HEAD"], submodule).strip()
+
+        tree = o.snapshot_tree(repo, o.resolve_head(repo))
+        gitlink = _read_git(["ls-tree", tree, "deps/sub"], repo).split()[2]
+
+        assert gitlink == checked_out
+
 
 class TestWrapCommit:
     def test_wraps_on_head_with_message(self, repo: Path) -> None:

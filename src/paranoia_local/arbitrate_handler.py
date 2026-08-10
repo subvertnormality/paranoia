@@ -723,6 +723,7 @@ def _arbitrate(
         )
         packet.research_packets = normalized
         packet.research_text = research_core.render(normalized)
+        arb.reject_reserved_tokens({"research packet": packet.research_text}, caller_ids)
         packet.research_enabled = True
         progress(f"shared research: {len(normalized)} captured packet(s) ready")
 

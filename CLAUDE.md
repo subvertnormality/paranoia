@@ -20,12 +20,16 @@
   conformance, and function bridges to structural/code review and tests; target model/web work
   at edited, new, refuted, and unverified external claims, requiring a full current captured and
   cold-attested packet for every non-freezable claim instead of compact-verdict churn; accept
-  only canonical HTTP(S) sources as governing evidence and fail closed over active legacy state;
+  only canonical HTTP(S) sources as governing evidence; validate retained inventory before
+  capture; attest exact replacement wording independently; compose per-claim limits with
+  aggregate capture/binding budgets; and fail closed over active legacy state;
 - never let the plan under review serve as evidence for its own assertions; bind claims to
   authoritative external sources;
 - let the calling coding agent autonomously edit from those packets before the next round; no
   human is required, and an unchanged rerun is not a correction;
 - apply the same capture boundary to default-on arbitration research; deciders get one identical
-  packet and no live web, while `research: false` is explicitly repository-only;
+  packet and no live web, caller IDs are rejected across the complete rendered packet, and
+  initialized submodule snapshots record their checked-out commit, while `research: false` is
+  explicitly repository-only;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.

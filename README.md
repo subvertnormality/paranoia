@@ -282,7 +282,8 @@ Evidence that refutes old wording does **not** prove replacement wording. When n
 authoritative passage entails a replacement, the packet explicitly says to remove,
 weaken, or research the assertion instead of inventing a correction.
 If a reviewer nevertheless proposes unsupported replacement text, the server drops
-that optional text and retains the valid verdict and evidence packet; it does not
+that optional text and retains the valid verdict and evidence packet; the cold attester
+judges the exact replacement separately from the refuted proposition. It does not
 discard the rest of the claim batch.
 Likewise, evidence that does not entail the model's `supported`/`refuted` verdict is retained
 only as context and that individual claim is forced to blocking `unverified`. One bad packet
@@ -292,7 +293,9 @@ If the bounded correction retry still contains an unbindable anchor, that item i
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item
 instead of researching the whole inventory again.
-Likewise, a missing retained ID rejects the initial response and is named on retry. If the
+Likewise, a missing retained ID is detected before capture, rejects the initial discovery, and is
+named on the same search-capable correction retry. Only the corrected complete inventory is
+downloaded and bound. If the
 final retry still omits it, valid corrected packets are applied and only that retained claim
 is carried forward as blocking `unverified`; one omission does not invalidate the edit cone.
 
@@ -337,6 +340,11 @@ absence is never an automatic retirement. The old packet remains active as `unve
 until then. The cold structural reviewer receives the complete evidence for every
 supported claim and every current-round disposition, so model-supplied authority and
 entailment labels are independently checked before the combined gate can clear.
+One plan audit may contain up to 500 claims and 20 evidence rows per claim as schema-corruption
+guards, but its composed execution budget is deliberately narrower: at most 200 source captures
+and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
+blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
+false closure.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
 harmless extra model metadata; required fields, unambiguous aliases, and transition validity
 remain strict. Both governing coverage arrays remain required even when empty, and malformed
@@ -527,6 +535,8 @@ What it does, in order:
 1. **Pins one snapshot.** Each decider gets its own inert materialization of the same raw Git
    tree and bounded metadata history. Git filters, hooks, textconv, executable bits, symlinks,
    gitlinks, and lazy-fetch helpers are never executed as part of evidence presentation.
+   Initialized submodules contribute their currently checked-out commit; uninitialized
+   submodules retain the pinned superproject gitlink.
    Git refs and the reflog are digested before and after; if anything moved, the
    run returns `FAILED` rather than reporting agreement it cannot describe.
 2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
@@ -536,7 +546,8 @@ What it does, in order:
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
    Claude `WebFetch` is not enabled. Python deterministically unions the results, hard-demotes
-   known UGC hosts, and sends byte-identical packets to both deciders.
+   known UGC hosts, rejects caller IDs anywhere in the complete rendered packet, and sends
+   byte-identical packets to both deciders.
 4. **Counterbalances presentation.** One decider sees canonical order, the other
    reversed, under opaque per-decider labels. Neither is told the other exists.
 5. **Computes the verdict.** No model adjudicates the adjudication. A decisive external

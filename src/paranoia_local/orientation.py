@@ -104,20 +104,39 @@ def snapshot_tree(repo: Path, head_id: str) -> str:
         for raw_path in sorted(tracked | candidates):
             path_text = raw_path.decode("utf-8", errors="surrogateescape")
             path = repo / path_text
+            indexed_mode = tracked_modes.get(raw_path)
             try:
                 info = path.lstat()
             except FileNotFoundError:
+                if indexed_mode == "160000":
+                    # An uninitialized/deinitialized submodule has no checked-out
+                    # commit. Keep the gitlink already seeded from the pinned HEAD.
+                    continue
                 records.append(f"0 {zero}\t".encode("ascii") + raw_path + b"\0")
                 continue
             if stat.S_ISDIR(info.st_mode):
-                # A tracked submodule stays the inert gitlink seeded from head_id.
+                if indexed_mode != "160000":
+                    raise RuntimeError(
+                        f"unexpected directory in working-state inventory: {path_text!r}"
+                    )
+                if not (path / ".git").exists():
+                    # Empty directory left by an uninitialized submodule: there is no
+                    # working commit to overlay on the gitlink seeded from head_id.
+                    continue
+                oid = inert_git.text(
+                    path, ["rev-parse", "--verify", "HEAD^{commit}"],
+                ).strip()
+                if len(oid) != oid_length or any(char not in "0123456789abcdef" for char in oid):
+                    raise RuntimeError(
+                        f"submodule HEAD returned an invalid object id for {path_text!r}"
+                    )
+                records.append(f"160000 {oid}\t".encode("ascii") + raw_path + b"\0")
                 continue
             if stat.S_ISLNK(info.st_mode):
                 data = os.fsencode(os.readlink(path))
                 mode = "120000"
             elif stat.S_ISREG(info.st_mode):
                 data = path.read_bytes()
-                indexed_mode = tracked_modes.get(raw_path)
                 if not file_mode_reliable and indexed_mode in {"100644", "100755"}:
                     mode = indexed_mode
                 else:

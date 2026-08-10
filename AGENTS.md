@@ -71,6 +71,9 @@ state and reviewer-native capabilities meet the supported model.
   primary path.
   Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
   digests plus cold authority/entailment decisions before support may freeze.
+  Validate retained inventory before capture; attest replacement wording as its own exact
+  proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
+  become visible debt rather than an hours-long run.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -86,6 +89,9 @@ state and reviewer-native capabilities meet the supported model.
   `research: false` is the explicit repository-only mode. Both deciders receive the same
   deterministic captured packet and have live web disabled. Unknown, non-governing, or
   passage-mismatched packet IDs cannot substantiate convergence.
+  Reject caller IDs across the complete rendered packet before either decider runs. Working-tree
+  snapshots use the checked-out commit of each initialized submodule, not a stale superproject
+  gitlink.
 - Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
   schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
   not evidence. Active versionless predecessor state must become blocking migration debt and

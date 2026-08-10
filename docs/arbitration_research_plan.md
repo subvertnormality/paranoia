@@ -155,7 +155,9 @@ subprocess return code and expected OID/byte length is checked. Repository ignor
 which untracked paths belong in the snapshot, but repository attributes, hooks, clean/process
 filters, external diff, textconv, and checkout machinery are never evaluated. Preserve the current
 working-tree semantics, including tracked-but-ignored files, deletions, executable modes, symlinks,
-and inert gitlink records; do not narrow arbitration to committed-only input.
+and gitlinks. For each initialized tracked submodule, record its currently checked-out commit;
+an uninitialized submodule retains the pinned superproject gitlink. Do not narrow arbitration to
+committed-only input.
 
 Put every Git invocation in snapshotting, inert materialization, and metadata-only history behind
 one shared inert-plumbing launcher. It sets `GIT_CONFIG_NOSYSTEM=1`, an empty global configuration,
@@ -310,8 +312,10 @@ use provider search, browser, app/connector, computer-use, plugin, MCP, or shell
 no live external bytes outside the logged packet can enter a vote. Repository bytes and model
 pretraining remain the explicitly stated non-web inputs.
 
-The server rejects research output containing caller IDs, temporary order labels, or trailer-field
-injection. The prompt forbids selection, comparison, ranking, and recommendations, but the server
+The server rejects caller IDs across the complete rendered research packet—including final URLs,
+metadata, locations, and captured passages—before labels are generated or either decider runs.
+It also rejects temporary order labels or trailer-field injection. The prompt forbids selection,
+comparison, ranking, and recommendations, but the server
 does not use a brittle natural-language advocacy detector that would also reject a technology's
 name. Canonical/reversed research presentations make option-order exposure symmetric by
 construction; this plan does not claim that counterbalancing eliminates or measurably reduces

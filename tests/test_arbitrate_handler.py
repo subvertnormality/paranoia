@@ -256,6 +256,39 @@ def test_default_research_injects_one_shared_captured_packet_before_voting(
     assert all(packet_id in call["body"] for call in decider_calls)
 
 
+def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(
+    repo: Path, tmp_path: Path,
+):
+    candidate = es.CandidateSource(
+        "https://docs.example.com/numeric", "Numeric docs", "Example",
+        "primary", "Example defines the numeric API", "supports_claim",
+    )
+    claim = ar.DiscoveryClaim("behavior", "The API preserves decimals.", candidate)
+    leaked = "The API preserves opt-decimal values."
+    capture = es.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64, leaked,
+    )
+    bound = es.BoundSource(candidate, capture, "Numeric types", leaked)
+
+    def researcher(**kwargs):
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (claim,), (bound,), (capture,),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    args = {key: value for key, value in BASE.items() if key != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo)}, log_dir=tmp_path / "logs",
+        engines=ENGINES, run_agent=agent, run_research=researcher,
+        now=lambda: "20260727T120000",
+    )
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "reserved token 'opt-decimal' appears in 'research packet'" in report
+    assert not [call for call in agent.calls if call["cwd"] is not None]
+
+
 def test_every_trailer_field_is_always_present(repo: Path, tmp_path: Path):
     """Nothing is signalled by absence, so a consumer never has to infer."""
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
