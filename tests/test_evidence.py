@@ -72,6 +72,33 @@ def test_packet_builder_does_not_run_repository_transport_for_missing_blob(
     assert not marker.exists()
 
 
+@pytest.mark.parametrize("config_key,attributes", [
+    ("diff.external", None),
+    ("diff.evil.textconv", "*.evil diff=evil\n"),
+])
+def test_packet_builder_disables_repository_diff_helpers(
+    repo: Path, tmp_path: Path, config_key: str, attributes: str | None,
+) -> None:
+    (repo / "sample.evil").write_text("before\n")
+    if attributes is not None:
+        (repo / ".gitattributes").write_text(attributes)
+    commit_all(repo, "add diff fixture")
+    base = orientation.resolve_head(repo)
+    (repo / "sample.evil").write_text("after\n")
+    commit_all(repo, "change diff fixture")
+    head = orientation.resolve_head(repo)
+    marker = tmp_path / "diff-helper-ran"
+    helper = tmp_path / "diff-helper"
+    helper.write_text(f"#!/bin/sh\n: > '{marker}'\nexit 1\n")
+    helper.chmod(0o755)
+    git(["config", config_key, str(helper)], repo)
+
+    packet = orientation.build_packet(repo, base, head)
+
+    assert "sample.evil" in packet
+    assert not marker.exists()
+
+
 # --- ref movement -----------------------------------------------------------
 
 
@@ -204,20 +231,17 @@ def test_citation_reads_the_cited_lines(repo: Path):
     assert "def greet(name):" in body
 
 
-def test_alias_citation_carries_the_referent_contents_not_the_target_string(repo: Path):
-    """Round-8 FATAL: `git show <commit>:<symlink>` returns the target string."""
+def test_alias_citation_is_rejected_because_inert_tree_shows_a_marker(repo: Path):
     (repo / "alias.py").symlink_to("app.py")
     commit_all(repo, "alias")
     commit = snapshot(repo)
     links = evidence.symlink_map(repo, commit)
-    got = evidence.resolve_citation(
+    assert evidence.resolve_citation(
         repo, Citation("alias.py", 4), snapshot=commit, links=links, context=1
-    )
-    assert got is not None
-    region, body = got
-    assert region.path == "app.py"  # canonicalized
-    assert "def greet(name):" in body
-    assert "app.py" not in body.replace("  ", "")  # not the literal target string
+    ) is None
+    assert evidence.resolve_citation(
+        repo, Citation("app.py", 4), snapshot=commit, links=links, context=1
+    ) is not None
 
 
 def test_alias_and_target_collapse_to_one_region(repo: Path):
@@ -228,10 +252,10 @@ def test_alias_and_target_collapse_to_one_region(repo: Path):
     a, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4), snapshot=commit, links=links, context=3
     )
-    b, _ = evidence.resolve_citation(
+    b = evidence.resolve_citation(
         repo, Citation("alias.py", 4), snapshot=commit, links=links, context=3
     )
-    assert a.key == b.key
+    assert a is not None and b is None
 
 
 def test_two_aliases_for_one_referent_collapse(repo: Path):
@@ -240,9 +264,12 @@ def test_two_aliases_for_one_referent_collapse(repo: Path):
     commit_all(repo, "aliases")
     commit = snapshot(repo)
     links = evidence.symlink_map(repo, commit)
-    r1, _ = evidence.resolve_citation(repo, Citation("a1.py", 4), snapshot=commit, links=links, context=3)
-    r2, _ = evidence.resolve_citation(repo, Citation("a2.py", 4), snapshot=commit, links=links, context=3)
-    assert r1.key == r2.key
+    assert evidence.resolve_citation(
+        repo, Citation("a1.py", 4), snapshot=commit, links=links, context=3,
+    ) is None
+    assert evidence.resolve_citation(
+        repo, Citation("a2.py", 4), snapshot=commit, links=links, context=3,
+    ) is None
 
 
 def test_line_past_eof_and_missing_path_drop(repo: Path):
@@ -266,20 +293,14 @@ def test_citation_to_a_directory_drops(repo: Path):
     ) is None
 
 
-def test_commit_prefixed_citation_reads_that_revision(repo: Path):
-    """Revision-aware: a bare path:line would silently resolve against the snapshot
-    with bytes the decider never read."""
+def test_historical_commit_citation_is_rejected_as_unmaterialized(repo: Path):
     old = orientation.resolve_head(repo)
     (repo / "app.py").write_text("# rewritten\n")
     commit_all(repo, "rewrite")
     commit = snapshot(repo)
-    got = evidence.resolve_citation(
+    assert evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old), snapshot=commit, links={}, context=1
-    )
-    assert got is not None
-    region, body = got
-    assert region.commit == old
-    assert "def greet(name):" in body
+    ) is None
     # the rewritten snapshot is only one line long, so line 4 no longer exists there
     assert evidence.resolve_citation(
         repo, Citation("app.py", 4), snapshot=commit, links={}, context=1
@@ -396,9 +417,7 @@ def test_read_region_clamps_and_drops_out_of_range(repo: Path):
     assert evidence.read_region(repo, Region(commit, "missing.py", 1, 3, 1)) is None
 
 
-def test_historical_alias_citation_is_canonicalized_in_its_own_commit(repo: Path):
-    """A revision-prefixed citation resolves in ITS commit, so it needs that
-    commit's symlink map — the snapshot's would not describe it."""
+def test_historical_alias_citation_is_rejected_as_unmaterialized(repo: Path):
     (repo / "alias.py").symlink_to("app.py")
     commit_all(repo, "alias")
     old = orientation.resolve_head(repo)
@@ -407,14 +426,10 @@ def test_historical_alias_citation_is_canonicalized_in_its_own_commit(repo: Path
     commit_all(repo, "de-alias")
     commit = snapshot(repo)
 
-    got = evidence.resolve_citation(
+    assert evidence.resolve_citation(
         repo, Citation("alias.py", 4, commit=old),
         snapshot=commit, links=evidence.symlink_map(repo, commit), context=1,
-    )
-    assert got is not None
-    region, body = got
-    assert region.path == "app.py"  # canonicalized in the OLD commit
-    assert "def greet(name):" in body
+    ) is None
 
 
 def test_historical_alias_and_target_collapse_to_one_region(repo: Path):
@@ -423,13 +438,13 @@ def test_historical_alias_and_target_collapse_to_one_region(repo: Path):
     old = orientation.resolve_head(repo)
     commit = snapshot(repo)
     resolver = evidence.LinkResolver(repo, commit)
-    a, _ = evidence.resolve_citation(
+    a = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old), snapshot=commit, links=resolver, context=3
     )
-    b, _ = evidence.resolve_citation(
+    b = evidence.resolve_citation(
         repo, Citation("alias.py", 4, commit=old), snapshot=commit, links=resolver, context=3
     )
-    assert a.key == b.key
+    assert a is None and b is None
 
 
 def test_link_resolver_caches_per_commit(repo: Path):
@@ -439,23 +454,23 @@ def test_link_resolver_caches_per_commit(repo: Path):
     assert resolver.for_commit("deadbeef") == {}  # unreachable commit degrades to empty
 
 
-def test_equivalent_commit_spellings_are_one_region(repo: Path):
+def test_equivalent_historical_commit_spellings_are_all_rejected(repo: Path):
     """Round-2 blocker: keying on the supplied spelling made `abc1234@f:1` and
     `abc1234def@f:1` two regions, so each vendor 'gained' the other's spelling and
     round 2 carried identical bytes twice."""
     old = orientation.resolve_head(repo)
     commit = snapshot(repo)
     resolver = evidence.LinkResolver(repo, commit)
-    short, _ = evidence.resolve_citation(
+    short = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old[:8]), snapshot=commit, links=resolver, context=1
     )
-    longer, _ = evidence.resolve_citation(
+    longer = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old[:12]), snapshot=commit, links=resolver, context=1
     )
-    full, _ = evidence.resolve_citation(
+    full = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=old), snapshot=commit, links=resolver, context=1
     )
-    assert short.commit == longer.commit == full.commit == old
+    assert short is None and longer is None and full is None
 
 
 def test_bare_and_explicitly_prefixed_snapshot_citations_are_one_region(repo: Path):
@@ -478,7 +493,7 @@ def test_unresolvable_revision_drops(repo: Path):
     ) is None
 
 
-def test_unchanged_file_at_wrapper_and_parent_is_one_region(repo: Path):
+def test_parent_citation_is_rejected_even_when_snapshot_bytes_match(repo: Path):
     """Round-3 blocker, the normal case: every run wraps HEAD, so a bare citation
     resolves to the wrapper commit while `HEAD@…` resolves to its parent. Same bytes,
     so it must be one region — otherwise both vendors 'gain' evidence and round 2
@@ -490,18 +505,13 @@ def test_unchanged_file_at_wrapper_and_parent_is_one_region(repo: Path):
     bare, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
     )
-    parent, _ = evidence.resolve_citation(
+    parent = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
     )
-    from paranoia_local.arbitration import same_region
-
-    assert bare.commit != parent.commit  # provenance is preserved
-    assert same_region(bare, parent)  # but identity is the carried content
+    assert bare is not None and parent is None
 
 
-def test_a_changed_cited_window_at_two_commits_is_two_regions(repo: Path):
-    from paranoia_local.arbitration import same_region
-
+def test_changed_historical_window_is_still_unmaterialized(repo: Path):
     head = orientation.resolve_head(repo)
     (repo / "app.py").write_text("# rewritten entirely\n" * 6)
     commit = snapshot(repo)
@@ -509,17 +519,15 @@ def test_a_changed_cited_window_at_two_commits_is_two_regions(repo: Path):
     now, _ = evidence.resolve_citation(
         repo, Citation("app.py", 4), snapshot=commit, links=resolver, context=1
     )
-    before, _ = evidence.resolve_citation(
+    before = evidence.resolve_citation(
         repo, Citation("app.py", 4, commit=head), snapshot=commit, links=resolver, context=1
     )
-    assert not same_region(now, before)
+    assert now is not None and before is None
 
 
-def test_a_change_outside_the_cited_window_is_still_one_region(repo: Path):
+def test_unchanged_historical_window_is_still_unmaterialized(repo: Path):
     """Round-4 blocker: keying on git's blob id split a region whose transported
     lines were identical, because the blob covers the whole file."""
-    from paranoia_local.arbitration import same_region
-
     (repo / "long.py").write_text("".join(f"L{i}\n" for i in range(1, 41)))
     commit_all(repo, "long")
     head = orientation.resolve_head(repo)
@@ -532,11 +540,10 @@ def test_a_change_outside_the_cited_window_is_still_one_region(repo: Path):
     now, _ = evidence.resolve_citation(
         repo, Citation("long.py", 10), snapshot=commit, links=resolver, context=3
     )
-    before, _ = evidence.resolve_citation(
+    before = evidence.resolve_citation(
         repo, Citation("long.py", 10, commit=head), snapshot=commit, links=resolver, context=3
     )
-    assert now.commit != before.commit
-    assert same_region(now, before)
+    assert now is not None and before is None
 
 
 def test_directory_symlink_with_dotdot_cannot_substitute_evidence(repo: Path):

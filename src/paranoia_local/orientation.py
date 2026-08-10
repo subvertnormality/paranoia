@@ -24,6 +24,11 @@ from . import inert_git
 # `git diff` itself. The reviewer has repo access, so nothing is lost — this
 # only keeps the prompt from ballooning on large branches.
 MAX_EMBED_CHARS = 200_000
+_INERT_DIFF_FLAGS = ["--no-ext-diff", "--no-textconv"]
+
+
+def _diff(args: list[str]) -> list[str]:
+    return ["diff", *_INERT_DIFF_FLAGS, *args]
 
 
 def _run(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
@@ -220,7 +225,7 @@ def changed_files(repo: Path, from_ref: str, to_ref: str) -> list[ChangeEntry]:
     non-UTF-8 filename must not crash the review. A path mangled by replacement won't
     round-trip to `git show`, so `file_evidence` will mark it `[not embeddable]` rather
     than embed it, which is the correct graceful degradation."""
-    r = inert_git.invoke(repo, ["diff", "--name-status", "-M", "-z", from_ref, to_ref])
+    r = inert_git.invoke(repo, _diff(["--name-status", "-M", "-z", from_ref, to_ref]))
     if r.returncode != 0:
         raise RuntimeError(
             "git diff --name-status failed: " + r.stderr.decode("utf-8", errors="replace").strip()
@@ -252,7 +257,7 @@ def _parse_name_status(out: str) -> list[ChangeEntry]:
 
 
 def diffstat(repo: Path, base: str, head: str) -> str:
-    return _run(["git", "diff", "--stat", f"{base}...{head}"], repo).strip()
+    return _run(["git", *_diff(["--stat", f"{base}...{head}"])], repo).strip()
 
 
 def commit_subjects(repo: Path, base: str, head: str) -> str:
@@ -266,11 +271,11 @@ def commit_subjects(repo: Path, base: str, head: str) -> str:
 
 
 def full_diff(repo: Path, base: str, head: str) -> str:
-    return _run(["git", "diff", f"{base}...{head}"], repo)
+    return _run(["git", *_diff([f"{base}...{head}"])], repo)
 
 
 def touched_files(repo: Path, base: str, head: str) -> list[str]:
-    out = _run(["git", "diff", "--name-only", f"{base}...{head}"], repo)
+    out = _run(["git", *_diff(["--name-only", f"{base}...{head}"])], repo)
     return [line for line in out.splitlines() if line.strip()]
 
 
@@ -287,7 +292,7 @@ def working_tree_diff(repo: Path) -> str:
     read access and opens them itself) rather than staged with `git add -N`,
     which would mutate the author's index.
     """
-    tracked = _run(["git", "diff", "HEAD"], repo)
+    tracked = _run(["git", *_diff(["HEAD"])], repo)
     untracked = _untracked(repo)
     if untracked:
         listing = "\n".join(f"+ (untracked) {p}" for p in untracked)
@@ -296,7 +301,7 @@ def working_tree_diff(repo: Path) -> str:
 
 
 def working_tree_stat(repo: Path) -> str:
-    stat = _run(["git", "diff", "--stat", "HEAD"], repo).strip()
+    stat = _run(["git", *_diff(["--stat", "HEAD"])], repo).strip()
     untracked = _untracked(repo)
     if untracked:
         stat += f"\n(+ {len(untracked)} untracked file(s))"
@@ -420,7 +425,7 @@ def _safe_diff(repo: Path, base: str, head: str) -> str:
     only the first ~8000 bytes, so it can embed raw content (incl. NUL or non-UTF-8 bytes)
     for a file whose binary marker appears later. Read bytes and decode with replacement,
     and neutralize NUL, so the packet can never carry control bytes or crash on decode."""
-    r = inert_git.invoke(repo, ["diff", base, head])
+    r = inert_git.invoke(repo, _diff([base, head]))
     return r.stdout.decode("utf-8", errors="replace").replace("\x00", "�")
 
 
@@ -502,7 +507,7 @@ def build_packet(
         )
     if focus:
         head_parts.append(f"=== REVIEWER FOCUS ===\n{focus}")
-    stat_proc = inert_git.invoke(repo, ["diff", "--stat", base_id, head_id])
+    stat_proc = inert_git.invoke(repo, _diff(["--stat", base_id, head_id]))
     stat = stat_proc.stdout.decode("utf-8", errors="replace").strip()  # byte-safe: a non-UTF-8 path in --stat must not crash
     if stat:
         head_parts.append(f"=== DIFFSTAT ===\n{stat}")

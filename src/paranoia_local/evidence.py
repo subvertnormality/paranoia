@@ -341,9 +341,18 @@ def resolve_citation(
     # — and a bare citation versus an explicitly snapshot-prefixed one — are one
     # region rather than two.
     commit = resolver.oid(citation.commit or snapshot)
-    if commit is None:
+    # The isolated reviewer sees only the materialized snapshot. HISTORY.txt contains
+    # commit metadata, not historical blobs, so an older-revision citation cannot prove
+    # what the reviewer read. An explicit spelling of the snapshot itself is harmless.
+    if commit is None or commit != snapshot:
         return None
-    path = canonical_path(citation.path, resolver.for_commit(commit))
+    commit_links = resolver.for_commit(commit)
+    # Inert-tree symlink entries are visible as marker + target text, deliberately not
+    # as their referents. Accepting an alias citation against referent bytes would bind
+    # the vote to content and line numbers that were not present at the cited path.
+    if citation.path in commit_links:
+        return None
+    path = canonical_path(citation.path, commit_links)
     # The path must be a LITERAL entry in the tree. Since nothing normalizes it
     # (see `arbitration._normalize_path`), this is what guarantees one citation
     # names one real file: git accepts `./f.py` as a lookup, but `./f.py` and

@@ -613,7 +613,9 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
 
 - **It decides only from pinned evidence.** A converging vote must cite either a repository
   line that resolves or a governing server-captured `SOURCE:<packet-id>`. Provider summaries,
-  unknown packet IDs, and live decider browsing cannot substantiate convergence.
+  unknown packet IDs, and live decider browsing cannot substantiate convergence. Repository
+  citations resolve only against regular-file bytes exposed in the inert snapshot; historical
+  blobs and symlink-path referents are rejected because the reviewer did not receive those bytes.
 - **`ADVISORY` does not block.** Each decider reports whether it judges that a
   named human owner should be authorizing the decision. That is reported, never
   gated: `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing
