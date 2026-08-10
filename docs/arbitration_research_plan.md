@@ -68,15 +68,25 @@ backend, result ranking, or universal page-extraction behavior is assumed.
 ### Inert evidence premises
 
 Git `ls-tree -r` recursively lists a named tree object, `--full-tree` makes paths relative to the
-tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file <type> <object>`
-reports the named object only when it exists and has that type, and prints its contents; these are
-the raw enumeration/read semantics used by the inert materializer. `GIT_NO_LAZY_FETCH=1` prevents
-commands from lazily fetching missing objects. Git's `core.fsmonitor` may name a hook that Git runs
-to identify changed paths, so inert invocations must override it rather than merely ignoring
-global and system configuration. These assertions bind to the official
+tree root, and `-z` terminates unquoted path records with NUL. Git `cat-file -t <object>` reports
+the named object's actual type. After the server has required that type to be `blob`,
+`git cat-file blob <object>` prints its raw, uncompressed contents; the separate type check avoids
+the typed form's documented trivial dereferencing behavior. These are the raw enumeration/read
+semantics used by the inert materializer. `GIT_NO_LAZY_FETCH=1` prevents commands from lazily
+fetching missing objects. These assertions bind to the official
 [`git-ls-tree`](https://git-scm.com/docs/git-ls-tree),
 [`git-cat-file`](https://git-scm.com/docs/git-cat-file), [`git`](https://git-scm.com/docs/git), and
 [`git-config`](https://git-scm.com/docs/git-config) references.
+
+Git `update-index --index-info` removes a path when its input record has mode zero. Command-scope
+configuration supplied with `git -c` overrides worktree, local, global, and system values for that
+command, and `core.fsmonitor=false` disables the fsmonitor extension and hook. On `git log`,
+`--no-patch` suppresses diff output and `--format=...` formats the selected commit metadata. These
+are the only repository-configured
+execution controls and metadata-history semantics on which the inert launcher relies; they bind to
+the official [`git-update-index`](https://git-scm.com/docs/git-update-index),
+[`git-config`](https://git-scm.com/docs/git-config), and
+[`git-log`](https://git-scm.com/docs/git-log) references.
 
 Codex `workspace-write` permits reads outside its writable roots but confines writes to the
 current working directory and configured writable roots; `/tmp` and the directory named by
@@ -143,19 +153,21 @@ and inert gitlink records; do not narrow arbitration to committed-only input.
 Put every Git invocation in snapshotting, inert materialization, and metadata-only history behind
 one shared inert-plumbing launcher. It sets `GIT_CONFIG_NOSYSTEM=1`, an empty global configuration,
 `GIT_NO_LAZY_FETCH=1`, and `GIT_OPTIONAL_LOCKS=0`, and passes command-line overrides including
-`core.fsmonitor=false`, `core.hooksPath=/dev/null`, and disabled external diff/textconv. Local
-repository configuration remains readable only where Git needs object-store/promisor metadata,
-but neither an fsmonitor hook nor a configured promisor transport may execute: missing objects
-fail the checked plumbing call. No evidence path calls Git outside this launcher.
+`core.fsmonitor=false`. The empty system/global layers are deterministic hygiene under the trusted
+operator stakes, not part of the no-helper proof. Local repository configuration remains readable
+only where Git needs object-store/promisor metadata, but neither an fsmonitor hook nor a configured
+promisor transport may execute: missing objects fail the checked plumbing call. None of the chosen
+plumbing commands invokes ordinary Git hooks, diff, or textconv, so the plan does not add redundant
+settings for those unrelated surfaces. No evidence path calls Git outside this launcher.
 
 Do not create the later evidence tree with `git worktree`, checkout, archive filters, or any
 model-run Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
-`git ls-tree -rz --full-tree` enumerates entries and `git cat-file blob <oid>` reads raw blobs,
-under `GIT_CONFIG_NOSYSTEM=1`, an empty global config, and command-line config that disables hooks,
-external diff, textconv, and optional locks. Every invocation also sets `GIT_NO_LAZY_FETCH=1`, so
-Git does not lazily fetch a missing promised object through a repository promisor remote. The
-materializer itself fails closed on a nonzero plumbing result, an absent object, an unexpected
-object type, or a blob whose length or digest does not match its enumerated object. It writes ordinary files itself; executable bits are
+`git ls-tree -rz --full-tree` enumerates entries. For each enumerated blob, `git cat-file -t <oid>`
+must return exactly `blob` before `git cat-file blob <oid>` reads its raw contents. Every invocation
+uses the shared launcher, including `GIT_NO_LAZY_FETCH=1`, so Git does not lazily fetch a missing
+promised object through a repository promisor remote. The materializer fails closed on a nonzero
+plumbing result, an absent object, an unexpected object type, or a blob whose length or digest does
+not match its enumerated object. It writes ordinary files itself; executable bits are
 recorded in a manifest but not made executable, symlinks are rendered as inert target-text records,
 and gitlinks are rendered as submodule-OID records. No checkout/filter/process driver runs.
 
@@ -166,7 +178,7 @@ disposable empty launch directory with `sandbox_workspace_write.exclude_slash_tm
 commands. The inert repository tree is a sibling outside the writable root and is exposed by a
 read-only symlink. It can run `rg`, `sed`, and similar inspections
 unattended but cannot modify the evidence tree. When history is useful, the server
-renders a bounded metadata-only `git log --format=...` record under the same empty-config
+renders a bounded metadata-only `git log --no-patch --format=...` record under the same empty-config
 environment; it never renders patches through diff/textconv. Arbitration citation resolution still
 uses the original pinned blobs, while the inert manifest makes exceptional symlink/gitlink entries
 explicit. The same inert tree grounds verified plan structure. This replaces, rather than wraps,
