@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -32,6 +33,8 @@ from .worktree import worktree_at
 Clock = Callable[[], str]
 
 PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
+PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
+MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 
 
 def _default_clock() -> str:
@@ -644,9 +647,11 @@ def _verify_plan_claims(
 ) -> tuple[dict[str, Any], str]:
     """Run exhaustive round 1, then verify only the external-claim edit cone."""
     targeted = pc.has_prior_snapshot(prior_state)
+    server_capture_required = type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
     frozen = (
         pc.frozen_supported_ids(
             prior_state, plan_text, repo=repo, plan_repo_path=plan_repo_path,
+            require_capture_attestation=server_capture_required,
         )
         if targeted else frozenset()
     )
@@ -680,7 +685,7 @@ def _verify_plan_claims(
     )
     claim_engine: Any = engine
     captured_engine: _CapturedClaimEngine | None = None
-    if type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+    if server_capture_required:
         captured_engine = _CapturedClaimEngine(
             engine, plan_text=plan_text, repo=repo, plan_repo_path=plan_repo_path,
         )
@@ -793,7 +798,7 @@ class _CapturedClaimEngine:
         self.binding_engine: Engine | None = None
         self.last_session: str | None = None
         self.discovery: pc.Audit | None = None
-        self.captures: dict[tuple[str, str], external_sources.Capture] = {}
+        self.captures: dict[tuple[int, int], external_sources.Capture] = {}
         self.attestation_raw = ""
 
     def close(self) -> None:
@@ -815,6 +820,7 @@ class _CapturedClaimEngine:
         if first.error or not first.session_ref:
             return first
         raw_parts = [first.raw]
+        discovery_corrected = False
         try:
             discovery = pc.parse_audit(
                 first.text, self.plan_text, repo=self.repo,
@@ -827,6 +833,7 @@ class _CapturedClaimEngine:
                 self.launch, model, effort, True, **discovery_kwargs,
             )
             raw_parts.append(corrected.raw)
+            discovery_corrected = True
             if corrected.error or not corrected.session_ref:
                 return corrected
             try:
@@ -845,63 +852,70 @@ class _CapturedClaimEngine:
         else:
             session_ref = first.session_ref
 
-        captures, rendered = self._capture(discovery)
+        if discovery.assessments:
+            if discovery_corrected:
+                return Review(
+                    text="[paranoia-local error] corrected audit still used compact assessments",
+                    session_ref=session_ref,
+                    raw="\n--- phase ---\n".join(raw_parts), error=True,
+                )
+            corrected = discoverer.resume(
+                session_ref,
+                "Compact retained assessments cannot cross the server-capture boundary. "
+                "Return one complete corrected claim audit with every retained current claim "
+                "as a full claim/evidence packet and coverage.prior_assessments empty.",
+                self.launch, model, effort, True, **discovery_kwargs,
+            )
+            raw_parts.append(corrected.raw)
+            if corrected.error or not corrected.session_ref:
+                return corrected
+            try:
+                discovery = pc.parse_audit(
+                    corrected.text, self.plan_text, repo=self.repo,
+                    plan_repo_path=self.plan_repo_path,
+                )
+            except pc.AuditError as error:
+                return Review(
+                    text=f"[paranoia-local error] corrected full-packet audit invalid: {error}",
+                    session_ref=corrected.session_ref,
+                    raw="\n--- phase ---\n".join(raw_parts), error=True,
+                )
+            if discovery.assessments:
+                return Review(
+                    text="[paranoia-local error] corrected audit still used compact assessments",
+                    session_ref=corrected.session_ref,
+                    raw="\n--- phase ---\n".join(raw_parts), error=True,
+                )
+            session_ref = corrected.session_ref
+        captures = self._capture(discovery)
         self.discovery = discovery
         self.captures = captures
         self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)
         binding_kwargs = dict(kwargs)
         binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
-        binding_prompt = (
-            "Provider search found candidate URLs, but only the server captures below are "
-            "evidence. Return the COMPLETE claim audit again using the same anchors, atomic "
-            "propositions, URLs, publishers, kinds, and relations. Copy exact passages only "
-            "from a usable capture; otherwise mark that claim unverified. Do not add URLs or "
-            "claims. Return exactly one claim-audit marker and JSON object.\n\n"
-            + rendered
-        )
-        binding = self.binding_engine.resume(
-            session_ref, binding_prompt, self.launch, model, effort, False,
-            **binding_kwargs,
-        )
-        raw_parts.append(binding.raw)
-        if binding.error:
-            return binding
         try:
-            audit = self._parse_bound(binding.text, discovery, captures)
-        except pc.AuditError as error:
-            if not binding.session_ref:
-                return Review(binding.text, None, "\n".join(raw_parts), error=True)
-            correction = self.binding_engine.resume(
-                binding.session_ref,
-                f"Your captured-evidence audit was rejected: {error}. Return one complete "
-                f"corrected {pc.AUDIT_MARKER} object. You may use only these captures:\n\n"
-                + rendered,
-                self.launch, model, effort, False, **binding_kwargs,
+            audit, binding_reviews = self._bind_indexed(
+                session_ref, discovery, captures, model, effort, binding_kwargs,
             )
-            raw_parts.append(correction.raw)
-            if correction.error:
-                return correction
-            try:
-                audit = self._parse_bound(correction.text, discovery, captures)
-            except pc.AuditError as second:
-                return Review(
-                    text=f"[paranoia-local error] binding audit invalid: {second}",
-                    session_ref=correction.session_ref,
-                    raw="\n--- phase ---\n".join(raw_parts), error=True,
-                )
-            binding = correction
+        except pc.AuditError as error:
+            return Review(
+                text=f"[paranoia-local error] binding audit invalid: {error}",
+                session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts), error=True,
+            )
+        raw_parts.extend(item.raw for item in binding_reviews)
 
         attested = self._attest(audit, model, effort)
         if isinstance(attested, Review):
             return attested
         raw_parts.append(self.attestation_raw)
-        self.last_session = binding.session_ref
+        last_binding = binding_reviews[-1] if binding_reviews else first
+        self.last_session = last_binding.session_ref
         return Review(
             text=_render_audit(attested),
-            session_ref=binding.session_ref,
+            session_ref=last_binding.session_ref,
             raw="\n--- phase ---\n".join(raw_parts),
-            usage=binding.usage,
-            duration_ms=binding.duration_ms,
+            usage=last_binding.usage,
+            duration_ms=last_binding.duration_ms,
         )
 
     def resume(
@@ -935,59 +949,207 @@ class _CapturedClaimEngine:
 
     def _capture(
         self, audit: pc.Audit,
-    ) -> tuple[dict[tuple[str, str], external_sources.Capture], str]:
+    ) -> dict[tuple[int, int], external_sources.Capture]:
         candidates: list[external_sources.CandidateSource] = []
-        keys: list[tuple[str, str]] = []
-        for claim in audit.claims:
-            for item in claim["evidence"]:
+        keys: list[tuple[int, int]] = []
+        for claim_index, claim in enumerate(audit.claims):
+            for evidence_index, item in enumerate(claim["evidence"]):
                 candidate = external_sources.CandidateSource(
                     item["url"], item["title"], item["publisher"],
                     item["source_kind"], item["authority_basis"], item["relation"],
                 )
                 candidates.append(candidate)
-                keys.append((claim["proposition"], item["url"]))
+                keys.append((claim_index, evidence_index))
         captured = external_sources.capture_all(candidates)
-        mapping = dict(zip(keys, captured, strict=True))
-        rows = []
-        for (proposition, url), item in mapping.items():
-            rows.append({
-                "proposition": proposition,
-                "url": url,
-                "final_url": item.final_url,
-                "status": item.status,
-                "content_type": item.content_type,
-                "content_sha256": item.content_sha256,
-                "text_sha256": item.text_sha256,
-                "error": item.error,
-                "line_numbered_text": external_sources.numbered_text(item.text or ""),
-            })
-        rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
-        if len(rendered) > 400_000:
-            raise pc.AuditError("captured claim binding input exceeds 400000 characters")
-        return mapping, rendered
+        return dict(zip(keys, captured, strict=True))
+
+    def _binding_batches(
+        self, discovery: pc.Audit,
+        captures: dict[tuple[int, int], external_sources.Capture],
+    ) -> list[list[dict[str, Any]]]:
+        batches: list[list[dict[str, Any]]] = []
+        current: list[dict[str, Any]] = []
+        current_chars = 2
+        for (claim_index, evidence_index), capture in captures.items():
+            claim = discovery.claims[claim_index]
+            item = claim["evidence"][evidence_index]
+            row = {
+                "claim_index": claim_index,
+                "evidence_index": evidence_index,
+                "proposition": claim["proposition"],
+                "candidate": {
+                    key: item[key] for key in (
+                        "url", "title", "publisher", "source_kind",
+                        "authority_basis", "relation",
+                    )
+                },
+                "capture": {
+                    "usable": capture.usable,
+                    "final_url": capture.final_url,
+                    "status": capture.status,
+                    "content_type": capture.content_type,
+                    "content_sha256": capture.content_sha256,
+                    "text_sha256": capture.text_sha256,
+                    "error": capture.error,
+                    "line_numbered_text": external_sources.numbered_text(capture.text or ""),
+                },
+            }
+            row_chars = len(json.dumps(row, ensure_ascii=False, separators=(",", ":"))) + 1
+            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
+                raise pc.AuditError(
+                    "one captured source exceeds the plan binding batch budget"
+                )
+            if current and current_chars + row_chars > MAX_PLAN_BINDING_BATCH_CHARS:
+                batches.append(current)
+                current = []
+                current_chars = 2
+            current.append(row)
+            current_chars += row_chars
+        if current:
+            batches.append(current)
+        return batches
+
+    def _bind_indexed(
+        self, session_ref: str, discovery: pc.Audit,
+        captures: dict[tuple[int, int], external_sources.Capture],
+        model: str, effort: str, binding_kwargs: dict[str, Any],
+    ) -> tuple[pc.Audit, list[Review]]:
+        assert self.binding_engine is not None
+        decisions: dict[tuple[int, int], tuple[str, str] | None] = {}
+        reviews: list[Review] = []
+        current_session = session_ref
+        for batch in self._binding_batches(discovery, captures):
+            rendered = json.dumps(batch, ensure_ascii=False, separators=(",", ":"))
+            instruction = (
+                "Bind every indexed candidate below using only its server capture. Return "
+                "exactly one row per (claim_index,evidence_index); preserve both indices. "
+                "Copy a precise location and exact passage only when usable, otherwise use "
+                "nulls. Do not return claims or source metadata.\n\n"
+                f"{PLAN_BINDING_MARKER}\n"
+                '{"bindings":[{"claim_index":0,"evidence_index":0,"usable":true,'
+                '"location":"section/table/page","passage":"exact captured passage"}]}\n\n'
+                + rendered
+            )
+            review = self.binding_engine.resume(
+                current_session, instruction, self.launch, model, effort, False,
+                **binding_kwargs,
+            )
+            reviews.append(review)
+            if review.error or not review.session_ref:
+                raise pc.AuditError("captured-text binding call failed", review.raw)
+            try:
+                parsed = self._parse_indexed_binding(review.text, batch, captures)
+            except pc.AuditError as first:
+                correction = self.binding_engine.resume(
+                    review.session_ref,
+                    f"Your indexed binding was rejected: {first}. Return one corrected "
+                    f"{PLAN_BINDING_MARKER} object for exactly this batch.\n\n{rendered}",
+                    self.launch, model, effort, False, **binding_kwargs,
+                )
+                reviews.append(correction)
+                if correction.error or not correction.session_ref:
+                    raise pc.AuditError("captured-text binding correction failed", correction.raw)
+                parsed = self._parse_indexed_binding(correction.text, batch, captures)
+                review = correction
+            decisions.update(parsed)
+            current_session = review.session_ref
+
+        claims = [deepcopy(claim) for claim in discovery.claims]
+        for claim_index, claim in enumerate(claims):
+            claim["capture_attestations"] = []
+            for evidence_index, item in enumerate(claim["evidence"]):
+                capture = captures[(claim_index, evidence_index)]
+                item["url"] = capture.final_url or item["url"]
+                binding = decisions.get((claim_index, evidence_index))
+                if binding is None:
+                    item["relation"] = "context"
+                    item["location"] = "Server capture unavailable"
+                    item["quote"] = "No server-captured passage was available."
+                else:
+                    item["location"], item["quote"] = binding
+        combined = pc.Audit(
+            tuple(claims), discovery.coverage, discovery.dispositions,
+            discovery.assessments,
+        )
+        audit = pc.parse_audit(
+            _render_audit(combined), self.plan_text, repo=self.repo,
+            plan_repo_path=self.plan_repo_path,
+        )
+        return audit, reviews
+
+    def _parse_indexed_binding(
+        self, text: str, batch: list[dict[str, Any]],
+        captures: dict[tuple[int, int], external_sources.Capture],
+    ) -> dict[tuple[int, int], tuple[str, str] | None]:
+        if text.count(PLAN_BINDING_MARKER) != 1:
+            raise pc.AuditError(f"expected exactly one {PLAN_BINDING_MARKER} marker", text)
+        tail = text.split(PLAN_BINDING_MARKER, 1)[1].strip()
+        try:
+            value, end = json.JSONDecoder().raw_decode(tail)
+        except json.JSONDecodeError as exc:
+            raise pc.AuditError(f"invalid indexed binding JSON: {exc}", text) from exc
+        if tail[end:].strip() or not isinstance(value, dict) or set(value) != {"bindings"}:
+            raise pc.AuditError("invalid indexed binding envelope", text)
+        raw = value["bindings"]
+        expected = {(row["claim_index"], row["evidence_index"]) for row in batch}
+        if not isinstance(raw, list) or len(raw) != len(expected):
+            raise pc.AuditError("indexed binding inventory differs from its batch", text)
+        result: dict[tuple[int, int], tuple[str, str] | None] = {}
+        for row in raw:
+            if not isinstance(row, dict) or set(row) != {
+                "claim_index", "evidence_index", "usable", "location", "passage",
+            }:
+                raise pc.AuditError("indexed binding row fields are invalid", text)
+            key = (row["claim_index"], row["evidence_index"])
+            if key not in expected or key in result or type(row["usable"]) is not bool:
+                raise pc.AuditError("indexed binding row identity is invalid or duplicated", text)
+            if not row["usable"]:
+                if row["location"] is not None or row["passage"] is not None:
+                    raise pc.AuditError("unusable indexed binding must contain nulls", text)
+                result[key] = None
+                continue
+            capture = captures[key]
+            if not capture.usable or not capture.text:
+                raise pc.AuditError("indexed binding used an unavailable capture", text)
+            try:
+                location = pc._one_line(row["location"], "binding.location")
+                passage = pc._one_line(row["passage"], "binding.passage")
+            except ValueError as exc:
+                raise pc.AuditError(str(exc), text) from exc
+            if not external_sources.passage_matches(passage, capture.text):
+                raise pc.AuditError("indexed binding passage is not in captured text", text)
+            result[key] = (location, passage)
+        return result
 
     def _parse_bound(
         self, text: str, discovery: pc.Audit,
-        captures: dict[tuple[str, str], external_sources.Capture],
+        captures: dict[tuple[int, int], external_sources.Capture],
     ) -> pc.Audit:
         audit = pc.parse_audit(
             text, self.plan_text, repo=self.repo, plan_repo_path=self.plan_repo_path,
         )
-        allowed = {
-            (claim["anchor"], claim["proposition"], item["url"])
-            for claim in discovery.claims for item in claim["evidence"]
-        }
-        if {
-            (claim["anchor"], claim["proposition"]) for claim in audit.claims
-        } != {
-            (claim["anchor"], claim["proposition"]) for claim in discovery.claims
-        }:
+        if len(audit.claims) != len(discovery.claims) or audit.assessments:
             raise pc.AuditError("binding changed or omitted the discovered claim inventory", text)
-        for claim in audit.claims:
-            for item in claim["evidence"]:
-                if (claim["anchor"], claim["proposition"], item["url"]) not in allowed:
-                    raise pc.AuditError("binding added or changed a claim/source", text)
-                capture = captures.get((claim["proposition"], item["url"]))
+        immutable_claim = ("kind", "scope", "anchor", "proposition", "prior_claim_id")
+        immutable_source = (
+            "title", "publisher", "source_kind", "authority_basis", "relation",
+        )
+        for claim_index, (claim, original) in enumerate(
+            zip(audit.claims, discovery.claims, strict=True)
+        ):
+            if any(claim.get(key) != original.get(key) for key in immutable_claim):
+                raise pc.AuditError("binding changed claim identity or metadata", text)
+            if len(claim["evidence"]) != len(original["evidence"]):
+                raise pc.AuditError("binding omitted a discovered source", text)
+            for evidence_index, (item, discovered) in enumerate(
+                zip(claim["evidence"], original["evidence"], strict=True)
+            ):
+                capture = captures.get((claim_index, evidence_index))
+                allowed_url = capture.final_url if capture and capture.final_url else discovered["url"]
+                if item["url"] != allowed_url or any(
+                    item[key] != discovered[key] for key in immutable_source
+                ):
+                    raise pc.AuditError("binding changed immutable source metadata", text)
                 if not capture or not capture.usable or not capture.text:
                     raise pc.AuditError("binding cited an unavailable capture", text)
                 if not external_sources.passage_matches(item["quote"], capture.text):
@@ -1002,7 +1164,7 @@ class _CapturedClaimEngine:
                     continue
                 if item["relation"] not in {"supports_claim", "refutes_claim", "supports_replacement"}:
                     continue
-                capture = self.captures.get((claim["proposition"], item["url"]))
+                capture = self.captures.get((claim_index, evidence_index))
                 items.append({
                     "claim_index": claim_index,
                     "evidence_index": evidence_index,
@@ -1046,7 +1208,7 @@ class _CapturedClaimEngine:
             if not isinstance(rows, list) or len(rows) != len(items):
                 raise ValueError("attestation inventory differs from the requested inventory")
             expected = {(row["claim_index"], row["evidence_index"]) for row in items}
-            decisions: dict[tuple[int, int], bool] = {}
+            decisions: dict[tuple[int, int], dict[str, Any]] = {}
             for row in rows:
                 if not isinstance(row, dict) or set(row) != {
                     "claim_index", "evidence_index", "publisher_authority",
@@ -1066,9 +1228,7 @@ class _CapturedClaimEngine:
                     "entailment_reason"
                 ].strip():
                     raise ValueError("attestation reasons must be non-empty strings")
-                decisions[key] = (
-                    row["publisher_authority"] and row["passage_entailment"]
-                )
+                decisions[key] = row
         except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
             return Review(
                 text=f"[paranoia-local error] evidence attestation invalid: {exc}",
@@ -1076,9 +1236,28 @@ class _CapturedClaimEngine:
             )
         claims = [dict(claim) for claim in audit.claims]
         for index, claim in enumerate(claims):
+            claim["capture_attestations"] = []
+            for evidence_index, item in enumerate(claim["evidence"]):
+                row = decisions.get((index, evidence_index))
+                capture = self.captures.get((index, evidence_index))
+                if row is None or capture is None or not capture.text_sha256:
+                    continue
+                claim["capture_attestations"].append({
+                    "evidence_index": evidence_index,
+                    "final_url": capture.final_url or item["url"],
+                    "text_sha256": capture.text_sha256,
+                    "relation": item["relation"],
+                    "publisher_authority": row["publisher_authority"],
+                    "authority_reason": row["authority_reason"],
+                    "passage_entailment": row["passage_entailment"],
+                    "entailment_reason": row["entailment_reason"],
+                })
             relation = "supports_claim" if claim["verdict"] == "supported" else "refutes_claim"
             qualifying = any(
-                item["relation"] == relation and decisions.get((index, evidence_index), False)
+                item["relation"] == relation
+                and (decision := decisions.get((index, evidence_index))) is not None
+                and decision["publisher_authority"] is True
+                and decision["passage_entailment"] is True
                 for evidence_index, item in enumerate(claim["evidence"])
             )
             if claim["verdict"] in {"supported", "refuted"} and not qualifying:

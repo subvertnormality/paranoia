@@ -236,6 +236,10 @@ passages. A separate cold, tool-free attester must accept both publisher authori
 entailment before a packet can close a claim. Claude `WebFetch` is never enabled or trusted in
 this path. There is no `PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search
 adapter.
+Redirect destinations govern URL eligibility, UGC/self-source classification, packet identity,
+and the persisted source URL; a benign discovery URL cannot launder an ineligible destination.
+Persisted claim provenance includes the captured-text digest and cold authority/entailment
+decisions, so legacy unattested support is researched once before freezing.
 
 The register is mechanically limited to load-bearing external propositions in three kinds:
 
@@ -307,8 +311,9 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
    Freeze identity includes the assertion-bearing Markdown block, structured heading levels,
    and list-parent chain, so quoting, negating, moving into code, changing list ownership, or
    relocating old words cannot preserve stale support;
-   Unverified or non-freezable claims require complete replacement evidence packets on the next
-   targeted round; they cannot churn through compact verdict-only assessments. Settled claims
+   Unverified, refuted, or otherwise non-freezable claims require complete current evidence
+   packets on the next targeted round; compact verdict-only assessments cannot cross the
+   server-capture boundary. Settled claims
    cause no model call or web search. Edited claims inherit no verdict;
 5. repeat until the structural review says `CONVERGED` and the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
@@ -585,9 +590,9 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
 
 **Behaviour worth knowing before you rely on it:**
 
-- **It only decides what the repository can settle.** A converging vote must cite a
-  line that resolves. A decision that does not turn on repo-verifiable grounds
-  will never return `CONVERGED`.
+- **It decides only from pinned evidence.** A converging vote must cite either a repository
+  line that resolves or a governing server-captured `SOURCE:<packet-id>`. Provider summaries,
+  unknown packet IDs, and live decider browsing cannot substantiate convergence.
 - **`ADVISORY` does not block.** Each decider reports whether it judges that a
   named human owner should be authorizing the decision. That is reported, never
   gated: `CONVERGED` with `ADVISORY: human-owner` is still `CONVERGED`. Enforcing
@@ -704,7 +709,7 @@ or missing entailment blocks; it never becomes an empty successful register.
 
 The reply ends with a machine-readable trailer whose fields are always present:
 `ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`,
-`ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`.
+`ORDER-SEED`, `REFS-MOVED`, `AUDIT`, `ROUNDS`, `RESEARCH`, and `RESEARCH-DIGEST`.
 
 ---
 

@@ -320,7 +320,7 @@ TOOLS: list[Tool] = [
             "properties": {
                 "repo_path": {
                     "type": "string",
-                    "description": "Absolute path to the git repo. Required: every decisive citation must be repo-verifiable.",
+                    "description": "Absolute path to the git repo whose context is pinned. Decisive evidence may be a repository citation or a captured SOURCE packet.",
                 },
                 "decision": {
                     "type": "string",

@@ -41,9 +41,9 @@
     "claims": [
       {
         "kind": "fact",
-        "proposition": "Python's documentation states that most decimal fractions cannot be represented exactly as binary fractions.",
-        "url": "https://docs.python.org/3/tutorial/floatingpoint.html#representation-error",
-        "passage": "Representation error refers to the fact that some (most, actually) decimal fractions cannot be represented exactly as binary (base 2) fractions."
+        "proposition": "Most decimal fractions cannot be represented exactly as binary fractions.",
+        "url": "https://docs.python.org/3.14/tutorial/floatingpoint.html",
+        "passage": "Unfortunately, most decimal fractions cannot be represented exactly as binary fractions."
       },
       {
         "kind": "behavior",
@@ -54,7 +54,8 @@
     ],
     "notes": [
       "A 120-second discovery cap failed after Codex had emitted a candidate audit but before process completion.",
-      "Raising bounded plan discovery and binding phases to 300 seconds produced clean closure twice on fresh state."
+      "Raising bounded plan discovery and binding phases to 300 seconds produced clean closure twice on fresh state.",
+      "The post-review rerun closed both claims after indexed binding and persisted the final URL, captured-text SHA-256, and positive cold authority/entailment attestations for each packet."
     ]
   },
   "repository_only_arbitration": {

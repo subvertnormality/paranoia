@@ -73,6 +73,15 @@ class TestSnapshotTree:
         o.snapshot_tree(repo, o.resolve_head(repo))
         assert _read_git(["status", "--porcelain"], repo) == before
 
+    def test_core_filemode_false_preserves_the_tracked_mode(self, repo: Path) -> None:
+        git(["config", "core.fileMode", "false"], repo)
+        tracked = repo / "app.py"
+        tracked.chmod(0o755)
+        tracked.write_text("changed = True\n")
+        tree = o.snapshot_tree(repo, o.resolve_head(repo))
+        mode = _read_git(["ls-tree", tree, "app.py"], repo).split()[0]
+        assert mode == "100644"
+
 
 class TestWrapCommit:
     def test_wraps_on_head_with_message(self, repo: Path) -> None:

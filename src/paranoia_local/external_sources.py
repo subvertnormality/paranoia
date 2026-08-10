@@ -75,7 +75,10 @@ class BoundSource:
 
     @property
     def governing(self) -> bool:
-        return structurally_governing(self.candidate) and self.capture.usable
+        effective = replace(
+            self.candidate, url=self.capture.final_url or self.candidate.url,
+        )
+        return structurally_governing(effective) and self.capture.usable
 
 
 def is_ugc_host(host: str) -> bool:

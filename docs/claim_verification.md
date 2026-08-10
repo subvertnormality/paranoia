@@ -77,9 +77,13 @@ The active ceiling is 500 external claims and 20 evidence records per claim. The
 pathology/corruption guards, not pagination limits. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Discovery and captured-text binding each have a 300-second cap and at most one correction;
-cold attestation has a 300-second cap. These limits allow a large real plan to complete useful
-research while keeping the complete claim phase inside its existing 1,800-second call bound.
+Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
+discovery and each binding batch allow at most one correction. These limits let a large real
+plan complete useful research without making any individual model call unbounded.
+Captured sources are bound in deterministic indexed batches of at most 400,000 characters in
+the same discovery session. The limit applies per batch, not to the whole claim inventory;
+one oversized source or a failed batch becomes visible blocking debt rather than aborting the
+plan handler.
 
 ## Evidence and authority
 
@@ -90,6 +94,11 @@ while preserving actor, event, date, modality, scope, and chronology. Evidence o
 condition does not prove that a named external report occurred. A provider's source label is a
 proposal, not an authority verdict; known UGC is mechanically demoted and the cold attester makes
 the final claim-specific authority and entailment judgements.
+
+The final redirect URL, rather than the discovery URL, governs UGC classification,
+self-citation rejection, source eligibility, packet identity, and the URL persisted in the
+claim register. A redirect therefore cannot promote a forum or the plan under review into
+authoritative evidence.
 
 Only canonical `https://` or `http://` locations with a host can govern a verdict. Repository,
 file, and custom-scheme locations may be retained as context but can never count as primary or
@@ -126,10 +135,12 @@ claims, and removal candidates. An unchanged, fully supported register causes no
 call or web search. This optimization applies only to claim verification: the full cold
 structural review still runs each round.
 
-An edited proposition inherits no verdict. An unresolved or otherwise non-freezable claim must
-return as a complete current evidence packet; a compact assessment is rejected even if it says
-`supported`. Compact retained-packet judgements are limited to exact still-present refuted
-claims; they cannot repair missing, changed, ambiguous, unverified, or stale support.
+An edited proposition inherits no verdict. Every unresolved or otherwise non-freezable claim,
+including an exact retained refutation, must return as a complete current server-captured and
+cold-attested evidence packet; compact assessments cannot cross the capture boundary.
+The register persists the final URL, captured-text SHA-256, relation, and both cold-attestation
+decisions. Supported legacy packets without this provenance re-enter research once instead of
+being silently frozen after an upgrade.
 A prior claim cannot disappear through model omission or ID reuse. Its old anchor must leave the
 plan and receive an explicit `removed` disposition. If the bounded correction retry still omits
 a required ID, valid packets are applied and only that claim remains `unverified`.

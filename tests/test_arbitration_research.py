@@ -1,9 +1,11 @@
 import json
+import re
 
 import pytest
 
 from paranoia_local import arbitration_research as ar
 from paranoia_local import external_sources as es
+from paranoia_local import prompts
 
 
 def discovery(proposition="The API retries twice.", url="https://docs.example.com/api"):
@@ -63,3 +65,10 @@ def test_packet_union_is_deterministic_and_governing():
     assert len(packets) == 1
     assert packets[0].governing
     assert ar.digest(packets) == ar.digest(tuple(reversed(packets)))
+
+
+def test_discovery_prompt_contains_no_pipe_delimited_pseudo_enum():
+    assert not re.search(
+        r'"(?:kind|source_kind|relation)":"[^"]*\|[^"]*"',
+        prompts.ARBITRATION_DISCOVERY_INSTRUCTIONS,
+    )

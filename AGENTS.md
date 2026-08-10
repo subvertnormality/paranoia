@@ -69,6 +69,8 @@ state and reviewer-native capabilities meet the supported model.
   attestation. Claude `WebFetch` must not be enabled in plan verification or arbitration
   research. No placeholder endpoint, optional plugin, or caller adapter may stand in for this
   primary path.
+  Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
+  digests plus cold authority/entailment decisions before support may freeze.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -97,9 +99,9 @@ state and reviewer-native capabilities meet the supported model.
   and requires no model call or web search. Bind “unchanged” to the same assertion-bearing
   Markdown block, structured heading levels, and list ancestry, not substring presence;
   quotation, code, negation, parent changes, or relocation must re-enter verification. Edited,
-  new, refuted, and unverified claims
-  receive targeted verification. Unverified or otherwise non-freezable claims require a full
-  replacement evidence packet rather than another compact verdict-only assessment; edited
+  new, refuted, and unverified claims receive targeted verification. Every non-freezable claim
+  requires a full current server-captured and cold-attested evidence packet rather than a compact
+  verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
   consume active context. This optimization applies only to external verification: the
   structural FATAL/MAJOR review remains broad and cold on every convergence round and must not

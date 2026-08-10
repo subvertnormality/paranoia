@@ -13,6 +13,16 @@ def test_known_ugc_is_mechanically_demoted():
     assert not es.structurally_governing(got)
 
 
+def test_redirect_to_ugc_cannot_make_a_bound_source_governing():
+    original = candidate("https://official.example/redirect", "primary")
+    capture = es.Capture(
+        original, "https://www.reddit.com/r/example", 200, "text/html",
+        "a" * 64, "b" * 64, "A matching passage.",
+    )
+    bound = es.BoundSource(original, capture, "post", "A matching passage.")
+    assert not bound.governing
+
+
 def test_exact_passage_matching_is_unicode_and_whitespace_conservative():
     assert es.passage_matches("Café supports  this", "Heading\nCafe\u0301 supports this.\n")
     assert not es.passage_matches("café refutes this", "Cafe\u0301 supports this.")

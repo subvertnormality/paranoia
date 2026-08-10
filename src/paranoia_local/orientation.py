@@ -77,10 +77,21 @@ def snapshot_tree(repo: Path, head_id: str) -> str:
     env = {"GIT_INDEX_FILE": str(idx_dir / "index")}
     try:
         inert_git.run(repo, ["read-tree", head_id], extra_env=env)
-        tracked = set(
-            part for part in inert_git.run(repo, ["ls-files", "-z", "--cached"], extra_env=env).split(b"\0")
-            if part
-        )
+        tracked_modes: dict[bytes, str] = {}
+        for record in inert_git.run(
+            repo, ["ls-files", "-s", "-z", "--cached"], extra_env=env,
+        ).split(b"\0"):
+            if not record:
+                continue
+            metadata, separator, raw_path = record.partition(b"\t")
+            fields = metadata.split()
+            if not separator or len(fields) != 3:
+                raise RuntimeError("malformed git ls-files --stage record")
+            tracked_modes[raw_path] = fields[0].decode("ascii")
+        tracked = set(tracked_modes)
+        file_mode_reliable = inert_git.text(
+            repo, ["config", "--bool", "core.fileMode"],
+        ).strip().lower() != "false"
         candidates = set(
             part for part in inert_git.run(
                 repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
@@ -106,7 +117,11 @@ def snapshot_tree(repo: Path, head_id: str) -> str:
                 mode = "120000"
             elif stat.S_ISREG(info.st_mode):
                 data = path.read_bytes()
-                mode = "100755" if info.st_mode & stat.S_IXUSR else "100644"
+                indexed_mode = tracked_modes.get(raw_path)
+                if not file_mode_reliable and indexed_mode in {"100644", "100755"}:
+                    mode = indexed_mode
+                else:
+                    mode = "100755" if info.st_mode & stat.S_IXUSR else "100644"
             else:
                 raise RuntimeError(f"unsupported filesystem entry in snapshot: {path_text!r}")
             oid = inert_git.text(

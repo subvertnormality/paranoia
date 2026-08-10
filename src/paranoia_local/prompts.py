@@ -261,7 +261,11 @@ Use only your native WebSearch tool to discover candidate authoritative URLs. Do
 Return only this marker and JSON, with at most 12 unique propositions and exactly one candidate per proposition:
 
 === RESEARCH DISCOVERY JSON ===
-{"claims":[{"kind":"fact|design_principle|behavior","proposition":"one atomic proposition","candidate":{"url":"https://...","title":"...","publisher":"...","source_kind":"primary|authoritative|secondary|ugc","authority_basis":"why this publisher governs this proposition","relation":"supports_claim|refutes_claim|context"}}]}"""
+{"claims":[{"kind":"behavior","proposition":"one atomic externally promised behavior","candidate":{"url":"https://official.example/reference","title":"Official reference","publisher":"Issuing authority","source_kind":"primary","authority_basis":"why this publisher governs this proposition","relation":"supports_claim"}}]}
+
+Allowed kind literals: "fact", "design_principle", "behavior". Allowed source_kind literals:
+"primary", "authoritative", "secondary", "ugc". Allowed relation literals:
+"supports_claim", "refutes_claim", "context"."""
 
 
 ARBITRATION_BINDING_INSTRUCTIONS = """You are binding previously discovered candidates to server-captured text.
