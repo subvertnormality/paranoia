@@ -45,6 +45,33 @@ def test_missing_promised_blob_does_not_run_repository_transport(
     assert not marker.exists()
 
 
+def test_packet_builder_does_not_run_repository_transport_for_missing_blob(
+    repo: Path, tmp_path: Path,
+) -> None:
+    base = orientation.resolve_head(repo)
+    (repo / "app.py").write_text("print('changed')\n")
+    commit_all(repo, "change app")
+    head = orientation.resolve_head(repo)
+    blob = git(["rev-parse", f"{head}:app.py"], repo).strip()
+    object_path = repo / ".git" / "objects" / blob[:2] / blob[2:]
+    assert object_path.exists()
+    object_path.unlink()
+    marker = tmp_path / "promisor-ran"
+    helper = tmp_path / "promisor-helper"
+    helper.write_text(f"#!/bin/sh\n: > '{marker}'\nexit 1\n")
+    helper.chmod(0o755)
+    git(["config", "extensions.partialClone", "origin"], repo)
+    git(["config", "remote.origin.promisor", "true"], repo)
+    git(["config", "remote.origin.partialclonefilter", "blob:none"], repo)
+    git(["config", "protocol.ext.allow", "always"], repo)
+    git(["config", "remote.origin.url", f"ext::{helper}"], repo)
+
+    packet = orientation.build_packet(repo, base, head)
+
+    assert "FILE app.py" in packet
+    assert not marker.exists()
+
+
 # --- ref movement -----------------------------------------------------------
 
 

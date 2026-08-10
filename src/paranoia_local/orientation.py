@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import tempfile
 import hashlib
 import stat
@@ -31,13 +30,13 @@ def _run(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
     # env, when given, is layered over the ambient environment — callers pass
     # only the git overrides they need (GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY,
     # snapshot identity) without having to reconstruct PATH etc.
-    r = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True,
-        env={**os.environ, **env} if env else None,
-    )
+    if not cmd or cmd[0] != "git":
+        raise ValueError("orientation._run only accepts Git commands")
+    r = inert_git.invoke(cwd, cmd[1:], extra_env=env)
     if r.returncode != 0:
-        raise RuntimeError(f"{' '.join(cmd)} failed: {r.stderr.strip()}")
-    return r.stdout
+        detail = r.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"{' '.join(cmd)} failed: {detail}")
+    return r.stdout.decode("utf-8", errors="surrogateescape")
 
 
 # Snapshot git commands are hermetic (ignore the user's global/system config, so a
@@ -168,10 +167,7 @@ def snapshot_tree(repo: Path, head_id: str) -> str:
 
 def has_head(repo: Path) -> bool:
     """Whether the repo has a resolvable HEAD (False for an unborn repo with no commit)."""
-    r = subprocess.run(
-        inert_git.argv(["rev-parse", "--verify", "--quiet", "HEAD"]), cwd=repo,
-        env=inert_git.environment(), capture_output=True, text=True,
-    )
+    r = inert_git.invoke(repo, ["rev-parse", "--verify", "--quiet", "HEAD"])
     return r.returncode == 0
 
 
@@ -224,10 +220,7 @@ def changed_files(repo: Path, from_ref: str, to_ref: str) -> list[ChangeEntry]:
     non-UTF-8 filename must not crash the review. A path mangled by replacement won't
     round-trip to `git show`, so `file_evidence` will mark it `[not embeddable]` rather
     than embed it, which is the correct graceful degradation."""
-    r = subprocess.run(
-        ["git", "diff", "--name-status", "-M", "-z", from_ref, to_ref],
-        cwd=repo, capture_output=True,
-    )
+    r = inert_git.invoke(repo, ["diff", "--name-status", "-M", "-z", from_ref, to_ref])
     if r.returncode != 0:
         raise RuntimeError(
             "git diff --name-status failed: " + r.stderr.decode("utf-8", errors="replace").strip()
@@ -418,7 +411,7 @@ _TRUNCATION_MARKER = (
 
 def _show_bytes(repo: Path, spec: str) -> bytes | None:
     """Raw bytes of a blob, or None if git can't produce one (e.g. a submodule gitlink)."""
-    r = subprocess.run(["git", "show", spec], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", spec])
     return r.stdout if r.returncode == 0 else None
 
 
@@ -427,7 +420,7 @@ def _safe_diff(repo: Path, base: str, head: str) -> str:
     only the first ~8000 bytes, so it can embed raw content (incl. NUL or non-UTF-8 bytes)
     for a file whose binary marker appears later. Read bytes and decode with replacement,
     and neutralize NUL, so the packet can never carry control bytes or crash on decode."""
-    r = subprocess.run(["git", "diff", base, head], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["diff", base, head])
     return r.stdout.decode("utf-8", errors="replace").replace("\x00", "�")
 
 
@@ -509,7 +502,7 @@ def build_packet(
         )
     if focus:
         head_parts.append(f"=== REVIEWER FOCUS ===\n{focus}")
-    stat_proc = subprocess.run(["git", "diff", "--stat", base_id, head_id], cwd=repo, capture_output=True)
+    stat_proc = inert_git.invoke(repo, ["diff", "--stat", base_id, head_id])
     stat = stat_proc.stdout.decode("utf-8", errors="replace").strip()  # byte-safe: a non-UTF-8 path in --stat must not crash
     if stat:
         head_parts.append(f"=== DIFFSTAT ===\n{stat}")
