@@ -192,8 +192,11 @@ invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
 Tracked Codex/Claude reviews return strict staged JSON, and the server applies their class records
-atomically with concrete finding debt. The terminal register below remains the compatible contract
-for one-shot and injected-engine reviews:
+atomically with concrete finding debt. Every lane finding must be named by at least one checklist
+row; a `finding` row names its finding IDs and non-finding rows cannot hide one. The integrity lane
+receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
+Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
+terminal register below remains the compatible contract for one-shot and injected-engine reviews:
 
 ```
 === CLASS REGISTER ===

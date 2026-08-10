@@ -83,8 +83,9 @@ Each lane owns the same fixed checklist from its perspective:
 8. cross-section/component consistency;
 9. simplicity, proportionality and scope.
 
-The `integrity` lane also receives every active class, including closed unmechanised classes, and
-must assess each as `satisfied|violated` with a resolved anchor. Each `violated` assessment must
+The `integrity` lane also receives every active class, including closed unmechanised and closed
+mechanised classes, with its invariant, severity, state, and procedure or pattern/pathspec. It must
+assess each as `satisfied|violated` with a resolved anchor. Each `violated` assessment must
 name a source finding. Settlement maps every assessment ID exactly once: `violated` requires open
 concrete debt and, when the class was closed, either `REOPEN` or one atomic `REPLACE` that retires
 the predecessor and creates an open successor with the corrected invariant, severity and procedure.
@@ -95,15 +96,18 @@ closed satisfied class. Omission, contradiction, or two operations against one c
 rejects the whole settlement. This makes recurrence mechanically blocking before a blocker-free
 census can use immediate clearance without repeating the class context in all three lane prompts.
 
-The lane returns one strict JSON manifest: its lane, every checklist ID exactly
-once with `covered|finding|not_applicable`, a bounded summary and one or more resolved evidence
-anchors, every required integrity class assessment, and every finding with lane-scoped ID, severity,
-summary, resolved evidence anchors, and remedy. Stakes and snapshot identity are server-owned inputs;
-the manifest is governing and extra prose is rejected.
-The server rejects missing/duplicate checklist IDs, dangling findings, invalid severity, and
-unresolvable plan/repository/diff anchors. It does not claim to validate semantic entailment or
-enumerate every paragraph and hunk. One same-session correction names the exact schema error; a
-second malformed reply visibly blocks the attempt.
+The lane returns one strict JSON manifest: its lane, every checklist ID exactly once with
+`covered|finding|not_applicable`, a bounded summary, one or more resolved evidence anchors, and the
+IDs of findings governing that row. A `finding` row must name findings, other statuses must not,
+and every lane finding must be named by at least one checklist row. The manifest also carries every
+required integrity class assessment and every finding with lane-scoped ID, severity, summary,
+resolved evidence anchors, and remedy. Stakes and snapshot identity are server-owned inputs; the
+manifest is governing and extra prose is rejected.
+The server rejects missing/duplicate checklist IDs, dangling or unbound findings, invalid severity,
+and unresolvable plan/repository/diff anchors. Repository anchors may not traverse symlinks; they
+must name ordinary files in the inert reviewed tree. It does not claim to validate semantic entailment or enumerate every
+paragraph and hunk. One same-session correction names the exact schema error; a second malformed
+reply visibly blocks the attempt.
 
 One consolidation call receives the parsed findings, checklist digests/summaries, integrity class
 assessments, frozen stakes, and current class IDs/invariants. Claim packets and repeated lane prose

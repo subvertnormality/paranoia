@@ -9,13 +9,19 @@ from paranoia_local.engines import Review
 
 
 def lane(lane="domain", findings=None, assessments=None):
+    findings = findings or []
+    coverage = [
+        {"id": key, "status": "covered", "summary": "checked",
+         "evidence": ["plan:1"], "finding_ids": []} for key in rc.CHECKLIST
+    ]
+    if findings:
+        coverage[0].update(
+            status="finding", finding_ids=[item["id"] for item in findings],
+        )
     return rc.LANE_MARKER + "\n" + json.dumps({
         "lane": lane,
-        "coverage": [
-            {"id": key, "status": "covered", "summary": "checked",
-             "evidence": ["plan:1"]} for key in rc.CHECKLIST
-        ],
-        "findings": findings or [], "class_assessments": assessments or [],
+        "coverage": coverage,
+        "findings": findings, "class_assessments": assessments or [],
     })
 
 
@@ -50,6 +56,15 @@ def test_lane_requires_every_checklist_item_exactly_once():
     parsed["coverage"].pop()
     with pytest.raises(rc.CensusError, match="every checklist"):
         rc.parse_lane(wire(rc.LANE_MARKER, parsed), lane="domain")
+
+
+def test_lane_binds_every_finding_to_checklist_coverage():
+    value = payload(lane(findings=[finding()]))
+    value["coverage"][0].update(status="covered", finding_ids=[])
+    with pytest.raises(rc.CensusError, match="bound to checklist"):
+        rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")
+    value["coverage"][0].update(status="finding", finding_ids=["domain-1"])
+    assert rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")["findings"][0]["id"] == "domain-1"
 
 
 def test_staged_envelope_requires_one_leading_marker_and_single_line_text():
@@ -196,6 +211,11 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
         rc.resolve_anchors({"evidence":["plan:3"]}, root=tmp_path, plan_lines=2)
     with pytest.raises(rc.CensusError, match="unresolvable repository"):
         rc.resolve_anchors({"evidence":["../outside.py:1"]}, root=tmp_path)
+    outside = tmp_path.parent / "outside-anchor.py"
+    outside.write_text("outside\n")
+    (tmp_path / "linked.py").symlink_to(outside)
+    with pytest.raises(rc.CensusError, match="unresolvable repository"):
+        rc.resolve_anchors({"evidence":["linked.py:1"]}, root=tmp_path)
 
 
 def test_violated_class_cannot_be_replaced_at_lower_severity():
@@ -421,6 +441,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "STRUCTURAL-PHASE: clear" in third
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
+    assert '"existing_debt": []' in calls[5]
     assert third.count("## What works") == 1
     audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
@@ -442,6 +463,18 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
 
 def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_path, monkeypatch):
     calls = []
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            "four-call-branch", mode=cc.BRANCH_MODE, next_seq=2,
+            classes={
+                "abc": cc.TrackedClass(
+                    "abc", "needle must remain absent", "MAJOR", 1, cc.CLOSED,
+                    pattern="needle", pathspec="README.md",
+                ),
+            },
+        ),
+    )
 
     def run(self, prompt, *args, **kwargs):
         calls.append(prompt)
@@ -450,14 +483,19 @@ def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_pat
                 row.split()[-1] for row in prompt.splitlines()
                 if row.startswith("ROLE: census lane")
             )
-            value = payload(lane(lane_name))
+            assessments = ([{
+                "class_id":"abc", "verdict":"satisfied",
+                "evidence":["README.md:1"], "finding_id":None,
+            }] if lane_name == "integrity" else [])
+            value = payload(lane(lane_name, assessments=assessments))
             for row in value["coverage"]:
                 row["evidence"] = ["README.md:1"]
             text = wire(rc.LANE_MARKER, value)
         else:
             text = wire(rc.SETTLEMENT_MARKER, {
                 "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
+                "assessment_dispositions":[{"assessment_id":"abc","governing_id":None}],
+                "findings":[], "debt":[],
                 "debt_updates":[], "class_records":[],
             })
         return Review(text=text, session_ref=f"b{len(calls)}", raw=text)
@@ -468,6 +506,12 @@ def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_pat
         "lineage":"four-call-branch", "round":1, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B1")
     assert len(calls) == 4
+    integrity_prompt = next(
+        prompt for prompt in calls if "ROLE: census lane integrity" in prompt
+    )
+    assert '"invariant": "needle must remain absent"' in integrity_prompt
+    assert '"pattern": "needle"' in integrity_prompt
+    assert '"pathspec": "README.md"' in integrity_prompt
     assert "STRUCTURAL-PHASE: clear" in result
     audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3

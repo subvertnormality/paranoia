@@ -90,13 +90,13 @@ def parse_lane(text: str, *, lane: str, class_ids: Sequence[str] = ()) -> dict[s
     got = [row.get("id") for row in coverage if isinstance(row, dict)]
     if sorted(got) != sorted(CHECKLIST) or len(got) != len(set(got)):
         raise CensusError("coverage must contain every checklist id exactly once")
-    finding_ids: set[str] = set()
     for row in coverage:
-        _exact(row, {"id", "status", "summary", "evidence"}, "coverage row")
+        _exact(row, {"id", "status", "summary", "evidence", "finding_ids"}, "coverage row")
         if row["status"] not in {"covered", "finding", "not_applicable"}:
             raise CensusError("invalid coverage status")
         _bounded(row["summary"], MAX_SUMMARY_CHARS, "coverage summary")
         _anchors(row["evidence"])
+    finding_ids: set[str] = set()
     for finding in _list(obj, "findings"):
         _exact(finding, {"id", "severity", "summary", "evidence", "remedy"}, "finding")
         fid = _bounded(finding["id"], 120, "finding id")
@@ -108,6 +108,18 @@ def parse_lane(text: str, *, lane: str, class_ids: Sequence[str] = ()) -> dict[s
         _bounded(finding["summary"], MAX_SUMMARY_CHARS, "finding summary")
         _bounded(finding["remedy"], MAX_SUMMARY_CHARS, "finding remedy")
         _anchors(finding["evidence"])
+    referenced: set[str] = set()
+    for row in coverage:
+        links = row["finding_ids"]
+        if not isinstance(links, list) or any(
+            not isinstance(fid, str) or fid not in finding_ids for fid in links
+        ) or len(links) != len(set(links)):
+            raise CensusError("coverage finding_ids must name unique lane findings")
+        if (row["status"] == "finding") != bool(links):
+            raise CensusError("finding coverage must name findings and other coverage must not")
+        referenced.update(links)
+    if referenced != finding_ids:
+        raise CensusError("every lane finding must be bound to checklist coverage")
     assessments = _list(obj, "class_assessments")
     expected = set(class_ids) if lane == "integrity" else set()
     seen: set[str] = set()
@@ -393,7 +405,15 @@ def resolve_anchors(value: Any, *, root: Any, plan_lines: int | None = None) -> 
                 raise CensusError(f"unresolvable repository anchor {anchor!r}")
             target = base / relative
             try:
-                count = sum(1 for _ in target.open("r", encoding="utf-8", errors="replace"))
+                cursor = base
+                for part in relative.parts:
+                    cursor = cursor / part
+                    if cursor.is_symlink():
+                        raise OSError("symlink evidence anchors are not snapshot paths")
+                resolved = target.resolve(strict=True)
+                if not resolved.is_relative_to(base):
+                    raise OSError("evidence anchor escapes snapshot")
+                count = sum(1 for _ in resolved.open("r", encoding="utf-8", errors="replace"))
             except (OSError, ValueError) as exc:
                 raise CensusError(f"unresolvable repository anchor {anchor!r}") from exc
             if line > count:

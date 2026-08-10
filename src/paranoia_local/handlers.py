@@ -178,6 +178,7 @@ def _staged_structural_review(
         {
             "class_id": c.class_id, "invariant": c.invariant,
             "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
+            "pattern": c.pattern, "pathspec": c.pathspec, "procedure": c.procedure,
         }
         for c in lineage.active()
     ]
@@ -229,7 +230,8 @@ def _staged_structural_review(
             instructions = prompts.STAGED_CENSUS_INSTRUCTIONS.replace("LANE", lane)
             lane_body = (
                 f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
-                f"ACTIVE CLASS IDS: {json.dumps(active_ids if lane == 'integrity' else [])}\n\n{body}"
+                "ACTIVE CLASSES: "
+                f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
             )
             prompt = prompts.compose(instructions, lane_body)
             if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
@@ -302,9 +304,10 @@ def _staged_structural_review(
         attempts.extend(call_attempts)
     else:
         role = "final" if phase == "final" else "correction"
-        existing = [d["id"] for d in state.get("debt", []) if d.get("status") == "open"]
+        open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
+        existing = [d["id"] for d in open_debt]
         stage_body = json.dumps({
-            "role": role, "stakes": stakes, "existing_debt": state.get("debt", []),
+            "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes, "artifact": body,
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.STAGED_FOLLOWUP_INSTRUCTIONS, stage_body)

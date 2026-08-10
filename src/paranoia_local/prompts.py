@@ -289,10 +289,12 @@ Read the complete supplied artifact and repository. Own every checklist item fro
 perspective. Report all in-scope severities; do not defer issues to another lane. Evidence anchors
 must resolve to plan sections or repository path:line locations. Return only:
 === REVIEW CENSUS JSON ===
-{"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
+{"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"],"finding_ids":[]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
 Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
 class_assessments array; integrity assesses every supplied active class exactly once and a violated
-assessment names one of its findings."""
+assessment names one of its findings. A coverage row with status finding names one or more lane
+finding IDs; all other rows use an empty finding_ids array, and every lane finding is named by at
+least one coverage row."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
@@ -316,7 +318,7 @@ is targeted to every open debt item and effects of its repair. Final is a fresh 
 review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
 followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
 debt, debt_updates, class_records and, for final, coverage plus class_assessments. Account for every
-existing debt exactly once. Final must include all nine checklist IDs and assess every active class
+supplied open debt exactly once. Final must include all nine checklist IDs and assess every active class
 exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
 census settlement; each debt update is {"id":"D1","status":"closed|open","evidence":["path:1"]}.
 Correction returns empty source/assessment dispositions. Final returns empty source dispositions
