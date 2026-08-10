@@ -106,13 +106,30 @@ def _settle_staged_failure(
     state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
     state["format_debt"] = str(error)
     closure.lineage.review_state = state
-    cc.save_lineage(closure.state_root, closure.lineage)
+    try:
+        cc.save_lineage(closure.state_root, closure.lineage)
+    except cc.StateUnavailable as exc:
+        closure.unavailable = str(exc)
+        message = f"lineage state unavailable after staged failure: {exc}"
+        review = Review(
+            text=rc.render_error_review(f"[paranoia-local error] {message}"),
+            session_ref=None, raw=message, returncode=2, error=True,
+        )
+        trailer = (
+            f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+            "CONVERGENCE: BLOCKED — staged failure state may not have persisted."
+        )
+        if mode == cc.PLAN_MODE:
+            trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
+        return review, trailer, [a.json() for a in getattr(error, "attempts", [])]
     closure._settled = True
     closure.register_status = f"staged rejected: {error}"
     closure.staged_manifests = getattr(error, "manifests", [])
     attempts = [a.json() for a in getattr(error, "attempts", [])]
     review = Review(
-        text=f"[paranoia-local error] staged review rejected: {error}",
+        text=rc.render_error_review(
+            f"[paranoia-local error] staged review rejected: {error}"
+        ),
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
     trailer = (
@@ -130,7 +147,9 @@ def _state_unavailable_review(
     """Return the established blocked result without running or mutating staged state."""
     reason = closure.unavailable or "lineage state is unavailable"
     review = Review(
-        text=f"[paranoia-local error] lineage state unavailable: {reason}",
+        text=rc.render_error_review(
+            f"[paranoia-local error] lineage state unavailable: {reason}"
+        ),
         session_ref=None, raw=reason, returncode=2, error=True,
     )
     trailer = (
@@ -151,7 +170,8 @@ def _structural_pending_review(
     closure._settled = True
     closure.register_status = "structural pending"
     review = Review(
-        text=f"[paranoia-local error] {reason}", session_ref=None, raw=reason,
+        text=rc.render_error_review(f"[paranoia-local error] {reason}"),
+        session_ref=None, raw=reason,
         returncode=124, error=True,
     )
     trailer = (
@@ -314,7 +334,9 @@ def _staged_structural_review(
         existing = [d["id"] for d in open_debt]
         stage_body = json.dumps({
             "role": role, "stakes": stakes, "existing_debt": open_debt,
-            "active_classes": active_classes, "artifact": body,
+            "active_classes": active_classes,
+            "checklist": list(rc.CHECKLIST) if role == "final" else [],
+            "artifact": body,
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.STAGED_FOLLOWUP_INSTRUCTIONS, stage_body)
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
@@ -347,7 +369,23 @@ def _staged_structural_review(
     lineage.review_state = state
     lineage.debt = None
     lineage.rounds += 1
-    cc.save_lineage(closure.state_root, lineage)
+    try:
+        cc.save_lineage(closure.state_root, lineage)
+    except cc.StateUnavailable as exc:
+        closure.unavailable = str(exc)
+        closure.staged_settlement = settlement
+        message = f"lineage state unavailable after staged settlement: {exc}"
+        failed = Review(
+            text=rc.render_error_review(f"[paranoia-local error] {message}"),
+            session_ref=review.session_ref, raw=message, returncode=2, error=True,
+        )
+        trailer = (
+            f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+            "CONVERGENCE: BLOCKED — this staged settlement may not have persisted."
+        )
+        if mode == cc.PLAN_MODE:
+            trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
+        return failed, trailer, [a.json() for a in attempts]
     closure._settled = True
     closure.register_status = f"staged {phase} parsed"
     closure.staged_settlement = settlement

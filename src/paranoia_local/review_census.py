@@ -57,6 +57,17 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
 
 
+def render_error_review(message: str) -> str:
+    safe = str(message).replace("\r", " ").replace("\n", " ")
+    return "\n\n".join((
+        "## What works\n\nNothing notable.",
+        f"## What doesn't work\n\n{safe}",
+        "## Risks\n\nNothing notable.",
+        "## Gaps\n\nNothing notable.",
+        "## Improvements\n\nNothing notable.",
+    ))
+
+
 def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     sd = digest(stakes)
     if not isinstance(raw, dict) or raw.get("version") != 1 or raw.get("stakes_digest") != sd:
@@ -229,13 +240,13 @@ def parse_settlement(
             if cid in operation_by_class:
                 raise CensusError("more than one class operation against one assessment")
             operation_by_class[cid] = record.get("op")
-            if role == "correction" and record.get("op") in {"reclassify", "replace"}:
+            if record.get("op") in {"reclassify", "replace"}:
                 replacement_severity = record.get("severity")
                 prior_severity = class_states[cid][2] if class_states else None
                 if replacement_severity not in rank:
                     raise CensusError("invalid class severity")
                 if prior_severity and rank[replacement_severity] < rank[prior_severity]:
-                    raise CensusError("correction cannot downgrade an active class")
+                    raise CensusError("staged settlement cannot downgrade an active class")
     for cid, verdict in (assessment_verdicts or {}).items():
         target = disposition_by_class.get(cid)
         if verdict == "violated" and target is None:

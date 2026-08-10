@@ -8,6 +8,15 @@ from paranoia_local import (
 from paranoia_local.engines import Review
 
 
+HEADINGS = (
+    "## What works", "## What doesn't work", "## Risks", "## Gaps", "## Improvements",
+)
+
+
+def assert_five_headings(text):
+    assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
+
+
 def lane(lane="domain", findings=None, assessments=None):
     findings = findings or []
     coverage = [
@@ -161,6 +170,22 @@ def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
     assert state["debt"][0]["source_ids"] == ["domain-1"]
 
 
+def test_every_staged_role_rejects_a_satisfied_class_downgrade():
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[], findings=[], debt=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
+        class_records=[{"op":"reclassify", "class_id":"abc", "severity":"MINOR"}],
+    )
+    with pytest.raises(rc.CensusError, match="cannot downgrade"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"satisfied"},
+            assessment_findings={"abc":None},
+            class_states={"abc": (cc.CLOSED, False, "MAJOR")}, role="census",
+        )
+
+
 def test_replace_carries_corrected_severity_in_one_transition():
     register = rc.register_from_records([{
         "op": "replace", "class_id": "old", "invariant": "better invariant",
@@ -230,7 +255,7 @@ def test_violated_class_cannot_be_replaced_at_lower_severity():
     )
     value["findings"] = [finding("C1", "MAJOR")]
     value["debt"] = [{"id":"D1", "finding_id":"C1", "status":"open"}]
-    with pytest.raises(rc.CensusError, match="cannot be downgraded"):
+    with pytest.raises(rc.CensusError, match="downgrade"):
         rc.parse_settlement(
             wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
             assessment_verdicts={"abc":"violated"},
@@ -328,8 +353,90 @@ def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_pa
     )
     closure.release()
     assert review.error and attempts == []
+    assert_five_headings(review.text)
     assert "STRUCTURAL-PENDING" in trailer and "CONVERGENCE: BLOCKED" in trailer
     assert not (cc.lineage_dir(tmp_path) / "pending-plan.pending").exists()
+
+
+def test_state_unavailable_result_has_five_headings(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "unavailable-plan", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.unavailable = "cannot read state"
+    review, trailer, attempts = handlers._state_unavailable_review(
+        closure, mode=cc.PLAN_MODE, claim_state=pc.empty_state(),
+    )
+    assert review.error and attempts == [] and "STATE-UNAVAILABLE" in trailer
+    assert_five_headings(review.text)
+
+
+def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
+    tmp_path, monkeypatch,
+):
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
+        "summary":"fix", "evidence":["plan:1"], "source_ids":[],
+        "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(
+        tmp_path,
+        cc.Lineage("save-fail", rounds=1, mode=cc.PLAN_MODE, review_state=state),
+    )
+    closure = handlers._PlanClassClosure(
+        "save-fail", round_no=2, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"correction", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                "class_records":[],
+            })
+            return Review(text=text, session_ref="s", raw=text)
+
+    monkeypatch.setattr(
+        cc, "save_lineage",
+        lambda *args, **kwargs: (_ for _ in ()).throw(cc.StateUnavailable("ambiguous write")),
+    )
+    review, trailer, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    closure.release()
+    assert review.error and [row["role"] for row in attempts] == ["correction"]
+    assert_five_headings(review.text)
+    assert "STATE-UNAVAILABLE" in trailer
+    assert (cc.lineage_dir(tmp_path) / "save-fail.pending").exists()
+    cc.clear_latch(tmp_path, "save-fail")
+
+
+def test_staged_format_debt_save_failure_also_retains_latch(tmp_path, monkeypatch):
+    cc.save_lineage(tmp_path, cc.Lineage("format-save-fail", mode=cc.PLAN_MODE))
+    closure = handlers._PlanClassClosure(
+        "format-save-fail", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    monkeypatch.setattr(
+        cc, "save_lineage",
+        lambda *args, **kwargs: (_ for _ in ()).throw(cc.StateUnavailable("ambiguous write")),
+    )
+    review, trailer, attempts = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=rc.CensusError("bad format"),
+        mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert review.error and attempts == []
+    assert_five_headings(review.text)
+    assert "STATE-UNAVAILABLE" in trailer
+    assert (cc.lineage_dir(tmp_path) / "format-save-fail.pending").exists()
+    cc.clear_latch(tmp_path, "format-save-fail")
 
 
 def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, monkeypatch):
@@ -472,6 +579,8 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
     assert '"existing_debt": []' in calls[5]
+    assert all(key in calls[5] for key in rc.CHECKLIST)
+    assert '"finding_ids"' in calls[5] and '"class_assessments"' in calls[5]
     assert third.count("## What works") == 1
     audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
@@ -578,6 +687,7 @@ def test_failed_consolidation_audit_retains_lane_and_retry_attempts(
         "lineage":"failed-consolidation", "round":1, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "BF")
     assert "CONVERGENCE: BLOCKED" in result
+    assert_five_headings(result)
     assert len(calls) == 5
     audit = json.loads(next((tmp_path / "logs").glob("BF-critique_branch-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
@@ -588,3 +698,84 @@ def test_failed_consolidation_audit_retains_lane_and_retry_attempts(
     assert [row["outcome"] for row in audit["attempt_ledger"]] == [
         "completed", "completed", "completed", "format-invalid", "format-invalid",
     ]
+
+
+def test_branch_handler_runs_census_correction_and_cold_final(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            findings = ([finding("F1", "MAJOR")] if lane_name == "behaviour" else [])
+            value = payload(lane(lane_name, findings=findings))
+            for row in value["coverage"]:
+                row["evidence"] = ["README.md:1"]
+            for item in value["findings"]:
+                item["evidence"] = ["README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+        elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"census",
+                "source_dispositions":[{"source_id":"behaviour:F1","governing_id":"G1"}],
+                "assessment_dispositions":[],
+                "findings":[{
+                    "id":"G1", "severity":"MAJOR", "summary":"repair it",
+                    "evidence":["README.md:1"], "remedy":"edit it",
+                }],
+                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
+                "debt_updates":[], "class_records":[],
+            })
+        elif '"role": "correction"' in prompt:
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"correction", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[{"id":"D1","status":"closed","evidence":["README.md:1"]}],
+                "class_records":[],
+            })
+        else:
+            assert '"role": "final"' in prompt
+            coverage = payload(lane())["coverage"]
+            for row in coverage:
+                row["evidence"] = ["README.md:1"]
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"final", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[], "class_records":[],
+                "coverage":coverage, "class_assessments":[],
+            })
+        return Review(text=text, session_ref=f"branch-{len(calls)}", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    args = {
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"three-phase-branch", "stakes":"trusted local tool",
+    }
+    first = handlers.critique_branch(
+        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"BC1",
+    )
+    second = handlers.critique_branch(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"BC2",
+    )
+    third = handlers.critique_branch(
+        {**args, "round":3}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"BC3",
+    )
+    assert "STRUCTURAL-PHASE: correction" in first
+    assert "STRUCTURAL-PHASE: final" in second
+    assert "STRUCTURAL-PHASE: clear" in third
+    assert "CONVERGENCE: NOT-BLOCKED" in third
+    assert len(calls) == 6
+    assert [row["role"] for row in json.loads(
+        next((tmp_path / "logs").glob("BC2-critique_branch-*.json")).read_text()
+    )["attempt_ledger"]] == ["correction"]
+    assert [row["role"] for row in json.loads(
+        next((tmp_path / "logs").glob("BC3-critique_branch-*.json")).read_text()
+    )["attempt_ledger"]] == ["final"]

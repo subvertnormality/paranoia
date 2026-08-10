@@ -81,10 +81,14 @@ This evidence supports the intended shape:
   the branch fixture caught six material survivors that old convergence missed;
 - durable debt prevents those findings from disappearing between rounds;
 - correction re-entails the fixed list rather than running three more novelty-seeking lanes;
-- the final cold review is reachable only after the operator or autonomous implementation loop has
-  actually repaired all blocking debt.
+- zero blocking debt advances to one mandatory cold final; a final finding returns to targeted
+  correction and requires another cold regression after repair.
 
-The implemented Paranoia Local branch review is the end-to-end convergence gate: its own reported
-debts are repaired in the branch, followed by targeted correction and one cold final regression.
-The historical replays are a blinded quality/cost comparator, not an oracle allowed to force
-clearance of defective bytes.
+The public fake-backed acceptance now executes both plan and branch through census, correction, and
+cold final, including phase trailers and per-round audit ledgers. The implemented Paranoia Local
+branch review is the real-provider end-to-end convergence gate: its own reported debts are repaired
+in the branch, followed by targeted correction and a cold final regression. Its completed final
+session, snapshot, call count, elapsed time, and audit digest belong to the immutable audit log and
+PR/handoff report produced after the reviewed commit; writing that future result into this commit
+would change the snapshot and make the attestation stale. The historical replays are a blinded
+quality/cost comparator, not an oracle allowed to force clearance of defective bytes.

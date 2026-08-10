@@ -205,7 +205,8 @@ persist when structural work later fails or lacks deadline; structural phase doe
 a valid structural settlement. Audit logs record phase, stakes/snapshot digests, validated
 manifests/dispositions, and one attempt-ledger row for every actual `run`/`resume`: role,
 engine/session, outcome, duration, and usage. Aggregate provider calls are the ledger length, never
-inferred from a status string.
+inferred from a status string. Concurrent lanes are serialized in stable lane order; without a
+provider-boundary timestamp the ledger does not claim temporal ordering between them.
 
 ## 5. Small code shape
 
@@ -284,5 +285,8 @@ Pre-PR real gates:
    evidence, not authority to force a new false clearance. The implementation's own convergence
    run must use the staged correction/final lifecycle, and measured wall time/call cost must be
    reported rather than waived;
-8. acceptance records with fixture/digest/oracle/result/audit metadata committed under `docs/`;
+8. acceptance records with fixture/digest/oracle/result metadata committed under `docs/`. The
+   completed final review's invocation metadata remains in its immutable audit log and PR/handoff
+   report: committing a statement that the current commit passed a later review would change the
+   reviewed snapshot and make that statement self-referentially stale;
 9. only then open a PR, pass CI, merge, and update the primary `main` worktree.

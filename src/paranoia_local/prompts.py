@@ -323,7 +323,12 @@ supplied open debt exactly once. Final must include all nine checklist IDs and a
 exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
 census settlement; each debt update is {"id":"D1","status":"closed|open","evidence":["path:1"]}.
 Correction returns empty source/assessment dispositions. Final returns empty source dispositions
-and one assessment disposition per class."""
+and one assessment disposition per class. The task's checklist array is governing. The exact
+final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
+"summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
+"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
+A finding row names one or more findings, all other coverage rows name none, and every finding is
+named by coverage."""
 
 
 # ── class closure ─────────────────────────────────────────────────────────────
