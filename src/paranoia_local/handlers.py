@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,7 @@ from typing import Any, Callable
 
 from . import arbitration, class_closure as cc
 from . import engines as eng, external_sources, inert_git, inert_tree
-from . import logs, orientation, plan_claims as pc, prompts
+from . import logs, orientation, plan_claims as pc, prompts, review_census as rc
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
 from .worktree import worktree_at
@@ -43,6 +44,113 @@ PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
+
+
+def _attempt(role: str, engine: Engine, review: Review) -> rc.Attempt:
+    return rc.Attempt(role, engine.name, review.session_ref,
+                      "failed" if review.error else "completed",
+                      review.duration_ms, review.usage)
+
+
+def _staged_structural_review(
+    *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
+    closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
+    on_progress: Callable[[str], None] | None,
+) -> tuple[Review, str, list[dict[str, Any]]]:
+    """Run census/correction/final and atomically settle it into the open lineage."""
+    assert closure.lineage is not None
+    lineage = closure.lineage
+    state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
+    phase = state["phase"]
+    active_ids = [c.class_id for c in lineage.active()]
+    attempts: list[rc.Attempt] = []
+
+    if phase == "census":
+        lanes = rc.LANES[mode]
+
+        def run_lane(lane: str) -> tuple[str, Review, dict[str, Any]]:
+            instructions = prompts.STAGED_CENSUS_INSTRUCTIONS.replace("LANE", lane)
+            lane_body = (
+                f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
+                f"ACTIVE CLASS IDS: {json.dumps(active_ids if lane == 'integrity' else [])}\n\n{body}"
+            )
+            prompt = prompts.compose(instructions, lane_body)
+            if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
+                raise rc.CensusError(f"staged lane prompt is {len(prompt)} characters")
+            result = engine.run(prompt, cwd, model, effort, False,
+                                timeout=900, **_progress_kwargs(on_progress))
+            if result.error:
+                raise rc.CensusError(f"{lane} lane failed (exit {result.returncode})")
+            return lane, result, rc.parse_lane(
+                result.text, lane=lane, class_ids=active_ids if lane == "integrity" else (),
+            )
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            lane_rows = list(pool.map(run_lane, lanes))
+        for lane, result, _ in lane_rows:
+            attempts.append(_attempt(f"census-{lane}", engine, result))
+        manifests = [row[2] for row in lane_rows]
+        source_ids = [f["id"] for m in manifests for f in m["findings"]]
+        assessment_ids = [a["class_id"] for m in manifests for a in m["class_assessments"]]
+        consolidation_body = json.dumps({
+            "role": "census", "stakes": stakes, "manifests": manifests,
+            "active_classes": active_ids,
+        }, ensure_ascii=False)
+        prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
+        if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
+            raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
+        review = engine.run(prompt, cwd, model, effort, False,
+                            timeout=600, **_progress_kwargs(on_progress))
+        attempts.append(_attempt("consolidation", engine, review))
+        if review.error:
+            raise rc.CensusError(f"consolidation failed (exit {review.returncode})")
+        settlement = rc.parse_settlement(
+            review.text, source_ids=source_ids, assessment_ids=assessment_ids, role="census",
+        )
+    else:
+        role = "final" if phase == "final" else "correction"
+        existing = [d["id"] for d in state.get("debt", []) if d.get("status") == "open"]
+        stage_body = json.dumps({
+            "role": role, "stakes": stakes, "existing_debt": state.get("debt", []),
+            "active_classes": active_ids, "artifact": body,
+        }, ensure_ascii=False)
+        prompt = prompts.compose(prompts.STAGED_FOLLOWUP_INSTRUCTIONS, stage_body)
+        if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
+            raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
+        review = engine.run(prompt, cwd, model, effort, False,
+                            timeout=1200, **_progress_kwargs(on_progress))
+        attempts.append(_attempt(role, engine, review))
+        if review.error:
+            raise rc.CensusError(f"{role} failed (exit {review.returncode})")
+        settlement = rc.parse_settlement(
+            review.text, source_ids=[], assessment_ids=active_ids if role == "final" else [],
+            known_debt=existing, role=role,
+        )
+
+    draft = cc.copy_lineage(lineage)
+    register = rc.register_from_records(
+        settlement["class_records"], mechanized=mode == cc.BRANCH_MODE,
+    )
+    minted = cc.apply_register(draft, register, round_no=round_no)
+    lineage.classes, lineage.next_seq, lineage.exemptions = (
+        draft.classes, draft.next_seq, draft.exemptions
+    )
+    if mode == cc.BRANCH_MODE:
+        closure._sweep(only=minted)
+    state = rc.settle_state(state, settlement, phase=phase, snapshot=snapshot, round_no=round_no)
+    claim_blocked = mode == cc.PLAN_MODE and pc.is_blocked(lineage.claim_state)
+    if lineage.blocking() or claim_blocked:
+        state["phase"] = "correction"
+    lineage.review_state = state
+    lineage.debt = None
+    lineage.rounds += 1
+    cc.save_lineage(closure.state_root, lineage)
+    closure._settled = True
+    closure.register_status = f"staged {phase} parsed"
+    trailer = rc.trailer(state)
+    if mode == cc.PLAN_MODE:
+        trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
+    return review, trailer, [a.json() for a in attempts]
 
 
 def _default_clock() -> str:
@@ -340,6 +448,7 @@ def _converge_branch_review(
     # entry and the engine call can all raise, and a latch stranded there would make every
     # later round STATE-UNAVAILABLE over a fault that already surfaced to the caller. A
     # failed *write* is the one case that deliberately keeps the latch (see `release`).
+    attempt_ledger: list[dict[str, Any]] = []
     try:
         packet = orientation.build_packet(
             repo, base_id, head_id,
@@ -352,12 +461,20 @@ def _converge_branch_review(
         prompt = prompts.compose(instructions, _prepend(calibration, packet))
 
         with worktree_at(repo, head_id) as wt:
-            review = engine.run(prompt, wt, model, effort, web_search,
-                                **_progress_kwargs(on_progress))
-            # Settle inside the worktree: a register retry resumes the same session and
-            # must see the same materialized snapshot the review did.
-            trailer = closure.settle(review, engine, wt, model, effort, web_search,
-                                     on_progress) if closure else None
+            if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+                review, trailer, attempt_ledger = _staged_structural_review(
+                    engine=engine.for_role(eng.ROLE_REPOSITORY), cwd=wt, model=model,
+                    effort=effort, mode=cc.BRANCH_MODE, body=_prepend(calibration, packet),
+                    closure=closure, stakes=calibration or "", snapshot=head_id,
+                    round_no=review_round or 1, on_progress=on_progress,
+                )
+            else:
+                review = engine.run(prompt, wt, model, effort, web_search,
+                                    **_progress_kwargs(on_progress))
+                # Settle inside the worktree: a register retry resumes the same session and
+                # must see the same materialized snapshot the review did.
+                trailer = closure.settle(review, engine, wt, model, effort, web_search,
+                                         on_progress) if closure else None
     except BaseException:
         if closure:
             closure.abandon()
@@ -378,7 +495,8 @@ def _converge_branch_review(
           "lineage": closure.lineage_id if closure else None,
           # The retry's register is what actually changed durable state, so it belongs in
           # the audit record; the original review only carries the malformed attempt.
-          "retry_register": closure.retry_register if closure else None})
+          "retry_register": closure.retry_register if closure else None,
+          "attempt_ledger": attempt_ledger})
     body = _footer(review, engine)
     if closure and closure.retry_register:
         # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
@@ -565,6 +683,7 @@ def critique_plan(
         closure.claims_enabled = claim_verification
         closure.claim_state = claim_state
 
+    attempt_ledger: list[dict[str, Any]] = []
     try:
         body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -601,6 +720,17 @@ def critique_plan(
                         session_ref=None, raw="plan deadline exhausted",
                         returncode=124, error=True,
                     )
+                elif closure:
+                    staged_body = body + (
+                        "\n\nThe pinned repository evidence root is `repository/`. Treat that "
+                        "prefix as the project root; no live Git or web tools are available."
+                    )
+                    review, trailer, attempt_ledger = _staged_structural_review(
+                        engine=reviewer, cwd=review_cwd, model=model, effort=effort,
+                        mode=cc.PLAN_MODE, body=_prepend(calibration, staged_body),
+                        closure=closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
+                        round_no=arguments.get("round") or 1, on_progress=on_progress,
+                    )
                 else:
                     review = reviewer.run(
                         isolated_prompt, review_cwd, model, effort, False,
@@ -609,9 +739,10 @@ def critique_plan(
                     )
                 if closure:
                     closure.deadline = plan_deadline
-                trailer = closure.settle(
-                    review, reviewer, review_cwd, model, effort, False, on_progress,
-                ) if closure else None
+                if closure and not attempt_ledger:
+                    trailer = closure.settle(
+                        review, reviewer, review_cwd, model, effort, False, on_progress,
+                    )
         else:
             review = engine.run(prompt, cwd, model, effort, web_search,
                                 **_progress_kwargs(on_progress))
@@ -653,6 +784,7 @@ def critique_plan(
         # The retry's register is what actually changed durable state, so the original
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
+        "attempt_ledger": attempt_ledger,
     })
     body_text = _footer(review, engine) + _stakes_notice(no_stakes)
     if closure and closure.retry_register:

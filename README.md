@@ -133,8 +133,17 @@ round 1 ──► review ──► fix ──► round 2 ──► review ──
              └── already_raised ────────────┴── already_raised ────► CONVERGENCE: NOT-BLOCKED
 ```
 
-Each structural round is a **fresh, cold reviewer**. Durable lineage state carries
-classes and plan-claim evidence forward; the reviewer never relies on chat memory.
+Tracked reviews use a staged lifecycle. A new or materially changed artifact starts with three
+independent cold lanes and one consolidation call. Their complete finding census becomes durable
+debt. Later correction rounds target that debt and correction effects; once it closes, one fresh
+whole-artifact final regression is mandatory. A clear initial census may converge immediately.
+This preserves broad first-pass/final coverage without paying for novelty hunting over unchanged
+material on every correction round.
+
+Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
+claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
+`STRUCTURAL-DEBT` in the trailer show where the autonomous loop is. There is no fixed round ceiling:
+provider, parsing, deadline, or oversized-state failures block visibly rather than clearing.
 
 ### `round` — the severity floor
 

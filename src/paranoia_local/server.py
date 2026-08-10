@@ -124,7 +124,7 @@ TOOLS: list[Tool] = [
                 },
                 "converge": {
                     "type": "boolean",
-                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false (with class_closure: false) to fall back to the legacy in-place review. Class closure runs ONLY on this path, so `converge: false` is REFUSED unless you also pass `class_closure: false` — otherwise the review would look gated and emit no CONVERGENCE trailer.",
+                    "description": "Convergence mode (default TRUE): review an immutable evidence packet through a broad three-lane census, targeted correction debt, and one cold final regression. A clear census may converge immediately. Pass false with class_closure:false for the legacy one-shot path.",
                 },
                 "max_packet_chars": {
                     "type": "integer",
@@ -139,11 +139,10 @@ TOOLS: list[Tool] = [
                 "class_closure": {
                     "type": "boolean",
                     "description": (
-                        "Track defect CLASSES across rounds (default true). The reviewer registers "
-                        "each class with a regex matching violations only; every later round re-runs "
-                        "it and a computed CONVERGENCE trailer reports BLOCKED while any BLOCKER/MAJOR "
-                        "class still matches. This is what stops a loop fixing one spelling of a "
-                        "defect per round. Set false to restore the pre-closure behaviour exactly."
+                        "Enable tracked staged review (default true): concrete census findings, "
+                        "reusable classes, targeted correction, and a mandatory cold final. Branch "
+                        "class predicates are still swept against each reviewed snapshot. Set false "
+                        "for the legacy one-shot review."
                     ),
                 },
                 "lineage": {
@@ -213,7 +212,7 @@ TOOLS: list[Tool] = [
                 "class_closure": {
                     "type": "boolean",
                     "description": (
-                        "Track defect CLASSES across plan rounds (default TRUE, as for "
+                        "Enable tracked staged plan review (default TRUE, as for "
                         "critique_branch). Requires `lineage` and `round`. Pass FALSE for a "
                         "ONE-SHOT review — a design sketch with no convergence loop behind "
                         "it — which is the single explicit escape, drops the `round` "

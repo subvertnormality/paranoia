@@ -8,6 +8,9 @@
 - after plan approval, review the implementation branch—not the plan—unless design is explicitly
   reopened, and label runs PLAN versus CODE;
 - treat recurring classes as an architecture checkpoint, not permission for another patch;
+- use broad cold structural coverage for a tracked snapshot's census and final regression, while
+  targeting intervening correction rounds to open debt and correction effects rather than
+  repeatedly searching unrelated unchanged material for novelty;
 - prioritize accurate, fast, workable behavior and a small architecture over out-of-scope
   hardening;
 - keep plan claim verification on by default with reviewer-native search used only for URL

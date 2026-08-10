@@ -11,6 +11,7 @@ from paranoia_local import (
     external_sources,
     handlers,
     plan_claims as pc,
+    prompts,
 )
 from paranoia_local.engines import Review
 
@@ -1473,7 +1474,21 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
 
     def structural_review(self, *args, **kwargs):
         observed["structural_timeout"] = kwargs.get("timeout")
-        return Review(text=STRUCTURAL_CLEAR, session_ref="structural", raw="structural")
+        prompt = args[0]
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane = next(x.split()[-1] for x in prompt.splitlines() if x.startswith("ROLE: census lane"))
+            coverage = [
+                {"id": key, "status": "covered", "summary": "checked",
+                 "evidence": ["repository/README.md:1"]}
+                for key in handlers.rc.CHECKLIST
+            ]
+            text = json.dumps({"lane": lane, "coverage": coverage, "findings": [],
+                               "class_assessments": []})
+        else:
+            text = json.dumps({"role": "census", "source_dispositions": [],
+                               "assessment_dispositions": [], "findings": [], "debt": [],
+                               "debt_updates": [], "class_records": []})
+        return Review(text=text, session_ref="structural", raw=text)
 
     monkeypatch.setattr(handlers, "_verify_plan_claims", deadline_debt)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
@@ -1494,7 +1509,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     )
 
     assert observed["deadline"] is not None
-    assert observed["structural_timeout"] == handlers.PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC
+    assert observed["structural_timeout"] in {900, 600}
     assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
     assert "CLAIM-AUDIT-DEBT" in result
 

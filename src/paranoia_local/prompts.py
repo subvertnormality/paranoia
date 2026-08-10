@@ -284,6 +284,34 @@ def compose(instructions: str, body: str) -> str:
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
 
 
+STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
+Read the complete supplied artifact and repository. Own every checklist item from your lane's
+perspective. Report all in-scope severities; do not defer issues to another lane. Evidence anchors
+must resolve to plan sections or repository path:line locations. Return only:
+=== REVIEW CENSUS JSON ===
+{"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
+Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
+class_assessments array; integrity assesses every supplied active class exactly once and a violated
+assessment names one of its findings."""
+
+
+STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
+review. Map every source finding and class assessment exactly once. Preserve the highest severity
+of merged findings. Every blocking governing finding needs exactly one open debt record. Return
+only === REVIEW SETTLEMENT JSON === followed by one JSON object with: role, source_dispositions,
+assessment_dispositions, findings, debt, debt_updates, and class_records. Class record op is one of
+new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
+operation. Do not emit prose."""
+
+
+STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
+is targeted to every open debt item and effects of its repair. Final is a fresh cold whole-artifact
+review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
+followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
+debt, debt_updates, and class_records. Account for every existing debt exactly once. Final must
+assess every active class exactly once; a violated class creates a finding and open debt."""
+
+
 # ── class closure ─────────────────────────────────────────────────────────────
 # The register is the ONLY channel by which a defect class becomes durable. Nothing in
 # the five prose sections is parsed: nine review rounds established that policing free
