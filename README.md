@@ -145,12 +145,12 @@ claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PH
 `STRUCTURAL-DEBT` in the trailer show where the autonomous loop is. There is no fixed round ceiling:
 provider, parsing, deadline, or oversized-state failures block visibly rather than clearing.
 
-### `round` — the severity floor
+### `round` — lineage ordering
 
-The 1-based round number. **Increment it every round.** At `round >= 3` the
-reviewer reports only merge-blocking findings and withholds `[MINOR]` and
-`[OUT-OF-SCOPE]`, writing `CONVERGED` when none remain. This is the lever that
-makes a loop *stop* instead of grinding through diminishing findings.
+The 1-based round number. **Increment it every round.** In tracked staged review, census and final
+remain complete at every in-scope severity while correction is limited to durable debt and repair
+effects; convergence comes from that phase boundary, not a late-round sampling floor. The legacy
+single-review path retains its round-3 severity floor.
 
 `round` is required on `critique_branch` and `critique_plan` unless you pass
 `class_closure: false`.

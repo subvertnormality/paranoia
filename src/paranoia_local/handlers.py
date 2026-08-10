@@ -16,8 +16,9 @@ import shutil
 import subprocess
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -52,23 +53,99 @@ def _attempt(role: str, engine: Engine, review: Review) -> rc.Attempt:
                       review.duration_ms, review.usage)
 
 
+def _staged_call(
+    *, role: str, engine: Engine, prompt: str, cwd: Path, model: str, effort: str,
+    timeout: int, parser: Callable[[str], dict[str, Any]],
+    on_progress: Callable[[str], None] | None,
+) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
+    """One staged call plus exactly one same-session schema correction."""
+    review = engine.run(prompt, cwd, model, effort, False, timeout=timeout,
+                        **_progress_kwargs(on_progress))
+    attempts = [_attempt(role, engine, review)]
+    if review.error:
+        error = rc.CensusError(f"{role} failed (exit {review.returncode})")
+        error.attempts = attempts  # type: ignore[attr-defined]
+        raise error
+    try:
+        return review, parser(review.text), attempts
+    except rc.CensusError as first:
+        if not review.session_ref:
+            error = rc.CensusError(f"{role} format invalid and has no resumable session: {first}")
+            error.attempts = attempts  # type: ignore[attr-defined]
+            raise error from first
+        retry = engine.resume(
+            review.session_ref,
+            "Your staged JSON was rejected: " + str(first) +
+            "\nFix exactly that. Return only the required marker and complete JSON object.",
+            cwd, model, effort, False, timeout=min(300, timeout),
+            **_progress_kwargs(on_progress),
+        )
+        attempts.append(_attempt(f"{role}-format-retry", engine, retry))
+        if retry.error:
+            error = rc.CensusError(f"{role} format retry failed (exit {retry.returncode})")
+            error.attempts = attempts  # type: ignore[attr-defined]
+            raise error from first
+        try:
+            parsed = parser(retry.text)
+        except rc.CensusError as second:
+            second.attempts = attempts  # type: ignore[attr-defined]
+            raise
+        return retry, parsed, attempts
+
+
+def _settle_staged_failure(
+    closure: "_ClosureRound", *, stakes: str, snapshot: str, error: rc.CensusError,
+    mode: str,
+) -> tuple[Review, str, list[dict[str, Any]]]:
+    assert closure.lineage is not None
+    state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
+    state["format_debt"] = str(error)
+    closure.lineage.review_state = state
+    cc.save_lineage(closure.state_root, closure.lineage)
+    closure._settled = True
+    closure.register_status = f"staged rejected: {error}"
+    attempts = [a.json() for a in getattr(error, "attempts", [])]
+    review = Review(
+        text=f"[paranoia-local error] staged review rejected: {error}",
+        session_ref=None, raw=str(error), returncode=2, error=True,
+    )
+    trailer = (
+        f"STRUCTURAL-PHASE: {state['phase']}\nSTRUCTURAL-ERROR: {error}\n"
+        "CONVERGENCE: BLOCKED — staged review did not settle."
+    )
+    if mode == cc.PLAN_MODE:
+        trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
+    return review, trailer, attempts
+
+
 def _staged_structural_review(
     *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
     closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
-    on_progress: Callable[[str], None] | None,
+    on_progress: Callable[[str], None] | None, plan_lines: int | None = None,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     """Run census/correction/final and atomically settle it into the open lineage."""
     assert closure.lineage is not None
     lineage = closure.lineage
+    rc.class_context(closure._blocks())
     state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
     phase = state["phase"]
-    active_ids = [c.class_id for c in lineage.active()]
+    active_classes = [
+        {
+            "class_id": c.class_id, "invariant": c.invariant,
+            "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
+        }
+        for c in lineage.active()
+    ]
+    active_ids = [c["class_id"] for c in active_classes]
+    class_states = {
+        c.class_id: (c.status, c.mechanized, c.severity) for c in lineage.active()
+    }
     attempts: list[rc.Attempt] = []
 
     if phase == "census":
         lanes = rc.LANES[mode]
 
-        def run_lane(lane: str) -> tuple[str, Review, dict[str, Any]]:
+        def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
             instructions = prompts.STAGED_CENSUS_INSTRUCTIONS.replace("LANE", lane)
             lane_body = (
                 f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
@@ -77,54 +154,98 @@ def _staged_structural_review(
             prompt = prompts.compose(instructions, lane_body)
             if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
                 raise rc.CensusError(f"staged lane prompt is {len(prompt)} characters")
-            result = engine.run(prompt, cwd, model, effort, False,
-                                timeout=900, **_progress_kwargs(on_progress))
-            if result.error:
-                raise rc.CensusError(f"{lane} lane failed (exit {result.returncode})")
-            return lane, result, rc.parse_lane(
-                result.text, lane=lane, class_ids=active_ids if lane == "integrity" else (),
+            result, parsed, lane_attempts = _staged_call(
+                role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
+                model=model, effort=effort, timeout=900, on_progress=on_progress,
+                parser=lambda text: rc.parse_lane(
+                    text, lane=lane,
+                    class_ids=active_ids if lane == "integrity" else (),
+                ),
             )
+            rc.resolve_anchors(
+                parsed, root=cwd,
+                plan_lines=plan_lines,
+            )
+            renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
+            for finding in parsed["findings"]:
+                finding["id"] = renamed[finding["id"]]
+            for assessment in parsed["class_assessments"]:
+                if assessment["finding_id"] is not None:
+                    assessment["finding_id"] = renamed[assessment["finding_id"]]
+            return lane, result, parsed, lane_attempts
 
+        lane_rows = []
+        lane_errors: list[rc.CensusError] = []
         with ThreadPoolExecutor(max_workers=3) as pool:
-            lane_rows = list(pool.map(run_lane, lanes))
-        for lane, result, _ in lane_rows:
-            attempts.append(_attempt(f"census-{lane}", engine, result))
+            pending = {pool.submit(run_lane, lane): lane for lane in lanes}
+            for future in as_completed(pending):
+                try:
+                    lane_rows.append(future.result())
+                except rc.CensusError as error:
+                    lane_errors.append(error)
+        lane_rows.sort(key=lambda row: lanes.index(row[0]))
+        if lane_errors:
+            all_attempts = [a for row in lane_rows for a in row[3]]
+            all_attempts.extend(
+                a for error in lane_errors for a in getattr(error, "attempts", [])
+            )
+            first_error = lane_errors[0]
+            first_error.attempts = all_attempts  # type: ignore[attr-defined]
+            raise first_error
+        for _, _, _, lane_attempts in lane_rows:
+            attempts.extend(lane_attempts)
         manifests = [row[2] for row in lane_rows]
         source_ids = [f["id"] for m in manifests for f in m["findings"]]
+        source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
         assessment_ids = [a["class_id"] for m in manifests for a in m["class_assessments"]]
+        assessment_verdicts = {
+            a["class_id"]: a["verdict"] for m in manifests for a in m["class_assessments"]
+        }
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
-            "active_classes": active_ids,
+            "active_classes": active_classes,
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
         if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
             raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
-        review = engine.run(prompt, cwd, model, effort, False,
-                            timeout=600, **_progress_kwargs(on_progress))
-        attempts.append(_attempt("consolidation", engine, review))
-        if review.error:
-            raise rc.CensusError(f"consolidation failed (exit {review.returncode})")
-        settlement = rc.parse_settlement(
-            review.text, source_ids=source_ids, assessment_ids=assessment_ids, role="census",
+        review, settlement, call_attempts = _staged_call(
+            role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
+            model=model, effort=effort, timeout=600, on_progress=on_progress,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=source_ids, source_severities=source_severities,
+                assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
+                class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
+                role="census",
+            ),
+        )
+        attempts.extend(call_attempts)
+        rc.resolve_anchors(
+            settlement, root=cwd,
+            plan_lines=plan_lines,
         )
     else:
         role = "final" if phase == "final" else "correction"
         existing = [d["id"] for d in state.get("debt", []) if d.get("status") == "open"]
         stage_body = json.dumps({
             "role": role, "stakes": stakes, "existing_debt": state.get("debt", []),
-            "active_classes": active_ids, "artifact": body,
+            "active_classes": active_classes, "artifact": body,
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.STAGED_FOLLOWUP_INSTRUCTIONS, stage_body)
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
             raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
-        review = engine.run(prompt, cwd, model, effort, False,
-                            timeout=1200, **_progress_kwargs(on_progress))
-        attempts.append(_attempt(role, engine, review))
-        if review.error:
-            raise rc.CensusError(f"{role} failed (exit {review.returncode})")
-        settlement = rc.parse_settlement(
-            review.text, source_ids=[], assessment_ids=active_ids if role == "final" else [],
-            known_debt=existing, role=role,
+        review, settlement, call_attempts = _staged_call(
+            role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
+            timeout=1200, on_progress=on_progress,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=active_ids if role == "final" else [],
+                class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
+                known_debt=existing, role=role,
+            ),
+        )
+        attempts.extend(call_attempts)
+        rc.resolve_anchors(
+            settlement, root=cwd,
+            plan_lines=plan_lines,
         )
 
     draft = cc.copy_lineage(lineage)
@@ -147,6 +268,8 @@ def _staged_structural_review(
     cc.save_lineage(closure.state_root, lineage)
     closure._settled = True
     closure.register_status = f"staged {phase} parsed"
+    closure.staged_settlement = settlement
+    review = replace(review, text=rc.render_review(settlement))
     trailer = rc.trailer(state)
     if mode == cc.PLAN_MODE:
         trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
@@ -371,6 +494,7 @@ def critique_branch(
             project_summary=project_summary, diff_intent=diff_intent, focus=focus,
             already=already, model=model, effort=effort, web_search=web_search,
             max_packet_chars=max_packet_chars, calibration=calibration,
+            stakes=stakes or "",
             log_dir=log_dir, now=now, on_progress=on_progress,
             closure_on=closure_on, closure_args=arguments,
             review_round=arguments.get("round"), include_unc=include_unc,
@@ -411,6 +535,7 @@ def _converge_branch_review(
     web_search: bool,
     max_packet_chars: int,
     calibration: str | None,
+    stakes: str,
     log_dir: Path,
     now: Clock,
     on_progress: Callable[[str], None] | None,
@@ -462,12 +587,18 @@ def _converge_branch_review(
 
         with worktree_at(repo, head_id) as wt:
             if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
-                review, trailer, attempt_ledger = _staged_structural_review(
-                    engine=engine.for_role(eng.ROLE_REPOSITORY), cwd=wt, model=model,
-                    effort=effort, mode=cc.BRANCH_MODE, body=_prepend(calibration, packet),
-                    closure=closure, stakes=calibration or "", snapshot=head_id,
-                    round_no=review_round or 1, on_progress=on_progress,
-                )
+                try:
+                    review, trailer, attempt_ledger = _staged_structural_review(
+                        engine=engine.for_role(eng.ROLE_REPOSITORY), cwd=wt, model=model,
+                        effort=effort, mode=cc.BRANCH_MODE, body=_prepend(calibration, packet),
+                        closure=closure, stakes=stakes, snapshot=head_id,
+                        round_no=review_round or 1, on_progress=on_progress,
+                    )
+                except rc.CensusError as error:
+                    review, trailer, attempt_ledger = _settle_staged_failure(
+                        closure, stakes=stakes, snapshot=head_id, error=error,
+                        mode=cc.BRANCH_MODE,
+                    )
             else:
                 review = engine.run(prompt, wt, model, effort, web_search,
                                     **_progress_kwargs(on_progress))
@@ -496,7 +627,8 @@ def _converge_branch_review(
           # The retry's register is what actually changed durable state, so it belongs in
           # the audit record; the original review only carries the malformed attempt.
           "retry_register": closure.retry_register if closure else None,
-          "attempt_ledger": attempt_ledger})
+          "attempt_ledger": attempt_ledger,
+          "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
     body = _footer(review, engine)
     if closure and closure.retry_register:
         # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
@@ -620,6 +752,16 @@ def critique_plan(
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
 
+    if closure and closure.lineage is not None:
+        prior_review = closure.lineage.review_state
+        current_stakes_digest = rc.digest(stakes or "")
+        if prior_review and prior_review.get("stakes_digest") != current_stakes_digest:
+            closure.lineage.claim_state = pc.empty_state()
+            closure.lineage.classes = {
+                cid: replace(cls, status=cc.OPEN) if not cls.mechanized else cls
+                for cid, cls in closure.lineage.classes.items()
+            }
+            blocks = closure._blocks()
     claim_state: dict[str, Any] = (
         closure.lineage.claim_state
         if closure and closure.lineage is not None
@@ -634,6 +776,7 @@ def critique_plan(
     )
     claim_status = "disabled"
     claim_duration_ms: int | None = None
+    attempt_ledger: list[dict[str, Any]] = []
     if claim_verification:
         claim_started = time.monotonic()
         if closure and closure.unavailable:
@@ -652,6 +795,7 @@ def critique_plan(
                     engine=engine, repo=repo, model=model, effort=effort,
                     plan_repo_path=plan_repo_path,
                     on_progress=on_progress,
+                    attempt_ledger=attempt_ledger,
                     deadline=(
                         min(
                             plan_deadline - PLAN_TEARDOWN_RESERVE_SEC,
@@ -683,7 +827,6 @@ def critique_plan(
         closure.claims_enabled = claim_verification
         closure.claim_state = claim_state
 
-    attempt_ledger: list[dict[str, Any]] = []
     try:
         body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -691,7 +834,10 @@ def critique_plan(
         if closure:
             instructions += "\n\n" + prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS
         prompt = prompts.compose(instructions, _prepend(calibration, body))
-        if type(engine) in (eng.CodexEngine, eng.ClaudeEngine) and claim_verification:
+        staged_profile = bool(
+            closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+        )
+        if type(engine) in (eng.CodexEngine, eng.ClaudeEngine) and (claim_verification or closure):
             parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
             snapshot = orientation.wrap_commit(
                 repo,
@@ -707,9 +853,13 @@ def critique_plan(
                     "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                     "prefix as the project root; no live Git or web tools are available."
                 )
+                staged_phase = (
+                    closure.lineage.review_state.get("phase", "census")
+                    if closure and closure.lineage else "census"
+                )
+                structural_reserve = 2160 if staged_phase == "census" else 1560
                 if plan_deadline is not None and (
-                    time.monotonic() + PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC
-                    + PLAN_TEARDOWN_RESERVE_SEC > plan_deadline
+                    time.monotonic() + structural_reserve > plan_deadline
                 ):
                     review = Review(
                         text=(
@@ -725,12 +875,20 @@ def critique_plan(
                         "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                         "prefix as the project root; no live Git or web tools are available."
                     )
-                    review, trailer, attempt_ledger = _staged_structural_review(
-                        engine=reviewer, cwd=review_cwd, model=model, effort=effort,
-                        mode=cc.PLAN_MODE, body=_prepend(calibration, staged_body),
-                        closure=closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
-                        round_no=arguments.get("round") or 1, on_progress=on_progress,
-                    )
+                    try:
+                        review, trailer, structural_attempts = _staged_structural_review(
+                            engine=reviewer, cwd=review_cwd, model=model, effort=effort,
+                            mode=cc.PLAN_MODE, body=_prepend(calibration, staged_body),
+                            closure=closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
+                            round_no=arguments.get("round") or 1, on_progress=on_progress,
+                            plan_lines=len(plan_text.splitlines()),
+                        )
+                    except rc.CensusError as error:
+                        review, trailer, structural_attempts = _settle_staged_failure(
+                            closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
+                            error=error, mode=cc.PLAN_MODE,
+                        )
+                    attempt_ledger.extend(structural_attempts)
                 else:
                     review = reviewer.run(
                         isolated_prompt, review_cwd, model, effort, False,
@@ -739,7 +897,7 @@ def critique_plan(
                     )
                 if closure:
                     closure.deadline = plan_deadline
-                if closure and not attempt_ledger:
+                if closure and not staged_profile:
                     trailer = closure.settle(
                         review, reviewer, review_cwd, model, effort, False, on_progress,
                     )
@@ -770,11 +928,9 @@ def critique_plan(
         "claim_verification": claim_verification,
         "claim_status": claim_status,
         "claim_duration_ms": claim_duration_ms,
-        "claim_model_calls": (
-            0 if claim_status.startswith("reused ")
-            else 2 if claim_status.startswith("parsed after retry") or "retry" in claim_status
-            else 1
-        ) if claim_verification and claim_status != "state-unavailable" else 0,
+        "claim_model_calls": sum(
+            1 for item in attempt_ledger if str(item.get("role", "")).startswith("claim-")
+        ),
         "claim_counts": {
             verdict: sum(
                 1 for claim in pc.normalize_state(claim_state)["claims"].values()
@@ -785,6 +941,7 @@ def critique_plan(
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
         "attempt_ledger": attempt_ledger,
+        "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
     })
     body_text = _footer(review, engine) + _stakes_notice(no_stakes)
     if closure and closure.retry_register:
@@ -814,6 +971,7 @@ def _verify_plan_claims(
     effort: str,
     plan_repo_path: str | None,
     on_progress: Callable[[str], None] | None,
+    attempt_ledger: list[dict[str, Any]] | None = None,
     deadline: float | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Run exhaustive round 1, then verify only the external-claim edit cone."""
@@ -860,12 +1018,15 @@ def _verify_plan_claims(
         captured_engine = _CapturedClaimEngine(
             engine, plan_text=plan_text, repo=repo, plan_repo_path=plan_repo_path,
             prior_state=prior_state, frozen_ids=frozen, deadline=deadline,
+            attempt_ledger=attempt_ledger,
         )
         claim_engine = captured_engine
     review = claim_engine.run(
         prompt, repo, model, effort, True, timeout=1800,
         **_progress_kwargs(on_progress),
     )
+    if captured_engine is None and attempt_ledger is not None:
+        attempt_ledger.append(_attempt("claim-audit", engine, review).json())
     if review.error:
         error = pc.AuditError(
             f"claim-audit reviewer failed (exit {review.returncode})", review.raw or review.text
@@ -903,6 +1064,8 @@ def _verify_plan_claims(
             ), repo,
             model, effort, True, timeout=1800, **_progress_kwargs(on_progress),
         )
+        if captured_engine is None and attempt_ledger is not None:
+            attempt_ledger.append(_attempt("claim-audit-retry", engine, retry).json())
         if retry.error:
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
@@ -965,6 +1128,7 @@ class _CapturedClaimEngine:
         plan_repo_path: str | None, prior_state: dict[str, Any] | None = None,
         frozen_ids: frozenset[str] = frozenset(),
         deadline: float | None = None,
+        attempt_ledger: list[dict[str, Any]] | None = None,
     ) -> None:
         self.engine = engine
         self.plan_text = plan_text
@@ -973,6 +1137,7 @@ class _CapturedClaimEngine:
         self.prior_state = prior_state or {}
         self.frozen_ids = frozen_ids
         self.deadline = deadline
+        self.attempt_ledger = attempt_ledger
         self.model_calls = 0
         self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
         self.binding_engine: Engine | None = None
@@ -1001,6 +1166,7 @@ class _CapturedClaimEngine:
         first = discoverer.run(
             prompt, self.launch, model, effort, True, **discovery_kwargs,
         )
+        self._record("claim-discovery", discoverer, first)
         if first.error or not first.session_ref:
             return first
         raw_parts = [first.raw]
@@ -1019,6 +1185,7 @@ class _CapturedClaimEngine:
                 ),
                 self.launch, model, effort, True, **discovery_kwargs,
             )
+            self._record("claim-discovery-retry", discoverer, corrected)
             raw_parts.append(corrected.raw)
             if corrected.error or not corrected.session_ref:
                 return corrected
@@ -1097,6 +1264,10 @@ class _CapturedClaimEngine:
         self.model_calls += 1
         return PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
 
+    def _record(self, role: str, engine: Engine, review: Review) -> None:
+        if self.attempt_ledger is not None:
+            self.attempt_ledger.append(_attempt(role, engine, review).json())
+
     @staticmethod
     def _deadline_failure(
         error: pc.AuditError, session_ref: str | None = None,
@@ -1134,6 +1305,7 @@ class _CapturedClaimEngine:
         corrected = role.resume(
             session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
         )
+        self._record("claim-binding-outer-retry", role, corrected)
         if corrected.error or self.discovery is None:
             return corrected
         try:
@@ -1255,6 +1427,7 @@ class _CapturedClaimEngine:
                 current_session, instruction, self.launch, model, effort, False,
                 **call_kwargs,
             )
+            self._record("claim-binding", self.binding_engine, review)
             reviews.append(review)
             if review.error or not review.session_ref:
                 raise pc.AuditError("captured-text binding call failed", review.raw)
@@ -1268,6 +1441,7 @@ class _CapturedClaimEngine:
                     f"{PLAN_BINDING_MARKER} object for exactly this batch.\n\n{rendered}",
                     self.launch, model, effort, False, **call_kwargs,
                 )
+                self._record("claim-binding-retry", self.binding_engine, correction)
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
                     raise pc.AuditError("captured-text binding correction failed", correction.raw)
@@ -1431,6 +1605,7 @@ class _CapturedClaimEngine:
         review = attester.run(
             prompt, self.launch, model, effort, False, timeout=timeout,
         )
+        self._record("claim-attestation", attester, review)
         self.attestation_raw = review.raw
         if review.error:
             return review

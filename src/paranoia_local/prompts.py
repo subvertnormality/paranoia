@@ -301,15 +301,26 @@ of merged findings. Every blocking governing finding needs exactly one open debt
 only === REVIEW SETTLEMENT JSON === followed by one JSON object with: role, source_dispositions,
 assessment_dispositions, findings, debt, debt_updates, and class_records. Class record op is one of
 new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
-operation. Do not emit prose."""
+operation. A new/replace record has op, invariant, severity and either pattern+pathspec (branch)
+or procedure (plan), with class_id additionally required for replace. Close/reopen has only op and
+class_id; reclassify additionally has severity. Use these exact row shapes:
+source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
+assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
+findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
+debt=[{"id":"D1","finding_id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"status":"open"}];
+debt_updates=[]; class_records=[]. Do not emit prose."""
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
 is targeted to every open debt item and effects of its repair. Final is a fresh cold whole-artifact
 review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
 followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
-debt, debt_updates, and class_records. Account for every existing debt exactly once. Final must
-assess every active class exactly once; a violated class creates a finding and open debt."""
+debt, debt_updates, class_records and, for final, coverage plus class_assessments. Account for every
+existing debt exactly once. Final must include all nine checklist IDs and assess every active class
+exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
+census settlement; each debt update is {"id":"D1","status":"closed|open","evidence":["path:1"]}.
+Correction returns empty source/assessment dispositions. Final returns empty source dispositions
+and one assessment disposition per class."""
 
 
 # ── class closure ─────────────────────────────────────────────────────────────

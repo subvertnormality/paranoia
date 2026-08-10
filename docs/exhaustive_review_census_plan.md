@@ -89,15 +89,17 @@ name a source finding. Settlement maps every assessment ID exactly once: `violat
 concrete debt and, when the class was closed, either `REOPEN` or one atomic `REPLACE` that retires
 the predecessor and creates an open successor with the corrected invariant, severity and procedure.
 `REPLACE` is the staged representation of existing supersession semantics; it never emits a second
-transition against the predecessor. `satisfied` requires `CLOSED` when the class was open and no
-transition when it was already closed. Omission, contradiction, or two operations against one class
+transition against the predecessor. A satisfied open unmechanised class requires `CLOSED`; a
+mechanised class remains governed by its snapshot predicate. No transition is needed for an already
+closed satisfied class. Omission, contradiction, or two operations against one class
 rejects the whole settlement. This makes recurrence mechanically blocking before a blocker-free
 census can use immediate clearance without repeating the class context in all three lane prompts.
 
-The lane returns one strict JSON manifest: lane/snapshot/stakes digests, every checklist ID exactly
+The lane returns one strict JSON manifest: its lane, every checklist ID exactly
 once with `covered|finding|not_applicable`, a bounded summary and one or more resolved evidence
 anchors, every required integrity class assessment, and every finding with lane-scoped ID, severity,
-summary, resolved evidence anchors, and remedy. The manifest is governing; prose is optional diagnostics.
+summary, resolved evidence anchors, and remedy. Stakes and snapshot identity are server-owned inputs;
+the manifest is governing and extra prose is rejected.
 The server rejects missing/duplicate checklist IDs, dangling findings, invalid severity, and
 unresolvable plan/repository/diff anchors. It does not claim to validate semantic entailment or
 enumerate every paragraph and hunk. One same-session correction names the exact schema error; a
@@ -119,17 +121,15 @@ remains only on unstaged one-shot paths.
 
 A valid census costs four model calls over two serial wall-clock phases. The bounded worst case is
 eight calls when all four replies need their one format correction. All limits use Python Unicode
-characters. The existing `MAX_PACKET_CHARS = 400_000` evidence-packet contract remains unchanged.
-Each active-claim projection is capped at 8,000 characters after the binding limits above, so the
-existing 500-claim maximum contributes at most 4,000,000 characters; current retirements have a
-separate 500,000-character aggregate bound. The staged lane's exact complete prompt therefore has
-a separate 5,000,000-character ceiling: this composes
-the maximum claim projection with the existing packet, instructions, stakes and class context
-without consuming artifact capacity. Each lane envelope is
+characters. The existing `MAX_PACKET_CHARS = 400_000` branch evidence-packet contract remains
+unchanged. Plan review passes the complete active claim register and current retirements; it does
+not truncate evidence that may change authority or entailment. Each exact staged lane prompt has a
+5,000,000-character ceiling, and an oversized prompt persists visible format debt rather than
+running partially or clearing. Each lane envelope is
 capped at 48,000 characters, with 2,000-character summaries/remedies and 512-character anchors.
 New class invariant/procedure fields are capped at 1,000/2,000 characters and total rendered active
 class context at 64,000 characters. Before a lane call, render its exact prompt and reject over
-5,000,000 characters; do not further truncate an already valid evidence packet. Consolidation has no
+5,000,000 characters; do not truncate a valid evidence packet. Consolidation has no
 artifact packet and retains a 400,000-character exact-prompt ceiling; three maximum lane envelopes
 leave more than 250,000 characters for its instructions, stakes, and class context. The plan
 prototype's complete raw four-call JSON record was 46,708 bytes.
@@ -212,19 +212,16 @@ inferred from a status string.
   atomically; this is not encoded as `REOPEN` plus another transition.
 - Add census, correction and final instruction blocks in `prompts.py`; retain the existing review
   sections, claim packets and class-register semantics.
-- Add one shared handler runner for three parallel calls plus consolidation. Plan and branch use it
-  only in census; existing single-review paths implement correction and final.
+- Add one shared handler runner for three parallel calls plus consolidation and for the targeted
+  correction/final calls.
 - Thread the same small attempt-ledger collector through plan discovery, capture binding,
   attestation, every retry, and structural calls; expose its rows in the existing audit JSON.
 - Extend current closure preparation/settlement with stakes, phase and concrete finding debt.
 - Preserve plan claim verification exactly: authoritative server-captured web evidence remains
   default-on, frozen unchanged supported claims avoid repeat web/model calls, and structural lanes
   receive the complete active claim register and current-round retirements with live web disabled,
-  preserving the canonical cold-review invariant. Each claim carries its proposition, replacement,
-  source URL/location and up to two decisive passages; durable state retains extra corroboration.
-  Ingestion bounds all rendered fields and each selected exact passage, while the aggregate exact
-  renderer caps each claim record at 8,000 characters. Existing oversized state returns
-  `STATE-OVERSIZED` and cannot clear.
+  preserving the canonical cold-review invariant. The exact composed prompt is checked before each
+  call; existing oversized state returns explicit staged debt and cannot clear.
 - Keep `AGENTS.md` and `CLAUDE.md` amendments already made: census/final are broad and cold;
   correction is targeted to open debt and correction effects.
 - Update README and tool schemas with default phases, costs, autonomous correction workflow,
@@ -233,11 +230,10 @@ inferred from a status string.
 
 ## 6. Deadlines and failure
 
-Create one monotonic 3,540-second tracked-review deadline for both modes. Census reserves 900 seconds
-for the parallel lanes, 600 for consolidation, and 60 for persistence/teardown. Correction/final
-reserve 1,200 seconds for the primary call, 300 for their sole format/register retry, and 60 for
-teardown. Preflight the complete applicable reserve and pass bounded remaining time to every
-`run`/`resume`; do not let engine defaults outlive the whole call.
+Plan review keeps its existing monotonic 3,540-second whole-review deadline and reserves the
+complete structural phase before starting it. In both modes, each census lane has a 900-second
+timeout, consolidation 600 seconds, correction/final 1,200 seconds, and a format correction at
+most 300 seconds. The three census lanes run concurrently.
 
 Plan evidence gathering can consume most of a request. If the full census reserve no longer fits,
 persist valid claim progress, leave phase and structural round unchanged, and return explicit
@@ -261,18 +257,11 @@ transitions/migration, stakes reset, concrete debt and deadline arithmetic. They
 closed active class recurring in an otherwise clean census is assessed by the integrity lane,
 registered as durable debt, and blocks clearance.
 
-Scripted handler tests cover concurrent byte-identical inputs; four-call valid census; one bounded
-format correction; sibling diagnostics; correction → required final → convergence/reopen; census
-immediate convergence; claim progress with structural phase unchanged; branch predicate sweeping;
-all active-class visibility in final; and unchanged one-shot/`converge:false` contracts. Maximum
-300 KB plan and 400 KB branch fixtures, maximum supported class context, and three maximum valid
-lane envelopes must fit the exact rendered requests without content truncation. A non-ASCII fixture
-proves limits count characters rather than UTF-8 bytes; an oversized legacy state visibly blocks.
-The plan maximum-shape fixture also carries 500 maximum 8,000-character active claim records plus
-current retirements and proves the complete lane prompt remains within 5,000,000 characters. Final tests
-require exact-one class assessment and exercise a closed recurrence settled by atomic `REPLACE`.
-Attempt-ledger tests enumerate discovery, binding batches, attestation, census lanes,
-consolidation, correction, final, and format retries exactly once.
+Scripted handler tests cover the four-call valid census, structural-only tracked plan entry,
+one bounded format correction, correction → required final, complete final coverage/class
+assessment, exact severity/debt retention, resolved anchors, atomic `REPLACE`, attempt logging, and
+the unchanged injected-engine/one-shot contracts. Real acceptance below supplies the provider and
+maximum-real-input coverage that fake-backed tests cannot establish.
 
 Pre-PR real gates:
 
