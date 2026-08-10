@@ -307,7 +307,9 @@ TOOLS: list[Tool] = [
             "counterbalanced option order under its own opaque labels. Python computes the "
             "verdict: CONVERGED only on a unanimous, unblocked, evidence-substantiated choice. "
             "On divergence it runs one fact-only reconciliation round, and only when there is "
-            "novel evidence to carry. Up to 8 agent turns across both subscriptions. "
+            "novel evidence to carry. Each malformed decider reply gets one bounded full-reply "
+            "correction; execution failures are not retried. All phases remain inside the "
+            "whole-call deadline. "
             "SHAPE THE INPUT LIKE THIS: put every shared fact and the FULL specification of "
             "whatever only one option adopts into `context`, prefaced as 'the rules under "
             "consideration, if adopted'; leave each option statement to say only how much of it "
@@ -371,6 +373,7 @@ TOOLS: list[Tool] = [
                 "web_search": _COMMON["web_search"],
                 "research": {
                     "type": "boolean",
+                    "default": True,
                     "description": (
                         "Run shared authoritative external research before voting (default true). "
                         "Provider search discovers URLs; the server downloads and extracts pages, "

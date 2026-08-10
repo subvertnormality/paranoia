@@ -5,6 +5,7 @@ both deciders, that labels are cleared against the real repository, that the
 round-2 gate is consulted before spending, and that the trailer tells the truth.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -191,6 +192,75 @@ def test_converged(repo: Path, tmp_path: Path):
     assert trailer_field(report, "ADVISORY") == "none"
 
 
+def test_malformed_decider_reply_gets_one_full_correction(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+    claude_attempts = 0
+
+    def flaky(**kwargs):
+        nonlocal claude_attempts
+        text = scripted(**kwargs)
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            claude_attempts += 1
+            if claude_attempts == 1:
+                return "AUTHORITY: technical\n" + text
+        return text
+
+    report = run(repo, flaky, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    decider_calls = [call for call in scripted.calls if call["cwd"] is not None]
+    assert [call["engine"] for call in decider_calls].count("codex") == 1
+    assert [call["engine"] for call in decider_calls].count("claude") == 2
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    claude = record["rounds"][0]["claude"]
+    assert len(claude["attempts"]) == 2
+    assert "reply mentions AUTHORITY:" in claude["attempts"][0]["rejection"]
+    assert claude["attempts"][1]["rejection"] is None
+    assert "FORMAT CORRECTION" in claude["attempts"][1]["body"]
+
+
+def test_decider_reply_fails_after_exactly_one_correction(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+
+    def always_bad_claude(**kwargs):
+        text = scripted(**kwargs)
+        return (
+            "SELECTED: duplicated too early\n" + text
+            if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude"
+            else text
+        )
+
+    report = run(repo, always_bad_claude, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "reply remained invalid after one correction" in report
+    decider_calls = [call for call in scripted.calls if call["cwd"] is not None]
+    assert [call["engine"] for call in decider_calls].count("codex") == 1
+    assert [call["engine"] for call in decider_calls].count("claude") == 2
+
+
+def test_decider_execution_failure_is_not_retried(repo: Path, tmp_path: Path):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+    claude_calls = 0
+
+    def failed_claude(**kwargs):
+        nonlocal claude_calls
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            claude_calls += 1
+            raise RuntimeError("provider unavailable")
+        return scripted(**kwargs)
+
+    report = run(repo, failed_claude, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "provider unavailable" in report
+    assert claude_calls == 1
+
+
 def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
     repo: Path, tmp_path: Path, monkeypatch,
 ):
@@ -254,6 +324,23 @@ def test_default_research_injects_one_shared_captured_packet_before_voting(
     assert len(decider_calls) == 2
     assert all(call["web_search"] is False for call in decider_calls)
     assert all(packet_id in call["body"] for call in decider_calls)
+
+
+def test_research_false_is_the_explicit_repository_only_switch(
+    repo: Path, tmp_path: Path,
+):
+    def researcher(**kwargs):
+        pytest.fail("research must not run when explicitly disabled")
+
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False},
+        log_dir=tmp_path / "logs", engines=ENGINES, run_agent=agent,
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "RESEARCH") == "repository-only"
 
 
 def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(

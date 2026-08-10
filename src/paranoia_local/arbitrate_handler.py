@@ -54,6 +54,15 @@ def _default_clock() -> str:
 
 
 @dataclass(frozen=True)
+class DeciderAttempt:
+    """One complete decider reply, including why a superseded reply was rejected."""
+
+    body: str
+    raw: str
+    rejection: str | None = None
+
+
+@dataclass(frozen=True)
 class Cast:
     """One decider's turn: the vote, the exact prompt body it saw, and its raw
     reply. The prompt and reply are kept so the audit can reconstruct the decision
@@ -62,6 +71,7 @@ class Cast:
     vote: Vote
     body: str
     raw: str
+    attempts: tuple[DeciderAttempt, ...] = ()
 
 
 @dataclass
@@ -892,6 +902,7 @@ def _arbitrate(
                         **_vote_record(cast.vote),
                         "prompt": cast.body,
                         "reply": cast.raw,
+                        "attempts": [asdict(attempt) for attempt in cast.attempts],
                     }
                     for cast in casts
                 }
@@ -1318,14 +1329,38 @@ def _fan_out(
         body = render_decider_body(packet, presentation, tuple(carried.get(engine.name, ())))
         with inert_tree.evidence_workspace(repo, snapshot) as workspace:
             review_cwd = workspace.cwd_for(engine.name)
-            text = agent(
-                engine_name=engine.name,
-                model=models.get(engine.name) or engine.default_model,
-                instructions=prompts.ARBITRATE_INSTRUCTIONS,
-                body=body, cwd=review_cwd, effort=effort, web_search=False,
-                timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
-            )
-        return Cast(vote=arb.parse_verdict(text, presentation), body=body, raw=text)
+            attempt_body = body
+            attempts: list[DeciderAttempt] = []
+            for attempt in range(2):
+                text = agent(
+                    engine_name=engine.name,
+                    model=models.get(engine.name) or engine.default_model,
+                    instructions=prompts.ARBITRATE_INSTRUCTIONS,
+                    body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
+                    timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
+                )
+                try:
+                    vote = arb.parse_verdict(text, presentation)
+                except ArbitrationError as exc:
+                    attempts.append(DeciderAttempt(attempt_body, text, str(exc)))
+                    if attempt == 1:
+                        raise ArbitrationError(
+                            f"reply remained invalid after one correction: {exc}"
+                        ) from exc
+                    attempt_body = (
+                        body
+                        + "\n\n=== FORMAT CORRECTION ===\n"
+                        + f"Your previous reply was rejected: {str(exc)[:1000]}\n"
+                        + "Fix exactly that. Return one complete replacement reply. Do not "
+                        "quote, preview, or discuss any trailer field name in the prose before "
+                        "the final trailer block."
+                    )
+                    continue
+                attempts.append(DeciderAttempt(attempt_body, text))
+                return Cast(
+                    vote=vote, body=attempt_body, raw=text, attempts=tuple(attempts),
+                )
+        raise AssertionError("bounded decider correction loop did not return")
 
     with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
         futures = {engine.name: pool.submit(one, engine) for engine in deciders}

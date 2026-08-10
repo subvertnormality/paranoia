@@ -830,8 +830,11 @@ whose active claims are all supported makes zero claim-model calls. The normal s
 review still runs in every round and remains the dominant irreducible cost of convergence.
 
 `arbitrate` is the expensive one and the only tool that spends from **both**
-subscriptions in a single call: typically 4 agent turns, 8 at worst (a cleaning
-retry plus a reconciliation round).
+subscriptions in a single call. Research is on unless `research: false` explicitly
+selects repository-only mode. A parser-rejected decider reply receives one
+complete correction attempt while the sibling result and completed cleaning/research
+work are retained; execution failures are not retried. Every attempt remains subject
+to the phase cap and 3,600-second whole-call deadline.
 
 ---
 

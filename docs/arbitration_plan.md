@@ -11,7 +11,9 @@
 > repository-only mode. Deciders now read inert raw-tree materializations rather than Git
 > worktrees, so repository-controlled Git helpers and executable/symlink semantics are not part
 > of evidence presentation. Where this historical brief says otherwise, the current research
-> plan and README describe the shipped contract.
+> plan and README describe the shipped contract. The shipped handler also gives a parser-rejected
+> decider reply one bounded full-reply correction while retaining its completed sibling; the
+> eight-turn accounting later in this historical brief is therefore no longer normative.
 
 Status: FINAL for implementation, revision 11. Ten codex adversarial-review rounds
 folded — round 1: 1 FATAL, 9 MAJOR, 4 MINOR; round 2: 2 FATAL, 9 MAJOR, 3 MINOR;

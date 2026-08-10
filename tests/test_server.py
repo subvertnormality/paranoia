@@ -51,6 +51,7 @@ class TestToolListing:
         props = tool.inputSchema["properties"]
         assert "engine" not in props and "model" not in props
         assert set(props["models"]["properties"]) == {"codex", "claude"}
+        assert props["research"]["default"] is True
 
     def test_critique_branch_requires_repo_path(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
