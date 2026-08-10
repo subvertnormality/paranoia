@@ -509,6 +509,62 @@ def test_round_two_runs_on_disjoint_evidence_and_can_converge(repo: Path, tmp_pa
     assert "ROUND-2 FLIPS" in report
 
 
+def test_round_two_converges_when_source_grounded_voter_holds(
+    repo: Path, tmp_path: Path,
+):
+    (repo / "other.py").write_text("A = 1\nB = 2\nC = 3\nD = 4\nE = 5\n")
+    commit_all(repo, "other")
+    candidate = es.CandidateSource(
+        "https://docs.example.com/numeric", "Numeric docs", "Example",
+        "primary", "Example defines the numeric API", "supports_claim",
+    )
+    claim = ar.DiscoveryClaim(
+        "behavior", "The API preserves decimal values exactly.", candidate,
+    )
+    capture = es.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        "The API preserves decimal values exactly.",
+    )
+    bound = es.BoundSource(
+        candidate, capture, "Numeric types",
+        "The API preserves decimal values exactly.",
+    )
+    packet_id = es.packet_id(claim.proposition, bound)
+
+    def researcher(**kwargs):
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (claim,), (bound,), (capture,),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    source_fields = {
+        "constraint": claim.proposition,
+        "decisive": f"SOURCE:{packet_id}",
+        "citations": "app.py:4",
+        "publisher_authority": "YES — the publisher defines the API",
+        "passage_entailment": "YES — the passage states the proposition",
+        "decision_relevance": "YES — exact decimals distinguish the options",
+    }
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda engine, rnd: picks.get((engine, rnd), "opt-decimal"),
+        extra={
+            ("codex", 1): {"decisive": "other.py:3"},
+            ("codex", 2): {"decisive": "app.py:4"},
+            ("claude", 1): source_fields,
+            ("claude", 2): source_fields,
+        },
+    )
+    args = {k: v for k, v in BASE.items() if k != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo)}, log_dir=tmp_path / "logs",
+        engines=ENGINES, run_agent=agent, run_research=researcher,
+        now=lambda: "20260727T120000",
+    )
+    assert trailer_field(report, "ROUNDS") == "2"
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+
+
 def test_round_two_is_withheld_when_both_cite_the_same_region(repo: Path, tmp_path: Path):
     """Both already hold the bytes: a second round would be a fresh sample."""
     picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}

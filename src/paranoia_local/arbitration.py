@@ -949,7 +949,7 @@ def substantiation(
         if isinstance(vote.decisive, SourceReference):
             packet = (source_packets or {}).get(vote.decisive.packet_id)
             out[vote.engine] = bool(
-                carried is None
+                (carried is None or (moved is not None and vote.engine not in moved))
                 and packet
                 and packet[1]
                 and normalize_text(vote.constraint) == normalize_text(packet[0])

@@ -289,6 +289,26 @@ def test_source_reference_with_negative_relevance_is_unsubstantiated():
     )[p.engine]
 
 
+def test_round_two_source_reference_substantiates_only_a_prior_holder():
+    p = _pres()
+    vote = arb.parse_verdict(trailer(
+        p.items[0][0], decisive="SOURCE:src-0123456789abcdef",
+        constraint="The API retries twice.",
+        publisher_authority="YES — vendor docs",
+        passage_entailment="YES — exact statement",
+        decision_relevance="YES — it distinguishes the options",
+    ), p)
+    packets = {"src-0123456789abcdef": ("The API retries twice.", True)}
+    assert arb.substantiation(
+        [vote], resolve=lambda _citation: None, carried={p.engine: []},
+        moved=set(), source_packets=packets,
+    )[p.engine]
+    assert not arb.substantiation(
+        [vote], resolve=lambda _citation: None, carried={p.engine: []},
+        moved={p.engine}, source_packets=packets,
+    )[p.engine]
+
+
 def test_a_trailer_field_before_the_block_is_rejected():
     """Round-10 blocker: reading only the closing lines silently discarded an earlier
     field, so a reply could state `SELECTED-RISK: [MAJOR] …` and then close with
