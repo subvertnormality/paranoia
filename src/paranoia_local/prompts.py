@@ -286,8 +286,9 @@ def compose(instructions: str, body: str) -> str:
 
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
 Read the complete supplied artifact and repository. Own every checklist item from your lane's
-perspective. Report all in-scope severities; do not defer issues to another lane. Evidence anchors
-must resolve to plan sections or repository path:line locations. Return only:
+perspective. Report all in-scope severities; do not defer issues to another lane. Cite the reviewed
+plan itself only as `plan:<line>` (never by its repository path); cite other supplied files as
+repository path:line locations. Every evidence anchor must resolve. Return only:
 === REVIEW CENSUS JSON ===
 {"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"],"finding_ids":[]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
 Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
@@ -327,6 +328,8 @@ and one assessment disposition per class. The task's checklist array is governin
 final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
 "summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
 "class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
+A plan artifact must be cited only as `plan:<line>`, never by its repository path; other supplied
+files use repository path:line anchors. Every anchor must resolve.
 A finding row names one or more findings, all other coverage rows name none, and every finding is
 named by coverage."""
 

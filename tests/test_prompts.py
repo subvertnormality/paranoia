@@ -108,6 +108,16 @@ class TestRebutInstructions:
         assert "hold" in t
 
 
+class TestStagedReviewInstructions:
+    def test_plan_anchors_have_one_unambiguous_spelling(self) -> None:
+        for text in (
+            prompts.STAGED_CENSUS_INSTRUCTIONS,
+            prompts.STAGED_FOLLOWUP_INSTRUCTIONS,
+        ):
+            assert "`plan:<line>`" in text
+            assert "never by its repository path" in text
+
+
 class TestCompose:
     def test_joins_instructions_and_body(self) -> None:
         out = prompts.compose("INSTRUCTIONS", "BODY")
