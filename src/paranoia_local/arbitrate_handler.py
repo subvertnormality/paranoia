@@ -1062,7 +1062,7 @@ def _failed_decision_report(
             snapshot=snapshot,
             seed=seed,
             refs_moved=refs_moved,
-            audit=str(audit) if audit else "none",
+            audit=str(audit) if audit else "FAILED could not write log",
             rounds=len(completed),
             research=research,
             research_digest=digest,

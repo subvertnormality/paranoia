@@ -904,6 +904,26 @@ def test_audit_failure_is_surfaced_not_swallowed(repo: Path, tmp_path: Path, mon
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"  # verdict still returned
 
 
+def test_terminal_correction_audit_failure_is_surfaced(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    scripted = Agent(lambda e, r: "opt-float")
+
+    def malformed_claude(**kwargs):
+        text = scripted(**kwargs)
+        return (
+            "AUTHORITY: duplicated too early\n" + text
+            if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude"
+            else text
+        )
+
+    monkeypatch.setattr(ah.logs, "write_log", lambda *a, **k: None)
+    report = run(repo, malformed_claude, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "AUDIT") == "FAILED could not write log"
+
+
 def test_report_pairs_original_with_cleaned(repo: Path, tmp_path: Path):
     agent = Agent(
         lambda e, r: "opt-float",
