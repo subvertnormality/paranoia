@@ -46,6 +46,8 @@ class Attempt:
     outcome: str
     duration_ms: int | None
     usage: dict[str, Any] | None
+    response_sha256: str | None = None
+    response_excerpt: str | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)
@@ -139,11 +141,14 @@ def parse_settlement(
     if obj.get("role") != role:
         raise CensusError(f"settlement role must be {role!r}")
     if role == "final":
-        parsed_final = parse_lane(json.dumps({
-            "lane": "integrity", "coverage": obj.get("coverage"),
-            "findings": obj.get("findings"),
-            "class_assessments": obj.get("class_assessments"),
-        }), lane="integrity", class_ids=assessment_ids)
+        parsed_final = parse_lane(
+            LANE_MARKER + "\n" + json.dumps({
+                "lane": "integrity", "coverage": obj.get("coverage"),
+                "findings": obj.get("findings"),
+                "class_assessments": obj.get("class_assessments"),
+            }),
+            lane="integrity", class_ids=assessment_ids,
+        )
         assessment_ids = [a["class_id"] for a in parsed_final["class_assessments"]]
         assessment_verdicts = {
             a["class_id"]: a["verdict"] for a in parsed_final["class_assessments"]
@@ -179,6 +184,11 @@ def parse_settlement(
             raise CensusError("invalid debt mapping")
         if item["severity"] != by_id[item["finding_id"]]["severity"]:
             raise CensusError("debt severity must equal governing finding severity")
+        if (
+            item["summary"] != by_id[item["finding_id"]]["summary"]
+            or item["evidence"] != by_id[item["finding_id"]]["evidence"]
+        ):
+            raise CensusError("debt summary and evidence must equal its governing finding")
         _anchors(item["evidence"])
     updates = _list(obj, "debt_updates")
     seen_updates: set[str] = set()
@@ -203,6 +213,13 @@ def parse_settlement(
             if cid in operation_by_class:
                 raise CensusError("more than one class operation against one assessment")
             operation_by_class[cid] = record.get("op")
+            if role == "correction" and record.get("op") in {"reclassify", "replace"}:
+                replacement_severity = record.get("severity")
+                prior_severity = class_states[cid][2] if class_states else None
+                if replacement_severity not in rank:
+                    raise CensusError("invalid class severity")
+                if prior_severity and rank[replacement_severity] < rank[prior_severity]:
+                    raise CensusError("correction cannot downgrade an active class")
     for cid, verdict in (assessment_verdicts or {}).items():
         target = disposition_by_class.get(cid)
         if verdict == "violated" and target is None:
@@ -299,7 +316,14 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
         item = old[update["id"]]
         item.update(status=update["status"], evidence=update["evidence"], last_round=round_no)
     for item in settlement.get("debt", []):
-        row = dict(item); row["first_round"] = round_no; row["last_round"] = round_no
+        if item["id"] in old:
+            raise CensusError(f"new debt reuses durable id {item['id']!r}")
+        row = dict(item)
+        row["source_ids"] = [
+            source["source_id"] for source in settlement.get("source_dispositions", [])
+            if source["governing_id"] == item["finding_id"]
+        ]
+        row["first_round"] = round_no; row["last_round"] = round_no
         old[row["id"]] = row
     active = [d for d in old.values() if d.get("status") == "open" and d.get("severity") in BLOCKING]
     next_phase = "correction" if active else ("clear" if phase == "census" else "final" if phase == "correction" else "clear")
@@ -365,9 +389,11 @@ def resolve_anchors(value: Any, *, root: Any, plan_lines: int | None = None) -> 
                 if plan_lines is None or line > plan_lines:
                     raise CensusError(f"unresolvable plan anchor {anchor!r}")
                 continue
-            target = (base / path).resolve()
+            relative = Path(path)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise CensusError(f"unresolvable repository anchor {anchor!r}")
+            target = base / relative
             try:
-                target.relative_to(base)
                 count = sum(1 for _ in target.open("r", encoding="utf-8", errors="replace"))
             except (OSError, ValueError) as exc:
                 raise CensusError(f"unresolvable repository anchor {anchor!r}") from exc
@@ -388,8 +414,10 @@ def _walk_dicts(value: Any):
 def _object(text: str, marker: str, cap: int) -> dict[str, Any]:
     if len(text) > cap:
         raise CensusError(f"reply exceeds {cap} characters")
-    pos = text.rfind(marker)
-    raw = text[pos + len(marker):].strip() if pos >= 0 else text.strip()
+    stripped = text.strip()
+    if text.count(marker) != 1 or not stripped.startswith(marker):
+        raise CensusError(f"reply must begin with exactly one {marker!r} marker")
+    raw = stripped[len(marker):].strip()
     try: obj = json.loads(raw)
     except json.JSONDecodeError as exc: raise CensusError(f"invalid JSON: {exc}") from exc
     if not isinstance(obj, dict): raise CensusError("JSON result must be an object")
@@ -407,7 +435,10 @@ def _exact(row: Any, keys: set[str], label: str) -> None:
 
 
 def _bounded(value: Any, cap: int, label: str) -> str:
-    if not isinstance(value, str) or not value.strip() or len(value) > cap:
+    if (
+        not isinstance(value, str) or not value.strip() or len(value) > cap
+        or "\n" in value or "\r" in value
+    ):
         raise CensusError(f"{label} must be 1..{cap} characters")
     return value
 

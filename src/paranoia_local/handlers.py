@@ -48,9 +48,12 @@ MAX_PLAN_BINDING_BATCHES = 5
 
 
 def _attempt(role: str, engine: Engine, review: Review) -> rc.Attempt:
+    response = review.raw or review.text or ""
     return rc.Attempt(role, engine.name, review.session_ref,
                       "failed" if review.error else "completed",
-                      review.duration_ms, review.usage)
+                      review.duration_ms, review.usage,
+                      rc.digest(response) if response else None,
+                      response[:4000] if response else None)
 
 
 def _staged_call(
@@ -69,6 +72,7 @@ def _staged_call(
     try:
         return review, parser(review.text), attempts
     except rc.CensusError as first:
+        attempts[-1] = replace(attempts[-1], outcome="format-invalid")
         if not review.session_ref:
             error = rc.CensusError(f"{role} format invalid and has no resumable session: {first}")
             error.attempts = attempts  # type: ignore[attr-defined]
@@ -88,6 +92,7 @@ def _staged_call(
         try:
             parsed = parser(retry.text)
         except rc.CensusError as second:
+            attempts[-1] = replace(attempts[-1], outcome="format-invalid")
             second.attempts = attempts  # type: ignore[attr-defined]
             raise
         return retry, parsed, attempts
@@ -104,6 +109,7 @@ def _settle_staged_failure(
     cc.save_lineage(closure.state_root, closure.lineage)
     closure._settled = True
     closure.register_status = f"staged rejected: {error}"
+    closure.staged_manifests = getattr(error, "manifests", [])
     attempts = [a.json() for a in getattr(error, "attempts", [])]
     review = Review(
         text=f"[paranoia-local error] staged review rejected: {error}",
@@ -116,6 +122,45 @@ def _settle_staged_failure(
     if mode == cc.PLAN_MODE:
         trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
     return review, trailer, attempts
+
+
+def _state_unavailable_review(
+    closure: "_ClosureRound", *, mode: str, claim_state: dict[str, Any] | None = None,
+) -> tuple[Review, str, list[dict[str, Any]]]:
+    """Return the established blocked result without running or mutating staged state."""
+    reason = closure.unavailable or "lineage state is unavailable"
+    review = Review(
+        text=f"[paranoia-local error] lineage state unavailable: {reason}",
+        session_ref=None, raw=reason, returncode=2, error=True,
+    )
+    trailer = (
+        f"CLASS-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
+        "CONVERGENCE: BLOCKED — lineage state could not be used this round."
+    )
+    if mode == cc.PLAN_MODE and claim_state is not None:
+        trailer = f"{pc.render_trailer(claim_state)}\n{trailer}"
+    return review, trailer, []
+
+
+def _structural_pending_review(
+    closure: "_ClosureRound", *, mode: str, claim_state: dict[str, Any], reason: str,
+) -> tuple[Review, str, list[dict[str, Any]]]:
+    """Settle a zero-attempt plan round whose structural reserve no longer fits."""
+    assert closure.lineage is not None
+    phase = closure.lineage.review_state.get("phase", "census")
+    closure._settled = True
+    closure.register_status = "structural pending"
+    review = Review(
+        text=f"[paranoia-local error] {reason}", session_ref=None, raw=reason,
+        returncode=124, error=True,
+    )
+    trailer = (
+        f"STRUCTURAL-PHASE: {phase}\nSTRUCTURAL-PENDING: {reason}\n"
+        "CONVERGENCE: BLOCKED — structural review has not run."
+    )
+    if mode == cc.PLAN_MODE:
+        trailer = f"{pc.render_trailer(claim_state)}\n{trailer}"
+    return review, trailer, []
 
 
 def _staged_structural_review(
@@ -142,6 +187,41 @@ def _staged_structural_review(
     }
     attempts: list[rc.Attempt] = []
 
+    def validate_lane(text: str, lane: str) -> dict[str, Any]:
+        parsed = rc.parse_lane(
+            text, lane=lane, class_ids=active_ids if lane == "integrity" else (),
+        )
+        rc.resolve_anchors(parsed, root=cwd, plan_lines=plan_lines)
+        return parsed
+
+    def validate_settlement(
+        text: str, *, source_ids: list[str], assessment_ids: list[str],
+        source_severities: dict[str, str] | None = None,
+        assessment_verdicts: dict[str, str] | None = None,
+        known_debt: list[str] | None = None, role: str,
+    ) -> dict[str, Any]:
+        parsed = rc.parse_settlement(
+            text, source_ids=source_ids, source_severities=source_severities,
+            assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
+            class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
+            known_debt=known_debt or (), role=role,
+        )
+        rc.resolve_anchors(parsed, root=cwd, plan_lines=plan_lines)
+        reserved_debt = {
+            item.get("id") for item in state.get("debt", []) if isinstance(item, dict)
+        }
+        reused = [item["id"] for item in parsed["debt"] if item["id"] in reserved_debt]
+        if reused:
+            raise rc.CensusError(f"new debt reuses durable ids {sorted(reused)}")
+        try:
+            register = rc.register_from_records(
+                parsed["class_records"], mechanized=mode == cc.BRANCH_MODE,
+            )
+            cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
+        except cc.RegisterError as exc:
+            raise rc.CensusError(f"invalid class operation: {exc}") from exc
+        return parsed
+
     if phase == "census":
         lanes = rc.LANES[mode]
 
@@ -157,14 +237,7 @@ def _staged_structural_review(
             result, parsed, lane_attempts = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=900, on_progress=on_progress,
-                parser=lambda text: rc.parse_lane(
-                    text, lane=lane,
-                    class_ids=active_ids if lane == "integrity" else (),
-                ),
-            )
-            rc.resolve_anchors(
-                parsed, root=cwd,
-                plan_lines=plan_lines,
+                parser=lambda text: validate_lane(text, lane),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
             for finding in parsed["findings"]:
@@ -191,10 +264,12 @@ def _staged_structural_review(
             )
             first_error = lane_errors[0]
             first_error.attempts = all_attempts  # type: ignore[attr-defined]
+            first_error.manifests = [row[2] for row in lane_rows]  # type: ignore[attr-defined]
             raise first_error
         for _, _, _, lane_attempts in lane_rows:
             attempts.extend(lane_attempts)
         manifests = [row[2] for row in lane_rows]
+        closure.staged_manifests = manifests
         source_ids = [f["id"] for m in manifests for f in m["findings"]]
         source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
         assessment_ids = [a["class_id"] for m in manifests for a in m["class_assessments"]]
@@ -211,18 +286,13 @@ def _staged_structural_review(
         review, settlement, call_attempts = _staged_call(
             role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
             model=model, effort=effort, timeout=600, on_progress=on_progress,
-            parser=lambda text: rc.parse_settlement(
+            parser=lambda text: validate_settlement(
                 text, source_ids=source_ids, source_severities=source_severities,
-                assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
-                class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
-                role="census",
+                assessment_ids=assessment_ids,
+                assessment_verdicts=assessment_verdicts, role="census",
             ),
         )
         attempts.extend(call_attempts)
-        rc.resolve_anchors(
-            settlement, root=cwd,
-            plan_lines=plan_lines,
-        )
     else:
         role = "final" if phase == "final" else "correction"
         existing = [d["id"] for d in state.get("debt", []) if d.get("status") == "open"]
@@ -236,17 +306,13 @@ def _staged_structural_review(
         review, settlement, call_attempts = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=1200, on_progress=on_progress,
-            parser=lambda text: rc.parse_settlement(
-                text, source_ids=[], assessment_ids=active_ids if role == "final" else [],
-                class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
+            parser=lambda text: validate_settlement(
+                text, source_ids=[],
+                assessment_ids=active_ids if role == "final" else [],
                 known_debt=existing, role=role,
             ),
         )
         attempts.extend(call_attempts)
-        rc.resolve_anchors(
-            settlement, root=cwd,
-            plan_lines=plan_lines,
-        )
 
     draft = cc.copy_lineage(lineage)
     register = rc.register_from_records(
@@ -586,11 +652,16 @@ def _converge_branch_review(
         prompt = prompts.compose(instructions, _prepend(calibration, packet))
 
         with worktree_at(repo, head_id) as wt:
-            if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+            if closure and closure.unavailable:
+                review, trailer, attempt_ledger = _state_unavailable_review(
+                    closure, mode=cc.BRANCH_MODE,
+                )
+            elif closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
                 try:
                     review, trailer, attempt_ledger = _staged_structural_review(
                         engine=engine.for_role(eng.ROLE_REPOSITORY), cwd=wt, model=model,
-                        effort=effort, mode=cc.BRANCH_MODE, body=_prepend(calibration, packet),
+                        effort=effort, mode=cc.BRANCH_MODE,
+                        body=f"=== REVIEW STAKES ===\n{stakes}\n\n{packet}",
                         closure=closure, stakes=stakes, snapshot=head_id,
                         round_no=review_round or 1, on_progress=on_progress,
                     )
@@ -628,6 +699,7 @@ def _converge_branch_review(
           # the audit record; the original review only carries the malformed attempt.
           "retry_register": closure.retry_register if closure else None,
           "attempt_ledger": attempt_ledger,
+          "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
           "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
     body = _footer(review, engine)
     if closure and closure.retry_register:
@@ -755,7 +827,21 @@ def critique_plan(
     if closure and closure.lineage is not None:
         prior_review = closure.lineage.review_state
         current_stakes_digest = rc.digest(stakes or "")
-        if prior_review and prior_review.get("stakes_digest") != current_stakes_digest:
+        claim_history = pc.normalize_state(closure.lineage.claim_state)
+        unknown_calibration = (
+            not isinstance(prior_review, dict)
+            or prior_review.get("version") != 1
+            or prior_review.get("stakes_digest") != current_stakes_digest
+        )
+        has_prior_state = bool(
+            closure.lineage.rounds or closure.lineage.classes
+            or claim_history["claims"] or claim_history.get("debt")
+            or claim_history.get("plan_snapshot")
+        )
+        if (
+            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+            and unknown_calibration and has_prior_state
+        ):
             closure.lineage.claim_state = pc.empty_state()
             closure.lineage.classes = {
                 cid: replace(cls, status=cc.OPEN) if not cls.mechanized else cls
@@ -827,6 +913,7 @@ def critique_plan(
         closure.claims_enabled = claim_verification
         closure.claim_state = claim_state
 
+    trailer: str | None = None
     try:
         body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -846,6 +933,7 @@ def critique_plan(
                 ),
                 parent,
             )
+            structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
             with inert_tree.evidence_workspace(repo, snapshot) as workspace:
                 reviewer = engine.for_role(eng.ROLE_REPOSITORY)
                 review_cwd = workspace.cwd_for(engine.name)
@@ -854,22 +942,37 @@ def critique_plan(
                     "prefix as the project root; no live Git or web tools are available."
                 )
                 staged_phase = (
-                    closure.lineage.review_state.get("phase", "census")
+                    rc.normalize_state(
+                        closure.lineage.review_state, stakes=stakes or "",
+                        snapshot=structural_snapshot,
+                    )["phase"]
                     if closure and closure.lineage else "census"
                 )
                 structural_reserve = 2160 if staged_phase == "census" else 1560
-                if plan_deadline is not None and (
+                if closure and closure.unavailable:
+                    review, trailer, structural_attempts = _state_unavailable_review(
+                        closure, mode=cc.PLAN_MODE, claim_state=claim_state,
+                    )
+                    attempt_ledger.extend(structural_attempts)
+                elif plan_deadline is not None and (
                     time.monotonic() + structural_reserve > plan_deadline
                 ):
-                    review = Review(
-                        text=(
-                            "[paranoia-local error] verified evidence work completed and was "
-                            "persisted, but the whole-plan deadline leaves insufficient time "
-                            "for the bounded structural review; rerun to reuse frozen claims"
-                        ),
-                        session_ref=None, raw="plan deadline exhausted",
-                        returncode=124, error=True,
+                    pending_reason = (
+                        "verified evidence work completed and was persisted, but the "
+                        "whole-plan deadline leaves insufficient time for the bounded "
+                        "structural review; rerun to reuse frozen claims"
                     )
+                    if closure:
+                        review, trailer, structural_attempts = _structural_pending_review(
+                            closure, mode=cc.PLAN_MODE, claim_state=claim_state,
+                            reason=pending_reason,
+                        )
+                        attempt_ledger.extend(structural_attempts)
+                    else:
+                        review = Review(
+                            text=f"[paranoia-local error] {pending_reason}",
+                            session_ref=None, raw=pending_reason, returncode=124, error=True,
+                        )
                 elif closure:
                     staged_body = body + (
                         "\n\nThe pinned repository evidence root is `repository/`. Treat that "
@@ -878,14 +981,15 @@ def critique_plan(
                     try:
                         review, trailer, structural_attempts = _staged_structural_review(
                             engine=reviewer, cwd=review_cwd, model=model, effort=effort,
-                            mode=cc.PLAN_MODE, body=_prepend(calibration, staged_body),
-                            closure=closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
+                            mode=cc.PLAN_MODE,
+                            body=f"=== REVIEW STAKES ===\n{stakes or ''}\n\n{staged_body}",
+                            closure=closure, stakes=stakes or "", snapshot=structural_snapshot,
                             round_no=arguments.get("round") or 1, on_progress=on_progress,
                             plan_lines=len(plan_text.splitlines()),
                         )
                     except rc.CensusError as error:
                         review, trailer, structural_attempts = _settle_staged_failure(
-                            closure, stakes=stakes or "", snapshot=rc.digest(plan_text),
+                            closure, stakes=stakes or "", snapshot=structural_snapshot,
                             error=error, mode=cc.PLAN_MODE,
                         )
                     attempt_ledger.extend(structural_attempts)
@@ -941,6 +1045,7 @@ def critique_plan(
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
         "attempt_ledger": attempt_ledger,
+        "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
     })
     body_text = _footer(review, engine) + _stakes_notice(no_stakes)

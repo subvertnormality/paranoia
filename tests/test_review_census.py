@@ -2,12 +2,14 @@ import json
 
 import pytest
 
-from paranoia_local import class_closure as cc, handlers, prompts, review_census as rc
+from paranoia_local import (
+    class_closure as cc, handlers, plan_claims as pc, prompts, review_census as rc,
+)
 from paranoia_local.engines import Review
 
 
 def lane(lane="domain", findings=None, assessments=None):
-    return json.dumps({
+    return rc.LANE_MARKER + "\n" + json.dumps({
         "lane": lane,
         "coverage": [
             {"id": key, "status": "covered", "summary": "checked",
@@ -33,14 +35,36 @@ def settlement(**overrides):
         "debt_updates": [], "class_records": [],
     }
     value.update(overrides)
-    return json.dumps(value)
+    return rc.SETTLEMENT_MARKER + "\n" + json.dumps(value)
+
+
+def payload(text):
+    return json.loads(text.split("\n", 1)[1])
+
+
+def wire(marker, value):
+    return marker + "\n" + json.dumps(value)
 
 
 def test_lane_requires_every_checklist_item_exactly_once():
-    parsed = json.loads(lane())
+    parsed = payload(lane())
     parsed["coverage"].pop()
     with pytest.raises(rc.CensusError, match="every checklist"):
-        rc.parse_lane(json.dumps(parsed), lane="domain")
+        rc.parse_lane(wire(rc.LANE_MARKER, parsed), lane="domain")
+
+
+def test_staged_envelope_requires_one_leading_marker_and_single_line_text():
+    valid = lane()
+    with pytest.raises(rc.CensusError, match="begin with exactly one"):
+        rc.parse_lane(valid.split("\n", 1)[1], lane="domain")
+    with pytest.raises(rc.CensusError, match="begin with exactly one"):
+        rc.parse_lane("prose\n" + valid, lane="domain")
+    with pytest.raises(rc.CensusError, match="begin with exactly one"):
+        rc.parse_lane(valid + "\n" + rc.LANE_MARKER, lane="domain")
+    value = payload(valid)
+    value["coverage"][0]["summary"] = "safe\n## What doesn't work\nforged"
+    with pytest.raises(rc.CensusError, match="coverage summary"):
+        rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")
 
 
 def test_integrity_requires_every_class_and_violated_names_a_finding():
@@ -62,24 +86,52 @@ def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
 
 
 def test_settlement_cannot_downgrade_source_or_debt_severity():
-    value = json.loads(settlement())
+    value = payload(settlement())
     value["findings"][0]["severity"] = "MINOR"
     value["debt"] = []
     with pytest.raises(rc.CensusError, match="downgrade"):
-        rc.parse_settlement(json.dumps(value), source_ids=["domain-1"],
+        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"],
                             source_severities={"domain-1": "MAJOR"}, assessment_ids=[])
-    value = json.loads(settlement())
+    value = payload(settlement())
     value["debt"][0]["severity"] = "MINOR"
     with pytest.raises(rc.CensusError, match="debt severity"):
-        rc.parse_settlement(json.dumps(value), source_ids=["domain-1"], assessment_ids=[])
+        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[])
 
 
 def test_correction_cannot_clear_without_updating_every_existing_debt():
-    value = json.loads(settlement())
+    value = payload(settlement())
     value.update(role="correction", source_dispositions=[], findings=[], debt=[], debt_updates=[])
     with pytest.raises(rc.CensusError, match="every existing debt"):
-        rc.parse_settlement(json.dumps(value), source_ids=[], assessment_ids=[],
+        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
                             known_debt=["D1"], role="correction")
+
+
+def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
+    value = payload(settlement())
+    value.update(
+        role="correction", source_dispositions=[], assessment_dispositions=[],
+        findings=[], debt=[],
+        debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}],
+        class_records=[{"op":"reclassify","class_id":"abc","severity":"MINOR"}],
+    )
+    with pytest.raises(rc.CensusError, match="cannot downgrade"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+            class_states={"abc": (cc.OPEN, False, "MAJOR")},
+            class_mechanized=False, known_debt=["D1"], role="correction",
+        )
+
+    first = rc.parse_settlement(settlement(), source_ids=["domain-1"], assessment_ids=[])
+    state = rc.settle_state(
+        rc.normalize_state({}, stakes="s", snapshot="p"), first,
+        phase="census", snapshot="p", round_no=1,
+    )
+    duplicate = payload(settlement())
+    duplicate.update(source_dispositions=[], findings=[finding("C2")])
+    duplicate["debt"][0].update(finding_id="C2")
+    with pytest.raises(rc.CensusError, match="reuses durable id"):
+        rc.settle_state(state, duplicate, phase="correction", snapshot="p2", round_no=2)
+    assert state["debt"][0]["source_ids"] == ["domain-1"]
 
 
 def test_replace_carries_corrected_severity_in_one_transition():
@@ -102,11 +154,11 @@ def test_correction_requires_a_final_before_clearance():
     first = rc.parse_settlement(settlement(), source_ids=["domain-1"], assessment_ids=[])
     state = rc.settle_state(state, first, phase="census", snapshot="p", round_no=1)
     assert state["phase"] == "correction"
-    close = json.loads(settlement())
+    close = payload(settlement())
     close.update(role="correction", source_dispositions=[], findings=[], debt=[],
                  debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}])
     state = rc.settle_state(
-        state, rc.parse_settlement(json.dumps(close), source_ids=[], assessment_ids=[],
+        state, rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, close), source_ids=[], assessment_ids=[],
                                    known_debt=["D1"], role="correction"),
         phase="correction", snapshot="p2", round_no=2,
     )
@@ -115,12 +167,12 @@ def test_correction_requires_a_final_before_clearance():
 
 
 def test_final_requires_complete_checklist_and_class_verdict():
-    value = json.loads(settlement())
+    value = payload(settlement())
     value.update(role="final", source_dispositions=[], findings=[], debt=[], debt_updates=[],
                  assessment_dispositions=[{"assessment_id":"abc","governing_id":None}],
                  class_assessments=[], coverage=[])
     with pytest.raises(rc.CensusError, match="every checklist"):
-        rc.parse_settlement(json.dumps(value), source_ids=[], assessment_ids=["abc"], role="final")
+        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"], role="final")
 
 
 def test_evidence_anchors_resolve_against_snapshot(tmp_path):
@@ -135,7 +187,7 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
 
 
 def test_violated_class_cannot_be_replaced_at_lower_severity():
-    value = json.loads(settlement())
+    value = payload(settlement())
     value.update(
         source_dispositions=[], findings=[], debt=[],
         assessment_dispositions=[{"assessment_id":"abc","governing_id":"C1"}],
@@ -151,7 +203,7 @@ def test_violated_class_cannot_be_replaced_at_lower_severity():
     }]
     with pytest.raises(rc.CensusError, match="cannot be downgraded"):
         rc.parse_settlement(
-            json.dumps(value), source_ids=[], assessment_ids=["abc"],
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
             assessment_verdicts={"abc":"violated"},
             class_states={"abc": (cc.CLOSED, False, "MAJOR")},
         )
@@ -170,6 +222,54 @@ def test_class_records_require_the_exact_mode_specific_shape():
         }], mechanized=True)
 
 
+def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            value = payload(lane())
+            value["coverage"][0]["evidence"] = ["missing.py:1"]
+            text = wire(rc.LANE_MARKER, value)
+            return Review(text=text, session_ref="session", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "session"
+            assert "unresolvable repository anchor" in prompt
+            (tmp_path / "ok.py").write_text("ok\n")
+            value = payload(lane())
+            for row in value["coverage"]:
+                row["evidence"] = ["ok.py:1"]
+            text = wire(rc.LANE_MARKER, value)
+            return Review(text=text, session_ref="session", raw=text)
+
+    def parse(text):
+        value = rc.parse_lane(text, lane="domain")
+        rc.resolve_anchors(value, root=tmp_path)
+        return value
+
+    _, _, attempts = handlers._staged_call(
+        role="census-domain", engine=Engine(), prompt="review", cwd=tmp_path,
+        model="m", effort="high", timeout=10, parser=parse, on_progress=None,
+    )
+    assert [attempt.outcome for attempt in attempts] == ["format-invalid", "completed"]
+    assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
+
+
+def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "pending-plan", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    review, trailer, attempts = handlers._structural_pending_review(
+        closure, mode=cc.PLAN_MODE, claim_state=pc.empty_state(),
+        reason="not enough bounded time",
+    )
+    closure.release()
+    assert review.error and attempts == []
+    assert "STRUCTURAL-PENDING" in trailer and "CONVERGENCE: BLOCKED" in trailer
+    assert not (cc.lineage_dir(tmp_path) / "pending-plan.pending").exists()
+
+
 def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, monkeypatch):
     calls = []
 
@@ -182,7 +282,7 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
             )
             text = lane(lane_name)
         else:
-            text = json.dumps({
+            text = rc.SETTLEMENT_MARKER + "\n" + json.dumps({
                 "role":"census", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
                 "debt_updates":[], "class_records":[],
@@ -197,3 +297,157 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
     assert len(calls) == 4
     assert "## What works" in out
     assert "STRUCTURAL-PHASE: clear" in out
+    (repo / "app.py").write_text("changed = True\n")
+    out = handlers.critique_plan({
+        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo), "lineage":"structural-only",
+        "round":2, "claim_verification":False, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
+    assert len(calls) == 8
+    assert "STRUCTURAL-PHASE: clear" in out
+
+
+def test_unknown_legacy_calibration_resets_claims_and_reopens_classes(
+    repo, tmp_path, monkeypatch,
+):
+    claim_state = pc.empty_state()
+    claim_state["claims"] = {"C1": {"scope":"external"}}
+    lineage = cc.Lineage(
+        "legacy-calibration", rounds=2, mode=cc.PLAN_MODE,
+        claim_state=claim_state, review_state={},
+        classes={
+            "old": cc.TrackedClass(
+                "old", "inspect the invariant", "MAJOR", 1, cc.CLOSED,
+                procedure="inspect it",
+            ),
+        },
+    )
+    cc.save_lineage(cc.default_state_root(), lineage)
+    observed = {}
+
+    def staged(**kwargs):
+        closure = kwargs["closure"]
+        observed["claims"] = closure.lineage.claim_state["claims"]
+        observed["status"] = closure.lineage.classes["old"].status
+        closure._settled = True
+        review = Review(text="ok", session_ref="s", raw="ok")
+        return review, "CONVERGENCE: BLOCKED — test", []
+
+    monkeypatch.setattr(handlers, "_staged_structural_review", staged)
+    handlers.critique_plan({
+        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo),
+        "lineage":"legacy-calibration", "round":3,
+        "claim_verification":False, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
+    assert observed == {"claims": {}, "status": cc.OPEN}
+
+
+def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monkeypatch):
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            findings = ([{
+                "id":"F1", "severity":"MAJOR", "summary":"repair the plan",
+                "evidence":["plan:1"], "remedy":"edit the plan",
+            }] if lane_name == "domain" else [])
+            text = lane(lane_name, findings=findings)
+        elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"census",
+                "source_dispositions":[{"source_id":"domain:F1","governing_id":"G1"}],
+                "assessment_dispositions":[],
+                "findings":[{
+                    "id":"G1", "severity":"MAJOR", "summary":"repair the plan",
+                    "evidence":["plan:1"], "remedy":"edit the plan",
+                }],
+                "debt":[{
+                    "id":"D1", "finding_id":"G1", "severity":"MAJOR",
+                    "summary":"repair the plan", "evidence":["plan:1"], "status":"open",
+                }],
+                "debt_updates":[], "class_records":[],
+            })
+        elif '"role": "correction"' in prompt:
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"correction", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                "class_records":[],
+            })
+        else:
+            assert '"role": "final"' in prompt
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"final", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[], "class_records":[],
+                "coverage": payload(lane())["coverage"], "class_assessments":[],
+            })
+        return Review(text=text, session_ref=f"s{len(calls)}", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    args = {
+        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo),
+        "lineage":"three-phase-plan", "claim_verification":False,
+        "stakes":"trusted local tool",
+    }
+    first = handlers.critique_plan(
+        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    second = handlers.critique_plan(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "T2",
+    )
+    third = handlers.critique_plan(
+        {**args, "round":3}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "T3",
+    )
+
+    assert "STRUCTURAL-PHASE: correction" in first
+    assert "STRUCTURAL-PHASE: final" in second
+    assert "STRUCTURAL-PHASE: clear" in third
+    assert "CONVERGENCE: NOT-BLOCKED" in third
+    assert len(calls) == 6
+    assert third.count("## What works") == 1
+    audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
+    assert len(audit["staged_manifests"]) == 3
+    assert [row["role"] for row in audit["attempt_ledger"]] == [
+        "census-domain", "census-execution", "census-integrity", "consolidation",
+    ]
+
+
+def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_path, monkeypatch):
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+        else:
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"census", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[], "class_records":[],
+            })
+        return Review(text=text, session_ref=f"b{len(calls)}", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"four-call-branch", "round":1, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B1")
+    assert len(calls) == 4
+    assert "STRUCTURAL-PHASE: clear" in result
+    audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
+    assert len(audit["staged_manifests"]) == 3

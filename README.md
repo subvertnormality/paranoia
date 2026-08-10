@@ -191,7 +191,9 @@ the claim and its citation, never the previous reviewer's prose.
 invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
-The reviewer ends its review with a register block:
+Tracked Codex/Claude reviews return strict staged JSON, and the server applies their class records
+atomically with concrete finding debt. The terminal register below remains the compatible contract
+for one-shot and injected-engine reviews:
 
 ```
 === CLASS REGISTER ===
@@ -201,7 +203,7 @@ PATTERN: def (create|update)_[a-z_]+\(.*\):\n(?!.*validate)
 PATHSPEC: src/
 ```
 
-The server then, every round:
+The server then, on every applicable snapshot:
 
 - **re-runs each registered regex itself** against the reviewed snapshot
   (`git grep`), and lists every surviving match to the next reviewer;
@@ -223,14 +225,15 @@ soon as the wording changes, so predicates are not accepted there at all. Plan
 closure gives you *non-forgetting plus explicit closure*, not automatic recurrence
 detection.
 
-**Register transitions** a reviewer can emit, besides a new class:
+**Class transitions** a reviewer can emit, besides a new class:
 
 | Record | Effect |
 |---|---|
 | `CLOSED: <id>` | An unmechanized class is judged closed |
 | `REOPEN: <id>` | A closed unmechanized class is violated again |
 | `RECLASSIFY: <id> <severity>` | Correct a severity |
-| `SUPERSEDE: <id>` + `BY:` / `WITH-PATTERN:` / `WITH-PROCEDURE:` | Replace a class |
+| `SUPERSEDE: <id>` + `BY:` / `WITH-PATTERN:` / `WITH-PROCEDURE:` | Replace a class on the legacy text path |
+| staged `replace` | Atomically retire a predecessor and create its corrected open successor |
 
 You cannot emit these yourself — ask for them in `focus`, e.g. *"class 3f2a91c4 is
 registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
@@ -327,11 +330,13 @@ calling coding agent performs the edit/rerun loop without waiting for a human:
    packets on the next targeted round; compact verdict-only assessments cannot cross the
    server-capture boundary. Settled claims
    cause no model call or web search. Edited claims inherit no verdict;
-5. repeat until the structural review says `CONVERGED` and the single computed trailer
+5. repeat until the single computed trailer
    says `CONVERGENCE: NOT-BLOCKED`.
 
-This changes only the external-evidence phase. Every round still runs the complete cold structural
-FATAL/MAJOR review with the full plan, repository, active claim register, and class lineage.
+Claim targeting changes only the external-evidence phase. Structural review runs a complete cold
+three-lane census for a new lineage/cleared snapshot, targeted correction against its durable debt,
+then one complete cold final regression. The full plan, repository, active claim register, and
+class lineage remain available throughout.
 The structural reviewer can still find architectural and repository blockers, but it is told
 not to manufacture evidence-register claims for repository mechanics or missing atomic bridges.
 
@@ -658,7 +663,9 @@ Accepted by the four review tools:
 
 ### Review output
 
-Every review returns exactly five sections, in this order:
+Every review returns exactly five headings, in this order. Legacy reviews populate their natural
+categories; tracked staged reviews put governing findings in `What doesn't work`, bounded remedies
+in `Improvements`, and write `Nothing notable.` in categories the settlement does not represent.
 
 | Section | Contains |
 |---|---|
@@ -682,27 +689,27 @@ next to its severity tag.
 
 The footer carries the `session_ref` for [`rebut`](#rebut).
 
-### Class-closure trailer
+### Tracked convergence trailer
 
 Appended below the review whenever class closure ran:
 
 ```
-LINEAGE: 9f2c1a4b0e77 (rounds recorded: 8)
-CLASS-REGISTER: parsed 1
-CLASS-CLOSURE: 1 open, 2 closed, 3 surviving matches, 0 exempt, 1 unmechanized
-CONVERGENCE: BLOCKED — 1 class(es) unclosed:
-  3f2a91c4 every public writer must validate before the first mutation (mechanized: 3 match(es))
+STRUCTURAL-PHASE: correction
+STRUCTURAL-DEBT: 2 blocking open
+CONVERGENCE: BLOCKED — staged structural debt remains open.
 ```
 
 | Line | Meaning |
 |---|---|
-| `CONVERGENCE: NOT-BLOCKED` | No blocking class is unclosed. Advisory classes may remain open |
-| `CONVERGENCE: BLOCKED` | Named classes are still open; any `CONVERGED` in the review above is void |
-| `CLASS-REGISTER: NONE` \| `parsed N` \| `malformed: …` | What the reviewer's register block contained |
-| `CLASS-CLOSURE-WARNING: … closed in the round it was registered` | The predicate matched nothing at birth — usually too narrow. Ask the next reviewer to `SUPERSEDE` it |
-| `BLOCKED — register debt from round N` | Two attempts at a parseable register failed. The next round with a good register clears it |
-| `unmechanized: awaiting reviewer CLOSED or RECLASSIFY` | A semantic class no regex can check |
+| `STRUCTURAL-PHASE: census\|correction\|final\|clear` | The next broad/targeted gate; `final` requires one fresh cold regression |
+| `STRUCTURAL-DEBT: N blocking open` | Concrete governing findings still requiring correction |
+| `CONVERGENCE: NOT-BLOCKED` | Structural debt/classes and, for plans, external claims are clear |
+| `CONVERGENCE: BLOCKED` | The named phase, debt, class, claim, format, or state condition still blocks |
+| `STRUCTURAL-ERROR` / `STRUCTURAL-PENDING` | A bounded format/deadline path did not produce a settled review |
 | `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
+
+The legacy one-shot/injected-engine trailer retains `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and
+unmechanized-class detail.
 
 `NOT-BLOCKED` asserts only that no blocking class is unclosed. It never asserts the
 change is correct — the reviewer's findings still govern that.
@@ -829,14 +836,15 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 ### Rate limits
 
-Reviews draw on your subscription's agentic-usage pool, and a convergence loop is
-many agent turns. Use `query` for quick checks and reserve multi-round
-`critique_branch` loops for changes that warrant them.
+Reviews draw on your subscription's agentic-usage pool. A tracked cold census is three concurrent
+reviewer calls plus consolidation; correction and final are one call each, with at most one bounded
+same-session format correction per call. Use `query` for quick checks.
 
 For `critique_plan`, round 1 pays for the exhaustive external-claim inventory. Later rounds send
 only the external edit cone and unresolved claims to the claim verifier; an unchanged plan
-whose active claims are all supported makes zero claim-model calls. The normal structural
-review still runs in every round and remains the dominant irreducible cost of convergence.
+whose active claims are all supported makes zero claim-model calls. Structural correction then
+targets durable debt instead of paying for another broad novelty search; the cold final remains the
+regression gate.
 
 `arbitrate` is the expensive one and the only tool that spends from **both**
 subscriptions in a single call. Research is on unless `research: false` explicitly

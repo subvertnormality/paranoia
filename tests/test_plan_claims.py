@@ -1482,12 +1482,16 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
                  "evidence": ["repository/README.md:1"]}
                 for key in handlers.rc.CHECKLIST
             ]
-            text = json.dumps({"lane": lane, "coverage": coverage, "findings": [],
-                               "class_assessments": []})
+            text = handlers.rc.LANE_MARKER + "\n" + json.dumps({
+                "lane": lane, "coverage": coverage, "findings": [],
+                "class_assessments": [],
+            })
         else:
-            text = json.dumps({"role": "census", "source_dispositions": [],
-                               "assessment_dispositions": [], "findings": [], "debt": [],
-                               "debt_updates": [], "class_records": []})
+            text = handlers.rc.SETTLEMENT_MARKER + "\n" + json.dumps({
+                "role": "census", "source_dispositions": [],
+                "assessment_dispositions": [], "findings": [], "debt": [],
+                "debt_updates": [], "class_records": [],
+            })
         return Review(text=text, session_ref="structural", raw=text)
 
     monkeypatch.setattr(handlers, "_verify_plan_claims", deadline_debt)
@@ -1496,7 +1500,6 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     monkeypatch.setattr(
         handlers.eng.CodexEngine, "run", structural_review,
     )
-
     result = handlers.critique_plan(
         {
             "plan_text": PLAN, "repo_path": str(repo), "lineage": lineage_id,

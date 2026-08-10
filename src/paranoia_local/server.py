@@ -78,14 +78,10 @@ _ROUND = {
     "minimum": 1,
     "description": (
         "REQUIRED unless you pass class_closure: false (the one-shot mode). "
-        "Convergence-loop round number (1-based). Increment it on each cold review round you run. "
-        "At round >=3 the reviewer restricts itself to merge-blocking in-scope findings — MAJOR "
-        "or higher ([BLOCKER]/[MAJOR] for code review, [FATAL]/[MAJOR] for plan review) — and "
-        "withholds [MINOR] and [OUT-OF-SCOPE], declaring 'CONVERGED' when none remain. This is "
-        "the lever to STOP a loop instead of chasing marginal/hardening findings across many "
-        "rounds. Start at 1 and raise as the design stabilises. It is required while class "
-        "closure is tracking a loop because without it the reviewer never reaches the "
-        "round-3 floor, so the loop has no terminating pressure at all."
+        "Convergence-loop sequence number (1-based); increment it after each settled attempt. "
+        "Tracked review uses it for lineage ordering while its cold census/final always cover "
+        "every in-scope severity and correction targets durable debt. The legacy one-shot "
+        "review retains the round-3 MAJOR-or-higher floor."
     ),
 }
 
