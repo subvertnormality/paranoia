@@ -48,6 +48,32 @@ MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
 
 
+def _allocate_fresh_debt_ids(
+    debt: list[dict[str, Any]], reserved: set[str | None],
+) -> None:
+    """Re-key model-local debt labels that collide with durable history.
+
+    A staged response has no reason to know every closed identifier retained by
+    the server.  Its debt IDs are local labels; durable identity is assigned at
+    settlement.  Preserve non-colliding labels for readable audits and allocate
+    deterministic D<n> labels only where history already owns the proposed ID.
+    """
+    unavailable = {item for item in reserved if isinstance(item, str)}
+    unavailable.update(
+        item["id"] for item in debt
+        if isinstance(item.get("id"), str) and item["id"] not in unavailable
+    )
+    next_number = 1
+    for item in debt:
+        if item["id"] not in reserved:
+            continue
+        while f"D{next_number}" in unavailable:
+            next_number += 1
+        item["id"] = f"D{next_number}"
+        unavailable.add(item["id"])
+        next_number += 1
+
+
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
 ) -> rc.Attempt:
@@ -271,9 +297,7 @@ def _staged_structural_review(
         reserved_debt = {
             item.get("id") for item in state.get("debt", []) if isinstance(item, dict)
         }
-        reused = [item["id"] for item in parsed["debt"] if item["id"] in reserved_debt]
-        if reused:
-            raise rc.CensusError(f"new debt reuses durable ids {sorted(reused)}")
+        _allocate_fresh_debt_ids(parsed["debt"], reserved_debt)
         try:
             register = rc.register_from_records(
                 parsed["class_records"], mechanized=mode == cc.BRANCH_MODE,

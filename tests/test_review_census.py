@@ -434,6 +434,16 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
     assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
 
 
+def test_new_debt_labels_are_rekeyed_when_durable_history_owns_them():
+    debt = [
+        {"id":"D1", "finding_id":"G1", "status":"open"},
+        {"id":"local", "finding_id":"G2", "status":"open"},
+        {"id":"D3", "finding_id":"G3", "status":"open"},
+    ]
+    handlers._allocate_fresh_debt_ids(debt, {"D1", "D2", "local"})
+    assert [item["id"] for item in debt] == ["D4", "D5", "D3"]
+
+
 def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_path):
     closure = handlers._PlanClassClosure(
         "pending-plan", round_no=1, state_root=tmp_path, stamp="T",
