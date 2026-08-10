@@ -580,7 +580,7 @@ def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
     assert "CLAIM-" not in trailer
 
 
-def test_unknown_legacy_calibration_resets_claims_and_reopens_classes(
+def test_unknown_legacy_calibration_preserves_disabled_claims_and_reverifies_on_enable(
     repo, tmp_path, monkeypatch,
 ):
     claim_state = pc.empty_state()
@@ -600,8 +600,14 @@ def test_unknown_legacy_calibration_resets_claims_and_reopens_classes(
 
     def staged(**kwargs):
         closure = kwargs["closure"]
-        observed["claims"] = closure.lineage.claim_state["claims"]
+        observed["claims"] = dict(closure.lineage.claim_state["claims"])
         observed["status"] = closure.lineage.classes["old"].status
+        observed["reverify"] = closure.lineage.claim_reverify_required
+        closure.lineage.review_state = rc.normalize_state(
+            closure.lineage.review_state, stakes=kwargs["stakes"],
+            snapshot=kwargs["snapshot"],
+        )
+        cc.save_lineage(closure.state_root, closure.lineage)
         closure._settled = True
         review = Review(text="ok", session_ref="s", raw="ok")
         return review, "CONVERGENCE: BLOCKED — test", []
@@ -612,7 +618,38 @@ def test_unknown_legacy_calibration_resets_claims_and_reopens_classes(
         "lineage":"legacy-calibration", "round":3,
         "claim_verification":False, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert observed == {"claims": {}, "status": cc.OPEN}
+    assert observed == {
+        "claims": {"C1": {"scope":"external"}},
+        "status": cc.OPEN, "reverify": True,
+    }
+    preserved = cc.load_lineage(
+        cc.default_state_root(), "legacy-calibration", stamp="later", mode=cc.PLAN_MODE,
+    )
+    assert preserved.claim_state == claim_state
+    assert preserved.claim_reverify_required is True
+
+    verify = {}
+
+    def verify_claims(plan_text, prior_state, **kwargs):
+        verify["prior"] = prior_state
+        verify["force"] = kwargs["force_exhaustive"]
+        return prior_state, "parsed 1 full current packet"
+
+    monkeypatch.setattr(handlers, "_verify_plan_claims", verify_claims)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    handlers.critique_plan({
+        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo),
+        "lineage":"legacy-calibration", "round":4,
+        "claim_verification":True, "web_search":True,
+        "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
+    assert verify == {"prior": claim_state, "force": True}
+    refreshed = cc.load_lineage(
+        cc.default_state_root(), "legacy-calibration", stamp="later", mode=cc.PLAN_MODE,
+    )
+    assert refreshed.claim_state == claim_state
+    assert refreshed.claim_reverify_required is False
 
 
 def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monkeypatch):

@@ -320,6 +320,10 @@ class Lineage:
     #: instead of introducing a second store/transaction protocol.  Branch mode leaves
     #: it empty and otherwise behaves byte-for-byte as before.
     claim_state: dict[str, Any] = field(default_factory=dict)
+    #: A structural-stakes transition invalidates claim verdict reuse too. Keep this
+    #: outside claim_state so an explicitly disabled claim phase preserves its evidence
+    #: byte-for-byte while remembering that the next enabled phase must be exhaustive.
+    claim_reverify_required: bool = False
     #: Staged structural-review phase and concrete finding debt. Kept in the same
     #: atomic file as classes and claims so no partial clearance can cross stores.
     review_state: dict[str, Any] = field(default_factory=dict)
@@ -428,6 +432,7 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
         debt=raw.get("debt"),
         claim_state=deepcopy(raw.get("claim_state", {})),
+        claim_reverify_required=bool(raw.get("claim_reverify_required", False)),
         review_state=deepcopy(raw.get("review_state", {})),
     )
 
@@ -444,6 +449,7 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
         "claim_state": lineage.claim_state,
+        "claim_reverify_required": lineage.claim_reverify_required,
         "review_state": lineage.review_state,
     }
 
@@ -550,6 +556,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
         mode=lineage.mode, claim_state=deepcopy(lineage.claim_state),
+        claim_reverify_required=lineage.claim_reverify_required,
         review_state=deepcopy(lineage.review_state),
     )
 

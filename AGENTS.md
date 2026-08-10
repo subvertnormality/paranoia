@@ -114,7 +114,10 @@ state and reviewer-native capabilities meet the supported model.
   verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
   consume active context. This optimization applies only to external verification. For tracked
-  structural review, a new snapshot's census and the final regression are broad and cold;
+  plan reviews with claim verification explicitly disabled, retain claim packets without rendering
+  or gating on them; if stakes change, persist a re-verification requirement and exhaustively audit
+  the preserved inventory when verification is next enabled. For tracked structural review, a new
+  snapshot's census and the final regression are broad and cold;
   intervening correction rounds are deliberately targeted to open findings/classes, the claimed
   corrections, and their transitive effects. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material

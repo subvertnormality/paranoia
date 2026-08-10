@@ -935,7 +935,11 @@ def critique_plan(
             type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
             and unknown_calibration and has_prior_state
         ):
-            closure.lineage.claim_state = pc.empty_state()
+            # Structural calibration and claim authority share the same stakes. When the
+            # claim phase is disabled, retain its packets exactly but remember that no
+            # verdict may freeze across this transition. The next enabled call performs
+            # a full audit over that preserved inventory.
+            closure.lineage.claim_reverify_required = True
             closure.lineage.classes = {
                 cid: replace(cls, status=cc.OPEN) if not cls.mechanized else cls
                 for cid, cls in closure.lineage.classes.items()
@@ -975,6 +979,10 @@ def critique_plan(
                     plan_repo_path=plan_repo_path,
                     on_progress=on_progress,
                     attempt_ledger=attempt_ledger,
+                    force_exhaustive=bool(
+                        closure and closure.lineage
+                        and closure.lineage.claim_reverify_required
+                    ),
                     deadline=(
                         min(
                             plan_deadline - PLAN_TEARDOWN_RESERVE_SEC,
@@ -992,6 +1000,8 @@ def critique_plan(
                 raise
             if closure and closure.lineage is not None:
                 closure.lineage.claim_state = claim_state
+                if claim_status.startswith("parsed"):
+                    closure.lineage.claim_reverify_required = False
                 # Persist useful evidence before the structural reviewer runs.  If that
                 # later CLI call fails, the next autonomous round reuses the completed
                 # research instead of starting over.  The existing pending latch still
@@ -1171,9 +1181,10 @@ def _verify_plan_claims(
     on_progress: Callable[[str], None] | None,
     attempt_ledger: list[dict[str, Any]] | None = None,
     deadline: float | None = None,
+    force_exhaustive: bool = False,
 ) -> tuple[dict[str, Any], str]:
     """Run exhaustive round 1, then verify only the external-claim edit cone."""
-    targeted = pc.has_prior_snapshot(prior_state)
+    targeted = pc.has_prior_snapshot(prior_state) and not force_exhaustive
     server_capture_required = type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
     frozen = (
         pc.frozen_supported_ids(

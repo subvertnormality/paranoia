@@ -199,6 +199,8 @@ Repository evidence anchors must resolve to ordinary files inside the exact iner
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
 dormant for that run: it is neither rendered nor gating, and is preserved for a later enabled run.
+If stakes change while claims are disabled, the packets remain intact and the lineage records that
+the next enabled claim phase must exhaustively reverify them under the new stakes.
 The terminal register below remains the compatible contract for one-shot and injected-engine reviews:
 
 ```
