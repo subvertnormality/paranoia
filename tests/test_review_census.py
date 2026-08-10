@@ -338,6 +338,7 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
     assert [attempt.role for attempt in attempts] == [
         "census-domain", "census-domain-format-retry",
     ]
+    assert [attempt.sequence for attempt in attempts] == [None, None]
     assert [attempt.outcome for attempt in attempts] == ["format-invalid", "completed"]
     assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
 
@@ -587,9 +588,12 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert audit["staged_settlement"]["source_dispositions"] == [
         {"source_id":"domain:F1", "governing_id":"G1"},
     ]
-    assert [row["role"] for row in audit["attempt_ledger"]] == [
-        "census-domain", "census-execution", "census-integrity", "consolidation",
-    ]
+    rows = audit["attempt_ledger"]
+    assert {row["role"] for row in rows[:3]} == {
+        "census-domain", "census-execution", "census-integrity",
+    }
+    assert rows[3]["role"] == "consolidation"
+    assert [row["sequence"] for row in rows] == [1, 2, 3, 4]
     lineage = cc.load_lineage(
         cc.default_state_root(), "three-phase-plan", stamp="T4", mode=cc.PLAN_MODE,
     )
@@ -691,13 +695,27 @@ def test_failed_consolidation_audit_retains_lane_and_retry_attempts(
     assert len(calls) == 5
     audit = json.loads(next((tmp_path / "logs").glob("BF-critique_branch-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
-    assert [row["role"] for row in audit["attempt_ledger"]] == [
+    rows = audit["attempt_ledger"]
+    invoked_lanes = [
+        next(
+            line.split()[-1] for line in prompt.splitlines()
+            if line.startswith("ROLE: census lane")
+        )
+        for kind, prompt in calls[:3] if kind == "run"
+    ]
+    assert [row["role"] for row in rows[:3]] == [
+        f"census-{lane_name}" for lane_name in invoked_lanes
+    ]
+    assert {row["role"] for row in rows[:3]} == {
         "census-behaviour", "census-execution", "census-integrity",
+    }
+    assert [row["role"] for row in rows[3:]] == [
         "consolidation", "consolidation-format-retry",
     ]
-    assert [row["outcome"] for row in audit["attempt_ledger"]] == [
+    assert [row["outcome"] for row in rows] == [
         "completed", "completed", "completed", "format-invalid", "format-invalid",
     ]
+    assert [row["sequence"] for row in rows] == [1, 2, 3, 4, 5]
 
 
 def test_branch_handler_runs_census_correction_and_cold_final(

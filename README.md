@@ -845,9 +845,9 @@ Reviews draw on your subscription's agentic-usage pool. A tracked cold census is
 reviewer calls plus consolidation; correction and final are one call each, with at most one bounded
 same-session format correction per call. Use `query` for quick checks.
 
-Audit `attempt_ledger` rows enumerate every provider run/resume exactly once. Concurrent census
-lanes are serialized in stable lane order for reproducible logs; that list is not a claim about
-their wall-clock start/completion order. Duration and session fields remain per-call telemetry.
+Audit `attempt_ledger` rows enumerate every provider run/resume exactly once. A synchronized
+sequence is assigned immediately before each concurrent census run/resume boundary, and the stage
+ledger is serialized by that sequence. Duration and session fields remain per-call telemetry.
 
 For `critique_plan`, round 1 pays for the exhaustive external-claim inventory. Later rounds send
 only the external edit cone and unresolved claims to the claim verifier; an unchanged plan

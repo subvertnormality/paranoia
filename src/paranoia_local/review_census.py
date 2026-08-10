@@ -48,6 +48,7 @@ class Attempt:
     usage: dict[str, Any] | None
     response_sha256: str | None = None
     response_excerpt: str | None = None
+    sequence: int | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)

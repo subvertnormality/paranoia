@@ -205,8 +205,8 @@ persist when structural work later fails or lacks deadline; structural phase doe
 a valid structural settlement. Audit logs record phase, stakes/snapshot digests, validated
 manifests/dispositions, and one attempt-ledger row for every actual `run`/`resume`: role,
 engine/session, outcome, duration, and usage. Aggregate provider calls are the ledger length, never
-inferred from a status string. Concurrent lanes are serialized in stable lane order; without a
-provider-boundary timestamp the ledger does not claim temporal ordering between them.
+inferred from a status string. Concurrent structural calls receive a synchronized monotonic
+sequence immediately before each provider run/resume boundary and are serialized by that sequence.
 
 ## 5. Small code shape
 

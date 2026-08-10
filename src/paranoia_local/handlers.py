@@ -21,6 +21,7 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from . import arbitration, class_closure as cc
@@ -47,24 +48,28 @@ MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
 
 
-def _attempt(role: str, engine: Engine, review: Review) -> rc.Attempt:
+def _attempt(
+    role: str, engine: Engine, review: Review, *, sequence: int | None = None,
+) -> rc.Attempt:
     response = review.raw or review.text or ""
     return rc.Attempt(role, engine.name, review.session_ref,
                       "failed" if review.error else "completed",
                       review.duration_ms, review.usage,
                       rc.digest(response) if response else None,
-                      response[:4000] if response else None)
+                      response[:4000] if response else None, sequence)
 
 
 def _staged_call(
     *, role: str, engine: Engine, prompt: str, cwd: Path, model: str, effort: str,
     timeout: int, parser: Callable[[str], dict[str, Any]],
     on_progress: Callable[[str], None] | None,
+    next_sequence: Callable[[], int] | None = None,
 ) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
     """One staged call plus exactly one same-session schema correction."""
+    sequence = next_sequence() if next_sequence else None
     review = engine.run(prompt, cwd, model, effort, False, timeout=timeout,
                         **_progress_kwargs(on_progress))
-    attempts = [_attempt(role, engine, review)]
+    attempts = [_attempt(role, engine, review, sequence=sequence)]
     if review.error:
         error = rc.CensusError(f"{role} failed (exit {review.returncode})")
         error.attempts = attempts  # type: ignore[attr-defined]
@@ -77,6 +82,7 @@ def _staged_call(
             error = rc.CensusError(f"{role} format invalid and has no resumable session: {first}")
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
+        retry_sequence = next_sequence() if next_sequence else None
         retry = engine.resume(
             review.session_ref,
             "Your staged JSON was rejected: " + str(first) +
@@ -84,7 +90,9 @@ def _staged_call(
             cwd, model, effort, False, timeout=min(300, timeout),
             **_progress_kwargs(on_progress),
         )
-        attempts.append(_attempt(f"{role}-format-retry", engine, retry))
+        attempts.append(_attempt(
+            f"{role}-format-retry", engine, retry, sequence=retry_sequence,
+        ))
         if retry.error:
             error = rc.CensusError(f"{role} format retry failed (exit {retry.returncode})")
             error.attempts = attempts  # type: ignore[attr-defined]
@@ -207,6 +215,14 @@ def _staged_structural_review(
         c.class_id: (c.status, c.mechanized, c.severity) for c in lineage.active()
     }
     attempts: list[rc.Attempt] = []
+    sequence_lock = Lock()
+    sequence_value = 0
+
+    def next_sequence() -> int:
+        nonlocal sequence_value
+        with sequence_lock:
+            sequence_value += 1
+            return sequence_value
 
     def validate_lane(text: str, lane: str) -> dict[str, Any]:
         parsed = rc.parse_lane(
@@ -261,7 +277,7 @@ def _staged_structural_review(
             result, parsed, lane_attempts = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=900, on_progress=on_progress,
-                parser=lambda text: validate_lane(text, lane),
+                parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
             for finding in parsed["findings"]:
@@ -286,6 +302,7 @@ def _staged_structural_review(
             all_attempts.extend(
                 a for error in lane_errors for a in getattr(error, "attempts", [])
             )
+            all_attempts.sort(key=lambda item: item.sequence or 0)
             first_error = lane_errors[0]
             first_error.attempts = all_attempts  # type: ignore[attr-defined]
             first_error.manifests = [row[2] for row in lane_rows]  # type: ignore[attr-defined]
@@ -314,6 +331,7 @@ def _staged_structural_review(
             review, settlement, call_attempts = _staged_call(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=600, on_progress=on_progress,
+                next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
                     assessment_ids=assessment_ids,
@@ -343,7 +361,7 @@ def _staged_structural_review(
             raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
         review, settlement, call_attempts = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
-            timeout=1200, on_progress=on_progress,
+            timeout=1200, on_progress=on_progress, next_sequence=next_sequence,
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
                 assessment_ids=active_ids if role == "final" else [],
@@ -393,6 +411,7 @@ def _staged_structural_review(
     trailer = rc.trailer(state)
     if mode == cc.PLAN_MODE:
         trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
+    attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
 
 
