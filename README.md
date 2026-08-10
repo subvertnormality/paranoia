@@ -196,7 +196,10 @@ atomically with concrete finding debt. Every lane finding must be named by at le
 row; a `finding` row names its finding IDs and non-finding rows cannot hide one. The integrity lane
 receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
-terminal register below remains the compatible contract for one-shot and injected-engine reviews:
+Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
+repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
+dormant for that run: it is neither rendered nor gating, and is preserved for a later enabled run.
+The terminal register below remains the compatible contract for one-shot and injected-engine reviews:
 
 ```
 === CLASS REGISTER ===

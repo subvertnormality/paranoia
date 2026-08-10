@@ -105,8 +105,9 @@ required integrity class assessment and every finding with lane-scoped ID, sever
 resolved evidence anchors, and remedy. Stakes and snapshot identity are server-owned inputs; the
 manifest is governing and extra prose is rejected.
 The server rejects missing/duplicate checklist IDs, dangling or unbound findings, invalid severity,
-and unresolvable plan/repository/diff anchors. Repository anchors may not traverse symlinks; they
-must name ordinary files in the inert reviewed tree. It does not claim to validate semantic entailment or enumerate every
+and unresolvable plan/repository/diff anchors. Repository anchors may not traverse repository
+symlinks; Codex's server-owned `repository/` launch alias is resolved to the inert tree before
+validation. Anchors must name ordinary files in that tree. It does not claim to validate semantic entailment or enumerate every
 paragraph and hunk. One same-session correction names the exact schema error; a second malformed
 reply visibly blocks the attempt.
 

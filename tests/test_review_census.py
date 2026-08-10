@@ -241,6 +241,40 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
     (tmp_path / "linked.py").symlink_to(outside)
     with pytest.raises(rc.CensusError, match="unresolvable repository"):
         rc.resolve_anchors({"evidence":["linked.py:1"]}, root=tmp_path)
+    materialized = tmp_path.parent / "materialized-repository"
+    materialized.mkdir()
+    (materialized / "README.md").write_text("snapshot\n")
+    (tmp_path / "repository").symlink_to(materialized, target_is_directory=True)
+    rc.resolve_anchors(
+        {"evidence":["repository/README.md:1"]}, root=tmp_path,
+        trusted_roots={"repository":materialized},
+    )
+
+
+def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
+    invalid = payload(settlement())
+    invalid["debt"][0]["id"] = ""
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, invalid)
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert "debt id must be" in prompt
+            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+        model="m", effort="high", timeout=10, on_progress=None,
+        parser=lambda text: rc.parse_settlement(
+            text, source_ids=["domain-1"], assessment_ids=[],
+        ),
+    )
+    assert parsed["debt"][0]["id"] == "D1"
+    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
 
 
 def test_violated_class_cannot_be_replaced_at_lower_severity():
@@ -291,6 +325,30 @@ def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
             wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
             class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
         )
+
+
+def test_violated_advisory_class_still_requires_concrete_debt():
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
+        findings=[finding("G1", "MINOR")], debt=[],
+        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
+        class_records=[{"op":"reopen", "class_id":"abc"}],
+    )
+    with pytest.raises(rc.CensusError, match="violated class needs exactly one open debt"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=["integrity:F1"],
+            assessment_ids=["abc"], assessment_verdicts={"abc":"violated"},
+            assessment_findings={"abc":"integrity:F1"},
+            class_states={"abc": (cc.CLOSED, False, "MINOR")}, role="census",
+        )
+    value["debt"] = [{"id":"D1", "finding_id":"G1", "status":"open"}]
+    assert rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=["integrity:F1"],
+        assessment_ids=["abc"], assessment_verdicts={"abc":"violated"},
+        assessment_findings={"abc":"integrity:F1"},
+        class_states={"abc": (cc.CLOSED, False, "MINOR")}, role="census",
+    )["debt"][0]["severity"] == "MINOR"
 
 
 def test_class_records_require_the_exact_mode_specific_shape():
@@ -476,6 +534,52 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
     assert "STRUCTURAL-PHASE: clear" in out
 
 
+def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
+    claim_state = pc.with_debt(
+        pc.empty_state(), pc.AuditError("stale external debt"), round_no=1,
+        plan_text="# Plan\n",
+    )
+    cc.save_lineage(
+        tmp_path,
+        cc.Lineage(
+            "dormant-claims", mode=cc.PLAN_MODE, claim_state=claim_state,
+            review_state=rc.normalize_state({}, stakes="s", snapshot="p"),
+        ),
+    )
+    closure = handlers._PlanClassClosure(
+        "dormant-claims", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    closure.claims_enabled = False
+
+    class Engine:
+        name = "fake"
+
+        def run(self, prompt, *args, **kwargs):
+            if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+                lane_name = next(
+                    row.split()[-1] for row in prompt.splitlines()
+                    if row.startswith("ROLE: census lane")
+                )
+                text = lane(lane_name)
+            else:
+                text = wire(rc.SETTLEMENT_MARKER, {
+                    "role":"census", "source_dispositions":[],
+                    "assessment_dispositions":[], "findings":[], "debt":[],
+                    "debt_updates":[], "class_records":[],
+                })
+            return Review(text=text, session_ref="s", raw=text)
+
+    _, trailer, _ = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=1,
+        on_progress=None, plan_lines=1,
+    )
+    closure.release()
+    assert "STRUCTURAL-PHASE: clear" in trailer
+    assert "CLAIM-" not in trailer
+
+
 def test_unknown_legacy_calibration_resets_claims_and_reopens_classes(
     repo, tmp_path, monkeypatch,
 ):
@@ -588,6 +692,8 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert audit["staged_settlement"]["source_dispositions"] == [
         {"source_id":"domain:F1", "governing_id":"G1"},
     ]
+    domain = next(row for row in audit["staged_manifests"] if row["lane"] == "domain")
+    assert domain["coverage"][0]["finding_ids"] == ["domain:F1"]
     rows = audit["attempt_ledger"]
     assert {row["role"] for row in rows[:3]} == {
         "census-domain", "census-execution", "census-integrity",

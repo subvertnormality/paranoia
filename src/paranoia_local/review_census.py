@@ -261,6 +261,12 @@ def parse_settlement(
                 raise CensusError(
                     "violated class disposition must follow its cited finding"
                 )
+            matches = [
+                item for item in debt
+                if item.get("finding_id") == target and item.get("status") == "open"
+            ]
+            if len(matches) != 1:
+                raise CensusError("every violated class needs exactly one open debt record")
         if class_states and cid in class_states:
             status, mechanized, prior_severity = class_states[cid]
             op = operation_by_class.get(cid)
@@ -407,7 +413,10 @@ def render_review(settlement: dict[str, Any]) -> str:
     ))
 
 
-def resolve_anchors(value: Any, *, root: Any, plan_lines: int | None = None) -> None:
+def resolve_anchors(
+    value: Any, *, root: Any, plan_lines: int | None = None,
+    trusted_roots: dict[str, Any] | None = None,
+) -> None:
     """Resolve every evidence array in a parsed staged object against the snapshot."""
     from pathlib import Path
     base = Path(root).resolve()
@@ -427,15 +436,21 @@ def resolve_anchors(value: Any, *, root: Any, plan_lines: int | None = None) -> 
             relative = Path(path)
             if relative.is_absolute() or ".." in relative.parts:
                 raise CensusError(f"unresolvable repository anchor {anchor!r}")
-            target = base / relative
+            anchor_base = base
+            if trusted_roots and relative.parts and relative.parts[0] in trusted_roots:
+                anchor_base = Path(trusted_roots[relative.parts[0]]).resolve()
+                relative = Path(*relative.parts[1:])
+                if not relative.parts:
+                    raise CensusError(f"unresolvable repository anchor {anchor!r}")
+            target = anchor_base / relative
             try:
-                cursor = base
+                cursor = anchor_base
                 for part in relative.parts:
                     cursor = cursor / part
                     if cursor.is_symlink():
                         raise OSError("symlink evidence anchors are not snapshot paths")
                 resolved = target.resolve(strict=True)
-                if not resolved.is_relative_to(base):
+                if not resolved.is_relative_to(anchor_base):
                     raise OSError("evidence anchor escapes snapshot")
                 count = sum(1 for _ in resolved.open("r", encoding="utf-8", errors="replace"))
             except (OSError, ValueError) as exc:
@@ -494,9 +509,9 @@ def _anchors(value: Any) -> None:
 def _unique_ids(rows: Sequence[Any], label: str) -> set[str]:
     ids: set[str] = set()
     for row in rows:
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str) or row["id"] in ids:
+        if not isinstance(row, dict) or row.get("id") in ids:
             raise CensusError(f"invalid or duplicate {label} id")
-        ids.add(row["id"])
+        ids.add(_bounded(row.get("id"), 120, f"{label} id"))
     return ids
 
 
