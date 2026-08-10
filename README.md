@@ -469,7 +469,7 @@ Returns a [five-section critique](#review-output) plus a
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number; must be an integer ≥ 1 |
 | `include_uncommitted` | boolean | `false` | Review the dirty working tree vs HEAD instead of a committed range. Runs in the live repo, not a worktree |
 | `isolate` | boolean | `true` | Review inside a throwaway worktree of `head_ref`. Ignored for uncommitted reviews |
-| `converge` | boolean | `true` | Pre-gather a deterministic evidence packet (every touched file in full, plus the diff) and review it against an immutable materialized snapshot. Always materializes, overriding `isolate` |
+| `converge` | boolean | `true` | Pre-gather a bounded deterministic diff/file packet, materialize an immutable snapshot, and use the tracked census → correction → final lifecycle. Always materializes, overriding `isolate` |
 | `max_packet_chars` | integer | `400000` | Character budget for that packet. `already_raised` is always preserved; only file evidence is trimmed |
 | `class_closure` | boolean | `true` | Track defect classes across rounds. `false` is the one-shot mode |
 | `lineage` | string | derived | Explicit class-closure key. Required when the reviewed ref is not a branch |

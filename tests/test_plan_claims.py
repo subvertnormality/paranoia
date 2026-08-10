@@ -1137,8 +1137,10 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         "evidence-binding": [binding, changed],
         "evidence-text": [attestation],
     })
+    ledger: list[dict] = []
     adapter = handlers._CapturedClaimEngine(
         engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        attempt_ledger=ledger,
     )
     try:
         first = adapter.run("audit", tmp_path, "m", "high", True)
@@ -1146,6 +1148,10 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
         assert retry.error
         assert "binding changed immutable source metadata" in retry.text
+        assert [row["role"] for row in ledger] == [
+            "claim-discovery", "claim-binding", "claim-attestation",
+            "claim-binding-outer-retry",
+        ]
     finally:
         adapter.close()
 
@@ -1283,15 +1289,20 @@ def test_retained_inventory_is_corrected_before_capture(
         ]
 
     monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    ledger: list[dict] = []
     adapter = handlers._CapturedClaimEngine(
         engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
-        prior_state=prior, frozen_ids=frozenset(),
+        prior_state=prior, frozen_ids=frozenset(), attempt_ledger=ledger,
     )
     try:
         result = adapter.run("audit", tmp_path, "m", "high", True)
         assert not result.error
         assert capture_sizes == [2]
         assert [role for role, _ in engine.calls].count("evidence-discovery") == 2
+        assert [row["role"] for row in ledger] == [
+            "claim-discovery", "claim-discovery-retry", "claim-binding",
+            "claim-attestation",
+        ]
     finally:
         adapter.close()
 

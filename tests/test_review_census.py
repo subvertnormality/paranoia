@@ -260,6 +260,9 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
         role="census-domain", engine=Engine(), prompt="review", cwd=tmp_path,
         model="m", effort="high", timeout=10, parser=parse, on_progress=None,
     )
+    assert [attempt.role for attempt in attempts] == [
+        "census-domain", "census-domain-format-retry",
+    ]
     assert [attempt.outcome for attempt in attempts] == ["format-invalid", "completed"]
     assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
 
@@ -431,6 +434,10 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
         cc.default_state_root(), "three-phase-plan", stamp="T4", mode=cc.PLAN_MODE,
     )
     assert lineage.review_state["debt"][0]["source_ids"] == ["domain:F1"]
+    second_audit = json.loads(next((tmp_path / "logs").glob("T2-critique_plan-*.json")).read_text())
+    third_audit = json.loads(next((tmp_path / "logs").glob("T3-critique_plan-*.json")).read_text())
+    assert [row["role"] for row in second_audit["attempt_ledger"]] == ["correction"]
+    assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
 
 
 def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_path, monkeypatch):
