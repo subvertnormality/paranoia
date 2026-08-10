@@ -103,20 +103,37 @@ session. The wrapper itself contains no project configuration. Research/binding 
 their launch root until the final resume completes, then remove it. This is an orchestration
 boundary, not a new container or provider abstraction.
 
-Do not create that evidence tree with `git worktree`, checkout, archive filters, or any model-run
-Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
+First replace the shared working-tree snapshot writer used before arbitration. `snapshot_tree`
+must not call `git add`, checkout, or any other operation that applies attributes. Seed a private
+index with `git read-tree <pinned-head>`, enumerate tracked and non-ignored untracked paths with
+`git ls-files -z --cached --others --exclude-standard`, compare that inventory with the filesystem
+to remove deleted paths, and hash each regular file's raw stdin bytes (or a symlink's raw target
+bytes) with `git hash-object -w --stdin --no-filters`. Feed the resulting mode/OID/path records to
+the private index with NUL-delimited `git update-index --index-info`, then `write-tree`. All of
+those commands use the same empty system/global configuration and no optional locks; every
+subprocess return code and expected OID/byte length is checked. Repository ignore rules may decide
+which untracked paths belong in the snapshot, but repository attributes, hooks, clean/process
+filters, external diff, textconv, and checkout machinery are never evaluated. Preserve the current
+working-tree semantics, including tracked-but-ignored files, deletions, executable modes, symlinks,
+and inert gitlink records; do not narrow arbitration to committed-only input.
+
+Do not create the later evidence tree with `git worktree`, checkout, archive filters, or any
+model-run Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
 `git ls-tree -rz --full-tree` enumerates entries and `git cat-file blob <oid>` reads raw blobs,
 under `GIT_CONFIG_NOSYSTEM=1`, an empty global config, and command-line config that disables hooks,
 external diff, textconv, and optional locks. Every invocation also sets `GIT_NO_LAZY_FETCH=1`, so
-a missing promised object fails visibly instead of demand-fetching through a repository promisor
-remote. It writes ordinary files itself; executable bits are
+Git does not lazily fetch a missing promised object through a repository promisor remote. The
+materializer itself fails closed on a nonzero plumbing result, an absent object, an unexpected
+object type, or a blob whose length or digest does not match its enumerated object. It writes ordinary files itself; executable bits are
 recorded in a manifest but not made executable, symlinks are rendered as inert target-text records,
 and gitlinks are rendered as submodule-OID records. No checkout/filter/process driver runs.
 
 Evidence-isolated model roles receive no Git commands. Claude's repository allowlist is reduced to
 `Read`, `Grep`, and `Glob`. Codex runs a network-restricted `workspace-write` sandbox rooted at its
-disposable empty launch directory; the inert repository tree is a sibling outside the writable
-root and is exposed by a read-only symlink. It can run `rg`, `sed`, and similar inspections
+disposable empty launch directory with `sandbox_workspace_write.exclude_slash_tmp=true`,
+`exclude_tmpdir_env_var=true`, `network_access=false`, and `writable_roots=[]` on fresh and resumed
+commands. The inert repository tree is a sibling outside the writable root and is exposed by a
+read-only symlink. It can run `rg`, `sed`, and similar inspections
 unattended but cannot modify the evidence tree. When history is useful, the server
 renders a bounded metadata-only `git log --format=...` record under the same empty-config
 environment; it never renders patches through diff/textconv. Arbitration citation resolution still
@@ -399,16 +416,20 @@ attestation, order, label, vote, and round records remain intact.
   `repository/` citations normalize to the pinned repository path before resolution;
 - inert-materialization fixtures define smudge/process filters, textconv, external diff, hooks,
   executable files, symlinks, and gitlinks; marker helpers never run during materialization or
-  reviewer reads, while raw expected bytes/manifests remain visible; a partial-clone fixture with
-  a missing promised blob and executable `ext::` promisor remote fails with no helper marker under
-  `GIT_NO_LAZY_FETCH=1`;
+  reviewer reads, while raw expected bytes/manifests remain visible; the fixture starts before the
+  shared dirty-tree snapshot and proves the markers also remain absent during snapshot creation.
+  A partial-clone fixture with a missing promised blob and executable `ext::` promisor remote
+  produces no helper marker under `GIT_NO_LAZY_FETCH=1`, and the materializer fails closed on the
+  missing/non-blob/length-or-digest-mismatch result without promising one Git-specific presentation;
 - supported-version acceptance captures the expected fresh/resumed Codex tool inventory and proves
   browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
   delegation tools are absent; an unsupported CLI version fails preflight before either provider
   call without claiming that feature flags enumerate all future tools;
 - the supported Codex profile runs `rg` and `sed` against the inert tree unattended from its
   disposable `workspace-write` root with `approval_policy="never"`, while evidence-tree mutation
-  and network/escalation attempts fail without prompting; pre/post digests prove immutability;
+  and network/escalation attempts fail without prompting; captured sandbox policy proves both temp
+  exclusions and an empty additional-writable-root list were applied on fresh and resume, and
+  pre/post digests prove immutability;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
