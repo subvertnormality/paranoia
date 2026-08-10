@@ -741,19 +741,21 @@ def _verify_plan_claims(
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
         ), "failed"
-    allow_missing = False
+    allow_missing = bool(captured_engine and captured_engine.allow_missing)
     try:
         audit = pc.parse_audit(
             review.text, plan_text, repo=repo, plan_repo_path=plan_repo_path,
         )
         pc.validate_prior_coverage(
             prior_state, audit, plan_text=plan_text, raw=review.text, frozen_ids=frozen,
-            repo=repo, plan_repo_path=plan_repo_path,
+            repo=repo, plan_repo_path=plan_repo_path, allow_missing=allow_missing,
         )
         status = (
             f"parsed {len(audit.claims)} new + {len(audit.assessments)} targeted retained"
             f" + {len(frozen)} frozen"
         )
+        if allow_missing:
+            status += "; localized retained omission after discovery correction"
     except pc.AuditError as first:
         if not review.session_ref or not hasattr(engine, "resume"):
             return (
@@ -844,6 +846,7 @@ class _CapturedClaimEngine:
         self.binding_engine: Engine | None = None
         self.last_session: str | None = None
         self.discovery: pc.Audit | None = None
+        self.allow_missing = False
         self.captures: dict[tuple[int, int], external_sources.Capture] = {}
         self.attestation_raw = ""
 
@@ -890,12 +893,28 @@ class _CapturedClaimEngine:
             try:
                 discovery = self._parse_discovery(corrected.text)
             except pc.AuditError as second:
-                return Review(
-                    text=f"[paranoia-local error] discovery audit invalid: {second}",
-                    session_ref=corrected.session_ref,
-                    raw="\n--- discovery correction ---\n".join(raw_parts),
-                    error=True,
-                )
+                # The discovery role has spent its one correction. If the corrected
+                # document is otherwise valid and only retained coverage is incomplete,
+                # preserve its useful packets and let reconciliation carry each omission
+                # forward as unverified. Other schema/transition errors remain wholesale.
+                try:
+                    discovery = pc.parse_audit(
+                        corrected.text, self.plan_text, repo=self.repo,
+                        plan_repo_path=self.plan_repo_path,
+                    )
+                    pc.validate_prior_coverage(
+                        self.prior_state, discovery, plan_text=self.plan_text,
+                        raw=corrected.text, frozen_ids=self.frozen_ids, repo=self.repo,
+                        plan_repo_path=self.plan_repo_path, allow_missing=True,
+                    )
+                except pc.AuditError:
+                    return Review(
+                        text=f"[paranoia-local error] discovery audit invalid: {second}",
+                        session_ref=corrected.session_ref,
+                        raw="\n--- discovery correction ---\n".join(raw_parts),
+                        error=True,
+                    )
+                self.allow_missing = True
             session_ref = corrected.session_ref
         else:
             session_ref = first.session_ref

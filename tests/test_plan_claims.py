@@ -1295,6 +1295,67 @@ def test_retained_inventory_is_corrected_before_capture(
         adapter.close()
 
 
+def test_final_retained_omission_preserves_valid_captured_packets(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    second_anchor = "SQLite 3.45.0 was released on January 15, 2024."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    first_claim = _claim(verdict="unverified", evidence=[])
+    second_claim = _claim(
+        anchor=second_anchor, proposition=second_anchor, verdict="unverified", evidence=[],
+    )
+    prior = pc.reconcile(
+        {}, pc.parse_audit(_audit(first_claim, second_claim), plan),
+        lineage_id="partial-inventory", round_no=1, plan_text=plan,
+    )
+    complete_first = _claim()
+    discovery_omission = _audit(complete_first)
+    binding = (
+        handlers.PLAN_BINDING_MARKER
+        + '\n{"bindings":[{"claim_index":0,"evidence_index":0,"usable":true,'
+        '"location":"release record","passage":"'
+        + complete_first["evidence"][0]["quote"]
+        + '"}]}'
+    )
+    attestation = (
+        '=== EVIDENCE ATTESTATION JSON ===\n{"attestations":['
+        '{"claim_index":0,"evidence_index":0,"publisher_authority":true,'
+        '"authority_reason":"official owner","passage_entailment":true,'
+        '"entailment_reason":"direct statement"}]}'
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [discovery_omission, discovery_omission],
+        "evidence-binding": [binding],
+        "evidence-text": [attestation],
+    })
+    capture_sizes: list[int] = []
+
+    def capture_all(candidates, **kwargs):
+        rows = list(candidates)
+        capture_sizes.append(len(rows))
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+                complete_first["evidence"][0]["quote"],
+            )
+            for candidate in rows
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    state, status = handlers._verify_plan_claims(
+        plan, prior, lineage_id="partial-inventory", round_no=2,
+        stakes="trusted local plan; factual correctness matters", engine=engine,
+        repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+        on_progress=None, deadline=float("inf"),
+    )
+
+    assert capture_sizes == [1]
+    assert "localized retained omission" in status
+    verdicts = sorted(record["verdict"] for record in state["claims"].values())
+    assert verdicts == ["supported", "unverified"]
+
+
 def test_plan_binding_batches_large_ordinary_inventory(tmp_path: Path) -> None:
     lines = [f"External behavior {index} is guaranteed." for index in range(11)]
     plan = "# Plan\n\n" + "\n".join(lines)
