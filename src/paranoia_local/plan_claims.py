@@ -11,16 +11,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
 from . import external_sources as sources
+from . import inert_git
 
 
 AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
@@ -595,16 +594,17 @@ def _is_plan_self_url(url: str, repo: Path, plan_repo_path: str) -> bool:
     return False
 
 
-@lru_cache(maxsize=128)
 def _canonical_remote_repo(repo_path: str) -> tuple[str, str] | None:
     try:
-        completed = subprocess.run(
-            ["git", "-C", repo_path, "config", "--get", "remote.origin.url"],
-            check=False, capture_output=True, text=True, timeout=3,
+        completed = inert_git.invoke(
+            Path(repo_path), ["config", "--get", "remote.origin.url"],
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError:
         return None
-    remote = completed.stdout.strip() if completed.returncode == 0 else ""
+    remote = (
+        completed.stdout.decode("utf-8", errors="replace").strip()
+        if completed.returncode == 0 else ""
+    )
     if not remote:
         return None
     if "://" not in remote:

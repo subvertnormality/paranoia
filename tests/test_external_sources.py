@@ -70,7 +70,7 @@ def test_default_urllib_opener_receives_timeout_as_keyword(monkeypatch):
     monkeypatch.setattr(es.urllib.request, "build_opener", lambda handler: Opener())
     got = es.capture(candidate())
     assert got.usable
-    assert seen["timeout"] == es.CONNECT_TIMEOUT_SEC + es.READ_TIMEOUT_SEC
+    assert 0 < seen["timeout"] <= es.CONNECT_TIMEOUT_SEC + es.READ_TIMEOUT_SEC
 
 
 def test_oversized_response_is_visible_non_governing(monkeypatch):
@@ -79,3 +79,20 @@ def test_oversized_response_is_visible_non_governing(monkeypatch):
     got = es.capture(candidate(), opener=lambda _request, _timeout: Response(body, "text/plain"))
     assert not got.usable
     assert "exceeds" in got.error
+
+
+def test_slow_stream_cannot_outlive_capture_deadline(monkeypatch):
+    monkeypatch.setattr(es, "_validate_public_url", lambda _url: None)
+    now = [0.0]
+
+    class SlowResponse(Response):
+        def read1(self, _size):
+            now[0] += 3.0
+            return b"x"
+
+    got = es.capture(
+        candidate(), opener=lambda _request, _timeout: SlowResponse(b"", "text/plain"),
+        deadline=5.0, clock=lambda: now[0],
+    )
+    assert not got.usable
+    assert "deadline expired" in got.error

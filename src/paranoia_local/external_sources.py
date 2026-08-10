@@ -10,6 +10,7 @@ import hashlib
 import ipaddress
 import re
 import socket
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -34,6 +35,7 @@ MAX_EXTRACTED_CHARS = 40_000
 CONNECT_TIMEOUT_SEC = 10
 READ_TIMEOUT_SEC = 20
 MAX_REDIRECTS = 5
+READ_CHUNK_BYTES = 64 * 1024
 
 
 class SourceError(ValueError):
@@ -175,14 +177,49 @@ def _extract(body: bytes, content_type: str) -> str:
     return text
 
 
+def _read_body(response: object, *, deadline: float, clock: Callable[[], float]) -> bytes:
+    """Read a real urllib response in bounded chunks under one wall-clock deadline."""
+    read1 = getattr(response, "read1", None)
+    if not callable(read1):
+        body = response.read(MAX_RESPONSE_BYTES + 1)  # type: ignore[attr-defined]
+        if clock() > deadline:
+            raise SourceError("source capture deadline expired while reading response")
+        return body
+    body = bytearray()
+    while len(body) <= MAX_RESPONSE_BYTES:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise SourceError("source capture deadline expired while reading response")
+        # HTTPResponse.read1 performs at most one buffered/raw read, so the deadline is
+        # checked between chunks rather than being reset indefinitely by a trickle stream.
+        chunk = read1(min(READ_CHUNK_BYTES, MAX_RESPONSE_BYTES + 1 - len(body)))
+        if clock() > deadline:
+            raise SourceError("source capture deadline expired while reading response")
+        if not chunk:
+            break
+        body.extend(chunk)
+    return bytes(body)
+
+
 def capture(
     candidate: CandidateSource,
     *,
     opener: Callable[[urllib.request.Request, float], object] | None = None,
+    deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Capture:
     candidate = normalize_candidate(candidate)
     try:
+        started = clock()
+        capture_deadline = started + CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC
+        if deadline is not None:
+            capture_deadline = min(capture_deadline, deadline)
+        if capture_deadline <= started:
+            raise SourceError("source capture deadline expired before request")
         _validate_public_url(candidate.url)
+        remaining = capture_deadline - clock()
+        if remaining <= 0:
+            raise SourceError("source capture deadline expired before request")
         request = urllib.request.Request(
             candidate.url,
             headers={"User-Agent": "paranoia-local/0.1 evidence-capture"},
@@ -195,14 +232,16 @@ def capture(
                 return built_opener.open(req, timeout=timeout)
         else:
             open_call = opener
-        with open_call(request, CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC) as response:  # type: ignore[attr-defined]
+        with open_call(
+            request, min(CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC, remaining),
+        ) as response:  # type: ignore[attr-defined]
             final_url = response.geturl()
             _validate_public_url(final_url)
             status = int(getattr(response, "status", 200))
             content_type = response.headers.get_content_type().lower()
             if content_type not in {"text/html", "application/xhtml+xml", "text/plain"}:
                 raise SourceError(f"unsupported content type {content_type!r}")
-            body = response.read(MAX_RESPONSE_BYTES + 1)
+            body = _read_body(response, deadline=capture_deadline, clock=clock)
             if len(body) > MAX_RESPONSE_BYTES:
                 raise SourceError(f"response exceeds {MAX_RESPONSE_BYTES} bytes")
         text = _extract(body, content_type)
@@ -224,12 +263,18 @@ def capture_all(
     *,
     capture_one: Callable[[CandidateSource], Capture] = capture,
     workers: int = 4,
+    deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> list[Capture]:
     from concurrent.futures import ThreadPoolExecutor
 
     rows = list(candidates)
+    invoke = (
+        (lambda candidate: capture(candidate, deadline=deadline, clock=clock))
+        if capture_one is capture else capture_one
+    )
     with ThreadPoolExecutor(max_workers=min(workers, max(1, len(rows)))) as pool:
-        return list(pool.map(capture_one, rows))
+        return list(pool.map(invoke, rows))
 
 
 def packet_id(proposition: str, source: BoundSource) -> str:

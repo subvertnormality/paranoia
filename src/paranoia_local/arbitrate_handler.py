@@ -707,6 +707,7 @@ def _arbitrate(
                     options=orders[engine.name],
                     forbidden=caller_ids,
                     effort=effort,
+                    deadline=deadline - TEARDOWN_RESERVE_SEC,
                 )
                 for engine in deciders
             }
@@ -997,6 +998,7 @@ def _research_one(
     options: Sequence[str],
     forbidden: Sequence[str],
     effort: str,
+    deadline: float | None = None,
 ) -> ResearchRun:
     launch = Path(tempfile.mkdtemp(prefix=f"paranoia-research-{engine.name}-"))
     reviews: list[eng.Review] = []
@@ -1034,7 +1036,7 @@ def _research_one(
             session_ref = review.session_ref
 
         captures = tuple(external_sources.capture_all(
-            [claim.candidate for claim in claims]
+            [claim.candidate for claim in claims], deadline=deadline,
         ))
         rendered = research_core.binding_input(claims, captures)
         binder = engine.for_role(eng.ROLE_BINDING)

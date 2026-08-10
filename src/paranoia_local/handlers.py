@@ -38,7 +38,7 @@ PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 3540
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 1200
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 300
 PLAN_TEARDOWN_RESERVE_SEC = 60
-MAX_PLAN_EVIDENCE_MODEL_CALLS = 7
+MAX_PLAN_EVIDENCE_MODEL_CALLS = 9
 PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 MAX_PLAN_CAPTURE_SOURCES = 200
@@ -1020,7 +1020,9 @@ class _CapturedClaimEngine:
                 f"plan audit proposed {len(candidates)} sources; aggregate capture ceiling is "
                 f"{MAX_PLAN_CAPTURE_SOURCES}"
             )
-        captured = external_sources.capture_all(candidates, workers=16)
+        captured = external_sources.capture_all(
+            candidates, workers=16, deadline=self.deadline,
+        )
         return dict(zip(keys, captured, strict=True))
 
     def _binding_batches(

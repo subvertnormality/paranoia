@@ -345,8 +345,10 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase also has a 3,000-second monotonic deadline and seven model calls
-maximum. The full verified plan call is bounded to 3,540 seconds: evidence state is persisted
+The complete evidence phase also has a 3,000-second monotonic deadline and nine model calls
+maximum. That fits discovery, five maximum-size binding batches, cold attestation, and one
+correction in both discovery and binding. The full verified plan call is bounded to 3,540
+seconds: evidence state is persisted
 first, and the 1,200-second structural phase starts only if its complete cap still fits. Otherwise
 the result is blocked and the next round reuses frozen supported claims instead of repeating
 research. A class-register correction has its own 300-second cap under the same deadline.

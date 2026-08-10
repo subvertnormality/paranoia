@@ -136,6 +136,32 @@ class TestAuditValidation:
         ).claims[0]
         assert claim["verdict"] == "supported"
 
+    def test_changed_origin_is_used_for_self_source_classification(
+        self, repo: Path,
+    ) -> None:
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/example/project.git"],
+            cwd=repo, check=True,
+        )
+        source = _source(
+            url="https://github.com/example/project/blob/main/docs/plan.md",
+            kind="primary",
+        )
+        first = pc.parse_audit(
+            _audit(_claim(evidence=[source])), PLAN,
+            repo=repo, plan_repo_path="docs/plan.md",
+        ).claims[0]
+        subprocess.run(
+            ["git", "remote", "set-url", "origin", "https://github.com/example/other.git"],
+            cwd=repo, check=True,
+        )
+        second = pc.parse_audit(
+            _audit(_claim(evidence=[source])), PLAN,
+            repo=repo, plan_repo_path="docs/plan.md",
+        ).claims[0]
+        assert first["verdict"] == "unverified"
+        assert second["verdict"] == "supported"
+
     def test_persisted_plan_self_evidence_cannot_freeze_after_upgrade(
         self, repo: Path,
     ) -> None:
@@ -1364,6 +1390,11 @@ def test_plan_evidence_model_call_budget_refuses_another_phase(tmp_path: Path) -
             adapter._next_model_timeout()
     finally:
         adapter.close()
+
+
+def test_plan_evidence_budget_composes_at_maximum_batch_count() -> None:
+    normal_path = 1 + handlers.MAX_PLAN_BINDING_BATCHES + 1
+    assert handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS >= normal_path + 2
 
 
 def test_evidence_deadline_debt_is_persisted_before_structural_review(

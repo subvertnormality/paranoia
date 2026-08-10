@@ -56,7 +56,7 @@
       "A 120-second discovery cap failed after Codex had emitted a candidate audit but before process completion.",
       "Raising bounded plan discovery and binding phases to 300 seconds produced clean closure twice on fresh state.",
       "The post-review rerun closed both claims after pre-capture inventory validation and indexed binding, then persisted the final URL, captured-text SHA-256, and positive cold authority/entailment attestations for each packet.",
-      "A final fresh Codex rerun under the whole-plan deadline and seven-call evidence budget again closed both claims from the official Python documentation without a retry or budget refusal."
+      "A final fresh Codex rerun under the whole-plan deadline and the then-current seven-call evidence budget again closed both claims from the official Python documentation without a retry or budget refusal."
     ]
   },
   "repository_only_arbitration": {
