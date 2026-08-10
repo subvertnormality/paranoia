@@ -107,13 +107,17 @@ Do not create that evidence tree with `git worktree`, checkout, archive filters,
 Git command. Add an inert server materializer that reads the pinned commit with plumbing only:
 `git ls-tree -rz --full-tree` enumerates entries and `git cat-file blob <oid>` reads raw blobs,
 under `GIT_CONFIG_NOSYSTEM=1`, an empty global config, and command-line config that disables hooks,
-external diff, textconv, and optional locks. It writes ordinary files itself; executable bits are
+external diff, textconv, and optional locks. Every invocation also sets `GIT_NO_LAZY_FETCH=1`, so
+a missing promised object fails visibly instead of demand-fetching through a repository promisor
+remote. It writes ordinary files itself; executable bits are
 recorded in a manifest but not made executable, symlinks are rendered as inert target-text records,
 and gitlinks are rendered as submodule-OID records. No checkout/filter/process driver runs.
 
 Evidence-isolated model roles receive no Git commands. Claude's repository allowlist is reduced to
-`Read`, `Grep`, `Glob`, `LS`, and `NotebookRead`; Codex keeps its read-only network-restricted shell
-inside the inert non-Git tree for `rg`, `sed`, and similar reads. When history is useful, the server
+`Read`, `Grep`, and `Glob`. Codex runs a network-restricted `workspace-write` sandbox rooted at its
+disposable empty launch directory; the inert repository tree is a sibling outside the writable
+root and is exposed by a read-only symlink. It can run `rg`, `sed`, and similar inspections
+unattended but cannot modify the evidence tree. When history is useful, the server
 renders a bounded metadata-only `git log --format=...` record under the same empty-config
 environment; it never renders patches through diff/textconv. Arbitration citation resolution still
 uses the original pinned blobs, while the inert manifest makes exceptional symlink/gitlink entries
@@ -128,16 +132,15 @@ fresh and resumed commands. It disables `apps`, `browser_use`, `browser_use_exte
 `tool_suggest`. Discovery alone sets `web_search="live"`; binding, voting, repository-only, and
 verified plan-structure roles set `web_search="disabled"`. Preflight requires the exact supported
 CLI profile and confirms every named flag exists; it does not claim `codex features list` is a
-complete tool inventory. The allow surface is the read-only shell capability already required by
-review, under the CLI's network-restricted sandbox, not an open-ended feature default. Fresh and
-resumed calls also set `approval_policy="never"`: permitted read-only inspection runs unattended,
-while any operation needing escalation fails instead of waiting for a human. Real profile
-acceptance, not an unsupported cross-version promise, must demonstrate unattended `rg`/`sed` reads.
+complete tool inventory. The allow surface is the shell inside a disposable `workspace-write`
+launch root, under the CLI's network-restricted sandbox, not an open-ended feature default. Fresh
+and resumed calls set `approval_policy="never"`; the supported-profile acceptance must demonstrate
+unattended `rg`/`sed` reads, failure to mutate the out-of-root evidence tree, and no network access.
 
 Every Claude evidence role adds `--safe-mode`, `--setting-sources ""`, `--strict-mcp-config` with no
 supplied MCP config, and its exact `--tools` set. Discovery exposes only `WebSearch`;
 binding exposes no built-in tools; repository-reading voting and plan-structure roles expose only
-`Read`, `Grep`, `Glob`, `LS`, and `NotebookRead`. Resume repeats the same role flags instead
+`Read`, `Grep`, and `Glob`. Resume repeats the same role flags instead
 of assuming the original session's inventory remains narrowed.
 
 ### 2. Balanced research fan-out
@@ -353,8 +356,10 @@ attestation, order, label, vote, and round records remain intact.
   resumed Codex roles repeat the complete external-feature deny profile, keep
   `--ignore-user-config`, and start outside the project. Claude evidence roles repeat `--safe-mode`,
   `--setting-sources ""`, `--strict-mcp-config`, and role-specific `--tools`; discovery gets
-  only `WebSearch`, binding gets none, and repository roles get exactly `Read`, `Grep`, `Glob`,
-  `LS`, and `NotebookRead` without Bash or web. Existing full mode remains for unrelated tools. Do not expose a provider
+  only `WebSearch`, binding gets none, and repository roles get exactly `Read`, `Grep`, and `Glob`
+  without Bash or web. Codex repository-reading roles use `workspace-write` only for the disposable
+  wrapper; the separately materialized evidence target is outside writable roots. Existing full
+  mode remains for unrelated tools. Do not expose a provider
   abstraction or search-endpoint configuration.
 - Update `prompts.py`, `server.py`, README, `docs/arbitration_plan.md`, AGENTS.md, and CLAUDE.md.
 - Add no persistent store, lineage, cache, daemon, transport, browser renderer, or search API.
@@ -394,13 +399,16 @@ attestation, order, label, vote, and round records remain intact.
   `repository/` citations normalize to the pinned repository path before resolution;
 - inert-materialization fixtures define smudge/process filters, textconv, external diff, hooks,
   executable files, symlinks, and gitlinks; marker helpers never run during materialization or
-  reviewer reads, while raw expected bytes/manifests remain visible;
+  reviewer reads, while raw expected bytes/manifests remain visible; a partial-clone fixture with
+  a missing promised blob and executable `ext::` promisor remote fails with no helper marker under
+  `GIT_NO_LAZY_FETCH=1`;
 - supported-version acceptance captures the expected fresh/resumed Codex tool inventory and proves
   browser, app/connector, computer-use, plugin, MCP, image-generation, workspace-dependency, and
   delegation tools are absent; an unsupported CLI version fails preflight before either provider
   call without claiming that feature flags enumerate all future tools;
-- the supported Codex profile runs `rg` and `sed` against the inert tree unattended with
-  `approval_policy="never"`, while a write/network/escalation attempt fails without prompting;
+- the supported Codex profile runs `rg` and `sed` against the inert tree unattended from its
+  disposable `workspace-write` root with `approval_policy="never"`, while evidence-tree mutation
+  and network/escalation attempts fail without prompting; pre/post digests prove immutability;
 - malformed discovery or binding retains the exact preceding session reference, receives one
   resume correction, and then fails closed; capture binding itself resumes the discovery session;
   raw output, call count, usage, and durations remain auditable;
