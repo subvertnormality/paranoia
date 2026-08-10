@@ -280,18 +280,25 @@ def _staged_structural_review(
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
         }, ensure_ascii=False)
-        prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
-        if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
-            raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
-        review, settlement, call_attempts = _staged_call(
-            role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
-            model=model, effort=effort, timeout=600, on_progress=on_progress,
-            parser=lambda text: validate_settlement(
-                text, source_ids=source_ids, source_severities=source_severities,
-                assessment_ids=assessment_ids,
-                assessment_verdicts=assessment_verdicts, role="census",
-            ),
-        )
+        try:
+            prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
+            if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
+                raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
+            review, settlement, call_attempts = _staged_call(
+                role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
+                model=model, effort=effort, timeout=600, on_progress=on_progress,
+                parser=lambda text: validate_settlement(
+                    text, source_ids=source_ids, source_severities=source_severities,
+                    assessment_ids=assessment_ids,
+                    assessment_verdicts=assessment_verdicts, role="census",
+                ),
+            )
+        except rc.CensusError as error:
+            error.attempts = [  # type: ignore[attr-defined]
+                *attempts, *getattr(error, "attempts", []),
+            ]
+            error.manifests = manifests  # type: ignore[attr-defined]
+            raise
         attempts.extend(call_attempts)
     else:
         role = "final" if phase == "final" else "correction"

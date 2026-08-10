@@ -471,3 +471,46 @@ def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_pat
     assert "STRUCTURAL-PHASE: clear" in result
     audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
+
+
+def test_failed_consolidation_audit_retains_lane_and_retry_attempts(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(("run", prompt))
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+            return Review(text=text, session_ref=lane_name, raw=text)
+        return Review(text="malformed", session_ref="consolidation", raw="malformed")
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        calls.append(("resume", prompt))
+        assert session_ref == "consolidation"
+        return Review(text="still malformed", session_ref=session_ref, raw="still malformed")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"failed-consolidation", "round":1, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "BF")
+    assert "CONVERGENCE: BLOCKED" in result
+    assert len(calls) == 5
+    audit = json.loads(next((tmp_path / "logs").glob("BF-critique_branch-*.json")).read_text())
+    assert len(audit["staged_manifests"]) == 3
+    assert [row["role"] for row in audit["attempt_ledger"]] == [
+        "census-behaviour", "census-execution", "census-integrity",
+        "consolidation", "consolidation-format-retry",
+    ]
+    assert [row["outcome"] for row in audit["attempt_ledger"]] == [
+        "completed", "completed", "completed", "format-invalid", "format-invalid",
+    ]
