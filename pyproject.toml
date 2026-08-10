@@ -13,6 +13,7 @@ authors = [{ name = "Andrew Hillel" }]
 keywords = ["mcp", "code-review", "claude-code", "codex", "adversarial-review"]
 dependencies = [
     "mcp>=1.2.0",
+    "trafilatura>=2.0,<3",
 ]
 
 [project.optional-dependencies]

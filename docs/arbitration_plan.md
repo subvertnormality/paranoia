@@ -1,5 +1,18 @@
 # Brief: `arbitrate` — a fifth tool that decides between options
 
+> **Current implementation note (2026-08-10).** This is the historical design record for the
+> original repository-only protocol. The current tool additionally performs bounded shared
+> external research by default as specified in
+> [`arbitration_research_plan.md`](arbitration_research_plan.md). Codex live search and Claude
+> `WebSearch` discover candidate URLs; Paranoia Local downloads and extracts the pages with
+> Trafilatura; the same sessions bind exact passages with browsing disabled; and both deciders
+> receive the identical deterministic packet with live web disabled. Claude `WebFetch` is never
+> enabled or trusted in that path. `research: false` explicitly selects the legacy
+> repository-only mode. Deciders now read inert raw-tree materializations rather than Git
+> worktrees, so repository-controlled Git helpers and executable/symlink semantics are not part
+> of evidence presentation. Where this historical brief says otherwise, the current research
+> plan and README describe the shipped contract.
+
 Status: FINAL for implementation, revision 11. Ten codex adversarial-review rounds
 folded — round 1: 1 FATAL, 9 MAJOR, 4 MINOR; round 2: 2 FATAL, 9 MAJOR, 3 MINOR;
 round 3: 3 FATAL, 1 MAJOR; round 4: 1 FATAL, 2 MAJOR; round 5: 3 MAJOR; round 6:

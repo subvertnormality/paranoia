@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from paranoia_local import class_closure as cc, handlers, plan_claims as pc
+from paranoia_local import (
+    class_closure as cc,
+    external_sources,
+    handlers,
+    plan_claims as pc,
+)
 from paranoia_local.engines import Review
 
 
@@ -545,6 +550,21 @@ class TestRetainedEvidence:
         )
         assert pc.frozen_supported_ids(first, listed) == set(first["claims"])
 
+    def test_reflowed_list_assertion_can_reuse_its_packet(self) -> None:
+        listed = (
+            '# Rollout\n\n- Python 3.11 was released in\n'
+            '  October 2022. A second sentence stays in the item.\n'
+        )
+        first = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), listed),
+            lineage_id="x-plan", round_no=1, plan_text=listed,
+        )
+        reflowed = (
+            '# Rollout\n\n- Python 3.11 was released in October 2022.\n'
+            '  A second sentence stays in the item.\n'
+        )
+        assert pc.frozen_supported_ids(first, reflowed) == set(first["claims"])
+
     def test_duplicate_assertion_and_quotation_cannot_freeze_ambiguously(self) -> None:
         mixed = (
             PLAN + '\n## Quotation\n\n'
@@ -1052,3 +1072,69 @@ class TestHandlerFlow:
         assert "REVIEW FAILED" in out
         assert "CONVERGENCE:" not in out
         assert "CLAIM-CLOSURE: 1 supported" in out
+
+
+class _RoleScript:
+    name = "codex"
+    default_model = "test"
+
+    def __init__(self, outputs: dict[str, list[str]]) -> None:
+        self.outputs = outputs
+        self.role = "default"
+
+    def for_role(self, role: str):
+        child = _RoleScript(self.outputs)
+        child.role = role
+        return child
+
+    def _next(self) -> Review:
+        return Review(
+            text=self.outputs[self.role].pop(0), session_ref="session", raw=self.role,
+        )
+
+    def run(self, *args, **kwargs):
+        return self._next()
+
+    def resume(self, *args, **kwargs):
+        return self._next()
+
+
+def test_captured_claim_retry_cannot_bypass_capture_validation(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "body", "text",
+        source["quote"],
+    )
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all", lambda candidates: [capture],
+    )
+    valid = _audit(_claim())
+    changed = _audit(_claim(evidence=[_source(url="https://example.com/changed")]))
+    attestation = (
+        '=== EVIDENCE ATTESTATION JSON ===\n'
+        '{"attestations":[{"claim_index":0,"evidence_index":0,'
+        '"publisher_authority":true,"authority_reason":"official release owner",'
+        '"passage_entailment":true,"entailment_reason":"states the release date"}]}'
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [valid],
+        "evidence-binding": [valid, changed],
+        "evidence-text": [attestation],
+    })
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    try:
+        first = adapter.run("audit", tmp_path, "m", "high", True)
+        assert not first.error
+        retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
+        assert retry.error
+        assert "binding added or changed" in retry.text
+    finally:
+        adapter.close()

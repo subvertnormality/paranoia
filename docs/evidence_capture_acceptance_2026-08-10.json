@@ -1,0 +1,78 @@
+{
+  "date": "2026-08-10",
+  "implementation_branch": "feat/arbitration-research",
+  "environment": {
+    "codex_cli": "0.144.6",
+    "codex_model": "gpt-5.6-sol",
+    "claude_cli": "2.1.197",
+    "claude_models": ["claude-opus-5", "claude-fable-5"],
+    "git": "2.50.1",
+    "trafilatura": "2.2.0"
+  },
+  "external_arbitration": {
+    "fixture": "/tmp/paranoia-real-acceptance",
+    "decision": "Python numeric representation for exact monetary input",
+    "result": "CONVERGED",
+    "selected": "choice-b: decimal.Decimal",
+    "rounds": 1,
+    "research_calls": {
+      "codex": 2,
+      "claude": 2
+    },
+    "captured_packets": 6,
+    "research_digest": "76886e0b0f33625660a99aab6a6a463024b82f0641613ebe2697013dc10e7ce2",
+    "authoritative_url": "https://docs.python.org/3/tutorial/floatingpoint.html",
+    "decisive_evidence": {
+      "claude": "SOURCE:src-4bcbdb3a2193d233",
+      "codex": "README.md:4"
+    },
+    "audit": "/tmp/paranoia-real-acceptance-logs/20260810T120000-arbitrate-f08e1e91.json",
+    "notes": [
+      "Codex and Claude discovered candidate URLs independently.",
+      "The server downloaded and extracted page text; same-session binding ran with web disabled.",
+      "Both deciders received the same normalized packet and ran with live web disabled.",
+      "An initial acceptance attempt exposed and then regression-tested a positional urllib timeout bug before any vote."
+    ]
+  },
+  "plan_claim_capture": {
+    "result": "2 supported, 0 refuted, 0 unverified",
+    "model_calls": "discovery, same-session binding, cold attestation",
+    "discovery_and_binding_cap_seconds": 300,
+    "claims": [
+      {
+        "kind": "fact",
+        "proposition": "Python's documentation states that most decimal fractions cannot be represented exactly as binary fractions.",
+        "url": "https://docs.python.org/3/tutorial/floatingpoint.html#representation-error",
+        "passage": "Representation error refers to the fact that some (most, actually) decimal fractions cannot be represented exactly as binary (base 2) fractions."
+      },
+      {
+        "kind": "behavior",
+        "proposition": "In general, decimal floating-point input is approximated by the binary floating-point value stored by the machine.",
+        "url": "https://docs.python.org/3.13/tutorial/floatingpoint.html",
+        "passage": "A consequence is that, in general, the decimal floating-point numbers you enter are only approximated by the binary floating-point numbers actually stored in the machine."
+      }
+    ],
+    "notes": [
+      "A 120-second discovery cap failed after Codex had emitted a candidate audit but before process completion.",
+      "Raising bounded plan discovery and binding phases to 300 seconds produced clean closure twice on fresh state."
+    ]
+  },
+  "repository_only_arbitration": {
+    "research": false,
+    "clean": false,
+    "result": "CONVERGED",
+    "selected": "choice-b: retain original text with parsed value",
+    "rounds": 1,
+    "decisive_evidence": {
+      "codex": "README.md:4",
+      "claude": "README.md:4"
+    },
+    "research_digest": null,
+    "audit": "/tmp/paranoia-repo-only-logs/20260810T130000-arbitrate-f42ca5d2.json",
+    "notes": [
+      "The first repository-only run exposed that Claude Read/Grep/Glob did not traverse the Codex-oriented launch symlink.",
+      "Claude now starts directly in the inert evidence root; Codex retains the non-writable symlink presentation.",
+      "The successful run made no discovery or capture calls. Optional framing cleanup was disabled to isolate repository evidence behavior."
+    ]
+  }
+}

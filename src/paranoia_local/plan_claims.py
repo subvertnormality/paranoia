@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
+from . import external_sources as sources
+
 
 AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
 MAX_ACTIVE_CLAIMS = 500
@@ -29,21 +31,17 @@ DIAGNOSTIC_CHARS = 4000
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
 SCOPES = frozenset({"external"})
 CLAIM_KINDS = frozenset({"fact", "design_principle", "behavior"})
-SOURCE_KINDS = frozenset({"primary", "authoritative", "secondary", "ugc"})
+SOURCE_KINDS = sources.SOURCE_KINDS
 RELATIONS = frozenset(
     {"supports_claim", "refutes_claim", "supports_replacement", "context"}
 )
-AUTHORITATIVE_KINDS = frozenset({"primary", "authoritative"})
+AUTHORITATIVE_KINDS = sources.AUTHORITATIVE_KINDS
 
 # These sources can be useful discovery leads, but cannot become authoritative merely
 # because a model labels them "primary".  This is intentionally a narrow deny-list of
 # unambiguously user-generated/community platforms, not a pretend universal authority
 # classifier.
-UGC_HOSTS = (
-    "reddit.com", "quora.com", "stackoverflow.com", "stackexchange.com",
-    "medium.com", "substack.com", "x.com", "twitter.com", "facebook.com",
-    "instagram.com", "tiktok.com", "youtube.com", "wikipedia.org",
-)
+UGC_HOSTS = sources.UGC_HOSTS
 
 
 class AuditError(ValueError):
@@ -1348,14 +1346,18 @@ def _assertion_contexts(
             list_ancestors[:] = [
                 item for item in list_ancestors if item[0] < leading
             ]
+            # The current item's own physical first line belongs to its semantic
+            # body, not its ancestry. Keeping it in both made a harmless Markdown
+            # reflow change identity because continuation-line marker text split an
+            # otherwise exact anchor. Parent list items still identify relocation.
+            block_list_path = tuple(list_ancestors)
             list_ancestors.append((leading, stripped))
             block_kind = "list"
-            block_list_path = tuple(list_ancestors)
-            block.append(f"<list-indent:{leading}>{stripped}")
+            block.append(stripped)
             index += 1
             continue
         if block_kind == "list":
-            block.append(f"<list-indent:{leading}>{stripped}")
+            block.append(stripped)
             index += 1
             continue
         if stripped.startswith("|"):
@@ -1432,7 +1434,7 @@ def _mint(lineage_id: str, seq: int, proposition: str) -> str:
 
 
 def _is_ugc_host(host: str) -> bool:
-    return any(host == suffix or host.endswith("." + suffix) for suffix in UGC_HOSTS)
+    return sources.is_ugc_host(host)
 
 
 def _excerpt(raw: str) -> str:

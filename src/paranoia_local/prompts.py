@@ -227,14 +227,17 @@ Never invoke MCP review tools or other agents to make or check this decision, in
 ## Output
 Write a short, dense justification: the decisive constraint, the evidence for it, and why the alternatives lose. No preamble, no summary, no hedging.
 
-Then end your reply with EXACTLY these six lines, verbatim, in this order, nothing after them:
+Then end your reply with EXACTLY these ten lines, verbatim, in this order, nothing after them:
 
 SELECTED: <one of the OPTION-… labels issued to you above, copied exactly>
 SELECTED-RISK: NONE
 AUTHORITY: technical
 NEW-OPTION: NONE
 CONSTRAINT: <the single decisive fact about the system behind your selection, one line>
-DECISIVE-CITATION: <path>:<line>
+PUBLISHER-AUTHORITY: N/A
+PASSAGE-ENTAILMENT: N/A
+DECISION-RELEVANCE: N/A
+DECISIVE-CITATION: <path>:<line> or SOURCE:<packet-id>
 CITATIONS: NONE
 
 These six lines must be the LAST thing in your reply, each appearing exactly once, and none of these field names may appear anywhere earlier in it. Write your reasoning as prose; do not restate or preview the format. A duplicated or early field line fails the whole reply, because a parser that preferred one occurrence would silently discard the other — including a blocking risk or the citation your vote actually rests on.
@@ -246,8 +249,29 @@ Field rules — these are parsed mechanically, so exact form matters:
 - AUTHORITY — `technical` if evidence can settle this. `human-owner` if the EFFECT of the choice requires a named human to authorize it: irreversible or external action, a compliance disposition, a change to a precommitted threshold, or a choice that defines what the system's outputs mean. Judge by effect, not by how the question was phrased. This is advisory and does not block; report it honestly either way.
 - NEW-OPTION — `NONE`, or one line describing an unlisted option you judge STRICTLY BETTER than the one you selected. Use it only when you mean it: it ends the adjudication and returns the decision to the operator for reframing.
 - CONSTRAINT — one line, a verifiable fact about the system, not a preference and not a restatement of your choice.
-- DECISIVE-CITATION — exactly one `<path>:<line>` for the line your selection actually turns on. `<commit>@<path>:<line>` if the line is from an earlier revision rather than the checked-out snapshot — a bare path:line is read from the snapshot, so an unprefixed historical citation would point at different bytes than you read. This field is what substantiates your vote: `NONE` means the decision cannot be reported as settled.
+- PUBLISHER-AUTHORITY, PASSAGE-ENTAILMENT, and DECISION-RELEVANCE — for a repository citation, all three must be exactly `N/A`. For `SOURCE:<packet-id>`, each must be `YES — <specific reason>` or `NO — <specific reason>`. Judge whether the publisher governs the exact proposition, whether the captured passage entails it, and whether it materially bears on the option comparison under the stated stakes. A researcher label is not authority.
+- DECISIVE-CITATION — exactly one `<path>:<line>` or `SOURCE:<packet-id>` for the evidence your selection actually turns on. `<commit>@<path>:<line>` if a repository line is from an earlier revision rather than the checked-out snapshot. A source reference is valid only for a captured packet shown in the task, and then CONSTRAINT must copy that packet's atomic proposition exactly. `NONE` means the decision cannot be reported as settled.
 - CITATIONS — up to three further `<path>:<line>` for supporting evidence, or `NONE`. Supporting only; they do not substantiate."""
+
+
+ARBITRATION_DISCOVERY_INSTRUCTIONS = """You are the bounded discovery phase for a technical decision.
+
+Use only your native WebSearch tool to discover candidate authoritative URLs. Do not fetch pages, use repository tools, invoke MCP/plugins/agents, recommend an option, rank options, or associate a proposition with an option label. Inventory only atomic load-bearing external facts, externally issued design principles, and promised external-system behaviors whose truth could change the comparison. Repository state, project preferences, implementation claims, forecasts, and incidental facts are out of scope. Prefer the governing vendor, standard, regulator, original paper, or official record. UGC may be a lead but must be labelled ugc and cannot govern.
+
+Return only this marker and JSON, with at most 12 unique propositions and exactly one candidate per proposition:
+
+=== RESEARCH DISCOVERY JSON ===
+{"claims":[{"kind":"fact|design_principle|behavior","proposition":"one atomic proposition","candidate":{"url":"https://...","title":"...","publisher":"...","source_kind":"primary|authoritative|secondary|ugc","authority_basis":"why this publisher governs this proposition","relation":"supports_claim|refutes_claim|context"}}]}"""
+
+
+ARBITRATION_BINDING_INSTRUCTIONS = """You are binding previously discovered candidates to server-captured text.
+
+You have no web, repository, MCP, plugin, browser, or delegation tools. Use only the supplied captures. For each claim_index, either copy one exact passage from that capture and give its precise section/location, or mark it unusable. Do not add or change a URL, source, proposition, publisher, relation, or claim. Provider search summaries are not evidence.
+
+Return only this marker and JSON, with exactly one item for every claim_index:
+
+=== EVIDENCE BINDING JSON ===
+{"bindings":[{"claim_index":0,"usable":true,"location":"section/table/page","passage":"exact captured passage"},{"claim_index":1,"usable":false,"location":null,"passage":null}]}"""
 
 
 def compose(instructions: str, body: str) -> str:

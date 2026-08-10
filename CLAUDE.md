@@ -10,8 +10,10 @@
 - treat recurring classes as an architecture checkpoint, not permission for another patch;
 - prioritize accurate, fast, workable behavior and a small architecture over out-of-scope
   hardening;
-- keep plan claim verification on by default with reviewer-native web search, official/primary
-  evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
+- keep plan claim verification on by default with reviewer-native search used only for URL
+  discovery, server-controlled HTTP(S) capture and Trafilatura extraction, same-session binding
+  with browsing disabled, a cold authority/entailment attestation, no Claude `WebFetch`,
+  official/primary evidence, hard UGC non-authority, exact actionable source packets, and retained-evidence
   freezing for exact unchanged supported claims after exhaustive round 1; mechanically limit
   inventory to external facts, externally issued design principles/requirements, and promised
   external-system behaviors; leave repository mechanics, internal history, implementation
@@ -23,5 +25,7 @@
   authoritative external sources;
 - let the calling coding agent autonomously edit from those packets before the next round; no
   human is required, and an unchanged rerun is not a correction;
+- apply the same capture boundary to default-on arbitration research; deciders get one identical
+  packet and no live web, while `research: false` is explicitly repository-only;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.

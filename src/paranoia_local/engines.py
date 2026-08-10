@@ -12,6 +12,8 @@ The impure subprocess call is injected via `runner` (see runner.py).
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -23,6 +25,24 @@ Runner = Callable[[list[str], str, Path, int], RunResult]
 
 # Longest progress message forwarded to the client (spinner-line sized).
 _PROGRESS_MSG_MAX = 100
+
+ROLE_DEFAULT = "default"
+ROLE_DISCOVERY = "evidence-discovery"
+ROLE_BINDING = "evidence-binding"
+ROLE_REPOSITORY = "evidence-repository"
+ROLE_TEXT = "evidence-text"
+EVIDENCE_ROLES = frozenset({ROLE_DISCOVERY, ROLE_BINDING, ROLE_REPOSITORY, ROLE_TEXT})
+
+SUPPORTED_CODEX_VERSION = "0.144.6"
+SUPPORTED_CLAUDE_VERSION = "2.1.197"
+
+CODEX_EXTERNAL_FEATURES = (
+    "apps", "browser_use", "browser_use_external", "browser_use_full_cdp_access",
+    "computer_use", "in_app_browser", "plugins", "remote_plugin", "plugin_sharing",
+    "enable_mcp_apps", "image_generation", "multi_agent", "workspace_dependencies",
+    "auth_elicitation", "tool_call_mcp_elicitation", "skill_mcp_dependency_install",
+    "hooks", "tool_suggest",
+)
 
 
 @dataclass(frozen=True)
@@ -54,6 +74,15 @@ class Engine(ABC):
     #: plan-claim phase keys off this capability so test/dummy engines are not silently
     #: asked to perform a second protocol they do not implement.
     native_web: bool = True
+    role: str = ROLE_DEFAULT
+
+    def for_role(self, role: str) -> Engine:
+        if role not in EVIDENCE_ROLES and role != ROLE_DEFAULT:
+            raise ValueError(f"unknown evidence role: {role}")
+        clone = type(self)()
+        clone.text_only = self.text_only
+        clone.role = role
+        return clone
 
     @abstractmethod
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
@@ -152,7 +181,36 @@ class CodexEngine(Engine):
     default_model = "gpt-5.6-sol"
     binary = "codex"
 
+    def _evidence_flags(self, *, resumed: bool = False) -> list[str]:
+        live = self.role == ROLE_DISCOVERY
+        flags = [
+            "-c", 'approval_policy="never"',
+            "-c", f'web_search="{"live" if live else "disabled"}"',
+            "-c", "sandbox_workspace_write.network_access=false",
+            "-c", "sandbox_workspace_write.exclude_slash_tmp=true",
+            "-c", "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+            "-c", "sandbox_workspace_write.writable_roots=[]",
+        ]
+        if resumed:
+            resumed_sandbox = (
+                "workspace-write"
+                if self.role in {ROLE_DISCOVERY, ROLE_REPOSITORY}
+                else "read-only"
+            )
+            flags += ["-c", f'sandbox_mode="{resumed_sandbox}"']
+        for feature in CODEX_EXTERNAL_FEATURES:
+            flags += ["--disable", feature]
+        return flags
+
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
+        if self.role in EVIDENCE_ROLES:
+            sandbox = "workspace-write" if self.role in {ROLE_DISCOVERY, ROLE_REPOSITORY} else "read-only"
+            return [
+                "codex", "exec", "--json", "--ignore-user-config",
+                "--skip-git-repo-check", "-s", sandbox, "-C", str(cwd), "-m", model,
+                "-c", f'model_reasoning_effort="{effort}"',
+                *self._evidence_flags(), "-",
+            ]
         argv = [
             "codex", "exec",
             "--json",
@@ -174,6 +232,13 @@ class CodexEngine(Engine):
     def build_resume_argv(
         self, session_ref: str, cwd: Path, model: str, effort: str, web_search: bool
     ) -> list[str]:
+        if self.role in EVIDENCE_ROLES:
+            return [
+                "codex", "exec", "resume", session_ref, "--json",
+                "--ignore-user-config", "--skip-git-repo-check", "-m", model,
+                "-c", f'model_reasoning_effort="{effort}"',
+                *self._evidence_flags(resumed=True), "-",
+            ]
         # `codex exec resume` does NOT accept -s/-C: a resumed session inherits
         # its original sandbox (read-only) and cwd. We pass -C nowhere and rely
         # on the process cwd (set by the runner). --skip-git-repo-check keeps it
@@ -273,6 +338,20 @@ class ClaudeEngine(Engine):
     default_model = "claude-fable-5"
     binary = "claude"
 
+    def _evidence_tools(self) -> str:
+        if self.role == ROLE_DISCOVERY:
+            return "WebSearch"
+        if self.role == ROLE_REPOSITORY:
+            return "Read,Grep,Glob"
+        return ""
+
+    def _evidence_argv(self, model: str, effort: str) -> list[str]:
+        return [
+            "--output-format", "json", "--model", model, "--effort", effort,
+            "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
+            "--tools", self._evidence_tools(),
+        ]
+
     def _allowed(self, web_search: bool) -> str:
         # text_only: an EMPTY allowlist. In `-p` mode a tool that needs permission
         # and isn't allowlisted is auto-denied, so this is a real capability
@@ -285,6 +364,8 @@ class ClaudeEngine(Engine):
         return ",".join(tools)
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
+        if self.role in EVIDENCE_ROLES:
+            return ["claude", "-p", *self._evidence_argv(model, effort)]
         return [
             "claude", "-p",
             "--output-format", "json",
@@ -303,6 +384,11 @@ class ClaudeEngine(Engine):
     def build_resume_argv(
         self, session_ref: str, cwd: Path, model: str, effort: str, web_search: bool
     ) -> list[str]:
+        if self.role in EVIDENCE_ROLES:
+            return [
+                "claude", "-p", "--resume", session_ref,
+                *self._evidence_argv(model, effort),
+            ]
         return [
             "claude", "-p",
             "--resume", session_ref,
@@ -370,3 +456,29 @@ def all_engines() -> tuple[Engine, ...]:
     comes from the recorded seed (see `arbitration.forward_engine`).
     """
     return tuple(cls() for cls in _ENGINES.values())
+
+
+def _cli_version(binary: str) -> str:
+    result = subprocess.run([binary, "--version"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"cannot run {binary} --version: {result.stderr.strip()}")
+    match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
+    if not match:
+        raise RuntimeError(f"cannot parse {binary} version from {result.stdout.strip()!r}")
+    return match.group(1)
+
+
+def require_evidence_profile(engine: Engine) -> str:
+    expected = {
+        "codex": SUPPORTED_CODEX_VERSION,
+        "claude": SUPPORTED_CLAUDE_VERSION,
+    }.get(engine.name)
+    if expected is None:
+        raise RuntimeError(f"no evidence profile for engine {engine.name!r}")
+    actual = _cli_version(engine.binary)
+    if actual != expected:
+        raise RuntimeError(
+            f"{engine.name} evidence mode supports CLI {expected}; found {actual}. "
+            "Install the supported version or add and accept a new explicit profile."
+        )
+    return actual

@@ -32,6 +32,8 @@ import re
 from dataclasses import dataclass, replace
 from typing import Callable, Collection, Iterable, Mapping, Sequence
 
+from .external_sources import normalize_text
+
 # --- shape limits -----------------------------------------------------------
 
 MIN_OPTIONS = 2
@@ -61,6 +63,9 @@ TRAILER_FIELDS = (
     "AUTHORITY",
     "NEW-OPTION",
     "CONSTRAINT",
+    "PUBLISHER-AUTHORITY",
+    "PASSAGE-ENTAILMENT",
+    "DECISION-RELEVANCE",
     "DECISIVE-CITATION",
     "CITATIONS",
 )
@@ -362,6 +367,14 @@ class Citation:
         return f"{self.commit}@{base}" if self.commit else base
 
 
+@dataclass(frozen=True)
+class SourceReference:
+    packet_id: str
+
+    def render(self) -> str:
+        return f"SOURCE:{self.packet_id}"
+
+
 _CITATION_RE = re.compile(
     r"^(?:(?P<commit>[0-9a-fA-F]{7,40})@)?(?P<path>[^\s:][^\s]*?):(?P<line>\d+)$"
 )
@@ -387,6 +400,8 @@ def _normalize_path(path: str) -> str:
     drops. A model that writes `./f.py` gets a dropped citation, which costs one
     `UNRESOLVED` — the cheap, self-announcing outcome.
     """
+    if path.startswith("repository/"):
+        path = path[len("repository/"):]
     if not path.strip():
         raise ArbitrationError(f"citation path is empty: {path!r}")
     return path
@@ -440,6 +455,19 @@ def parse_decisive_citation(field: str) -> tuple[Citation, ...]:
     if "," in text or len(text.split()) != 1:
         return ()
     return parse_citations(text, limit=1)
+
+
+def parse_decisive_reference(field: str) -> Citation | SourceReference | None:
+    text = (field or "").strip()
+    if text.upper() == "NONE" or not text:
+        return None
+    if text.startswith("SOURCE:"):
+        packet_id = text[len("SOURCE:"):]
+        if re.fullmatch(r"src-[0-9a-f]{16}", packet_id):
+            return SourceReference(packet_id)
+        return None
+    citations = parse_decisive_citation(text)
+    return citations[0] if citations else None
 
 
 @dataclass(frozen=True)
@@ -661,8 +689,22 @@ class Vote:
     authority: str
     new_option: str | None
     constraint: str
-    decisive: Citation | None
+    decisive: Citation | SourceReference | None
     citations: tuple[Citation, ...]
+    publisher_authority: bool | None
+    passage_entailment: bool | None
+    decision_relevance: bool | None
+    evidence_reasons: Mapping[str, str]
+
+
+def _judgement(raw: str, field: str) -> tuple[bool | None, str]:
+    text = raw.strip()
+    if text.upper() == "N/A":
+        return None, ""
+    match = re.fullmatch(r"(YES|NO)\s+[—-]\s+(\S.*)", text, re.IGNORECASE)
+    if not match:
+        raise ArbitrationError(f"{field} must be N/A or YES/NO — <reason>")
+    return match.group(1).upper() == "YES", match.group(2).strip()
 
 
 def _trailer_values(text: str) -> dict[str, str]:
@@ -739,7 +781,21 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
     new_option_raw = values["NEW-OPTION"].strip()
     new_option = None if new_option_raw.upper() == "NONE" or not new_option_raw else new_option_raw
 
-    decisive = parse_decisive_citation(values["DECISIVE-CITATION"])
+    decisive = parse_decisive_reference(values["DECISIVE-CITATION"])
+    authority_ok, authority_reason = _judgement(
+        values["PUBLISHER-AUTHORITY"], "PUBLISHER-AUTHORITY"
+    )
+    entailment_ok, entailment_reason = _judgement(
+        values["PASSAGE-ENTAILMENT"], "PASSAGE-ENTAILMENT"
+    )
+    relevance_ok, relevance_reason = _judgement(
+        values["DECISION-RELEVANCE"], "DECISION-RELEVANCE"
+    )
+    if isinstance(decisive, SourceReference):
+        if None in (authority_ok, entailment_ok, relevance_ok):
+            raise ArbitrationError("SOURCE decisive evidence requires three YES/NO judgements")
+    elif any(value is not None for value in (authority_ok, entailment_ok, relevance_ok)):
+        raise ArbitrationError("repository decisive evidence requires three N/A judgements")
     return Vote(
         engine=presentation.engine,
         label=label,
@@ -749,8 +805,16 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
         authority=authority,
         new_option=new_option,
         constraint=values["CONSTRAINT"].strip(),
-        decisive=decisive[0] if decisive else None,
+        decisive=decisive,
         citations=parse_citations(values["CITATIONS"]),
+        publisher_authority=authority_ok,
+        passage_entailment=entailment_ok,
+        decision_relevance=relevance_ok,
+        evidence_reasons={
+            "publisher_authority": authority_reason,
+            "passage_entailment": entailment_reason,
+            "decision_relevance": relevance_reason,
+        },
     )
 
 
@@ -853,6 +917,7 @@ def substantiation(
     resolve: Callable[[Citation], Region | None],
     carried: Mapping[str, Sequence[Region]] | None = None,
     moved: Collection[str] | None = None,
+    source_packets: Mapping[str, tuple[str, bool]] | None = None,
 ) -> dict[str, bool]:
     """Per-engine substantiation.
 
@@ -880,6 +945,18 @@ def substantiation(
     for vote in votes:
         if vote.decisive is None:
             out[vote.engine] = False
+            continue
+        if isinstance(vote.decisive, SourceReference):
+            packet = (source_packets or {}).get(vote.decisive.packet_id)
+            out[vote.engine] = bool(
+                carried is None
+                and packet
+                and packet[1]
+                and normalize_text(vote.constraint) == normalize_text(packet[0])
+                and vote.publisher_authority is True
+                and vote.passage_entailment is True
+                and vote.decision_relevance is True
+            )
             continue
         region = resolve(vote.decisive)
         if region is None:

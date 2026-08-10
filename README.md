@@ -229,8 +229,13 @@ registered MAJOR but its effect is cosmetic; reclassify it if you agree."*
 ### Plan claim verification — evidence before critique
 
 `critique_plan` verifies external premises **by default**, before structural review. It uses
-the selected signed-in reviewer CLI's built-in web search. There is no
-`PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search adapter.
+the selected signed-in reviewer CLI's built-in search **only to discover candidate URLs**.
+Paranoia Local then downloads those public HTTP(S) pages itself, extracts main text with
+Trafilatura, and resumes the same reviewer session with web access disabled to bind exact
+passages. A separate cold, tool-free attester must accept both publisher authority and passage
+entailment before a packet can close a claim. Claude `WebFetch` is never enabled or trusted in
+this path. There is no `PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search
+adapter.
 
 The register is mechanically limited to load-bearing external propositions in three kinds:
 
@@ -248,8 +253,10 @@ repository claims are mechanically retired and stop consuming active inventory o
 Fresh model output mislabeled `repository` is rejected into bounded correction/debt rather than
 silently discarded, because it could actually be an eligible external premise.
 
-External claims close only when an exact passage from a primary or authoritative
-source entails that exact proposition. First-party documentation, standards,
+External claims close only when an exact passage reproduced from Paranoia's server-captured
+page is accepted by the cold attester as both authoritative and entailing the exact proposition.
+Provider summaries, search snippets, and provider-fetched page text are not evidence.
+First-party documentation, standards,
 statutes/regulators, government data, original papers/datasets, and the relevant
 entity's records are preferred. Secondary material can corroborate or locate a
 source. Reddit, Stack Overflow, forums, social media, wikis, blogs, and other UGC
@@ -512,22 +519,31 @@ over one pinned snapshot, and Python computes the verdict.
 
 What it does, in order:
 
-1. **Pins one snapshot.** Each decider gets its own worktree of the same commit.
+1. **Pins one snapshot.** Each decider gets its own inert materialization of the same raw Git
+   tree and bounded metadata history. Git filters, hooks, textconv, executable bits, symlinks,
+   gitlinks, and lazy-fetch helpers are never executed as part of evidence presentation.
    Git refs and the reflog are digested before and after; if anything moved, the
    run returns `FAILED` rather than reporting agreement it cannot describe.
 2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
    equalized in detail — then has the *other* vendor attest that field by field.
    `stakes` is passed through verbatim, never rewritten.
-3. **Counterbalances presentation.** One decider sees canonical order, the other
+3. **Researches shared external premises by default.** Codex live search and Claude
+   `WebSearch` independently discover candidate URLs in parallel. The server downloads and
+   extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
+   Claude `WebFetch` is not enabled. Python deterministically unions the results, hard-demotes
+   known UGC hosts, and sends byte-identical packets to both deciders.
+4. **Counterbalances presentation.** One decider sees canonical order, the other
    reversed, under opaque per-decider labels. Neither is told the other exists.
-4. **Computes the verdict.** No model adjudicates the adjudication.
-5. **On divergence**, runs one reconciliation round carrying only `path:line`
+5. **Computes the verdict.** No model adjudicates the adjudication. A decisive external
+   reference must name a captured packet and explicitly pass publisher-authority,
+   passage-entailment, and decision-relevance checks.
+6. **On divergence**, runs one reconciliation round carrying only `path:line`
    citations and bytes the server itself read — never the other model's prose —
    and only when there is genuinely novel evidence.
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
-| `repo_path` | string | **required** | Every decisive citation must be repo-verifiable |
+| `repo_path` | string | **required** | Repository context to pin; decisive evidence may be a repository citation or captured source packet |
 | `decision` | string | **required** | What is being decided (max 2500 chars) — not the evidence for it |
 | `options` | array | **required** | 2–4 mutually exclusive `{id, statement}`. Array order is irrelevant; canonical order is derived by sorting ids |
 | `stakes` | string | **required** | Pass `"unstated"` to accept a fixed default reading |
@@ -539,7 +555,15 @@ What it does, in order:
 | `cleaner_model` | string | `claude-opus-5` | Override the cleaner model |
 | `order_seed` | string | — | Replay a previous run's `ORDER-SEED` to reproduce its labels and ordering |
 | `retain_snapshot` | boolean | `false` | Create `refs/paranoia/arbitrate/<stamp>` so evidence survives `git gc` |
+| `research` | boolean | `true` | Run bounded shared external research. Set `false` only for an explicit repository-only decision; both deciders then run with web disabled |
 | `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+`research: true` requires `web_search: true`; the incompatible combination is rejected before
+any model call. `web_search` authorizes only the isolated discovery roles. Binding and every
+decider call run with web disabled, and only server-captured packets can affect substantiation.
+The signed-in end-to-end record, including exact versions, packet digest, source references,
+plan-claim closure, repository-only closure, and defects found by the first real runs, is
+[`docs/evidence_capture_acceptance_2026-08-10.json`](docs/evidence_capture_acceptance_2026-08-10.json).
 
 **`arbitrate` has no `engine` or `model`** — it drives both vendors, so a single
 override could only degrade it to one of them or send one vendor's model name to
@@ -730,12 +754,11 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 ## Safety model
 
-- **Read-only reviewer.** Codex runs under its OS sandbox (`--sandbox read-only`); Claude
-  runs with a read-only tool allowlist (`Read`, `Grep`, `Glob`, scoped `git`
-  reads, web search) and write tools explicitly denied. The reviewer cannot edit
-  your code or run your test suite. Built-in web search is enabled by default and
-  required for plan claim verification. The separate calling coding agent owns
-  autonomous corrections.
+- **Role-bounded reviewer.** Ordinary reviews remain read-only. Evidence discovery receives
+  only provider search; binding and cold attestation receive no web or repository tools; verified
+  plan structure and arbitration voting receive only read access to an inert evidence tree and
+  no web. The reviewer cannot edit your code or run your test suite. The separate calling coding
+  agent owns autonomous corrections.
 - **Reviewer capability is hermetic.** Codex is spawned with `--ignore-user-config`:
   authentication remains available, while registered MCP servers and user-configured tools
   do not. This prevents a reviewer from recursively calling paranoia-local even when repo
@@ -750,14 +773,17 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 - **Isolated.** Committed reviews run inside a throwaway `git worktree` of the
   target ref, so they never collide with your working tree and can review a branch
   that isn't checked out. Dirty-working-tree reviews necessarily run in the live
-  repo, read-only.
+  repo, read-only. Verified plan structure and arbitration instead use disposable inert
+  materializations, because those paths must not expose repository-selected Git helpers,
+  executable bits, symlink traversal, or live Git commands.
 - **No API keys, no telemetry.** The server shells out to a CLI you are already
   signed into.
 - **Minimal footprint.** In `converge` mode the server creates a short-lived
   worktree and a few unreferenced git objects in the target repo. Both are cleaned
   up on exit and no ref is created. A hard crash can leave the worktree
   registration until the next `git worktree prune` / `git gc`. Your working tree
-  and index are never touched.
+  and index are never touched. Verified plan and arbitration evidence modes create disposable
+  directories plus unreferenced snapshot objects, but no worktree registration.
 
   **One opt-in exception:** `arbitrate` with `retain_snapshot: true` creates
   `refs/paranoia/arbitrate/<stamp>` so its evidence survives `git gc`. It is the

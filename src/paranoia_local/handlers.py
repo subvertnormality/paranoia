@@ -11,6 +11,8 @@ footer exposing the session reference for `rebut`.
 from __future__ import annotations
 
 import hashlib
+import json
+import shutil
 import subprocess
 import tempfile
 import time
@@ -19,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import arbitration, class_closure as cc
+from . import engines as eng, external_sources, inert_git, inert_tree
 from . import logs, orientation, plan_claims as pc, prompts
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
@@ -27,6 +30,8 @@ from .worktree import worktree_at
 
 
 Clock = Callable[[], str]
+
+PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
 
 
 def _default_clock() -> str:
@@ -456,6 +461,12 @@ def critique_plan(
             "claim verification requires the reviewer's built-in web search; "
             "web_search: false is incompatible with claim_verification: true"
         )
+    if claim_verification and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+        try:
+            inert_git.require_supported_version()
+            eng.require_evidence_profile(engine)
+        except RuntimeError as exc:
+            raise ValueError(str(exc)) from exc
 
     # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A per-project
     # setting could never suffice anyway, since the lineage is inherently per-seam, and
@@ -537,10 +548,34 @@ def critique_plan(
         if closure:
             instructions += "\n\n" + prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS
         prompt = prompts.compose(instructions, _prepend(calibration, body))
-        review = engine.run(prompt, cwd, model, effort, web_search,
-                            **_progress_kwargs(on_progress))
-        trailer = closure.settle(review, engine, cwd, model, effort, web_search,
-                                 on_progress) if closure else None
+        if type(engine) in (eng.CodexEngine, eng.ClaudeEngine) and claim_verification:
+            parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
+            snapshot = orientation.wrap_commit(
+                repo,
+                orientation.snapshot_tree(
+                    repo, parent or orientation.empty_tree(repo),
+                ),
+                parent,
+            )
+            with inert_tree.evidence_workspace(repo, snapshot) as workspace:
+                reviewer = engine.for_role(eng.ROLE_REPOSITORY)
+                review_cwd = workspace.cwd_for(engine.name)
+                isolated_prompt = prompt + (
+                    "\n\nThe pinned repository evidence root is `repository/`. Treat that "
+                    "prefix as the project root; no live Git or web tools are available."
+                )
+                review = reviewer.run(
+                    isolated_prompt, review_cwd, model, effort, False,
+                    **_progress_kwargs(on_progress),
+                )
+                trailer = closure.settle(
+                    review, reviewer, review_cwd, model, effort, False, on_progress,
+                ) if closure else None
+        else:
+            review = engine.run(prompt, cwd, model, effort, web_search,
+                                **_progress_kwargs(on_progress))
+            trailer = closure.settle(review, engine, cwd, model, effort, web_search,
+                                     on_progress) if closure else None
     except BaseException:
         if closure:
             closure.abandon()
@@ -643,7 +678,14 @@ def _verify_plan_claims(
         pc.targeted_audit_instructions(plan_text, prior_state, stakes, frozen)
         if targeted else pc.audit_instructions(plan_text, prior_state, stakes)
     )
-    review = engine.run(
+    claim_engine: Any = engine
+    captured_engine: _CapturedClaimEngine | None = None
+    if type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+        captured_engine = _CapturedClaimEngine(
+            engine, plan_text=plan_text, repo=repo, plan_repo_path=plan_repo_path,
+        )
+        claim_engine = captured_engine
+    review = claim_engine.run(
         prompt, repo, model, effort, True, timeout=1800,
         **_progress_kwargs(on_progress),
     )
@@ -676,7 +718,7 @@ def _verify_plan_claims(
                 ),
                 f"malformed: {first.reason}",
             )
-        retry = engine.resume(
+        retry = claim_engine.resume(
             review.session_ref, pc.retry_instructions(
                 first, plan_text, prior_state, frozen_ids=frozen,
             ), repo,
@@ -727,7 +769,336 @@ def _verify_plan_claims(
         plan_repo_path=plan_repo_path,
         allow_missing=allow_missing,
     )
+    if captured_engine is not None:
+        captured_engine.close()
     return state, status
+
+
+class _CapturedClaimEngine:
+    """Adapt the existing claim lifecycle to discovery -> capture -> binding.
+
+    The outer lifecycle still owns retained packets, retry debt, and reconciliation.
+    This adapter only ensures the audit it receives cannot cite provider-reported text.
+    """
+
+    def __init__(
+        self, engine: Engine, *, plan_text: str, repo: Path,
+        plan_repo_path: str | None,
+    ) -> None:
+        self.engine = engine
+        self.plan_text = plan_text
+        self.repo = repo
+        self.plan_repo_path = plan_repo_path
+        self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
+        self.binding_engine: Engine | None = None
+        self.last_session: str | None = None
+        self.discovery: pc.Audit | None = None
+        self.captures: dict[tuple[str, str], external_sources.Capture] = {}
+        self.attestation_raw = ""
+
+    def close(self) -> None:
+        shutil.rmtree(self.launch, ignore_errors=True)
+
+    def __del__(self) -> None:
+        self.close()
+
+    def run(
+        self, prompt: str, cwd: Path, model: str, effort: str, web_search: bool,
+        **kwargs: Any,
+    ) -> Review:
+        discovery_kwargs = dict(kwargs)
+        discovery_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        discoverer = self.engine.for_role(eng.ROLE_DISCOVERY)
+        first = discoverer.run(
+            prompt, self.launch, model, effort, True, **discovery_kwargs,
+        )
+        if first.error or not first.session_ref:
+            return first
+        raw_parts = [first.raw]
+        try:
+            discovery = pc.parse_audit(
+                first.text, self.plan_text, repo=self.repo,
+                plan_repo_path=self.plan_repo_path,
+            )
+        except pc.AuditError as error:
+            corrected = discoverer.resume(
+                first.session_ref,
+                pc.retry_instructions(error, self.plan_text, {}),
+                self.launch, model, effort, True, **discovery_kwargs,
+            )
+            raw_parts.append(corrected.raw)
+            if corrected.error or not corrected.session_ref:
+                return corrected
+            try:
+                discovery = pc.parse_audit(
+                    corrected.text, self.plan_text, repo=self.repo,
+                    plan_repo_path=self.plan_repo_path,
+                )
+            except pc.AuditError as second:
+                return Review(
+                    text=f"[paranoia-local error] discovery audit invalid: {second}",
+                    session_ref=corrected.session_ref,
+                    raw="\n--- discovery correction ---\n".join(raw_parts),
+                    error=True,
+                )
+            session_ref = corrected.session_ref
+        else:
+            session_ref = first.session_ref
+
+        captures, rendered = self._capture(discovery)
+        self.discovery = discovery
+        self.captures = captures
+        self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)
+        binding_kwargs = dict(kwargs)
+        binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        binding_prompt = (
+            "Provider search found candidate URLs, but only the server captures below are "
+            "evidence. Return the COMPLETE claim audit again using the same anchors, atomic "
+            "propositions, URLs, publishers, kinds, and relations. Copy exact passages only "
+            "from a usable capture; otherwise mark that claim unverified. Do not add URLs or "
+            "claims. Return exactly one claim-audit marker and JSON object.\n\n"
+            + rendered
+        )
+        binding = self.binding_engine.resume(
+            session_ref, binding_prompt, self.launch, model, effort, False,
+            **binding_kwargs,
+        )
+        raw_parts.append(binding.raw)
+        if binding.error:
+            return binding
+        try:
+            audit = self._parse_bound(binding.text, discovery, captures)
+        except pc.AuditError as error:
+            if not binding.session_ref:
+                return Review(binding.text, None, "\n".join(raw_parts), error=True)
+            correction = self.binding_engine.resume(
+                binding.session_ref,
+                f"Your captured-evidence audit was rejected: {error}. Return one complete "
+                f"corrected {pc.AUDIT_MARKER} object. You may use only these captures:\n\n"
+                + rendered,
+                self.launch, model, effort, False, **binding_kwargs,
+            )
+            raw_parts.append(correction.raw)
+            if correction.error:
+                return correction
+            try:
+                audit = self._parse_bound(correction.text, discovery, captures)
+            except pc.AuditError as second:
+                return Review(
+                    text=f"[paranoia-local error] binding audit invalid: {second}",
+                    session_ref=correction.session_ref,
+                    raw="\n--- phase ---\n".join(raw_parts), error=True,
+                )
+            binding = correction
+
+        attested = self._attest(audit, model, effort)
+        if isinstance(attested, Review):
+            return attested
+        raw_parts.append(self.attestation_raw)
+        self.last_session = binding.session_ref
+        return Review(
+            text=_render_audit(attested),
+            session_ref=binding.session_ref,
+            raw="\n--- phase ---\n".join(raw_parts),
+            usage=binding.usage,
+            duration_ms=binding.duration_ms,
+        )
+
+    def resume(
+        self, session_ref: str, prompt: str, cwd: Path, model: str, effort: str,
+        web_search: bool, **kwargs: Any,
+    ) -> Review:
+        role = self.binding_engine or self.engine.for_role(eng.ROLE_BINDING)
+        binding_kwargs = dict(kwargs)
+        binding_kwargs["timeout"] = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        corrected = role.resume(
+            session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
+        )
+        if corrected.error or self.discovery is None:
+            return corrected
+        try:
+            audit = self._parse_bound(corrected.text, self.discovery, self.captures)
+        except pc.AuditError as error:
+            return Review(
+                text=f"[paranoia-local error] corrected binding audit invalid: {error}",
+                session_ref=corrected.session_ref, raw=corrected.raw, error=True,
+            )
+        attested = self._attest(audit, model, effort)
+        if isinstance(attested, Review):
+            return attested
+        return Review(
+            text=_render_audit(attested), session_ref=corrected.session_ref,
+            raw=corrected.raw + "\n--- cold attestation ---\n" + self.attestation_raw,
+            usage=corrected.usage,
+            duration_ms=corrected.duration_ms,
+        )
+
+    def _capture(
+        self, audit: pc.Audit,
+    ) -> tuple[dict[tuple[str, str], external_sources.Capture], str]:
+        candidates: list[external_sources.CandidateSource] = []
+        keys: list[tuple[str, str]] = []
+        for claim in audit.claims:
+            for item in claim["evidence"]:
+                candidate = external_sources.CandidateSource(
+                    item["url"], item["title"], item["publisher"],
+                    item["source_kind"], item["authority_basis"], item["relation"],
+                )
+                candidates.append(candidate)
+                keys.append((claim["proposition"], item["url"]))
+        captured = external_sources.capture_all(candidates)
+        mapping = dict(zip(keys, captured, strict=True))
+        rows = []
+        for (proposition, url), item in mapping.items():
+            rows.append({
+                "proposition": proposition,
+                "url": url,
+                "final_url": item.final_url,
+                "status": item.status,
+                "content_type": item.content_type,
+                "content_sha256": item.content_sha256,
+                "text_sha256": item.text_sha256,
+                "error": item.error,
+                "line_numbered_text": external_sources.numbered_text(item.text or ""),
+            })
+        rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+        if len(rendered) > 400_000:
+            raise pc.AuditError("captured claim binding input exceeds 400000 characters")
+        return mapping, rendered
+
+    def _parse_bound(
+        self, text: str, discovery: pc.Audit,
+        captures: dict[tuple[str, str], external_sources.Capture],
+    ) -> pc.Audit:
+        audit = pc.parse_audit(
+            text, self.plan_text, repo=self.repo, plan_repo_path=self.plan_repo_path,
+        )
+        allowed = {
+            (claim["anchor"], claim["proposition"], item["url"])
+            for claim in discovery.claims for item in claim["evidence"]
+        }
+        if {
+            (claim["anchor"], claim["proposition"]) for claim in audit.claims
+        } != {
+            (claim["anchor"], claim["proposition"]) for claim in discovery.claims
+        }:
+            raise pc.AuditError("binding changed or omitted the discovered claim inventory", text)
+        for claim in audit.claims:
+            for item in claim["evidence"]:
+                if (claim["anchor"], claim["proposition"], item["url"]) not in allowed:
+                    raise pc.AuditError("binding added or changed a claim/source", text)
+                capture = captures.get((claim["proposition"], item["url"]))
+                if not capture or not capture.usable or not capture.text:
+                    raise pc.AuditError("binding cited an unavailable capture", text)
+                if not external_sources.passage_matches(item["quote"], capture.text):
+                    raise pc.AuditError("binding quote does not occur in captured text", text)
+        return audit
+
+    def _attest(self, audit: pc.Audit, model: str, effort: str) -> pc.Audit | Review:
+        items: list[dict[str, Any]] = []
+        for claim_index, claim in enumerate(audit.claims):
+            for evidence_index, item in enumerate(claim["evidence"]):
+                if item["source_kind"] not in pc.AUTHORITATIVE_KINDS:
+                    continue
+                if item["relation"] not in {"supports_claim", "refutes_claim", "supports_replacement"}:
+                    continue
+                capture = self.captures.get((claim["proposition"], item["url"]))
+                items.append({
+                    "claim_index": claim_index,
+                    "evidence_index": evidence_index,
+                    "proposition": claim["proposition"],
+                    "publisher": item["publisher"],
+                    "authority_basis": item["authority_basis"],
+                    "relation": item["relation"],
+                    "location": item["location"],
+                    "passage": item["quote"],
+                    "capture": {
+                        "final_url": capture.final_url if capture else None,
+                        "status": capture.status if capture else None,
+                        "content_type": capture.content_type if capture else None,
+                        "content_sha256": capture.content_sha256 if capture else None,
+                        "text_sha256": capture.text_sha256 if capture else None,
+                    },
+                })
+        if not items:
+            return audit
+        prompt = (
+            "You are a cold evidence attester with no web or repository tools. Independently "
+            "judge only whether each named publisher governs the exact proposition and whether "
+            "the exact passage entails the declared relation. Return only:\n"
+            "=== EVIDENCE ATTESTATION JSON ===\n"
+            '{"attestations":[{"claim_index":0,"evidence_index":0,'
+            '"publisher_authority":true,"authority_reason":"specific reason",'
+            '"passage_entailment":true,"entailment_reason":"specific reason"}]}\n\n'
+            + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
+        )
+        attester = self.engine.for_role(eng.ROLE_TEXT)
+        review = attester.run(prompt, self.launch, model, effort, False, timeout=300)
+        self.attestation_raw = review.raw
+        if review.error:
+            return review
+        try:
+            tail = review.text.split("=== EVIDENCE ATTESTATION JSON ===", 1)[1].strip()
+            value, end = json.JSONDecoder().raw_decode(tail)
+            if tail[end:].strip() or set(value) != {"attestations"}:
+                raise ValueError("invalid attestation envelope")
+            rows = value["attestations"]
+            if not isinstance(rows, list) or len(rows) != len(items):
+                raise ValueError("attestation inventory differs from the requested inventory")
+            expected = {(row["claim_index"], row["evidence_index"]) for row in items}
+            decisions: dict[tuple[int, int], bool] = {}
+            for row in rows:
+                if not isinstance(row, dict) or set(row) != {
+                    "claim_index", "evidence_index", "publisher_authority",
+                    "authority_reason", "passage_entailment", "entailment_reason",
+                }:
+                    raise ValueError("invalid attestation row")
+                key = (row["claim_index"], row["evidence_index"])
+                if key not in expected or key in decisions:
+                    raise ValueError("unknown or duplicate attestation row")
+                if type(row["publisher_authority"]) is not bool or type(
+                    row["passage_entailment"]
+                ) is not bool:
+                    raise ValueError("attestation verdicts must be booleans")
+                if not isinstance(row["authority_reason"], str) or not row[
+                    "authority_reason"
+                ].strip() or not isinstance(row["entailment_reason"], str) or not row[
+                    "entailment_reason"
+                ].strip():
+                    raise ValueError("attestation reasons must be non-empty strings")
+                decisions[key] = (
+                    row["publisher_authority"] and row["passage_entailment"]
+                )
+        except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            return Review(
+                text=f"[paranoia-local error] evidence attestation invalid: {exc}",
+                session_ref=review.session_ref, raw=review.raw, error=True,
+            )
+        claims = [dict(claim) for claim in audit.claims]
+        for index, claim in enumerate(claims):
+            relation = "supports_claim" if claim["verdict"] == "supported" else "refutes_claim"
+            qualifying = any(
+                item["relation"] == relation and decisions.get((index, evidence_index), False)
+                for evidence_index, item in enumerate(claim["evidence"])
+            )
+            if claim["verdict"] in {"supported", "refuted"} and not qualifying:
+                claim["verdict"] = "unverified"
+                claim["replacement"] = None
+                claim["rationale"] = (
+                    str(claim.get("rationale", ""))
+                    + " Cold evidence attestation did not accept both publisher authority and passage entailment."
+                ).strip()
+        return pc.Audit(
+            tuple(claims), audit.coverage, audit.dispositions, audit.assessments,
+            audit.issues, audit.raw_sha256, audit.rejected_excerpt,
+        )
+
+
+def _render_audit(audit: pc.Audit) -> str:
+    return pc.AUDIT_MARKER + "\n" + json.dumps(
+        {"claims": list(audit.claims), "coverage": audit.coverage},
+        ensure_ascii=False, separators=(",", ":"),
+    )
 
 
 def _query_body(

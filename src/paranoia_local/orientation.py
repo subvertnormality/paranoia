@@ -13,10 +13,13 @@ import os
 import shutil
 import subprocess
 import tempfile
+import hashlib
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
 from .textsafe import display
+from . import inert_git
 
 # Above this, we stop embedding the raw diff and tell the reviewer to run
 # `git diff` itself. The reviewer has repo access, so nothing is lost — this
@@ -54,7 +57,7 @@ _SNAPSHOT_IDENTITY = {
 def resolve_head(repo: Path) -> str:
     """The current commit id — resolved ONCE so a concurrent HEAD move can't make
     later snapshot/diff commands describe a different revision."""
-    return _run(["git", "rev-parse", "HEAD"], repo).strip()
+    return inert_git.text(repo, ["rev-parse", "HEAD"]).strip()
 
 
 def resolve_ref(repo: Path, ref: str) -> str:
@@ -65,17 +68,66 @@ def resolve_ref(repo: Path, ref: str) -> str:
 def snapshot_tree(repo: Path, head_id: str) -> str:
     """Write a tree of the current working state and return its sha.
 
-    Captures tracked (including tracked-but-ignored) AND untracked files: a private
-    alternate index is seeded from `head_id` (`read-tree`) so tracked-but-ignored paths
-    survive, then `add -A` stages everything. The author's real index is never touched.
-    Objects land in the repo's own store, loose and unreferenced (see `wrap_commit`).
+    Captures tracked (including tracked-but-ignored) and non-ignored untracked files
+    without ``git add``. Raw bytes are hashed without attributes/filters and written to
+    a private index. The author's real index is never touched.
     """
     idx_dir = Path(tempfile.mkdtemp(prefix="paranoia-idx-"))
-    env = {**_HERMETIC_ENV, "GIT_INDEX_FILE": str(idx_dir / "index")}
+    inert_git.require_supported_version()
+    env = {"GIT_INDEX_FILE": str(idx_dir / "index")}
     try:
-        _run(["git", "read-tree", head_id], repo, env=env)
-        _run(["git", "add", "-A"], repo, env=env)
-        return _run(["git", "write-tree"], repo, env=env).strip()
+        inert_git.run(repo, ["read-tree", head_id], extra_env=env)
+        tracked = set(
+            part for part in inert_git.run(repo, ["ls-files", "-z", "--cached"], extra_env=env).split(b"\0")
+            if part
+        )
+        candidates = set(
+            part for part in inert_git.run(
+                repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                extra_env=env,
+            ).split(b"\0") if part
+        )
+        oid_length = len(head_id)
+        zero = "0" * oid_length
+        records: list[bytes] = []
+        for raw_path in sorted(tracked | candidates):
+            path_text = raw_path.decode("utf-8", errors="surrogateescape")
+            path = repo / path_text
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                records.append(f"0 {zero}\t".encode("ascii") + raw_path + b"\0")
+                continue
+            if stat.S_ISDIR(info.st_mode):
+                # A tracked submodule stays the inert gitlink seeded from head_id.
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                data = os.fsencode(os.readlink(path))
+                mode = "120000"
+            elif stat.S_ISREG(info.st_mode):
+                data = path.read_bytes()
+                mode = "100755" if info.st_mode & stat.S_IXUSR else "100644"
+            else:
+                raise RuntimeError(f"unsupported filesystem entry in snapshot: {path_text!r}")
+            oid = inert_git.text(
+                repo, ["hash-object", "-w", "--stdin", "--no-filters"],
+                input_bytes=data,
+            ).strip()
+            algorithm = "sha1" if len(oid) == 40 else "sha256" if len(oid) == 64 else None
+            if algorithm is None:
+                raise RuntimeError(f"unsupported Git object id: {oid!r}")
+            digest = hashlib.new(algorithm)
+            digest.update(f"blob {len(data)}\0".encode())
+            digest.update(data)
+            if digest.hexdigest() != oid:
+                raise RuntimeError(f"git hash-object returned the wrong digest for {path_text!r}")
+            records.append(f"{mode} {oid}\t".encode("ascii") + raw_path + b"\0")
+        if records:
+            inert_git.run(
+                repo, ["update-index", "-z", "--index-info"],
+                input_bytes=b"".join(records), extra_env=env,
+            )
+        return inert_git.text(repo, ["write-tree"], extra_env=env).strip()
     finally:
         shutil.rmtree(idx_dir, ignore_errors=True)
 
@@ -83,7 +135,8 @@ def snapshot_tree(repo: Path, head_id: str) -> str:
 def has_head(repo: Path) -> bool:
     """Whether the repo has a resolvable HEAD (False for an unborn repo with no commit)."""
     r = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", "HEAD"], cwd=repo, capture_output=True, text=True
+        inert_git.argv(["rev-parse", "--verify", "--quiet", "HEAD"]), cwd=repo,
+        env=inert_git.environment(), capture_output=True, text=True,
     )
     return r.returncode == 0
 
@@ -91,7 +144,7 @@ def has_head(repo: Path) -> bool:
 def empty_tree(repo: Path) -> str:
     """The empty-tree object id in THIS repo's object format — the base for an unborn repo.
     Computed (not a hard-coded SHA-1 constant) so SHA-256 repositories also work."""
-    return _run(["git", "hash-object", "-t", "tree", "/dev/null"], repo).strip()
+    return inert_git.text(repo, ["hash-object", "-t", "tree", "/dev/null"]).strip()
 
 
 def wrap_commit(
@@ -104,12 +157,12 @@ def wrap_commit(
     read it with no special object-store env. The message is passed explicitly (`-m`): bare
     `git commit-tree` reads it from stdin, which for the MCP server is the live transport.
     """
-    env = {**_HERMETIC_ENV, **_SNAPSHOT_IDENTITY}
-    args = ["git", "commit-tree", tree]
+    env = {**_SNAPSHOT_IDENTITY}
+    args = ["commit-tree", tree]
     if parent:
         args += ["-p", parent]
     args += ["-m", message]
-    return _run(args, repo, env=env).strip()
+    return inert_git.text(repo, args, extra_env=env).strip()
 
 
 @dataclass(frozen=True)

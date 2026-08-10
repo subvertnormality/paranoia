@@ -11,8 +11,10 @@ import pytest
 
 from paranoia_local import arbitrate_handler as ah
 from paranoia_local import arbitration as arb
+from paranoia_local import arbitration_research as ar
 from paranoia_local import engines as eng
 from paranoia_local import evidence
+from paranoia_local import external_sources as es
 
 from .conftest import commit_all, git
 
@@ -25,6 +27,7 @@ BASE = dict(
     decision="Choose the numeric type for a threshold used in a log line.",
     options=OPTIONS,
     stakes="Single-user local CLI, trusted input, no multi-tenancy.",
+    research=False,
 )
 
 
@@ -76,7 +79,9 @@ ATTEST_OK_WITH_HINTS = (
 
 
 def decider_reply(label, *, risk="NONE", authority="technical", new_option="NONE",
-                  constraint="A fact.", decisive="app.py:4", citations="NONE"):
+                  constraint="A fact.", decisive="app.py:4", citations="NONE",
+                  publisher_authority="N/A", passage_entailment="N/A",
+                  decision_relevance="N/A"):
     return (
         "Reasoning here.\n\n"
         f"SELECTED: {label}\n"
@@ -84,6 +89,9 @@ def decider_reply(label, *, risk="NONE", authority="technical", new_option="NONE
         f"AUTHORITY: {authority}\n"
         f"NEW-OPTION: {new_option}\n"
         f"CONSTRAINT: {constraint}\n"
+        f"PUBLISHER-AUTHORITY: {publisher_authority}\n"
+        f"PASSAGE-ENTAILMENT: {passage_entailment}\n"
+        f"DECISION-RELEVANCE: {decision_relevance}\n"
         f"DECISIVE-CITATION: {decisive}\n"
         f"CITATIONS: {citations}\n"
     )
@@ -105,10 +113,11 @@ class Agent:
         self._seen: set[str] = set()
 
     def __call__(self, *, engine_name, model, instructions, body, cwd, effort,
-                 web_search, timeout, text_only):
+                 web_search, timeout, text_only, role=eng.ROLE_DEFAULT):
         self.calls.append(
             {"engine": engine_name, "model": model, "body": body, "cwd": cwd,
-             "text_only": text_only, "timeout": timeout, "instructions": instructions}
+             "text_only": text_only, "timeout": timeout, "instructions": instructions,
+             "web_search": web_search}
         )
         if "NEUTRALIZER" in instructions:
             return self.cleaner if self.cleaner is not None else cleaner_reply(self.statements)
@@ -180,6 +189,71 @@ def test_converged(repo: Path, tmp_path: Path):
     assert trailer_field(report, "CLEANING") == "attested"
     assert trailer_field(report, "REFS-MOVED") == "no"
     assert trailer_field(report, "ADVISORY") == "none"
+
+
+def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    ticks = iter([0.0, 3400.0])
+    monkeypatch.setattr(ah.time, "monotonic", lambda: next(ticks))
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    report = run(repo, agent, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "insufficient time to start a 210s agent phase" in report
+    assert not agent.calls
+
+
+def test_default_research_injects_one_shared_captured_packet_before_voting(
+    repo: Path, tmp_path: Path,
+):
+    candidate = es.CandidateSource(
+        "https://docs.example.com/numeric", "Numeric docs", "Example",
+        "primary", "Example defines the numeric API", "supports_claim",
+    )
+    claim = ar.DiscoveryClaim(
+        "behavior", "The API preserves decimal values exactly.", candidate,
+    )
+    capture = es.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        "The API preserves decimal values exactly.",
+    )
+    bound = es.BoundSource(
+        candidate, capture, "Numeric types", "The API preserves decimal values exactly.",
+    )
+    packet_id = es.packet_id(claim.proposition, bound)
+    research_calls: list[str] = []
+
+    def researcher(**kwargs):
+        research_calls.append(kwargs["engine"].name)
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (claim,), (bound,), (capture,),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    evidence_fields = {
+        "constraint": claim.proposition,
+        "decisive": f"SOURCE:{packet_id}",
+        "publisher_authority": "YES — the publisher defines the API",
+        "passage_entailment": "YES — the passage states the proposition",
+        "decision_relevance": "YES — exact decimals distinguish the options",
+    }
+    agent = Agent(
+        lambda engine, rnd: "opt-decimal",
+        extra={("codex", 1): evidence_fields, ("claude", 1): evidence_fields},
+    )
+    args = {k: v for k, v in BASE.items() if k != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo)}, log_dir=tmp_path / "logs",
+        engines=ENGINES, run_agent=agent, run_research=researcher,
+        now=lambda: "20260727T120000",
+    )
+    assert sorted(research_calls) == ["claude", "codex"]
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "RESEARCH") == "complete 1 packets"
+    decider_calls = [call for call in agent.calls if call["cwd"] is not None]
+    assert len(decider_calls) == 2
+    assert all(call["web_search"] is False for call in decider_calls)
+    assert all(packet_id in call["body"] for call in decider_calls)
 
 
 def test_every_trailer_field_is_always_present(repo: Path, tmp_path: Path):

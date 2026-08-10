@@ -62,9 +62,13 @@ state and reviewer-native capabilities meet the supported model.
 
 ## Claim-verification invariants
 
-- Verification is on by default for real plan reviews and uses the selected reviewer CLI's
-  built-in web search. No placeholder endpoint, optional plugin, or caller adapter may stand
-  in for the primary path.
+- Verification is on by default for real plan reviews. Codex live search or Claude `WebSearch`
+  may discover candidate URLs, but provider summaries, snippets, and fetched bodies are never
+  evidence. The server must capture public HTTP(S) pages, extract them with Trafilatura, resume
+  binding with browsing disabled, and require a separate cold authority-and-entailment
+  attestation. Claude `WebFetch` must not be enabled in plan verification or arbitration
+  research. No placeholder endpoint, optional plugin, or caller adapter may stand in for this
+  primary path.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -76,6 +80,10 @@ state and reviewer-native capabilities meet the supported model.
   past date requires a source authoritative for that date, not a later summary.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
+- Shared arbitration research follows the same capture boundary. Research is on by default;
+  `research: false` is the explicit repository-only mode. Both deciders receive the same
+  deterministic captured packet and have live web disabled. Unknown, non-governing, or
+  passage-mismatched packet IDs cannot substantiate convergence.
 - Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
   schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
   not evidence. Active versionless predecessor state must become blocking migration debt and
