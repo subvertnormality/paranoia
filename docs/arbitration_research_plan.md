@@ -384,6 +384,13 @@ materialization, logging, and teardown. The handler tracks one monotonic whole-r
 will not start a phase whose cap plus reserved teardown margin cannot fit; that produces a visible
 bounded failure rather than a client timeout.
 
+A parser-rejected decider reply receives one complete correction attempt against the same inert
+snapshot and shared research packet. The completed sibling vote and all cleaning and research work
+are retained. If the correction is also rejected, those replies, the sibling, and the actual phase
+provenance remain in the failure audit. This correction is still subject to the 900-second phase cap
+and whole-call deadline; it is not additional unbounded budget. Provider execution failures are not
+retried.
+
 ### 7. Audit and progress
 
 Add progress events for shared research and validation. Add trailer fields:
