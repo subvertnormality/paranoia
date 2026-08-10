@@ -301,7 +301,8 @@ TOOLS: list[Tool] = [
         name="arbitrate",
         description=(
             "Decide between 2-4 options by independent two-vendor adjudication. An Opus agent "
-            "neutralizes the framing (cross-vendor attested), then BOTH frontier engines choose "
+            "neutralizes the framing (cross-vendor attested), performs bounded two-vendor URL "
+            "discovery plus server-controlled Trafilatura capture by default, then BOTH frontier engines choose "
             "cold and unaware of each other, over one pinned snapshot, each seeing a "
             "counterbalanced option order under its own opaque labels. Python computes the "
             "verdict: CONVERGED only on a unanimous, unblocked, evidence-substantiated choice. "
@@ -319,7 +320,7 @@ TOOLS: list[Tool] = [
             "properties": {
                 "repo_path": {
                     "type": "string",
-                    "description": "Absolute path to the git repo. Required: every decisive citation must be repo-verifiable.",
+                    "description": "Absolute path to the git repo whose context is pinned. Decisive evidence may be a repository citation or a captured SOURCE packet.",
                 },
                 "decision": {
                     "type": "string",
@@ -368,6 +369,16 @@ TOOLS: list[Tool] = [
                 },
                 "effort": _COMMON["effort"],
                 "web_search": _COMMON["web_search"],
+                "research": {
+                    "type": "boolean",
+                    "description": (
+                        "Run shared authoritative external research before voting (default true). "
+                        "Provider search discovers URLs; the server downloads and extracts pages, "
+                        "then resumes the same sessions to bind exact passages. Deciders receive "
+                        "the identical captured packet with live web tools disabled. Set false only "
+                        "for an explicit repository-only decision. research:true requires web_search:true."
+                    ),
+                },
             },
             "required": ["repo_path", "decision", "options", "stakes"],
         },

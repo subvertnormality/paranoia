@@ -35,6 +35,9 @@ def trailer(
     constraint="Because of a thing.",
     decisive="app.py:4",
     citations="NONE",
+    publisher_authority="N/A",
+    passage_entailment="N/A",
+    decision_relevance="N/A",
 ):
     return (
         "Some reasoning.\n\n"
@@ -43,6 +46,9 @@ def trailer(
         f"AUTHORITY: {authority}\n"
         f"NEW-OPTION: {new_option}\n"
         f"CONSTRAINT: {constraint}\n"
+        f"PUBLISHER-AUTHORITY: {publisher_authority}\n"
+        f"PASSAGE-ENTAILMENT: {passage_entailment}\n"
+        f"DECISION-RELEVANCE: {decision_relevance}\n"
         f"DECISIVE-CITATION: {decisive}\n"
         f"CITATIONS: {citations}\n"
     )
@@ -60,6 +66,10 @@ def vote(engine, selected, **kw):
         constraint=kw.get("constraint", "c"),
         decisive=kw.get("decisive", Citation("app.py", 4)),
         citations=kw.get("citations", ()),
+        publisher_authority=kw.get("publisher_authority"),
+        passage_entailment=kw.get("passage_entailment"),
+        decision_relevance=kw.get("decision_relevance"),
+        evidence_reasons=kw.get("evidence_reasons", {}),
     )
 
 
@@ -240,6 +250,63 @@ def test_parse_verdict_maps_label_to_caller_id():
     assert v.selected == p.label_to_id[label]
     assert v.severity == "NONE"
     assert v.decisive == Citation("app.py", 4)
+
+
+def test_source_reference_requires_all_three_positive_judgements_and_exact_constraint():
+    p = _pres()
+    label = p.items[0][0]
+    v = arb.parse_verdict(trailer(
+        label,
+        decisive="SOURCE:src-0123456789abcdef",
+        constraint="The API retries twice.",
+        publisher_authority="YES — the vendor defines the API",
+        passage_entailment="YES — the passage says it retries twice",
+        decision_relevance="YES — retry behavior changes the failure comparison",
+    ), p)
+    assert isinstance(v.decisive, arb.SourceReference)
+    assert arb.substantiation(
+        [v], resolve=lambda _citation: None,
+        source_packets={"src-0123456789abcdef": ("The API retries twice.", True)},
+    )[p.engine]
+    assert not arb.substantiation(
+        [v], resolve=lambda _citation: None,
+        source_packets={"src-0123456789abcdef": ("The API retries three times.", True)},
+    )[p.engine]
+
+
+def test_source_reference_with_negative_relevance_is_unsubstantiated():
+    p = _pres()
+    v = arb.parse_verdict(trailer(
+        p.items[0][0], decisive="SOURCE:src-0123456789abcdef",
+        constraint="The API retries twice.",
+        publisher_authority="YES — vendor docs",
+        passage_entailment="YES — exact statement",
+        decision_relevance="NO — it does not distinguish these options",
+    ), p)
+    assert not arb.substantiation(
+        [v], resolve=lambda _citation: None,
+        source_packets={"src-0123456789abcdef": ("The API retries twice.", True)},
+    )[p.engine]
+
+
+def test_round_two_source_reference_substantiates_only_a_prior_holder():
+    p = _pres()
+    vote = arb.parse_verdict(trailer(
+        p.items[0][0], decisive="SOURCE:src-0123456789abcdef",
+        constraint="The API retries twice.",
+        publisher_authority="YES — vendor docs",
+        passage_entailment="YES — exact statement",
+        decision_relevance="YES — it distinguishes the options",
+    ), p)
+    packets = {"src-0123456789abcdef": ("The API retries twice.", True)}
+    assert arb.substantiation(
+        [vote], resolve=lambda _citation: None, carried={p.engine: []},
+        moved=set(), source_packets=packets,
+    )[p.engine]
+    assert not arb.substantiation(
+        [vote], resolve=lambda _citation: None, carried={p.engine: []},
+        moved={p.engine}, source_packets=packets,
+    )[p.engine]
 
 
 def test_a_trailer_field_before_the_block_is_rejected():

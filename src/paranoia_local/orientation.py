@@ -11,30 +11,37 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import tempfile
+import hashlib
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
 from .textsafe import display
+from . import inert_git
 
 # Above this, we stop embedding the raw diff and tell the reviewer to run
 # `git diff` itself. The reviewer has repo access, so nothing is lost — this
 # only keeps the prompt from ballooning on large branches.
 MAX_EMBED_CHARS = 200_000
+_INERT_DIFF_FLAGS = ["--no-ext-diff", "--no-textconv"]
+
+
+def _diff(args: list[str]) -> list[str]:
+    return ["diff", *_INERT_DIFF_FLAGS, *args]
 
 
 def _run(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
     # env, when given, is layered over the ambient environment — callers pass
     # only the git overrides they need (GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY,
     # snapshot identity) without having to reconstruct PATH etc.
-    r = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True,
-        env={**os.environ, **env} if env else None,
-    )
+    if not cmd or cmd[0] != "git":
+        raise ValueError("orientation._run only accepts Git commands")
+    r = inert_git.invoke(cwd, cmd[1:], extra_env=env)
     if r.returncode != 0:
-        raise RuntimeError(f"{' '.join(cmd)} failed: {r.stderr.strip()}")
-    return r.stdout
+        detail = r.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"{' '.join(cmd)} failed: {detail}")
+    return r.stdout.decode("utf-8", errors="surrogateescape")
 
 
 # Snapshot git commands are hermetic (ignore the user's global/system config, so a
@@ -54,7 +61,7 @@ _SNAPSHOT_IDENTITY = {
 def resolve_head(repo: Path) -> str:
     """The current commit id — resolved ONCE so a concurrent HEAD move can't make
     later snapshot/diff commands describe a different revision."""
-    return _run(["git", "rev-parse", "HEAD"], repo).strip()
+    return inert_git.text(repo, ["rev-parse", "HEAD"]).strip()
 
 
 def resolve_ref(repo: Path, ref: str) -> str:
@@ -65,33 +72,114 @@ def resolve_ref(repo: Path, ref: str) -> str:
 def snapshot_tree(repo: Path, head_id: str) -> str:
     """Write a tree of the current working state and return its sha.
 
-    Captures tracked (including tracked-but-ignored) AND untracked files: a private
-    alternate index is seeded from `head_id` (`read-tree`) so tracked-but-ignored paths
-    survive, then `add -A` stages everything. The author's real index is never touched.
-    Objects land in the repo's own store, loose and unreferenced (see `wrap_commit`).
+    Captures tracked (including tracked-but-ignored) and non-ignored untracked files
+    without ``git add``. Raw bytes are hashed without attributes/filters and written to
+    a private index. The author's real index is never touched.
     """
     idx_dir = Path(tempfile.mkdtemp(prefix="paranoia-idx-"))
-    env = {**_HERMETIC_ENV, "GIT_INDEX_FILE": str(idx_dir / "index")}
+    inert_git.require_supported_version()
+    env = {"GIT_INDEX_FILE": str(idx_dir / "index")}
     try:
-        _run(["git", "read-tree", head_id], repo, env=env)
-        _run(["git", "add", "-A"], repo, env=env)
-        return _run(["git", "write-tree"], repo, env=env).strip()
+        inert_git.run(repo, ["read-tree", head_id], extra_env=env)
+        tracked_modes: dict[bytes, str] = {}
+        for record in inert_git.run(
+            repo, ["ls-files", "-s", "-z", "--cached"], extra_env=env,
+        ).split(b"\0"):
+            if not record:
+                continue
+            metadata, separator, raw_path = record.partition(b"\t")
+            fields = metadata.split()
+            if not separator or len(fields) != 3:
+                raise RuntimeError("malformed git ls-files --stage record")
+            tracked_modes[raw_path] = fields[0].decode("ascii")
+        tracked = set(tracked_modes)
+        file_mode_reliable = inert_git.text(
+            repo, ["config", "--bool", "core.fileMode"],
+        ).strip().lower() != "false"
+        candidates = set(
+            part for part in inert_git.run(
+                repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                extra_env=env,
+            ).split(b"\0") if part
+        )
+        oid_length = len(head_id)
+        zero = "0" * oid_length
+        records: list[bytes] = []
+        for raw_path in sorted(tracked | candidates):
+            path_text = raw_path.decode("utf-8", errors="surrogateescape")
+            path = repo / path_text
+            indexed_mode = tracked_modes.get(raw_path)
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                if indexed_mode == "160000":
+                    # An uninitialized/deinitialized submodule has no checked-out
+                    # commit. Keep the gitlink already seeded from the pinned HEAD.
+                    continue
+                records.append(f"0 {zero}\t".encode("ascii") + raw_path + b"\0")
+                continue
+            if stat.S_ISDIR(info.st_mode):
+                if indexed_mode != "160000":
+                    raise RuntimeError(
+                        f"unexpected directory in working-state inventory: {path_text!r}"
+                    )
+                if not (path / ".git").exists():
+                    # Empty directory left by an uninitialized submodule: there is no
+                    # working commit to overlay on the gitlink seeded from head_id.
+                    continue
+                oid = inert_git.text(
+                    path, ["rev-parse", "--verify", "HEAD^{commit}"],
+                ).strip()
+                if len(oid) != oid_length or any(char not in "0123456789abcdef" for char in oid):
+                    raise RuntimeError(
+                        f"submodule HEAD returned an invalid object id for {path_text!r}"
+                    )
+                records.append(f"160000 {oid}\t".encode("ascii") + raw_path + b"\0")
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                data = os.fsencode(os.readlink(path))
+                mode = "120000"
+            elif stat.S_ISREG(info.st_mode):
+                data = path.read_bytes()
+                if not file_mode_reliable and indexed_mode in {"100644", "100755"}:
+                    mode = indexed_mode
+                else:
+                    mode = "100755" if info.st_mode & stat.S_IXUSR else "100644"
+            else:
+                raise RuntimeError(f"unsupported filesystem entry in snapshot: {path_text!r}")
+            oid = inert_git.text(
+                repo, ["hash-object", "-w", "--stdin", "--no-filters"],
+                input_bytes=data,
+            ).strip()
+            algorithm = "sha1" if len(oid) == 40 else "sha256" if len(oid) == 64 else None
+            if algorithm is None:
+                raise RuntimeError(f"unsupported Git object id: {oid!r}")
+            digest = hashlib.new(algorithm)
+            digest.update(f"blob {len(data)}\0".encode())
+            digest.update(data)
+            if digest.hexdigest() != oid:
+                raise RuntimeError(f"git hash-object returned the wrong digest for {path_text!r}")
+            records.append(f"{mode} {oid}\t".encode("ascii") + raw_path + b"\0")
+        if records:
+            inert_git.run(
+                repo, ["update-index", "-z", "--index-info"],
+                input_bytes=b"".join(records), extra_env=env,
+            )
+        return inert_git.text(repo, ["write-tree"], extra_env=env).strip()
     finally:
         shutil.rmtree(idx_dir, ignore_errors=True)
 
 
 def has_head(repo: Path) -> bool:
     """Whether the repo has a resolvable HEAD (False for an unborn repo with no commit)."""
-    r = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", "HEAD"], cwd=repo, capture_output=True, text=True
-    )
+    r = inert_git.invoke(repo, ["rev-parse", "--verify", "--quiet", "HEAD"])
     return r.returncode == 0
 
 
 def empty_tree(repo: Path) -> str:
     """The empty-tree object id in THIS repo's object format — the base for an unborn repo.
     Computed (not a hard-coded SHA-1 constant) so SHA-256 repositories also work."""
-    return _run(["git", "hash-object", "-t", "tree", "/dev/null"], repo).strip()
+    return inert_git.text(repo, ["hash-object", "-t", "tree", "/dev/null"]).strip()
 
 
 def wrap_commit(
@@ -104,12 +192,12 @@ def wrap_commit(
     read it with no special object-store env. The message is passed explicitly (`-m`): bare
     `git commit-tree` reads it from stdin, which for the MCP server is the live transport.
     """
-    env = {**_HERMETIC_ENV, **_SNAPSHOT_IDENTITY}
-    args = ["git", "commit-tree", tree]
+    env = {**_SNAPSHOT_IDENTITY}
+    args = ["commit-tree", tree]
     if parent:
         args += ["-p", parent]
     args += ["-m", message]
-    return _run(args, repo, env=env).strip()
+    return inert_git.text(repo, args, extra_env=env).strip()
 
 
 @dataclass(frozen=True)
@@ -137,10 +225,7 @@ def changed_files(repo: Path, from_ref: str, to_ref: str) -> list[ChangeEntry]:
     non-UTF-8 filename must not crash the review. A path mangled by replacement won't
     round-trip to `git show`, so `file_evidence` will mark it `[not embeddable]` rather
     than embed it, which is the correct graceful degradation."""
-    r = subprocess.run(
-        ["git", "diff", "--name-status", "-M", "-z", from_ref, to_ref],
-        cwd=repo, capture_output=True,
-    )
+    r = inert_git.invoke(repo, _diff(["--name-status", "-M", "-z", from_ref, to_ref]))
     if r.returncode != 0:
         raise RuntimeError(
             "git diff --name-status failed: " + r.stderr.decode("utf-8", errors="replace").strip()
@@ -172,7 +257,7 @@ def _parse_name_status(out: str) -> list[ChangeEntry]:
 
 
 def diffstat(repo: Path, base: str, head: str) -> str:
-    return _run(["git", "diff", "--stat", f"{base}...{head}"], repo).strip()
+    return _run(["git", *_diff(["--stat", f"{base}...{head}"])], repo).strip()
 
 
 def commit_subjects(repo: Path, base: str, head: str) -> str:
@@ -186,11 +271,11 @@ def commit_subjects(repo: Path, base: str, head: str) -> str:
 
 
 def full_diff(repo: Path, base: str, head: str) -> str:
-    return _run(["git", "diff", f"{base}...{head}"], repo)
+    return _run(["git", *_diff([f"{base}...{head}"])], repo)
 
 
 def touched_files(repo: Path, base: str, head: str) -> list[str]:
-    out = _run(["git", "diff", "--name-only", f"{base}...{head}"], repo)
+    out = _run(["git", *_diff(["--name-only", f"{base}...{head}"])], repo)
     return [line for line in out.splitlines() if line.strip()]
 
 
@@ -207,7 +292,7 @@ def working_tree_diff(repo: Path) -> str:
     read access and opens them itself) rather than staged with `git add -N`,
     which would mutate the author's index.
     """
-    tracked = _run(["git", "diff", "HEAD"], repo)
+    tracked = _run(["git", *_diff(["HEAD"])], repo)
     untracked = _untracked(repo)
     if untracked:
         listing = "\n".join(f"+ (untracked) {p}" for p in untracked)
@@ -216,7 +301,7 @@ def working_tree_diff(repo: Path) -> str:
 
 
 def working_tree_stat(repo: Path) -> str:
-    stat = _run(["git", "diff", "--stat", "HEAD"], repo).strip()
+    stat = _run(["git", *_diff(["--stat", "HEAD"])], repo).strip()
     untracked = _untracked(repo)
     if untracked:
         stat += f"\n(+ {len(untracked)} untracked file(s))"
@@ -331,7 +416,7 @@ _TRUNCATION_MARKER = (
 
 def _show_bytes(repo: Path, spec: str) -> bytes | None:
     """Raw bytes of a blob, or None if git can't produce one (e.g. a submodule gitlink)."""
-    r = subprocess.run(["git", "show", spec], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", spec])
     return r.stdout if r.returncode == 0 else None
 
 
@@ -340,7 +425,7 @@ def _safe_diff(repo: Path, base: str, head: str) -> str:
     only the first ~8000 bytes, so it can embed raw content (incl. NUL or non-UTF-8 bytes)
     for a file whose binary marker appears later. Read bytes and decode with replacement,
     and neutralize NUL, so the packet can never carry control bytes or crash on decode."""
-    r = subprocess.run(["git", "diff", base, head], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, _diff([base, head]))
     return r.stdout.decode("utf-8", errors="replace").replace("\x00", "�")
 
 
@@ -422,7 +507,7 @@ def build_packet(
         )
     if focus:
         head_parts.append(f"=== REVIEWER FOCUS ===\n{focus}")
-    stat_proc = subprocess.run(["git", "diff", "--stat", base_id, head_id], cwd=repo, capture_output=True)
+    stat_proc = inert_git.invoke(repo, _diff(["--stat", base_id, head_id]))
     stat = stat_proc.stdout.decode("utf-8", errors="replace").strip()  # byte-safe: a non-UTF-8 path in --stat must not crash
     if stat:
         head_parts.append(f"=== DIFFSTAT ===\n{stat}")

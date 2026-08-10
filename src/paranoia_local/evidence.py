@@ -17,9 +17,9 @@ Four jobs:
 from __future__ import annotations
 
 import hashlib
-import subprocess
 from pathlib import Path
 
+from . import inert_git
 from .arbitration import ArbitrationError, Citation, Region, digest_lines
 
 # Modes are the only way to tell a symlink from a file in a tree listing;
@@ -43,7 +43,7 @@ def _git(args: list[str], cwd: Path, *, check: bool = True, raw: bool = False) -
     (`orientation.py`). No caller- or model-supplied string can contain a lone
     surrogate, so such a path simply never matches rather than matching the wrong file.
     """
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
+    r = inert_git.invoke(cwd, args)
     if r.returncode != 0:
         if not check:
             return ""
@@ -139,7 +139,7 @@ def _symlink_target(repo: Path, commit: str, path: str) -> str:
     `" real.py "` and `real.py` tracked, a stripped target resolves the citation to
     the wrong file — the decider reads one and substantiation checks the other.
     """
-    r = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", f"{commit}:{path}"])
     if r.returncode != 0:
         return ""
     return r.stdout.decode("utf-8", errors="surrogateescape")
@@ -239,10 +239,7 @@ def scan_for_tokens(repo: Path, commit: str, tokens: list[str]) -> list[str]:
         if token in paths or token in messages:
             hits.add(token)
             continue
-        r = subprocess.run(
-            ["git", "grep", "-F", "-l", "-e", token, commit],
-            cwd=repo, capture_output=True,
-        )
+        r = inert_git.invoke(repo, ["grep", "-F", "-l", "-e", token, commit])
         # rc 0 = found, 1 = not found, >1 = a real failure we must not read as "clear"
         if r.returncode == 0:
             hits.add(token)
@@ -256,7 +253,7 @@ def scan_for_tokens(repo: Path, commit: str, tokens: list[str]) -> list[str]:
 # --- citation reads ---------------------------------------------------------
 
 
-def _blob(repo: Path, commit: str, path: str) -> str | None:
+def _blob(repo: Path, commit: str, path: str) -> bytes | None:
     """The file's contents, or None unless `path` is a regular blob at `commit`.
 
     The type check is load-bearing, not defensive: `git show <commit>:<dir>`
@@ -264,13 +261,21 @@ def _blob(repo: Path, commit: str, path: str) -> str | None:
     `commit <sha>`. Either would be carried into round 2 as though it were source.
     """
     spec = f"{commit}:{path}"
-    t = subprocess.run(["git", "cat-file", "-t", spec], cwd=repo, capture_output=True)
+    t = inert_git.invoke(repo, ["cat-file", "-t", spec])
     if t.returncode != 0 or t.stdout.decode().strip() != "blob":
         return None
-    r = subprocess.run(["git", "show", spec], cwd=repo, capture_output=True)
+    r = inert_git.invoke(repo, ["show", spec])
     if r.returncode != 0:
         return None
-    return r.stdout.decode("utf-8", errors="replace")
+    return r.stdout
+
+
+def _lf_lines(data: bytes) -> list[bytes]:
+    """Match the line numbering of the unchanged bytes in the inert workspace."""
+    lines = data.split(b"\n")
+    if lines and lines[-1] == b"":
+        lines.pop()
+    return lines
 
 
 class LinkResolver:
@@ -301,9 +306,8 @@ class LinkResolver:
     def oid(self, rev: str) -> str | None:
         """`rev` as its full commit id, or None if it does not resolve."""
         if rev not in self._oids:
-            r = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-                cwd=self._repo, capture_output=True,
+            r = inert_git.invoke(
+                self._repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
             )
             out = r.stdout.decode("utf-8", errors="replace").strip()
             self._oids[rev] = out if r.returncode == 0 and out else None
@@ -345,19 +349,28 @@ def resolve_citation(
     # — and a bare citation versus an explicitly snapshot-prefixed one — are one
     # region rather than two.
     commit = resolver.oid(citation.commit or snapshot)
-    if commit is None:
+    # The isolated reviewer sees only the materialized snapshot. HISTORY.txt contains
+    # commit metadata, not historical blobs, so an older-revision citation cannot prove
+    # what the reviewer read. An explicit spelling of the snapshot itself is harmless.
+    if commit is None or commit != snapshot:
         return None
-    path = canonical_path(citation.path, resolver.for_commit(commit))
+    commit_links = resolver.for_commit(commit)
+    # Inert-tree symlink entries are visible as marker + target text, deliberately not
+    # as their referents. Accepting an alias citation against referent bytes would bind
+    # the vote to content and line numbers that were not present at the cited path.
+    if citation.path in commit_links:
+        return None
+    path = canonical_path(citation.path, commit_links)
     # The path must be a LITERAL entry in the tree. Since nothing normalizes it
     # (see `arbitration._normalize_path`), this is what guarantees one citation
     # names one real file: git accepts `./f.py` as a lookup, but `./f.py` and
     # `f.py` are different strings and would key as different regions.
     if path is None or path not in resolver.paths(commit):
         return None
-    text = _blob(repo, commit, path)
-    if text is None:
+    data = _blob(repo, commit, path)
+    if data is None:
         return None
-    lines = text.splitlines()
+    lines = _lf_lines(data)
     eof = len(lines)
     if eof == 0 or not (1 <= citation.line <= eof):
         return None
@@ -380,15 +393,18 @@ def read_region(repo: Path, region: Region) -> str | None:
     substantiation is checked against the merged bounds, so a citation inside the
     merged span but outside what was actually sent would count as carried evidence.
     """
-    text = _blob(repo, region.commit, region.path)
-    if text is None:
+    data = _blob(repo, region.commit, region.path)
+    if data is None:
         return None
-    lines = text.splitlines()
+    lines = _lf_lines(data)
     lo = max(1, region.lo)
     hi = min(len(lines), region.hi)
     if lo > hi:
         return None
-    return "\n".join(f"{n:>6}  {lines[n - 1]}" for n in range(lo, hi + 1))
+    return "\n".join(
+        f"{n:>6}  {lines[n - 1].decode('utf-8', errors='replace')}"
+        for n in range(lo, hi + 1)
+    )
 
 
 def validate_hints(repo: Path, commit: str, hints: list[dict]) -> list[dict]:

@@ -62,9 +62,20 @@ state and reviewer-native capabilities meet the supported model.
 
 ## Claim-verification invariants
 
-- Verification is on by default for real plan reviews and uses the selected reviewer CLI's
-  built-in web search. No placeholder endpoint, optional plugin, or caller adapter may stand
-  in for the primary path.
+- Verification is on by default for real plan reviews. Codex live search or Claude `WebSearch`
+  may discover candidate URLs, but provider summaries, snippets, and fetched bodies are never
+  evidence. The server must capture public HTTP(S) pages, extract them with Trafilatura, resume
+  binding with browsing disabled, and require a separate cold authority-and-entailment
+  attestation. Claude `WebFetch` must not be enabled in plan verification or arbitration
+  research. No placeholder endpoint, optional plugin, or caller adapter may stand in for this
+  primary path.
+  Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
+  digests plus cold authority/entailment decisions before support may freeze.
+  Validate retained inventory before capture; attest replacement wording as its own exact
+  proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
+  become visible debt rather than an hours-long run.
+  Bound the full verified plan call below the documented MCP timeout, persist claim debt before
+  structural review, and start each model phase only when its full cap fits the monotonic deadline.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -76,6 +87,15 @@ state and reviewer-native capabilities meet the supported model.
   past date requires a source authoritative for that date, not a later summary.
 - Prefer official/primary evidence. Secondary sources corroborate or locate. Reddit, forums,
   Stack Overflow, social media, wikis, blogs, and other UGC never govern closure.
+- Shared arbitration research follows the same capture boundary. Research is on by default;
+  `research: false` is the explicit repository-only mode. Both deciders receive the same
+  deterministic captured packet and have live web disabled. Unknown, non-governing, or
+  passage-mismatched packet IDs cannot substantiate convergence.
+  Reject caller IDs across the complete rendered packet before either decider runs. Working-tree
+  snapshots use the checked-out commit of each initialized submodule, not a stale superproject
+  gitlink.
+  Route every Git evidence read through the shared inert launcher; promised missing objects must
+  fail closed without lazy-fetching through a repository-configured transport.
 - Only canonical HTTP(S) sources with a host may govern closure. Repository, file, and custom
   schemes are context only, and a repository plan's own blob/raw HTTP(S) URL remains self-context,
   not evidence. Active versionless predecessor state must become blocking migration debt and
@@ -89,9 +109,9 @@ state and reviewer-native capabilities meet the supported model.
   and requires no model call or web search. Bind “unchanged” to the same assertion-bearing
   Markdown block, structured heading levels, and list ancestry, not substring presence;
   quotation, code, negation, parent changes, or relocation must re-enter verification. Edited,
-  new, refuted, and unverified claims
-  receive targeted verification. Unverified or otherwise non-freezable claims require a full
-  replacement evidence packet rather than another compact verdict-only assessment; edited
+  new, refuted, and unverified claims receive targeted verification. Every non-freezable claim
+  requires a full current server-captured and cold-attested evidence packet rather than a compact
+  verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
   consume active context. This optimization applies only to external verification: the
   structural FATAL/MAJOR review remains broad and cold on every convergence round and must not

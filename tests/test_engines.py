@@ -68,6 +68,25 @@ class TestCodexArgv:
         assert "-C" not in argv
         assert "--ignore-user-config" in argv
 
+    def test_evidence_roles_are_explicit_on_fresh_and_resume(self) -> None:
+        discovery = engines.get_engine("codex").for_role(engines.ROLE_DISCOVERY)
+        fresh = discovery.build_argv(Path("/launch"), "m", "high", True)
+        assert 'web_search="live"' in fresh
+        assert "workspace-write" in fresh
+        for feature in engines.CODEX_EXTERNAL_FEATURES:
+            assert fresh.count(feature) == 1
+        repository = engines.get_engine("codex").for_role(engines.ROLE_REPOSITORY)
+        resumed = repository.build_resume_argv("s", Path("/launch"), "m", "high", False)
+        joined = " ".join(resumed)
+        assert 'web_search="disabled"' in resumed
+        assert "exclude_slash_tmp=true" in joined
+        assert "exclude_tmpdir_env_var=true" in joined
+        assert "writable_roots=[]" in joined
+        assert 'approval_policy="never"' in resumed
+        binding = engines.get_engine("codex").for_role(engines.ROLE_BINDING)
+        bound_resume = binding.build_resume_argv("s", Path("/launch"), "m", "high", False)
+        assert 'sandbox_mode="read-only"' in bound_resume
+
     def test_parse_output_extracts_final_message_and_thread(self) -> None:
         e = engines.get_engine("codex")
         review = e.parse_output(CODEX_JSONL)
@@ -130,6 +149,18 @@ class TestClaudeArgv:
         argv = e.build_resume_argv(session_ref="sess-xyz", cwd=Path("/repo"), model="m", effort="high", web_search=False)
         assert "--resume" in argv
         assert "sess-xyz" in argv
+
+    def test_evidence_role_tool_sets_repeat_on_resume(self) -> None:
+        discovery = engines.get_engine("claude").for_role(engines.ROLE_DISCOVERY)
+        fresh = discovery.build_argv(Path("/launch"), "m", "high", True)
+        assert fresh[fresh.index("--tools") + 1] == "WebSearch"
+        assert "--safe-mode" in fresh and "--strict-mcp-config" in fresh
+        binding = engines.get_engine("claude").for_role(engines.ROLE_BINDING)
+        resumed = binding.build_resume_argv("s", Path("/launch"), "m", "high", False)
+        assert resumed[resumed.index("--tools") + 1] == ""
+        repository = engines.get_engine("claude").for_role(engines.ROLE_REPOSITORY)
+        argv = repository.build_argv(Path("/launch"), "m", "high", False)
+        assert argv[argv.index("--tools") + 1] == "Read,Grep,Glob"
 
     def test_parse_output_extracts_result_and_session(self) -> None:
         e = engines.get_engine("claude")

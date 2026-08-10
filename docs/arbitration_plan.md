@@ -1,5 +1,18 @@
 # Brief: `arbitrate` — a fifth tool that decides between options
 
+> **Current implementation note (2026-08-10).** This is the historical design record for the
+> original repository-only protocol. The current tool additionally performs bounded shared
+> external research by default as specified in
+> [`arbitration_research_plan.md`](arbitration_research_plan.md). Codex live search and Claude
+> `WebSearch` discover candidate URLs; Paranoia Local downloads and extracts the pages with
+> Trafilatura; the same sessions bind exact passages with browsing disabled; and both deciders
+> receive the identical deterministic packet with live web disabled. Claude `WebFetch` is never
+> enabled or trusted in that path. `research: false` explicitly selects the legacy
+> repository-only mode. Deciders now read inert raw-tree materializations rather than Git
+> worktrees, so repository-controlled Git helpers and executable/symlink semantics are not part
+> of evidence presentation. Where this historical brief says otherwise, the current research
+> plan and README describe the shipped contract.
+
 Status: FINAL for implementation, revision 11. Ten codex adversarial-review rounds
 folded — round 1: 1 FATAL, 9 MAJOR, 4 MINOR; round 2: 2 FATAL, 9 MAJOR, 3 MINOR;
 round 3: 3 FATAL, 1 MAJOR; round 4: 1 FATAL, 2 MAJOR; round 5: 3 MAJOR; round 6:
@@ -300,15 +313,10 @@ left extraction to a generic `extract_citations` over free-form prose, undefined
 for incidental `path:line` text, missing paths, lines past EOF, and
 `./foo.py:7` versus `foo.py:7`. Instead citations get their own trailer field:
 
-- `CITATIONS: [<commit>@]<path>:<line>[, …]` — at most 3, parsed only from this
-  field, never scavenged from prose. **Revision-aware:** an unprefixed citation
-  resolves in the snapshot; a `<commit>@` prefix resolves in that commit. Deciders
-  are told to read git history (`prompts.py:53`) and have `git log`/`git show`
-  (`engines.py:245`), so a bare `path:line` from an earlier revision would
-  otherwise be silently substituted with the snapshot's bytes at that line —
-  substantiating a vote, and carrying into round 2, evidence the decider never
-  read. The commit identity is part of the region key, the carried evidence, and
-  the audit record.
+- `CITATIONS: <path>:<line>[, …]` — at most 3, parsed only from this field,
+  never scavenged from prose. Citations resolve only against regular-file bytes
+  materialized from the pinned snapshot. Historical blobs are not present in the
+  inert workspace, so a historical prefix cannot substantiate a vote.
 - **Not normalized at all.** The path is used exactly as written and must be a
   literal entry in the cited commit's tree. Rewriting it — stripping `./`,
   collapsing `..`, folding backslashes, dropping a leading `/` — can map the path
@@ -333,28 +341,16 @@ for incidental `path:line` text, missing paths, lines past EOF, and
   reads `sub/f.py` while lexical popping yields root `f.py`, and both are tracked.
   The escape gate keeps its lexical reading, which over-reports rather than misses,
   so a repository with ordinary `../shared/x.py` links is still arbitrable.
-- The revision is resolved to its **full commit id**, and the path is
-  **canonicalized through that commit's symlink graph**, before anything else.
+- The snapshot is resolved to its **full commit id** before anything else.
 - Must resolve in the snapshot (`git cat-file -e`) with `1 ≤ line ≤ EOF`.
   A citation that fails resolution is dropped and the drop is recorded.
 
-**Alias paths must be canonicalized, or the region key is wrong and the carried
-bytes are meaningless.** §3.1 permits *in-tree* symlinks, and that permission
-creates two distinct defects here. `git show <commit>:<path>` on a symlink returns
-the **target string**, not the referent's contents (`orientation.py:335`, and the
-behaviour is already recorded at `docs/orientation_reuse_plan.md:77`) — so reading
-`alias.py:1` carries the literal text `real.py` as though it were source. Worse,
-if one decider cites `real.py:1` and another cites `alias.py:1` where
-`alias.py → real.py`, the two saw the *same* evidence but a path-keyed region test
-calls them distinct, so §2.11's novelty gate passes and round 2 runs with nothing
-new in it — the very evidence-free second sample that gate exists to prevent.
-
-Every citation is therefore resolved through the symlink map §3.1 already
-enumerates, before bounds-checking, before reading context, and before a region key
-is formed. The final referent must be a **tracked regular blob**; a citation that
-resolves to a directory, a gitlink, or a dangling target is dropped and recorded.
-Region keys are always the canonical referent, so two aliases for one file collapse
-to one region and the gate sees them as the same evidence.
+**Symlink paths cannot substantiate a vote.** The inert workspace exposes a
+symlink as a marker plus its target string, deliberately not as the referent bytes.
+A citation naming that symlink would therefore bind different content and line
+numbers from those visible at the cited path. It is rejected; the decider must cite
+the tracked regular referent path it actually read. Directories, gitlinks, dangling
+targets, and historical blobs are likewise non-substantiating.
 
 **A citation anchor is not an evidence region, and §2.11 must reason about
 regions.** Revision 3 detected "the same region" by comparing normalized
@@ -725,8 +721,8 @@ SELECTED-RISK: NONE | [MINOR] <one line> | [MAJOR] <one line> | [FATAL] <one lin
 AUTHORITY: technical | human-owner
 NEW-OPTION: NONE | <one-line description of an unlisted option that is strictly better>
 CONSTRAINT: <one decisive fact about the system, in prose>
-DECISIVE-CITATION: NONE | [<commit>@]<path>:<line>
-CITATIONS: NONE | [<commit>@]<path>:<line>[, …]   (max 3, supporting, non-gating)
+DECISIVE-CITATION: NONE | <path>:<line>
+CITATIONS: NONE | <path>:<line>[, …]   (max 3, supporting, non-gating)
 ```
 
 **`DECISIVE-CITATION` is a separate field because substantiation must bind to the
@@ -1191,10 +1187,9 @@ region novel to its own vendor yields `CONVERGED`; a decisive anchor that merely
 **not** substantiate, because `anchor_within` is point-in-interval and not
 intersection; a citation that parses but fails to resolve does not substantiate.
 
-*Revision-aware citations (§2.5).* A bare `path:line` resolves in the snapshot; a
-`<commit>@path:line` resolves in that commit and carries that commit's bytes; the
-same `path:line` at two different commits are **different** regions; a
-`<commit>@` prefix naming an unreachable commit is dropped and recorded. The full evaluation order is asserted, including a case
+*Snapshot-visible citations (§2.5).* A bare `path:line` resolves in the materialized
+snapshot. Historical commit prefixes and symlink paths are dropped because their
+referent bytes were not exposed to the decider. The full evaluation order is asserted, including a case
 where `BLOCKED` and unsubstantiated both hold and `BLOCKED` wins, and one where
 `REFRAME_REQUIRED` and unsubstantiated agreement both hold.
 

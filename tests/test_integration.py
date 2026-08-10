@@ -164,6 +164,9 @@ class TestArbitrateEndToEnd:
                 {"id": "opt-b", "statement": "Bravo approach."},
             ],
             "stakes": "Local CLI, trusted input.",
+            # These tests exercise subprocess, sandbox, and worktree plumbing.
+            # The research protocol has focused integration coverage of its own.
+            "research": False,
         }
 
     def test_drives_both_vendors_in_their_own_worktrees(self, repo, tmp_path, fake_arb_bins):
@@ -172,10 +175,11 @@ class TestArbitrateEndToEnd:
             default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
         )
         debug = fake_arb_bins.read_text()
-        # cleaner (claude, text-only), attester (codex, text-only), then two deciders
+        # Cleaner (Claude, text-only), attester (Codex, text-only), then two
+        # deciders in separate inert evidence workspaces.
         assert "You are a NEUTRALIZER" in debug
         assert "You are a TEXT AUDITOR" in debug
-        assert debug.count("paranoia-wt-") >= 2  # a worktree each
+        assert debug.count("/launch") >= 2
         # both engines were actually invoked as deciders
         assert "-s read-only" in debug          # codex
         assert "--output-format json" in debug  # claude

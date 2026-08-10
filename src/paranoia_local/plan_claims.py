@@ -11,14 +11,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import unified_diff
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
+
+from . import external_sources as sources
+from . import inert_git
 
 
 AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
@@ -29,21 +30,17 @@ DIAGNOSTIC_CHARS = 4000
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
 SCOPES = frozenset({"external"})
 CLAIM_KINDS = frozenset({"fact", "design_principle", "behavior"})
-SOURCE_KINDS = frozenset({"primary", "authoritative", "secondary", "ugc"})
+SOURCE_KINDS = sources.SOURCE_KINDS
 RELATIONS = frozenset(
     {"supports_claim", "refutes_claim", "supports_replacement", "context"}
 )
-AUTHORITATIVE_KINDS = frozenset({"primary", "authoritative"})
+AUTHORITATIVE_KINDS = sources.AUTHORITATIVE_KINDS
 
 # These sources can be useful discovery leads, but cannot become authoritative merely
 # because a model labels them "primary".  This is intentionally a narrow deny-list of
 # unambiguously user-generated/community platforms, not a pretend universal authority
 # classifier.
-UGC_HOSTS = (
-    "reddit.com", "quora.com", "stackoverflow.com", "stackexchange.com",
-    "medium.com", "substack.com", "x.com", "twitter.com", "facebook.com",
-    "instagram.com", "tiktok.com", "youtube.com", "wikipedia.org",
-)
+UGC_HOSTS = sources.UGC_HOSTS
 
 
 class AuditError(ValueError):
@@ -192,7 +189,7 @@ def has_prior_snapshot(state_raw: Any) -> bool:
 
 def frozen_supported_ids(
     state_raw: Any, plan_text: str, *, repo: Path | None = None,
-    plan_repo_path: str | None = None,
+    plan_repo_path: str | None = None, require_capture_attestation: bool = False,
 ) -> frozenset[str]:
     """Return exact supported claims that need no new model/web judgement.
 
@@ -207,6 +204,8 @@ def frozen_supported_ids(
     frozen: set[str] = set()
     for claim_id, record in state["claims"].items():
         if not isinstance(record, dict) or record.get("verdict") != "supported":
+            continue
+        if require_capture_attestation and not _captured_support(record):
             continue
         if not _assertion_binding_unchanged(
             record.get("anchor", ""), previous_plan, plan_text,
@@ -225,6 +224,27 @@ def frozen_supported_ids(
             continue
         frozen.add(claim_id)
     return frozenset(frozen)
+
+
+def _captured_support(record: dict[str, Any]) -> bool:
+    evidence = record.get("evidence", [])
+    for row in record.get("capture_attestations", []):
+        if not isinstance(row, dict):
+            continue
+        index = row.get("evidence_index")
+        if not isinstance(index, int) or not 0 <= index < len(evidence):
+            continue
+        item = evidence[index]
+        if (
+            isinstance(item, dict)
+            and item.get("relation") == "supports_claim"
+            and row.get("relation") == "supports_claim"
+            and row.get("final_url") == item.get("url")
+            and row.get("publisher_authority") is True
+            and row.get("passage_entailment") is True
+        ):
+            return True
+    return False
 
 
 def changed_plan_text(state_raw: Any, plan_text: str) -> str:
@@ -349,37 +369,16 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
 
 
 def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
-    """Validate compact current-round judgements over retained exact claims."""
+    """Keep the legacy wire field explicit but mechanically empty."""
     if not isinstance(raw, list):
         raise AuditError("coverage.prior_assessments must be an array", text)
-    if len(raw) > MAX_ACTIVE_CLAIMS:
+    if raw:
         raise AuditError(
-            f"audit returned {len(raw)} retained assessments; safety ceiling is "
-            f"{MAX_ACTIVE_CLAIMS}", text,
+            "coverage.prior_assessments must be empty; compact assessments cannot cross "
+            "the server-capture boundary",
+            text,
         )
-    result: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for index, item in enumerate(raw):
-        if not isinstance(item, dict) or set(item) != {"claim_id", "verdict", "rationale"}:
-            raise AuditError(
-                f"prior assessment {index} must contain exactly claim_id, verdict, and rationale",
-                text,
-            )
-        try:
-            claim_id = _one_line(item["claim_id"], "assessment.claim_id")
-            verdict = _one_line(item["verdict"], "assessment.verdict")
-            rationale = _one_line(item["rationale"], "assessment.rationale")
-        except ValueError as exc:
-            raise AuditError(f"prior assessment {index}: {exc}", text) from exc
-        if verdict not in VERDICTS:
-            raise AuditError(
-                f"prior assessment {index} verdict must be one of {sorted(VERDICTS)}", text,
-            )
-        if claim_id in seen:
-            raise AuditError(f"duplicate assessment for prior claim {claim_id}", text)
-        seen.add(claim_id)
-        result.append({"claim_id": claim_id, "verdict": verdict, "rationale": rationale})
-    return tuple(result)
+    return ()
 
 
 def _validate_claim(
@@ -389,7 +388,7 @@ def _validate_claim(
     if not isinstance(item, dict):
         raise ValueError("must be an object")
     required = {"kind", "scope", "anchor", "proposition", "verdict", "evidence", "replacement"}
-    optional = {"prior_claim_id", "rationale"}
+    optional = {"prior_claim_id", "rationale", "capture_attestations"}
     unknown = set(item) - required - optional
     missing = required - set(item)
     if missing or unknown:
@@ -434,6 +433,9 @@ def _validate_claim(
     if prior is not None:
         prior = _one_line(prior, "prior_claim_id")
     rationale = str(item.get("rationale", "")).strip()
+    capture_attestations = _validate_capture_attestations(
+        item.get("capture_attestations", []), checked,
+    )
 
     qualifying = [
         e for e in checked
@@ -465,7 +467,61 @@ def _validate_claim(
         "kind": kind, "scope": scope, "anchor": anchor,
         "proposition": proposition, "verdict": verdict, "evidence": checked,
         "replacement": replacement, "prior_claim_id": prior, "rationale": rationale,
+        "capture_attestations": capture_attestations,
     }
+
+
+def _validate_capture_attestations(
+    value: Any, evidence: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or len(value) > len(evidence):
+        raise ValueError("capture_attestations must contain at most one row per evidence item")
+    required = {
+        "evidence_index", "final_url", "text_sha256", "relation",
+        "publisher_authority", "authority_reason", "passage_entailment",
+        "entailment_reason",
+    }
+    rows: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for row in value:
+        if not isinstance(row, dict) or set(row) != required:
+            raise ValueError("capture_attestation fields are invalid")
+        index = row["evidence_index"]
+        if not isinstance(index, int) or not 0 <= index < len(evidence) or index in seen:
+            raise ValueError("capture_attestation evidence_index is invalid or duplicated")
+        seen.add(index)
+        final_url = _one_line(row["final_url"], "capture_attestation.final_url")
+        parsed = urlparse(final_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("capture_attestation final_url must be absolute HTTP(S)")
+        text_sha256 = _one_line(
+            row["text_sha256"], "capture_attestation.text_sha256",
+        )
+        if not re.fullmatch(r"[0-9a-f]{64}", text_sha256):
+            raise ValueError("capture_attestation text_sha256 must be lowercase SHA-256")
+        relation = _one_line(row["relation"], "capture_attestation.relation")
+        if relation != evidence[index]["relation"]:
+            raise ValueError("capture_attestation relation differs from its evidence item")
+        if final_url != evidence[index]["url"]:
+            raise ValueError("capture_attestation final_url differs from its evidence URL")
+        for field in ("publisher_authority", "passage_entailment"):
+            if type(row[field]) is not bool:
+                raise ValueError(f"capture_attestation {field} must be boolean")
+        rows.append({
+            "evidence_index": index,
+            "final_url": final_url,
+            "text_sha256": text_sha256,
+            "relation": relation,
+            "publisher_authority": row["publisher_authority"],
+            "authority_reason": _one_line(
+                row["authority_reason"], "capture_attestation.authority_reason",
+            ),
+            "passage_entailment": row["passage_entailment"],
+            "entailment_reason": _one_line(
+                row["entailment_reason"], "capture_attestation.entailment_reason",
+            ),
+        })
+    return rows
 
 
 def _validate_evidence(
@@ -538,16 +594,17 @@ def _is_plan_self_url(url: str, repo: Path, plan_repo_path: str) -> bool:
     return False
 
 
-@lru_cache(maxsize=128)
 def _canonical_remote_repo(repo_path: str) -> tuple[str, str] | None:
     try:
-        completed = subprocess.run(
-            ["git", "-C", repo_path, "config", "--get", "remote.origin.url"],
-            check=False, capture_output=True, text=True, timeout=3,
+        completed = inert_git.invoke(
+            Path(repo_path), ["config", "--get", "remote.origin.url"],
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError:
         return None
-    remote = completed.stdout.strip() if completed.returncode == 0 else ""
+    remote = (
+        completed.stdout.decode("utf-8", errors="replace").strip()
+        if completed.returncode == 0 else ""
+    )
     if not remote:
         return None
     if "://" not in remote:
@@ -628,37 +685,6 @@ def reconcile(
         if isinstance(previous, dict) and previous.get("proposition") != record["proposition"]:
             record["previous_proposition"] = previous.get("proposition")
         current[claim_id] = record
-
-    # Unresolved exact retained claims use a compact current-round assessment. The reviewer
-    # has re-opened and rechecked entailment for the retained packet, while the server owns
-    # the anchor, proposition, and evidence bytes. This avoids asking the model to reproduce large
-    # packets merely to prove it did not forget them.
-    for assessment in audit.assessments:
-        claim_id = assessment["claim_id"]
-        previous = old[claim_id]
-        record = deepcopy(previous)
-        verdict = assessment["verdict"]
-        rationale = assessment["rationale"]
-        record.update({
-            "claim_id": claim_id,
-            "verdict": verdict,
-            "verified_round": round_no,
-            "rationale": rationale,
-        })
-        if verdict != "refuted":
-            record["replacement"] = None
-        elif not any(
-            _qualifying(
-                evidence, record.get("scope", ""), repo=repo,
-                plan_repo_path=plan_repo_path,
-            )
-            and evidence.get("relation") == "supports_replacement"
-            for evidence in record.get("evidence", [])
-            if isinstance(evidence, dict)
-        ):
-            record["replacement"] = None
-        current[claim_id] = record
-        used.add(claim_id)
 
     retired = list(prior["retired"])
     dispositions = {item["claim_id"]: item for item in audit.dispositions}
@@ -745,6 +771,12 @@ def validate_prior_coverage(
             f"{MAX_ACTIVE_CLAIMS}", raw,
         )
     old = prior["claims"]
+    if audit.assessments:
+        raise AuditError(
+            "non-frozen retained claims require full current evidence packets; compact "
+            "assessments cannot cross the server-capture boundary",
+            raw,
+        )
     by_prop = {
         record.get("proposition"): claim_id
         for claim_id, record in old.items()
@@ -755,55 +787,12 @@ def validate_prior_coverage(
         for claim in audit.claims
         if claim["proposition"] in by_prop
     }
-    assessed = {item["claim_id"] for item in audit.assessments}
-    full_packet_required = _full_packet_candidate_ids(
-        prior_raw, plan_text, frozen,
-    )
-    invalid_compact = assessed & full_packet_required
-    if invalid_compact:
-        raise AuditError(
-            "non-freezable claims require full current evidence packets, not compact "
-            "assessments: " + ", ".join(sorted(invalid_compact)), raw,
-        )
-    overlap = emitted & assessed
-    if overlap:
-        raise AuditError(
-            "retained claims were both fully emitted and compactly assessed: "
-            + ", ".join(sorted(overlap)), raw,
-        )
     frozen_overlap = emitted & frozen
     if frozen_overlap:
         raise AuditError(
             "frozen claims were re-emitted by the targeted audit: "
             + ", ".join(sorted(frozen_overlap)), raw,
         )
-    for item in audit.assessments:
-        claim_id = item["claim_id"]
-        record = old.get(claim_id)
-        if not isinstance(record, dict):
-            raise AuditError(f"assessment references unknown prior claim {claim_id}", raw)
-        if not _anchor_in_plan(record.get("anchor", ""), plan_text):
-            raise AuditError(
-                f"assessment references absent prior anchor {claim_id}; use a removal disposition",
-                raw,
-            )
-        evidence = [e for e in record.get("evidence", []) if isinstance(e, dict)]
-        qualifying = [
-            e for e in evidence
-            if _qualifying(
-                e, record.get("scope", ""), repo=repo,
-                plan_repo_path=plan_repo_path,
-            )
-        ]
-        relation = {
-            "supported": "supports_claim", "refuted": "refutes_claim",
-        }.get(item["verdict"])
-        if relation and not any(e.get("relation") == relation for e in qualifying):
-            raise AuditError(
-                f"assessment {claim_id} says {item['verdict']} but its retained packet "
-                f"has no qualifying {relation} evidence; emit a full current claim packet",
-                raw,
-            )
     expected = {
         claim_id for claim_id, record in old.items()
         if isinstance(record, dict)
@@ -814,10 +803,11 @@ def validate_prior_coverage(
         raise AuditError(
             "frozen IDs are not exact current claims: " + ", ".join(sorted(unknown_frozen)), raw,
         )
-    missing = expected - emitted - assessed - frozen
+    missing = expected - emitted - frozen
     if missing and not allow_missing:
         raise AuditError(
-            "missing current assessments for retained claims: " + ", ".join(sorted(missing)),
+            "missing full current evidence packets for retained claims: "
+            + ", ".join(sorted(missing)),
             raw,
         )
 
@@ -979,7 +969,9 @@ def audit_instructions(plan_text: str, prior_state: Any, stakes: str | None) -> 
     """Build the research prompt.  Concrete JSON literals avoid pseudo-enum failures."""
     prior = evidence_context(prior_state)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(prior_state, plan_text)
+    retained_full = evidence_context(
+        prior_state, normalize_state(prior_state)["claims"].keys(),
+    )
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
     return f"""You are the authoritative external-claim phase of an autonomous plan review.
 
@@ -1017,8 +1009,8 @@ source. Reddit, forums, Stack Overflow, social media, wikis, blogs, and other UG
 conflict signals only; they can NEVER support or refute a governing verdict.
 
 For every retained claim, decide supported, refuted, or unverified. A source verifies a
-claim only when the exact quoted passage entails that exact atomic proposition. For
-Every source must have a canonical absolute web URL, title, publisher, precise
+claim only when the exact quoted passage entails that exact atomic proposition. Every
+source must have a canonical absolute web URL, title, publisher, precise
 section/table/page location, exact passage, and an explanation of why that publisher governs
 this proposition. Label source_kind honestly as primary, authoritative, secondary, or ugc.
 A proposed replacement is allowed only when an authoritative passage entails
@@ -1028,14 +1020,10 @@ atomic proposition. An anchor saying that a dated audit/report occurred is not v
 evidence that contains only the underlying condition. The current plan/dossier is the
 assertion under review, not evidence for itself.
 
-Prior packets below are CANDIDATE evidence, never inherited verdicts. Re-open or search
-each retained URL as needed and re-assess entailment against the CURRENT proposition.
-For every item in RETAINED EXACT CLAIMS, return exactly one compact entry in
-coverage.prior_assessments. Do not repeat that unchanged claim or its evidence in claims.
-The server owns its exact anchor, proposition, and retained packet; your compact verdict is
-the current-round re-entailment judgement. If retained evidence cannot support/refute the
-current verdict, return unverified, or emit a full claim packet with new current evidence
-instead of a compact assessment. The server rejects a missing retained ID in this same round.
+Prior packets below are candidate leads, never inherited verdicts. Re-open or search each
+retained URL and return every still-present retained proposition as a full current claim/evidence
+packet. `coverage.prior_assessments` must be empty: compact verdicts cannot cross the server
+capture and cold-attestation boundary. The server rejects a missing retained ID in this round.
 
 Use claims only for newly discovered or edited propositions. Set prior_claim_id only for the
 exact same atomic proposition; use null for edited wording. Every absent prior claim needs one
@@ -1044,8 +1032,8 @@ when the old verbatim external anchor is absent from the current plan. If an eli
 became a local decision, edit away the old externally asserted wording; do not merely relabel it.
 prior_claim_id is contextual only and cannot transfer identity to edited wording.
 
-RETAINED EXACT CLAIMS REQUIRING ASSESSMENT (JSON):
-{assessments}
+RETAINED CLAIMS REQUIRING FULL CURRENT PACKETS (JSON):
+{retained_full}
 
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
 {removals}
@@ -1064,7 +1052,7 @@ Reply with only the marker and one JSON object. Do not use markdown fences. Thes
 CONCRETE literals, not pipe-delimited pseudo-enums. The shape is:
 
 {AUDIT_MARKER}
-{{"claims":[{{"kind":"design_principle","scope":"external","anchor":"verbatim plan text","proposition":"one atomic externally issued design principle","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/standard","title":"Official standard","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issues the governing standard","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_assessments":[{{"claim_id":"C-retained","verdict":"supported","rationale":"Retained exact passage still entails the unchanged proposition."}}],"prior_dispositions":[],"notes":"brief coverage note"}}}}
+{{"claims":[{{"kind":"design_principle","scope":"external","anchor":"verbatim plan text","proposition":"one atomic externally issued design principle","prior_claim_id":null,"verdict":"supported","evidence":[{{"url":"https://official.example/standard","title":"Official standard","publisher":"Issuing authority","source_kind":"primary","authority_basis":"The publisher issues the governing standard","location":"Section 2, table 1","quote":"Exact source passage","relation":"supports_claim"}}],"replacement":null,"rationale":"brief claim-specific assessment"}}],"coverage":{{"sections_scanned":3,"omitted_nonfacts":12,"prior_assessments":[],"prior_dispositions":[],"notes":"brief coverage note"}}}}
 
 Allowed verdict literals: "supported", "refuted", "unverified".
 Allowed kind literals: "fact", "design_principle", "behavior".
@@ -1086,9 +1074,6 @@ def targeted_audit_instructions(
     full_packet_ids = _full_packet_candidate_ids(prior_state, plan_text, frozen)
     prior = evidence_context(prior_state, targeted_ids)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(
-        prior_state, plan_text, exclude_ids=frozen | full_packet_ids,
-    )
     full_packets = evidence_context(prior_state, full_packet_ids)
     changes = changed_plan_text(prior_state, plan_text)
     stakes_text = stakes or "modest single-team internal tool; trusted operators; ordinary scale"
@@ -1127,10 +1112,9 @@ evidence entails the replacement itself.
 
 Every item in RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS must be re-researched and
 returned in `claims` with its exact unchanged proposition and a current, complete evidence
-packet. Do not put these IDs in `prior_assessments`: their old packets were unverified or
-could not be frozen, so a compact verdict cannot repair them. The server preserves their
-identity by exact proposition. Items in RETAINED REFUTED CLAIMS may instead receive one
-compact current judgement in `coverage.prior_assessments` while their anchor remains.
+packet. Do not put these IDs in `prior_assessments`: only a fresh server capture plus cold
+attestation can change or retain an unresolved verdict. The server preserves identity by exact
+proposition. `coverage.prior_assessments` must be empty in the captured-evidence path.
 
 Preserve event, actor, date, modality, scope, and chronology: evidence of an underlying
 condition does not prove that a dated external audit/report event occurred. Use claims only
@@ -1140,9 +1124,6 @@ identity or verdict.
 
 RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
 {full_packets}
-
-RETAINED REFUTED CLAIMS ELIGIBLE FOR COMPACT ASSESSMENT (JSON):
-{assessments}
 
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
 {removals}
@@ -1173,9 +1154,6 @@ def retry_instructions(
     targeted_ids = set(state["claims"]) - frozen
     full_packet_ids = _full_packet_candidate_ids(prior_state, plan_text, frozen)
     removals = _removal_candidates(prior_state, plan_text)
-    assessments = _assessment_candidates(
-        prior_state, plan_text, exclude_ids=frozen | full_packet_ids,
-    )
     prior = evidence_context(prior_state, targeted_ids)
     full_packets = evidence_context(prior_state, full_packet_ids)
     scope_label = "CURRENT PLAN EDIT CONE" if frozen else "PLAN"
@@ -1212,11 +1190,8 @@ RETAINED CLAIMS REQUIRING COMPLETE REPLACEMENT EVIDENCE PACKETS (JSON):
 Return each of these exact propositions as a full item in `claims`. Do not compactly
 assess them: their retained packets are unresolved or non-freezable and cannot govern.
 
-RETAINED REFUTED CLAIMS REQUIRING ONE ASSESSMENT EACH (JSON):
-{assessments}
-
-Return each retained exact ID once in coverage.prior_assessments using exactly claim_id,
-verdict, and rationale. Do not repeat unchanged packets in claims. A missing ID is invalid.
+`coverage.prior_assessments` must be an empty array. Compact retained verdicts cannot cross
+the server-capture and cold-attestation boundary.
 
 ABSENT PRIOR ANCHOR CANDIDATES (JSON):
 {removals}
@@ -1348,14 +1323,18 @@ def _assertion_contexts(
             list_ancestors[:] = [
                 item for item in list_ancestors if item[0] < leading
             ]
+            # The current item's own physical first line belongs to its semantic
+            # body, not its ancestry. Keeping it in both made a harmless Markdown
+            # reflow change identity because continuation-line marker text split an
+            # otherwise exact anchor. Parent list items still identify relocation.
+            block_list_path = tuple(list_ancestors)
             list_ancestors.append((leading, stripped))
             block_kind = "list"
-            block_list_path = tuple(list_ancestors)
-            block.append(f"<list-indent:{leading}>{stripped}")
+            block.append(stripped)
             index += 1
             continue
         if block_kind == "list":
-            block.append(f"<list-indent:{leading}>{stripped}")
+            block.append(stripped)
             index += 1
             continue
         if stripped.startswith("|"):
@@ -1388,38 +1367,16 @@ def _removal_candidates(prior_state: Any, plan_text: str) -> str:
     return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
 
 
-def _assessment_candidates(
-    prior_state: Any, plan_text: str, *, exclude_ids: Iterable[str] = (),
-) -> str:
-    state = normalize_state(prior_state)
-    excluded = frozenset(exclude_ids)
-    candidates = [
-        {
-            "claim_id": claim_id,
-            "anchor": claim.get("anchor"),
-            "proposition": claim.get("proposition"),
-        }
-        for claim_id, claim in state["claims"].items()
-        if claim_id not in excluded
-        and isinstance(claim, dict)
-        and isinstance(claim.get("anchor"), str)
-        and claim["anchor"].strip()
-        and _anchor_in_plan(claim["anchor"], plan_text)
-    ]
-    return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
-
-
 def _full_packet_candidate_ids(
     prior_state: Any, plan_text: str, exclude_ids: Iterable[str] = (),
 ) -> set[str]:
-    """Claims whose retained evidence cannot be repaired by a compact verdict."""
+    """Every non-frozen retained claim requires a current captured packet."""
     state = normalize_state(prior_state)
     excluded = frozenset(exclude_ids)
     return {
         claim_id for claim_id, claim in state["claims"].items()
         if claim_id not in excluded
         and isinstance(claim, dict)
-        and claim.get("verdict") != "refuted"
         and _anchor_in_plan(claim.get("anchor", ""), plan_text)
     }
 
@@ -1432,7 +1389,7 @@ def _mint(lineage_id: str, seq: int, proposition: str) -> str:
 
 
 def _is_ugc_host(host: str) -> bool:
-    return any(host == suffix or host.endswith("." + suffix) for suffix in UGC_HOSTS)
+    return sources.is_ugc_host(host)
 
 
 def _excerpt(raw: str) -> str:
