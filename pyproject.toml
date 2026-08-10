@@ -12,7 +12,8 @@ license = { text = "MIT" }
 authors = [{ name = "Andrew Hillel" }]
 keywords = ["mcp", "code-review", "claude-code", "codex", "adversarial-review"]
 dependencies = [
-    "mcp>=1.2.0",
+    # MCP 2.0 renamed Tool.inputSchema and is not API-compatible with this server.
+    "mcp>=1.2.0,<2",
     "trafilatura>=2.0,<3",
 ]
 

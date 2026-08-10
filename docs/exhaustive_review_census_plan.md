@@ -269,13 +269,15 @@ Pre-PR real gates:
 2. simulated plan and branch census → correction → final, including failures and audit fields;
 3. real Codex plan review convergence under section 1 stakes;
 4. real Codex implementation review convergence under the same stakes;
-5. blinded A/B replay of the recoverable 16-round plan fixture above through both base-commit and
-   new mechanisms, with frozen historical-class oracle, provider-call count and monotonic elapsed
-   time;
-6. equivalent blinded A/B replay for a recoverable changing-branch lineage that historically took
-   10–19 rounds, including its ordered snapshots;
+5. blinded replay of the recoverable 16-round plan fixture above through the implemented path,
+   with frozen historical-class oracle, provider-call count and monotonic elapsed time;
+6. equivalent blinded replay for a recoverable changing-branch lineage that historically reached
+   round 10–19, testing its first implementation and historically converged snapshots;
 7. each new census must recover every applicable historical FATAL/MAJOR root class without an
-   unresolved new FATAL/MAJOR false positive; the new convergence run must use fewer rounds, and its
-   measured wall time/call cost must be reported rather than waived;
+   unresolved new FATAL/MAJOR false positive. Targeted correction must close repaired roots and
+   retain any material defect still present in the historical bytes; old convergence is comparison
+   evidence, not authority to force a new false clearance. The implementation's own convergence
+   run must use the staged correction/final lifecycle, and measured wall time/call cost must be
+   reported rather than waived;
 8. acceptance records with fixture/digest/oracle/result/audit metadata committed under `docs/`;
 9. only then open a PR, pass CI, merge, and update the primary `main` worktree.
