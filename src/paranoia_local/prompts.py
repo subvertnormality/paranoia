@@ -310,7 +310,8 @@ source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
 assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
 findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
 debt=[{"id":"D1","finding_id":"G1","status":"open"}];
-debt_updates=[]; class_records=[]. Do not emit prose."""
+debt_updates=[]; class_records=[]. A violated assessment must map to the same governing finding as
+its cited lane finding; a satisfied assessment maps to null. Do not emit prose."""
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction

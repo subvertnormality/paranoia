@@ -238,6 +238,36 @@ def test_violated_class_cannot_be_replaced_at_lower_severity():
         )
 
 
+def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
+    value = payload(settlement())
+    value.update(
+        role="final", source_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
+        findings=[finding("G1", "BLOCKER")],
+        debt=[{"id":"D1", "finding_id":"G1", "status":"open"}],
+        debt_updates=[], class_records=[{"op":"reopen", "class_id":"abc"}],
+        coverage=payload(lane(findings=[finding("G1", "BLOCKER")]))["coverage"],
+        class_assessments=[{
+            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
+            "finding_id":"G1",
+        }],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+        class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
+    )
+    assert parsed["class_records"] == [{"op":"reopen", "class_id":"abc"}]
+    value["assessment_dispositions"][0]["governing_id"] = "G2"
+    value["findings"].append(finding("G2", "BLOCKER"))
+    value["debt"].append({"id":"D2", "finding_id":"G2", "status":"open"})
+    value["coverage"][0]["finding_ids"].append("G2")
+    with pytest.raises(rc.CensusError, match="follow its cited finding"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
+        )
+
+
 def test_class_records_require_the_exact_mode_specific_shape():
     with pytest.raises(rc.CensusError, match="new class record"):
         rc.register_from_records([{

@@ -145,6 +145,7 @@ def parse_settlement(
     text: str, *, source_ids: Sequence[str], assessment_ids: Sequence[str],
     source_severities: dict[str, str] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
+    assessment_findings: dict[str, str | None] | None = None,
     class_states: dict[str, tuple[str, bool, str]] | None = None,
     class_mechanized: bool | None = None,
     known_debt: Sequence[str] = (), role: str = "census",
@@ -164,6 +165,9 @@ def parse_settlement(
         assessment_ids = [a["class_id"] for a in parsed_final["class_assessments"]]
         assessment_verdicts = {
             a["class_id"]: a["verdict"] for a in parsed_final["class_assessments"]
+        }
+        assessment_findings = {
+            a["class_id"]: a["finding_id"] for a in parsed_final["class_assessments"]
         }
     findings = _list(obj, "findings")
     finding_ids = _unique_ids(findings, "governing finding")
@@ -215,6 +219,7 @@ def parse_settlement(
         raise CensusError("every existing debt item must be updated exactly once")
     _list(obj, "class_records")
     disposition_by_class = {r["assessment_id"]: r["governing_id"] for r in assessment_rows}
+    governing_by_source = {r["source_id"]: r["governing_id"] for r in source_rows}
     operation_by_class: dict[str, str] = {}
     for record in obj["class_records"]:
         cid = record.get("class_id") if isinstance(record, dict) else None
@@ -237,6 +242,13 @@ def parse_settlement(
             raise CensusError("violated class assessment must map to a governing finding")
         if verdict == "satisfied" and target is not None:
             raise CensusError("satisfied class assessment cannot map to a finding")
+        cited = (assessment_findings or {}).get(cid)
+        if verdict == "violated" and assessment_findings is not None:
+            expected = governing_by_source.get(cited, cited if role == "final" else None)
+            if expected is None or target != expected:
+                raise CensusError(
+                    "violated class disposition must follow its cited finding"
+                )
         if class_states and cid in class_states:
             status, mechanized, prior_severity = class_states[cid]
             op = operation_by_class.get(cid)

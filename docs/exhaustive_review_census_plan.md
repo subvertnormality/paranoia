@@ -87,7 +87,8 @@ The `integrity` lane also receives every active class, including closed unmechan
 mechanised classes, with its invariant, severity, state, and procedure or pattern/pathspec. It must
 assess each as `satisfied|violated` with a resolved anchor. Each `violated` assessment must
 name a source finding. Settlement maps every assessment ID exactly once: `violated` requires open
-concrete debt and, when the class was closed, either `REOPEN` or one atomic `REPLACE` that retires
+concrete debt through the same governing finding as that cited lane finding and, when the class was
+closed, either `REOPEN` or one atomic `REPLACE` that retires
 the predecessor and creates an open successor with the corrected invariant, severity and procedure.
 `REPLACE` is the staged representation of existing supersession semantics; it never emits a second
 transition against the predecessor. A satisfied open unmechanised class requires `CLOSED`; a

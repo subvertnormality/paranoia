@@ -199,11 +199,13 @@ def _staged_structural_review(
         text: str, *, source_ids: list[str], assessment_ids: list[str],
         source_severities: dict[str, str] | None = None,
         assessment_verdicts: dict[str, str] | None = None,
+        assessment_findings: dict[str, str | None] | None = None,
         known_debt: list[str] | None = None, role: str,
     ) -> dict[str, Any]:
         parsed = rc.parse_settlement(
             text, source_ids=source_ids, source_severities=source_severities,
             assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
+            assessment_findings=assessment_findings,
             class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
             known_debt=known_debt or (), role=role,
         )
@@ -278,6 +280,9 @@ def _staged_structural_review(
         assessment_verdicts = {
             a["class_id"]: a["verdict"] for m in manifests for a in m["class_assessments"]
         }
+        assessment_findings = {
+            a["class_id"]: a["finding_id"] for m in manifests for a in m["class_assessments"]
+        }
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
@@ -292,7 +297,8 @@ def _staged_structural_review(
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
                     assessment_ids=assessment_ids,
-                    assessment_verdicts=assessment_verdicts, role="census",
+                    assessment_verdicts=assessment_verdicts,
+                    assessment_findings=assessment_findings, role="census",
                 ),
             )
         except rc.CensusError as error:
