@@ -722,6 +722,7 @@ def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
             ),
         )
     assert "format invalid" not in str(caught.value)
+    assert caught.value.failure_kind == "validation"
     assert [row.outcome for row in caught.value.attempts] == ["validation-invalid"]
 
 
@@ -1049,9 +1050,27 @@ def test_staged_generic_failure_clears_old_cache_and_uses_matching_debt(tmp_path
     assert "CLASS-REGISTER: staged rejected: bad settlement" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
     assert "STRUCTURAL-ERROR: bad settlement" in trailer
+    assert "CONVERGENCE: BLOCKED — staged execution did not settle." in trailer
     assert "census_cache" not in closure.lineage.review_state
     assert closure.lineage.review_state["staged_failure"] == "bad settlement"
     assert "validation_debt" not in closure.lineage.review_state
+
+
+def test_staged_validation_failure_without_cache_renders_validation_debt(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "validation-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = rc.CensusError("lane schema rejected")
+    error.failure_kind = "validation"  # type: ignore[attr-defined]
+    review, trailer, attempts = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert review.error and attempts == []
+    assert closure.lineage.review_state["validation_debt"] == "lane schema rejected"
+    assert "staged_failure" not in closure.lineage.review_state
+    assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in trailer
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
@@ -1431,6 +1450,7 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         log_dir=tmp_path / "logs", now=lambda: "C1",
     )
     assert "STRUCTURAL-ERROR" in first
+    assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in first
     lineage = cc.load_lineage(
         cc.default_state_root(), "cached-census-branch", stamp="C2",
         mode=cc.BRANCH_MODE,

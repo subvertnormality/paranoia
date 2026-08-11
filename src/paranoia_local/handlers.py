@@ -116,6 +116,7 @@ def _staged_call(
             error = rc.CensusError(
                 f"{role} validation invalid and has no resumable session: {first}"
             )
+            error.failure_kind = "validation"  # type: ignore[attr-defined]
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
         retry_sequence = next_sequence() if next_sequence else None
@@ -139,6 +140,7 @@ def _staged_call(
             parsed = parser(retry.text)
         except rc.CensusError as second:
             attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
+            second.failure_kind = "validation"  # type: ignore[attr-defined]
             second.attempts = attempts  # type: ignore[attr-defined]
             raise
         return retry, parsed, attempts
@@ -228,11 +230,12 @@ def _settle_staged_failure(
     state.pop("staged_failure", None)
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
-    if isinstance(cache, dict):
+    if getattr(error, "failure_kind", None) == "validation":
         state["validation_debt"] = str(error)
-        state["census_cache"] = deepcopy(cache)
     else:
         state["staged_failure"] = str(error)
+    if isinstance(cache, dict):
+        state["census_cache"] = deepcopy(cache)
     closure.lineage.review_state = state
     try:
         cc.save_lineage(closure.state_root, closure.lineage)
@@ -263,8 +266,7 @@ def _settle_staged_failure(
     )
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
-        f"STRUCTURAL-PHASE: {state['phase']}\nSTRUCTURAL-ERROR: {error}\n"
-        "CONVERGENCE: BLOCKED — staged review did not settle.",
+        rc.trailer(state),
     ))
     if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
         trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
