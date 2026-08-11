@@ -121,15 +121,27 @@ assessments, frozen stakes, and current class IDs/invariants. Claim packets and 
 are omitted: their structural conclusions are already present in validated findings. Consolidation
 groups shared root causes without conducting another broad review. Its one staged JSON envelope
 contains every source-finding disposition, integrity-assessment disposition, governing finding,
-concrete-debt record, and class registration/transition in structured form. Every source finding
+concrete-debt record, explicit finding-to-class disposition, and class registration/transition in
+structured form. Every governing finding is classified exactly once as a genuine one-off, a new
+reusable class, or an occurrence of an active class. Every `new` class record is referenced by
+exactly one new-class disposition; a violated active-class assessment binds its governing finding
+to that same class. Multiple occurrences of one active class consolidate into one governing root
+finding and one violated assessment in census, correction, and final. Missing or duplicate
+dispositions, extra existing-class findings, and unbound new records reject the complete
+settlement. Every source finding
 of every severity and every integrity assessment is mapped exactly once; the governing severity
 cannot be lower than any merged source; every blocking governing finding and every governing
 finding referenced by a violated class assessment maps to exactly one open concrete-debt record,
 including advisory findings whose debt does not gate convergence. The server parses the complete envelope into the existing
 `Register`/lineage types, validates all fields, then applies finding and class state atomically. A
 missing source or assessment ID, dangling merge, missing blocking debt, unsupported class
-transition, or prose-only blocker rejects the whole envelope. The legacy terminal text class block
-remains only on unstaged one-shot paths.
+transition, or prose-only blocker rejects the whole envelope. The staged JSON is an adapter into
+the existing class engine rather than a second closure implementation. The legacy terminal text
+class block remains only on unstaged one-shot paths, but staged output still renders the canonical
+`CLASS-REGISTER` and `CLASS-CLOSURE` trailer (including minted IDs and blocking class detail) beside
+the single governing structural convergence verdict.
+If lineage loading or persistence is ambiguous, both fields remain present but class closure is
+`STATE-UNAVAILABLE`; in-memory counts are not represented as confirmed durable state.
 
 A valid census costs four model calls over two serial wall-clock phases. The bounded worst case is
 eight calls when all four replies need their one format correction. All limits use Python Unicode
@@ -166,8 +178,17 @@ not ask for unrelated novelty in unchanged material.
 Its terminal staged JSON envelope accounts for every open concrete finding as `closed|open`, with
 resolved evidence for closure, may add a correction-introduced finding, and carries structured new
 class records/transitions. The server converts those class records to the existing reusable
-invariant model only after the whole envelope validates. Missing debt or an unregistered prose
-blocker rejects the reply and gets one bounded same-session format correction.
+invariant model only after the whole envelope validates. Every newly introduced governing finding
+uses the same mandatory finding-to-class disposition contract as census. Missing debt, a missing
+class disposition, an unbound new class, or an unregistered prose
+blocker rejects the reply and gets one bounded same-session format correction. Correction does not
+reassess every active class. Consolidation merges multiple occurrences of one reusable class into
+at most one `existing_class` governing root finding per active class per settlement. Correction
+returns exactly one partial `violated` assessment for each active class with such a finding, using
+the same consolidated finding binding; it returns no assessment for other classes. Duplicate
+governing rows for one class are rejected rather than adding a second class identity. An
+already-open class needs no transition; binding new debt to a closed unmechanised class additionally
+requires `REOPEN`, and a closed mechanised class requires `REPLACE`.
 
 When correction closes all blocking finding, class, and claim debt, computed output remains blocked
 with `FINAL-REGRESSION: required`. The same round cannot declare final convergence.
@@ -201,6 +222,10 @@ Extend the existing atomically replaced lineage JSON; do not add a state store. 
 Concrete debt carries exact census findings until correction. The existing class register continues
 to carry reusable invariants; claim state continues to carry external evidence. Clearance requires
 no blocking debt in any of the three.
+An unbound live class remains first-class class debt and is rendered by `CLASS-CLOSURE`; it is not
+converted into a synthetic concrete finding. `STRUCTURAL-DEBT` therefore continues to count only
+real governing findings, while the class trailer preserves bounded path-level recurrence evidence
+using the canonical binary-safe display and the single verdict explicitly names open class closure.
 
 Transitions settle with class results in one atomic lineage write: census with blockers →
 correction; census clear → clear; correction with blockers → correction; correction clear → final;

@@ -37,6 +37,14 @@ finding and every governing finding referenced by a violated class assessment, i
 computed blocking-debt count; do not weaken the validator or inflate severity to reconcile a
 prompt mismatch.
 
+Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
+finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
+active class. Bind each new class record to one finding, apply it through the canonical class engine,
+and render `CLASS-REGISTER` plus `CLASS-CLOSURE` with canonical IDs and blocking detail alongside the
+single staged structural verdict. Concrete structural debt is not a substitute for class closure.
+When lineage state is unavailable or persistence is ambiguous, render both class fields but use
+`CLASS-CLOSURE: STATE-UNAVAILABLE`; never present unconfirmed in-memory counts as durable state.
+
 ## Classes are architectural hypotheses
 
 An open class is not a patch instruction. Triage all open/reopened classes together: concrete

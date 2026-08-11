@@ -939,7 +939,8 @@ def render_exempt(lineage: Lineage) -> str | None:
 
 
 def render_trailer(lineage: Lineage, *, register_status: str,
-                   minted: Sequence[str] = (), reopened: Sequence[str] = ()) -> str:
+                   minted: Sequence[str] = (), reopened: Sequence[str] = (),
+                   include_verdict: bool = True) -> str:
     """The computed verdict. It only ever asserts the NEGATIVE: `NOT-BLOCKED` says no
     blocking class is unclosed, never that the change is correct and never the word
     `converged` — a mechanical check laundered into an approval is the failure mode
@@ -974,7 +975,16 @@ def render_trailer(lineage: Lineage, *, register_status: str,
                 for c in born_closed
             )
         )
-    if lineage.debt:
+    if not include_verdict:
+        if blocking:
+            for c in sorted(blocking, key=lambda c: (c.first_round, c.class_id)):
+                how = (f"mechanized: {len(c.matches)} match(es)" if c.mechanized
+                       else "unmechanized: awaiting reviewer CLOSED or RECLASSIFY")
+                if c.status in (MALFORMED, OVER_BROAD, UNCHECKED):
+                    how = f"{c.status}: {display(c.detail or 'closure not proven')}"
+                lines.append(f"  {c.class_id} {display(c.invariant)} ({how})")
+                _append_match_detail(lines, c)
+    elif lineage.debt:
         lines.append(
             f"CONVERGENCE: BLOCKED — register debt from round {lineage.debt.get('round')}: "
             f"{lineage.debt.get('reason')}"
@@ -987,6 +997,7 @@ def render_trailer(lineage: Lineage, *, register_status: str,
             if c.status in (MALFORMED, OVER_BROAD, UNCHECKED):
                 how = f"{c.status}: {display(c.detail or 'closure not proven')}"
             lines.append(f"  {c.class_id} {display(c.invariant)} ({how})")
+            _append_match_detail(lines, c)
         lines.append(
             "  Any `CONVERGED` in the review text above is VOID: it is the reviewer's "
             "judgement about new findings, not a statement about these classes."
@@ -995,3 +1006,16 @@ def render_trailer(lineage: Lineage, *, register_status: str,
         lines.append("CONVERGENCE: NOT-BLOCKED — no blocking class is unclosed; advisory "
                      "classes may remain open. Reviewer findings still govern.")
     return "\n".join(lines)
+
+
+def _append_match_detail(lines: list[str], tracked: TrackedClass) -> None:
+    """Use the same bounded, binary-safe recurrence display as reviewer context."""
+    for match in tracked.matches[:MAX_MATCHES]:
+        if match.get("binary"):
+            lines.append(f"    {display(match['path'])}: binary match (line not shown)")
+        else:
+            lines.append(
+                f"    {display(match['path'])}:{match['line']}: {display(match['text'])}"
+            )
+    if len(tracked.matches) > MAX_MATCHES:
+        lines.append(f"    … {len(tracked.matches) - MAX_MATCHES} further match(es) not shown")

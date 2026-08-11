@@ -196,6 +196,27 @@ def parse_settlement(
         assessment_findings = {
             a["class_id"]: a["finding_id"] for a in parsed_final["class_assessments"]
         }
+    elif role == "correction":
+        # Correction remains targeted: it assesses only active classes claimed by a
+        # newly introduced existing_class finding, not every active class as final does.
+        correction_assessments = _list(obj, "class_assessments")
+        seen_correction_classes: set[str] = set()
+        for row in correction_assessments:
+            _exact(row, {"class_id", "verdict", "evidence", "finding_id"}, "class assessment")
+            cid = row.get("class_id")
+            if (
+                not isinstance(cid, str) or cid in seen_correction_classes
+                or class_states is None or cid not in class_states
+            ):
+                raise CensusError(f"unexpected or duplicate correction class assessment {cid!r}")
+            seen_correction_classes.add(cid)
+            if row.get("verdict") != "violated":
+                raise CensusError("correction class assessment must be violated")
+            _anchors(row.get("evidence"))
+            _bounded(row.get("finding_id"), 120, "class assessment finding_id")
+        assessment_ids = [row["class_id"] for row in correction_assessments]
+        assessment_verdicts = {row["class_id"]: row["verdict"] for row in correction_assessments}
+        assessment_findings = {row["class_id"]: row["finding_id"] for row in correction_assessments}
     findings = _list(obj, "findings")
     finding_ids = _unique_ids(findings, "governing finding")
     debt = _list(obj, "debt")
@@ -249,9 +270,83 @@ def parse_settlement(
             _bounded(item["reason"], MAX_SUMMARY_CHARS, "open debt reason")
     if known_debt and seen_updates != set(known_debt):
         raise CensusError("every existing debt item must be updated exactly once")
-    _list(obj, "class_records")
+    class_records = _list(obj, "class_records")
+    class_dispositions = _list(obj, "class_dispositions")
+    disposition_findings: set[str] = set()
+    referenced_new_records: set[int] = set()
+    finding_class: dict[str, str | None] = {}
+    for item in class_dispositions:
+        if not isinstance(item, dict):
+            raise CensusError("class disposition must be an object")
+        kind = item.get("kind")
+        required = {
+            "one_off":{"finding_id", "kind", "reason"},
+            "new_class":{"finding_id", "kind", "record_index"},
+            "existing_class":{"finding_id", "kind", "class_id"},
+        }.get(kind)
+        if required is None:
+            raise CensusError("invalid class disposition kind")
+        _exact(item, required, "class disposition")
+        fid = item.get("finding_id")
+        if fid not in finding_ids or fid in disposition_findings:
+            raise CensusError("unexpected or duplicate class disposition finding_id")
+        disposition_findings.add(fid)
+        if kind == "one_off":
+            _bounded(item.get("reason"), MAX_SUMMARY_CHARS, "one-off reason")
+            finding_class[fid] = None
+        elif kind == "new_class":
+            index = item.get("record_index")
+            if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(class_records):
+                raise CensusError("new-class disposition has invalid record_index")
+            referenced_record = class_records[index]
+            if (
+                not isinstance(referenced_record, dict)
+                or referenced_record.get("op") != "new"
+                or index in referenced_new_records
+            ):
+                raise CensusError("new-class disposition must uniquely reference a new class record")
+            referenced_new_records.add(index)
+            finding_class[fid] = f"record:{index}"
+        else:
+            cid = item.get("class_id")
+            if class_states is not None and cid not in class_states:
+                raise CensusError(f"class disposition names unknown active class {cid!r}")
+            _bounded(cid, 120, "class disposition class_id")
+            if (assessment_verdicts or {}).get(cid) == "satisfied":
+                raise CensusError(
+                    "satisfied class assessment cannot also receive an existing-class finding"
+                )
+            finding_class[fid] = cid
+    if disposition_findings != set(finding_ids):
+        raise CensusError("every governing finding needs exactly one class disposition")
+    new_record_indexes = {
+        index for index, record in enumerate(class_records)
+        if isinstance(record, dict) and record.get("op") == "new"
+    }
+    if referenced_new_records != new_record_indexes:
+        raise CensusError("every new class record must be bound to one governing finding")
+    # Keep the model-facing debt rows in their documented exact shape.  This private
+    # settlement map carries the validated binding into durable state without making
+    # callers or audit readers mistake derived class IDs for model-supplied fields.
+    obj["_finding_class_refs"] = finding_class
     disposition_by_class = {r["assessment_id"]: r["governing_id"] for r in assessment_rows}
     governing_by_source = {r["source_id"]: r["governing_id"] for r in source_rows}
+    existing_rows = [
+        item for item in class_dispositions if item.get("kind") == "existing_class"
+    ]
+    existing_bindings = {item["class_id"]: item["finding_id"] for item in existing_rows}
+    if len(existing_bindings) != len(existing_rows):
+        raise CensusError(
+            "settlement must consolidate same-class occurrences into one governing finding"
+        )
+    violated_bindings = {
+        cid: disposition_by_class.get(cid)
+        for cid, verdict in (assessment_verdicts or {}).items() if verdict == "violated"
+    }
+    if existing_bindings != violated_bindings:
+        raise CensusError(
+            "every existing-class finding needs one matching violated assessment"
+        )
     operation_by_class: dict[str, str] = {}
     for record in obj["class_records"]:
         cid = record.get("class_id") if isinstance(record, dict) else None
@@ -268,6 +363,17 @@ def parse_settlement(
                     raise CensusError("invalid class severity")
                 if prior_severity and rank[replacement_severity] < rank[prior_severity]:
                     raise CensusError("staged settlement cannot downgrade an active class")
+    for item in class_dispositions:
+        if item.get("kind") != "existing_class" or class_states is None:
+            continue
+        cid = item["class_id"]
+        status, mechanized, _ = class_states[cid]
+        if status == cc.CLOSED and (assessment_verdicts or {}).get(cid) != "violated":
+            allowed = {"replace"} if mechanized else {"reopen", "replace"}
+            if operation_by_class.get(cid) not in allowed:
+                raise CensusError(
+                    "finding bound to a closed class must reopen or replace that class"
+                )
     for cid, verdict in (assessment_verdicts or {}).items():
         target = disposition_by_class.get(cid)
         if verdict == "violated" and target is None:
@@ -276,7 +382,9 @@ def parse_settlement(
             raise CensusError("satisfied class assessment cannot map to a finding")
         cited = (assessment_findings or {}).get(cid)
         if verdict == "violated" and assessment_findings is not None:
-            expected = governing_by_source.get(cited, cited if role == "final" else None)
+            expected = governing_by_source.get(
+                cited, cited if role in {"correction", "final"} else None,
+            )
             if expected is None or target != expected:
                 raise CensusError(
                     "violated class disposition must follow its cited finding"
@@ -287,6 +395,8 @@ def parse_settlement(
             ]
             if len(matches) != 1:
                 raise CensusError("every violated class needs exactly one open debt record")
+            if finding_class.get(target) != cid:
+                raise CensusError("violated class finding must disposition to that existing class")
         if class_states and cid in class_states:
             status, mechanized, prior_severity = class_states[cid]
             op = operation_by_class.get(cid)
@@ -312,6 +422,35 @@ def parse_settlement(
     if class_mechanized is not None:
         register_from_records(obj["class_records"], mechanized=class_mechanized)
     return obj
+
+
+def minted_record_ids(
+    records: Sequence[dict[str, Any]], minted: Sequence[str],
+) -> dict[int, str]:
+    """Map staged record positions to IDs minted by the canonical class engine."""
+    indexes = [i for i, row in enumerate(records) if row.get("op") == "replace"]
+    indexes.extend(i for i, row in enumerate(records) if row.get("op") == "new")
+    if len(indexes) != len(minted):
+        raise CensusError("minted class count does not match class records")
+    return dict(zip(indexes, minted, strict=True))
+
+
+def register_status(
+    records: Sequence[dict[str, Any]], minted_by_record: dict[int, str], *, phase: str,
+) -> str:
+    operations: list[str] = []
+    for index, record in enumerate(records):
+        op = record.get("op")
+        if op == "new":
+            operations.append(f"NEW {minted_by_record[index]}")
+        elif op == "replace":
+            operations.append(
+                f"REPLACE {record.get('class_id')} -> {minted_by_record[index]}"
+            )
+        elif op in {"close", "reopen", "reclassify"}:
+            operations.append(f"{op.upper()} {record.get('class_id')}")
+    detail = ", ".join(operations) if operations else "NONE"
+    return f"staged {phase} parsed — {detail}"
 
 
 def register_from_records(
@@ -403,6 +542,14 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
             for assessment in settlement.get("assessment_dispositions", [])
             if assessment["governing_id"] == item["finding_id"]
         ]
+        class_ref = settlement.get("_finding_class_refs", {}).get(item["finding_id"])
+        if class_ref and not class_ref.startswith("record:"):
+            row["class_ids"].append(class_ref)
+        row["class_ids"] = list(dict.fromkeys(row["class_ids"]))
+        row["class_record_indexes"] = (
+            [int(class_ref.split(":", 1)[1])]
+            if class_ref and class_ref.startswith("record:") else []
+        )
         row["first_round"] = round_no; row["last_round"] = round_no
         old[row["id"]] = row
     active = [d for d in old.values() if d.get("status") == "open" and d.get("severity") in BLOCKING]
@@ -411,6 +558,7 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
     out.pop("unbound_classes", None)
+    out.pop("unbound_class_ids", None)
     return out
 
 
@@ -421,6 +569,8 @@ def trailer(state: dict[str, Any]) -> str:
     if state.get("format_debt"):
         lines.append(f"STRUCTURAL-ERROR: {state['format_debt']}")
         lines.append("CONVERGENCE: BLOCKED — staged format debt remains open.")
+    elif state.get("unbound_class_ids"):
+        lines.append("CONVERGENCE: BLOCKED — class closure remains open.")
     elif phase == "final":
         lines.append("FINAL-REGRESSION: required")
         lines.append("CONVERGENCE: BLOCKED — cold final regression is required.")
@@ -448,7 +598,6 @@ def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = Non
             consumed.add(fid)
         rendered.extend(row for fid, row in current.items() if fid not in consumed)
         findings = rendered
-        findings.extend(state.get("unbound_classes", []))
 
     def rows(items: list[dict[str, Any]]) -> str:
         if not items:
@@ -456,6 +605,7 @@ def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = Non
         return "\n".join(
             f"- [{f['severity']}] {f['summary']}"
             + (f" — remains open: {f['reason']}" if f.get("reason") else "")
+            + (f" [classes: {', '.join(f['class_ids'])}]" if f.get("class_ids") else "")
             + f" ({', '.join(f['evidence'])})"
             for f in items
         )

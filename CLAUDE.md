@@ -38,3 +38,7 @@
   through the shared inert Git launcher so missing promised objects cannot lazy-fetch;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.
+- preserve class closure on staged plan and branch reviews: explicitly disposition every governing
+  finding as one-off/new/existing, bind every new record, use the canonical class engine, and expose
+  `CLASS-REGISTER` and `CLASS-CLOSURE`; structural debt alone is not feature parity.
+  Ambiguous persistence uses `CLASS-CLOSURE: STATE-UNAVAILABLE`, not unconfirmed class counts.

@@ -195,8 +195,12 @@ the claim and its citation, never the previous reviewer's prose.
 invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
-Tracked staged plan reviews return strict staged JSON, and the server applies their class records
-atomically with concrete finding debt. Every lane finding must be named by at least one checklist
+Tracked staged plan and branch reviews return strict staged JSON, and the server applies their
+class records through the same durable class engine used by the legacy terminal register. Every
+governing finding must explicitly declare whether it is a genuine one-off, a new reusable class,
+or an occurrence of an active class. Every new class record is bound to exactly one governing
+finding; omission or an unbound record rejects the settlement instead of silently treating its
+finding as classless. Every lane finding must be named by at least one checklist
 row; a `finding` row names its finding IDs and non-finding rows cannot hide one. The integrity lane
 receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
@@ -715,6 +719,9 @@ The footer carries the `session_ref` for [`rebut`](#rebut).
 Appended below a staged tracked plan or branch review:
 
 ```
+CLASS-REGISTER: staged census parsed — NEW 19ef00ab
+CLASS-CLOSURE: 1 open, 0 closed
+  19ef00ab repeated state transitions preserve their owner (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)
 STRUCTURAL-PHASE: correction
 STRUCTURAL-DEBT: 2 blocking open
 CONVERGENCE: BLOCKED — staged structural debt remains open.
@@ -722,6 +729,8 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 
 | Line | Meaning |
 |---|---|
+| `CLASS-REGISTER` | The class operations applied by this staged settlement, including canonical IDs minted by the existing class engine |
+| `CLASS-CLOSURE` | Open/closed reusable-class counts plus blocking class detail |
 | `STRUCTURAL-PHASE: census\|correction\|final\|clear` | The next broad/targeted gate; `final` requires one fresh cold regression |
 | `STRUCTURAL-DEBT: N blocking open` | Concrete governing findings still requiring correction |
 | `CONVERGENCE: NOT-BLOCKED` | Structural debt/classes and, for plans, external claims are clear |
@@ -729,9 +738,19 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 | `STRUCTURAL-ERROR` / `STRUCTURAL-PENDING` | A bounded format/deadline path did not produce a settled review |
 | `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
 
-One-shot and injected-engine trailers retain `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and
-unmechanized-class detail. Staged branch class state is incorporated into `STRUCTURAL-DEBT` and the
-computed convergence line.
+`STRUCTURAL-DEBT` counts concrete governing findings only. An unbound live reusable class remains a
+first-class blocker in `CLASS-CLOSURE`; it is not duplicated into synthetic finding prose or given
+invented evidence anchors. The class trailer lists bounded path/line/text match detail and renders a
+binary recurrence as `path: binary match (line not shown)`. In that case the governing line says
+class closure remains open.
+
+One-shot, injected-engine, and successfully persisted staged tracked trailers all retain
+`CLASS-REGISTER`, `CLASS-CLOSURE`, match, and unmechanized-class detail. If lineage state cannot be
+loaded or a write may not have persisted, the staged trailer instead emits `CLASS-REGISTER` plus
+`CLASS-CLOSURE: STATE-UNAVAILABLE`; reporting in-memory counts as durable in that case would be
+misleading. Staged plan and branch reviews additionally
+bind concrete debt to the corresponding canonical class IDs and use one final structural verdict;
+the class trailer does not emit a competing convergence line.
 
 `NOT-BLOCKED` asserts only that the computed structural-debt, class, and (for verified plans)
 external-claim gates are clear. It is a review result, not a proof that the change is correct.
