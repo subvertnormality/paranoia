@@ -54,4 +54,5 @@
   failure, timeout, cancellation, and failed retry delete older cache, persist as generic staged
   failure, and are never reusable. Only terminal consolidation validation uses validation debt;
   lane, follow-up, and consolidation-preflight validation are structured staged failures carrying
-  exact role, kind, and message.
+  exact role, kind, and message; preserve timeout, unavailable, provider, execution, and retry roles
+  rather than flattening them.

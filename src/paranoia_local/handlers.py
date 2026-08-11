@@ -91,6 +91,20 @@ def _attempt(
                       response[:4000] if response else None, sequence)
 
 
+def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
+    kind = (
+        "timeout" if review.returncode == 124
+        else "unavailable" if review.returncode == 127
+        else "provider" if review.returncode == 0
+        else "execution"
+    )
+    detail = " ".join((review.text or review.raw or "engine failure").split())[:2000]
+    error = rc.CensusError(f"{role} {kind}: {detail}")
+    error.stage_role = role  # type: ignore[attr-defined]
+    error.failure_kind = kind  # type: ignore[attr-defined]
+    return error
+
+
 def _staged_call(
     *, role: str, engine: Engine, prompt: str, cwd: Path, model: str, effort: str,
     timeout: int, parser: Callable[[str], dict[str, Any]],
@@ -105,9 +119,7 @@ def _staged_call(
                         **_progress_kwargs(on_progress))
     attempts = [_attempt(role, engine, review, sequence=sequence)]
     if review.error:
-        error = rc.CensusError(f"{role} failed (exit {review.returncode})")
-        error.stage_role = role  # type: ignore[attr-defined]
-        error.failure_kind = "execution"  # type: ignore[attr-defined]
+        error = _engine_failure_error(review, role=role)
         error.attempts = attempts  # type: ignore[attr-defined]
         raise error
     try:
@@ -136,9 +148,9 @@ def _staged_call(
             f"{role}-format-retry", engine, retry, sequence=retry_sequence,
         ))
         if retry.error:
-            error = rc.CensusError(f"{role} validation retry failed (exit {retry.returncode})")
-            error.stage_role = role  # type: ignore[attr-defined]
-            error.failure_kind = "execution"  # type: ignore[attr-defined]
+            error = _engine_failure_error(
+                retry, role=f"{role}-validation-retry",
+            )
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
         try:

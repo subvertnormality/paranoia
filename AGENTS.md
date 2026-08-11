@@ -49,7 +49,8 @@ engine/model/effort/web settings, plan context, and cache schema. Persist it onl
 validation rejection. Incomplete or mismatched lanes, execution failure, timeout, cancellation, or
 failed retry must delete any older cache and never suppress a fresh census. Persist those
 non-terminal-consolidation-validation exits as structured staged failure with exact role, kind,
-and message, not validation debt.
+and message, not validation debt. Preserve timeout, unavailable executable, provider error, and
+other execution outcomes distinctly, including the validation-retry role.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

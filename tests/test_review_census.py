@@ -732,6 +732,69 @@ def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
     assert [row.outcome for row in caught.value.attempts] == ["validation-invalid"]
 
 
+def test_staged_timeout_preserves_kind_message_state_and_trailer(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(
+                text="[paranoia-local error] timed out after 1800s",
+                session_ref=None, raw="timed out after 1800s", returncode=124, error=True,
+            )
+
+    with pytest.raises(rc.CensusError, match="timed out after 1800s") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: {},
+        )
+    assert caught.value.stage_role == "consolidation"
+    assert caught.value.failure_kind == "timeout"
+    closure = handlers._PlanClassClosure(
+        "timeout-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"timeout",
+        "message":"consolidation timeout: [paranoia-local error] timed out after 1800s",
+    }
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=timeout" in trailer
+    assert "CONVERGENCE: BLOCKED — staged timeout failure did not settle." in trailer
+
+
+def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, *args, **kwargs):
+            return Review(
+                text="reviewer timed out", session_ref="s", raw="reviewer timed out",
+                returncode=124, error=True,
+            )
+
+    with pytest.raises(rc.CensusError, match="validation-retry timeout") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=[],
+            ),
+        )
+    assert caught.value.stage_role == "consolidation-validation-retry"
+    assert caught.value.failure_kind == "timeout"
+    assert not handlers._cacheable_consolidation_error(caught.value)
+
+
 def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
     invalid = payload(settlement())
     invalid["debt"][0]["id"] = ""

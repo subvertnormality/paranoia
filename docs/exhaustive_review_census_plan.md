@@ -299,7 +299,9 @@ fresh immutable census. Parser and semantic settlement failures are logged as
 `validation-invalid`, not misclassified as format-only failures. Only terminal consolidation
 validation populates `validation_debt`. Lane/follow-up validation and every execution-class failure
 first delete any older cache and persist as structured `staged_failure` with exact role, kind, and
-message; consolidation preflight validation does the same. They cannot authorize reuse.
+message; consolidation preflight validation does the same. Engine outcomes preserve timeout,
+unavailable executable, in-band provider error, and other execution failure distinctly, including
+the validation-retry role. They cannot authorize reuse.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

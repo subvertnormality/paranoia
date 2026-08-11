@@ -221,7 +221,9 @@ their separate mechanical closure rule. Rejections after parsing are recorded as
 Only terminal consolidation validation populates `validation_debt`; lane/follow-up validation and
 execution, retry, timeout, cancellation, deadline, and consolidation-preflight failures persist as
 structured `staged_failure` records with their exact role, kind, and message. They invalidate any
-older census cache and cannot authorize reuse.
+older census cache and cannot authorize reuse. Engine outcomes retain `timeout`, `unavailable`,
+`provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
+retry has its own retry role.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
