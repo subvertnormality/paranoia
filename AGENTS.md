@@ -31,6 +31,12 @@ reporting implementation progress. Label every run in commentary as PLAN or CODE
 Before review, update public documentation and these agent instructions. Before opening a PR,
 run the primary capability end to end; fake-backed tests alone do not establish usability.
 
+For staged census settlement, preserve one concrete debt record for every blocking governing
+finding and every governing finding referenced by a violated class assessment, including
+`MINOR` and `OUT-OF-SCOPE`. Advisory debt is tracked but excluded from phase gating and the
+computed blocking-debt count; do not weaken the validator or inflate severity to reconcile a
+prompt mismatch.
+
 ## Classes are architectural hypotheses
 
 An open class is not a patch instruction. Triage all open/reopened classes together: concrete

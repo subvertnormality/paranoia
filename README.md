@@ -224,6 +224,12 @@ A class closes when its predicate returns zero matches and reopens the moment it
 matches again. `MINOR` and `OUT-OF-SCOPE` classes are tracked but advisory — they
 never block.
 
+Staged census settlements preserve that distinction: exactly one concrete debt
+record is required for every blocking governing finding and for every governing
+finding cited by a violated class assessment, including advisory assessments.
+Advisory debt remains durable review context but is excluded from phase gating and
+the computed blocking-debt count.
+
 Where no regex can express the invariant, the reviewer registers a `PROCEDURE:`
 instead. Those are **unmechanized**: nothing re-runs them, they are shown to every
 later reviewer, and they close only when a reviewer explicitly writes

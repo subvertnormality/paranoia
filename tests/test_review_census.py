@@ -293,6 +293,7 @@ def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
     _, parsed, attempts = handlers._staged_call(
         role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
         model="m", effort="high", timeout=10, on_progress=None,
+        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
         parser=lambda text: rc.parse_settlement(
             text, source_ids=["domain-1"], assessment_ids=[],
         ),
@@ -326,11 +327,49 @@ def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path)
     _, parsed, attempts = handlers._staged_call(
         role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
         model="m", effort="high", timeout=10, on_progress=None,
+        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
         parser=lambda text: rc.parse_settlement(
             text, source_ids=["domain-1"], assessment_ids=[],
         ),
     )
     assert parsed["findings"][0]["remedy"] == "fix it"
+    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+
+
+def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
+    invalid = payload(settlement())
+    invalid.update(
+        source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
+        findings=[finding("G1", "OUT-OF-SCOPE")], debt=[],
+        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
+    )
+    repaired = dict(invalid)
+    repaired["debt"] = [{"id":"D1","finding_id":"G1","status":"open"}]
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, invalid)
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert "every violated class needs exactly one open debt record" in prompt
+            assert "including MINOR and OUT-OF-SCOPE" in prompt
+            text = wire(rc.SETTLEMENT_MARKER, repaired)
+            return Review(text=text, session_ref=session_ref, raw=text)
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+        model="m", effort="high", timeout=10, on_progress=None,
+        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+        parser=lambda text: rc.parse_settlement(
+            text, source_ids=["integrity:F1"], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"violated"},
+            assessment_findings={"abc":"integrity:F1"},
+        ),
+    )
+    assert parsed["debt"][0]["severity"] == "OUT-OF-SCOPE"
     assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
 
 
@@ -385,6 +424,9 @@ def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
 
 
 def test_violated_advisory_class_still_requires_concrete_debt():
+    assert "every governing finding referenced by a\nviolated class assessment" in (
+        prompts.STAGED_CONSOLIDATION_INSTRUCTIONS
+    )
     value = payload(settlement())
     value.update(
         source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
@@ -426,18 +468,22 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
         name = "fake"
 
         def run(self, *args, **kwargs):
-            value = payload(lane())
+            value = payload(lane(findings=[finding("F1")]))
             value["coverage"][0]["evidence"] = ["missing.py:1"]
+            value["findings"][0]["evidence"] = ["missing.py:1"]
             text = wire(rc.LANE_MARKER, value)
             return Review(text=text, session_ref="session", raw=text)
 
         def resume(self, session_ref, prompt, *args, **kwargs):
             assert session_ref == "session"
             assert "unresolvable repository anchor" in prompt
+            assert "Lane manifests never contain settlement debt" in prompt
+            assert "open debt" not in prompt
             (tmp_path / "ok.py").write_text("ok\n")
-            value = payload(lane())
+            value = payload(lane(findings=[finding("F1")]))
             for row in value["coverage"]:
                 row["evidence"] = ["ok.py:1"]
+            value["findings"][0]["evidence"] = ["ok.py:1"]
             text = wire(rc.LANE_MARKER, value)
             return Review(text=text, session_ref="session", raw=text)
 
@@ -449,6 +495,7 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
     _, _, attempts = handlers._staged_call(
         role="census-domain", engine=Engine(), prompt="review", cwd=tmp_path,
         model="m", effort="high", timeout=10, parser=parse, on_progress=None,
+        retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
     )
     assert [attempt.role for attempt in attempts] == [
         "census-domain", "census-domain-format-retry",

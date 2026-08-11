@@ -122,8 +122,9 @@ groups shared root causes without conducting another broad review. Its one stage
 contains every source-finding disposition, integrity-assessment disposition, governing finding,
 concrete-debt record, and class registration/transition in structured form. Every source finding
 of every severity and every integrity assessment is mapped exactly once; the governing severity
-cannot be lower than any merged source; every blocking governing finding maps to exactly one open
-concrete-debt record. The server parses the complete envelope into the existing
+cannot be lower than any merged source; every blocking governing finding and every governing
+finding referenced by a violated class assessment maps to exactly one open concrete-debt record,
+including advisory findings whose debt does not gate convergence. The server parses the complete envelope into the existing
 `Register`/lineage types, validates all fields, then applies finding and class state atomically. A
 missing source or assessment ID, dangling merge, missing blocking debt, unsupported class
 transition, or prose-only blocker rejects the whole envelope. The legacy terminal text class block
