@@ -113,9 +113,16 @@ state and reviewer-native capabilities meet the supported model.
   requires a full current server-captured and cold-attested evidence packet rather than a compact
   verdict-only assessment; edited
   wording also requires a new full packet. Removed and mechanically out-of-scope claims do not
-  consume active context. This optimization applies only to external verification: the
-  structural FATAL/MAJOR review remains broad and cold on every convergence round and must not
-  reopen evidence inventory for repository mechanics or “missing atomic bridges.”
+  consume active context. This optimization applies only to external verification. For tracked
+  plan reviews with claim verification explicitly disabled, retain claim packets without rendering
+  or gating on them; if stakes change, persist a re-verification requirement and exhaustively audit
+  the preserved inventory when verification is next enabled. For tracked plan structural review,
+  a new plan snapshot's census and the final regression are broad and cold; intervening correction
+  rounds are deliberately targeted to open findings/classes, the claimed corrections, and their
+  transitive effects. Tracked branch review remains broad and cold on every convergence round while
+  its staged lifecycle is validated separately. Do not reopen external inventory for repository
+  mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
+  for novelty between the census and final regression.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and

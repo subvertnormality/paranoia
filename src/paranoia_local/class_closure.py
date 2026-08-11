@@ -320,6 +320,13 @@ class Lineage:
     #: instead of introducing a second store/transaction protocol.  Branch mode leaves
     #: it empty and otherwise behaves byte-for-byte as before.
     claim_state: dict[str, Any] = field(default_factory=dict)
+    #: A structural-stakes transition invalidates claim verdict reuse too. Keep this
+    #: outside claim_state so an explicitly disabled claim phase preserves its evidence
+    #: byte-for-byte while remembering that the next enabled phase must be exhaustive.
+    claim_reverify_required: bool = False
+    #: Staged structural-review phase and concrete finding debt. Kept in the same
+    #: atomic file as classes and claims so no partial clearance can cross stores.
+    review_state: dict[str, Any] = field(default_factory=dict)
     #: Which tool created this lineage. A plan lineage holds only unmechanized classes
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
@@ -425,6 +432,8 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         exemptions=[Exemption(**e) for e in raw.get("exemptions", [])],
         debt=raw.get("debt"),
         claim_state=deepcopy(raw.get("claim_state", {})),
+        claim_reverify_required=bool(raw.get("claim_reverify_required", False)),
+        review_state=deepcopy(raw.get("review_state", {})),
     )
 
 
@@ -440,6 +449,8 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         "exemptions": [vars(e) for e in lineage.exemptions],
         "debt": lineage.debt,
         "claim_state": lineage.claim_state,
+        "claim_reverify_required": lineage.claim_reverify_required,
+        "review_state": lineage.review_state,
     }
 
 
@@ -545,6 +556,8 @@ def copy_lineage(lineage: Lineage) -> Lineage:
         lineage_id=lineage.lineage_id, rounds=lineage.rounds, next_seq=lineage.next_seq,
         classes=dict(lineage.classes), exemptions=list(lineage.exemptions), debt=lineage.debt,
         mode=lineage.mode, claim_state=deepcopy(lineage.claim_state),
+        claim_reverify_required=lineage.claim_reverify_required,
+        review_state=deepcopy(lineage.review_state),
     )
 
 
@@ -586,6 +599,24 @@ def _apply_transition(lineage: Lineage, t: Transition, *, round_no: int, minted:
 
     if t.kind == "RECLASSIFY":
         lineage.classes[t.class_id] = replace(cls, severity=t.severity or cls.severity)
+        return
+
+    if t.kind == "REPLACE":
+        if t.target is not None:
+            raise RegisterError("REPLACE creates a successor and cannot name BY")
+        if cls.mechanized:
+            if not t.pattern or not t.pathspec:
+                raise RegisterError("mechanized REPLACE needs pattern and pathspec")
+        elif not t.procedure:
+            raise RegisterError("unmechanized REPLACE needs procedure")
+        new_id = _add(
+            lineage, t.invariant or cls.invariant, t.severity or cls.severity,
+            cls.first_round, t.pattern, t.pathspec, t.procedure,
+        )
+        minted.append(new_id)
+        lineage.classes[t.class_id] = replace(
+            cls, status=SUPERSEDED, superseded_by=new_id
+        )
         return
 
     # SUPERSEDE — the source must not survive as a blocker, so the replacement has to be real.

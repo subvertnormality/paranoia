@@ -11,6 +11,7 @@ from paranoia_local import (
     external_sources,
     handlers,
     plan_claims as pc,
+    prompts,
 )
 from paranoia_local.engines import Review
 
@@ -1136,8 +1137,10 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         "evidence-binding": [binding, changed],
         "evidence-text": [attestation],
     })
+    ledger: list[dict] = []
     adapter = handlers._CapturedClaimEngine(
         engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        attempt_ledger=ledger,
     )
     try:
         first = adapter.run("audit", tmp_path, "m", "high", True)
@@ -1145,6 +1148,10 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
         assert retry.error
         assert "binding changed immutable source metadata" in retry.text
+        assert [row["role"] for row in ledger] == [
+            "claim-discovery", "claim-binding", "claim-attestation",
+            "claim-binding-outer-retry",
+        ]
     finally:
         adapter.close()
 
@@ -1282,15 +1289,20 @@ def test_retained_inventory_is_corrected_before_capture(
         ]
 
     monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    ledger: list[dict] = []
     adapter = handlers._CapturedClaimEngine(
         engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
-        prior_state=prior, frozen_ids=frozenset(),
+        prior_state=prior, frozen_ids=frozenset(), attempt_ledger=ledger,
     )
     try:
         result = adapter.run("audit", tmp_path, "m", "high", True)
         assert not result.error
         assert capture_sizes == [2]
         assert [role for role, _ in engine.calls].count("evidence-discovery") == 2
+        assert [row["role"] for row in ledger] == [
+            "claim-discovery", "claim-discovery-retry", "claim-binding",
+            "claim-attestation",
+        ]
     finally:
         adapter.close()
 
@@ -1473,7 +1485,25 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
 
     def structural_review(self, *args, **kwargs):
         observed["structural_timeout"] = kwargs.get("timeout")
-        return Review(text=STRUCTURAL_CLEAR, session_ref="structural", raw="structural")
+        prompt = args[0]
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane = next(x.split()[-1] for x in prompt.splitlines() if x.startswith("ROLE: census lane"))
+            coverage = [
+                {"id": key, "status": "covered", "summary": "checked",
+                 "evidence": ["repository/README.md:1"], "finding_ids": []}
+                for key in handlers.rc.CHECKLIST
+            ]
+            text = handlers.rc.LANE_MARKER + "\n" + json.dumps({
+                "lane": lane, "coverage": coverage, "findings": [],
+                "class_assessments": [],
+            })
+        else:
+            text = handlers.rc.SETTLEMENT_MARKER + "\n" + json.dumps({
+                "role": "census", "source_dispositions": [],
+                "assessment_dispositions": [], "findings": [], "debt": [],
+                "debt_updates": [], "class_records": [],
+            })
+        return Review(text=text, session_ref="structural", raw=text)
 
     monkeypatch.setattr(handlers, "_verify_plan_claims", deadline_debt)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
@@ -1481,7 +1511,6 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     monkeypatch.setattr(
         handlers.eng.CodexEngine, "run", structural_review,
     )
-
     result = handlers.critique_plan(
         {
             "plan_text": PLAN, "repo_path": str(repo), "lineage": lineage_id,
@@ -1494,7 +1523,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     )
 
     assert observed["deadline"] is not None
-    assert observed["structural_timeout"] == handlers.PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC
+    assert observed["structural_timeout"] in {900, 600}
     assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
     assert "CLAIM-AUDIT-DEBT" in result
 

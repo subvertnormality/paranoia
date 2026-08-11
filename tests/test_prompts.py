@@ -108,6 +108,29 @@ class TestRebutInstructions:
         assert "hold" in t
 
 
+class TestStagedReviewInstructions:
+    def test_plan_anchors_have_one_unambiguous_spelling(self) -> None:
+        for text in (
+            prompts.staged_census_instructions("plan", "domain"),
+            prompts.staged_followup_instructions("plan"),
+        ):
+            assert "`plan:<line>`" in text
+            assert "never by its repository path" in text
+            assert "`repository/<path>:<line>`" in text
+            assert "literal `repository/` prefix is required" in text
+
+
+def test_branch_staged_prompts_forbid_the_plan_alias():
+    for text in (
+        prompts.staged_census_instructions("branch", "behaviour"),
+        prompts.staged_followup_instructions("branch"),
+    ):
+        assert "there is no `plan:` evidence alias" in text
+        assert "including plans, contracts, and documentation" in text
+        assert "Cite the reviewed plan itself" not in text
+        assert "ANCHOR_POLICY" not in text
+
+
 class TestCompose:
     def test_joins_instructions_and_body(self) -> None:
         out = prompts.compose("INSTRUCTIONS", "BODY")

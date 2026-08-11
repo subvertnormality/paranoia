@@ -301,12 +301,17 @@ class CodexEngine(Engine):
             etype = event.get("type")
             if etype == "thread.started":
                 thread_id = event.get("thread_id") or thread_id
-            if etype == "error":
+            if etype in {"error", "turn.failed"}:
                 error = True
             if etype == "turn.completed":
                 u = event.get("usage")
                 if isinstance(u, dict):
                     usage = u
+                # Codex can emit a transient top-level error while retrying a
+                # model stream and still finish the turn successfully.  The
+                # terminal event, not an earlier recovered event, governs the
+                # process result.
+                error = False
             item = event.get("item")
             if isinstance(item, dict):
                 if item.get("type") == "agent_message":

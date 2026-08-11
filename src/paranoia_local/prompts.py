@@ -284,6 +284,76 @@ def compose(instructions: str, body: str) -> str:
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
 
 
+PLAN_EVIDENCE_ANCHORS = """Cite the reviewed plan itself only as `plan:<line>`
+(never by its repository path); cite every other supplied file as `repository/<path>:<line>`
+(the literal `repository/` prefix is required)."""
+
+BRANCH_EVIDENCE_ANCHORS = """This is a branch review and there is no `plan:` evidence alias.
+Cite every supplied file as `repository/<path>:<line>` (the literal `repository/` prefix is
+required), including plans, contracts, and documentation stored in the repository."""
+
+
+def staged_census_instructions(mode: str, lane: str) -> str:
+    policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
+    return STAGED_CENSUS_INSTRUCTIONS.replace("ANCHOR_POLICY", policy).replace(
+        "LANE", lane,
+    )
+
+
+def staged_followup_instructions(mode: str) -> str:
+    policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
+    return STAGED_FOLLOWUP_INSTRUCTIONS.replace("ANCHOR_POLICY", policy)
+
+
+STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
+Read the complete supplied artifact and repository. Own every checklist item from your lane's
+perspective. Report all in-scope severities; do not defer issues to another lane. ANCHOR_POLICY
+Every evidence anchor must resolve. Return only:
+=== REVIEW CENSUS JSON ===
+{"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"],"finding_ids":[]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
+Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
+class_assessments array; integrity assesses every supplied active class exactly once and a violated
+assessment names one of its findings. A coverage row with status finding names one or more lane
+finding IDs; all other rows use an empty finding_ids array, and every lane finding is named by at
+least one coverage row."""
+
+
+STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
+review. Map every source finding and class assessment exactly once. Preserve the highest severity
+of merged findings. Every blocking governing finding needs exactly one open debt record. Return
+only === REVIEW SETTLEMENT JSON === followed by one JSON object with: role, source_dispositions,
+assessment_dispositions, findings, debt, debt_updates, and class_records. Class record op is one of
+new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
+operation. A new/replace record has op, invariant, severity and either pattern+pathspec (branch)
+or procedure (plan), with class_id additionally required for replace. Close/reopen has only op and
+class_id; reclassify additionally has severity. Use these exact row shapes:
+source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
+assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
+findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
+debt=[{"id":"D1","finding_id":"G1","status":"open"}];
+debt_updates=[]; class_records=[]. A violated assessment must map to the same governing finding as
+its cited lane finding; a satisfied assessment maps to null. Do not emit prose."""
+
+
+STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
+is targeted to every open debt item and effects of its repair. Final is a fresh cold whole-artifact
+review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
+followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
+debt, debt_updates, class_records and, for final, coverage plus class_assessments. Account for every
+supplied open debt exactly once. Final must include all nine checklist IDs and assess every active class
+exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
+census settlement; each debt update is {"id":"D1","status":"closed|open","evidence":["path:1"]}.
+Correction returns empty source/assessment dispositions. Final returns empty source dispositions
+and one assessment disposition per class. The task's checklist array is governing. The exact
+final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
+"summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
+"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
+ANCHOR_POLICY
+Every anchor must resolve.
+A finding row names one or more findings, all other coverage rows name none, and every finding is
+named by coverage."""
+
+
 # ── class closure ─────────────────────────────────────────────────────────────
 # The register is the ONLY channel by which a defect class becomes durable. Nothing in
 # the five prose sections is parsed: nine review rounds established that policing free

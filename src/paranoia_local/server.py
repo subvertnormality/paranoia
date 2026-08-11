@@ -78,14 +78,10 @@ _ROUND = {
     "minimum": 1,
     "description": (
         "REQUIRED unless you pass class_closure: false (the one-shot mode). "
-        "Convergence-loop round number (1-based). Increment it on each cold review round you run. "
-        "At round >=3 the reviewer restricts itself to merge-blocking in-scope findings — MAJOR "
-        "or higher ([BLOCKER]/[MAJOR] for code review, [FATAL]/[MAJOR] for plan review) — and "
-        "withholds [MINOR] and [OUT-OF-SCOPE], declaring 'CONVERGED' when none remain. This is "
-        "the lever to STOP a loop instead of chasing marginal/hardening findings across many "
-        "rounds. Start at 1 and raise as the design stabilises. It is required while class "
-        "closure is tracking a loop because without it the reviewer never reaches the "
-        "round-3 floor, so the loop has no terminating pressure at all."
+        "Convergence-loop sequence number (1-based); increment it after each settled attempt. "
+        "Tracked review uses it for lineage ordering while its cold census/final always cover "
+        "every in-scope severity and correction targets durable debt. The legacy one-shot "
+        "review retains the round-3 MAJOR-or-higher floor."
     ),
 }
 
@@ -124,7 +120,7 @@ TOOLS: list[Tool] = [
                 },
                 "converge": {
                     "type": "boolean",
-                    "description": "Convergence mode (default TRUE): pre-gather a deterministic evidence packet (touched files in full + diff) so the reviewer skips re-reading them every round, and review it against an immutable materialized worktree. Cheaper repeated rounds; always materializes (overrides isolate). Pass false (with class_closure: false) to fall back to the legacy in-place review. Class closure runs ONLY on this path, so `converge: false` is REFUSED unless you also pass `class_closure: false` — otherwise the review would look gated and emit no CONVERGENCE trailer.",
+                    "description": "Convergence mode (default TRUE): review an immutable evidence packet through a broad three-lane census, targeted correction debt, and one cold final regression. A clear census may converge immediately. Pass false with class_closure:false for the legacy one-shot path.",
                 },
                 "max_packet_chars": {
                     "type": "integer",
@@ -139,11 +135,10 @@ TOOLS: list[Tool] = [
                 "class_closure": {
                     "type": "boolean",
                     "description": (
-                        "Track defect CLASSES across rounds (default true). The reviewer registers "
-                        "each class with a regex matching violations only; every later round re-runs "
-                        "it and a computed CONVERGENCE trailer reports BLOCKED while any BLOCKER/MAJOR "
-                        "class still matches. This is what stops a loop fixing one spelling of a "
-                        "defect per round. Set false to restore the pre-closure behaviour exactly."
+                        "Enable tracked staged review (default true): concrete census findings, "
+                        "reusable classes, targeted correction, and a mandatory cold final. Branch "
+                        "class predicates are still swept against each reviewed snapshot. Set false "
+                        "for the legacy one-shot review."
                     ),
                 },
                 "lineage": {
@@ -213,7 +208,7 @@ TOOLS: list[Tool] = [
                 "class_closure": {
                     "type": "boolean",
                     "description": (
-                        "Track defect CLASSES across plan rounds (default TRUE, as for "
+                        "Enable tracked staged plan review (default TRUE, as for "
                         "critique_branch). Requires `lineage` and `round`. Pass FALSE for a "
                         "ONE-SHOT review — a design sketch with no convergence loop behind "
                         "it — which is the single explicit escape, drops the `round` "
