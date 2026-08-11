@@ -35,12 +35,18 @@ from .worktree import worktree_at
 
 Clock = Callable[[], str]
 
-PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
-PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 3000
-PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 3540
-PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 1200
-PLAN_REGISTER_RETRY_TIMEOUT_SEC = 300
-PLAN_TEARDOWN_RESERVE_SEC = 60
+PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 600
+PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 6000
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 7080
+PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
+PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
+PLAN_TEARDOWN_RESERVE_SEC = 120
+STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
+STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
+STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
+STAGED_FORMAT_RETRY_TIMEOUT_SEC = 600
+STAGED_CENSUS_RESERVE_SEC = 4320
+STAGED_FOLLOWUP_RESERVE_SEC = 3120
 MAX_PLAN_EVIDENCE_MODEL_CALLS = 9
 PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
@@ -116,7 +122,8 @@ def _staged_call(
             "Your staged JSON was rejected: " + str(first) +
             "\nFix every schema violation in the complete object, not only the first one. "
             + retry_guidance + " Return only the required marker and complete JSON object.",
-            cwd, model, effort, web_search, timeout=min(300, timeout),
+            cwd, model, effort, web_search,
+            timeout=min(STAGED_FORMAT_RETRY_TIMEOUT_SEC, timeout),
             **_progress_kwargs(on_progress),
         )
         attempts.append(_attempt(
@@ -379,7 +386,8 @@ def _staged_structural_review(
                 raise rc.CensusError(f"staged lane prompt is {len(prompt)} characters")
             result, parsed, lane_attempts = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
-                model=model, effort=effort, timeout=900, on_progress=on_progress,
+                model=model, effort=effort, timeout=STAGED_CENSUS_LANE_TIMEOUT_SEC,
+                on_progress=on_progress,
                 retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
                 web_search=web_search,
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
@@ -440,7 +448,8 @@ def _staged_structural_review(
                 raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
             review, settlement, call_attempts = _staged_call(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
-                model=model, effort=effort, timeout=600, on_progress=on_progress,
+                model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
+                on_progress=on_progress,
                 retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
                 web_search=web_search,
                 next_sequence=next_sequence,
@@ -477,7 +486,8 @@ def _staged_structural_review(
             raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
         review, settlement, call_attempts = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
-            timeout=1200, on_progress=on_progress, next_sequence=next_sequence,
+            timeout=STAGED_FOLLOWUP_TIMEOUT_SEC, on_progress=on_progress,
+            next_sequence=next_sequence,
             retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
             web_search=web_search,
             parser=lambda text: validate_settlement(
@@ -1191,7 +1201,10 @@ def critique_plan(
                     )["phase"]
                     if closure and closure.lineage else "census"
                 )
-                structural_reserve = 2160 if staged_phase == "census" else 1560
+                structural_reserve = (
+                    STAGED_CENSUS_RESERVE_SEC
+                    if staged_phase == "census" else STAGED_FOLLOWUP_RESERVE_SEC
+                )
                 if closure and closure.unavailable:
                     review, trailer, structural_attempts = _state_unavailable_review(
                         closure, mode=cc.PLAN_MODE, claim_state=claim_state,
@@ -1371,7 +1384,7 @@ def _verify_plan_claims(
         )
         claim_engine = captured_engine
     review = claim_engine.run(
-        prompt, repo, model, effort, True, timeout=1800,
+        prompt, repo, model, effort, True, timeout=3600,
         **_progress_kwargs(on_progress),
     )
     if captured_engine is None and attempt_ledger is not None:
@@ -1411,7 +1424,7 @@ def _verify_plan_claims(
             review.session_ref, pc.retry_instructions(
                 first, plan_text, prior_state, frozen_ids=frozen,
             ), repo,
-            model, effort, True, timeout=1800, **_progress_kwargs(on_progress),
+            model, effort, True, timeout=3600, **_progress_kwargs(on_progress),
         )
         if captured_engine is None and attempt_ledger is not None:
             attempt_ledger.append(_attempt("claim-audit-retry", engine, retry).json())

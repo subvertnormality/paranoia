@@ -78,6 +78,9 @@ Never improve speed by dropping a load-bearing claim, accepting weak authority, 
 verdict, weakening evidence-to-claim entailment, or falsely clearing debt. Do not add CAS,
 journals, custom transports, all-pair protocols, or hostile-race defenses when existing atomic
 state and reviewer-native capabilities meet the supported model.
+Treat operational timeouts as generous circuit breakers, not review-quality budgets. Do not
+shorten a normal thorough review to control cost; use bounded model-call counts, batches, packet
+sizes, and convergence phases to stop pathological work while allowing valid calls to finish.
 
 ## Claim-verification invariants
 

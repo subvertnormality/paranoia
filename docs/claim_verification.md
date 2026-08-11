@@ -85,9 +85,9 @@ pagination limits. They cover ordinary large plans while preventing the multipli
 from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
+Each discovery, captured-text binding, and cold-attestation model call has a 600-second cap;
 discovery and each binding batch allow at most one correction. The complete evidence phase has
-a 3,000-second monotonic deadline and at most nine model calls, including enough capacity for
+a 6,000-second monotonic deadline and at most nine model calls, including enough capacity for
 one discovery correction and one binding correction at the five-batch maximum. These
 limits let a large real plan complete useful research without making either a call sequence or
 an individual model call unbounded.
@@ -96,11 +96,12 @@ per-source wall-clock bounds, then bound in deterministic indexed batches in the
 discovery session. One oversized source, a sixth batch, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
 
-The complete verified plan call has a 3,540-second deadline, leaving a 60-second teardown
-reserve within the documented 3,600-second MCP client timeout. After evidence state is persisted,
-the cold structural review starts only when its full 1,200-second cap still fits. If it does not,
+The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
+reserve within the documented 7,200-second MCP client timeout. After evidence state is persisted,
+the cold structural review starts only when its current 4,320-second census or 3,120-second
+follow-up reserve still fits. If it does not,
 the round returns blocked and the next invocation reuses frozen supported claims rather than
-repeating research. A malformed class register gets one 300-second retry only when that cap also
+repeating research. A malformed class register gets one 600-second retry only when that cap also
 fits the same deadline.
 
 ## Evidence and authority

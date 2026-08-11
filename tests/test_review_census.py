@@ -15,6 +15,22 @@ HEADINGS = (
 )
 
 
+def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
+    assert handlers.STAGED_CENSUS_LANE_TIMEOUT_SEC == 1800
+    assert handlers.STAGED_CONSOLIDATION_TIMEOUT_SEC == 1200
+    assert handlers.STAGED_FOLLOWUP_TIMEOUT_SEC == 2400
+    assert handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC == 600
+    assert handlers.STAGED_CENSUS_RESERVE_SEC >= (
+        handlers.STAGED_CENSUS_LANE_TIMEOUT_SEC
+        + handlers.STAGED_CONSOLIDATION_TIMEOUT_SEC
+        + handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC
+    )
+    assert handlers.STAGED_FOLLOWUP_RESERVE_SEC >= (
+        handlers.STAGED_FOLLOWUP_TIMEOUT_SEC
+        + handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC
+    )
+
+
 def assert_five_headings(text):
     assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
 

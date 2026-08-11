@@ -343,12 +343,12 @@ def test_correction_execution_failure_preserves_the_rejected_reply(
 def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
     repo: Path, tmp_path: Path, monkeypatch,
 ):
-    ticks = iter([0.0, 3400.0])
+    ticks = iter([0.0, 6800.0])
     monkeypatch.setattr(ah.time, "monotonic", lambda: next(ticks))
     agent = Agent(lambda engine, rnd: "opt-decimal")
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "insufficient time to start a 210s agent phase" in report
+    assert "insufficient time to start a 420s agent phase" in report
     assert not agent.calls
 
 

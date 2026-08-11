@@ -40,11 +40,11 @@ Clock = Callable[[], str]
 # Per-phase caps compose below the client's whole-call ceiling. Before every agent
 # call we also reserve teardown time, so a late phase is refused instead of being
 # started when its own timeout cannot fit.
-CLEAN_TIMEOUT_SEC = 210
-DECIDE_TIMEOUT_SEC = 900
-RESEARCH_GROUP_TIMEOUT_SEC = 720
-WHOLE_TIMEOUT_SEC = 3600
-TEARDOWN_RESERVE_SEC = 60
+CLEAN_TIMEOUT_SEC = 420
+DECIDE_TIMEOUT_SEC = 1800
+RESEARCH_GROUP_TIMEOUT_SEC = 1440
+WHOLE_TIMEOUT_SEC = 7200
+TEARDOWN_RESERVE_SEC = 120
 
 SNAPSHOT_REF_PREFIX = "refs/paranoia/arbitrate"
 
@@ -1170,7 +1170,7 @@ def _research_one(
                 prompts.ARBITRATION_DISCOVERY_INSTRUCTIONS,
                 _research_body(packet, options),
             ),
-            launch, model, effort, True, timeout=120,
+            launch, model, effort, True, timeout=240,
         )
         reviews.append(review)
         discovery_raw.append(review.raw)
@@ -1183,7 +1183,7 @@ def _research_one(
                 review.session_ref,
                 f"Your discovery JSON was rejected: {first}. Return one complete corrected "
                 f"{research_core.DISCOVERY_MARKER} object and nothing else.",
-                launch, model, effort, True, timeout=120,
+                launch, model, effort, True, timeout=240,
             )
             reviews.append(correction)
             discovery_raw.append(correction.raw)
@@ -1202,7 +1202,7 @@ def _research_one(
         binding = binder.resume(
             session_ref,
             prompts.compose(prompts.ARBITRATION_BINDING_INSTRUCTIONS, rendered),
-            launch, model, effort, False, timeout=180,
+            launch, model, effort, False, timeout=360,
         )
         reviews.append(binding)
         binding_raw.append(binding.raw)
@@ -1217,7 +1217,7 @@ def _research_one(
                 binding.session_ref,
                 f"Your binding JSON was rejected: {first}. Return one complete corrected "
                 f"{research_core.BINDING_MARKER} object and nothing else.\n\n{rendered}",
-                launch, model, effort, False, timeout=180,
+                launch, model, effort, False, timeout=360,
             )
             reviews.append(correction)
             binding_raw.append(correction.raw)

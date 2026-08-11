@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 # An agentic review is many turns of tool use; it can run for many minutes.
-DEFAULT_TIMEOUT_SEC = 3600
+DEFAULT_TIMEOUT_SEC = 7200
 
 
 @dataclass(frozen=True)
