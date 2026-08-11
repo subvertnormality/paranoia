@@ -52,4 +52,5 @@
   post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,
   active-class state, engine settings, plan context, and cache schema all match exactly; execution
   failure, timeout, cancellation, and failed retry delete older cache, persist as generic staged
-  failure, and are never reusable.
+  failure, and are never reusable. Only terminal consolidation validation uses validation debt;
+  lane and follow-up validation are generic staged failures.

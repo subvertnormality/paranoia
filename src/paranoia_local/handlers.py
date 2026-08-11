@@ -106,6 +106,8 @@ def _staged_call(
     attempts = [_attempt(role, engine, review, sequence=sequence)]
     if review.error:
         error = rc.CensusError(f"{role} failed (exit {review.returncode})")
+        error.stage_role = role  # type: ignore[attr-defined]
+        error.failure_kind = "execution"  # type: ignore[attr-defined]
         error.attempts = attempts  # type: ignore[attr-defined]
         raise error
     try:
@@ -116,6 +118,7 @@ def _staged_call(
             error = rc.CensusError(
                 f"{role} validation invalid and has no resumable session: {first}"
             )
+            error.stage_role = role  # type: ignore[attr-defined]
             error.failure_kind = "validation"  # type: ignore[attr-defined]
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
@@ -134,12 +137,15 @@ def _staged_call(
         ))
         if retry.error:
             error = rc.CensusError(f"{role} validation retry failed (exit {retry.returncode})")
+            error.stage_role = role  # type: ignore[attr-defined]
+            error.failure_kind = "execution"  # type: ignore[attr-defined]
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
         try:
             parsed = parser(retry.text)
         except rc.CensusError as second:
             attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
+            second.stage_role = role  # type: ignore[attr-defined]
             second.failure_kind = "validation"  # type: ignore[attr-defined]
             second.attempts = attempts  # type: ignore[attr-defined]
             raise
@@ -156,6 +162,13 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
     return cc.render_trailer(
         closure.lineage, register_status=status, include_verdict=False,
     )
+
+
+def _staged_error(message: str, *, role: str, kind: str) -> rc.CensusError:
+    error = rc.CensusError(message)
+    error.stage_role = role  # type: ignore[attr-defined]
+    error.failure_kind = kind  # type: ignore[attr-defined]
+    return error
 
 
 def _census_cache_binding(
@@ -214,8 +227,12 @@ def _cached_census_manifests(
 
 def _cacheable_consolidation_error(error: rc.CensusError) -> bool:
     attempts = getattr(error, "attempts", [])
-    return bool(attempts) and all(
-        attempt.outcome == "validation-invalid" for attempt in attempts
+    return (
+        getattr(error, "stage_role", None) == "consolidation"
+        and getattr(error, "failure_kind", None) == "validation"
+        and bool(attempts) and all(
+            attempt.outcome == "validation-invalid" for attempt in attempts
+        )
     )
 
 
@@ -230,7 +247,10 @@ def _settle_staged_failure(
     state.pop("staged_failure", None)
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
-    if getattr(error, "failure_kind", None) == "validation":
+    if (
+        getattr(error, "stage_role", None) == "consolidation"
+        and getattr(error, "failure_kind", None) == "validation"
+    ):
         state["validation_debt"] = str(error)
     else:
         state["staged_failure"] = str(error)
@@ -466,7 +486,10 @@ def _staged_structural_review(
             )
             prompt = prompts.compose(instructions, lane_body)
             if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
-                raise rc.CensusError(f"staged lane prompt is {len(prompt)} characters")
+                raise _staged_error(
+                    f"staged lane prompt is {len(prompt)} characters",
+                    role=f"census-{lane}", kind="validation",
+                )
             result, parsed, lane_attempts = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CENSUS_LANE_TIMEOUT_SEC,
@@ -534,7 +557,10 @@ def _staged_structural_review(
         try:
             prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
             if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
-                raise rc.CensusError(f"consolidation prompt is {len(prompt)} characters")
+                raise _staged_error(
+                    f"consolidation prompt is {len(prompt)} characters",
+                    role="consolidation", kind="validation",
+                )
             review, settlement, call_attempts = _staged_call(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
@@ -577,7 +603,10 @@ def _staged_structural_review(
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.staged_followup_instructions(mode), stage_body)
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
-            raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
+            raise _staged_error(
+                f"{role} prompt is {len(prompt)} characters",
+                role=role, kind="validation",
+            )
         review, settlement, call_attempts = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=STAGED_FOLLOWUP_TIMEOUT_SEC, on_progress=on_progress,

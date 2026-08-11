@@ -62,6 +62,8 @@ def test_census_cache_requires_every_exact_binding():
 def test_only_terminal_validation_rejection_can_cache_completed_lanes():
     def error(*outcomes):
         value = rc.CensusError("rejected")
+        value.stage_role = "consolidation"  # type: ignore[attr-defined]
+        value.failure_kind = "validation"  # type: ignore[attr-defined]
         value.attempts = [  # type: ignore[attr-defined]
             rc.Attempt("consolidation", "codex", "s", outcome, None, None)
             for outcome in outcomes
@@ -76,6 +78,9 @@ def test_only_terminal_validation_rejection_can_cache_completed_lanes():
     assert not handlers._cacheable_consolidation_error(error(
         "validation-invalid", "failed",
     ))
+    lane_error = error("validation-invalid")
+    lane_error.stage_role = "census-domain"  # type: ignore[attr-defined]
+    assert not handlers._cacheable_consolidation_error(lane_error)
     assert not handlers._cacheable_consolidation_error(rc.CensusError("oversized"))
 
 
@@ -722,6 +727,7 @@ def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
             ),
         )
     assert "format invalid" not in str(caught.value)
+    assert caught.value.stage_role == "consolidation"
     assert caught.value.failure_kind == "validation"
     assert [row.outcome for row in caught.value.attempts] == ["validation-invalid"]
 
@@ -1062,6 +1068,7 @@ def test_staged_validation_failure_without_cache_renders_validation_debt(tmp_pat
     )
     closure.prepare()
     error = rc.CensusError("lane schema rejected")
+    error.stage_role = "consolidation"  # type: ignore[attr-defined]
     error.failure_kind = "validation"  # type: ignore[attr-defined]
     review, trailer, attempts = handlers._settle_staged_failure(
         closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
@@ -1071,6 +1078,23 @@ def test_staged_validation_failure_without_cache_renders_validation_debt(tmp_pat
     assert closure.lineage.review_state["validation_debt"] == "lane schema rejected"
     assert "staged_failure" not in closure.lineage.review_state
     assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in trailer
+
+
+def test_lane_validation_failure_remains_generic_staged_failure(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "lane-validation-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = handlers._staged_error(
+        "lane prompt exceeds ceiling", role="census-domain", kind="validation",
+    )
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == "lane prompt exceeds ceiling"
+    assert "validation_debt" not in closure.lineage.review_state
+    assert "CONVERGENCE: BLOCKED — staged execution did not settle." in trailer
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
