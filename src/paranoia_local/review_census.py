@@ -351,6 +351,20 @@ def parse_settlement(
         raise CensusError(
             "every existing-class finding needs one matching violated assessment"
         )
+    for source, targets in governing_by_source.items():
+        if len(targets) == 1:
+            continue
+        for target in targets:
+            cid = finding_class.get(target)
+            if (
+                not isinstance(cid, str)
+                or existing_bindings.get(cid) != target
+                or (assessment_verdicts or {}).get(cid) != "violated"
+                or (assessment_findings or {}).get(cid) != source
+            ):
+                raise CensusError(
+                    "source fan-out requires distinct violated existing-class findings"
+                )
     operation_by_class: dict[str, str] = {}
     for record in obj["class_records"]:
         cid = record.get("class_id") if isinstance(record, dict) else None

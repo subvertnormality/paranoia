@@ -205,7 +205,9 @@ row; a `finding` row names its finding IDs and non-finding rows cannot hide one.
 receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
 If one atomic lane finding violates several active classes, census consolidation may map that source
 finding to one distinct governing finding per class. The source observation is not artificially
-split; duplicate source-to-governing pairs and omitted sources still reject the settlement.
+split: every target of a repeated source must be an existing-class finding backed by its own
+violated assessment citing that source. One-off or new-class targets, duplicate source-to-governing
+pairs, and omitted sources still reject the settlement.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state

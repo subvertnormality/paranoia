@@ -253,7 +253,7 @@ def test_census_rejects_an_extra_existing_class_finding_without_an_assessment():
         )
 
 
-def test_census_source_finding_can_fan_out_to_two_violated_classes():
+def test_census_source_finding_can_fan_out_only_to_violated_classes():
     source = "integrity:F1"
     classes = ["class-a", "class-b"]
     value = payload(settlement())
@@ -298,6 +298,26 @@ def test_census_source_finding_can_fan_out_to_two_violated_classes():
         rc.parse_settlement(
             wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
             assessment_ids=classes,
+        )
+
+    value["source_dispositions"].pop()
+    value["class_dispositions"][1] = {
+        "finding_id":"G2", "kind":"one_off", "reason":"unique site",
+    }
+    value["assessment_dispositions"][1]["governing_id"] = None
+    verdicts = {classes[0]:"violated", classes[1]:"satisfied"}
+    cited_findings = {classes[0]:source, classes[1]:None}
+    with pytest.raises(
+        rc.CensusError,
+        match="source fan-out requires distinct violated existing-class findings",
+    ):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
+            source_severities={source:"MAJOR"}, assessment_ids=classes,
+            assessment_verdicts=verdicts,
+            assessment_findings=cited_findings,
+            class_states={cid:(cc.OPEN, False, "MAJOR") for cid in classes},
+            class_mechanized=None, role="census",
         )
 
 

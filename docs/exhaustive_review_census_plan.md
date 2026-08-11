@@ -131,7 +131,9 @@ dispositions, extra existing-class findings, and unbound new records reject the 
 settlement. Every source finding of every severity is mapped at least once and every integrity
 assessment exactly once. A single atomic source finding may fan out to distinct governing findings
 when it is an occurrence of multiple active classes; each source-to-governing pair remains unique,
-and each resulting existing-class governing finding retains its one matching violated assessment.
+and every target of that repeated source is an existing-class governing finding with its own
+matching violated assessment citing the same source. Repetition cannot manufacture one-off or new
+class debt from a single observation.
 The governing severity
 cannot be lower than any merged source; every blocking governing finding and every governing
 finding referenced by a violated class assessment maps to exactly one open concrete-debt record,

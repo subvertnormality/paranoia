@@ -39,6 +39,8 @@ prompt mismatch.
 One atomic lane finding may violate several active classes. Preserve that observation and allow
 its source disposition to fan out to one distinct governing finding per affected class; do not
 force the reviewer to split or paraphrase the source finding merely to satisfy settlement shape.
+Every target of a repeated source must be an existing-class finding backed by its own distinct
+violated assessment citing that source; repetition must not manufacture one-off or new-class debt.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
