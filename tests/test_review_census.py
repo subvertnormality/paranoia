@@ -120,6 +120,14 @@ def test_settlement_accepts_only_the_observed_decorative_marker_variant():
         )
 
 
+def test_lane_accepts_only_the_observed_decorative_marker_variant():
+    short = rc.LANE_MARKER.removesuffix(" ===")
+    text = lane().replace(rc.LANE_MARKER, short, 1)
+    assert rc.parse_lane(text, lane="domain")["lane"] == "domain"
+    with pytest.raises(rc.CensusError, match="begin with exactly one"):
+        rc.parse_lane("prose\n" + text, lane="domain")
+
+
 def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
     value = payload(settlement())
     value["findings"][0]["severity"] = "MINOR"

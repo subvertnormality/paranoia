@@ -95,6 +95,13 @@ def class_context(blocks: Iterable[str]) -> str:
 
 
 def parse_lane(text: str, *, lane: str, class_ids: Sequence[str] = ()) -> dict[str, Any]:
+    # The same decorative-only omission observed on settlement markers also
+    # occurs on lane markers. Accept that exact first-line spelling so all
+    # three expensive census lanes are not predictably repeated.
+    stripped = text.strip()
+    short_marker = LANE_MARKER.removesuffix(" ===")
+    if stripped.startswith(short_marker + "\n"):
+        text = LANE_MARKER + stripped[len(short_marker):]
     obj = _object(text, LANE_MARKER, MAX_LANE_CHARS)
     if obj.get("lane") != lane:
         raise CensusError(f"lane must be {lane!r}")
