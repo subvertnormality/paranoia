@@ -1,7 +1,7 @@
 # Staged census for tracked plan review
 
-Status: the plan lifecycle is accepted and activated. The branch lifecycle remains a design under
-separate validation and is not activated by this change.
+Status: the plan and branch lifecycles are activated. The plan replay proved a material efficiency
+win; branch replay proved stronger controlled coverage but not a comparable efficiency win.
 
 ## 1. Outcome and proportionate stakes
 
@@ -10,9 +10,8 @@ coverage, correct one consolidated finding set, and converge through targeted cl
 full regression. They should stop using every correction round as another novelty-maximising review
 of unchanged material.
 
-The same architecture may later serve `critique_branch`, but only after a representative strict
-same-start comparison proves both material review quality and convergence efficiency. Until then,
-tracked branch review retains its established broad, cold single-review/class-register path.
+The same architecture serves tracked `critique_branch` without the external-claim phase. It uses a
+broad cold census, targeted correction, and a mandatory broad cold final regression.
 
 Operating model: one trusted operator and OS; first-party repositories; plan/repository bytes and
 model replies are untrusted data. There is no hostile same-user race, compromised OS or provider,
@@ -92,10 +91,12 @@ mechanised classes, with its invariant, severity, state, and procedure or patter
 assess each as `satisfied|violated` with a resolved anchor. Each `violated` assessment must
 name a source finding. Settlement maps every assessment ID exactly once: `violated` requires open
 concrete debt through the same governing finding as that cited lane finding and, when the class was
-closed, either `REOPEN` or one atomic `REPLACE` that retires
+closed, either `REOPEN` for an unmechanised class or one atomic `REPLACE` that retires
 the predecessor and creates an open successor with the corrected invariant, severity and procedure.
 `REPLACE` is the staged representation of existing supersession semantics; it never emits a second
-transition against the predecessor. A satisfied open unmechanised class requires `CLOSED`; a
+transition against the predecessor. Its successor may use either supported mechanism independently
+of the predecessor, and any governing debt binding moves atomically to the live successor before
+phase calculation. A satisfied open unmechanised class requires `CLOSED`; a
 mechanised class remains governed by its snapshot predicate. No transition is needed for an already
 closed satisfied class. Omission, contradiction, or two operations against one class
 rejects the whole settlement. This makes recurrence mechanically blocking before a blocker-free
@@ -193,8 +194,9 @@ Extend the existing atomically replaced lineage JSON; do not add a state store. 
 
 - frozen stakes text/digest;
 - `census|correction|final|clear` phase;
-- last census/final snapshot digest;
-- concrete review debt: ID, severity, summary, evidence, source IDs, status and round metadata.
+- last census/final artifact digest; for branches this covers the complete packet, including both
+  resolved endpoints and material packet-defining inputs, rather than the head commit alone;
+- concrete review debt: ID, severity, summary, evidence, source/class IDs, status and round metadata.
 
 Concrete debt carries exact census findings until correction. The existing class register continues
 to carry reusable invariants; claim state continues to carry external evidence. Clearance requires
@@ -206,6 +208,9 @@ final with blockers → correction; final clear → clear. `clear` plus a change
 census. Artifact changes during correction remain correction because edits are expected there.
 
 A legacy lineage without `review_state` has unknown calibration and starts a new inventory+census.
+Any durable legacy register failure is included verbatim in that cold re-audit and is cleared only
+by its successfully settled census. A reopened blocking class without bound staged debt likewise
+forces the broad integrity census instead of entering an empty targeted correction.
 Plan claim verification still runs before structural review. Valid claim-evidence progress may
 persist when structural work later fails or lacks deadline; structural phase does not advance until
 a valid structural settlement. Audit logs record phase, stakes/snapshot digests, validated
@@ -224,6 +229,8 @@ sequence immediately before each provider run/resume boundary and are serialized
   atomically; this is not encoded as `REOPEN` plus another transition.
 - Add census, correction and final instruction blocks in `prompts.py`; retain the existing review
   sections, claim packets and class-register semantics.
+- Branch staged roles retain the resolved code-review web-search capability; plan structural roles
+  remain web-disabled because their external claims use the separate captured-evidence pipeline.
 - Add one shared handler runner for three parallel calls plus consolidation and for the targeted
   correction/final calls.
 - Thread the same small attempt-ledger collector through plan discovery, capture binding,
@@ -295,7 +302,7 @@ Plan activation gates:
    reviewed snapshot and make that statement self-referentially stale;
 8. only then open a PR, pass CI, merge, and update the primary `main` worktree.
 
-Branch activation has a separate gate: a strict same-start representative replay must be materially
-better than the established path in quality, rounds, provider calls, processed input, and
-uncached-input-plus-output. The first comparison improved quality but used 14 calls versus 10 and
-more tokens, so branch staging is deliberately deferred.
+Branch activation rests on stronger controlled coverage rather than an all-metrics efficiency
+claim. The first comparison improved quality but used 14 calls versus 10 and more tokens; a later
+representative replay likewise found additional material defects without proving a comparable cost
+win. Branch staging therefore must not be described as guaranteed to use fewer calls or tokens.

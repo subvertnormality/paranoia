@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 
 import pytest
 
@@ -140,7 +142,7 @@ def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
     )
     assert parsed["debt"][0] == {
         "id":"D1", "finding_id":"C1", "status":"open", "severity":"MAJOR",
-        "summary":"broken", "evidence":["a.py:1"],
+        "summary":"broken", "evidence":["a.py:1"], "remedy":"fix it",
     }
 
     fatal = payload(settlement())
@@ -158,6 +160,64 @@ def test_correction_cannot_clear_without_updating_every_existing_debt():
     with pytest.raises(rc.CensusError, match="every existing debt"):
         rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
                             known_debt=["D1"], role="correction")
+
+
+def test_open_debt_update_requires_and_renders_an_actionable_reason():
+    value = payload(settlement())
+    value.update(
+        role="correction", source_dispositions=[], assessment_dispositions=[],
+        findings=[], debt=[],
+        debt_updates=[{"id":"D1", "status":"open", "evidence":["a.py:2"]}],
+    )
+    with pytest.raises(rc.CensusError, match="debt update fields"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+            known_debt=["D1"], role="correction",
+        )
+    value["debt_updates"][0]["reason"] = "the stale-head path still bypasses validation"
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+        known_debt=["D1"], role="correction",
+    )
+    state = {
+        "phase":"correction", "debt":[{
+            "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
+            "summary":"validate the selected head", "evidence":["a.py:1"],
+            "remedy":"reject a stale head", "source_ids":[],
+        }],
+    }
+    updated = rc.settle_state(
+        state, parsed, phase="correction", snapshot="p", round_no=2,
+    )
+    rendered = rc.render_review(parsed, updated)
+    what_doesnt_work = rendered.split("## What doesn't work\n\n", 1)[1].split("\n\n## Risks", 1)[0]
+    assert what_doesnt_work != "Nothing notable."
+    assert "stale-head path still bypasses validation" in rendered
+    assert "validate the selected head" in rendered
+
+    advisory = finding("A1", "MINOR")
+    advisory["summary"] = "current advisory finding"
+    rendered = rc.render_review(
+        {"findings":[advisory]},
+        {"debt":updated["debt"]},
+    )
+    assert "current advisory finding" in rendered
+    assert "validate the selected head" in rendered
+    rendered = rc.render_review({"findings":[]}, {"debt":[], "unbound_classes":[{
+        "class_id":"abc", "severity":"MAJOR", "summary":"exact live owner",
+        "reason":"OPEN: unmechanized review required", "evidence":[],
+        "remedy":"Re-audit this class in the broad integrity census.",
+    }]})
+    assert "exact live owner" in rendered
+    assert "unmechanized review required" in rendered
+    rendered = rc.render_review({"findings":[]}, {"debt":[
+        {"id":"D1", "finding_id":"F1", "status":"open", "severity":"MAJOR",
+         "summary":"first durable debt", "evidence":[], "remedy":"fix first"},
+        {"id":"D2", "finding_id":"F1", "status":"open", "severity":"MAJOR",
+         "summary":"second durable debt", "evidence":[], "remedy":"fix second"},
+    ]})
+    assert "first durable debt" in rendered
+    assert "second durable debt" in rendered
 
 
 def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
@@ -221,6 +281,67 @@ def test_replace_carries_corrected_severity_in_one_transition():
     assert lineage.classes[minted[0]].status == cc.OPEN
 
 
+def test_branch_records_allow_procedure_classes_and_reject_mechanized_reopen():
+    created = rc.register_from_records([{
+        "op":"new", "invariant":"new semantic invariant", "severity":"MAJOR",
+        "procedure":"inspect every generated record",
+    }], mechanized=None)
+    assert created.new_classes[0].procedure == "inspect every generated record"
+    assert created.new_classes[0].pattern is None
+
+    register = rc.register_from_records([{
+        "op":"replace", "class_id":"old", "invariant":"semantic invariant",
+        "severity":"MAJOR", "procedure":"inspect every transition",
+    }], mechanized=None)
+    lineage = cc.Lineage("branch", classes={
+        "old": cc.TrackedClass(
+            "old", "legacy semantic invariant", "MAJOR", 1, cc.CLOSED,
+            procedure="inspect one transition",
+        ),
+    }, next_seq=2, mode=cc.BRANCH_MODE)
+    minted = cc.apply_register(lineage, register, round_no=2)
+    assert lineage.classes[minted[0]].procedure == "inspect every transition"
+
+    to_procedure = rc.register_from_records([{
+        "op":"replace", "class_id":"regex", "invariant":"semantic successor",
+        "severity":"MAJOR", "procedure":"inspect semantics",
+    }], mechanized=None)
+    conversion = cc.Lineage("conversion", classes={
+        "regex":cc.TrackedClass(
+            "regex", "regex predecessor", "MAJOR", 1, cc.CLOSED,
+            pattern="BAD", pathspec="*.py",
+        ),
+    }, next_seq=2, mode=cc.BRANCH_MODE)
+    successor = cc.apply_register(conversion, to_procedure, round_no=2)[0]
+    assert conversion.classes[successor].procedure == "inspect semantics"
+
+    to_pattern = rc.register_from_records([{
+        "op":"replace", "class_id":"semantic", "invariant":"regex successor",
+        "severity":"MAJOR", "pattern":"BAD", "pathspec":"*.py",
+    }], mechanized=None)
+    conversion = cc.Lineage("conversion-2", classes={
+        "semantic":cc.TrackedClass(
+            "semantic", "semantic predecessor", "MAJOR", 1, cc.CLOSED,
+            procedure="inspect semantics",
+        ),
+    }, next_seq=2, mode=cc.BRANCH_MODE)
+    successor = cc.apply_register(conversion, to_pattern, round_no=2)[0]
+    assert conversion.classes[successor].pattern == "BAD"
+
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
+        class_records=[{"op":"reopen", "class_id":"abc"}],
+    )
+    with pytest.raises(rc.CensusError, match="mechanized class must replace"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"violated"},
+            class_states={"abc": (cc.CLOSED, True, "MAJOR")},
+        )
+
+
 def test_correction_requires_a_final_before_clearance():
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     first = rc.parse_settlement(settlement(), source_ids=["domain-1"], assessment_ids=[])
@@ -254,6 +375,11 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
         {"evidence":["repository/a.py:2"]}, root=tmp_path,
         trusted_roots={"repository":tmp_path},
     )
+    with pytest.raises(rc.CensusError, match="requires repository/ prefix"):
+        rc.resolve_anchors(
+            {"evidence":["a.py:2"]}, root=tmp_path,
+            trusted_roots={"repository":tmp_path},
+        )
     with pytest.raises(rc.CensusError, match="out-of-range"):
         rc.resolve_anchors({"evidence":["a.py:3"]}, root=tmp_path)
     with pytest.raises(rc.CensusError, match="unresolvable plan"):
@@ -861,14 +987,36 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
 
 
-def test_branch_codex_keeps_the_single_broad_review_path(
+def test_branch_codex_runs_the_staged_census_path(
     repo_with_branch, tmp_path, monkeypatch,
 ):
     calls = []
+    web_flags = []
 
     def run(self, prompt, *args, **kwargs):
         calls.append(prompt)
-        text = "## What works\nNothing notable.\n\n=== CLASS REGISTER ===\nNONE"
+        web_flags.append(args[3])
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["repository/README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+        else:
+            debt_updates = []
+            if '"id": "legacy-register"' in prompt:
+                debt_updates = [{
+                    "id":"legacy-register", "status":"closed",
+                    "evidence":["repository/README.md:1"],
+                }]
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"census", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":debt_updates, "class_records":[],
+            })
         return Review(text=text, session_ref="branch-session", raw=text)
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
@@ -876,13 +1024,167 @@ def test_branch_codex_keeps_the_single_broad_review_path(
         "repo_path": str(repo_with_branch),
         "base_ref": "main",
         "head_ref": "feature",
-        "lineage": "single-broad-branch",
+        "lineage": "staged-branch",
         "round": 1,
         "stakes": "trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B1")
 
-    assert len(calls) == 1
-    assert prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] not in calls[0]
-    assert "CLASS-CLOSURE: 0 open, 0 closed" in result
+    assert len(calls) == 4
+    assert web_flags == [True] * 4
+    assert sum(prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in call for call in calls) == 3
+    assert all("Follow the blast radius" in call for call in calls[:3])
+    assert "STRUCTURAL-PHASE: clear" in result
     audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
-    assert audit["staged_manifests"] is None
+    assert len(audit["staged_manifests"]) == 3
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "staged-branch", stamp="B2", mode=cc.BRANCH_MODE,
+    )
+    assert len(lineage.review_state["snapshot_digest"]) == 64
+    assert lineage.review_state["snapshot_digest"] != audit["head_id"]
+    assert audit["base_id"] not in lineage.review_state["snapshot_digest"]
+
+    lineage.debt = {"round":0, "reason":"legacy register was malformed"}
+    cc.save_lineage(cc.default_state_root(), lineage)
+    calls.clear(); web_flags.clear()
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"staged-branch", "round":2, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B2")
+    assert len(calls) == 4
+    assert "CONVERGENCE: NOT-BLOCKED" in result
+    migrated = cc.load_lineage(
+        cc.default_state_root(), "staged-branch", stamp="B3", mode=cc.BRANCH_MODE,
+    )
+    assert migrated.debt is None
+    assert not [d for d in migrated.review_state["debt"] if d["status"] == "open"]
+
+    subprocess.run(
+        ["git", "checkout", "-q", "-b", "moved-base", "main"],
+        cwd=repo_with_branch, check=True,
+        env={**os.environ, "GIT_CONFIG_GLOBAL":"/dev/null", "GIT_CONFIG_SYSTEM":"/dev/null"},
+    )
+    (repo_with_branch / "base-only.txt").write_text("changed base endpoint\n")
+    subprocess.run(["git", "add", "base-only.txt"], cwd=repo_with_branch, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.com",
+         "-c", "commit.gpgsign=false", "commit", "-qm", "move base"],
+        cwd=repo_with_branch, check=True,
+        env={**os.environ, "GIT_CONFIG_GLOBAL":"/dev/null", "GIT_CONFIG_SYSTEM":"/dev/null"},
+    )
+    calls.clear(); web_flags.clear()
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"moved-base", "head_ref":"feature",
+        "lineage":"staged-branch", "round":3, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B3")
+    assert len(calls) == 4
+    assert "CONVERGENCE: NOT-BLOCKED" in result
+
+
+def test_branch_settlement_persists_a_new_procedure_class(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    def run(self, prompt, *args, **kwargs):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["repository/README.md:1"]
+        else:
+            value = {
+                "role":"census", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[], "class_records":[{
+                    "op":"new", "invariant":"semantic transition ownership",
+                    "severity":"MAJOR", "procedure":"inspect every transition owner",
+                }],
+            }
+        text = wire(
+            rc.LANE_MARKER if "lane" in value else rc.SETTLEMENT_MARKER, value,
+        )
+        return Review(text=text, session_ref="branch-session", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"procedure-branch", "round":1, "stakes":"trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "P1")
+    assert "CONVERGENCE: BLOCKED" in result
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "procedure-branch", stamp="P2", mode=cc.BRANCH_MODE,
+    )
+    classes = lineage.active()
+    assert len(classes) == 1
+    assert classes[0].procedure == "inspect every transition owner"
+    assert not classes[0].mechanized
+
+
+def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_path):
+    (tmp_path / "a.py").write_text("broken\n")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "final"
+    lineage = cc.Lineage("replace-binding", classes={
+        "abc":cc.TrackedClass(
+            "abc", "old invariant", "MAJOR", 1, cc.CLOSED,
+            procedure="inspect old behavior",
+        ),
+    }, next_seq=2, mode=cc.BRANCH_MODE, review_state=state)
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            findings = [finding("G1", "MAJOR")]
+            coverage = payload(lane(findings=findings))["coverage"]
+            findings[0]["evidence"] = ["repository/a.py:1"]
+            for row in coverage:
+                row["evidence"] = ["repository/a.py:1"]
+            value = {
+                "role":"final", "source_dispositions":[],
+                "assessment_dispositions":[{"assessment_id":"abc", "governing_id":"G1"}],
+                "findings":findings,
+                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
+                "debt_updates":[], "class_records":[{
+                    "op":"replace", "class_id":"abc", "invariant":"new invariant",
+                    "severity":"MAJOR", "procedure":"inspect new behavior",
+                }],
+                "coverage":coverage,
+                "class_assessments":[{
+                    "class_id":"abc", "verdict":"violated",
+                    "evidence":["repository/a.py:1"],
+                    "finding_id":"G1",
+                }],
+            }
+            text = wire(rc.SETTLEMENT_MARKER, value)
+            return Review(text=text, session_ref="s", raw=text)
+
+    closure = Closure()
+    _, trailer, _ = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high", mode=cc.BRANCH_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None,
+    )
+    successor = lineage.classes["abc"].superseded_by
+    assert successor
+    assert lineage.review_state["debt"][0]["class_ids"] == [successor]
+    assert lineage.review_state["phase"] == "correction"
+    assert "STRUCTURAL-PHASE: correction" in trailer

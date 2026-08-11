@@ -1,8 +1,8 @@
 # Plan staged-census acceptance evidence
 
 This record freezes the real-provider acceptance evidence for activating the staged structural
-review lifecycle in tracked plan review. The branch lifecycle remains disabled: it is being
-validated separately and is not implied by this evidence.
+review lifecycle in tracked plan review and records the separate, qualified evidence used to
+activate the same lifecycle for tracked branch review.
 
 The replay used Codex at high reasoning with live web search disabled. Its frozen stakes assumed
 one trusted operator and OS and first-party repositories. Correct domain behaviour, provenance,
@@ -36,7 +36,7 @@ alter the default-on external-claim pipeline. Plan claim acceptance and real cap
 tests cover that pipeline separately; when enabled, staged structural lanes consume the retained
 claim register and evidence packets.
 
-## Branch status: deferred
+## Branch status: activated with qualified evidence
 
 The strict same-start branch comparison did converge and found additional material defects, but it
 did not pass the all-metrics efficiency gate: eight rounds plus one rebuttal, 14 provider calls,
@@ -44,9 +44,28 @@ did not pass the all-metrics efficiency gate: eight rounds plus one rebuttal, 14
 lineage's 10 rounds/calls, 27,907,358 processed input tokens, and approximately 1,901,974
 uncached-input-plus-output tokens. Stronger quality does not justify claiming an efficiency win.
 
-Consequently this change activates staged census only for tracked plans. Tracked branch review
-continues to use the established broad, cold single-review/class-register path until a separate
-implementation proves both review quality and representative convergence efficiency.
+The first comparison established stronger review quality but did not establish an all-metrics
+efficiency win. Branch activation therefore must not be described as guaranteed to use fewer calls
+or tokens.
+
+A second representative replay against the debt-reconciliation branch clarified that tradeoff.
+The staged lifecycle reached round 9 without convergence, using 18 provider calls, 62,127,846
+processed input tokens and 219,059 output tokens. Its mandatory cold finals correctly found three
+material roots that the initial census and intervening targeted corrections had missed: loss of a
+discharged supersede, stale acceptance-ledger governance, and a regenerated transition whose live
+predecessor identity and owner were not checked exactly. This is strong fail-closed review
+behaviour, but not evidence that branch convergence is cheaper: deep code defects remained
+path-dependent, and each newly corrected root required another cold final. The historical lineage
+contains 13 identifiable broad reviews, but different executor/model behaviour and correction
+choices make that round count directional rather than a controlled performance comparison.
+
+The replay nevertheless supports activation on intrinsic review merits: the cold final prevented a
+false clear, correction rounds were scoped to durable debt and changed code, and the implementation
+reuses the existing plan lifecycle rather than adding another subsystem. The reusable settlement
+improvement also requires any open update to state the concrete remaining condition and renders the
+complete durable open-debt set rather than incorrectly saying that nothing is notable. The product
+claim is stronger controlled coverage and targeted correction—not guaranteed first-pass
+exhaustiveness or guaranteed lower cost.
 
 ## Acceptance conclusion
 
