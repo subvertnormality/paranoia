@@ -37,6 +37,29 @@ class TestFactory:
         assert "fable" in engines.get_engine("claude").default_model
 
 
+def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:
+    review = engines.CodexEngine().parse_output(
+        '{"type":"thread.started","thread_id":"recovered"}\n'
+        '{"type":"error","message":"transient stream failure"}\n'
+        '{"type":"item.completed","item":{"type":"agent_message",'
+        '"text":"settled"}}\n'
+        '{"type":"turn.completed","usage":{"input_tokens":10}}\n'
+    )
+
+    assert review.error is False
+    assert review.text == "settled"
+
+
+def test_codex_terminal_error_remains_a_failure() -> None:
+    review = engines.CodexEngine().parse_output(
+        '{"type":"thread.started","thread_id":"failed"}\n'
+        '{"type":"item.completed","item":{"type":"agent_message",'
+        '"text":"partial"}}\n'
+        '{"type":"turn.failed","error":{"message":"terminal"}}\n'
+    )
+
+    assert review.error is True
+
 class TestCodexArgv:
     def test_build_argv_read_only_and_model_and_effort(self) -> None:
         e = engines.get_engine("codex")
