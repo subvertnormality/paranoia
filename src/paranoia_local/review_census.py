@@ -162,6 +162,14 @@ def parse_settlement(
     class_mechanized: bool | None = None,
     known_debt: Sequence[str] = (), role: str = "census",
 ) -> dict[str, Any]:
+    # Codex reliably emits the uniquely framed settlement object but sometimes
+    # drops only the marker's decorative trailing equals signs.  Normalizing
+    # that exact first-line variant avoids an otherwise identical second model
+    # turn; prose prefixes, duplicate markers, and malformed JSON still fail.
+    stripped = text.strip()
+    short_marker = SETTLEMENT_MARKER.removesuffix(" ===")
+    if stripped.startswith(short_marker + "\n"):
+        text = SETTLEMENT_MARKER + stripped[len(short_marker):]
     obj = _object(text, SETTLEMENT_MARKER, MAX_CONSOLIDATION_PROMPT_CHARS)
     if obj.get("role") != role:
         raise CensusError(f"settlement role must be {role!r}")

@@ -108,6 +108,18 @@ def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
         rc.parse_settlement(settlement(debt=[]), source_ids=["domain-1"], assessment_ids=[])
 
 
+def test_settlement_accepts_only_the_observed_decorative_marker_variant():
+    short = rc.SETTLEMENT_MARKER.removesuffix(" ===")
+    text = settlement().replace(rc.SETTLEMENT_MARKER, short, 1)
+    assert rc.parse_settlement(
+        text, source_ids=["domain-1"], assessment_ids=[],
+    )["role"] == "census"
+    with pytest.raises(rc.CensusError, match="begin with exactly one"):
+        rc.parse_settlement(
+            "prose\n" + text, source_ids=["domain-1"], assessment_ids=[],
+        )
+
+
 def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
     value = payload(settlement())
     value["findings"][0]["severity"] = "MINOR"
