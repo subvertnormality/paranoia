@@ -230,6 +230,10 @@ def test_final_requires_complete_checklist_and_class_verdict():
 def test_evidence_anchors_resolve_against_snapshot(tmp_path):
     (tmp_path / "a.py").write_text("one\ntwo\n")
     rc.resolve_anchors({"evidence":["a.py:2"]}, root=tmp_path)
+    rc.resolve_anchors(
+        {"evidence":["repository/a.py:2"]}, root=tmp_path,
+        trusted_roots={"repository":tmp_path},
+    )
     with pytest.raises(rc.CensusError, match="out-of-range"):
         rc.resolve_anchors({"evidence":["a.py:3"]}, root=tmp_path)
     with pytest.raises(rc.CensusError, match="unresolvable plan"):

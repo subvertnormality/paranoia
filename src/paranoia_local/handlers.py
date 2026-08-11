@@ -268,6 +268,8 @@ def _staged_structural_review(
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
             trusted_roots = {"repository": repository_alias.resolve(strict=True)}
+        elif mode == cc.BRANCH_MODE:
+            trusted_roots = {"repository": cwd.resolve(strict=True)}
         rc.resolve_anchors(
             parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
         )
@@ -291,6 +293,8 @@ def _staged_structural_review(
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
             trusted_roots = {"repository": repository_alias.resolve(strict=True)}
+        elif mode == cc.BRANCH_MODE:
+            trusted_roots = {"repository": cwd.resolve(strict=True)}
         rc.resolve_anchors(
             parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
         )
