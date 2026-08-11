@@ -1,14 +1,18 @@
-# Staged census for tracked plan and branch review
+# Staged census for tracked plan review
 
-Status: revision 13, approved for implementation by the operator after an architecture checkpoint
-and blinded prototypes.
+Status: the plan lifecycle is accepted and activated. The branch lifecycle remains a design under
+separate validation and is not activated by this change.
 
 ## 1. Outcome and proportionate stakes
 
-Tracked `critique_plan` and `critique_branch` reviews should front-load independent structural
+Tracked `critique_plan` reviews should front-load independent structural
 coverage, correct one consolidated finding set, and converge through targeted closure plus one cold
 full regression. They should stop using every correction round as another novelty-maximising review
 of unchanged material.
+
+The same architecture may later serve `critique_branch`, but only after a representative strict
+same-start comparison proves both material review quality and convergence efficiency. Until then,
+tracked branch review retains its established broad, cold single-review/class-register path.
 
 Operating model: one trusted operator and OS; first-party repositories; plan/repository bytes and
 model replies are untrusted data. There is no hostile same-user race, compromised OS or provider,
@@ -270,24 +274,27 @@ assessment, exact severity/debt retention, resolved anchors, atomic `REPLACE`, a
 the unchanged injected-engine/one-shot contracts. Real acceptance below supplies the provider and
 maximum-real-input coverage that fake-backed tests cannot establish.
 
-Pre-PR real gates:
+Plan activation gates:
 
 1. full local suite;
-2. simulated plan and branch census → correction → final, including failures and audit fields;
+2. simulated plan census → correction → final, including failures and audit fields;
 3. real Codex plan review convergence under section 1 stakes;
-4. real Codex implementation review convergence under the same stakes;
+4. real Codex implementation review convergence under the established branch-review path;
 5. blinded replay of the recoverable 16-round plan fixture above through the implemented path,
    with frozen historical-class oracle, provider-call count and monotonic elapsed time;
-6. equivalent blinded replay for a recoverable changing-branch lineage that historically reached
-   round 10–19, testing its first implementation and historically converged snapshots;
-7. each new census must recover every applicable historical FATAL/MAJOR root class without an
+6. each new plan census must recover every applicable historical FATAL/MAJOR root class without an
    unresolved new FATAL/MAJOR false positive. Targeted correction must close repaired roots and
    retain any material defect still present in the historical bytes; old convergence is comparison
    evidence, not authority to force a new false clearance. The implementation's own convergence
    run must use the staged correction/final lifecycle, and measured wall time/call cost must be
    reported rather than waived;
-8. acceptance records with fixture/digest/oracle/result metadata committed under `docs/`. The
+7. acceptance records with fixture/digest/oracle/result metadata committed under `docs/`. The
    completed final review's invocation metadata remains in its immutable audit log and PR/handoff
    report: committing a statement that the current commit passed a later review would change the
    reviewed snapshot and make that statement self-referentially stale;
-9. only then open a PR, pass CI, merge, and update the primary `main` worktree.
+8. only then open a PR, pass CI, merge, and update the primary `main` worktree.
+
+Branch activation has a separate gate: a strict same-start representative replay must be materially
+better than the established path in quality, rounds, provider calls, processed input, and
+uncached-input-plus-output. The first comparison improved quality but used 14 calls versus 10 and
+more tokens, so branch staging is deliberately deferred.

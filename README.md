@@ -133,12 +133,13 @@ round 1 ──► review ──► fix ──► round 2 ──► review ──
              └── already_raised ────────────┴── already_raised ────► CONVERGENCE: NOT-BLOCKED
 ```
 
-Tracked reviews use a staged lifecycle. A new or materially changed artifact starts with three
+Tracked plan reviews use a staged lifecycle. A new or materially changed plan starts with three
 independent cold lanes and one consolidation call. Their complete finding census becomes durable
 debt. Later correction rounds target that debt and correction effects; once it closes, one fresh
 whole-artifact final regression is mandatory. A clear initial census may converge immediately.
 This preserves broad first-pass/final coverage without paying for novelty hunting over unchanged
-material on every correction round.
+material on every correction round. Tracked branch reviews retain the established broad, cold
+single-review path while the branch census is validated separately.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
@@ -147,10 +148,10 @@ provider, parsing, deadline, or oversized-state failures block visibly rather th
 
 ### `round` — lineage ordering
 
-The 1-based round number. **Increment it every round.** In tracked staged review, census and final
+The 1-based round number. **Increment it every round.** In tracked staged plan review, census and final
 remain complete at every in-scope severity while correction is limited to durable debt and repair
-effects; convergence comes from that phase boundary, not a late-round sampling floor. The legacy
-single-review path retains its round-3 severity floor.
+effects; convergence comes from that phase boundary. Branch and other legacy single-review paths
+retain their broad review and round-3 severity floor.
 
 `round` is required on `critique_branch` and `critique_plan` unless you pass
 `class_closure: false`.
@@ -191,7 +192,7 @@ the claim and its citation, never the previous reviewer's prose.
 invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
-Tracked Codex/Claude reviews return strict staged JSON, and the server applies their class records
+Tracked staged plan reviews return strict staged JSON, and the server applies their class records
 atomically with concrete finding debt. Every lane finding must be named by at least one checklist
 row; a `finding` row names its finding IDs and non-finding rows cannot hide one. The integrity lane
 receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
@@ -477,7 +478,7 @@ Returns a [five-section critique](#review-output) plus a
 | `round` | integer | **required** unless `class_closure: false` | 1-based round number; must be an integer ≥ 1 |
 | `include_uncommitted` | boolean | `false` | Review the dirty working tree vs HEAD instead of a committed range. Runs in the live repo, not a worktree |
 | `isolate` | boolean | `true` | Review inside a throwaway worktree of `head_ref`. Ignored for uncommitted reviews |
-| `converge` | boolean | `true` | Pre-gather a bounded deterministic diff/file packet, materialize an immutable snapshot, and use the tracked census → correction → final lifecycle. Always materializes, overriding `isolate` |
+| `converge` | boolean | `true` | Pre-gather a bounded deterministic diff/file packet and materialize an immutable snapshot for tracked broad review. Always materializes, overriding `isolate` |
 | `max_packet_chars` | integer | `400000` | Character budget for that packet. `already_raised` is always preserved; only file evidence is trimmed |
 | `class_closure` | boolean | `true` | Track defect classes across rounds. `false` is the one-shot mode |
 | `lineage` | string | derived | Explicit class-closure key. Required when the reviewed ref is not a branch |
@@ -673,8 +674,8 @@ Accepted by the four review tools:
 
 ### Review output
 
-Every review returns exactly five headings, in this order. Legacy reviews populate their natural
-categories; tracked staged reviews put governing findings in `What doesn't work`, bounded remedies
+Every review returns exactly five headings, in this order. Legacy and tracked branch reviews populate
+their natural categories; tracked staged plan reviews put governing findings in `What doesn't work`, bounded remedies
 in `Improvements`, and write `Nothing notable.` in categories the settlement does not represent.
 
 | Section | Contains |
@@ -701,7 +702,7 @@ The footer carries the `session_ref` for [`rebut`](#rebut).
 
 ### Tracked convergence trailer
 
-Appended below the review whenever class closure ran:
+Appended below a staged tracked plan review:
 
 ```
 STRUCTURAL-PHASE: correction
@@ -718,8 +719,8 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 | `STRUCTURAL-ERROR` / `STRUCTURAL-PENDING` | A bounded format/deadline path did not produce a settled review |
 | `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
 
-The legacy one-shot/injected-engine trailer retains `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and
-unmechanized-class detail.
+Tracked branch, one-shot, and injected-engine trailers retain `CLASS-REGISTER`, `CLASS-CLOSURE`,
+match, and unmechanized-class detail.
 
 `NOT-BLOCKED` asserts only that the computed structural-debt, class, and (for verified plans)
 external-claim gates are clear. It is a review result, not a proof that the change is correct.
@@ -846,7 +847,7 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 ### Rate limits
 
-Reviews draw on your subscription's agentic-usage pool. A tracked cold census is three concurrent
+Reviews draw on your subscription's agentic-usage pool. A tracked plan cold census is three concurrent
 reviewer calls plus consolidation; correction and final are one call each, with at most one bounded
 same-session format correction per call. Use `query` for quick checks.
 

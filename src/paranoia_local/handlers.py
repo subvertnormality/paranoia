@@ -784,20 +784,6 @@ def _converge_branch_review(
                 review, trailer, attempt_ledger = _state_unavailable_review(
                     closure, mode=cc.BRANCH_MODE,
                 )
-            elif closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
-                try:
-                    review, trailer, attempt_ledger = _staged_structural_review(
-                        engine=engine.for_role(eng.ROLE_REPOSITORY), cwd=wt, model=model,
-                        effort=effort, mode=cc.BRANCH_MODE,
-                        body=f"=== REVIEW STAKES ===\n{stakes}\n\n{packet}",
-                        closure=closure, stakes=stakes, snapshot=head_id,
-                        round_no=review_round or 1, on_progress=on_progress,
-                    )
-                except rc.CensusError as error:
-                    review, trailer, attempt_ledger = _settle_staged_failure(
-                        closure, stakes=stakes, snapshot=head_id, error=error,
-                        mode=cc.BRANCH_MODE,
-                    )
             else:
                 review = engine.run(prompt, wt, model, effort, web_search,
                                     **_progress_kwargs(on_progress))

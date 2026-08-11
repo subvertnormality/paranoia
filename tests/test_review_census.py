@@ -814,196 +814,28 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
 
 
-def test_branch_handler_runs_the_four_call_cold_census(repo_with_branch, tmp_path, monkeypatch):
+def test_branch_codex_keeps_the_single_broad_review_path(
+    repo_with_branch, tmp_path, monkeypatch,
+):
     calls = []
-    cc.save_lineage(
-        cc.default_state_root(),
-        cc.Lineage(
-            "four-call-branch", mode=cc.BRANCH_MODE, next_seq=2,
-            classes={
-                "abc": cc.TrackedClass(
-                    "abc", "needle must remain absent", "MAJOR", 1, cc.CLOSED,
-                    pattern="needle", pathspec="README.md",
-                ),
-            },
-        ),
-    )
 
     def run(self, prompt, *args, **kwargs):
         calls.append(prompt)
-        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
-            lane_name = next(
-                row.split()[-1] for row in prompt.splitlines()
-                if row.startswith("ROLE: census lane")
-            )
-            assessments = ([{
-                "class_id":"abc", "verdict":"satisfied",
-                "evidence":["README.md:1"], "finding_id":None,
-            }] if lane_name == "integrity" else [])
-            value = payload(lane(lane_name, assessments=assessments))
-            for row in value["coverage"]:
-                row["evidence"] = ["README.md:1"]
-            text = wire(rc.LANE_MARKER, value)
-        else:
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[{"assessment_id":"abc","governing_id":None}],
-                "findings":[], "debt":[],
-                "debt_updates":[], "class_records":[],
-            })
-        return Review(text=text, session_ref=f"b{len(calls)}", raw=text)
+        text = "## What works\nNothing notable.\n\n=== CLASS REGISTER ===\nNONE"
+        return Review(text=text, session_ref="branch-session", raw=text)
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
     result = handlers.critique_branch({
-        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
-        "lineage":"four-call-branch", "round":1, "stakes":"trusted local tool",
+        "repo_path": str(repo_with_branch),
+        "base_ref": "main",
+        "head_ref": "feature",
+        "lineage": "single-broad-branch",
+        "round": 1,
+        "stakes": "trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B1")
-    assert len(calls) == 4
-    integrity_prompt = next(
-        prompt for prompt in calls if "ROLE: census lane integrity" in prompt
-    )
-    assert '"invariant": "needle must remain absent"' in integrity_prompt
-    assert '"pattern": "needle"' in integrity_prompt
-    assert '"pathspec": "README.md"' in integrity_prompt
-    assert "STRUCTURAL-PHASE: clear" in result
+
+    assert len(calls) == 1
+    assert prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] not in calls[0]
+    assert "CLASS-CLOSURE: 0 open, 0 closed" in result
     audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
-    assert len(audit["staged_manifests"]) == 3
-
-
-def test_failed_consolidation_audit_retains_lane_and_retry_attempts(
-    repo_with_branch, tmp_path, monkeypatch,
-):
-    calls = []
-
-    def run(self, prompt, *args, **kwargs):
-        calls.append(("run", prompt))
-        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
-            lane_name = next(
-                row.split()[-1] for row in prompt.splitlines()
-                if row.startswith("ROLE: census lane")
-            )
-            value = payload(lane(lane_name))
-            for row in value["coverage"]:
-                row["evidence"] = ["README.md:1"]
-            text = wire(rc.LANE_MARKER, value)
-            return Review(text=text, session_ref=lane_name, raw=text)
-        return Review(text="malformed", session_ref="consolidation", raw="malformed")
-
-    def resume(self, session_ref, prompt, *args, **kwargs):
-        calls.append(("resume", prompt))
-        assert session_ref == "consolidation"
-        return Review(text="still malformed", session_ref=session_ref, raw="still malformed")
-
-    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
-    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
-    result = handlers.critique_branch({
-        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
-        "lineage":"failed-consolidation", "round":1, "stakes":"trusted local tool",
-    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "BF")
-    assert "CONVERGENCE: BLOCKED" in result
-    assert_five_headings(result)
-    assert len(calls) == 5
-    audit = json.loads(next((tmp_path / "logs").glob("BF-critique_branch-*.json")).read_text())
-    assert len(audit["staged_manifests"]) == 3
-    rows = audit["attempt_ledger"]
-    invoked_lanes = [
-        next(
-            line.split()[-1] for line in prompt.splitlines()
-            if line.startswith("ROLE: census lane")
-        )
-        for kind, prompt in calls[:3] if kind == "run"
-    ]
-    assert [row["role"] for row in rows[:3]] == [
-        f"census-{lane_name}" for lane_name in invoked_lanes
-    ]
-    assert {row["role"] for row in rows[:3]} == {
-        "census-behaviour", "census-execution", "census-integrity",
-    }
-    assert [row["role"] for row in rows[3:]] == [
-        "consolidation", "consolidation-format-retry",
-    ]
-    assert [row["outcome"] for row in rows] == [
-        "completed", "completed", "completed", "format-invalid", "format-invalid",
-    ]
-    assert [row["sequence"] for row in rows] == [1, 2, 3, 4, 5]
-
-
-def test_branch_handler_runs_census_correction_and_cold_final(
-    repo_with_branch, tmp_path, monkeypatch,
-):
-    calls = []
-
-    def run(self, prompt, *args, **kwargs):
-        calls.append(prompt)
-        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
-            lane_name = next(
-                row.split()[-1] for row in prompt.splitlines()
-                if row.startswith("ROLE: census lane")
-            )
-            findings = ([finding("F1", "MAJOR")] if lane_name == "behaviour" else [])
-            value = payload(lane(lane_name, findings=findings))
-            for row in value["coverage"]:
-                row["evidence"] = ["README.md:1"]
-            for item in value["findings"]:
-                item["evidence"] = ["README.md:1"]
-            text = wire(rc.LANE_MARKER, value)
-        elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"census",
-                "source_dispositions":[{"source_id":"behaviour:F1","governing_id":"G1"}],
-                "assessment_dispositions":[],
-                "findings":[{
-                    "id":"G1", "severity":"MAJOR", "summary":"repair it",
-                    "evidence":["README.md:1"], "remedy":"edit it",
-                }],
-                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[], "class_records":[],
-            })
-        elif '"role": "correction"' in prompt:
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"correction", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[{"id":"D1","status":"closed","evidence":["README.md:1"]}],
-                "class_records":[],
-            })
-        else:
-            assert '"role": "final"' in prompt
-            coverage = payload(lane())["coverage"]
-            for row in coverage:
-                row["evidence"] = ["README.md:1"]
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"final", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_records":[],
-                "coverage":coverage, "class_assessments":[],
-            })
-        return Review(text=text, session_ref=f"branch-{len(calls)}", raw=text)
-
-    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
-    args = {
-        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
-        "lineage":"three-phase-branch", "stakes":"trusted local tool",
-    }
-    first = handlers.critique_branch(
-        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda:"BC1",
-    )
-    second = handlers.critique_branch(
-        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda:"BC2",
-    )
-    third = handlers.critique_branch(
-        {**args, "round":3}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda:"BC3",
-    )
-    assert "STRUCTURAL-PHASE: correction" in first
-    assert "STRUCTURAL-PHASE: final" in second
-    assert "STRUCTURAL-PHASE: clear" in third
-    assert "CONVERGENCE: NOT-BLOCKED" in third
-    assert len(calls) == 6
-    assert [row["role"] for row in json.loads(
-        next((tmp_path / "logs").glob("BC2-critique_branch-*.json")).read_text()
-    )["attempt_ledger"]] == ["correction"]
-    assert [row["role"] for row in json.loads(
-        next((tmp_path / "logs").glob("BC3-critique_branch-*.json")).read_text()
-    )["attempt_ledger"]] == ["final"]
+    assert audit["staged_manifests"] is None
