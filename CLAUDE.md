@@ -12,6 +12,8 @@
   targeting intervening correction rounds to open debt and correction effects;
 - prioritize accurate, fast, workable behavior and a small architecture over out-of-scope
   hardening;
+- keep operational timeouts generous enough for normal thorough reviews; control runaway cost
+  with bounded calls, batches, packet sizes, and phases rather than truncating valid model work;
 - keep plan claim verification on by default with reviewer-native search used only for URL
   discovery, server-controlled HTTP(S) capture and Trafilatura extraction, same-session binding
   with browsing disabled, a cold authority/entailment attestation, no Claude `WebFetch`,

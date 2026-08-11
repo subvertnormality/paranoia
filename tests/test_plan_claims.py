@@ -1523,7 +1523,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     )
 
     assert observed["deadline"] is not None
-    assert observed["structural_timeout"] in {900, 600}
+    assert observed["structural_timeout"] in {1800, 1200}
     assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
     assert "CLAIM-AUDIT-DEBT" in result
 

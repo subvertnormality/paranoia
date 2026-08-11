@@ -944,9 +944,9 @@ not arbitration, and Parallax's rule is unambiguous — *"never run the driver's
 vendor twice."*
 
 **Time budget.** The client's tool timeout bounds the *whole* arbitration, not
-each subprocess, so `DEFAULT_TIMEOUT_SEC = 3600` per call is not a budget.
-Per-phase timeouts (cleaner and attester 300s each, ×2 for the retry; deciders
-900s per round) put the worst serial path at 3000s, under 3600. `engines.Engine.run`
+each subprocess, so `DEFAULT_TIMEOUT_SEC = 7200` per call is not a budget.
+Per-phase timeouts (cleaner and attester 420s each, ×2 for the retry; deciders
+1,800s per round) put the worst serial path below 7,200s. `engines.Engine.run`
 already accepts `timeout` and `runner.run_capture` enforces it. Progress is also
 not the reassurance revision 1 assumed — notifications require a client progress
 token (`server.py:269`) and the Claude engine emits one JSON blob at completion
@@ -1022,18 +1022,18 @@ verdict, verbatim record"** — not "no interpretation".
 
 | Step | Agent runs | Cap |
 |---|---|---|
-| Clean | 1 | `text_only`, 300s |
-| Attest | 1 | `text_only`, `effort: low`, 300s |
-| Clean + attest retry, if it fires | 2 | 300s each |
-| Round 1 (parallel) | 2 | snapshot worktree, `effort: medium`, 900s |
-| Round 2, gated (parallel) | 2 | 900s |
+| Clean | 1 | `text_only`, 420s |
+| Attest | 1 | `text_only`, `effort: low`, 420s |
+| Clean + attest retry, if it fires | 2 | 420s each |
+| Round 1 (parallel) | 2 | snapshot worktree, `effort: medium`, 1,800s |
+| Round 2, gated (parallel) | 2 | 1,800s |
 | **Typical** | **4** | |
 | **Worst case** | **8** | retry *and* gated-through divergence |
 
 Only decider runs are expensive. Wall clock is
 `clean + attest + max(decider) [+ max(decider)]` — rounds fan out in parallel, new
 for this repo, whose handlers are all a single `engine.run`. Realistically 5–18
-minutes; worst serial path 3000s. `clean: false` drops to 2 or 4 runs;
+minutes; the 7,200-second whole-call deadline remains the hard stop. `clean: false` drops to 2 or 4 runs;
 `REFRAME_REQUIRED` and the §2.11 gate both terminate early. The README's
 rate-limit section needs a line: one arbitration is up to eight agent turns across
 two subscriptions.
@@ -1232,8 +1232,8 @@ whose second hop escapes is also rejected.
 *Audit.* The log alone reconstructs both prompts, both replies, and the carried
 evidence without needing the snapshot commit to still exist;
 `retain_snapshot: true` creates the ref and the default creates none; `read_citation_lines` works from both a primary checkout and a
-linked worktree (this repo is used from a linked worktree); per-phase timeouts sum
-under 3600s; a `logs.write_log` failure yields `AUDIT: FAILED …` and still returns
+linked worktree (this repo is used from a linked worktree); per-phase timeouts fit
+under 7,200s; a `logs.write_log` failure yields `AUDIT: FAILED …` and still returns
 the verdict; preflight fails when either binary is absent and spends nothing; a
 single decider failure names its engine. Integration against the existing fake
 CLIs on `PATH`: both engines invoked once per round, in parallel; no worktree

@@ -373,13 +373,13 @@ the first-round preferences, expand cost, and make the evidence corpus outcome-d
 or inadequate external packets instead produce unsubstantiated votes and an honest unresolved
 result; the caller may improve the framing and start a new arbitration.
 
-Cleaner and attester calls use 210-second caps. Discovery calls use 120-second caps and binding
-calls use 180-second caps; each may have one same-session correction at the same cap. Server
-capture has a 120-second phase cap. The explicit worst path is therefore: cleaner initial/retry
-420 seconds, attester initial/retry 420, discovery initial/correction 240, capture 120, binding
-initial/correction 360, decision round one 900, and decision round two 900 = 3,360 seconds.
+Cleaner and attester calls use 420-second caps. Discovery calls use 240-second caps and binding
+calls use 360-second caps; each may have one same-session correction at the same cap. Server
+capture has a 240-second phase cap. The explicit worst path is therefore: cleaner initial/retry
+840 seconds, attester initial/retry 840, discovery initial/correction 480, capture 240, binding
+initial/correction 720, decision round one 1,800, and decision round two 1,800 = 6,720 seconds.
 Parallel vendors count once per group. This
-leaves 240 seconds of the existing 3,600-second whole-call ceiling for validation, git
+leaves 480 seconds of the 7,200-second whole-call ceiling for validation, git
 materialization, logging, and teardown. The handler tracks one monotonic whole-run deadline and
 will not start a phase whose cap plus reserved teardown margin cannot fit; that produces a visible
 bounded failure rather than a client timeout.
@@ -387,7 +387,7 @@ bounded failure rather than a client timeout.
 A parser-rejected decider reply receives one complete correction attempt against the same inert
 snapshot and shared research packet. The completed sibling vote and all cleaning and research work
 are retained. If the correction is also rejected, those replies, the sibling, and the actual phase
-provenance remain in the failure audit. This correction is still subject to the 900-second phase cap
+provenance remain in the failure audit. This correction is still subject to the 1,800-second phase cap
 and whole-call deadline; it is not additional unbounded budget. Provider execution failures are not
 retried.
 

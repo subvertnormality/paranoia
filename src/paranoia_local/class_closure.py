@@ -49,7 +49,7 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
-PER_CLASS_TIMEOUT = 10     # seconds
+PER_CLASS_TIMEOUT = 20     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
 
 REGISTER_MARKER = "=== CLASS REGISTER ==="

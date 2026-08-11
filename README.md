@@ -73,8 +73,8 @@ every call fails:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 3600
-startup_timeout_sec = 30
+tool_timeout_sec = 7200
+startup_timeout_sec = 60
 ```
 
 Verify with `codex mcp get paranoia`.
@@ -386,14 +386,14 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase also has a 3,000-second monotonic deadline and nine model calls
+The complete evidence phase also has a 6,000-second monotonic deadline and nine model calls
 maximum. That fits discovery, five maximum-size binding batches, cold attestation, and one
-correction in both discovery and binding. The full verified plan call is bounded to 3,540 seconds.
-Evidence state is persisted first. A staged census starts only when its full 2,160-second
-lane/consolidation/retry reserve still fits; correction and final use a 1,560-second reserve. If the
+correction in both discovery and binding. The full verified plan call is bounded to 7,080 seconds.
+Evidence state is persisted first. A staged census starts only when its full 4,320-second
+lane/consolidation/retry reserve still fits; correction and final use a 3,120-second reserve. If the
 reserve no longer fits, the result is visibly pending and the next round reuses frozen supported
-claims instead of repeating research. Individual structural calls retain their 900/600/1,200 and
-300-second role limits. A legacy class-register correction has its own 300-second cap under the
+claims instead of repeating research. Individual structural calls use 1,800/1,200/2,400 and
+600-second role limits. A legacy class-register correction has its own 600-second cap under the
 same deadline.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
 harmless extra model metadata; required fields, unambiguous aliases, and transition validity
@@ -902,7 +902,7 @@ selects repository-only mode. A parser-rejected decider reply receives one
 complete correction attempt while the sibling result and completed cleaning/research
 work are retained. If correction still fails, the audit records both rejected replies,
 the completed sibling, and the actual phase provenance; execution failures are not
-retried. Every attempt remains subject to the phase cap and 3,600-second whole-call deadline.
+retried. Every attempt remains subject to the phase cap and 7,200-second whole-call deadline.
 
 ---
 
