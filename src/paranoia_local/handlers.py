@@ -145,7 +145,7 @@ def _staged_call(
             **_progress_kwargs(on_progress),
         )
         attempts.append(_attempt(
-            f"{role}-format-retry", engine, retry, sequence=retry_sequence,
+            f"{role}-validation-retry", engine, retry, sequence=retry_sequence,
         ))
         if retry.error:
             error = _engine_failure_error(
@@ -183,11 +183,23 @@ def _staged_error(message: str, *, role: str, kind: str) -> rc.CensusError:
     return error
 
 
+def _staged_lane_prompt(
+    *, mode: str, lane: str, active_classes: list[dict[str, Any]], body: str,
+) -> str:
+    instructions = prompts.staged_census_instructions(mode, lane)
+    lane_body = (
+        f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
+        "ACTIVE CLASSES: "
+        f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
+    )
+    return prompts.compose(instructions, lane_body)
+
+
 def _census_cache_binding(
     *, mode: str, snapshot: str, stakes: str, body: str,
     active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
     engine_name: str, model: str, effort: str, web_search: bool,
-    plan_lines: int | None,
+    plan_lines: int | None, lane_prompts: dict[str, str],
 ) -> dict[str, Any]:
     canonical_classes = json.dumps(
         sorted(active_classes, key=lambda row: row["class_id"]),
@@ -198,6 +210,7 @@ def _census_cache_binding(
         "active_classes":active_classes, "existing_debt":existing_debt,
         "engine":engine_name, "model":model, "effort":effort,
         "web_search":web_search, "plan_lines":plan_lines,
+        "lane_prompts":lane_prompts,
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {
         "version":rc.CENSUS_CACHE_VERSION,
@@ -480,6 +493,12 @@ def _staged_structural_review(
 
     if phase == "census":
         lanes = rc.LANES[mode]
+        lane_prompts = {
+            lane:_staged_lane_prompt(
+                mode=mode, lane=lane, active_classes=active_classes, body=body,
+            )
+            for lane in lanes
+        }
         existing_debt = [
             d for d in state.get("debt", []) if d.get("status") == "open"
         ]
@@ -488,16 +507,11 @@ def _staged_structural_review(
             active_classes=active_classes, existing_debt=existing_debt,
             engine_name=engine.name, model=model, effort=effort,
             web_search=web_search, plan_lines=plan_lines,
+            lane_prompts=lane_prompts,
         )
 
         def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
-            instructions = prompts.staged_census_instructions(mode, lane)
-            lane_body = (
-                f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
-                "ACTIVE CLASSES: "
-                f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
-            )
-            prompt = prompts.compose(instructions, lane_body)
+            prompt = lane_prompts[lane]
             if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
                 raise _staged_error(
                     f"staged lane prompt is {len(prompt)} characters",

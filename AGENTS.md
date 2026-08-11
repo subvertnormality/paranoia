@@ -46,11 +46,13 @@ do not discard a healthy census because the model omitted that redundant lifecyc
 After consolidation-only failure, reuse a complete validated lane census only under exact bindings
 to mode, structural snapshot, full review body/open debt, stakes, active-class state,
 engine/model/effort/web settings, plan context, and cache schema. Persist it only after terminal
-validation rejection. Incomplete or mismatched lanes, execution failure, timeout, cancellation, or
+validation rejection, and bind the exact composed lane prompt bytes so instruction changes
+invalidate reuse. Incomplete or mismatched lanes, execution failure, timeout, cancellation, or
 failed retry must delete any older cache and never suppress a fresh census. Persist those
 non-terminal-consolidation-validation exits as structured staged failure with exact role, kind,
 and message, not validation debt. Preserve timeout, unavailable executable, provider error, and
 other execution outcomes distinctly, including the validation-retry role.
+Attempt telemetry must use that same `*-validation-retry` role.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

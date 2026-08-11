@@ -147,7 +147,8 @@ If all three census lanes validate but consolidation is rejected, their manifest
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
 engine/model/effort/web capability settings, plan line context, and cache schema. It is recorded only
-after terminal validation rejection; execution failure, timeout, cancellation, or failed retry is
+after terminal validation rejection; the binding also digests the exact composed lane prompt bytes,
+including current instructions. Execution failure, timeout, cancellation, or failed retry is
 not reusable. Any binding change or incomplete lane set forces a fresh census.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
@@ -223,7 +224,7 @@ execution, retry, timeout, cancellation, deadline, and consolidation-preflight f
 structured `staged_failure` records with their exact role, kind, and message. They invalidate any
 older census cache and cannot authorize reuse. Engine outcomes retain `timeout`, `unavailable`,
 `provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
-retry has its own retry role.
+retry and its attempt-ledger event use the same `*-validation-retry` role.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state

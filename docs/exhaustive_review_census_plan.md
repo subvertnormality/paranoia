@@ -293,7 +293,8 @@ resumable structural-pending output. The autonomous caller repeats the same roun
 makes it cheaper. When all three lanes validated and only consolidation failed, the lineage retains
 those manifests and a retry runs consolidation only if mode, structural snapshot, full review body,
 open debt, stakes, active-class state, engine/model/effort/web settings, plan line context, and cache
-schema all match exactly. Persistence requires terminal validation rejection; incomplete lanes,
+schema all match exactly. The digest includes the exact composed prompt bytes for every lane, so an
+instruction-contract change invalidates reuse. Persistence requires terminal validation rejection; incomplete lanes,
 failed validation retry, execution failure, timeout, cancellation, or any binding change force a
 fresh immutable census. Parser and semantic settlement failures are logged as
 `validation-invalid`, not misclassified as format-only failures. Only terminal consolidation
@@ -301,7 +302,7 @@ validation populates `validation_debt`. Lane/follow-up validation and every exec
 first delete any older cache and persist as structured `staged_failure` with exact role, kind, and
 message; consolidation preflight validation does the same. Engine outcomes preserve timeout,
 unavailable executable, in-band provider error, and other execution failure distinctly, including
-the validation-retry role. They cannot authorize reuse.
+the same `*-validation-retry` role in failure state and attempt telemetry. They cannot authorize reuse.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

@@ -34,10 +34,11 @@ def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
 def test_census_cache_requires_every_exact_binding():
     lanes = rc.LANES[cc.PLAN_MODE]
     manifests = [payload(lane(name)) for name in lanes]
+    lane_prompts = {name:f"prompt-{name}" for name in lanes}
     binding = handlers._census_cache_binding(
         mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
         active_classes=[], existing_debt=[], engine_name="codex", model="model",
-        effort="high", web_search=False, plan_lines=3,
+        effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
     )
     state = {"census_cache":{**binding, "manifests":manifests}}
 
@@ -56,6 +57,16 @@ def test_census_cache_requires_every_exact_binding():
     incomplete = {"census_cache":{**binding, "manifests":manifests[:-1]}}
     assert handlers._cached_census_manifests(
         incomplete, binding=binding, lanes=lanes, validate=validate,
+    ) is None
+    changed_contract = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=[], existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3,
+        lane_prompts={**lane_prompts, lanes[0]:"updated instructions"},
+    )
+    assert changed_contract["input_digest"] != binding["input_digest"]
+    assert handlers._cached_census_manifests(
+        state, binding=changed_contract, lanes=lanes, validate=validate,
     ) is None
 
 
@@ -1055,7 +1066,7 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
         retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
     )
     assert [attempt.role for attempt in attempts] == [
-        "census-domain", "census-domain-format-retry",
+        "census-domain", "census-domain-validation-retry",
     ]
     assert [attempt.sequence for attempt in attempts] == [None, None]
     assert [attempt.outcome for attempt in attempts] == ["validation-invalid", "completed"]
