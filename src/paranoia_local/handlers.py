@@ -315,7 +315,7 @@ def _staged_structural_review(
         lanes = rc.LANES[mode]
 
         def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
-            instructions = prompts.STAGED_CENSUS_INSTRUCTIONS.replace("LANE", lane)
+            instructions = prompts.staged_census_instructions(mode, lane)
             lane_body = (
                 f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
                 "ACTIVE CLASSES: "
@@ -408,7 +408,7 @@ def _staged_structural_review(
             "checklist": list(rc.CHECKLIST) if role == "final" else [],
             "artifact": body,
         }, ensure_ascii=False)
-        prompt = prompts.compose(prompts.STAGED_FOLLOWUP_INSTRUCTIONS, stage_body)
+        prompt = prompts.compose(prompts.staged_followup_instructions(mode), stage_body)
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
             raise rc.CensusError(f"{role} prompt is {len(prompt)} characters")
         review, settlement, call_attempts = _staged_call(

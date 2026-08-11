@@ -284,12 +284,31 @@ def compose(instructions: str, body: str) -> str:
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
 
 
+PLAN_EVIDENCE_ANCHORS = """Cite the reviewed plan itself only as `plan:<line>`
+(never by its repository path); cite every other supplied file as `repository/<path>:<line>`
+(the literal `repository/` prefix is required)."""
+
+BRANCH_EVIDENCE_ANCHORS = """This is a branch review and there is no `plan:` evidence alias.
+Cite every supplied file as `repository/<path>:<line>` (the literal `repository/` prefix is
+required), including plans, contracts, and documentation stored in the repository."""
+
+
+def staged_census_instructions(mode: str, lane: str) -> str:
+    policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
+    return STAGED_CENSUS_INSTRUCTIONS.replace("ANCHOR_POLICY", policy).replace(
+        "LANE", lane,
+    )
+
+
+def staged_followup_instructions(mode: str) -> str:
+    policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
+    return STAGED_FOLLOWUP_INSTRUCTIONS.replace("ANCHOR_POLICY", policy)
+
+
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
 Read the complete supplied artifact and repository. Own every checklist item from your lane's
-perspective. Report all in-scope severities; do not defer issues to another lane. Cite the reviewed
-plan itself only as `plan:<line>` (never by its repository path); cite every other supplied file
-as `repository/<path>:<line>` (the literal `repository/` prefix is required). Every evidence
-anchor must resolve. Return only:
+perspective. Report all in-scope severities; do not defer issues to another lane. ANCHOR_POLICY
+Every evidence anchor must resolve. Return only:
 === REVIEW CENSUS JSON ===
 {"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"],"finding_ids":[]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
 Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
@@ -329,8 +348,7 @@ and one assessment disposition per class. The task's checklist array is governin
 final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
 "summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
 "class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
-A plan artifact must be cited only as `plan:<line>`, never by its repository path; every other
-supplied file uses `repository/<path>:<line>` (the literal `repository/` prefix is required).
+ANCHOR_POLICY
 Every anchor must resolve.
 A finding row names one or more findings, all other coverage rows name none, and every finding is
 named by coverage."""
