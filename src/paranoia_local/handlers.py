@@ -111,7 +111,7 @@ def _staged_call(
     try:
         return review, parser(review.text), attempts
     except rc.CensusError as first:
-        attempts[-1] = replace(attempts[-1], outcome="format-invalid")
+        attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
         if not review.session_ref:
             error = rc.CensusError(f"{role} format invalid and has no resumable session: {first}")
             error.attempts = attempts  # type: ignore[attr-defined]
@@ -136,7 +136,7 @@ def _staged_call(
         try:
             parsed = parser(retry.text)
         except rc.CensusError as second:
-            attempts[-1] = replace(attempts[-1], outcome="format-invalid")
+            attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
             second.attempts = attempts  # type: ignore[attr-defined]
             raise
         return retry, parsed, attempts
@@ -154,13 +154,63 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
     )
 
 
+def _census_cache_binding(
+    *, mode: str, snapshot: str, stakes: str, body: str,
+    active_classes: list[dict[str, Any]],
+) -> dict[str, Any]:
+    canonical_classes = json.dumps(
+        sorted(active_classes, key=lambda row: row["class_id"]),
+        ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return {
+        "version":rc.CENSUS_CACHE_VERSION,
+        "mode":mode,
+        "snapshot_digest":snapshot,
+        "stakes_digest":rc.digest(stakes),
+        "input_digest":rc.digest(body),
+        "active_classes_digest":rc.digest(canonical_classes),
+    }
+
+
+def _cached_census_manifests(
+    state: dict[str, Any], *, binding: dict[str, Any], lanes: tuple[str, ...],
+    validate: Callable[[str, str], dict[str, Any]],
+) -> list[dict[str, Any]] | None:
+    cache = state.get("census_cache")
+    if not isinstance(cache, dict) or any(cache.get(key) != value for key, value in binding.items()):
+        return None
+    raw = cache.get("manifests")
+    if not isinstance(raw, list) or len(raw) != len(lanes):
+        return None
+    by_lane = {
+        item.get("lane"): item for item in raw
+        if isinstance(item, dict) and isinstance(item.get("lane"), str)
+    }
+    if set(by_lane) != set(lanes):
+        return None
+    validated: list[dict[str, Any]] = []
+    try:
+        for lane in lanes:
+            validated.append(validate(
+                rc.LANE_MARKER + "\n" + json.dumps(by_lane[lane], ensure_ascii=False),
+                lane,
+            ))
+    except rc.CensusError:
+        return None
+    return validated
+
+
 def _settle_staged_failure(
     closure: "_ClosureRound", *, stakes: str, snapshot: str, error: rc.CensusError,
     mode: str,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     assert closure.lineage is not None
     state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
-    state["format_debt"] = str(error)
+    state["validation_debt"] = str(error)
+    state.pop("format_debt", None)
+    cache = getattr(error, "census_cache", None)
+    if isinstance(cache, dict):
+        state["census_cache"] = deepcopy(cache)
     closure.lineage.review_state = state
     try:
         cc.save_lineage(closure.state_root, closure.lineage)
@@ -373,6 +423,10 @@ def _staged_structural_review(
 
     if phase == "census":
         lanes = rc.LANES[mode]
+        cache_binding = _census_cache_binding(
+            mode=mode, snapshot=snapshot, stakes=stakes, body=body,
+            active_classes=active_classes,
+        )
 
         def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
             instructions = prompts.staged_census_instructions(mode, lane)
@@ -402,29 +456,37 @@ def _staged_structural_review(
                     assessment["finding_id"] = renamed[assessment["finding_id"]]
             return lane, result, parsed, lane_attempts
 
-        lane_rows = []
-        lane_errors: list[rc.CensusError] = []
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            pending = {pool.submit(run_lane, lane): lane for lane in lanes}
-            for future in as_completed(pending):
-                try:
-                    lane_rows.append(future.result())
-                except rc.CensusError as error:
-                    lane_errors.append(error)
-        lane_rows.sort(key=lambda row: lanes.index(row[0]))
-        if lane_errors:
-            all_attempts = [a for row in lane_rows for a in row[3]]
-            all_attempts.extend(
-                a for error in lane_errors for a in getattr(error, "attempts", [])
-            )
-            all_attempts.sort(key=lambda item: item.sequence or 0)
-            first_error = lane_errors[0]
-            first_error.attempts = all_attempts  # type: ignore[attr-defined]
-            first_error.manifests = [row[2] for row in lane_rows]  # type: ignore[attr-defined]
-            raise first_error
-        for _, _, _, lane_attempts in lane_rows:
-            attempts.extend(lane_attempts)
-        manifests = [row[2] for row in lane_rows]
+        manifests = _cached_census_manifests(
+            state, binding=cache_binding, lanes=lanes, validate=validate_lane,
+        )
+        if manifests is None:
+            lane_rows = []
+            lane_errors: list[rc.CensusError] = []
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                pending = {pool.submit(run_lane, lane): lane for lane in lanes}
+                for future in as_completed(pending):
+                    try:
+                        lane_rows.append(future.result())
+                    except rc.CensusError as error:
+                        lane_errors.append(error)
+            lane_rows.sort(key=lambda row: lanes.index(row[0]))
+            if lane_errors:
+                all_attempts = [a for row in lane_rows for a in row[3]]
+                all_attempts.extend(
+                    a for error in lane_errors for a in getattr(error, "attempts", [])
+                )
+                all_attempts.sort(key=lambda item: item.sequence or 0)
+                first_error = lane_errors[0]
+                first_error.attempts = all_attempts  # type: ignore[attr-defined]
+                first_error.manifests = [  # type: ignore[attr-defined]
+                    row[2] for row in lane_rows
+                ]
+                raise first_error
+            for _, _, _, lane_attempts in lane_rows:
+                attempts.extend(lane_attempts)
+            manifests = [row[2] for row in lane_rows]
+        elif on_progress is not None:
+            on_progress("reusing validated census lanes after settlement rejection")
         closure.staged_manifests = manifests
         source_ids = [f["id"] for m in manifests for f in m["findings"]]
         source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
@@ -469,6 +531,9 @@ def _staged_structural_review(
                 *attempts, *getattr(error, "attempts", []),
             ]
             error.manifests = manifests  # type: ignore[attr-defined]
+            error.census_cache = {  # type: ignore[attr-defined]
+                **cache_binding, "manifests":deepcopy(manifests),
+            }
             raise
         attempts.extend(call_attempts)
     else:
@@ -898,19 +963,20 @@ def _converge_branch_review(
                     closure, mode=cc.BRANCH_MODE,
                 )
             elif closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+                structural_snapshot = rc.digest(f"{base_id}\0{head_id}\0{packet}")
                 try:
                     review, trailer, attempt_ledger = _staged_structural_review(
                         engine=engine, cwd=wt, model=model,
                         effort=effort, mode=cc.BRANCH_MODE,
                         body=f"=== REVIEW STAKES ===\n{stakes}\n\n{packet}",
                         closure=closure, stakes=stakes,
-                        snapshot=rc.digest(f"{base_id}\0{head_id}\0{packet}"),
+                        snapshot=structural_snapshot,
                         round_no=review_round or 1, on_progress=on_progress,
                         web_search=web_search,
                     )
                 except rc.CensusError as error:
                     review, trailer, attempt_ledger = _settle_staged_failure(
-                        closure, stakes=stakes, snapshot=head_id, error=error,
+                        closure, stakes=stakes, snapshot=structural_snapshot, error=error,
                         mode=cc.BRANCH_MODE,
                     )
             else:

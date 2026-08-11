@@ -41,6 +41,11 @@ its source disposition to fan out to one distinct governing finding per affected
 force the reviewer to split or paraphrase the source finding merely to satisfy settlement shape.
 Every target of a repeated source must be an existing-class finding backed by its own distinct
 violated assessment citing that source; repetition must not manufacture one-off or new-class debt.
+Derive the deterministic close transition when an open, unmechanized class is assessed satisfied;
+do not discard a healthy census because the model omitted that redundant lifecycle record.
+After consolidation-only failure, reuse a complete validated lane census only under exact bindings
+to mode, structural snapshot, full review input, stakes, active-class state, and cache schema.
+Incomplete or mismatched cached lanes must never suppress a fresh census.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

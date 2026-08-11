@@ -143,6 +143,10 @@ three-lane census, targeted correction rounds over durable debt and changed code
 broad, cold final regression before clearance. Every staged branch role retains the established
 code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
 structured output contract changes. One-shot reviews retain the single broad review.
+If all three census lanes validate but consolidation is rejected, their manifests are persisted
+with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
+on mode, structural snapshot, complete review input, frozen stakes, active-class state, and cache
+schema; any change or incomplete lane set forces a fresh census.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
@@ -208,6 +212,10 @@ finding to one distinct governing finding per class. The source observation is n
 split: every target of a repeated source must be an existing-class finding backed by its own
 violated assessment citing that source. One-off or new-class targets, duplicate source-to-governing
 pairs, and omitted sources still reject the settlement.
+An open, unmechanized active class assessed `satisfied` closes deterministically. Consolidation may
+emit the explicit close record, and the server derives it when omitted; mechanized classes retain
+their separate mechanical closure rule. Rejections after parsing are recorded as
+`validation-invalid`, which covers both envelope/schema and semantic lifecycle failures.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state

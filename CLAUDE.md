@@ -48,3 +48,6 @@
   disposition fan out to one distinct governing finding per affected class; do not split the
   observation merely to satisfy the settlement schema. Require every repeated-source target to be
   an existing-class finding backed by its own distinct violated assessment citing that source.
+- derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
+  post-consolidation-failure census only when its snapshot, full input, stakes, mode, active-class
+  state, and cache schema all match exactly.

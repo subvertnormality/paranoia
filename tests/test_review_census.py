@@ -31,6 +31,33 @@ def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
     )
 
 
+def test_census_cache_requires_every_exact_binding():
+    lanes = rc.LANES[cc.PLAN_MODE]
+    manifests = [payload(lane(name)) for name in lanes]
+    binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=[],
+    )
+    state = {"census_cache":{**binding, "manifests":manifests}}
+
+    def validate(text, lane_name):
+        return rc.parse_lane(text, lane=lane_name)
+
+    assert handlers._cached_census_manifests(
+        state, binding=binding, lanes=lanes, validate=validate,
+    ) == manifests
+    for key in binding:
+        changed = dict(binding)
+        changed[key] = f"different-{binding[key]}"
+        assert handlers._cached_census_manifests(
+            state, binding=changed, lanes=lanes, validate=validate,
+        ) is None
+    incomplete = {"census_cache":{**binding, "manifests":manifests[:-1]}}
+    assert handlers._cached_census_manifests(
+        incomplete, binding=binding, lanes=lanes, validate=validate,
+    ) is None
+
+
 def assert_five_headings(text):
     assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
 
@@ -177,6 +204,34 @@ def test_existing_class_disposition_cannot_contradict_satisfied_or_closed_state(
             assessment_verdicts={"abc":"satisfied"},
             class_states={"abc":(cc.CLOSED, False, "MAJOR")},
         )
+
+
+def test_open_unmechanized_satisfied_class_gets_deterministic_close():
+    assert "currently open and unmechanized must also have" in (
+        prompts.STAGED_CONSOLIDATION_INSTRUCTIONS
+    )
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[], findings=[], debt=[], class_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
+        class_records=[],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+        assessment_verdicts={"abc":"satisfied"},
+        class_states={"abc":(cc.OPEN, False, "MAJOR")},
+    )
+    assert parsed["class_records"] == [{"op":"close", "class_id":"abc"}]
+    register = rc.register_from_records(parsed["class_records"], mechanized=False)
+    assert register.transitions[0].kind == "CLOSED"
+
+    with pytest.raises(rc.CensusError, match="mechanized open class cannot be model-closed"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"satisfied"},
+            class_states={"abc":(cc.OPEN, True, "MAJOR")},
+        )
+
 
 def test_correction_existing_class_binding_requires_a_matching_violated_assessment():
     value = payload(settlement())
@@ -652,7 +707,7 @@ def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
         ),
     )
     assert parsed["debt"][0]["id"] == "D1"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path):
@@ -686,7 +741,7 @@ def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path)
         ),
     )
     assert parsed["findings"][0]["remedy"] == "fix it"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_path):
@@ -716,7 +771,7 @@ def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_pa
         ),
     )
     assert parsed["class_dispositions"][0]["kind"] == "one_off"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
@@ -754,7 +809,7 @@ def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
         ),
     )
     assert parsed["debt"][0]["severity"] == "OUT-OF-SCOPE"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_violated_class_cannot_be_replaced_at_lower_severity():
@@ -891,7 +946,7 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
         "census-domain", "census-domain-format-retry",
     ]
     assert [attempt.sequence for attempt in attempts] == [None, None]
-    assert [attempt.outcome for attempt in attempts] == ["format-invalid", "completed"]
+    assert [attempt.outcome for attempt in attempts] == ["validation-invalid", "completed"]
     assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
 
 
@@ -1278,6 +1333,80 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     third_audit = json.loads(next((tmp_path / "logs").glob("T3-critique_plan-*.json")).read_text())
     assert [row["role"] for row in second_audit["attempt_ledger"]] == ["correction"]
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
+
+
+def test_branch_reuses_complete_census_after_settlement_rejection(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    calls: list[str] = []
+    accept_settlement = False
+
+    def invalid_settlement():
+        return wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+
+    def valid_settlement():
+        return wire(rc.SETTLEMENT_MARKER, {
+            "role":"census", "source_dispositions":[],
+            "assessment_dispositions":[], "findings":[], "debt":[],
+            "debt_updates":[], "class_dispositions":[], "class_records":[],
+        })
+
+    def run(self, prompt, *args, **kwargs):
+        nonlocal accept_settlement
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            calls.append(f"lane:{lane_name}")
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["repository/README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+        else:
+            calls.append("consolidation")
+            text = valid_settlement() if accept_settlement else invalid_settlement()
+        return Review(text=text, session_ref="cache-session", raw=text)
+
+    def resume(self, *args, **kwargs):
+        calls.append("consolidation-retry")
+        text = invalid_settlement()
+        return Review(text=text, session_ref="cache-session", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    args = {
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"cached-census-branch", "stakes":"trusted local tool",
+    }
+    first = handlers.critique_branch(
+        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "C1",
+    )
+    assert "STRUCTURAL-ERROR" in first
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "cached-census-branch", stamp="C2",
+        mode=cc.BRANCH_MODE,
+    )
+    assert len(lineage.review_state["census_cache"]["manifests"]) == 3
+    assert calls.count("consolidation") == 1
+    assert sum(call.startswith("lane:") for call in calls) == 3
+
+    accept_settlement = True
+    second = handlers.critique_branch(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "C2",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in second
+    assert calls.count("consolidation") == 2
+    assert sum(call.startswith("lane:") for call in calls) == 3
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "cached-census-branch", stamp="C3",
+        mode=cc.BRANCH_MODE,
+    )
+    assert "census_cache" not in lineage.review_state
+    audit = json.loads(next((tmp_path / "logs").glob("C2-critique_branch-*.json")).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]] == ["consolidation"]
 
 
 def test_branch_codex_runs_the_staged_census_path(
