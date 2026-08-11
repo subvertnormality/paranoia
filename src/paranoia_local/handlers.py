@@ -91,10 +91,11 @@ def _staged_call(
     retry_guidance: str,
     on_progress: Callable[[str], None] | None,
     next_sequence: Callable[[], int] | None = None,
+    web_search: bool = False,
 ) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
     """One staged call plus exactly one same-session schema correction."""
     sequence = next_sequence() if next_sequence else None
-    review = engine.run(prompt, cwd, model, effort, False, timeout=timeout,
+    review = engine.run(prompt, cwd, model, effort, web_search, timeout=timeout,
                         **_progress_kwargs(on_progress))
     attempts = [_attempt(role, engine, review, sequence=sequence)]
     if review.error:
@@ -115,7 +116,7 @@ def _staged_call(
             "Your staged JSON was rejected: " + str(first) +
             "\nFix every schema violation in the complete object, not only the first one. "
             + retry_guidance + " Return only the required marker and complete JSON object.",
-            cwd, model, effort, False, timeout=min(300, timeout),
+            cwd, model, effort, web_search, timeout=min(300, timeout),
             **_progress_kwargs(on_progress),
         )
         attempts.append(_attempt(
@@ -226,12 +227,31 @@ def _staged_structural_review(
     *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
     closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
     on_progress: Callable[[str], None] | None, plan_lines: int | None = None,
+    web_search: bool = False,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     """Run census/correction/final and atomically settle it into the open lineage."""
     assert closure.lineage is not None
     lineage = closure.lineage
     rc.class_context(closure._blocks())
     state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
+    if lineage.debt:
+        # A pre-staging malformed-register round is not silently normalized into an
+        # empty verified register. Its only autonomous recovery is a fresh cold census
+        # that sees the exact durable failure it supersedes.
+        state = rc.normalize_state(None, stakes=stakes, snapshot=snapshot)
+        state["debt"] = [{
+            "id":"legacy-register", "finding_id":"legacy-register",
+            "status":"open", "severity":cc.BLOCKER,
+            "summary":"A pre-staging review left unresolved class-register debt.",
+            "reason":str(lineage.debt.get("reason", "unresolved register failure")),
+            "remedy":"Use the cold census to explicitly retain or discharge this debt.",
+            "evidence":[], "source_ids":[], "class_ids":[],
+            "first_round":lineage.debt.get("round", 0),
+            "last_round":lineage.debt.get("round", 0),
+        }]
+        body += "\n\nLEGACY REGISTER DEBT REQUIRING COLD RE-AUDIT:\n" + json.dumps(
+            lineage.debt, ensure_ascii=False,
+        )
     phase = state["phase"]
     active_classes = [
         {
@@ -245,6 +265,25 @@ def _staged_structural_review(
     class_states = {
         c.class_id: (c.status, c.mechanized, c.severity) for c in lineage.active()
     }
+    debt_class_ids = {
+        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        for cid in debt.get("class_ids", [])
+    }
+    unbound_blocking = {
+        c.class_id for c in lineage.blocking() if c.class_id not in debt_class_ids
+    }
+    has_blocking_debt = any(
+        d.get("status") == "open" and d.get("severity") in rc.BLOCKING
+        for d in state.get("debt", [])
+    )
+    if phase == "census" and state.get("unbound_classes") and has_blocking_debt:
+        # State written by the earlier over-broad gate already has actionable debt;
+        # resume targeted correction rather than paying for a redundant census.
+        state["phase"] = phase = "correction"
+    if phase != "census" and unbound_blocking and not has_blocking_debt:
+        # A reopened or migrated class without governing staged debt needs the broad
+        # integrity lane, not an empty targeted correction that can never settle it.
+        state["phase"] = phase = "census"
     attempts: list[rc.Attempt] = []
     sequence_lock = Lock()
     sequence_value = 0
@@ -281,7 +320,8 @@ def _staged_structural_review(
             text, source_ids=source_ids, source_severities=source_severities,
             assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
             assessment_findings=assessment_findings,
-            class_states=class_states, class_mechanized=mode == cc.BRANCH_MODE,
+            class_states=class_states,
+            class_mechanized=None if mode == cc.BRANCH_MODE else False,
             known_debt=known_debt or (), role=role,
         )
         trusted_roots = None
@@ -299,7 +339,7 @@ def _staged_structural_review(
         _allocate_fresh_debt_ids(parsed["debt"], reserved_debt)
         try:
             register = rc.register_from_records(
-                parsed["class_records"], mechanized=mode == cc.BRANCH_MODE,
+                parsed["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
             )
             cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
         except cc.RegisterError as exc:
@@ -323,6 +363,7 @@ def _staged_structural_review(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=900, on_progress=on_progress,
                 retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
+                web_search=web_search,
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -371,6 +412,9 @@ def _staged_structural_review(
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
+            "existing_debt": [
+                d for d in state.get("debt", []) if d.get("status") == "open"
+            ],
         }, ensure_ascii=False)
         try:
             prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
@@ -380,12 +424,17 @@ def _staged_structural_review(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=600, on_progress=on_progress,
                 retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+                web_search=web_search,
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
                     assessment_ids=assessment_ids,
                     assessment_verdicts=assessment_verdicts,
-                    assessment_findings=assessment_findings, role="census",
+                    assessment_findings=assessment_findings,
+                    known_debt=[
+                        d["id"] for d in state.get("debt", []) if d.get("status") == "open"
+                    ],
+                    role="census",
                 ),
             )
         except rc.CensusError as error:
@@ -412,6 +461,7 @@ def _staged_structural_review(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=1200, on_progress=on_progress, next_sequence=next_sequence,
             retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            web_search=web_search,
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
                 assessment_ids=active_ids if role == "final" else [],
@@ -422,7 +472,7 @@ def _staged_structural_review(
 
     draft = cc.copy_lineage(lineage)
     register = rc.register_from_records(
-        settlement["class_records"], mechanized=mode == cc.BRANCH_MODE,
+        settlement["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
     )
     minted = cc.apply_register(draft, register, round_no=round_no)
     lineage.classes, lineage.next_seq, lineage.exemptions = (
@@ -431,11 +481,39 @@ def _staged_structural_review(
     if mode == cc.BRANCH_MODE:
         closure._sweep(only=minted)
     state = rc.settle_state(state, settlement, phase=phase, snapshot=snapshot, round_no=round_no)
+    replacements = {
+        cid: cls.superseded_by for cid, cls in lineage.classes.items()
+        if cls.status == cc.SUPERSEDED and cls.superseded_by
+    }
+    for debt in state.get("debt", []):
+        debt["class_ids"] = [replacements.get(cid, cid) for cid in debt.get("class_ids", [])]
     claim_blocked = (
         mode == cc.PLAN_MODE and closure.claims_enabled
         and pc.is_blocked(lineage.claim_state)
     )
-    if lineage.blocking() or claim_blocked:
+    mapped_classes = {
+        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        for cid in debt.get("class_ids", [])
+    }
+    unbound = [c for c in lineage.blocking() if c.class_id not in mapped_classes]
+    has_blocking_debt = any(
+        d.get("status") == "open" and d.get("severity") in rc.BLOCKING
+        for d in state.get("debt", [])
+    )
+    if unbound:
+        state["phase"] = "correction" if has_blocking_debt else "census"
+        state["unbound_classes"] = [{
+            "class_id":c.class_id, "severity":c.severity, "summary":c.invariant,
+            "reason":(
+                f"{c.status}: {len(c.matches)} surviving match(es)"
+                if c.mechanized else f"{c.status}: unmechanized review required"
+            ),
+            "evidence":[
+                f"repository/{m.path}:{m.line}" for m in c.matches
+            ],
+            "remedy":"Re-audit this class in the broad integrity census.",
+        } for c in unbound]
+    elif lineage.blocking() or claim_blocked:
         state["phase"] = "correction"
     lineage.review_state = state
     lineage.debt = None
@@ -460,7 +538,7 @@ def _staged_structural_review(
     closure._settled = True
     closure.register_status = f"staged {phase} parsed"
     closure.staged_settlement = settlement
-    review = replace(review, text=rc.render_review(settlement))
+    review = replace(review, text=rc.render_review(settlement, state))
     trailer = rc.trailer(state)
     if mode == cc.PLAN_MODE and closure.claims_enabled:
         trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
@@ -782,6 +860,22 @@ def _converge_branch_review(
                 review, trailer, attempt_ledger = _state_unavailable_review(
                     closure, mode=cc.BRANCH_MODE,
                 )
+            elif closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+                try:
+                    review, trailer, attempt_ledger = _staged_structural_review(
+                        engine=engine, cwd=wt, model=model,
+                        effort=effort, mode=cc.BRANCH_MODE,
+                        body=f"=== REVIEW STAKES ===\n{stakes}\n\n{packet}",
+                        closure=closure, stakes=stakes,
+                        snapshot=rc.digest(f"{base_id}\0{head_id}\0{packet}"),
+                        round_no=review_round or 1, on_progress=on_progress,
+                        web_search=web_search,
+                    )
+                except rc.CensusError as error:
+                    review, trailer, attempt_ledger = _settle_staged_failure(
+                        closure, stakes=stakes, snapshot=head_id, error=error,
+                        mode=cc.BRANCH_MODE,
+                    )
             else:
                 review = engine.run(prompt, wt, model, effort, web_search,
                                     **_progress_kwargs(on_progress))

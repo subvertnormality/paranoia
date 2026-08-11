@@ -84,6 +84,12 @@ The task input contains, under `=== FILE … ===` sections, the current contents
 # "read every touched file / re-run git" gather step is replaced by a verify-and-go-deeper
 # instruction. Used by the Phase-1 `converge` path (handlers.critique_branch).
 CODE_REVIEW_INSTRUCTIONS_PACKET = CODE_REVIEW_INSTRUCTIONS + "\n\n" + _PACKET_PREAMBLE
+# Staged roles replace only the legacy five-section output contract. They retain the
+# established investigation, calibration, proportionality and packet-use profile so
+# changing review lifecycle does not silently narrow what branch reviewers inspect.
+CODE_REVIEW_INVESTIGATION = CODE_REVIEW_INSTRUCTIONS.partition(
+    "\n## Output — EXACTLY"
+)[0] + "\n\n" + _PACKET_PREAMBLE
 
 PLAN_REVIEW_INSTRUCTIONS = f"""You are Paranoia, an adversarial reviewer of plans and design documents. Assume the plan will fail in ways the author has not considered.
 
@@ -295,14 +301,22 @@ required), including plans, contracts, and documentation stored in the repositor
 
 def staged_census_instructions(mode: str, lane: str) -> str:
     policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
-    return STAGED_CENSUS_INSTRUCTIONS.replace("ANCHOR_POLICY", policy).replace(
+    instructions = STAGED_CENSUS_INSTRUCTIONS.replace("ANCHOR_POLICY", policy).replace(
         "LANE", lane,
+    )
+    return (
+        CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
+        if mode == "branch" else instructions
     )
 
 
 def staged_followup_instructions(mode: str) -> str:
     policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
-    return STAGED_FOLLOWUP_INSTRUCTIONS.replace("ANCHOR_POLICY", policy)
+    instructions = STAGED_FOLLOWUP_INSTRUCTIONS.replace("ANCHOR_POLICY", policy)
+    return (
+        CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
+        if mode == "branch" else instructions
+    )
 
 
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
@@ -322,13 +336,17 @@ STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do 
 review. Map every source finding and class assessment exactly once. Preserve the highest severity
 of merged findings. Every blocking governing finding and every governing finding referenced by a
 violated class assessment needs exactly one open debt record, regardless of severity. Advisory debt
-is tracked but does not block convergence. Return only === REVIEW SETTLEMENT JSON === followed by
+is tracked but does not block convergence. If existing_debt is supplied, update every item exactly
+once; preserve it open with a concrete reason or close it with current evidence. Return only
+=== REVIEW SETTLEMENT JSON === followed by
 one JSON object with: role, source_dispositions, assessment_dispositions, findings, debt,
 debt_updates, and class_records. Class record op is one of
 new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
-operation. A new/replace record has op, invariant, severity and either pattern+pathspec (branch)
-or procedure (plan), with class_id additionally required for replace. Close/reopen has only op and
-class_id; reclassify additionally has severity. Use these exact row shapes:
+operation. A branch new/replace record has op, invariant, severity and exactly one of
+pattern+pathspec or procedure; a plan record has procedure. A replace additionally has class_id.
+Close/reopen has only op and class_id; reclassify additionally has severity. A closed mechanized
+class that is violated must use replace with a corrected predicate—reopen is only for unmechanized
+classes. Use these exact row shapes:
 source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
 assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
 findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
@@ -344,7 +362,10 @@ followed by one JSON object with role, source_dispositions, assessment_dispositi
 debt, debt_updates, class_records and, for final, coverage plus class_assessments. Account for every
 supplied open debt exactly once. Final must include all nine checklist IDs and assess every active class
 exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
-census settlement; each debt update is {"id":"D1","status":"closed|open","evidence":["path:1"]}.
+census settlement. A closed debt update is
+{"id":"D1","status":"closed","evidence":["path:1"]}; an open debt update is
+{"id":"D1","status":"open","evidence":["path:1"],"reason":"exact remaining defect"}.
+The open reason must state the concrete unresolved condition so the operator can repair it directly.
 Correction returns empty source/assessment dispositions. Final returns empty source dispositions
 and one assessment disposition per class. The task's checklist array is governing. The exact
 final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
@@ -369,10 +390,12 @@ STAGED_SETTLEMENT_RETRY_GUIDANCE = (
     "assessment needs exactly one open debt row, including MINOR and OUT-OF-SCOPE; advisory "
     "debt is tracked but does not block convergence. Finding rows have exactly "
     "id,severity,summary,evidence,remedy (never class_id). Debt rows have exactly "
-    "id,finding_id,status. Debt updates have exactly id,status,evidence. Class records are "
+    "id,finding_id,status. Closed debt updates have exactly id,status,evidence; open updates "
+    "also require reason. Class records are "
     "operations: close/reopen have only op,class_id; reclassify adds severity; new/replace use "
-    "the exact invariant, severity and mode-specific procedure or pattern/pathspec shape from "
-    "the original prompt. They never contain status,finding_ids,debt_ids."
+    "the exact invariant and severity plus procedure or pattern/pathspec as allowed by the mode "
+    "and predecessor mechanism. A violated closed mechanized class uses replace, not reopen. "
+    "They never contain status,finding_ids,debt_ids."
 )
 
 

@@ -604,11 +604,11 @@ def _apply_transition(lineage: Lineage, t: Transition, *, round_no: int, minted:
     if t.kind == "REPLACE":
         if t.target is not None:
             raise RegisterError("REPLACE creates a successor and cannot name BY")
-        if cls.mechanized:
-            if not t.pattern or not t.pathspec:
-                raise RegisterError("mechanized REPLACE needs pattern and pathspec")
-        elif not t.procedure:
-            raise RegisterError("unmechanized REPLACE needs procedure")
+        successor_mechanized = bool(t.pattern or t.pathspec)
+        if successor_mechanized == bool(t.procedure):
+            raise RegisterError("REPLACE needs exactly pattern plus pathspec or procedure")
+        if successor_mechanized and (not t.pattern or not t.pathspec):
+            raise RegisterError("mechanized REPLACE needs pattern and pathspec")
         new_id = _add(
             lineage, t.invariant or cls.invariant, t.severity or cls.severity,
             cls.first_round, t.pattern, t.pathspec, t.procedure,

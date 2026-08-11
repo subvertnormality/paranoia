@@ -138,8 +138,11 @@ independent cold lanes and one consolidation call. Their complete finding census
 debt. Later correction rounds target that debt and correction effects; once it closes, one fresh
 whole-artifact final regression is mandatory. A clear initial census may converge immediately.
 This preserves broad first-pass/final coverage without paying for novelty hunting over unchanged
-material on every correction round. Tracked branch reviews retain the established broad, cold
-single-review path while the branch census is validated separately.
+material on every correction round. Tracked branch reviews use the same lifecycle: a broad, cold
+three-lane census, targeted correction rounds over durable debt and changed code, and a mandatory
+broad, cold final regression before clearance. Every staged branch role retains the established
+code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
+structured output contract changes. One-shot reviews retain the single broad review.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
@@ -148,10 +151,10 @@ provider, parsing, deadline, or oversized-state failures block visibly rather th
 
 ### `round` — lineage ordering
 
-The 1-based round number. **Increment it every round.** In tracked staged plan review, census and final
-remain complete at every in-scope severity while correction is limited to durable debt and repair
-effects; convergence comes from that phase boundary. Branch and other legacy single-review paths
-retain their broad review and round-3 severity floor.
+The 1-based round number. **Increment it every round.** In tracked staged plan and branch review,
+census and final remain complete at every in-scope severity while correction is limited to durable
+debt and repair effects; convergence comes from that phase boundary. One-shot and injected-engine
+legacy paths retain their single broad review and round-3 severity floor.
 
 `round` is required on `critique_branch` and `critique_plan` unless you pass
 `class_closure: false`.
@@ -680,9 +683,10 @@ Accepted by the four review tools:
 
 ### Review output
 
-Every review returns exactly five headings, in this order. Legacy and tracked branch reviews populate
-their natural categories; tracked staged plan reviews put governing findings in `What doesn't work`, bounded remedies
-in `Improvements`, and write `Nothing notable.` in categories the settlement does not represent.
+Every review returns exactly five headings, in this order. One-shot reviews populate their natural
+categories; tracked staged plan and branch reviews put governing findings in `What doesn't work`,
+bounded remedies in `Improvements`, and write `Nothing notable.` in categories the settlement does
+not represent.
 
 | Section | Contains |
 |---|---|
@@ -708,7 +712,7 @@ The footer carries the `session_ref` for [`rebut`](#rebut).
 
 ### Tracked convergence trailer
 
-Appended below a staged tracked plan review:
+Appended below a staged tracked plan or branch review:
 
 ```
 STRUCTURAL-PHASE: correction
@@ -725,8 +729,9 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 | `STRUCTURAL-ERROR` / `STRUCTURAL-PENDING` | A bounded format/deadline path did not produce a settled review |
 | `STATE-UNAVAILABLE` | Lineage state is unreadable, unwritable, or a previous write may not have completed. The message names the absolute path; repair or delete it, then re-run |
 
-Tracked branch, one-shot, and injected-engine trailers retain `CLASS-REGISTER`, `CLASS-CLOSURE`,
-match, and unmechanized-class detail.
+One-shot and injected-engine trailers retain `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and
+unmechanized-class detail. Staged branch class state is incorporated into `STRUCTURAL-DEBT` and the
+computed convergence line.
 
 `NOT-BLOCKED` asserts only that the computed structural-debt, class, and (for verified plans)
 external-claim gates are clear. It is a review result, not a proof that the change is correct.

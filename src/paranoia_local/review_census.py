@@ -230,18 +230,23 @@ def parse_settlement(
         governing = by_id[item["finding_id"]]
         item.update(
             severity=governing["severity"], summary=governing["summary"],
-            evidence=list(governing["evidence"]),
+            evidence=list(governing["evidence"]), remedy=governing["remedy"],
         )
     updates = _list(obj, "debt_updates")
     seen_updates: set[str] = set()
     for item in updates:
-        _exact(item, {"id", "status", "evidence"}, "debt update")
+        if not isinstance(item, dict) or item.get("status") not in {"open", "closed"}:
+            raise CensusError("invalid debt-update status")
+        required = {"id", "status", "evidence", "reason"} if item["status"] == "open" else {
+            "id", "status", "evidence",
+        }
+        _exact(item, required, "debt update")
         if item["id"] in seen_updates or item["id"] not in set(known_debt):
             raise CensusError("unexpected or duplicate debt update")
         seen_updates.add(item["id"])
-        if item["status"] not in {"open", "closed"}:
-            raise CensusError("invalid debt-update status")
         _anchors(item["evidence"])
+        if item["status"] == "open":
+            _bounded(item["reason"], MAX_SUMMARY_CHARS, "open debt reason")
     if known_debt and seen_updates != set(known_debt):
         raise CensusError("every existing debt item must be updated exactly once")
     _list(obj, "class_records")
@@ -285,8 +290,13 @@ def parse_settlement(
         if class_states and cid in class_states:
             status, mechanized, prior_severity = class_states[cid]
             op = operation_by_class.get(cid)
-            if verdict == "violated" and status == cc.CLOSED and op not in {"reopen", "replace"}:
-                raise CensusError("closed violated class must reopen or replace")
+            if verdict == "violated" and status == cc.CLOSED:
+                allowed = {"replace"} if mechanized else {"reopen", "replace"}
+                if op not in allowed:
+                    raise CensusError(
+                        "closed violated mechanized class must replace" if mechanized
+                        else "closed violated class must reopen or replace"
+                    )
             if verdict == "satisfied" and status in cc.UNPROVEN_STATUSES:
                 if mechanized:
                     raise CensusError("mechanized open class cannot be model-closed")
@@ -304,17 +314,22 @@ def parse_settlement(
     return obj
 
 
-def register_from_records(records: Sequence[dict[str, Any]], *, mechanized: bool) -> cc.Register:
+def register_from_records(
+    records: Sequence[dict[str, Any]], *, mechanized: bool | None,
+) -> cc.Register:
     new: list[cc.NewClass] = []
     transitions: list[cc.Transition] = []
     for row in records:
         if not isinstance(row, dict):
             raise CensusError("class record must be an object")
         op = row.get("op")
+        row_mechanized = mechanized if mechanized is not None else (
+            "pattern" in row or "pathspec" in row
+        )
         if op == "new":
             allowed = (
                 {"op", "invariant", "severity", "pattern", "pathspec"}
-                if mechanized else {"op", "invariant", "severity", "procedure"}
+                if row_mechanized else {"op", "invariant", "severity", "procedure"}
             )
             _exact(row, allowed, "new class record")
             if row.get("severity") not in cc.SEVERITIES:
@@ -322,9 +337,9 @@ def register_from_records(records: Sequence[dict[str, Any]], *, mechanized: bool
             new.append(cc.NewClass(
                 invariant=_bounded(row.get("invariant"), 1000, "class invariant"),
                 severity=row.get("severity"),
-                pattern=_bounded(row.get("pattern"), 2000, "pattern") if mechanized else None,
-                pathspec=_bounded(row.get("pathspec"), 1000, "pathspec") if mechanized else None,
-                procedure=None if mechanized else _bounded(row.get("procedure"), 2000, "procedure"),
+                pattern=_bounded(row.get("pattern"), 2000, "pattern") if row_mechanized else None,
+                pathspec=_bounded(row.get("pathspec"), 1000, "pathspec") if row_mechanized else None,
+                procedure=None if row_mechanized else _bounded(row.get("procedure"), 2000, "procedure"),
             ))
         elif op in {"close", "reopen", "reclassify", "replace"}:
             if op in {"close", "reopen"}:
@@ -334,7 +349,7 @@ def register_from_records(records: Sequence[dict[str, Any]], *, mechanized: bool
             else:
                 allowed = (
                     {"op", "class_id", "invariant", "severity", "pattern", "pathspec"}
-                    if mechanized else {"op", "class_id", "invariant", "severity", "procedure"}
+                    if row_mechanized else {"op", "class_id", "invariant", "severity", "procedure"}
                 )
                 _exact(row, allowed, "class replacement record")
             if op in {"reclassify", "replace"} and row.get("severity") not in cc.SEVERITIES:
@@ -349,15 +364,15 @@ def register_from_records(records: Sequence[dict[str, Any]], *, mechanized: bool
                 ),
                 pattern=(
                     _bounded(row.get("pattern"), 2000, "pattern")
-                    if op == "replace" and mechanized else None
+                    if op == "replace" and row_mechanized else None
                 ),
                 pathspec=(
                     _bounded(row.get("pathspec"), 1000, "pathspec")
-                    if op == "replace" and mechanized else None
+                    if op == "replace" and row_mechanized else None
                 ),
                 procedure=(
                     _bounded(row.get("procedure"), 2000, "procedure")
-                    if op == "replace" and not mechanized else None
+                    if op == "replace" and not row_mechanized else None
                 ),
             ))
         else:
@@ -371,6 +386,10 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     for update in settlement.get("debt_updates", []):
         item = old[update["id"]]
         item.update(status=update["status"], evidence=update["evidence"], last_round=round_no)
+        if update["status"] == "open":
+            item["reason"] = update["reason"]
+        else:
+            item.pop("reason", None)
     for item in settlement.get("debt", []):
         if item["id"] in old:
             raise CensusError(f"new debt reuses durable id {item['id']!r}")
@@ -379,6 +398,11 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
             source["source_id"] for source in settlement.get("source_dispositions", [])
             if source["governing_id"] == item["finding_id"]
         ]
+        row["class_ids"] = [
+            assessment["assessment_id"]
+            for assessment in settlement.get("assessment_dispositions", [])
+            if assessment["governing_id"] == item["finding_id"]
+        ]
         row["first_round"] = round_no; row["last_round"] = round_no
         old[row["id"]] = row
     active = [d for d in old.values() if d.get("status") == "open" and d.get("severity") in BLOCKING]
@@ -386,6 +410,7 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     out = dict(state)
     out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
+    out.pop("unbound_classes", None)
     return out
 
 
@@ -406,19 +431,39 @@ def trailer(state: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_review(settlement: dict[str, Any]) -> str:
+def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = None) -> str:
     """Restore the stable human response while JSON remains in Review.raw/audit state."""
-    findings = settlement.get("findings", [])
+    findings = list(settlement.get("findings", []))
+    if state is not None:
+        current = {row.get("id"): dict(row) for row in findings}
+        rendered: list[dict[str, Any]] = []
+        consumed: set[str] = set()
+        for debt in state.get("debt", []):
+            if debt.get("status") != "open":
+                continue
+            fid = debt.get("finding_id")
+            row = dict(current.get(fid, {}))
+            row.update(debt)
+            rendered.append(row)
+            consumed.add(fid)
+        rendered.extend(row for fid, row in current.items() if fid not in consumed)
+        findings = rendered
+        findings.extend(state.get("unbound_classes", []))
 
     def rows(items: list[dict[str, Any]]) -> str:
         if not items:
             return "Nothing notable."
         return "\n".join(
-            f"- [{f['severity']}] {f['summary']} ({', '.join(f['evidence'])})"
+            f"- [{f['severity']}] {f['summary']}"
+            + (f" — remains open: {f['reason']}" if f.get("reason") else "")
+            + f" ({', '.join(f['evidence'])})"
             for f in items
         )
 
-    improvements = [f"- [{f['severity']}] {f['remedy']}" for f in findings]
+    improvements = [
+        f"- [{f['severity']}] {f.get('remedy') or f.get('reason') or 'Resolve the cited debt.'}"
+        for f in findings
+    ]
     return "\n\n".join((
         "## What works\n\nNothing notable.",
         "## What doesn't work\n\n" + rows(findings),
@@ -451,6 +496,12 @@ def resolve_anchors(
             relative = Path(path)
             if relative.is_absolute() or ".." in relative.parts:
                 raise CensusError(f"unresolvable repository anchor {anchor!r}")
+            if trusted_roots and "repository" in trusted_roots and (
+                not relative.parts or relative.parts[0] != "repository"
+            ):
+                raise CensusError(
+                    f"repository evidence anchor requires repository/ prefix: {anchor!r}"
+                )
             anchor_base = base
             if trusted_roots and relative.parts and relative.parts[0] in trusted_roots:
                 anchor_base = Path(trusted_roots[relative.parts[0]]).resolve()

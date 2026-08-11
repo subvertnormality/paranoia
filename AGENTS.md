@@ -125,8 +125,8 @@ state and reviewer-native capabilities meet the supported model.
   the preserved inventory when verification is next enabled. For tracked plan structural review,
   a new plan snapshot's census and the final regression are broad and cold; intervening correction
   rounds are deliberately targeted to open findings/classes, the claimed corrections, and their
-  transitive effects. Tracked branch review remains broad and cold on every convergence round while
-  its staged lifecycle is validated separately. Do not reopen external inventory for repository
+  transitive effects. Tracked branch review uses the same broad cold census, targeted correction,
+  and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
