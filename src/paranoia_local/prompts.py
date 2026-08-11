@@ -340,7 +340,16 @@ is tracked but does not block convergence. If existing_debt is supplied, update 
 once; preserve it open with a concrete reason or close it with current evidence. Return only
 === REVIEW SETTLEMENT JSON === followed by
 one JSON object with: role, source_dispositions, assessment_dispositions, findings, debt,
-debt_updates, and class_records. Class record op is one of
+debt_updates, class_dispositions, and class_records. A finding is a reusable class when the
+reasoning that condemns this site or passage would condemn another occurrence; a genuinely unique
+wrong value or site is one-off. Classify every governing finding exactly once as
+{"finding_id":"G1","kind":"one_off","reason":"why it cannot recur"},
+{"finding_id":"G1","kind":"new_class","record_index":0}, or
+{"finding_id":"G1","kind":"existing_class","class_id":"active-id"}. Every new class record
+must be referenced by exactly one new_class disposition. A violated existing-class assessment must
+disposition its governing finding to that same existing class. Consolidate same-class occurrences into one governing
+finding in census as well as correction; every existing_class finding has exactly one matching
+violated assessment and assessment disposition. Class record op is one of
 new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
 operation. A branch new/replace record has op, invariant, severity and exactly one of
 pattern+pathspec or procedure; a plan record has procedure. A replace additionally has class_id.
@@ -351,7 +360,8 @@ source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
 assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
 findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
 debt=[{"id":"D1","finding_id":"G1","status":"open"}];
-debt_updates=[]; class_records=[]. A violated assessment must map to the same governing finding as
+debt_updates=[]; class_dispositions=[{"finding_id":"G1","kind":"one_off","reason":"unique site"}];
+class_records=[]. A violated assessment must map to the same governing finding as
 its cited lane finding; a satisfied assessment maps to null. Do not emit prose."""
 
 
@@ -359,15 +369,24 @@ STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in th
 is targeted to every open debt item and effects of its repair. Final is a fresh cold whole-artifact
 review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
 followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
-debt, debt_updates, class_records and, for final, coverage plus class_assessments. Account for every
-supplied open debt exactly once. Final must include all nine checklist IDs and assess every active class
+debt, debt_updates, class_dispositions, class_records and class_assessments; final also has coverage.
+Account for every
+governing finding through class_dispositions using the same one_off, new_class, or existing_class
+shapes as census; omission is invalid. Account for every supplied open debt exactly once. Final
+must include all nine checklist IDs and assess every active class
 exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
 census settlement. A closed debt update is
 {"id":"D1","status":"closed","evidence":["path:1"]}; an open debt update is
 {"id":"D1","status":"open","evidence":["path:1"],"reason":"exact remaining defect"}.
 The open reason must state the concrete unresolved condition so the operator can repair it directly.
-Correction returns empty source/assessment dispositions. Final returns empty source dispositions
-and one assessment disposition per class. The task's checklist array is governing. The exact
+Correction returns empty source dispositions. Consolidate all occurrences of the same reusable
+class into at most one existing_class governing finding per active class per settlement. For each
+active class with that one governing finding, class_assessments and assessment_dispositions contain
+exactly one violated row; they contain no other classes. The assessment finding_id and disposition
+governing_id both name the consolidated finding.
+Final returns empty source dispositions and one assessment disposition per active class. A closed
+unmechanized class also requires reopen and a closed mechanized class requires replace. The task's
+checklist array is governing. The exact
 final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
 "summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
 "class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
@@ -391,7 +410,11 @@ STAGED_SETTLEMENT_RETRY_GUIDANCE = (
     "debt is tracked but does not block convergence. Finding rows have exactly "
     "id,severity,summary,evidence,remedy (never class_id). Debt rows have exactly "
     "id,finding_id,status. Closed debt updates have exactly id,status,evidence; open updates "
-    "also require reason. Class records are "
+    "also require reason. Every governing finding has exactly one class_dispositions row: "
+    "one_off adds reason, new_class adds record_index, existing_class adds class_id. Every new "
+    "class record is referenced once. Correction consolidates same-class occurrences into one "
+    "governing finding; each existing_class finding also needs one matching violated "
+    "class_assessments row and assessment_dispositions row. Class records are "
     "operations: close/reopen have only op,class_id; reclassify adds severity; new/replace use "
     "the exact invariant and severity plus procedure or pattern/pathspec as allowed by the mode "
     "and predecessor mechanism. A violated closed mechanized class uses replace, not reopen. "

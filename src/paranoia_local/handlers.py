@@ -135,6 +135,18 @@ def _staged_call(
         return retry, parsed, attempts
 
 
+def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
+    """Render the canonical class surface on every staged result path."""
+    if closure.lineage is None:
+        return (
+            f"CLASS-REGISTER: {status}\n"
+            "CLASS-CLOSURE: STATE-UNAVAILABLE — lineage could not be loaded."
+        )
+    return cc.render_trailer(
+        closure.lineage, register_status=status, include_verdict=False,
+    )
+
+
 def _settle_staged_failure(
     closure: "_ClosureRound", *, stakes: str, snapshot: str, error: rc.CensusError,
     mode: str,
@@ -153,6 +165,7 @@ def _settle_staged_failure(
             session_ref=None, raw=message, returncode=2, error=True,
         )
         trailer = (
+            "CLASS-REGISTER: staged rejected; failure state persistence unavailable\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
             "CONVERGENCE: BLOCKED — staged failure state may not have persisted."
         )
@@ -169,10 +182,11 @@ def _settle_staged_failure(
         ),
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
-    trailer = (
+    trailer = "\n".join((
+        _staged_class_trailer(closure, closure.register_status),
         f"STRUCTURAL-PHASE: {state['phase']}\nSTRUCTURAL-ERROR: {error}\n"
-        "CONVERGENCE: BLOCKED — staged review did not settle."
-    )
+        "CONVERGENCE: BLOCKED — staged review did not settle.",
+    ))
     if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
         trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
     return review, trailer, attempts
@@ -190,6 +204,7 @@ def _state_unavailable_review(
         session_ref=None, raw=reason, returncode=2, error=True,
     )
     trailer = (
+        "CLASS-REGISTER: staged state unavailable\n"
         f"CLASS-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
         "CONVERGENCE: BLOCKED — lineage state could not be used this round."
     )
@@ -214,10 +229,11 @@ def _structural_pending_review(
         session_ref=None, raw=reason,
         returncode=124, error=True,
     )
-    trailer = (
+    trailer = "\n".join((
+        _staged_class_trailer(closure, closure.register_status),
         f"STRUCTURAL-PHASE: {phase}\nSTRUCTURAL-PENDING: {reason}\n"
-        "CONVERGENCE: BLOCKED — structural review has not run."
-    )
+        "CONVERGENCE: BLOCKED — structural review has not run.",
+    ))
     if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
         trailer = f"{pc.render_trailer(claim_state)}\n{trailer}"
     return review, trailer, []
@@ -276,7 +292,9 @@ def _staged_structural_review(
         d.get("status") == "open" and d.get("severity") in rc.BLOCKING
         for d in state.get("debt", [])
     )
-    if phase == "census" and state.get("unbound_classes") and has_blocking_debt:
+    if phase == "census" and (
+        state.get("unbound_class_ids") or state.get("unbound_classes")
+    ) and has_blocking_debt:
         # State written by the earlier over-broad gate already has actionable debt;
         # resume targeted correction rather than paying for a redundant census.
         state["phase"] = phase = "correction"
@@ -475,6 +493,7 @@ def _staged_structural_review(
         settlement["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
     )
     minted = cc.apply_register(draft, register, round_no=round_no)
+    minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
     lineage.classes, lineage.next_seq, lineage.exemptions = (
         draft.classes, draft.next_seq, draft.exemptions
     )
@@ -486,7 +505,14 @@ def _staged_structural_review(
         if cls.status == cc.SUPERSEDED and cls.superseded_by
     }
     for debt in state.get("debt", []):
-        debt["class_ids"] = [replacements.get(cid, cid) for cid in debt.get("class_ids", [])]
+        debt.setdefault("class_ids", []).extend(
+            minted_by_record[index] for index in debt.pop("class_record_indexes", [])
+        )
+        if debt.get("status") == "open":
+            debt["class_ids"] = [
+                replacements.get(cid, cid) for cid in debt.get("class_ids", [])
+            ]
+        debt["class_ids"] = list(dict.fromkeys(debt["class_ids"]))
     claim_blocked = (
         mode == cc.PLAN_MODE and closure.claims_enabled
         and pc.is_blocked(lineage.claim_state)
@@ -502,22 +528,16 @@ def _staged_structural_review(
     )
     if unbound:
         state["phase"] = "correction" if has_blocking_debt else "census"
-        state["unbound_classes"] = [{
-            "class_id":c.class_id, "severity":c.severity, "summary":c.invariant,
-            "reason":(
-                f"{c.status}: {len(c.matches)} surviving match(es)"
-                if c.mechanized else f"{c.status}: unmechanized review required"
-            ),
-            "evidence":[
-                f"repository/{m.path}:{m.line}" for m in c.matches
-            ],
-            "remedy":"Re-audit this class in the broad integrity census.",
-        } for c in unbound]
+        state["unbound_class_ids"] = [c.class_id for c in unbound]
+        state.pop("unbound_classes", None)
     elif lineage.blocking() or claim_blocked:
         state["phase"] = "correction"
     lineage.review_state = state
     lineage.debt = None
     lineage.rounds += 1
+    register_status = rc.register_status(
+        settlement["class_records"], minted_by_record, phase=phase,
+    )
     try:
         cc.save_lineage(closure.state_root, lineage)
     except cc.StateUnavailable as exc:
@@ -529,6 +549,7 @@ def _staged_structural_review(
             session_ref=review.session_ref, raw=message, returncode=2, error=True,
         )
         trailer = (
+            f"CLASS-REGISTER: {register_status}; persistence unavailable\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
             "CONVERGENCE: BLOCKED — this staged settlement may not have persisted."
         )
@@ -536,10 +557,16 @@ def _staged_structural_review(
             trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
         return failed, trailer, [a.json() for a in attempts]
     closure._settled = True
-    closure.register_status = f"staged {phase} parsed"
+    closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
-    trailer = rc.trailer(state)
+    trailer = "\n".join((
+        cc.render_trailer(
+            lineage, register_status=closure.register_status, minted=minted,
+            include_verdict=False,
+        ),
+        rc.trailer(state),
+    ))
     if mode == cc.PLAN_MODE and closure.claims_enabled:
         trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
     attempts.sort(key=lambda item: item.sequence or 0)

@@ -48,7 +48,11 @@ def settlement(**overrides):
         "assessment_dispositions": [],
         "findings": [finding("C1")],
         "debt": [{"id": "D1", "finding_id": "C1", "status": "open"}],
-        "debt_updates": [], "class_records": [],
+        "debt_updates": [],
+        "class_dispositions": [{
+            "finding_id":"C1", "kind":"one_off", "reason":"unique fixture site",
+        }],
+        "class_records": [],
     }
     value.update(overrides)
     return rc.SETTLEMENT_MARKER + "\n" + json.dumps(value)
@@ -110,6 +114,145 @@ def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
         rc.parse_settlement(settlement(debt=[]), source_ids=["domain-1"], assessment_ids=[])
 
 
+def test_settlement_requires_an_explicit_class_disposition_for_every_finding():
+    with pytest.raises(rc.CensusError, match="every governing finding needs exactly one"):
+        rc.parse_settlement(
+            settlement(class_dispositions=[]), source_ids=["domain-1"], assessment_ids=[],
+        )
+
+    value = payload(settlement())
+    value.update(
+        class_dispositions=[{"finding_id":"C1", "kind":"new_class", "record_index":0}],
+        class_records=[{
+            "op":"new", "invariant":"all repeated sites obey the same rule",
+            "severity":"MAJOR", "procedure":"inspect every repeated site",
+        }],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[],
+        class_mechanized=False,
+    )
+    assert parsed["_finding_class_refs"] == {"C1":"record:0"}
+
+    value["class_dispositions"] = [{
+        "finding_id":"C1", "kind":"one_off", "reason":"incorrectly declared unique",
+    }]
+    with pytest.raises(rc.CensusError, match="every new class record must be bound"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[],
+        )
+
+
+def test_existing_class_disposition_cannot_contradict_satisfied_or_closed_state():
+    assert "at most one existing_class governing finding per active class" in (
+        prompts.STAGED_FOLLOWUP_INSTRUCTIONS
+    )
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
+        class_dispositions=[{
+            "finding_id":"C1", "kind":"existing_class", "class_id":"abc",
+        }],
+    )
+    with pytest.raises(rc.CensusError, match="satisfied class assessment"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"satisfied"},
+            class_states={"abc":(cc.CLOSED, False, "MAJOR")},
+        )
+
+def test_correction_existing_class_binding_requires_a_matching_violated_assessment():
+    value = payload(settlement())
+    value.update(
+        role="correction", source_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
+        class_dispositions=[{
+            "finding_id":"C1", "kind":"existing_class", "class_id":"abc",
+        }],
+        class_assessments=[{
+            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
+            "finding_id":"C1",
+        }],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+        class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
+    )
+    assert parsed["_finding_class_refs"] == {"C1":"abc"}
+    with pytest.raises(rc.CensusError, match="closed violated class must reopen or replace"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+            class_states={"abc":(cc.CLOSED, False, "MAJOR")}, role="correction",
+        )
+    value["class_records"] = [{"op":"reopen", "class_id":"abc"}]
+    assert rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+        class_states={"abc":(cc.CLOSED, False, "MAJOR")}, role="correction",
+    )["_finding_class_refs"] == {"C1":"abc"}
+    value["class_records"] = []
+
+    value["class_assessments"] = []
+    value["assessment_dispositions"] = []
+    with pytest.raises(rc.CensusError, match="matching violated assessment"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
+        )
+
+    value = payload(settlement())
+    value.update(
+        role="correction", source_dispositions=[],
+        findings=[finding("C1"), finding("C2")],
+        debt=[
+            {"id":"D1", "finding_id":"C1", "status":"open"},
+            {"id":"D2", "finding_id":"C2", "status":"open"},
+        ],
+        class_dispositions=[
+            {"finding_id":"C1", "kind":"existing_class", "class_id":"abc"},
+            {"finding_id":"C2", "kind":"existing_class", "class_id":"abc"},
+        ],
+        class_assessments=[{
+            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
+            "finding_id":"C1",
+        }],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
+    )
+    with pytest.raises(rc.CensusError, match="consolidate same-class occurrences"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
+            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
+        )
+
+
+def test_census_rejects_an_extra_existing_class_finding_without_an_assessment():
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[
+            {"source_id":"integrity:F1", "governing_id":"C1"},
+            {"source_id":"domain:F2", "governing_id":"C2"},
+        ],
+        findings=[finding("C1"), finding("C2")],
+        debt=[
+            {"id":"D1", "finding_id":"C1", "status":"open"},
+            {"id":"D2", "finding_id":"C2", "status":"open"},
+        ],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
+        class_dispositions=[
+            {"finding_id":"C1", "kind":"existing_class", "class_id":"abc"},
+            {"finding_id":"C2", "kind":"existing_class", "class_id":"abc"},
+        ],
+    )
+    with pytest.raises(rc.CensusError, match="consolidate same-class occurrences"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value),
+            source_ids=["integrity:F1", "domain:F2"], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"violated"},
+            assessment_findings={"abc":"integrity:F1"},
+            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="census",
+        )
+
+
 def test_settlement_accepts_only_the_observed_decorative_marker_variant():
     short = rc.SETTLEMENT_MARKER.removesuffix(" ===")
     text = settlement().replace(rc.SETTLEMENT_MARKER, short, 1)
@@ -157,6 +300,7 @@ def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
 def test_correction_cannot_clear_without_updating_every_existing_debt():
     value = payload(settlement())
     value.update(role="correction", source_dispositions=[], findings=[], debt=[], debt_updates=[])
+    value.update(class_dispositions=[], class_assessments=[])
     with pytest.raises(rc.CensusError, match="every existing debt"):
         rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
                             known_debt=["D1"], role="correction")
@@ -168,6 +312,7 @@ def test_open_debt_update_requires_and_renders_an_actionable_reason():
         role="correction", source_dispositions=[], assessment_dispositions=[],
         findings=[], debt=[],
         debt_updates=[{"id":"D1", "status":"open", "evidence":["a.py:2"]}],
+        class_dispositions=[], class_assessments=[],
     )
     with pytest.raises(rc.CensusError, match="debt update fields"):
         rc.parse_settlement(
@@ -203,13 +348,6 @@ def test_open_debt_update_requires_and_renders_an_actionable_reason():
     )
     assert "current advisory finding" in rendered
     assert "validate the selected head" in rendered
-    rendered = rc.render_review({"findings":[]}, {"debt":[], "unbound_classes":[{
-        "class_id":"abc", "severity":"MAJOR", "summary":"exact live owner",
-        "reason":"OPEN: unmechanized review required", "evidence":[],
-        "remedy":"Re-audit this class in the broad integrity census.",
-    }]})
-    assert "exact live owner" in rendered
-    assert "unmechanized review required" in rendered
     rendered = rc.render_review({"findings":[]}, {"debt":[
         {"id":"D1", "finding_id":"F1", "status":"open", "severity":"MAJOR",
          "summary":"first durable debt", "evidence":[], "remedy":"fix first"},
@@ -226,6 +364,7 @@ def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
         role="correction", source_dispositions=[], assessment_dispositions=[],
         findings=[], debt=[],
         debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}],
+        class_dispositions=[], class_assessments=[],
         class_records=[{"op":"reclassify","class_id":"abc","severity":"MINOR"}],
     )
     with pytest.raises(rc.CensusError, match="cannot downgrade"):
@@ -255,6 +394,7 @@ def test_every_staged_role_rejects_a_satisfied_class_downgrade():
     value.update(
         source_dispositions=[], findings=[], debt=[],
         assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
+        class_dispositions=[],
         class_records=[{"op":"reclassify", "class_id":"abc", "severity":"MINOR"}],
     )
     with pytest.raises(rc.CensusError, match="cannot downgrade"):
@@ -332,6 +472,7 @@ def test_branch_records_allow_procedure_classes_and_reject_mechanized_reopen():
     value.update(
         source_dispositions=[],
         assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
+        class_dispositions=[{"finding_id":"C1", "kind":"existing_class", "class_id":"abc"}],
         class_records=[{"op":"reopen", "class_id":"abc"}],
     )
     with pytest.raises(rc.CensusError, match="mechanized class must replace"):
@@ -349,7 +490,8 @@ def test_correction_requires_a_final_before_clearance():
     assert state["phase"] == "correction"
     close = payload(settlement())
     close.update(role="correction", source_dispositions=[], findings=[], debt=[],
-                 debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}])
+                 debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}],
+                 class_dispositions=[], class_assessments=[])
     state = rc.settle_state(
         state, rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, close), source_ids=[], assessment_ids=[],
                                    known_debt=["D1"], role="correction"),
@@ -363,6 +505,7 @@ def test_final_requires_complete_checklist_and_class_verdict():
     value = payload(settlement())
     value.update(role="final", source_dispositions=[], findings=[], debt=[], debt_updates=[],
                  assessment_dispositions=[{"assessment_id":"abc","governing_id":None}],
+                 class_dispositions=[],
                  class_assessments=[], coverage=[])
     with pytest.raises(rc.CensusError, match="every checklist"):
         rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"], role="final")
@@ -462,12 +605,43 @@ def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path)
     assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
 
 
+def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_path):
+    invalid = payload(settlement())
+    invalid.update(
+        class_dispositions=[{"finding_id":"C1", "kind":"new_class", "record_index":0}],
+        class_records=["not an object"],
+    )
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, invalid)
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert "new-class disposition must uniquely reference" in prompt
+            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+        model="m", effort="high", timeout=10, on_progress=None,
+        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+        parser=lambda text: rc.parse_settlement(
+            text, source_ids=["domain-1"], assessment_ids=[],
+        ),
+    )
+    assert parsed["class_dispositions"][0]["kind"] == "one_off"
+    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+
+
 def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
     invalid = payload(settlement())
     invalid.update(
         source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
         findings=[finding("G1", "OUT-OF-SCOPE")], debt=[],
         assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
+        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
     )
     repaired = dict(invalid)
     repaired["debt"] = [{"id":"D1","finding_id":"G1","status":"open"}]
@@ -504,6 +678,7 @@ def test_violated_class_cannot_be_replaced_at_lower_severity():
     value.update(
         source_dispositions=[], findings=[], debt=[],
         assessment_dispositions=[{"assessment_id":"abc","governing_id":"C1"}],
+        class_dispositions=[{"finding_id":"C1", "kind":"existing_class", "class_id":"abc"}],
         class_records=[{
             "op":"replace", "class_id":"abc", "invariant":"narrower invariant",
             "severity":"MINOR", "procedure":"inspect it",
@@ -526,6 +701,7 @@ def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
         assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
         findings=[finding("G1", "BLOCKER")],
         debt=[{"id":"D1", "finding_id":"G1", "status":"open"}],
+        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
         debt_updates=[], class_records=[{"op":"reopen", "class_id":"abc"}],
         coverage=payload(lane(findings=[finding("G1", "BLOCKER")]))["coverage"],
         class_assessments=[{
@@ -540,9 +716,12 @@ def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
     assert parsed["class_records"] == [{"op":"reopen", "class_id":"abc"}]
     value["assessment_dispositions"][0]["governing_id"] = "G2"
     value["findings"].append(finding("G2", "BLOCKER"))
+    value["class_dispositions"].append({
+        "finding_id":"G2", "kind":"one_off", "reason":"unique second fixture",
+    })
     value["debt"].append({"id":"D2", "finding_id":"G2", "status":"open"})
     value["coverage"][0]["finding_ids"].append("G2")
-    with pytest.raises(rc.CensusError, match="follow its cited finding"):
+    with pytest.raises(rc.CensusError, match="matching violated assessment"):
         rc.parse_settlement(
             wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
             class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
@@ -558,6 +737,7 @@ def test_violated_advisory_class_still_requires_concrete_debt():
         source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
         findings=[finding("G1", "MINOR")], debt=[],
         assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
+        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
         class_records=[{"op":"reopen", "class_id":"abc"}],
     )
     with pytest.raises(rc.CensusError, match="violated class needs exactly one open debt"):
@@ -653,6 +833,8 @@ def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_pa
     closure.release()
     assert review.error and attempts == []
     assert_five_headings(review.text)
+    assert "CLASS-REGISTER: structural pending" in trailer
+    assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
     assert "STRUCTURAL-PENDING" in trailer and "CONVERGENCE: BLOCKED" in trailer
     assert not (cc.lineage_dir(tmp_path) / "pending-plan.pending").exists()
 
@@ -666,7 +848,24 @@ def test_state_unavailable_result_has_five_headings(tmp_path):
         closure, mode=cc.PLAN_MODE, claim_state=pc.empty_state(),
     )
     assert review.error and attempts == [] and "STATE-UNAVAILABLE" in trailer
+    assert "CLASS-REGISTER: staged state unavailable" in trailer
     assert_five_headings(review.text)
+
+
+def test_staged_format_failure_retains_canonical_class_trailer(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "format-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    review, trailer, attempts = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=rc.CensusError("bad settlement"),
+        mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert review.error and attempts == []
+    assert "CLASS-REGISTER: staged rejected: bad settlement" in trailer
+    assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
+    assert "STRUCTURAL-ERROR: bad settlement" in trailer
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
@@ -694,7 +893,8 @@ def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
             text = wire(rc.SETTLEMENT_MARKER, {
                 "role":"correction", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                    "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                    "class_dispositions":[], "class_assessments":[],
                 "class_records":[],
             })
             return Review(text=text, session_ref="s", raw=text)
@@ -711,6 +911,7 @@ def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
     closure.release()
     assert review.error and [row["role"] for row in attempts] == ["correction"]
     assert_five_headings(review.text)
+    assert "CLASS-REGISTER:" in trailer
     assert "STATE-UNAVAILABLE" in trailer
     assert (cc.lineage_dir(tmp_path) / "save-fail.pending").exists()
     cc.clear_latch(tmp_path, "save-fail")
@@ -733,6 +934,7 @@ def test_staged_format_debt_save_failure_also_retains_latch(tmp_path, monkeypatc
     closure.release()
     assert review.error and attempts == []
     assert_five_headings(review.text)
+    assert "CLASS-REGISTER: staged rejected; failure state persistence unavailable" in trailer
     assert "STATE-UNAVAILABLE" in trailer
     assert (cc.lineage_dir(tmp_path) / "format-save-fail.pending").exists()
     cc.clear_latch(tmp_path, "format-save-fail")
@@ -753,7 +955,7 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
             text = rc.SETTLEMENT_MARKER + "\n" + json.dumps({
                 "role":"census", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_records":[],
+                "debt_updates":[], "class_dispositions":[], "class_records":[],
             })
         return Review(text=text, session_ref="s", raw=text)
 
@@ -806,7 +1008,7 @@ def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
                 text = wire(rc.SETTLEMENT_MARKER, {
                     "role":"census", "source_dispositions":[],
                     "assessment_dispositions":[], "findings":[], "debt":[],
-                    "debt_updates":[], "class_records":[],
+                    "debt_updates":[], "class_dispositions":[], "class_records":[],
                 })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -917,13 +1119,18 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
                     "evidence":["plan:1"], "remedy":"edit the plan",
                 }],
                 "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[], "class_records":[],
+                "debt_updates":[],
+                "class_dispositions":[{
+                    "finding_id":"G1", "kind":"one_off", "reason":"unique plan edit",
+                }],
+                "class_records":[],
             })
         elif '"role": "correction"' in prompt:
             text = wire(rc.SETTLEMENT_MARKER, {
                 "role":"correction", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                    "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
+                    "class_dispositions":[], "class_assessments":[],
                 "class_records":[],
             })
         else:
@@ -931,7 +1138,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
             text = wire(rc.SETTLEMENT_MARKER, {
                 "role":"final", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_records":[],
+                "debt_updates":[], "class_dispositions":[], "class_records":[],
                 "coverage": payload(lane())["coverage"], "class_assessments":[],
             })
         return Review(text=text, session_ref=f"s{len(calls)}", raw=text)
@@ -956,6 +1163,8 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     )
 
     assert "STRUCTURAL-PHASE: correction" in first
+    assert "CLASS-REGISTER: staged census parsed" in first
+    assert "CLASS-CLOSURE: 0 open, 0 closed" in first
     assert "STRUCTURAL-PHASE: final" in second
     assert "STRUCTURAL-PHASE: clear" in third
     assert "CONVERGENCE: NOT-BLOCKED" in third
@@ -1015,7 +1224,7 @@ def test_branch_codex_runs_the_staged_census_path(
             text = wire(rc.SETTLEMENT_MARKER, {
                 "role":"census", "source_dispositions":[],
                 "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":debt_updates, "class_records":[],
+                "debt_updates":debt_updates, "class_dispositions":[], "class_records":[],
             })
         return Review(text=text, session_ref="branch-session", raw=text)
 
@@ -1095,8 +1304,19 @@ def test_branch_settlement_persists_a_new_procedure_class(
         else:
             value = {
                 "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_records":[{
+                "assessment_dispositions":[],
+                "findings":[{
+                    "id":"G1", "severity":"MAJOR",
+                    "summary":"transition ownership is inconsistent",
+                    "evidence":["repository/README.md:1"],
+                    "remedy":"make transition ownership consistent",
+                }],
+                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
+                "debt_updates":[],
+                "class_dispositions":[{
+                    "finding_id":"G1", "kind":"new_class", "record_index":0,
+                }],
+                "class_records":[{
                     "op":"new", "invariant":"semantic transition ownership",
                     "severity":"MAJOR", "procedure":"inspect every transition owner",
                 }],
@@ -1112,6 +1332,8 @@ def test_branch_settlement_persists_a_new_procedure_class(
         "lineage":"procedure-branch", "round":1, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "P1")
     assert "CONVERGENCE: BLOCKED" in result
+    assert "CLASS-REGISTER: staged census parsed" in result
+    assert "CLASS-CLOSURE: 1 open, 0 closed" in result
     lineage = cc.load_lineage(
         cc.default_state_root(), "procedure-branch", stamp="P2", mode=cc.BRANCH_MODE,
     )
@@ -1119,12 +1341,19 @@ def test_branch_settlement_persists_a_new_procedure_class(
     assert len(classes) == 1
     assert classes[0].procedure == "inspect every transition owner"
     assert not classes[0].mechanized
+    assert lineage.review_state["debt"][0]["class_ids"] == [classes[0].class_id]
 
 
 def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_path):
     (tmp_path / "a.py").write_text("broken\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
+    state["debt"] = [{
+        "id":"historic", "finding_id":"historic", "status":"closed",
+        "severity":"MAJOR", "summary":"past occurrence", "evidence":["repository/a.py:1"],
+        "remedy":"already fixed", "source_ids":[], "class_ids":["abc"],
+        "first_round":1, "last_round":1,
+    }]
     lineage = cc.Lineage("replace-binding", classes={
         "abc":cc.TrackedClass(
             "abc", "old invariant", "MAJOR", 1, cc.CLOSED,
@@ -1163,7 +1392,11 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
                 "assessment_dispositions":[{"assessment_id":"abc", "governing_id":"G1"}],
                 "findings":findings,
                 "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[], "class_records":[{
+                "debt_updates":[],
+                "class_dispositions":[{
+                    "finding_id":"G1", "kind":"existing_class", "class_id":"abc",
+                }],
+                "class_records":[{
                     "op":"replace", "class_id":"abc", "invariant":"new invariant",
                     "severity":"MAJOR", "procedure":"inspect new behavior",
                 }],
@@ -1185,6 +1418,82 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
     )
     successor = lineage.classes["abc"].superseded_by
     assert successor
-    assert lineage.review_state["debt"][0]["class_ids"] == [successor]
+    current = next(d for d in lineage.review_state["debt"] if d["id"] == "D1")
+    assert current["class_ids"] == [successor]
+    historic = next(d for d in lineage.review_state["debt"] if d["id"] == "historic")
+    assert historic["class_ids"] == ["abc"]
     assert lineage.review_state["phase"] == "correction"
     assert "STRUCTURAL-PHASE: correction" in trailer
+
+
+def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_path):
+    (tmp_path / "a.py").write_text("BAD\n")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "correction"
+    state["debt"] = [{
+        "id":"D0", "finding_id":"G0", "status":"open", "severity":"MAJOR",
+        "summary":"repair another defect", "evidence":["repository/a.py:1"],
+        "remedy":"repair it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }]
+    tracked = cc.TrackedClass(
+        "abc", "no BAD tokens", "MAJOR", 1, cc.OPEN,
+        pattern="BAD", pathspec="*.py",
+        matches=(
+            {"path":"a.py", "line":1, "text":"BAD"},
+            {"path":"blob.bin", "line":0, "text":"", "binary":True},
+        ),
+    )
+    lineage = cc.Lineage(
+        "unbound-match", classes={"abc":tracked}, next_seq=2,
+        mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {
+                "role":"correction", "source_dispositions":[],
+                "assessment_dispositions":[], "findings":[], "debt":[],
+                "debt_updates":[{
+                    "id":"D0", "status":"closed", "evidence":["repository/a.py:1"],
+                }],
+                "class_dispositions":[], "class_records":[],
+                "class_assessments":[],
+            })
+            return Review(text=text, session_ref="s", raw=text)
+
+    closure = Closure()
+    review, trailer, _ = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high", mode=cc.BRANCH_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None,
+    )
+    assert not review.error
+    assert lineage.review_state["unbound_class_ids"] == ["abc"]
+    assert "abc no BAD tokens" in trailer
+    assert "2 match(es)" in trailer
+    assert "a.py:1: BAD" in trailer
+    assert "blob.bin: binary match (line not shown)" in trailer
+    assert "blob.bin:0" not in trailer
+    assert "STRUCTURAL-DEBT: 0 blocking open" in trailer
+    assert "class closure remains open" in trailer
+    assert "CONVERGENCE: BLOCKED" in trailer

@@ -1501,7 +1501,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
             text = handlers.rc.SETTLEMENT_MARKER + "\n" + json.dumps({
                 "role": "census", "source_dispositions": [],
                 "assessment_dispositions": [], "findings": [], "debt": [],
-                "debt_updates": [], "class_records": [],
+                "debt_updates": [], "class_dispositions": [], "class_records": [],
             })
         return Review(text=text, session_ref="structural", raw=text)
 
