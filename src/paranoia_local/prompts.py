@@ -333,8 +333,8 @@ least one coverage row."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
-review. Map every source finding and class assessment exactly once. Preserve the highest severity
-of merged findings. Every blocking governing finding and every governing finding referenced by a
+review. Map every source finding at least once and every class assessment exactly once. Preserve
+the highest severity of merged findings. Every blocking governing finding and every governing finding referenced by a
 violated class assessment needs exactly one open debt record, regardless of severity. Advisory debt
 is tracked but does not block convergence. If existing_debt is supplied, update every item exactly
 once; preserve it open with a concrete reason or close it with current evidence. Return only
@@ -356,7 +356,11 @@ pattern+pathspec or procedure; a plan record has procedure. A replace additional
 Close/reopen has only op and class_id; reclassify additionally has severity. A closed mechanized
 class that is violated must use replace with a corrected predicate—reopen is only for unmechanized
 classes. Use these exact row shapes:
-source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}];
+source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}]; one source_id may appear
+again with a distinct governing_id when one atomic lane finding is an occurrence of multiple active
+classes. Every target of a repeated source_id must be an existing_class finding backed by a distinct
+violated assessment that cites that source. Never split a finding into one_off or new_class targets,
+or duplicate the same source_id/governing_id pair;
 assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
 findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
 debt=[{"id":"D1","finding_id":"G1","status":"open"}];

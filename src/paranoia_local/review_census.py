@@ -222,7 +222,9 @@ def parse_settlement(
     debt = _list(obj, "debt")
     debt_ids = _unique_ids(debt, "debt")
     source_rows = _list(obj, "source_dispositions")
-    _exact_dispositions(source_rows, source_ids, finding_ids, "source_id")
+    _exact_dispositions(
+        source_rows, source_ids, finding_ids, "source_id", allow_fanout=True,
+    )
     assessment_rows = _list(obj, "assessment_dispositions")
     _exact_dispositions(assessment_rows, assessment_ids, finding_ids, "assessment_id", allow_null=True)
     for finding in findings:
@@ -330,7 +332,9 @@ def parse_settlement(
     # callers or audit readers mistake derived class IDs for model-supplied fields.
     obj["_finding_class_refs"] = finding_class
     disposition_by_class = {r["assessment_id"]: r["governing_id"] for r in assessment_rows}
-    governing_by_source = {r["source_id"]: r["governing_id"] for r in source_rows}
+    governing_by_source: dict[str, set[str]] = {}
+    for row in source_rows:
+        governing_by_source.setdefault(row["source_id"], set()).add(row["governing_id"])
     existing_rows = [
         item for item in class_dispositions if item.get("kind") == "existing_class"
     ]
@@ -347,6 +351,20 @@ def parse_settlement(
         raise CensusError(
             "every existing-class finding needs one matching violated assessment"
         )
+    for source, targets in governing_by_source.items():
+        if len(targets) == 1:
+            continue
+        for target in targets:
+            cid = finding_class.get(target)
+            if (
+                not isinstance(cid, str)
+                or existing_bindings.get(cid) != target
+                or (assessment_verdicts or {}).get(cid) != "violated"
+                or (assessment_findings or {}).get(cid) != source
+            ):
+                raise CensusError(
+                    "source fan-out requires distinct violated existing-class findings"
+                )
     operation_by_class: dict[str, str] = {}
     for record in obj["class_records"]:
         cid = record.get("class_id") if isinstance(record, dict) else None
@@ -383,9 +401,9 @@ def parse_settlement(
         cited = (assessment_findings or {}).get(cid)
         if verdict == "violated" and assessment_findings is not None:
             expected = governing_by_source.get(
-                cited, cited if role in {"correction", "final"} else None,
+                cited, {cited} if role in {"correction", "final"} else set(),
             )
-            if expected is None or target != expected:
+            if target not in expected:
                 raise CensusError(
                     "violated class disposition must follow its cited finding"
                 )
@@ -739,14 +757,25 @@ def _unique_ids(rows: Sequence[Any], label: str) -> set[str]:
 
 
 def _exact_dispositions(rows: Sequence[Any], expected: Sequence[str], targets: set[str], key: str,
-                        allow_null: bool = False) -> None:
+                        allow_null: bool = False, allow_fanout: bool = False) -> None:
     seen: set[str] = set()
+    seen_pairs: set[tuple[str, str | None]] = set()
+    expected_set = set(expected)
     for row in rows:
         if not isinstance(row, dict) or set(row) != {key, "governing_id"}:
             raise CensusError(f"invalid {key} disposition")
+        source = row[key]
         target = row["governing_id"]
-        if (row[key] in seen or row[key] not in set(expected)
-                or (target not in targets and not (allow_null and target is None))):
+        pair = (source, target)
+        if (
+            source not in expected_set
+            or pair in seen_pairs
+            or (source in seen and not allow_fanout)
+            or (target not in targets and not (allow_null and target is None))
+        ):
             raise CensusError(f"invalid or duplicate {key} disposition")
-        seen.add(row[key])
-    if seen != set(expected): raise CensusError(f"every {key} must be dispositioned exactly once")
+        seen.add(source)
+        seen_pairs.add(pair)
+    if seen != expected_set:
+        suffix = "at least once" if allow_fanout else "exactly once"
+        raise CensusError(f"every {key} must be dispositioned {suffix}")

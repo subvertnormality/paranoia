@@ -128,8 +128,13 @@ exactly one new-class disposition; a violated active-class assessment binds its 
 to that same class. Multiple occurrences of one active class consolidate into one governing root
 finding and one violated assessment in census, correction, and final. Missing or duplicate
 dispositions, extra existing-class findings, and unbound new records reject the complete
-settlement. Every source finding
-of every severity and every integrity assessment is mapped exactly once; the governing severity
+settlement. Every source finding of every severity is mapped at least once and every integrity
+assessment exactly once. A single atomic source finding may fan out to distinct governing findings
+when it is an occurrence of multiple active classes; each source-to-governing pair remains unique,
+and every target of that repeated source is an existing-class governing finding with its own
+matching violated assessment citing the same source. Repetition cannot manufacture one-off or new
+class debt from a single observation.
+The governing severity
 cannot be lower than any merged source; every blocking governing finding and every governing
 finding referenced by a violated class assessment maps to exactly one open concrete-debt record,
 including advisory findings whose debt does not gate convergence. The server parses the complete envelope into the existing

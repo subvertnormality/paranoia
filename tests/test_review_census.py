@@ -253,6 +253,74 @@ def test_census_rejects_an_extra_existing_class_finding_without_an_assessment():
         )
 
 
+def test_census_source_finding_can_fan_out_only_to_violated_classes():
+    source = "integrity:F1"
+    classes = ["class-a", "class-b"]
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[
+            {"source_id":source, "governing_id":"G1"},
+            {"source_id":source, "governing_id":"G2"},
+        ],
+        assessment_dispositions=[
+            {"assessment_id":classes[0], "governing_id":"G1"},
+            {"assessment_id":classes[1], "governing_id":"G2"},
+        ],
+        findings=[finding("G1"), finding("G2")],
+        debt=[
+            {"id":"D1", "finding_id":"G1", "status":"open"},
+            {"id":"D2", "finding_id":"G2", "status":"open"},
+        ],
+        class_dispositions=[
+            {"finding_id":"G1", "kind":"existing_class", "class_id":classes[0]},
+            {"finding_id":"G2", "kind":"existing_class", "class_id":classes[1]},
+        ],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
+        source_severities={source:"MAJOR"}, assessment_ids=classes,
+        assessment_verdicts={cid:"violated" for cid in classes},
+        assessment_findings={cid:source for cid in classes},
+        class_states={cid:(cc.OPEN, False, "MAJOR") for cid in classes},
+        class_mechanized=None, role="census",
+    )
+    assert parsed["_finding_class_refs"] == {"G1":classes[0], "G2":classes[1]}
+    state = rc.settle_state(
+        rc.normalize_state({}, stakes="s", snapshot="p"), parsed,
+        phase="census", snapshot="p", round_no=1,
+    )
+    assert [row["source_ids"] for row in state["debt"]] == [[source], [source]]
+
+    value["source_dispositions"].append(
+        {"source_id":source, "governing_id":"G2"},
+    )
+    with pytest.raises(rc.CensusError, match="duplicate source_id disposition"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
+            assessment_ids=classes,
+        )
+
+    value["source_dispositions"].pop()
+    value["class_dispositions"][1] = {
+        "finding_id":"G2", "kind":"one_off", "reason":"unique site",
+    }
+    value["assessment_dispositions"][1]["governing_id"] = None
+    verdicts = {classes[0]:"violated", classes[1]:"satisfied"}
+    cited_findings = {classes[0]:source, classes[1]:None}
+    with pytest.raises(
+        rc.CensusError,
+        match="source fan-out requires distinct violated existing-class findings",
+    ):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
+            source_severities={source:"MAJOR"}, assessment_ids=classes,
+            assessment_verdicts=verdicts,
+            assessment_findings=cited_findings,
+            class_states={cid:(cc.OPEN, False, "MAJOR") for cid in classes},
+            class_mechanized=None, role="census",
+        )
+
+
 def test_settlement_accepts_only_the_observed_decorative_marker_variant():
     short = rc.SETTLEMENT_MARKER.removesuffix(" ===")
     text = settlement().replace(rc.SETTLEMENT_MARKER, short, 1)
