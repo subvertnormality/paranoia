@@ -247,13 +247,14 @@ def _settle_staged_failure(
     state.pop("staged_failure", None)
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
-    if (
-        getattr(error, "stage_role", None) == "consolidation"
-        and getattr(error, "failure_kind", None) == "validation"
-    ):
+    if isinstance(cache, dict):
         state["validation_debt"] = str(error)
     else:
-        state["staged_failure"] = str(error)
+        state["staged_failure"] = {
+            "role":getattr(error, "stage_role", "unknown"),
+            "kind":getattr(error, "failure_kind", "unknown"),
+            "message":str(error),
+        }
     if isinstance(cache, dict):
         state["census_cache"] = deepcopy(cache)
     closure.lineage.review_state = state

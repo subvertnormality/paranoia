@@ -1047,22 +1047,28 @@ def test_staged_generic_failure_clears_old_cache_and_uses_matching_debt(tmp_path
     closure.prepare()
     closure.lineage.review_state = rc.normalize_state({}, stakes="s", snapshot="p")
     closure.lineage.review_state["census_cache"] = {"stale":True}
+    error = handlers._staged_error(
+        "provider exited", role="correction", kind="execution",
+    )
     review, trailer, attempts = handlers._settle_staged_failure(
-        closure, stakes="s", snapshot="p", error=rc.CensusError("bad settlement"),
+        closure, stakes="s", snapshot="p", error=error,
         mode=cc.PLAN_MODE,
     )
     closure.release()
     assert review.error and attempts == []
-    assert "CLASS-REGISTER: staged rejected: bad settlement" in trailer
+    assert "CLASS-REGISTER: staged rejected: provider exited" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
-    assert "STRUCTURAL-ERROR: bad settlement" in trailer
-    assert "CONVERGENCE: BLOCKED — staged execution did not settle." in trailer
+    assert "STRUCTURAL-ERROR: provider exited" in trailer
+    assert "STRUCTURAL-FAILURE: role=correction kind=execution" in trailer
+    assert "CONVERGENCE: BLOCKED — staged execution failure did not settle." in trailer
     assert "census_cache" not in closure.lineage.review_state
-    assert closure.lineage.review_state["staged_failure"] == "bad settlement"
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"correction", "kind":"execution", "message":"provider exited",
+    }
     assert "validation_debt" not in closure.lineage.review_state
 
 
-def test_staged_validation_failure_without_cache_renders_validation_debt(tmp_path):
+def test_consolidation_preflight_validation_without_cache_is_structured_failure(tmp_path):
     closure = handlers._PlanClassClosure(
         "validation-failure", round_no=1, state_root=tmp_path, stamp="T",
     )
@@ -1075,9 +1081,12 @@ def test_staged_validation_failure_without_cache_renders_validation_debt(tmp_pat
     )
     closure.release()
     assert review.error and attempts == []
-    assert closure.lineage.review_state["validation_debt"] == "lane schema rejected"
-    assert "staged_failure" not in closure.lineage.review_state
-    assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in trailer
+    assert "validation_debt" not in closure.lineage.review_state
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"validation", "message":"lane schema rejected",
+    }
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=validation" in trailer
+    assert "CONVERGENCE: BLOCKED — staged validation failure did not settle." in trailer
 
 
 def test_lane_validation_failure_remains_generic_staged_failure(tmp_path):
@@ -1092,9 +1101,51 @@ def test_lane_validation_failure_remains_generic_staged_failure(tmp_path):
         closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
     )
     closure.release()
-    assert closure.lineage.review_state["staged_failure"] == "lane prompt exceeds ceiling"
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"census-domain", "kind":"validation",
+        "message":"lane prompt exceeds ceiling",
+    }
     assert "validation_debt" not in closure.lineage.review_state
-    assert "CONVERGENCE: BLOCKED — staged execution did not settle." in trailer
+    assert "STRUCTURAL-FAILURE: role=census-domain kind=validation" in trailer
+    assert "CONVERGENCE: BLOCKED — staged validation failure did not settle." in trailer
+
+
+def test_consolidation_prompt_ceiling_is_noncacheable_structured_validation(
+    tmp_path, monkeypatch,
+):
+    closure = handlers._PlanClassClosure(
+        "consolidation-preflight", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+
+    class Engine:
+        name = "fake"
+
+        def run(self, prompt, *args, **kwargs):
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            text = lane(lane_name)
+            return Review(text=text, session_ref="s", raw=text)
+
+    monkeypatch.setattr(rc, "MAX_CONSOLIDATION_PROMPT_CHARS", 1)
+    with pytest.raises(rc.CensusError, match="consolidation prompt") as caught:
+        handlers._staged_structural_review(
+            engine=Engine(), cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=closure, stakes="s",
+            snapshot="p", round_no=1, on_progress=None, plan_lines=1,
+        )
+    assert caught.value.stage_role == "consolidation"
+    assert caught.value.failure_kind == "validation"
+    assert not handlers._cacheable_consolidation_error(caught.value)
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=validation" in trailer
+    assert "validation_debt" not in closure.lineage.review_state
+    assert "census_cache" not in closure.lineage.review_state
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(

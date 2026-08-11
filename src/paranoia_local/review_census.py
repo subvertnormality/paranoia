@@ -604,8 +604,18 @@ def trailer(state: dict[str, Any]) -> str:
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
     validation_debt = state.get("validation_debt") or state.get("format_debt")
     if state.get("staged_failure"):
-        lines.append(f"STRUCTURAL-ERROR: {state['staged_failure']}")
-        lines.append("CONVERGENCE: BLOCKED — staged execution did not settle.")
+        failure = state["staged_failure"]
+        if isinstance(failure, dict):
+            role = failure.get("role", "unknown")
+            kind = failure.get("kind", "unknown")
+            message = failure.get("message", "staged review failed")
+            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
+            lines.append(f"CONVERGENCE: BLOCKED — staged {kind} failure did not settle.")
+        else:
+            # Version-1 state written before structured failure metadata.
+            lines.append(f"STRUCTURAL-ERROR: {failure}")
+            lines.append("CONVERGENCE: BLOCKED — staged failure did not settle.")
     elif validation_debt:
         lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
         lines.append("CONVERGENCE: BLOCKED — staged validation debt remains open.")

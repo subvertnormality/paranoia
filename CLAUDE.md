@@ -53,4 +53,5 @@
   active-class state, engine settings, plan context, and cache schema all match exactly; execution
   failure, timeout, cancellation, and failed retry delete older cache, persist as generic staged
   failure, and are never reusable. Only terminal consolidation validation uses validation debt;
-  lane and follow-up validation are generic staged failures.
+  lane, follow-up, and consolidation-preflight validation are structured staged failures carrying
+  exact role, kind, and message.
