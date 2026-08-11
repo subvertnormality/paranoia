@@ -617,7 +617,14 @@ def trailer(state: dict[str, Any]) -> str:
             lines.append(f"STRUCTURAL-ERROR: {failure}")
             lines.append("CONVERGENCE: BLOCKED — staged failure did not settle.")
     elif validation_debt:
-        lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
+        if isinstance(validation_debt, dict):
+            role = validation_debt.get("role", "consolidation-validation-retry")
+            kind = validation_debt.get("kind", "validation")
+            message = validation_debt.get("message", "settlement validation rejected")
+            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
+        else:
+            lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
         lines.append("CONVERGENCE: BLOCKED — staged validation debt remains open.")
     elif state.get("unbound_class_ids"):
         lines.append("CONVERGENCE: BLOCKED — class closure remains open.")

@@ -225,6 +225,8 @@ structured `staged_failure` records with their exact role, kind, and message. Th
 older census cache and cannot authorize reuse. Engine outcomes retain `timeout`, `unavailable`,
 `provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
 retry and its attempt-ledger event use the same `*-validation-retry` role.
+Terminal validation debt retains that same structured role, kind, and message in lineage state and
+the convergence trailer.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
@@ -901,7 +903,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 Reviews draw on your subscription's agentic-usage pool. A tracked plan cold census is three concurrent
 reviewer calls plus consolidation; correction and final are one call each, with at most one bounded
-same-session format correction per call. Use `query` for quick checks.
+same-session validation correction per call. It covers schema and semantic settlement rejection and
+is recorded as `*-validation-retry`. Use `query` for quick checks.
 
 Audit `attempt_ledger` rows enumerate every provider run/resume exactly once. A synchronized
 sequence is assigned immediately before each concurrent census run/resume boundary, and the stage

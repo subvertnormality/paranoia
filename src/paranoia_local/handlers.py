@@ -157,7 +157,7 @@ def _staged_call(
             parsed = parser(retry.text)
         except rc.CensusError as second:
             attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
-            second.stage_role = role  # type: ignore[attr-defined]
+            second.stage_role = f"{role}-validation-retry"  # type: ignore[attr-defined]
             second.failure_kind = "validation"  # type: ignore[attr-defined]
             second.attempts = attempts  # type: ignore[attr-defined]
             raise
@@ -253,7 +253,9 @@ def _cached_census_manifests(
 def _cacheable_consolidation_error(error: rc.CensusError) -> bool:
     attempts = getattr(error, "attempts", [])
     return (
-        getattr(error, "stage_role", None) == "consolidation"
+        getattr(error, "stage_role", None) in {
+            "consolidation", "consolidation-validation-retry",
+        }
         and getattr(error, "failure_kind", None) == "validation"
         and bool(attempts) and all(
             attempt.outcome == "validation-invalid" for attempt in attempts
@@ -273,7 +275,11 @@ def _settle_staged_failure(
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
     if isinstance(cache, dict):
-        state["validation_debt"] = str(error)
+        state["validation_debt"] = {
+            "role":getattr(error, "stage_role", "consolidation-validation-retry"),
+            "kind":"validation",
+            "message":str(error),
+        }
     else:
         state["staged_failure"] = {
             "role":getattr(error, "stage_role", "unknown"),

@@ -53,6 +53,7 @@ non-terminal-consolidation-validation exits as structured staged failure with ex
 and message, not validation debt. Preserve timeout, unavailable executable, provider error, and
 other execution outcomes distinctly, including the validation-retry role.
 Attempt telemetry must use that same `*-validation-retry` role.
+Terminal validation debt must persist and render the identical structured role, kind, and message.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

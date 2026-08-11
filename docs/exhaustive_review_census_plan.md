@@ -303,6 +303,7 @@ first delete any older cache and persist as structured `staged_failure` with exa
 message; consolidation preflight validation does the same. Engine outcomes preserve timeout,
 unavailable executable, in-band provider error, and other execution failure distinctly, including
 the same `*-validation-retry` role in failure state and attempt telemetry. They cannot authorize reuse.
+Terminal validation debt also persists and renders that structured role, kind, and message.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

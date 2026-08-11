@@ -85,6 +85,9 @@ def test_only_terminal_validation_rejection_can_cache_completed_lanes():
     assert handlers._cacheable_consolidation_error(error(
         "validation-invalid", "validation-invalid",
     ))
+    retry_error = error("validation-invalid", "validation-invalid")
+    retry_error.stage_role = "consolidation-validation-retry"  # type: ignore[attr-defined]
+    assert handlers._cacheable_consolidation_error(retry_error)
     assert not handlers._cacheable_consolidation_error(error("failed"))
     assert not handlers._cacheable_consolidation_error(error(
         "validation-invalid", "failed",
@@ -1599,13 +1602,17 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         log_dir=tmp_path / "logs", now=lambda: "C1",
     )
     assert "STRUCTURAL-ERROR" in first
+    assert "STRUCTURAL-FAILURE: role=consolidation-validation-retry kind=validation" in first
     assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in first
     lineage = cc.load_lineage(
         cc.default_state_root(), "cached-census-branch", stamp="C2",
         mode=cc.BRANCH_MODE,
     )
     assert len(lineage.review_state["census_cache"]["manifests"]) == 3
-    assert "validation_debt" in lineage.review_state
+    assert lineage.review_state["validation_debt"]["role"] == (
+        "consolidation-validation-retry"
+    )
+    assert lineage.review_state["validation_debt"]["kind"] == "validation"
     assert "staged_failure" not in lineage.review_state
     assert calls.count("consolidation") == 1
     assert sum(call.startswith("lane:") for call in calls) == 3
