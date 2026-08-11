@@ -88,6 +88,7 @@ def _attempt(
 def _staged_call(
     *, role: str, engine: Engine, prompt: str, cwd: Path, model: str, effort: str,
     timeout: int, parser: Callable[[str], dict[str, Any]],
+    retry_guidance: str,
     on_progress: Callable[[str], None] | None,
     next_sequence: Callable[[], int] | None = None,
 ) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
@@ -113,13 +114,7 @@ def _staged_call(
             review.session_ref,
             "Your staged JSON was rejected: " + str(first) +
             "\nFix every schema violation in the complete object, not only the first one. "
-            "Finding rows have exactly id,severity,summary,evidence,remedy (never class_id). "
-            "Debt rows have exactly id,finding_id,status. Debt updates have exactly "
-            "id,status,evidence. Class records are operations: close/reopen have only "
-            "op,class_id; reclassify adds severity; new/replace use the exact invariant, "
-            "severity and mode-specific procedure or pattern/pathspec shape from the original "
-            "prompt. They never contain status,finding_ids,debt_ids. Return only the required "
-            "marker and complete JSON object.",
+            + retry_guidance + " Return only the required marker and complete JSON object.",
             cwd, model, effort, False, timeout=min(300, timeout),
             **_progress_kwargs(on_progress),
         )
@@ -327,6 +322,7 @@ def _staged_structural_review(
             result, parsed, lane_attempts = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=900, on_progress=on_progress,
+                retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -383,6 +379,7 @@ def _staged_structural_review(
             review, settlement, call_attempts = _staged_call(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=600, on_progress=on_progress,
+                retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
@@ -414,6 +411,7 @@ def _staged_structural_review(
         review, settlement, call_attempts = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=1200, on_progress=on_progress, next_sequence=next_sequence,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
                 assessment_ids=active_ids if role == "final" else [],

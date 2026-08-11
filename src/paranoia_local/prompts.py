@@ -320,9 +320,11 @@ least one coverage row."""
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
 review. Map every source finding and class assessment exactly once. Preserve the highest severity
-of merged findings. Every blocking governing finding needs exactly one open debt record. Return
-only === REVIEW SETTLEMENT JSON === followed by one JSON object with: role, source_dispositions,
-assessment_dispositions, findings, debt, debt_updates, and class_records. Class record op is one of
+of merged findings. Every blocking governing finding and every governing finding referenced by a
+violated class assessment needs exactly one open debt record, regardless of severity. Advisory debt
+is tracked but does not block convergence. Return only === REVIEW SETTLEMENT JSON === followed by
+one JSON object with: role, source_dispositions, assessment_dispositions, findings, debt,
+debt_updates, and class_records. Class record op is one of
 new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
 operation. A new/replace record has op, invariant, severity and either pattern+pathspec (branch)
 or procedure (plan), with class_id additionally required for replace. Close/reopen has only op and
@@ -352,6 +354,26 @@ ANCHOR_POLICY
 Every anchor must resolve.
 A finding row names one or more findings, all other coverage rows name none, and every finding is
 named by coverage."""
+
+
+STAGED_LANE_RETRY_GUIDANCE = (
+    "Coverage rows have exactly id,status,summary,evidence,finding_ids. Lane finding rows have "
+    "exactly id,severity,summary,evidence,remedy. Class assessment rows have exactly "
+    "class_id,verdict,evidence,finding_id. Lane manifests never contain settlement debt, debt "
+    "updates, dispositions, or class records."
+)
+
+
+STAGED_SETTLEMENT_RETRY_GUIDANCE = (
+    "Every blocking finding and every governing finding referenced by a violated class "
+    "assessment needs exactly one open debt row, including MINOR and OUT-OF-SCOPE; advisory "
+    "debt is tracked but does not block convergence. Finding rows have exactly "
+    "id,severity,summary,evidence,remedy (never class_id). Debt rows have exactly "
+    "id,finding_id,status. Debt updates have exactly id,status,evidence. Class records are "
+    "operations: close/reopen have only op,class_id; reclassify adds severity; new/replace use "
+    "the exact invariant, severity and mode-specific procedure or pattern/pathspec shape from "
+    "the original prompt. They never contain status,finding_ids,debt_ids."
+)
 
 
 # ── class closure ─────────────────────────────────────────────────────────────
