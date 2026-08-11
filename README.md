@@ -218,6 +218,8 @@ An open, unmechanized active class assessed `satisfied` closes deterministically
 emit the explicit close record, and the server derives it when omitted; mechanized classes retain
 their separate mechanical closure rule. Rejections after parsing are recorded as
 `validation-invalid`, which covers both envelope/schema and semantic lifecycle failures.
+Execution, retry, timeout, cancellation, and deadline failures instead persist as
+`staged_failure`, invalidate any older census cache, and cannot authorize reuse.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state

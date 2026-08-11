@@ -1033,11 +1033,13 @@ def test_state_unavailable_result_has_five_headings(tmp_path):
     assert_five_headings(review.text)
 
 
-def test_staged_format_failure_retains_canonical_class_trailer(tmp_path):
+def test_staged_generic_failure_clears_old_cache_and_uses_matching_debt(tmp_path):
     closure = handlers._PlanClassClosure(
         "format-failure", round_no=1, state_root=tmp_path, stamp="T",
     )
     closure.prepare()
+    closure.lineage.review_state = rc.normalize_state({}, stakes="s", snapshot="p")
+    closure.lineage.review_state["census_cache"] = {"stale":True}
     review, trailer, attempts = handlers._settle_staged_failure(
         closure, stakes="s", snapshot="p", error=rc.CensusError("bad settlement"),
         mode=cc.PLAN_MODE,
@@ -1047,6 +1049,9 @@ def test_staged_format_failure_retains_canonical_class_trailer(tmp_path):
     assert "CLASS-REGISTER: staged rejected: bad settlement" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
     assert "STRUCTURAL-ERROR: bad settlement" in trailer
+    assert "census_cache" not in closure.lineage.review_state
+    assert closure.lineage.review_state["staged_failure"] == "bad settlement"
+    assert "validation_debt" not in closure.lineage.review_state
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
@@ -1431,6 +1436,8 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         mode=cc.BRANCH_MODE,
     )
     assert len(lineage.review_state["census_cache"]["manifests"]) == 3
+    assert "validation_debt" in lineage.review_state
+    assert "staged_failure" not in lineage.review_state
     assert calls.count("consolidation") == 1
     assert sum(call.startswith("lane:") for call in calls) == 3
 

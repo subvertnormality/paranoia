@@ -591,6 +591,7 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
     out.pop("validation_debt", None)
+    out.pop("staged_failure", None)
     out.pop("census_cache", None)
     out.pop("unbound_classes", None)
     out.pop("unbound_class_ids", None)
@@ -602,7 +603,10 @@ def trailer(state: dict[str, Any]) -> str:
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
     validation_debt = state.get("validation_debt") or state.get("format_debt")
-    if validation_debt:
+    if state.get("staged_failure"):
+        lines.append(f"STRUCTURAL-ERROR: {state['staged_failure']}")
+        lines.append("CONVERGENCE: BLOCKED — staged execution did not settle.")
+    elif validation_debt:
         lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
         lines.append("CONVERGENCE: BLOCKED — staged validation debt remains open.")
     elif state.get("unbound_class_ids"):

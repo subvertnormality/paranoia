@@ -223,11 +223,16 @@ def _settle_staged_failure(
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     assert closure.lineage is not None
     state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
-    state["validation_debt"] = str(error)
+    state.pop("census_cache", None)
+    state.pop("validation_debt", None)
+    state.pop("staged_failure", None)
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
     if isinstance(cache, dict):
+        state["validation_debt"] = str(error)
         state["census_cache"] = deepcopy(cache)
+    else:
+        state["staged_failure"] = str(error)
     closure.lineage.review_state = state
     try:
         cc.save_lineage(closure.state_root, closure.lineage)

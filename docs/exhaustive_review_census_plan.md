@@ -296,7 +296,9 @@ open debt, stakes, active-class state, engine/model/effort/web settings, plan li
 schema all match exactly. Persistence requires terminal validation rejection; incomplete lanes,
 failed validation retry, execution failure, timeout, cancellation, or any binding change force a
 fresh immutable census. Parser and semantic settlement failures are logged as
-`validation-invalid`, not misclassified as format-only failures.
+`validation-invalid`, not misclassified as format-only failures. Every other staged failure first
+deletes any older cache and persists as generic `staged_failure`; it is never represented as
+validation debt and cannot authorize reuse.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

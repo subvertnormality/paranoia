@@ -51,4 +51,5 @@
 - derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
   post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,
   active-class state, engine settings, plan context, and cache schema all match exactly; execution
-  failure, timeout, cancellation, and failed retry are never reusable.
+  failure, timeout, cancellation, and failed retry delete older cache, persist as generic staged
+  failure, and are never reusable.
