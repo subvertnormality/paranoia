@@ -42,3 +42,6 @@
   finding as one-off/new/existing, bind every new record, use the canonical class engine, and expose
   `CLASS-REGISTER` and `CLASS-CLOSURE`; structural debt alone is not feature parity.
   Ambiguous persistence uses `CLASS-CLOSURE: STATE-UNAVAILABLE`, not unconfirmed class counts.
+- preserve an atomic lane finding that violates several active classes and let its source
+  disposition fan out to one distinct governing finding per affected class; do not split the
+  observation merely to satisfy the settlement schema.

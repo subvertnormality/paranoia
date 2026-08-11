@@ -36,6 +36,9 @@ finding and every governing finding referenced by a violated class assessment, i
 `MINOR` and `OUT-OF-SCOPE`. Advisory debt is tracked but excluded from phase gating and the
 computed blocking-debt count; do not weaken the validator or inflate severity to reconcile a
 prompt mismatch.
+One atomic lane finding may violate several active classes. Preserve that observation and allow
+its source disposition to fan out to one distinct governing finding per affected class; do not
+force the reviewer to split or paraphrase the source finding merely to satisfy settlement shape.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
