@@ -116,6 +116,8 @@ class TestStagedReviewInstructions:
         ):
             assert "`plan:<line>`" in text
             assert "never by its repository path" in text
+            assert "`repository/<path>:<line>`" in text
+            assert "literal `repository/` prefix is required" in text
 
 
 class TestCompose:
