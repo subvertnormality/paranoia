@@ -44,8 +44,10 @@ violated assessment citing that source; repetition must not manufacture one-off 
 Derive the deterministic close transition when an open, unmechanized class is assessed satisfied;
 do not discard a healthy census because the model omitted that redundant lifecycle record.
 After consolidation-only failure, reuse a complete validated lane census only under exact bindings
-to mode, structural snapshot, full review input, stakes, active-class state, and cache schema.
-Incomplete or mismatched cached lanes must never suppress a fresh census.
+to mode, structural snapshot, full review body/open debt, stakes, active-class state,
+engine/model/effort/web settings, plan context, and cache schema. Persist it only after terminal
+validation rejection. Incomplete or mismatched lanes, execution failure, timeout, cancellation, or
+failed retry must never suppress a fresh census.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

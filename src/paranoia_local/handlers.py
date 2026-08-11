@@ -113,7 +113,9 @@ def _staged_call(
     except rc.CensusError as first:
         attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
         if not review.session_ref:
-            error = rc.CensusError(f"{role} format invalid and has no resumable session: {first}")
+            error = rc.CensusError(
+                f"{role} validation invalid and has no resumable session: {first}"
+            )
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
         retry_sequence = next_sequence() if next_sequence else None
@@ -130,7 +132,7 @@ def _staged_call(
             f"{role}-format-retry", engine, retry, sequence=retry_sequence,
         ))
         if retry.error:
-            error = rc.CensusError(f"{role} format retry failed (exit {retry.returncode})")
+            error = rc.CensusError(f"{role} validation retry failed (exit {retry.returncode})")
             error.attempts = attempts  # type: ignore[attr-defined]
             raise error from first
         try:
@@ -156,18 +158,26 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
 
 def _census_cache_binding(
     *, mode: str, snapshot: str, stakes: str, body: str,
-    active_classes: list[dict[str, Any]],
+    active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
+    engine_name: str, model: str, effort: str, web_search: bool,
+    plan_lines: int | None,
 ) -> dict[str, Any]:
     canonical_classes = json.dumps(
         sorted(active_classes, key=lambda row: row["class_id"]),
         ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     )
+    complete_input = json.dumps({
+        "mode":mode, "snapshot_digest":snapshot, "stakes":stakes, "body":body,
+        "active_classes":active_classes, "existing_debt":existing_debt,
+        "engine":engine_name, "model":model, "effort":effort,
+        "web_search":web_search, "plan_lines":plan_lines,
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {
         "version":rc.CENSUS_CACHE_VERSION,
         "mode":mode,
         "snapshot_digest":snapshot,
         "stakes_digest":rc.digest(stakes),
-        "input_digest":rc.digest(body),
+        "input_digest":rc.digest(complete_input),
         "active_classes_digest":rc.digest(canonical_classes),
     }
 
@@ -198,6 +208,13 @@ def _cached_census_manifests(
     except rc.CensusError:
         return None
     return validated
+
+
+def _cacheable_consolidation_error(error: rc.CensusError) -> bool:
+    attempts = getattr(error, "attempts", [])
+    return bool(attempts) and all(
+        attempt.outcome == "validation-invalid" for attempt in attempts
+    )
 
 
 def _settle_staged_failure(
@@ -423,9 +440,14 @@ def _staged_structural_review(
 
     if phase == "census":
         lanes = rc.LANES[mode]
+        existing_debt = [
+            d for d in state.get("debt", []) if d.get("status") == "open"
+        ]
         cache_binding = _census_cache_binding(
             mode=mode, snapshot=snapshot, stakes=stakes, body=body,
-            active_classes=active_classes,
+            active_classes=active_classes, existing_debt=existing_debt,
+            engine_name=engine.name, model=model, effort=effort,
+            web_search=web_search, plan_lines=plan_lines,
         )
 
         def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
@@ -500,9 +522,7 @@ def _staged_structural_review(
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
-            "existing_debt": [
-                d for d in state.get("debt", []) if d.get("status") == "open"
-            ],
+            "existing_debt": existing_debt,
         }, ensure_ascii=False)
         try:
             prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
@@ -527,13 +547,15 @@ def _staged_structural_review(
                 ),
             )
         except rc.CensusError as error:
+            cacheable = _cacheable_consolidation_error(error)
             error.attempts = [  # type: ignore[attr-defined]
                 *attempts, *getattr(error, "attempts", []),
             ]
             error.manifests = manifests  # type: ignore[attr-defined]
-            error.census_cache = {  # type: ignore[attr-defined]
-                **cache_binding, "manifests":deepcopy(manifests),
-            }
+            if cacheable:
+                error.census_cache = {  # type: ignore[attr-defined]
+                    **cache_binding, "manifests":deepcopy(manifests),
+                }
             raise
         attempts.extend(call_attempts)
     else:

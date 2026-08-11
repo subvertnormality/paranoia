@@ -145,8 +145,10 @@ code-review investigation, packet-use, proportionality, and warranted-web-search
 structured output contract changes. One-shot reviews retain the single broad review.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
-on mode, structural snapshot, complete review input, frozen stakes, active-class state, and cache
-schema; any change or incomplete lane set forces a fresh census.
+on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
+engine/model/effort/web capability settings, plan line context, and cache schema. It is recorded only
+after terminal validation rejection; execution failure, timeout, cancellation, or failed retry is
+not reusable. Any binding change or incomplete lane set forces a fresh census.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and

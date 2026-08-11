@@ -36,7 +36,8 @@ def test_census_cache_requires_every_exact_binding():
     manifests = [payload(lane(name)) for name in lanes]
     binding = handlers._census_cache_binding(
         mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
-        active_classes=[],
+        active_classes=[], existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3,
     )
     state = {"census_cache":{**binding, "manifests":manifests}}
 
@@ -56,6 +57,26 @@ def test_census_cache_requires_every_exact_binding():
     assert handlers._cached_census_manifests(
         incomplete, binding=binding, lanes=lanes, validate=validate,
     ) is None
+
+
+def test_only_terminal_validation_rejection_can_cache_completed_lanes():
+    def error(*outcomes):
+        value = rc.CensusError("rejected")
+        value.attempts = [  # type: ignore[attr-defined]
+            rc.Attempt("consolidation", "codex", "s", outcome, None, None)
+            for outcome in outcomes
+        ]
+        return value
+
+    assert handlers._cacheable_consolidation_error(error("validation-invalid"))
+    assert handlers._cacheable_consolidation_error(error(
+        "validation-invalid", "validation-invalid",
+    ))
+    assert not handlers._cacheable_consolidation_error(error("failed"))
+    assert not handlers._cacheable_consolidation_error(error(
+        "validation-invalid", "failed",
+    ))
+    assert not handlers._cacheable_consolidation_error(rc.CensusError("oversized"))
 
 
 def assert_five_headings(text):
@@ -681,6 +702,27 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
         {"evidence":["repository/README.md:1"]}, root=tmp_path,
         trusted_roots={"repository":materialized},
     )
+
+
+def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            return Review(text=text, session_ref=None, raw=text)
+
+    with pytest.raises(rc.CensusError, match="validation invalid") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=[],
+            ),
+        )
+    assert "format invalid" not in str(caught.value)
+    assert [row.outcome for row in caught.value.attempts] == ["validation-invalid"]
 
 
 def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):

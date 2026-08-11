@@ -292,9 +292,10 @@ persist valid claim progress, leave phase and structural round unchanged, and re
 resumable structural-pending output. The autonomous caller repeats the same round; retained evidence
 makes it cheaper. When all three lanes validated and only consolidation failed, the lineage retains
 those manifests and a retry runs consolidation only if mode, structural snapshot, full review body,
-stakes, active-class state, and cache schema all match exactly. Incomplete lanes or any binding
-change force a fresh immutable census. Cancellation, provider execution failure, and deadline are
-terminal for that attempt. Parser and semantic settlement failures are logged as
+open debt, stakes, active-class state, engine/model/effort/web settings, plan line context, and cache
+schema all match exactly. Persistence requires terminal validation rejection; incomplete lanes,
+failed validation retry, execution failure, timeout, cancellation, or any binding change force a
+fresh immutable census. Parser and semantic settlement failures are logged as
 `validation-invalid`, not misclassified as format-only failures.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
