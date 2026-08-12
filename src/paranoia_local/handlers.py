@@ -95,11 +95,12 @@ def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
     kind = (
         "timeout" if review.returncode == 124
         else "unavailable" if review.returncode == 127
+        else "cancellation" if review.returncode in {-15, -2, 130, 143}
         else "provider" if review.returncode == 0
         else "execution"
     )
-    detail = " ".join((review.text or review.raw or "engine failure").split())[:2000]
-    error = rc.CensusError(f"{role} {kind}: {detail}")
+    detail = review.text or review.raw or "engine failure"
+    error = rc.CensusError(detail)
     error.stage_role = role  # type: ignore[attr-defined]
     error.failure_kind = kind  # type: ignore[attr-defined]
     return error

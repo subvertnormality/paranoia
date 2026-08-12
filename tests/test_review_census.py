@@ -775,10 +775,47 @@ def test_staged_timeout_preserves_kind_message_state_and_trailer(tmp_path):
     closure.release()
     assert closure.lineage.review_state["staged_failure"] == {
         "role":"consolidation", "kind":"timeout",
-        "message":"consolidation timeout: [paranoia-local error] timed out after 1800s",
+        "message":"[paranoia-local error] timed out after 1800s",
     }
     assert "STRUCTURAL-FAILURE: role=consolidation kind=timeout" in trailer
     assert "CONVERGENCE: BLOCKED — staged timeout failure did not settle." in trailer
+
+
+@pytest.mark.parametrize("returncode", [-15, -2, 130, 143])
+def test_staged_cancellation_preserves_exact_kind_and_message(tmp_path, returncode):
+    message = "cancelled by operator\nwithout rewriting"
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(
+                text=message, session_ref=None, raw=message,
+                returncode=returncode, error=True,
+            )
+
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._staged_call(
+            role="coverage", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: {},
+        )
+    assert str(caught.value) == message
+    assert caught.value.failure_kind == "cancellation"
+    closure = handlers._PlanClassClosure(
+        f"cancel-{returncode}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"coverage", "kind":"cancellation", "message":message,
+    }
+    assert f"STRUCTURAL-ERROR: {message}" in trailer
+    assert "CONVERGENCE: BLOCKED — staged cancellation failure did not settle." in trailer
 
 
 def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
@@ -795,7 +832,7 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
                 returncode=124, error=True,
             )
 
-    with pytest.raises(rc.CensusError, match="validation-retry timeout") as caught:
+    with pytest.raises(rc.CensusError, match="reviewer timed out") as caught:
         handlers._staged_call(
             role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=1800, on_progress=None,
@@ -807,6 +844,17 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert caught.value.stage_role == "consolidation-validation-retry"
     assert caught.value.failure_kind == "timeout"
     assert not handlers._cacheable_consolidation_error(caught.value)
+
+
+def test_staged_execution_failure_preserves_exact_message():
+    message = "engine failed\nwith useful detail"
+    error = handlers._engine_failure_error(
+        Review(text=message, session_ref=None, raw=message, returncode=9, error=True),
+        role="consolidation",
+    )
+    assert error.stage_role == "consolidation"
+    assert error.failure_kind == "execution"
+    assert str(error) == message
 
 
 def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
