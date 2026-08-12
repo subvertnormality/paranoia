@@ -1,4 +1,4 @@
-# paranoia-local
+# Paranoia
 
 Get a cold, adversarial review of your code, your plans, and your decisions from
 the *other* frontier coding agent — running locally, on its own subscription, with
