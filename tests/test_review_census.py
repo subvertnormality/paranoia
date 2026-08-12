@@ -860,33 +860,48 @@ def test_staged_execution_failure_preserves_exact_message():
 
 
 @pytest.mark.parametrize(
-    ("engine_name", "stdout"),
+    ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
     [
         (
             "codex",
             '{"type":"item.completed","item":{"type":"agent_message",'
             '"text":"partial"}}\n',
+            "", "partial", "codex exited with return code 9",
         ),
         (
             "claude",
             '{"is_error":false,"result":"partial","session_id":"s"}',
+            "", "partial", "claude exited with return code 9",
+        ),
+        (
+            "codex",
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"partial"}}\n'
+            '{"type":"turn.failed","error":{"message":'
+            '"terminal provider diagnostic"}}\n',
+            " \n\t", "partial", "terminal provider diagnostic",
+        ),
+        (
+            "claude",
+            '{"is_error":true,"result":"terminal provider diagnostic",'
+            '"session_id":"s"}',
+            " \n\t", "terminal provider diagnostic", "terminal provider diagnostic",
         ),
     ],
 )
-def test_empty_stderr_process_exit_reaches_staged_trailer(
-    tmp_path, engine_name, stdout,
+def test_empty_or_whitespace_stderr_process_exit_reaches_staged_trailer(
+    tmp_path, engine_name, stdout, stderr, expected_text, expected_detail,
 ):
     engine = engines.get_engine(engine_name)
 
     def runner(argv, stdin_text, cwd, timeout):
-        return RunResult(returncode=9, stdout=stdout, stderr="")
+        return RunResult(returncode=9, stdout=stdout, stderr=stderr)
 
     review = engine.run(
         "p", tmp_path, engine.default_model, "high", False, runner=runner,
     )
-    expected = f"{engine_name} exited with return code 9"
-    assert review.text == "partial"
-    assert review.failure_detail == expected
+    assert review.text == expected_text
+    assert review.failure_detail == expected_detail
     error = handlers._engine_failure_error(review, role="consolidation")
     closure = handlers._PlanClassClosure(
         f"empty-stderr-{engine_name}", round_no=1, state_root=tmp_path, stamp="T",
@@ -897,9 +912,9 @@ def test_empty_stderr_process_exit_reaches_staged_trailer(
     )
     closure.release()
     assert closure.lineage.review_state["staged_failure"] == {
-        "role":"consolidation", "kind":"execution", "message":expected,
+        "role":"consolidation", "kind":"execution", "message":expected_detail,
     }
-    assert f"STRUCTURAL-ERROR: {expected}" in trailer
+    assert f"STRUCTURAL-ERROR: {expected_detail}" in trailer
 
 
 def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):

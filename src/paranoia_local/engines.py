@@ -165,7 +165,7 @@ class Engine(ABC):
         failed = result.returncode != 0 or review.error
         failure_detail = (
             (
-                result.stderr or review.failure_detail
+                (result.stderr if result.stderr.strip() else None) or review.failure_detail
                 or f"{self.name} exited with return code {result.returncode}"
             ) if result.returncode != 0
             else review.failure_detail
