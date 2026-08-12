@@ -2270,3 +2270,36 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
     assert "STRUCTURAL-DEBT: 0 blocking open" in trailer
     assert "class closure remains open" in trailer
     assert "CONVERGENCE: BLOCKED" in trailer
+
+
+def test_a_markdown_fenced_payload_parses_like_a_bare_one():
+    """Engines intermittently wrap the payload in a markdown fence.
+
+    Observed 2026-08-12 on `claude-opus-5`: a complete, correct `final`
+    settlement arrived as ```` ```json ```` + the object + ```` ``` ````, and
+    `json.loads` failed at `char 0`. The review had already run — 9.5 minutes and
+    47k output tokens — so rejecting the reply discarded a finished verdict over
+    a formatting artifact, not a disagreement about content.
+    """
+    bare = settlement()
+    marker, body = bare.split("\n", 1)
+    for opening in ("```json", "```"):
+        fenced = f"{marker}\n{opening}\n{body}\n```"
+        assert (rc.parse_settlement(fenced, source_ids=["domain-1"], assessment_ids=[])
+                == rc.parse_settlement(bare, source_ids=["domain-1"], assessment_ids=[]))
+
+    # Lanes take the same extraction path, so they gain the same tolerance.
+    lane_bare = lane()
+    lane_marker, lane_body = lane_bare.split("\n", 1)
+    assert (rc.parse_lane(f"{lane_marker}\n```json\n{lane_body}\n```", lane="domain")
+            == rc.parse_lane(lane_bare, lane="domain"))
+
+
+def test_an_unclosed_or_non_fence_payload_is_still_rejected():
+    """The tolerance is for a FENCE, not for arbitrary prose around the object."""
+    marker, body = settlement().split("\n", 1)
+    for broken in (f"{marker}\n```json\n{body}",          # never closed
+                   f"{marker}\n```json not-a-language\n{body}\n```",
+                   f"{marker}\nhere you go:\n{body}"):     # prose, no fence
+        with pytest.raises(rc.CensusError, match="invalid JSON"):
+            rc.parse_settlement(broken, source_ids=["domain-1"], assessment_ids=[])

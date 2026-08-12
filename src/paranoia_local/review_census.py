@@ -768,13 +768,41 @@ def _walk_dicts(value: Any):
             yield from _walk_dicts(child)
 
 
+def _unfence(raw: str) -> str:
+    """Strip a markdown code fence the engine wrapped the payload in.
+
+    The prompt asks for bare JSON after the marker, and engines mostly comply —
+    but not always. Observed 2026-08-12 on `claude-opus-5`: a complete `final`
+    settlement arrived fenced, and `json.loads` failed at `char 0`. The review
+    had already run, so the reply was discarded over a formatting artifact
+    rather than any disagreement about its content.
+
+    Deliberately narrow. Only an opening fence with an optional single-token
+    language tag and a matching closing fence is unwrapped; anything else is
+    returned untouched so it still fails the parse. A fence is a wrapper, not a
+    licence to accept prose around the object.
+    """
+    if not raw.startswith("```"):
+        return raw
+    newline = raw.find("\n")
+    if newline == -1:
+        return raw
+    language = raw[3:newline].strip()
+    if language and not language.isidentifier():
+        return raw
+    closing = raw.rfind("```")
+    if closing <= newline:
+        return raw
+    return raw[newline + 1:closing].strip()
+
+
 def _object(text: str, marker: str, cap: int) -> dict[str, Any]:
     if len(text) > cap:
         raise CensusError(f"reply exceeds {cap} characters")
     stripped = text.strip()
     if text.count(marker) != 1 or not stripped.startswith(marker):
         raise CensusError(f"reply must begin with exactly one {marker!r} marker")
-    raw = stripped[len(marker):].strip()
+    raw = _unfence(stripped[len(marker):].strip())
     try: obj = json.loads(raw)
     except json.JSONDecodeError as exc: raise CensusError(f"invalid JSON: {exc}") from exc
     if not isinstance(obj, dict): raise CensusError("JSON result must be an object")
