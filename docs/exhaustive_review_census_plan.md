@@ -147,18 +147,23 @@ class block remains only on unstaged one-shot paths, but staged output still ren
 the single governing structural convergence verdict.
 If lineage loading or persistence is ambiguous, both fields remain present but class closure is
 `STATE-UNAVAILABLE`; in-memory counts are not represented as confirmed durable state.
+For a satisfied open, unmechanized class, the server derives the deterministic `close` transition
+when consolidation omits it; the prompt still asks for the explicit record. The model supplies the
+assessment judgement, while the server owns its fixed lifecycle consequence.
 
 A valid census costs four model calls over two serial wall-clock phases. The bounded worst case is
 eight calls when all four replies need their one format correction. All limits use Python Unicode
 characters. The existing `MAX_PACKET_CHARS = 400_000` branch evidence-packet contract remains
 unchanged. Plan review passes the complete active claim register and current retirements; it does
 not truncate evidence that may change authority or entailment. Each exact staged lane prompt has a
-5,000,000-character ceiling, and an oversized prompt persists visible format debt rather than
-running partially or clearing. Each lane envelope is
+5,000,000-character ceiling, and an oversized prompt persists a visible non-cacheable structured
+failure rather than running partially or clearing. Each lane envelope is
 capped at 48,000 characters, with 2,000-character summaries/remedies and 512-character anchors.
 New class invariant/procedure fields are capped at 1,000/2,000 characters and total rendered active
-class context at 64,000 characters. Before a lane call, render its exact prompt and reject over
-5,000,000 characters; do not truncate a valid evidence packet. Consolidation has no
+class context at 64,000 characters. Active-class or lane-prompt overflow is a non-cacheable
+structured staged failure of kind `validation`; only terminal consolidation rejection populates
+`validation_debt`. Before a lane call, render its exact prompt and reject over 5,000,000
+characters; do not truncate a valid evidence packet. Consolidation has no
 artifact packet and retains a 400,000-character exact-prompt ceiling; three maximum lane envelopes
 leave more than 250,000 characters for its instructions, stakes, and class context. The plan
 prototype's complete raw four-call JSON record was 46,708 bytes.
@@ -287,9 +292,20 @@ most 600 seconds. The three census lanes run concurrently.
 Plan evidence gathering can consume most of a request. If the full census reserve no longer fits,
 persist valid claim progress, leave phase and structural round unchanged, and return explicit
 resumable structural-pending output. The autonomous caller repeats the same round; retained evidence
-makes it cheaper. Completed sibling lane replies remain in failure audit diagnostics, but a retry
-starts one fresh immutable census attempt. Cancellation, provider execution failure and deadline are
-terminal for that attempt, not format errors.
+makes it cheaper. When all three lanes validated and only consolidation failed, the lineage retains
+those manifests and a retry runs consolidation only if mode, structural snapshot, full review body,
+open debt, stakes, active-class state, engine/model/effort/web settings, plan line context, and cache
+schema all match exactly. The digest includes the exact composed prompt bytes for every lane, so an
+instruction-contract change invalidates reuse. Persistence requires terminal validation rejection; incomplete lanes,
+failed validation retry, execution failure, timeout, cancellation, or any binding change force a
+fresh immutable census. Parser and semantic settlement failures are logged as
+`validation-invalid`, not misclassified as format-only failures. Only terminal consolidation
+validation populates `validation_debt`. Lane/follow-up validation and every execution-class failure
+first delete any older cache and persist as structured `staged_failure` with exact role, kind, and
+message; consolidation preflight validation does the same. Engine outcomes preserve timeout,
+unavailable executable, in-band provider error, and other execution failure distinctly, including
+the same `*-validation-retry` role in failure state and attempt telemetry. They cannot authorize reuse.
+Terminal validation debt also persists and renders that structured role, kind, and message.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

@@ -48,3 +48,12 @@
   disposition fan out to one distinct governing finding per affected class; do not split the
   observation merely to satisfy the settlement schema. Require every repeated-source target to be
   an existing-class finding backed by its own distinct violated assessment citing that source.
+- derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
+  post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,
+  active-class state, engine settings, plan context, exact composed lane prompts, and cache schema
+  all match exactly; execution
+  failure, timeout, cancellation, and failed retry delete older cache, persist as generic staged
+  failure, and are never reusable. Only terminal consolidation validation uses validation debt;
+  lane, follow-up, and consolidation-preflight validation are structured staged failures carrying
+  exact role, kind, and message; preserve timeout, unavailable, provider, execution, and retry roles
+  rather than flattening them.

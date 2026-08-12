@@ -143,6 +143,13 @@ three-lane census, targeted correction rounds over durable debt and changed code
 broad, cold final regression before clearance. Every staged branch role retains the established
 code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
 structured output contract changes. One-shot reviews retain the single broad review.
+If all three census lanes validate but consolidation is rejected, their manifests are persisted
+with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
+on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
+engine/model/effort/web capability settings, plan line context, and cache schema. It is recorded only
+after terminal validation rejection; the binding also digests the exact composed lane prompt bytes,
+including current instructions. Execution failure, timeout, cancellation, or failed retry is
+not reusable. Any binding change or incomplete lane set forces a fresh census.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
@@ -208,6 +215,18 @@ finding to one distinct governing finding per class. The source observation is n
 split: every target of a repeated source must be an existing-class finding backed by its own
 violated assessment citing that source. One-off or new-class targets, duplicate source-to-governing
 pairs, and omitted sources still reject the settlement.
+An open, unmechanized active class assessed `satisfied` closes deterministically. Consolidation may
+emit the explicit close record, and the server derives it when omitted; mechanized classes retain
+their separate mechanical closure rule. Rejections after parsing are recorded as
+`validation-invalid`, which covers both envelope/schema and semantic lifecycle failures.
+Only terminal consolidation validation populates `validation_debt`; lane/follow-up validation and
+execution, retry, timeout, cancellation, deadline, and consolidation-preflight failures persist as
+structured `staged_failure` records with their exact role, kind, and message. They invalidate any
+older census cache and cannot authorize reuse. Engine outcomes retain `timeout`, `unavailable`,
+`provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
+retry and its attempt-ledger event use the same `*-validation-retry` role.
+Terminal validation debt retains that same structured role, kind, and message in lineage state and
+the convergence trailer.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
@@ -884,7 +903,8 @@ cannot silently reset a tracked lineage. Set `PARANOIA_STATE_ROOT` to relocate i
 
 Reviews draw on your subscription's agentic-usage pool. A tracked plan cold census is three concurrent
 reviewer calls plus consolidation; correction and final are one call each, with at most one bounded
-same-session format correction per call. Use `query` for quick checks.
+same-session validation correction per call. It covers schema and semantic settlement rejection and
+is recorded as `*-validation-retry`. Use `query` for quick checks.
 
 Audit `attempt_ledger` rows enumerate every provider run/resume exactly once. A synchronized
 sequence is assigned immediately before each concurrent census run/resume boundary, and the stage

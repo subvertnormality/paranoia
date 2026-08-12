@@ -5,9 +5,11 @@ import subprocess
 import pytest
 
 from paranoia_local import (
-    class_closure as cc, handlers, plan_claims as pc, prompts, review_census as rc,
+    class_closure as cc, engines, handlers, plan_claims as pc, prompts,
+    review_census as rc,
 )
 from paranoia_local.engines import Review
+from paranoia_local.runner import RunResult
 
 
 HEADINGS = (
@@ -29,6 +31,73 @@ def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
         handlers.STAGED_FOLLOWUP_TIMEOUT_SEC
         + handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC
     )
+
+
+def test_census_cache_requires_every_exact_binding():
+    lanes = rc.LANES[cc.PLAN_MODE]
+    manifests = [payload(lane(name)) for name in lanes]
+    lane_prompts = {name:f"prompt-{name}" for name in lanes}
+    binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=[], existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
+    )
+    state = {"census_cache":{**binding, "manifests":manifests}}
+
+    def validate(text, lane_name):
+        return rc.parse_lane(text, lane=lane_name)
+
+    assert handlers._cached_census_manifests(
+        state, binding=binding, lanes=lanes, validate=validate,
+    ) == manifests
+    for key in binding:
+        changed = dict(binding)
+        changed[key] = f"different-{binding[key]}"
+        assert handlers._cached_census_manifests(
+            state, binding=changed, lanes=lanes, validate=validate,
+        ) is None
+    incomplete = {"census_cache":{**binding, "manifests":manifests[:-1]}}
+    assert handlers._cached_census_manifests(
+        incomplete, binding=binding, lanes=lanes, validate=validate,
+    ) is None
+    changed_contract = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=[], existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3,
+        lane_prompts={**lane_prompts, lanes[0]:"updated instructions"},
+    )
+    assert changed_contract["input_digest"] != binding["input_digest"]
+    assert handlers._cached_census_manifests(
+        state, binding=changed_contract, lanes=lanes, validate=validate,
+    ) is None
+
+
+def test_only_terminal_validation_rejection_can_cache_completed_lanes():
+    def error(*outcomes):
+        value = rc.CensusError("rejected")
+        value.stage_role = "consolidation"  # type: ignore[attr-defined]
+        value.failure_kind = "validation"  # type: ignore[attr-defined]
+        value.attempts = [  # type: ignore[attr-defined]
+            rc.Attempt("consolidation", "codex", "s", outcome, None, None)
+            for outcome in outcomes
+        ]
+        return value
+
+    assert handlers._cacheable_consolidation_error(error("validation-invalid"))
+    assert handlers._cacheable_consolidation_error(error(
+        "validation-invalid", "validation-invalid",
+    ))
+    retry_error = error("validation-invalid", "validation-invalid")
+    retry_error.stage_role = "consolidation-validation-retry"  # type: ignore[attr-defined]
+    assert handlers._cacheable_consolidation_error(retry_error)
+    assert not handlers._cacheable_consolidation_error(error("failed"))
+    assert not handlers._cacheable_consolidation_error(error(
+        "validation-invalid", "failed",
+    ))
+    lane_error = error("validation-invalid")
+    lane_error.stage_role = "census-domain"  # type: ignore[attr-defined]
+    assert not handlers._cacheable_consolidation_error(lane_error)
+    assert not handlers._cacheable_consolidation_error(rc.CensusError("oversized"))
 
 
 def assert_five_headings(text):
@@ -177,6 +246,34 @@ def test_existing_class_disposition_cannot_contradict_satisfied_or_closed_state(
             assessment_verdicts={"abc":"satisfied"},
             class_states={"abc":(cc.CLOSED, False, "MAJOR")},
         )
+
+
+def test_open_unmechanized_satisfied_class_gets_deterministic_close():
+    assert "currently open and unmechanized must also have" in (
+        prompts.STAGED_CONSOLIDATION_INSTRUCTIONS
+    )
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[], findings=[], debt=[], class_dispositions=[],
+        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
+        class_records=[],
+    )
+    parsed = rc.parse_settlement(
+        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+        assessment_verdicts={"abc":"satisfied"},
+        class_states={"abc":(cc.OPEN, False, "MAJOR")},
+    )
+    assert parsed["class_records"] == [{"op":"close", "class_id":"abc"}]
+    register = rc.register_from_records(parsed["class_records"], mechanized=False)
+    assert register.transitions[0].kind == "CLOSED"
+
+    with pytest.raises(rc.CensusError, match="mechanized open class cannot be model-closed"):
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+            assessment_verdicts={"abc":"satisfied"},
+            class_states={"abc":(cc.OPEN, True, "MAJOR")},
+        )
+
 
 def test_correction_existing_class_binding_requires_a_matching_violated_assessment():
     value = payload(settlement())
@@ -628,6 +725,220 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
     )
 
 
+def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            return Review(text=text, session_ref=None, raw=text)
+
+    with pytest.raises(rc.CensusError, match="validation invalid") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=[],
+            ),
+        )
+    assert "format invalid" not in str(caught.value)
+    assert caught.value.stage_role == "consolidation"
+    assert caught.value.failure_kind == "validation"
+    assert [row.outcome for row in caught.value.attempts] == ["validation-invalid"]
+
+
+def test_staged_timeout_preserves_kind_message_state_and_trailer(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(
+                text="[paranoia-local error] timed out after 1800s",
+                session_ref=None, raw="timed out after 1800s", returncode=124, error=True,
+            )
+
+    with pytest.raises(rc.CensusError, match="timed out after 1800s") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: {},
+        )
+    assert caught.value.stage_role == "consolidation"
+    assert caught.value.failure_kind == "timeout"
+    closure = handlers._PlanClassClosure(
+        "timeout-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"timeout",
+        "message":"[paranoia-local error] timed out after 1800s",
+    }
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=timeout" in trailer
+    assert "CONVERGENCE: BLOCKED — staged timeout failure did not settle." in trailer
+
+
+@pytest.mark.parametrize("returncode", [-15, -2, 130, 143])
+def test_staged_cancellation_preserves_exact_kind_and_message(tmp_path, returncode):
+    message = "cancelled by operator\nwithout rewriting"
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(
+                text=message, session_ref=None, raw=message,
+                returncode=returncode, error=True,
+            )
+
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._staged_call(
+            role="coverage", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: {},
+        )
+    assert str(caught.value) == message
+    assert caught.value.failure_kind == "cancellation"
+    closure = handlers._PlanClassClosure(
+        f"cancel-{returncode}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"coverage", "kind":"cancellation", "message":message,
+    }
+    assert f"STRUCTURAL-ERROR: {message}" in trailer
+    assert "CONVERGENCE: BLOCKED — staged cancellation failure did not settle." in trailer
+
+
+def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, *args, **kwargs):
+            return Review(
+                text="reviewer timed out", session_ref="s", raw="reviewer timed out",
+                returncode=124, error=True,
+            )
+
+    with pytest.raises(rc.CensusError, match="reviewer timed out") as caught:
+        handlers._staged_call(
+            role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=1800, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=[],
+            ),
+        )
+    assert caught.value.stage_role == "consolidation-validation-retry"
+    assert caught.value.failure_kind == "timeout"
+    assert not handlers._cacheable_consolidation_error(caught.value)
+
+
+def test_staged_execution_failure_preserves_exact_message():
+    message = "engine failed\nwith useful detail"
+    error = handlers._engine_failure_error(
+        Review(text=message, session_ref=None, raw=message, returncode=9, error=True),
+        role="consolidation",
+    )
+    assert error.stage_role == "consolidation"
+    assert error.failure_kind == "execution"
+    assert str(error) == message
+
+
+@pytest.mark.parametrize(
+    ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
+    [
+        (
+            "codex",
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"partial"}}\n',
+            "", "partial", "codex exited with return code 9",
+        ),
+        (
+            "claude",
+            '{"is_error":false,"result":"partial","session_id":"s"}',
+            "", "partial", "claude exited with return code 9",
+        ),
+        (
+            "codex",
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"partial"}}\n'
+            '{"type":"turn.failed","error":{"message":'
+            '"terminal provider diagnostic"}}\n',
+            " \n\t", "partial", "terminal provider diagnostic",
+        ),
+        (
+            "claude",
+            '{"is_error":true,"result":"terminal provider diagnostic",'
+            '"session_id":"s"}',
+            " \n\t", "terminal provider diagnostic", "terminal provider diagnostic",
+        ),
+    ],
+)
+def test_empty_or_whitespace_stderr_process_exit_reaches_staged_trailer(
+    tmp_path, engine_name, stdout, stderr, expected_text, expected_detail,
+):
+    engine = engines.get_engine(engine_name)
+
+    def runner(argv, stdin_text, cwd, timeout):
+        return RunResult(returncode=9, stdout=stdout, stderr=stderr)
+
+    review = engine.run(
+        "p", tmp_path, engine.default_model, "high", False, runner=runner,
+    )
+    assert review.text == expected_text
+    assert review.failure_detail == expected_detail
+    error = handlers._engine_failure_error(review, role="consolidation")
+    closure = handlers._PlanClassClosure(
+        f"empty-stderr-{engine_name}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"execution", "message":expected_detail,
+    }
+    assert f"STRUCTURAL-ERROR: {expected_detail}" in trailer
+
+
+def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):
+    with pytest.raises(rc.CensusError, match="STATE-OVERSIZED") as caught:
+        handlers._staged_class_context(["x" * (rc.MAX_CLASS_CONTEXT_CHARS + 1)])
+    assert caught.value.stage_role == "active-class-preflight"
+    assert caught.value.failure_kind == "validation"
+    closure = handlers._PlanClassClosure(
+        "oversized-classes", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    failure = closure.lineage.review_state["staged_failure"]
+    assert failure == {
+        "role":"active-class-preflight", "kind":"validation",
+        "message":str(caught.value),
+    }
+    assert f"STRUCTURAL-ERROR: {caught.value}" in trailer
+    assert "STRUCTURAL-FAILURE: role=active-class-preflight kind=validation" in trailer
+
+
 def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
     invalid = payload(settlement())
     invalid["debt"][0]["id"] = ""
@@ -652,7 +963,7 @@ def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
         ),
     )
     assert parsed["debt"][0]["id"] == "D1"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path):
@@ -686,7 +997,7 @@ def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path)
         ),
     )
     assert parsed["findings"][0]["remedy"] == "fix it"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_path):
@@ -716,7 +1027,7 @@ def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_pa
         ),
     )
     assert parsed["class_dispositions"][0]["kind"] == "one_off"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
@@ -754,7 +1065,7 @@ def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
         ),
     )
     assert parsed["debt"][0]["severity"] == "OUT-OF-SCOPE"
-    assert [row.outcome for row in attempts] == ["format-invalid", "completed"]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
 def test_violated_class_cannot_be_replaced_at_lower_severity():
@@ -888,10 +1199,10 @@ def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path)
         retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
     )
     assert [attempt.role for attempt in attempts] == [
-        "census-domain", "census-domain-format-retry",
+        "census-domain", "census-domain-validation-retry",
     ]
     assert [attempt.sequence for attempt in attempts] == [None, None]
-    assert [attempt.outcome for attempt in attempts] == ["format-invalid", "completed"]
+    assert [attempt.outcome for attempt in attempts] == ["validation-invalid", "completed"]
     assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
 
 
@@ -911,15 +1222,21 @@ def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_pa
     )
     closure.prepare()
     review, trailer, attempts = handlers._structural_pending_review(
-        closure, mode=cc.PLAN_MODE, claim_state=pc.empty_state(),
+        closure, mode=cc.PLAN_MODE, stakes="s", snapshot="p",
         reason="not enough bounded time",
     )
     closure.release()
     assert review.error and attempts == []
     assert_five_headings(review.text)
-    assert "CLASS-REGISTER: structural pending" in trailer
+    assert "CLASS-REGISTER: staged rejected: not enough bounded time" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
-    assert "STRUCTURAL-PENDING" in trailer and "CONVERGENCE: BLOCKED" in trailer
+    assert "STRUCTURAL-ERROR: not enough bounded time" in trailer
+    assert "STRUCTURAL-FAILURE: role=structural-reserve-preflight kind=deadline" in trailer
+    assert "CONVERGENCE: BLOCKED — staged deadline failure did not settle." in trailer
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"structural-reserve-preflight", "kind":"deadline",
+        "message":"not enough bounded time",
+    }
     assert not (cc.lineage_dir(tmp_path) / "pending-plan.pending").exists()
 
 
@@ -936,20 +1253,112 @@ def test_state_unavailable_result_has_five_headings(tmp_path):
     assert_five_headings(review.text)
 
 
-def test_staged_format_failure_retains_canonical_class_trailer(tmp_path):
+def test_staged_generic_failure_clears_old_cache_and_uses_matching_debt(tmp_path):
     closure = handlers._PlanClassClosure(
         "format-failure", round_no=1, state_root=tmp_path, stamp="T",
     )
     closure.prepare()
+    closure.lineage.review_state = rc.normalize_state({}, stakes="s", snapshot="p")
+    closure.lineage.review_state["census_cache"] = {"stale":True}
+    error = handlers._staged_error(
+        "provider exited", role="correction", kind="execution",
+    )
     review, trailer, attempts = handlers._settle_staged_failure(
-        closure, stakes="s", snapshot="p", error=rc.CensusError("bad settlement"),
+        closure, stakes="s", snapshot="p", error=error,
         mode=cc.PLAN_MODE,
     )
     closure.release()
     assert review.error and attempts == []
-    assert "CLASS-REGISTER: staged rejected: bad settlement" in trailer
+    assert "CLASS-REGISTER: staged rejected: provider exited" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
-    assert "STRUCTURAL-ERROR: bad settlement" in trailer
+    assert "STRUCTURAL-ERROR: provider exited" in trailer
+    assert "STRUCTURAL-FAILURE: role=correction kind=execution" in trailer
+    assert "CONVERGENCE: BLOCKED — staged execution failure did not settle." in trailer
+    assert "census_cache" not in closure.lineage.review_state
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"correction", "kind":"execution", "message":"provider exited",
+    }
+    assert "validation_debt" not in closure.lineage.review_state
+
+
+def test_consolidation_preflight_validation_without_cache_is_structured_failure(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "validation-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = rc.CensusError("lane schema rejected")
+    error.stage_role = "consolidation"  # type: ignore[attr-defined]
+    error.failure_kind = "validation"  # type: ignore[attr-defined]
+    review, trailer, attempts = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert review.error and attempts == []
+    assert "validation_debt" not in closure.lineage.review_state
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"validation", "message":"lane schema rejected",
+    }
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=validation" in trailer
+    assert "CONVERGENCE: BLOCKED — staged validation failure did not settle." in trailer
+
+
+def test_lane_validation_failure_remains_generic_staged_failure(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "lane-validation-failure", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = handlers._staged_error(
+        "lane prompt exceeds ceiling", role="census-domain", kind="validation",
+    )
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"census-domain", "kind":"validation",
+        "message":"lane prompt exceeds ceiling",
+    }
+    assert "validation_debt" not in closure.lineage.review_state
+    assert "STRUCTURAL-FAILURE: role=census-domain kind=validation" in trailer
+    assert "CONVERGENCE: BLOCKED — staged validation failure did not settle." in trailer
+
+
+def test_consolidation_prompt_ceiling_is_noncacheable_structured_validation(
+    tmp_path, monkeypatch,
+):
+    closure = handlers._PlanClassClosure(
+        "consolidation-preflight", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+
+    class Engine:
+        name = "fake"
+
+        def run(self, prompt, *args, **kwargs):
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            text = lane(lane_name)
+            return Review(text=text, session_ref="s", raw=text)
+
+    monkeypatch.setattr(rc, "MAX_CONSOLIDATION_PROMPT_CHARS", 1)
+    with pytest.raises(rc.CensusError, match="consolidation prompt") as caught:
+        handlers._staged_structural_review(
+            engine=Engine(), cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=closure, stakes="s",
+            snapshot="p", round_no=1, on_progress=None, plan_lines=1,
+        )
+    assert caught.value.stage_role == "consolidation"
+    assert caught.value.failure_kind == "validation"
+    assert not handlers._cacheable_consolidation_error(caught.value)
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert "STRUCTURAL-FAILURE: role=consolidation kind=validation" in trailer
+    assert "validation_debt" not in closure.lineage.review_state
+    assert "census_cache" not in closure.lineage.review_state
 
 
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
@@ -1278,6 +1687,87 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     third_audit = json.loads(next((tmp_path / "logs").glob("T3-critique_plan-*.json")).read_text())
     assert [row["role"] for row in second_audit["attempt_ledger"]] == ["correction"]
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
+
+
+def test_branch_reuses_complete_census_after_settlement_rejection(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    calls: list[str] = []
+    accept_settlement = False
+
+    def invalid_settlement():
+        return wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+
+    def valid_settlement():
+        return wire(rc.SETTLEMENT_MARKER, {
+            "role":"census", "source_dispositions":[],
+            "assessment_dispositions":[], "findings":[], "debt":[],
+            "debt_updates":[], "class_dispositions":[], "class_records":[],
+        })
+
+    def run(self, prompt, *args, **kwargs):
+        nonlocal accept_settlement
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            calls.append(f"lane:{lane_name}")
+            value = payload(lane(lane_name))
+            for row in value["coverage"]:
+                row["evidence"] = ["repository/README.md:1"]
+            text = wire(rc.LANE_MARKER, value)
+        else:
+            calls.append("consolidation")
+            text = valid_settlement() if accept_settlement else invalid_settlement()
+        return Review(text=text, session_ref="cache-session", raw=text)
+
+    def resume(self, *args, **kwargs):
+        calls.append("consolidation-retry")
+        text = invalid_settlement()
+        return Review(text=text, session_ref="cache-session", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    args = {
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"cached-census-branch", "stakes":"trusted local tool",
+    }
+    first = handlers.critique_branch(
+        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "C1",
+    )
+    assert "STRUCTURAL-ERROR" in first
+    assert "STRUCTURAL-FAILURE: role=consolidation-validation-retry kind=validation" in first
+    assert "CONVERGENCE: BLOCKED — staged validation debt remains open." in first
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "cached-census-branch", stamp="C2",
+        mode=cc.BRANCH_MODE,
+    )
+    assert len(lineage.review_state["census_cache"]["manifests"]) == 3
+    assert lineage.review_state["validation_debt"]["role"] == (
+        "consolidation-validation-retry"
+    )
+    assert lineage.review_state["validation_debt"]["kind"] == "validation"
+    assert "staged_failure" not in lineage.review_state
+    assert calls.count("consolidation") == 1
+    assert sum(call.startswith("lane:") for call in calls) == 3
+
+    accept_settlement = True
+    second = handlers.critique_branch(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda: "C2",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in second
+    assert calls.count("consolidation") == 2
+    assert sum(call.startswith("lane:") for call in calls) == 3
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "cached-census-branch", stamp="C3",
+        mode=cc.BRANCH_MODE,
+    )
+    assert "census_cache" not in lineage.review_state
+    audit = json.loads(next((tmp_path / "logs").glob("C2-critique_branch-*.json")).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]] == ["consolidation"]
 
 
 def test_branch_codex_runs_the_staged_census_path(

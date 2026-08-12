@@ -366,7 +366,10 @@ findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],
 debt=[{"id":"D1","finding_id":"G1","status":"open"}];
 debt_updates=[]; class_dispositions=[{"finding_id":"G1","kind":"one_off","reason":"unique site"}];
 class_records=[]. A violated assessment must map to the same governing finding as
-its cited lane finding; a satisfied assessment maps to null. Do not emit prose."""
+its cited lane finding; a satisfied assessment maps to null. A satisfied active class that is
+currently open and unmechanized must also have {"op":"close","class_id":"that-id"} in
+class_records; an already-closed satisfied class needs no record. The server derives that close if
+it is omitted, but emitting it makes the settlement's lifecycle explicit. Do not emit prose."""
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction

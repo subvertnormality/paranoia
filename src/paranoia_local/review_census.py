@@ -32,6 +32,7 @@ MAX_CLASS_CONTEXT_CHARS = 64_000
 MAX_STAGED_PROMPT_CHARS = 5_000_000
 MAX_CONSOLIDATION_PROMPT_CHARS = 400_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
+CENSUS_CACHE_VERSION = 1
 
 
 class CensusError(ValueError):
@@ -365,6 +366,20 @@ def parse_settlement(
                 raise CensusError(
                     "source fan-out requires distinct violated existing-class findings"
                 )
+    declared_class_ops = {
+        record.get("class_id") for record in obj["class_records"]
+        if isinstance(record, dict) and isinstance(record.get("class_id"), str)
+    }
+    for cid, verdict in (assessment_verdicts or {}).items():
+        if verdict != "satisfied" or class_states is None or cid not in class_states:
+            continue
+        status, mechanized, _ = class_states[cid]
+        if status in cc.UNPROVEN_STATUSES and not mechanized and cid not in declared_class_ops:
+            # The assessment is the model judgement. Closing the corresponding open,
+            # unmechanized class is its deterministic lifecycle consequence; requiring
+            # the model to restate that consequence made healthy censuses fail wholesale.
+            obj["class_records"].append({"op":"close", "class_id":cid})
+            declared_class_ops.add(cid)
     operation_by_class: dict[str, str] = {}
     for record in obj["class_records"]:
         cid = record.get("class_id") if isinstance(record, dict) else None
@@ -575,6 +590,9 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     out = dict(state)
     out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
+    out.pop("validation_debt", None)
+    out.pop("staged_failure", None)
+    out.pop("census_cache", None)
     out.pop("unbound_classes", None)
     out.pop("unbound_class_ids", None)
     return out
@@ -584,9 +602,30 @@ def trailer(state: dict[str, Any]) -> str:
     debt = [d for d in state.get("debt", []) if d.get("status") == "open" and d.get("severity") in BLOCKING]
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
-    if state.get("format_debt"):
-        lines.append(f"STRUCTURAL-ERROR: {state['format_debt']}")
-        lines.append("CONVERGENCE: BLOCKED — staged format debt remains open.")
+    validation_debt = state.get("validation_debt") or state.get("format_debt")
+    if state.get("staged_failure"):
+        failure = state["staged_failure"]
+        if isinstance(failure, dict):
+            role = failure.get("role", "unknown")
+            kind = failure.get("kind", "unknown")
+            message = failure.get("message", "staged review failed")
+            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
+            lines.append(f"CONVERGENCE: BLOCKED — staged {kind} failure did not settle.")
+        else:
+            # Version-1 state written before structured failure metadata.
+            lines.append(f"STRUCTURAL-ERROR: {failure}")
+            lines.append("CONVERGENCE: BLOCKED — staged failure did not settle.")
+    elif validation_debt:
+        if isinstance(validation_debt, dict):
+            role = validation_debt.get("role", "consolidation-validation-retry")
+            kind = validation_debt.get("kind", "validation")
+            message = validation_debt.get("message", "settlement validation rejected")
+            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
+        else:
+            lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
+        lines.append("CONVERGENCE: BLOCKED — staged validation debt remains open.")
     elif state.get("unbound_class_ids"):
         lines.append("CONVERGENCE: BLOCKED — class closure remains open.")
     elif phase == "final":

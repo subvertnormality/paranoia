@@ -48,6 +48,7 @@ def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:
 
     assert review.error is False
     assert review.text == "settled"
+    assert review.failure_detail is None
 
 
 def test_codex_terminal_error_remains_a_failure() -> None:
@@ -59,6 +60,8 @@ def test_codex_terminal_error_remains_a_failure() -> None:
     )
 
     assert review.error is True
+    assert review.text == "partial"
+    assert review.failure_detail == "terminal"
 
 class TestCodexArgv:
     def test_build_argv_read_only_and_model_and_effort(self) -> None:
@@ -229,6 +232,28 @@ class TestRunWithInjectedRunner:
         )
         assert "error" in review.text.lower()
         assert "auth failed" in review.text
+        assert review.failure_detail == "auth failed: not logged in"
+
+    def test_process_failure_detail_is_not_masked_by_partial_output(self) -> None:
+        e = engines.get_engine("codex")
+        partial = (
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"partial reviewer output"}}\n'
+        )
+
+        def fake_runner(argv, stdin_text, cwd, timeout):
+            return RunResult(
+                returncode=9, stdout=partial,
+                stderr="terminal process diagnostic\n",
+            )
+
+        review = e.run(
+            prompt="x", cwd=Path("/repo"), model="m", effort="high",
+            web_search=False, runner=fake_runner,
+        )
+        assert review.error is True
+        assert review.text == "partial reviewer output"
+        assert review.failure_detail == "terminal process diagnostic\n"
 
     def test_resume_uses_resume_argv(self) -> None:
         e = engines.get_engine("claude")
