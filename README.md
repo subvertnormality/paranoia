@@ -226,7 +226,17 @@ older census cache and cannot authorize reuse. Engine outcomes retain `timeout`,
 `provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
 retry and its attempt-ledger event use the same `*-validation-retry` role.
 Terminal validation debt retains that same structured role, kind, and message in lineage state and
-the convergence trailer.
+the convergence trailer. Terminal staged validation rejection also persists each rejected extracted
+model reply as a bounded head-and-tail excerpt plus its full SHA-256 in lineage state and the audit
+log's top-level `rejected_payloads`; provider-envelope excerpts in `attempt_ledger` remain separate.
+Correction prompts give the non-null `assessment_dispositions` row literally and require exactly
+`assessment_id` plus `governing_id`, so the validation retry can remove any analogized extra keys.
+Concurrent lane failure fan-in retains replies from every failed lane in attempt-sequence order,
+and diagnostics are attached to the closure before lineage persistence so a save failure cannot
+erase them from the still-available branch or plan audit log.
+Rejected extracted-reply digests use UTF-8 `surrogatepass`, making diagnostic capture total for
+unpaired surrogates that a provider's JSON string can legally decode; structural state digests keep
+their existing encoding contract.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state

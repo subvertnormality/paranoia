@@ -390,7 +390,11 @@ Correction returns empty source dispositions. Consolidate all occurrences of the
 class into at most one existing_class governing finding per active class per settlement. For each
 active class with that one governing finding, class_assessments and assessment_dispositions contain
 exactly one violated row; they contain no other classes. The assessment finding_id and disposition
-governing_id both name the consolidated finding.
+governing_id both name the consolidated finding. In correction the exact disposition shape is
+assessment_dispositions=[{"assessment_id":"class-id","governing_id":"G1"}] — exactly these
+two keys, with no class_id, finding_id, verdict, disposition, or other extra key. Its paired
+assessment is class_assessments=[{"class_id":"class-id","verdict":"violated",
+"evidence":["path:1"],"finding_id":"G1"}].
 Final returns empty source dispositions and one assessment disposition per active class. A closed
 unmechanized class also requires reopen and a closed mechanized class requires replace. The task's
 checklist array is governing. The exact
@@ -421,7 +425,9 @@ STAGED_SETTLEMENT_RETRY_GUIDANCE = (
     "one_off adds reason, new_class adds record_index, existing_class adds class_id. Every new "
     "class record is referenced once. Correction consolidates same-class occurrences into one "
     "governing finding; each existing_class finding also needs one matching violated "
-    "class_assessments row and assessment_dispositions row. Class records are "
+    "class_assessments row and an assessment_dispositions row with exactly assessment_id and "
+    "governing_id — never class_id, finding_id, verdict, disposition, or another extra key. "
+    "Class records are "
     "operations: close/reopen have only op,class_id; reclassify adds severity; new/replace use "
     "the exact invariant and severity plus procedure or pattern/pathspec as allowed by the mode "
     "and predecessor mechanism. A violated closed mechanized class uses replace, not reopen. "

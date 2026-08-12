@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -197,6 +198,32 @@ def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
                             assessment_ids=[])
     with pytest.raises(rc.CensusError, match="open debt"):
         rc.parse_settlement(settlement(debt=[]), source_ids=["domain-1"], assessment_ids=[])
+
+
+def test_assessment_disposition_shape_error_names_index_and_actual_keys():
+    value = payload(settlement())
+    value.update(
+        source_dispositions=[],
+        assessment_dispositions=[{
+            "assessment_id":"abc", "governing_id":"C1",
+            "disposition":"existing_class",
+        }],
+    )
+    with pytest.raises(rc.CensusError) as caught:
+        rc.parse_settlement(
+            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
+        )
+    message = str(caught.value)
+    assert "invalid assessment_id disposition at index 0" in message
+    assert "expected exactly ['assessment_id', 'governing_id']" in message
+    assert "'disposition'" in message
+
+
+def test_correction_prompt_gives_literal_non_null_two_key_disposition():
+    instructions = prompts.STAGED_FOLLOWUP_INSTRUCTIONS
+    assert 'assessment_dispositions=[{"assessment_id":"class-id","governing_id":"G1"}]' in instructions
+    assert "exactly these\ntwo keys" in instructions
+    assert "no class_id, finding_id, verdict, disposition" in instructions
 
 
 def test_settlement_requires_an_explicit_class_disposition_for_every_finding():
@@ -848,6 +875,162 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert not handlers._cacheable_consolidation_error(caught.value)
 
 
+def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
+    invalid = payload(settlement())
+    invalid.update(
+        role="correction", source_dispositions=[],
+        assessment_dispositions=[{
+            "assessment_id":"abc", "governing_id":"C1",
+            "disposition":"existing_class",
+        }],
+    )
+    first_text = wire(rc.SETTLEMENT_MARKER, invalid)
+    retry_text = first_text.replace('"disposition": "existing_class"', '"verdict": "violated"')
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=first_text, session_ref="s", raw="provider-envelope-first")
+
+        def resume(self, *args, **kwargs):
+            return Review(text=retry_text, session_ref="s", raw="provider-envelope-retry")
+
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._staged_call(
+            role="correction", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=["abc"], role="correction",
+            ),
+        )
+    rejected = caught.value.rejected_payloads
+    assert [item["role"] for item in rejected] == [
+        "correction", "correction-validation-retry",
+    ]
+    assert rejected[0]["sha256"] == rc.digest(first_text)
+    assert rejected[0]["excerpt"] == first_text
+    assert rejected[1]["sha256"] == rc.digest(retry_text)
+    assert "provider-envelope" not in rejected[0]["excerpt"]
+
+    closure = handlers._PlanClassClosure(
+        "rejected-correction", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    failure = closure.lineage.review_state["staged_failure"]
+    assert failure["role"] == "correction-validation-retry"
+    assert failure["rejected_payloads"] == rejected
+    assert closure.rejected_payloads == rejected
+
+
+def test_rejected_payload_bounds_head_and_tail_with_full_digest():
+    raw = "HEAD" + ("x" * rc.MAX_REJECTED_PAYLOAD_CHARS) + "TAIL"
+    payload_row = rc.rejected_payload("correction", raw)
+    assert payload_row["sha256"] == rc.digest(raw)
+    assert payload_row["excerpt"].startswith("HEAD")
+    assert payload_row["excerpt"].endswith("TAIL")
+    assert "bounded rejected staged output" in payload_row["excerpt"]
+
+
+def test_staged_rejection_with_unpaired_surrogate_retries_and_persists(tmp_path):
+    first_text = "invalid staged reply \ud800"
+    retry_text = "still invalid \udcff"
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(
+                text=first_text, session_ref="s",
+                raw='{"result":"invalid staged reply \\ud800"}',
+            )
+
+        def resume(self, *args, **kwargs):
+            return Review(
+                text=retry_text, session_ref="s",
+                raw='{"result":"still invalid \\udcff"}',
+            )
+
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._staged_call(
+            role="correction", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, on_progress=None,
+            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
+            parser=lambda text: rc.parse_settlement(
+                text, source_ids=[], assessment_ids=[], role="correction",
+            ),
+        )
+    rejected = caught.value.rejected_payloads
+    assert [item["excerpt"] for item in rejected] == [first_text, retry_text]
+    assert rejected[0]["sha256"] == hashlib.sha256(
+        first_text.encode("utf-8", "surrogatepass")
+    ).hexdigest()
+    assert [row.outcome for row in caught.value.attempts] == [
+        "validation-invalid", "validation-invalid",
+    ]
+
+    closure = handlers._PlanClassClosure(
+        "surrogate-rejected", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"]["rejected_payloads"] == rejected
+
+
+def test_parallel_lane_failure_fan_in_retains_all_rejected_payloads_in_sequence_order(
+    tmp_path, monkeypatch,
+):
+    closure = handlers._PlanClassClosure(
+        "parallel-rejected", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+
+    def staged_call(**kwargs):
+        role = kwargs["role"]
+        lane_name = role.removeprefix("census-")
+        if lane_name in {"domain", "execution"}:
+            sequence = 3 if lane_name == "domain" else 1
+            error = rc.CensusError(f"{lane_name} invalid")
+            error.stage_role = f"{role}-validation-retry"  # type: ignore[attr-defined]
+            error.failure_kind = "validation"  # type: ignore[attr-defined]
+            error.attempts = [  # type: ignore[attr-defined]
+                rc.Attempt(role, "fake", "s", "validation-invalid", None, None,
+                           sequence=sequence),
+            ]
+            error.rejected_payloads = [  # type: ignore[attr-defined]
+                rc.rejected_payload(role, f"{lane_name}-reply", sequence=sequence),
+            ]
+            raise error
+        text = lane(lane_name)
+        return (
+            Review(text=text, session_ref="s", raw=text), payload(text),
+            [rc.Attempt(role, "fake", "s", "completed", None, None, sequence=2)],
+        )
+
+    monkeypatch.setattr(handlers, "_staged_call", staged_call)
+    with pytest.raises(rc.CensusError, match="domain invalid") as caught:
+        handlers._staged_structural_review(
+            engine=type("Engine", (), {"name":"fake"})(), cwd=tmp_path,
+            model="m", effort="high", mode=cc.PLAN_MODE, body="artifact",
+            closure=closure, stakes="s", snapshot="p", round_no=1,
+            on_progress=None, plan_lines=1,
+        )
+    assert [item["role"] for item in caught.value.rejected_payloads] == [
+        "census-execution", "census-domain",
+    ]
+    assert [item["sequence"] for item in caught.value.rejected_payloads] == [1, 3]
+    assert [item.sequence for item in caught.value.attempts] == [1, 2, 3]
+    closure.release()
+
+
 def test_staged_execution_failure_preserves_exact_message():
     message = "engine failed\nwith useful detail"
     error = handlers._engine_failure_error(
@@ -1420,8 +1603,14 @@ def test_staged_format_debt_save_failure_also_retains_latch(tmp_path, monkeypatc
         cc, "save_lineage",
         lambda *args, **kwargs: (_ for _ in ()).throw(cc.StateUnavailable("ambiguous write")),
     )
+    error = rc.CensusError("bad format")
+    error.stage_role = "correction-validation-retry"  # type: ignore[attr-defined]
+    error.failure_kind = "validation"  # type: ignore[attr-defined]
+    error.rejected_payloads = [  # type: ignore[attr-defined]
+        rc.rejected_payload("correction", "rejected correction", sequence=1),
+    ]
     review, trailer, attempts = handlers._settle_staged_failure(
-        closure, stakes="s", snapshot="p", error=rc.CensusError("bad format"),
+        closure, stakes="s", snapshot="p", error=error,
         mode=cc.PLAN_MODE,
     )
     closure.release()
@@ -1429,6 +1618,7 @@ def test_staged_format_debt_save_failure_also_retains_latch(tmp_path, monkeypatc
     assert_five_headings(review.text)
     assert "CLASS-REGISTER: staged rejected; failure state persistence unavailable" in trailer
     assert "STATE-UNAVAILABLE" in trailer
+    assert closure.rejected_payloads == error.rejected_payloads
     assert (cc.lineage_dir(tmp_path) / "format-save-fail.pending").exists()
     cc.clear_latch(tmp_path, "format-save-fail")
 
@@ -1749,9 +1939,18 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         "consolidation-validation-retry"
     )
     assert lineage.review_state["validation_debt"]["kind"] == "validation"
+    rejected = lineage.review_state["validation_debt"]["rejected_payloads"]
+    assert [item["role"] for item in rejected] == [
+        "consolidation", "consolidation-validation-retry",
+    ]
+    assert all(item["excerpt"] == invalid_settlement() for item in rejected)
     assert "staged_failure" not in lineage.review_state
     assert calls.count("consolidation") == 1
     assert sum(call.startswith("lane:") for call in calls) == 3
+    failed_audit = json.loads(
+        next((tmp_path / "logs").glob("C1-critique_branch-*.json")).read_text()
+    )
+    assert failed_audit["rejected_payloads"] == rejected
 
     accept_settlement = True
     second = handlers.critique_branch(

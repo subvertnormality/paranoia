@@ -54,6 +54,16 @@ and message, not validation debt. Preserve timeout, unavailable executable, prov
 other execution outcomes distinctly, including the validation-retry role.
 Attempt telemetry must use that same `*-validation-retry` role.
 Terminal validation debt must persist and render the identical structured role, kind, and message.
+Persist terminally rejected staged model replies separately from provider envelopes as bounded
+head-and-tail excerpts plus full-reply SHA-256 in both lineage failure/debt state and the top-level
+audit record. Correction instructions and retry diagnostics must state the exact two-key
+`assessment_id`/`governing_id` disposition shape at the point of use.
+Parallel staged failure fan-in must preserve rejected replies from every failed lane in deterministic
+attempt-sequence order. Attach diagnostics to the closure before lineage persistence so a failed
+state write cannot remove them from either branch or plan audit output.
+Hash rejected extracted model text with a total, documented encoding for every Python string the
+engine JSON parser can produce, including unpaired surrogates; do not change historical structural
+or state digest encoding as a side effect of diagnostic capture.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
