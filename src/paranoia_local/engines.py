@@ -57,6 +57,7 @@ class Review:
     error: bool = False
     usage: dict | None = None
     duration_ms: int | None = None
+    failure_detail: str | None = None
 
 
 class Engine(ABC):
@@ -162,18 +163,27 @@ class Engine(ABC):
         # non-empty stdout, which the old "rc != 0 AND empty stdout" gate silently
         # swallowed, defeating any downstream fallback.
         failed = result.returncode != 0 or review.error
+        failure_detail = (
+            result.stderr if result.returncode != 0 and result.stderr
+            else review.failure_detail
+        )
         if failed and not (review.text or "").strip():
+            detail = failure_detail or review.raw or "engine failure"
             return Review(
                 text=(
                     f"[paranoia-local error] {self.name} exited {result.returncode}: "
-                    f"{result.stderr.strip()[:2000]}"
+                    f"{detail.strip()[:2000]}"
                 ),
                 session_ref=review.session_ref,
                 raw=result.stderr or result.stdout,
                 returncode=result.returncode,
                 error=True,
+                failure_detail=detail,
             )
-        return replace(review, returncode=result.returncode, error=failed)
+        return replace(
+            review, returncode=result.returncode, error=failed,
+            failure_detail=failure_detail,
+        )
 
 
 class CodexEngine(Engine):
@@ -288,6 +298,7 @@ class CodexEngine(Engine):
         last_message: str | None = None
         usage: dict | None = None
         error = False
+        failure_detail: str | None = None
         for line in stdout.splitlines():
             line = line.strip()
             if not line:
@@ -303,6 +314,13 @@ class CodexEngine(Engine):
                 thread_id = event.get("thread_id") or thread_id
             if etype in {"error", "turn.failed"}:
                 error = True
+                detail = event.get("error")
+                if isinstance(detail, dict):
+                    detail = detail.get("message")
+                if not isinstance(detail, str):
+                    detail = event.get("message")
+                if isinstance(detail, str):
+                    failure_detail = detail
             if etype == "turn.completed":
                 u = event.get("usage")
                 if isinstance(u, dict):
@@ -312,6 +330,7 @@ class CodexEngine(Engine):
                 # terminal event, not an earlier recovered event, governs the
                 # process result.
                 error = False
+                failure_detail = None
             item = event.get("item")
             if isinstance(item, dict):
                 if item.get("type") == "agent_message":
@@ -320,8 +339,12 @@ class CodexEngine(Engine):
                         last_message = text
                 elif item.get("type") == "error":
                     error = True
+                    detail = item.get("message") or item.get("text")
+                    if isinstance(detail, str):
+                        failure_detail = detail
         return Review(
-            text=last_message or "", session_ref=thread_id, raw=stdout, error=error, usage=usage
+            text=last_message or "", session_ref=thread_id, raw=stdout, error=error,
+            usage=usage, failure_detail=failure_detail,
         )
 
 
@@ -417,13 +440,16 @@ class ClaudeEngine(Engine):
         tokens, cost = data.get("usage"), data.get("total_cost_usd")
         if tokens is not None or cost is not None:
             usage = {"tokens": tokens, "cost_usd": cost}
+        text = str(data.get("result", ""))
+        is_error = bool(data.get("is_error", False))
         return Review(
-            text=str(data.get("result", "")),
+            text=text,
             session_ref=data.get("session_id"),
             raw=stdout,
-            error=bool(data.get("is_error", False)),
+            error=is_error,
             usage=usage,
             duration_ms=data.get("duration_ms"),
+            failure_detail=text if is_error else None,
         )
 
 

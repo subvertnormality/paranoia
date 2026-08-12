@@ -857,6 +857,28 @@ def test_staged_execution_failure_preserves_exact_message():
     assert str(error) == message
 
 
+def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):
+    with pytest.raises(rc.CensusError, match="STATE-OVERSIZED") as caught:
+        handlers._staged_class_context(["x" * (rc.MAX_CLASS_CONTEXT_CHARS + 1)])
+    assert caught.value.stage_role == "active-class-preflight"
+    assert caught.value.failure_kind == "validation"
+    closure = handlers._PlanClassClosure(
+        "oversized-classes", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    failure = closure.lineage.review_state["staged_failure"]
+    assert failure == {
+        "role":"active-class-preflight", "kind":"validation",
+        "message":str(caught.value),
+    }
+    assert f"STRUCTURAL-ERROR: {caught.value}" in trailer
+    assert "STRUCTURAL-FAILURE: role=active-class-preflight kind=validation" in trailer
+
+
 def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
     invalid = payload(settlement())
     invalid["debt"][0]["id"] = ""

@@ -160,8 +160,10 @@ not truncate evidence that may change authority or entailment. Each exact staged
 running partially or clearing. Each lane envelope is
 capped at 48,000 characters, with 2,000-character summaries/remedies and 512-character anchors.
 New class invariant/procedure fields are capped at 1,000/2,000 characters and total rendered active
-class context at 64,000 characters. Before a lane call, render its exact prompt and reject over
-5,000,000 characters; do not truncate a valid evidence packet. Consolidation has no
+class context at 64,000 characters. Active-class or lane-prompt overflow is a non-cacheable
+structured staged failure of kind `validation`; only terminal consolidation rejection populates
+`validation_debt`. Before a lane call, render its exact prompt and reject over 5,000,000
+characters; do not truncate a valid evidence packet. Consolidation has no
 artifact packet and retains a 400,000-character exact-prompt ceiling; three maximum lane envelopes
 leave more than 250,000 characters for its instructions, stakes, and class context. The plan
 prototype's complete raw four-call JSON record was 46,708 bytes.

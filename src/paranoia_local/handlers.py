@@ -99,7 +99,7 @@ def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
         else "provider" if review.returncode == 0
         else "execution"
     )
-    detail = review.text or review.raw or "engine failure"
+    detail = review.failure_detail or review.text or review.raw or "engine failure"
     error = rc.CensusError(detail)
     error.stage_role = role  # type: ignore[attr-defined]
     error.failure_kind = kind  # type: ignore[attr-defined]
@@ -182,6 +182,15 @@ def _staged_error(message: str, *, role: str, kind: str) -> rc.CensusError:
     error.stage_role = role  # type: ignore[attr-defined]
     error.failure_kind = kind  # type: ignore[attr-defined]
     return error
+
+
+def _staged_class_context(blocks: list[str]) -> str:
+    try:
+        return rc.class_context(blocks)
+    except rc.CensusError as exc:
+        raise _staged_error(
+            str(exc), role="active-class-preflight", kind="validation",
+        ) from exc
 
 
 def _staged_lane_prompt(
@@ -382,7 +391,7 @@ def _staged_structural_review(
     """Run census/correction/final and atomically settle it into the open lineage."""
     assert closure.lineage is not None
     lineage = closure.lineage
-    rc.class_context(closure._blocks())
+    _staged_class_context(closure._blocks())
     state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
     if lineage.debt:
         # A pre-staging malformed-register round is not silently normalized into an
