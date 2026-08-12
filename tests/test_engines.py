@@ -268,3 +268,24 @@ class TestRunWithInjectedRunner:
             model="m", effort="high", web_search=False, runner=fake_runner,
         )
         assert "--resume" in captured["argv"]
+
+
+def test_every_claude_deny_rule_is_a_tool_the_cli_knows():
+    """An unknown deny rule contaminates the engine's structured output.
+
+    Claude Code rejects a rule naming no known tool with
+
+        Permission deny rule "X" matches no known tool — check for typos.
+
+    on the same stream the review is read from, so the reply no longer parses and
+    EVERY review on this engine fails. `MultiEdit` was removed from Claude Code
+    (absent in 2.1.197) and had to be dropped for that reason.
+
+    This pins the names rather than the absence of one, because the failure is
+    not specific to `MultiEdit`: any future rule naming a retired or misspelled
+    tool breaks the engine the same way. The allowlist is what actually bounds
+    the reviewer — a tool that is not allowlisted is auto-denied in `-p` mode —
+    so this list is belt-and-braces and shrinking it costs nothing.
+    """
+    assert engines.CLAUDE_DENY_TOOLS == ["Write", "Edit", "NotebookEdit"]
+    assert "MultiEdit" not in engines.CLAUDE_DENY_TOOLS

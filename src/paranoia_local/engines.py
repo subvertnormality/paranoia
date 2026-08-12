@@ -361,7 +361,15 @@ CLAUDE_RO_TOOLS = [
     "Bash(git rev-parse:*)", "Bash(git cat-file:*)", "Bash(git shortlog:*)",
 ]
 CLAUDE_WEB_TOOLS = ["WebSearch", "WebFetch"]
-CLAUDE_DENY_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"]
+# Redundant belt-and-braces over the allowlist above, which is what actually
+# bounds the reviewer. Every NAME here must exist in the installed Claude Code,
+# because the CLI rejects an unknown deny rule with
+#   Permission deny rule "X" matches no known tool — check for typos.
+# and that line contaminates the engine's structured output, so every review on
+# this engine fails to parse. `MultiEdit` was removed from Claude Code (absent
+# in 2.1.197) and was dropped here for that reason; it denied nothing either
+# way, since a tool that is not allowlisted is auto-denied in `-p` mode.
+CLAUDE_DENY_TOOLS = ["Write", "Edit", "NotebookEdit"]
 
 
 class ClaudeEngine(Engine):
