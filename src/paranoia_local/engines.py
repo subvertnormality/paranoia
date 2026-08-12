@@ -164,7 +164,10 @@ class Engine(ABC):
         # swallowed, defeating any downstream fallback.
         failed = result.returncode != 0 or review.error
         failure_detail = (
-            result.stderr if result.returncode != 0 and result.stderr
+            (
+                result.stderr or review.failure_detail
+                or f"{self.name} exited with return code {result.returncode}"
+            ) if result.returncode != 0
             else review.failure_detail
         )
         if failed and not (review.text or "").strip():

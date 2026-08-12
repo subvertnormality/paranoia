@@ -5,9 +5,11 @@ import subprocess
 import pytest
 
 from paranoia_local import (
-    class_closure as cc, handlers, plan_claims as pc, prompts, review_census as rc,
+    class_closure as cc, engines, handlers, plan_claims as pc, prompts,
+    review_census as rc,
 )
 from paranoia_local.engines import Review
+from paranoia_local.runner import RunResult
 
 
 HEADINGS = (
@@ -855,6 +857,49 @@ def test_staged_execution_failure_preserves_exact_message():
     assert error.stage_role == "consolidation"
     assert error.failure_kind == "execution"
     assert str(error) == message
+
+
+@pytest.mark.parametrize(
+    ("engine_name", "stdout"),
+    [
+        (
+            "codex",
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"partial"}}\n',
+        ),
+        (
+            "claude",
+            '{"is_error":false,"result":"partial","session_id":"s"}',
+        ),
+    ],
+)
+def test_empty_stderr_process_exit_reaches_staged_trailer(
+    tmp_path, engine_name, stdout,
+):
+    engine = engines.get_engine(engine_name)
+
+    def runner(argv, stdin_text, cwd, timeout):
+        return RunResult(returncode=9, stdout=stdout, stderr="")
+
+    review = engine.run(
+        "p", tmp_path, engine.default_model, "high", False, runner=runner,
+    )
+    expected = f"{engine_name} exited with return code 9"
+    assert review.text == "partial"
+    assert review.failure_detail == expected
+    error = handlers._engine_failure_error(review, role="consolidation")
+    closure = handlers._PlanClassClosure(
+        f"empty-stderr-{engine_name}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"consolidation", "kind":"execution", "message":expected,
+    }
+    assert f"STRUCTURAL-ERROR: {expected}" in trailer
 
 
 def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):
