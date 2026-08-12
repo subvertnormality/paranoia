@@ -306,6 +306,17 @@ message; consolidation preflight validation does the same. Engine outcomes prese
 unavailable executable, in-band provider error, and other execution failure distinctly, including
 the same `*-validation-retry` role in failure state and attempt telemetry. They cannot authorize reuse.
 Terminal validation debt also persists and renders that structured role, kind, and message.
+Every terminal staged validation rejection retains the extracted model reply, independently of the
+provider envelope, as a bounded head-and-tail excerpt with a digest of the full reply in both the
+structured failure/debt state and top-level audit record. Disposition shape diagnostics name the row
+index and actual keys, and correction instructions show the exact two-key non-null assessment
+disposition beside its paired four-key class assessment.
+Parallel lane failure fan-in aggregates rejected replies from every failed lane in deterministic
+attempt-sequence order. The closure receives those diagnostics before lineage persistence is
+attempted, preserving them for both branch and plan audit sinks even when the state write fails.
+The rejected-reply SHA-256 uses UTF-8 `surrogatepass` so every Python string produced by provider
+JSON decoding, including an unpaired surrogate, remains diagnosable without changing the existing
+structural/state digest contract.
 
 The supported local runtime is a trusted execution boundary, not an externally researched factual
 premise. Preflight uses the exact rendered request bytes and the tool's existing conservative local

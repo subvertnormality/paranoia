@@ -31,6 +31,7 @@ MAX_ANCHOR_CHARS = 512
 MAX_CLASS_CONTEXT_CHARS = 64_000
 MAX_STAGED_PROMPT_CHARS = 5_000_000
 MAX_CONSOLIDATION_PROMPT_CHARS = 400_000
+MAX_REJECTED_PAYLOAD_CHARS = 12_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
 CENSUS_CACHE_VERSION = 1
 
@@ -57,6 +58,31 @@ class Attempt:
 
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
+
+
+def rejected_payload(
+    role: str, text: str, *, sequence: int | None = None,
+) -> dict[str, Any]:
+    """Bound one rejected extracted reply; hash every string JSON can decode."""
+    if len(text) <= MAX_REJECTED_PAYLOAD_CHARS:
+        excerpt = text
+    else:
+        half = MAX_REJECTED_PAYLOAD_CHARS // 2
+        excerpt = (
+            text[:half]
+            + "\n… [bounded rejected staged output] …\n"
+            + text[-half:]
+        )
+    return {
+        "role":role, "sequence":sequence,
+        # Engine JSON extraction can legally produce unpaired surrogates.  This
+        # diagnostic digest is deliberately separate from structural digest(),
+        # whose historical surrogateescape contract keys durable state.
+        "sha256":hashlib.sha256(
+            text.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "excerpt":excerpt,
+    }
 
 
 def render_error_review(message: str) -> str:
@@ -800,19 +826,39 @@ def _exact_dispositions(rows: Sequence[Any], expected: Sequence[str], targets: s
     seen: set[str] = set()
     seen_pairs: set[tuple[str, str | None]] = set()
     expected_set = set(expected)
-    for row in rows:
-        if not isinstance(row, dict) or set(row) != {key, "governing_id"}:
-            raise CensusError(f"invalid {key} disposition")
+    required = {key, "governing_id"}
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise CensusError(
+                f"invalid {key} disposition at index {index}: expected an object with "
+                f"exactly {sorted(required)!r}, got {type(row).__name__}"
+            )
+        if set(row) != required:
+            actual = sorted(repr(item) for item in row)
+            raise CensusError(
+                f"invalid {key} disposition at index {index}: expected exactly "
+                f"{sorted(required)!r}, got keys [{', '.join(actual)}]"
+            )
         source = row[key]
         target = row["governing_id"]
         pair = (source, target)
-        if (
-            source not in expected_set
-            or pair in seen_pairs
-            or (source in seen and not allow_fanout)
-            or (target not in targets and not (allow_null and target is None))
-        ):
-            raise CensusError(f"invalid or duplicate {key} disposition")
+        if source not in expected_set:
+            raise CensusError(
+                f"invalid {key} disposition at index {index}: unknown {key} {source!r}"
+            )
+        if pair in seen_pairs:
+            raise CensusError(
+                f"duplicate {key} disposition at index {index}: repeated mapping "
+                f"{source!r} to {target!r}"
+            )
+        if source in seen and not allow_fanout:
+            raise CensusError(
+                f"duplicate {key} disposition at index {index}: repeated {key} {source!r}"
+            )
+        if target not in targets and not (allow_null and target is None):
+            raise CensusError(
+                f"invalid {key} disposition at index {index}: unknown governing_id {target!r}"
+            )
         seen.add(source)
         seen_pairs.add(pair)
     if seen != expected_set:

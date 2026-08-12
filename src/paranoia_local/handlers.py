@@ -126,6 +126,9 @@ def _staged_call(
     try:
         return review, parser(review.text), attempts
     except rc.CensusError as first:
+        rejected = [rc.rejected_payload(
+            role, review.text, sequence=attempts[-1].sequence,
+        )]
         attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
         if not review.session_ref:
             error = rc.CensusError(
@@ -134,6 +137,7 @@ def _staged_call(
             error.stage_role = role  # type: ignore[attr-defined]
             error.failure_kind = "validation"  # type: ignore[attr-defined]
             error.attempts = attempts  # type: ignore[attr-defined]
+            error.rejected_payloads = rejected  # type: ignore[attr-defined]
             raise error from first
         retry_sequence = next_sequence() if next_sequence else None
         retry = engine.resume(
@@ -153,14 +157,20 @@ def _staged_call(
                 retry, role=f"{role}-validation-retry",
             )
             error.attempts = attempts  # type: ignore[attr-defined]
+            error.rejected_payloads = rejected  # type: ignore[attr-defined]
             raise error from first
         try:
             parsed = parser(retry.text)
         except rc.CensusError as second:
+            rejected.append(rc.rejected_payload(
+                f"{role}-validation-retry", retry.text,
+                sequence=attempts[-1].sequence,
+            ))
             attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
             second.stage_role = f"{role}-validation-retry"  # type: ignore[attr-defined]
             second.failure_kind = "validation"  # type: ignore[attr-defined]
             second.attempts = attempts  # type: ignore[attr-defined]
+            second.rejected_payloads = rejected  # type: ignore[attr-defined]
             raise
         return retry, parsed, attempts
 
@@ -284,6 +294,7 @@ def _settle_staged_failure(
     state.pop("staged_failure", None)
     state.pop("format_debt", None)
     cache = getattr(error, "census_cache", None)
+    rejected_payloads = getattr(error, "rejected_payloads", [])
     if isinstance(cache, dict):
         state["validation_debt"] = {
             "role":getattr(error, "stage_role", "consolidation-validation-retry"),
@@ -296,9 +307,14 @@ def _settle_staged_failure(
             "kind":getattr(error, "failure_kind", "unknown"),
             "message":str(error),
         }
+    failure_key = "validation_debt" if isinstance(cache, dict) else "staged_failure"
+    if rejected_payloads:
+        state[failure_key]["rejected_payloads"] = deepcopy(rejected_payloads)
     if isinstance(cache, dict):
         state["census_cache"] = deepcopy(cache)
     closure.lineage.review_state = state
+    closure.staged_manifests = getattr(error, "manifests", [])
+    closure.rejected_payloads = deepcopy(rejected_payloads)
     try:
         cc.save_lineage(closure.state_root, closure.lineage)
     except cc.StateUnavailable as exc:
@@ -318,7 +334,6 @@ def _settle_staged_failure(
         return review, trailer, [a.json() for a in getattr(error, "attempts", [])]
     closure._settled = True
     closure.register_status = f"staged rejected: {error}"
-    closure.staged_manifests = getattr(error, "manifests", [])
     attempts = [a.json() for a in getattr(error, "attempts", [])]
     review = Review(
         text=rc.render_error_review(
@@ -545,23 +560,39 @@ def _staged_structural_review(
         )
         if manifests is None:
             lane_rows = []
-            lane_errors: list[rc.CensusError] = []
+            lane_errors: list[tuple[str, rc.CensusError]] = []
             with ThreadPoolExecutor(max_workers=3) as pool:
                 pending = {pool.submit(run_lane, lane): lane for lane in lanes}
                 for future in as_completed(pending):
                     try:
                         lane_rows.append(future.result())
                     except rc.CensusError as error:
-                        lane_errors.append(error)
+                        lane_errors.append((pending[future], error))
             lane_rows.sort(key=lambda row: lanes.index(row[0]))
             if lane_errors:
+                lane_errors.sort(key=lambda row: lanes.index(row[0]))
                 all_attempts = [a for row in lane_rows for a in row[3]]
                 all_attempts.extend(
-                    a for error in lane_errors for a in getattr(error, "attempts", [])
+                    a for _, error in lane_errors for a in getattr(error, "attempts", [])
                 )
                 all_attempts.sort(key=lambda item: item.sequence or 0)
-                first_error = lane_errors[0]
+                rejected_payloads = [
+                    (lanes.index(lane_name), position, payload)
+                    for lane_name, error in lane_errors
+                    for position, payload in enumerate(
+                        getattr(error, "rejected_payloads", [])
+                    )
+                ]
+                rejected_payloads.sort(key=lambda row: (
+                    row[2].get("sequence") is None,
+                    row[2].get("sequence") or 0,
+                    row[0], row[1],
+                ))
+                first_error = lane_errors[0][1]
                 first_error.attempts = all_attempts  # type: ignore[attr-defined]
+                first_error.rejected_payloads = [  # type: ignore[attr-defined]
+                    payload for _, _, payload in rejected_payloads
+                ]
                 first_error.manifests = [  # type: ignore[attr-defined]
                     row[2] for row in lane_rows
                 ]
@@ -1098,6 +1129,7 @@ def _converge_branch_review(
           # the audit record; the original review only carries the malformed attempt.
           "retry_register": closure.retry_register if closure else None,
           "attempt_ledger": attempt_ledger,
+          "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
           "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
           "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
     body = _footer(review, engine)
@@ -1457,6 +1489,7 @@ def critique_plan(
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
         "attempt_ledger": attempt_ledger,
+        "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
     })
