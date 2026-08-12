@@ -1162,15 +1162,21 @@ def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_pa
     )
     closure.prepare()
     review, trailer, attempts = handlers._structural_pending_review(
-        closure, mode=cc.PLAN_MODE, claim_state=pc.empty_state(),
+        closure, mode=cc.PLAN_MODE, stakes="s", snapshot="p",
         reason="not enough bounded time",
     )
     closure.release()
     assert review.error and attempts == []
     assert_five_headings(review.text)
-    assert "CLASS-REGISTER: structural pending" in trailer
+    assert "CLASS-REGISTER: staged rejected: not enough bounded time" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
-    assert "STRUCTURAL-PENDING" in trailer and "CONVERGENCE: BLOCKED" in trailer
+    assert "STRUCTURAL-ERROR: not enough bounded time" in trailer
+    assert "STRUCTURAL-FAILURE: role=structural-reserve-preflight kind=deadline" in trailer
+    assert "CONVERGENCE: BLOCKED — staged deadline failure did not settle." in trailer
+    assert closure.lineage.review_state["staged_failure"] == {
+        "role":"structural-reserve-preflight", "kind":"deadline",
+        "message":"not enough bounded time",
+    }
     assert not (cc.lineage_dir(tmp_path) / "pending-plan.pending").exists()
 
 

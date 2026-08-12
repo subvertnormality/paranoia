@@ -360,26 +360,15 @@ def _state_unavailable_review(
 
 
 def _structural_pending_review(
-    closure: "_ClosureRound", *, mode: str, claim_state: dict[str, Any], reason: str,
+    closure: "_ClosureRound", *, mode: str, stakes: str, snapshot: str, reason: str,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     """Settle a zero-attempt plan round whose structural reserve no longer fits."""
-    assert closure.lineage is not None
-    phase = closure.lineage.review_state.get("phase", "census")
-    closure._settled = True
-    closure.register_status = "structural pending"
-    review = Review(
-        text=rc.render_error_review(f"[paranoia-local error] {reason}"),
-        session_ref=None, raw=reason,
-        returncode=124, error=True,
+    error = _staged_error(
+        reason, role="structural-reserve-preflight", kind="deadline",
     )
-    trailer = "\n".join((
-        _staged_class_trailer(closure, closure.register_status),
-        f"STRUCTURAL-PHASE: {phase}\nSTRUCTURAL-PENDING: {reason}\n"
-        "CONVERGENCE: BLOCKED — structural review has not run.",
-    ))
-    if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
-        trailer = f"{pc.render_trailer(claim_state)}\n{trailer}"
-    return review, trailer, []
+    return _settle_staged_failure(
+        closure, stakes=stakes, snapshot=snapshot, error=error, mode=mode,
+    )
 
 
 def _staged_structural_review(
@@ -1387,8 +1376,8 @@ def critique_plan(
                     )
                     if closure:
                         review, trailer, structural_attempts = _structural_pending_review(
-                            closure, mode=cc.PLAN_MODE, claim_state=claim_state,
-                            reason=pending_reason,
+                            closure, mode=cc.PLAN_MODE, stakes=stakes or "",
+                            snapshot=structural_snapshot, reason=pending_reason,
                         )
                         attempt_ledger.extend(structural_attempts)
                     else:

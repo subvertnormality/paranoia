@@ -156,8 +156,8 @@ eight calls when all four replies need their one format correction. All limits u
 characters. The existing `MAX_PACKET_CHARS = 400_000` branch evidence-packet contract remains
 unchanged. Plan review passes the complete active claim register and current retirements; it does
 not truncate evidence that may change authority or entailment. Each exact staged lane prompt has a
-5,000,000-character ceiling, and an oversized prompt persists visible validation debt rather than
-running partially or clearing. Each lane envelope is
+5,000,000-character ceiling, and an oversized prompt persists a visible non-cacheable structured
+failure rather than running partially or clearing. Each lane envelope is
 capped at 48,000 characters, with 2,000-character summaries/remedies and 512-character anchors.
 New class invariant/procedure fields are capped at 1,000/2,000 characters and total rendered active
 class context at 64,000 characters. Active-class or lane-prompt overflow is a non-cacheable
