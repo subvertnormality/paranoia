@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -77,6 +78,18 @@ def active_class(
         "pathspec": "*.py" if mechanized else None,
         "procedure": None if mechanized else "inspect the recurring path",
     }
+
+
+def lineage_with_active(cls):
+    tracked = cc.TrackedClass(
+        class_id=cls["class_id"], invariant=cls["invariant"],
+        severity=cls["severity"], first_round=1, status=cls["status"],
+        pattern=cls["pattern"], pathspec=cls["pathspec"], procedure=cls["procedure"],
+    )
+    return cc.Lineage(
+        lineage_id="protocol-v2-fixture", mode=cc.BRANCH_MODE,
+        classes={tracked.class_id: tracked}, next_seq=2,
+    )
 
 
 def durable_debt(
@@ -170,6 +183,63 @@ def test_schema_error_names_json_pointer_and_does_not_accept_alias():
     message = str(caught.value)
     assert "/governing_findings/0/classification" in message
     assert "disposition" in message
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["coverage"][0].update(summary="   "),
+        lambda value: value["findings"][0].update(summary="\t"),
+        lambda value: value["findings"][0].update(remedy="   "),
+    ],
+)
+def test_semantic_strings_require_non_whitespace(mutate):
+    value = lane_value(findings=[{
+        "id": "F1", "severity": "MAJOR", "summary": "broken",
+        "evidence": ["plan:1"], "remedy": "fix",
+    }])
+    mutate(value)
+    with pytest.raises(sp.ProtocolError, match="does not match"):
+        sp.parse_lane(json.dumps(value), mode="plan", lane="domain")
+
+
+def test_role_specific_response_caps_fail_before_json_decode():
+    lane_text = "{" + ("x" * sp.MAX_LANE_RESPONSE_CHARS)
+    with pytest.raises(sp.ProtocolError, match="response is"):
+        sp.parse_lane(lane_text, mode="plan", lane="domain")
+    decision_text = "{" + ("x" * sp.MAX_DECISION_RESPONSE_CHARS)
+    with pytest.raises(sp.ProtocolError, match="response is"):
+        sp.materialize_decision(decision_text, mode="plan", role="census")
+
+
+@pytest.mark.parametrize("field", ["one_off", "procedure", "open_reason"])
+def test_decision_semantic_strings_require_non_whitespace(field):
+    if field == "one_off":
+        value = decision("census", governing_findings=[finding(
+            source_ids=["domain:F1"],
+            classification={"kind": "one_off", "reason": "   "},
+        )])
+    elif field == "procedure":
+        value = decision("census", governing_findings=[finding(
+            source_ids=["domain:F1"],
+            classification={
+                "kind": "new_class", "definition": {
+                    "invariant": "reusable", "severity": "MAJOR", "procedure": "\t",
+                },
+            },
+        )])
+    else:
+        value = decision("correction", debt_outcomes=[{
+            "debt_id": "D7", "status": "open", "evidence": ["plan:1"],
+            "reason": "   ",
+        }])
+    with pytest.raises(sp.ProtocolError, match="not valid under any"):
+        materialize(
+            value,
+            source_ids=["domain:F1"] if field != "open_reason" else [],
+            source_severities={"domain:F1": "MAJOR"},
+            durable_debt=[durable_debt(cid=None)] if field == "open_reason" else [],
+        )
 
 
 @pytest.mark.parametrize(
@@ -325,6 +395,8 @@ def test_branch_schema_rejects_git_pathspec_magic_for_new_and_replacement_classe
         "kind": "replace", "class_id": "class-a", "definition": bad_definition,
     }])
     for value in (census, correction):
+        schema = sp.provider_schema(sp.decision_schema("branch", value["role"]))
+        assert list(Draft202012Validator(schema).iter_errors(value))
         with pytest.raises(sp.ProtocolError, match="not valid under any"):
             materialize(
                 value, mode="branch", source_ids=["behaviour:F1"],
@@ -422,6 +494,21 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
     )
     assert parsed["class_records"][0]["op"] == action["kind"]
     assert parsed["debt_updates"][0]["status"] == "closed"
+    lineage = lineage_with_active(active_class())
+    register = rc.register_from_records(parsed["class_records"], mechanized=None)
+    minted = cc.apply_register(lineage, register, round_no=2)
+    state = rc.settle_state(
+        {"phase": "correction", "debt": [durable_debt()]}, parsed,
+        phase="correction", snapshot="s", round_no=2,
+    )
+    assert state["debt"][0]["status"] == "closed"
+    if action["kind"] == "reclassify":
+        assert lineage.classes["class-a"].severity == "BLOCKER"
+        assert minted == []
+    else:
+        assert lineage.classes["class-a"].status == cc.SUPERSEDED
+        assert len(minted) == 1
+        assert lineage.classes[minted[0]].procedure == "inspect the replacement invariant"
 
 
 def test_satisfied_open_mechanized_class_cannot_be_model_closed():
@@ -496,6 +583,36 @@ def test_closed_mechanized_class_cannot_be_replaced_by_manual_procedure():
         )
 
 
+def test_closed_mechanized_replacement_runs_through_canonical_class_engine():
+    cls = active_class(status=cc.CLOSED, mechanized=True)
+    value = decision(
+        "final", coverage=coverage("G1"),
+        governing_findings=[finding(classification={
+            "kind": "existing_class", "class_id": "class-a",
+        })],
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "G1"},
+        }],
+        class_actions=[{
+            "kind": "replace", "class_id": "class-a",
+            "definition": {
+                "invariant": "corrected predicate", "severity": "MAJOR",
+                "pattern": "STILL_BAD", "pathspec": "src/*.py",
+            },
+        }],
+    )
+    parsed = materialize(value, mode="branch", active_classes=[cls])
+    register = rc.register_from_records(parsed["class_records"], mechanized=None)
+    lineage = lineage_with_active(cls)
+    minted = cc.apply_register(lineage, register, round_no=2)
+    assert lineage.classes["class-a"].status == cc.SUPERSEDED
+    assert len(minted) == 1
+    successor = lineage.classes[minted[0]]
+    assert successor.mechanized
+    assert (successor.pattern, successor.pathspec) == ("STILL_BAD", "src/*.py")
+
+
 def test_source_fanout_requires_distinct_cited_existing_classes():
     classes = [active_class("class-a"), active_class("class-b")]
     findings = [
@@ -560,6 +677,20 @@ def test_census_schema_represents_full_three_lane_aggregate_and_fanout():
         Draft202012Validator(sp.decision_schema("branch", "census")).iter_errors(value)
     )
 
+    source_ids = [f"{sp.LANES[cc.BRANCH_MODE][index % 3]}:F{index}" for index in range(150)]
+    aggregate = decision("census", governing_findings=[
+        finding(
+            fid=f"A{index}", source_ids=[source],
+            classification={"kind": "one_off", "reason": "one aggregate source"},
+        )
+        for index, source in enumerate(source_ids)
+    ])
+    parsed = materialize(
+        aggregate, mode="branch", source_ids=source_ids,
+        source_severities={source: "MAJOR" for source in source_ids},
+    )
+    assert len(parsed["findings"]) == 150
+
 
 def test_semantic_validation_reports_all_independent_issues():
     value = decision(
@@ -616,6 +747,39 @@ def v1_projection(parsed):
     return projected
 
 
+def durable_projection(settlement, *, active=None, prior_debt=(), phase="census"):
+    active = active or []
+    lineage = cc.Lineage(
+        lineage_id="v1-v2-durable", mode=cc.PLAN_MODE,
+        classes={
+            row["class_id"]: lineage_with_active(row).classes[row["class_id"]]
+            for row in active
+        },
+        next_seq=len(active) + 1,
+    )
+    register = rc.register_from_records(settlement["class_records"], mechanized=False)
+    minted = cc.apply_register(lineage, register, round_no=2)
+    minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
+    state = rc.normalize_state({}, stakes="s", snapshot="before")
+    state["phase"] = phase
+    state["debt"] = deepcopy(list(prior_debt))
+    state = rc.settle_state(
+        state, settlement, phase=phase, snapshot="after", round_no=2,
+    )
+    for debt in state["debt"]:
+        debt.setdefault("class_ids", []).extend(
+            minted_by_record[index] for index in debt.pop("class_record_indexes", [])
+        )
+        debt["class_ids"] = list(dict.fromkeys(debt["class_ids"]))
+        if debt["id"] not in {row["id"] for row in prior_debt}:
+            debt["id"] = f"fresh:{debt['finding_id']}"
+    state["debt"].sort(key=lambda row: row["finding_id"])
+    classes = sorted(
+        (vars(row) for row in lineage.classes.values()), key=lambda row: row["class_id"],
+    )
+    return state, classes, rc.trailer(state)
+
+
 def test_frozen_historical_v1_census_projection_is_preserved():
     """Projection captured from the pre-V2 settlement contract at 83fc1e6."""
     classes = [active_class(severity="MINOR")]
@@ -662,7 +826,7 @@ def test_frozen_historical_v1_census_projection_is_preserved():
         }
         for row in values
     ]
-    assert v1_projection(parsed) == {
+    expected = {
         "role": "census",
         "source_dispositions": [
             {"source_id": "domain:F1", "governing_id": "G1"},
@@ -692,6 +856,16 @@ def test_frozen_historical_v1_census_projection_is_preserved():
             "finding_id": "G2",
         }],
     }
+    assert v1_projection(parsed) == expected
+    legacy = deepcopy(expected)
+    for index, row in enumerate(legacy["debt"], 1):
+        row["id"] = f"legacy-local-{index}"
+    legacy["_finding_class_refs"] = {
+        "G1": None, "G2": "class-a", "G3": "record:0",
+    }
+    assert durable_projection(parsed, active=classes) == durable_projection(
+        legacy, active=classes,
+    )
 
 
 def test_frozen_historical_v1_correction_projection_is_preserved():
@@ -715,7 +889,7 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
         }],
     )
     parsed = materialize(raw, active_classes=[active_class()], durable_debt=debts)
-    assert v1_projection(parsed) == {
+    expected = {
         "role": "correction", "source_dispositions": [],
         "assessment_dispositions": [
             {"assessment_id": "class-a", "governing_id": "G4"},
@@ -743,6 +917,15 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
             "finding_id": "G4",
         }],
     }
+    assert v1_projection(parsed) == expected
+    legacy = deepcopy(expected)
+    legacy["debt"][0]["id"] = "legacy-local-new"
+    legacy["_finding_class_refs"] = {"G4": "class-a"}
+    assert durable_projection(
+        parsed, active=[active_class()], prior_debt=debts, phase="correction",
+    ) == durable_projection(
+        legacy, active=[active_class()], prior_debt=debts, phase="correction",
+    )
 
 
 def test_frozen_historical_v1_final_projection_is_preserved():
@@ -753,7 +936,7 @@ def test_frozen_historical_v1_final_projection_is_preserved():
         }],
     )
     parsed = materialize(raw, active_classes=[active_class()])
-    assert v1_projection(parsed) == {
+    expected = {
         "role": "final", "source_dispositions": [], "assessment_dispositions": [
             {"assessment_id": "class-a", "governing_id": None},
         ],
@@ -765,3 +948,11 @@ def test_frozen_historical_v1_final_projection_is_preserved():
         }],
         "coverage": coverage(),
     }
+    assert v1_projection(parsed) == expected
+    legacy = deepcopy(expected)
+    legacy["_finding_class_refs"] = {}
+    assert durable_projection(
+        parsed, active=[active_class()], phase="final",
+    ) == durable_projection(
+        legacy, active=[active_class()], phase="final",
+    )

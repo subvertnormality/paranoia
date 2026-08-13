@@ -155,7 +155,10 @@ def wire(value):
 
 def parse_decision(text, *, role="census"):
     try:
-        return sp.decode(text, sp.decision_schema(cc.PLAN_MODE, role))
+        return sp.decode(
+            text, sp.decision_schema(cc.PLAN_MODE, role),
+            max_chars=sp.MAX_DECISION_RESPONSE_CHARS,
+        )
     except sp.ProtocolError as exc:
         raise rc.CensusError(str(exc)) from exc
 
@@ -216,6 +219,42 @@ def test_a_line_range_anchor_resolves_like_a_single_line(tmp_path):
     for bad in ("a.py:3-1", "a.py:0-2", "a.py:1-", "a.py:-2", "a.py:1-2-3", "a.py:1-x"):
         with pytest.raises(rc.CensusError, match="unresolvable evidence anchor"):
             rc.resolve_anchors({"evidence":[bad]}, root=tmp_path)
+
+
+def test_anchor_resolution_reports_independent_json_pointer_issues(tmp_path):
+    (tmp_path / "a.py").write_text("one\n")
+    value = {
+        "findings": [
+            {"evidence": ["a.py:2", "missing.py:1"]},
+            {"evidence": ["plan:3"]},
+        ],
+    }
+    with pytest.raises(rc.CensusError) as caught:
+        rc.resolve_anchors(value, root=tmp_path, plan_lines=2)
+    assert str(caught.value).splitlines() == [
+        "/findings/0/evidence/0: out-of-range repository anchor 'a.py:2'",
+        "/findings/0/evidence/1: unresolvable repository anchor 'missing.py:1'",
+        "/findings/1/evidence/0: unresolvable plan anchor 'plan:3'",
+    ]
+
+
+def test_canonical_class_validation_reports_independent_action_pointers():
+    parsed = {
+        "class_records": [
+            {"op": "close", "class_id": "missing-a"},
+            {"op": "reopen", "class_id": "missing-b"},
+        ],
+        "_class_record_pointers": ["/class_actions/0", "/class_actions/1"],
+    }
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._validate_materialized_class_records(
+            parsed, mode=cc.BRANCH_MODE,
+            lineage=cc.Lineage("validation-fixture"), round_no=1,
+        )
+    assert str(caught.value).splitlines() == [
+        "/class_actions/0: invalid class operation: CLOSED names unknown class id 'missing-a'",
+        "/class_actions/1: invalid class operation: REOPEN names unknown class id 'missing-b'",
+    ]
 
 
 def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
@@ -1269,6 +1308,69 @@ def test_branch_codex_runs_the_staged_census_path(
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B3")
     assert len(calls) == 4
     assert "CONVERGENCE: NOT-BLOCKED" in result
+
+
+def test_tracked_branch_rejects_pathspec_magic_on_fresh_and_retry(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    invalid = {
+        "role": "census",
+        "governing_findings": [{
+            "id": "G1", "severity": "MAJOR", "summary": "bad scope",
+            "evidence": ["repository/README.md:1"], "remedy": "use literal scope",
+            "source_ids": ["behaviour:F1"],
+            "classification": {
+                "kind": "new_class", "definition": {
+                    "invariant": "literal scopes only", "severity": "MAJOR",
+                    "pattern": "BAD", "pathspec": ":(exclude)generated/**",
+                },
+            },
+        }],
+        "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
+    }
+
+    def response(prompt):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            findings = []
+            if lane_name == "behaviour":
+                findings = [{
+                    "id": "F1", "severity": "MAJOR", "summary": "bad scope",
+                    "evidence": ["repository/README.md:1"],
+                    "remedy": "use literal scope",
+                }]
+            value = payload(lane(lane_name, findings=findings))
+            for row in value["coverage"]:
+                row["evidence"] = ["repository/README.md:1"]
+            return wire(value)
+        return wire(invalid)
+
+    def run(self, prompt, *args, **kwargs):
+        text = response(prompt)
+        return Review(text=text, session_ref="pathspec-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        text = wire(invalid)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_branch({
+        "repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
+        "lineage": "pathspec-magic-branch", "round": 1,
+        "stakes": "trusted local tool",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "PS1")
+
+    assert "CLASS-REGISTER: staged rejected" in result
+    assert "CONVERGENCE: BLOCKED" in result
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "pathspec-magic-branch", stamp="PS2", mode=cc.BRANCH_MODE,
+    )
+    assert lineage.active() == []
+    assert "not valid under any" in lineage.review_state["validation_debt"]["message"]
 
 
 def test_branch_settlement_persists_a_new_procedure_class(

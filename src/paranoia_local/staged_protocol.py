@@ -37,6 +37,8 @@ MAX_CENSUS_SOURCES = len(LANES[cc.PLAN_MODE]) * MAX_LANE_FINDINGS
 # One source normally produces one governing finding.  Fan-out may additionally
 # produce one distinct existing-class finding for every active class.
 MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
+MAX_LANE_RESPONSE_CHARS = 5_000_000
+MAX_DECISION_RESPONSE_CHARS = 5_000_000
 
 
 class ProtocolError(ValueError):
@@ -65,7 +67,7 @@ def _string(max_length: int, *, enum: Sequence[str] | None = None,
             const: str | None = None) -> dict[str, Any]:
     value: dict[str, Any] = {
         "type": "string", "minLength": 1, "maxLength": max_length,
-        "pattern": r"^[^\r\n]+$",
+        "pattern": r"^(?=.*\S)[^\r\n]+$",
     }
     if enum is not None:
         value["enum"] = list(enum)
@@ -336,7 +338,11 @@ def _schema_issues(value: Any, schema: dict[str, Any]) -> list[str]:
     return issues
 
 
-def decode(text: str, schema: dict[str, Any]) -> dict[str, Any]:
+def decode(text: str, schema: dict[str, Any], *, max_chars: int) -> dict[str, Any]:
+    if len(text) > max_chars:
+        raise ProtocolError(
+            f"/: response is {len(text)} characters; maximum is {max_chars}"
+        )
     try:
         value = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -404,7 +410,7 @@ def _validate_coverage(
 
 def parse_lane(text: str, *, mode: str, lane: str,
                class_ids: Sequence[str] = ()) -> dict[str, Any]:
-    value = decode(text, lane_schema(mode, lane))
+    value = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
     issues: list[str] = []
     findings = _unique(value["findings"], "id", "findings", issues)
     _validate_coverage(value["coverage"], findings, issues)
@@ -453,7 +459,9 @@ def materialize_decision(
 ) -> dict[str, Any]:
     """Validate one semantic decision and project it to the durable V1 shape."""
 
-    value = decode(text, decision_schema(mode, role))
+    value = decode(
+        text, decision_schema(mode, role), max_chars=MAX_DECISION_RESPONSE_CHARS,
+    )
     issues: list[str] = []
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
@@ -502,9 +510,10 @@ def materialize_decision(
             )
 
     class_records: list[dict[str, Any]] = []
+    class_record_pointers: list[str] = []
     finding_class: dict[str, str | None] = {}
     existing_findings: dict[str, str] = {}
-    for finding in findings:
+    for finding_index, finding in enumerate(findings):
         classification = finding["classification"]
         kind = classification["kind"]
         if kind == "one_off":
@@ -512,6 +521,9 @@ def materialize_decision(
         elif kind == "new_class":
             index = len(class_records)
             class_records.append({"op": "new", **classification["definition"]})
+            class_record_pointers.append(
+                f"/governing_findings/{finding_index}/classification/definition"
+            )
             finding_class[finding["id"]] = f"record:{index}"
         else:
             cid = classification["class_id"]
@@ -545,6 +557,10 @@ def materialize_decision(
         for row in value["debt_outcomes"]
     ]
 
+    outcome_pointers = {
+        row["class_id"]: f"/class_outcomes/{index}"
+        for index, row in reversed(list(enumerate(value["class_outcomes"])))
+    }
     outcomes = _unique(
         value["class_outcomes"], "class_id", "class_outcomes", issues,
     )
@@ -653,6 +669,10 @@ def materialize_decision(
                 f"/debt_outcomes/{debt_id}: open class-bound debt needs a violated class"
             )
 
+    action_pointers = {
+        row["class_id"]: f"/class_actions/{index}"
+        for index, row in reversed(list(enumerate(value["class_actions"])))
+    }
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
     )
@@ -726,6 +746,11 @@ def materialize_decision(
                 "op": "replace", "class_id": action["class_id"],
                 **action["definition"],
             })
+        class_record_pointers.append(
+            action_pointers.get(
+                action["class_id"], outcome_pointers.get(action["class_id"], "/class_actions"),
+            )
+        )
 
     debt_bearing = [
         finding for finding in findings
@@ -769,6 +794,7 @@ def materialize_decision(
         "class_records": class_records,
         "class_assessments": materialized_assessments,
         "_finding_class_refs": finding_class,
+        "_class_record_pointers": class_record_pointers,
     }
     if role == "final":
         result["coverage"] = value["coverage"]

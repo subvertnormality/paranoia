@@ -343,74 +343,90 @@ def resolve_anchors(
     value: Any, *, root: Any, plan_lines: int | None = None,
     trusted_roots: dict[str, Any] | None = None,
 ) -> None:
-    """Resolve every evidence array in a parsed staged object against the snapshot."""
+    """Resolve every evidence array and report all independent bad anchors together."""
     from pathlib import Path
     base = Path(root).resolve()
-    for row in _walk_dicts(value):
-        evidence = row.get("evidence")
-        if not isinstance(evidence, list):
+    issues: list[str] = []
+    for pointer, anchor in _walk_evidence(value):
+        path, sep, raw_line = anchor.rpartition(":")
+        # `path:start-end` is accepted alongside `path:line`. The prompt asks
+        # reviewers to quote the offending *lines*, so a range is the natural
+        # citation for a multi-line defect and engines emit one unprompted.
+        raw_start, dash, raw_end = raw_line.partition("-")
+        raw_end = raw_end if dash else raw_start
+        if (
+            not sep or not raw_start.isdigit() or not raw_end.isdigit()
+            or int(raw_start) < 1 or int(raw_end) < int(raw_start)
+        ):
+            issues.append(f"{pointer}: unresolvable evidence anchor {anchor!r}")
             continue
-        for anchor in evidence:
-            path, sep, raw_line = anchor.rpartition(":")
-            # `path:start-end` is accepted alongside `path:line`. The prompt asks
-            # reviewers to quote the offending *lines*, so a range is the natural
-            # citation for a multi-line defect and engines emit one unprompted.
-            # Rejecting it discarded whole staged reviews — two rounds lost on
-            # 2026-08-13 to anchors whose file and lines both existed.
-            raw_start, dash, raw_end = raw_line.partition("-")
-            # An empty tail after a dash is a malformed range, not a bare line.
-            raw_end = raw_end if dash else raw_start
-            if (
-                not sep or not raw_start.isdigit() or not raw_end.isdigit()
-                or int(raw_start) < 1 or int(raw_end) < int(raw_start)
-            ):
-                raise CensusError(f"unresolvable evidence anchor {anchor!r}")
-            # Bound-check the END: a range ending inside the file starts inside it.
-            line = int(raw_end)
-            if path == "plan":
-                if plan_lines is None or line > plan_lines:
-                    raise CensusError(f"unresolvable plan anchor {anchor!r}")
+        # Bound-check the END: a range ending inside the file starts inside it.
+        line = int(raw_end)
+        if path == "plan":
+            if plan_lines is None or line > plan_lines:
+                issues.append(f"{pointer}: unresolvable plan anchor {anchor!r}")
+            continue
+        relative = Path(path)
+        if relative.is_absolute() or ".." in relative.parts:
+            issues.append(f"{pointer}: unresolvable repository anchor {anchor!r}")
+            continue
+        if trusted_roots and "repository" in trusted_roots and (
+            not relative.parts or relative.parts[0] != "repository"
+        ):
+            issues.append(
+                f"{pointer}: repository evidence anchor requires repository/ prefix: {anchor!r}"
+            )
+            continue
+        anchor_base = base
+        if trusted_roots and relative.parts and relative.parts[0] in trusted_roots:
+            anchor_base = Path(trusted_roots[relative.parts[0]]).resolve()
+            relative = Path(*relative.parts[1:])
+            if not relative.parts:
+                issues.append(f"{pointer}: unresolvable repository anchor {anchor!r}")
                 continue
-            relative = Path(path)
-            if relative.is_absolute() or ".." in relative.parts:
-                raise CensusError(f"unresolvable repository anchor {anchor!r}")
-            if trusted_roots and "repository" in trusted_roots and (
-                not relative.parts or relative.parts[0] != "repository"
-            ):
-                raise CensusError(
-                    f"repository evidence anchor requires repository/ prefix: {anchor!r}"
-                )
-            anchor_base = base
-            if trusted_roots and relative.parts and relative.parts[0] in trusted_roots:
-                anchor_base = Path(trusted_roots[relative.parts[0]]).resolve()
-                relative = Path(*relative.parts[1:])
-                if not relative.parts:
-                    raise CensusError(f"unresolvable repository anchor {anchor!r}")
-            target = anchor_base / relative
-            try:
-                cursor = anchor_base
-                for part in relative.parts:
-                    cursor = cursor / part
-                    if cursor.is_symlink():
-                        raise OSError("symlink evidence anchors are not snapshot paths")
-                resolved = target.resolve(strict=True)
-                if not resolved.is_relative_to(anchor_base):
-                    raise OSError("evidence anchor escapes snapshot")
-                count = sum(1 for _ in resolved.open("r", encoding="utf-8", errors="replace"))
-            except (OSError, ValueError) as exc:
-                raise CensusError(f"unresolvable repository anchor {anchor!r}") from exc
-            if line > count:
-                raise CensusError(f"out-of-range repository anchor {anchor!r}")
+        target = anchor_base / relative
+        try:
+            cursor = anchor_base
+            for part in relative.parts:
+                cursor = cursor / part
+                if cursor.is_symlink():
+                    raise OSError("symlink evidence anchors are not snapshot paths")
+            resolved = target.resolve(strict=True)
+            if not resolved.is_relative_to(anchor_base):
+                raise OSError("evidence anchor escapes snapshot")
+            count = sum(1 for _ in resolved.open("r", encoding="utf-8", errors="replace"))
+        except (OSError, ValueError):
+            issues.append(f"{pointer}: unresolvable repository anchor {anchor!r}")
+            continue
+        if line > count:
+            issues.append(f"{pointer}: out-of-range repository anchor {anchor!r}")
+    if issues:
+        ordered = sorted(dict.fromkeys(issues))
+        shown = ordered[:sp.MAX_ISSUES]
+        if len(ordered) > sp.MAX_ISSUES:
+            shown.append(
+                f"/: {len(ordered) - sp.MAX_ISSUES} additional anchor errors omitted"
+            )
+        raise CensusError("\n".join(shown)[:sp.MAX_ISSUE_CHARS])
 
 
-def _walk_dicts(value: Any):
+def _walk_evidence(value: Any, pointer: str = ""):
     if isinstance(value, dict):
-        yield value
-        for child in value.values():
-            yield from _walk_dicts(child)
+        for key, child in value.items():
+            # Materialized settlement debt mirrors governing-finding evidence;
+            # report only the model-owned finding pointer the retry can repair.
+            if not pointer and key == "debt":
+                continue
+            escaped = str(key).replace("~", "~0").replace("/", "~1")
+            child_pointer = f"{pointer}/{escaped}"
+            if key == "evidence" and isinstance(child, list):
+                for index, anchor in enumerate(child):
+                    yield f"{child_pointer}/{index}", anchor
+            else:
+                yield from _walk_evidence(child, child_pointer)
     elif isinstance(value, list):
-        for child in value:
-            yield from _walk_dicts(child)
+        for index, child in enumerate(value):
+            yield from _walk_evidence(child, f"{pointer}/{index}")
 
 
 

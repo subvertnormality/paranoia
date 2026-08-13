@@ -153,7 +153,10 @@ For Claude, schema success additionally requires an object in the provider envel
 `structured_output`; a zero exit status with only result prose is a provider failure. Branch class
 schemas reject leading-colon Git pathspec magic, and replacements of mechanized classes must retain
 a pattern plus literal pathspec. The local semantic pass returns bounded, deterministically ordered
-independent issues so the single validation retry can repair more than the first defect.
+independent graph, model-owned anchor, and canonical-class issues with model-repairable JSON
+pointers so the single validation retry can repair more than the first defect. Whitespace-only
+semantic text and staged replies above the documented five-million-character role caps fail before
+settlement or JSON decoding.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,

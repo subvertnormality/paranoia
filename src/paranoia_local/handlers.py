@@ -217,6 +217,36 @@ def _staged_lane_prompt(
     return prompts.compose(instructions, lane_body)
 
 
+def _validate_materialized_class_records(
+    parsed: dict[str, Any], *, mode: str, lineage: cc.Lineage, round_no: int,
+) -> None:
+    """Collect independent canonical-engine faults before spending the one retry."""
+    issues: list[str] = []
+    pointers = parsed.get("_class_record_pointers", [])
+    for index, record in enumerate(parsed["class_records"]):
+        try:
+            single = rc.register_from_records(
+                [record], mechanized=None if mode == cc.BRANCH_MODE else False,
+            )
+            cc.apply_register(cc.copy_lineage(lineage), single, round_no=round_no)
+        except (cc.RegisterError, rc.CensusError) as exc:
+            pointer = pointers[index] if index < len(pointers) else f"/class_records/{index}"
+            issues.append(f"{pointer}: invalid class operation: {exc}")
+    if not issues:
+        try:
+            register = rc.register_from_records(
+                parsed["class_records"],
+                mechanized=None if mode == cc.BRANCH_MODE else False,
+            )
+            cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
+        except (cc.RegisterError, rc.CensusError) as exc:
+            issues.append(f"/class_actions: invalid operation set: {exc}")
+    if issues:
+        raise rc.CensusError(
+            "\n".join(sorted(dict.fromkeys(issues)))[:sp.MAX_ISSUE_CHARS]
+        )
+
+
 def _census_cache_binding(
     *, mode: str, snapshot: str, stakes: str, body: str,
     active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
@@ -509,13 +539,9 @@ def _staged_structural_review(
         rc.resolve_anchors(
             parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
         )
-        try:
-            register = rc.register_from_records(
-                parsed["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
-            )
-            cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
-        except cc.RegisterError as exc:
-            raise rc.CensusError(f"invalid class operation: {exc}") from exc
+        _validate_materialized_class_records(
+            parsed, mode=mode, lineage=lineage, round_no=round_no,
+        )
         return parsed
 
     if phase == "census":

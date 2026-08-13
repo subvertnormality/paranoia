@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-1 findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-2 held findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -62,15 +62,15 @@ payload.
 ## Automated verification
 
 The environment's command wrapper terminates a single process after roughly 30 seconds, so the
-final 967-test collection was run in four exhaustive groups with identical environment and Git
+final 978-test collection was run in four exhaustive groups with identical environment and Git
 isolation:
 
 - 159 arbitration-handler tests passed;
-- 306 acceptance/arbitration/class-closure tests passed in 27.35 seconds;
-- 136 engine/evidence/handler/inert-tree tests passed in 12.51 seconds;
-- 366 integration/plan/staged/server tests passed in 13.37 seconds.
+- 306 acceptance/arbitration/class-closure tests passed in 23.84 seconds;
+- 136 engine/evidence/handler/inert-tree tests passed in 7.19 seconds;
+- 377 integration/plan/staged/server tests passed in 11.78 seconds.
 
-Total: **967 passed**. The nine-mutation bounded gate also passed, focused
+Total: **978 passed**. The nine-mutation bounded gate also passed, focused
 V2/engine/prompt/plan tests passed independently, and `git diff --check` is clean.
 
 After the first CODE census, focused gates cover the accepted findings:
@@ -101,16 +101,27 @@ satisfied outcome, accumulates independent semantic issues, admits the calculate
 100-active-class census bound, and adds the narrowly described differential/mutation evidence.
 No provider call, retry, phase, persistence format, trust boundary, or subsystem was added.
 
+CODE round 2 closed the provider-envelope class and retained six blocking classes because the
+first correction's tests stopped at schema/materializer boundaries and anchor/class diagnostics
+still returned one error at a time. The second checkpoint pass adds a tracked-branch fresh/retry
+rejection test for pathspec magic; sends valid mechanized replacement and standalone action/debt
+closure through the canonical class engine and durable settlement; compares frozen V1 and V2
+projections through durable phase, debt, class state, trailer, and explicit fresh-ID normalization;
+materializes 150 sources drawn from all three lane namespaces; and accumulates independent anchor
+and canonical-action faults with model-owned pointers. Derived mirror debt is omitted from anchor
+diagnostics so retry pointers remain repairable. Five-million-character lane/decision pre-decode
+caps and non-whitespace semantic strings close the two advisory observations without adding a call.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+284 net lines** and current sizes 2,689, 434, 501, 616, and 775 lines. The increase is
-bounded semantic issue accumulation, provider-envelope closure, and the corrected schema limits;
+modules to **+352 net lines** and current sizes 2,715, 450, 501, 616, and 801 lines. The increase is
+bounded graph/anchor/class issue accumulation, provider-envelope closure, and corrected schema limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the final diff is **+304 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+372 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 

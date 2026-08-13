@@ -89,6 +89,11 @@ class definitions must reject leading-colon Git pathspec magic, and a mechanized
 must remain mechanized. Semantic validation must report independent safe-to-detect issues together
 within its bounded diagnostic so the one retry can repair them. The census decision schema must
 represent the complete aggregate admitted by all three lane bounds and active-class fan-out.
+Resolve all independent model-owned anchors and dry-run all independent class actions into one
+bounded, pointer-addressed retry diagnostic; derived mirror debt must not create unrepairable
+diagnostic pointers. Reject whitespace-only semantic text and oversized raw staged replies before
+JSON decoding. Cross-layer tests must carry accepted class actions through the canonical engine and
+durable settlement, not stop at materializer row shape.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
