@@ -1520,17 +1520,16 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
             coverage = [
                 {"id": key, "status": "covered", "summary": "checked",
                  "evidence": ["repository/README.md:1"], "finding_ids": []}
-                for key in handlers.rc.CHECKLIST
+                for key in handlers.sp.CHECKLIST
             ]
-            text = handlers.rc.LANE_MARKER + "\n" + json.dumps({
+            text = json.dumps({
                 "lane": lane, "coverage": coverage, "findings": [],
                 "class_assessments": [],
             })
         else:
-            text = handlers.rc.SETTLEMENT_MARKER + "\n" + json.dumps({
-                "role": "census", "source_dispositions": [],
-                "assessment_dispositions": [], "findings": [], "debt": [],
-                "debt_updates": [], "class_dispositions": [], "class_records": [],
+            text = json.dumps({
+                "role": "census", "governing_findings": [],
+                "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
             })
         return Review(text=text, session_ref="structural", raw=text)
 

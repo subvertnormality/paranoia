@@ -132,8 +132,12 @@ def passage_matches(passage: str, captured_text: str) -> bool:
     return bool(needle) and needle in normalize_text(captured_text)
 
 
+def numbered_lines(lines: Iterable[str]) -> str:
+    return "\n".join(f"{index:05d}: {line}" for index, line in enumerate(lines, 1))
+
+
 def numbered_text(text: str) -> str:
-    return "\n".join(f"{index:05d}: {line}" for index, line in enumerate(text.splitlines(), 1))
+    return numbered_lines(text.splitlines())
 
 
 def _validate_public_url(url: str) -> None:

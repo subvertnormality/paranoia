@@ -58,14 +58,42 @@ Every failed engine Review projected into staged or claim state must also retain
 stdout, structured failure detail, and process stderr as distinct bounded, hashed channels.
 Persist terminally rejected staged model replies separately from provider envelopes as bounded
 head-and-tail excerpts plus full-reply SHA-256 in both lineage failure/debt state and the top-level
-audit record. Correction instructions and retry diagnostics must state the exact two-key
-`assessment_id`/`governing_id` disposition shape at the point of use.
+audit record. Retry diagnostics must retain the bounded local validation issue and JSON Pointer;
+do not restore a hand-maintained row-shape catalogue beside the executable schema.
 Parallel staged failure fan-in must preserve rejected replies from every failed lane in deterministic
 attempt-sequence order. Attach diagnostics to the closure before lineage persistence so a failed
 state write cannot remove them from either branch or plan audit output.
 Hash rejected extracted model text with a total, documented encoding for every Python string the
 engine JSON parser can produce, including unpaired surrogates; do not change historical structural
 or state digest encoding as a side effect of diagnostic capture.
+
+For the staged Protocol v2 cutover, give plan reviewers a displayed line-number view derived from
+the same line collection used by anchor bounds while retaining original unnumbered bytes for
+digests, claims, and persistence. Constrain fresh and resumed provider output with a deterministic
+provider-compatible projection of the closed, role-specific JSON Schema the server validates.
+Provider-subset omissions such as Codex's unsupported `uniqueItems`, plus non-semantic draft
+metadata that Claude cannot receive, remain fail-closed local constraints and may cause only the
+existing same-session validation retry. Ask the model for each semantic judgement once;
+derive mirror debt, disposition, binding, and lifecycle rows deterministically, then dry-run the
+canonical class engine before the single atomic state transition. Preserve every current legal
+semantic outcome, including carried-debt identity, independent new-class severity, and standalone
+class actions. Preserve stored debt IDs; allocate new IDs canonically and compare historical fresh
+V1 labels through an explicit semantic bijection. Define rejection atomicity over substantive
+review/class state while retaining required failure diagnostics. Prove historical V1/V2
+materialization equivalence, and do not ship a permissive alias normalizer, partial settlement,
+durable dual protocol, extra model call, or new persistence mechanism. A structured-output
+capability failure blocks the cutover rather than falling back to unconstrained prose.
+Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
+`structured_output`; a successful process plus result prose is not structured success. Branch
+class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement
+must remain mechanized. Semantic validation must report independent safe-to-detect issues together
+within its bounded diagnostic so the one retry can repair them. The census decision schema must
+represent the complete aggregate admitted by all three lane bounds and active-class fan-out.
+Resolve all independent model-owned anchors and dry-run all independent class actions into one
+bounded, pointer-addressed retry diagnostic; derived mirror debt must not create unrepairable
+diagnostic pointers. Reject whitespace-only semantic text and oversized raw staged replies before
+JSON decoding. Cross-layer tests must carry accepted class actions through the canonical engine and
+durable settlement, not stop at materializer row shape.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

@@ -142,13 +142,28 @@ material on every correction round. Tracked branch reviews use the same lifecycl
 three-lane census, targeted correction rounds over durable debt and changed code, and a mandatory
 broad, cold final regression before clearance. Every staged branch role retains the established
 code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
-structured output contract changes. One-shot reviews retain the single broad review.
+structured output contract changes. The staged roles use closed, role-specific provider schemas,
+then the server validates the complete bounded schema and semantic graph independently. The pinned
+Codex schema subset lacks `uniqueItems`, and Claude must not receive the draft-identifying
+`$schema` metadata. Those two non-semantic keywords are removed only from the provider projection;
+uniqueness remains mandatory in local validation, so duplicates can trigger the existing
+same-session correction but can never settle. There is no prose/marker fallback. One-shot reviews
+retain the single broad review.
+For Claude, schema success additionally requires an object in the provider envelope's
+`structured_output`; a zero exit status with only result prose is a provider failure. Branch class
+schemas reject leading-colon Git pathspec magic, and replacements of mechanized classes must retain
+a pattern plus literal pathspec. The local semantic pass returns bounded, deterministically ordered
+independent graph, model-owned anchor, and canonical-class issues with model-repairable JSON
+pointers so the single validation retry can repair more than the first defect. Whitespace-only
+semantic text, lane replies above 240,000 characters, and decision replies above 1,000,000
+characters fail before settlement or JSON decoding. The separate composed-prompt circuit breaker
+remains 5,000,000 characters.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
 engine/model/effort/web capability settings, plan line context, and cache schema. It is recorded only
 after terminal validation rejection; the binding also digests the exact composed lane prompt bytes,
-including current instructions. Execution failure, timeout, cancellation, or failed retry is
+including current instructions and provider schema. Execution failure, timeout, cancellation, or failed retry is
 not reusable. Any binding change or incomplete lane set forces a fresh census.
 
 Durable lineage state carries concrete findings, reusable classes, frozen stakes, phase, and plan
@@ -202,11 +217,13 @@ the claim and its citation, never the previous reviewer's prose.
 invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
-Tracked staged plan and branch reviews return strict staged JSON, and the server applies their
-class records through the same durable class engine used by the legacy terminal register. Every
+Tracked staged plan and branch reviews return provider-constrained semantic JSON. The model emits
+each source mapping, classification, debt outcome, class outcome, and independent class action once;
+the server validates the graph, allocates new debt IDs, derives the internal mirror rows, and applies
+class operations through the same durable class engine used by the legacy terminal register. Every
 governing finding must explicitly declare whether it is a genuine one-off, a new reusable class,
-or an occurrence of an active class. Every new class record is bound to exactly one governing
-finding; omission or an unbound record rejects the settlement instead of silently treating its
+or an occurrence of an active class. Every embedded new-class definition is bound to exactly one
+finding; omission or an unbound definition rejects the settlement instead of silently treating its
 finding as classless. Every lane finding must be named by at least one checklist
 row; a `finding` row names its finding IDs and non-finding rows cannot hide one. The integrity lane
 receives each active class's invariant and its procedure or mechanized predicate, not only an ID.
@@ -215,8 +232,8 @@ finding to one distinct governing finding per class. The source observation is n
 split: every target of a repeated source must be an existing-class finding backed by its own
 violated assessment citing that source. One-off or new-class targets, duplicate source-to-governing
 pairs, and omitted sources still reject the settlement.
-An open, unmechanized active class assessed `satisfied` closes deterministically. Consolidation may
-emit the explicit close record, and the server derives it when omitted; mechanized classes retain
+An open, unmechanized active class assessed `satisfied` closes deterministically; the model does not
+need to repeat that derived action. Mechanized classes retain
 their separate mechanical closure rule. Rejections after parsing are recorded as
 `validation-invalid`, which covers both envelope/schema and semantic lifecycle failures.
 Only terminal consolidation validation populates `validation_debt`; lane/follow-up validation and
@@ -229,14 +246,18 @@ Terminal validation debt retains that same structured role, kind, and message in
 the convergence trailer. Terminal staged validation rejection also persists each rejected extracted
 model reply as a bounded head-and-tail excerpt plus its full SHA-256 in lineage state and the audit
 log's top-level `rejected_payloads`; provider-envelope excerpts in `attempt_ledger` remain separate.
-Correction prompts give the non-null `assessment_dispositions` row literally and require exactly
-`assessment_id` plus `governing_id`, so the validation retry can remove any analogized extra keys.
+Validation retry guidance includes the bounded server validation issue with a JSON Pointer, while
+the provider schema remains the structural source of truth. The server does not normalize aliases,
+fences, markers, partial objects, unresolved anchors, or missing semantic decisions.
 Concurrent lane failure fan-in retains replies from every failed lane in attempt-sequence order,
 and diagnostics are attached to the closure before lineage persistence so a save failure cannot
 erase them from the still-available branch or plan audit log.
 Rejected extracted-reply digests use UTF-8 `surrogatepass`, making diagnostic capture total for
 unpaired surrogates that a provider's JSON string can legally decode; structural state digests keep
 their existing encoding contract.
+For tracked plans, the reviewer sees immutable `NNNNN: ` display prefixes derived from the same
+`splitlines()` collection that supplies anchor bounds. Those prefixes are presentation metadata;
+the unnumbered original remains the sole input to plan/claim digests and persistence.
 Repository evidence anchors must resolve to ordinary files inside the exact inert snapshot. The
 Codex's server-created `repository/` alias is resolved only to that server-owned snapshot root;
 repository symlinks remain invalid. Disabling plan claim verification makes retained claim state
@@ -1028,6 +1049,7 @@ audit digest, outcome/selection/snapshot, or production hashes.
 ```bash
 pip install -e '.[dev]'
 python -m pytest        # unit + integration; integration uses fake CLIs, no quota
+python scripts/run_staged_protocol_mutation_checks.py  # bounded Protocol v2 release gate
 ```
 
 The engine subprocess boundary is dependency-injected, so the whole stack is
@@ -1038,7 +1060,11 @@ Design documents for the two non-obvious subsystems live in
 [`docs/`](docs/): [`class_closure_plan.md`](docs/class_closure_plan.md),
 [`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
 [`claim_verification.md`](docs/claim_verification.md), and
-[`arbitration_plan.md`](docs/arbitration_plan.md).
+[`arbitration_plan.md`](docs/arbitration_plan.md). The proposed simplification of the
+staged model contract is specified in
+[`staged_review_protocol_v2_plan.md`](docs/staged_review_protocol_v2_plan.md), with
+implementation evidence in
+[`staged_review_protocol_v2_acceptance.md`](docs/staged_review_protocol_v2_acceptance.md).
 The latest real Codex verification evidence is recorded in
 [`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 

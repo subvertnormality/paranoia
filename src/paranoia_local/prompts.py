@@ -303,13 +303,16 @@ def compose(instructions: str, body: str) -> str:
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
 
 
-PLAN_EVIDENCE_ANCHORS = """Cite the reviewed plan itself only as `plan:<line>`
-(never by its repository path); cite every other supplied file as `repository/<path>:<line>`
-(the literal `repository/` prefix is required)."""
+PLAN_EVIDENCE_ANCHORS = """The plan is displayed with `NNNNN: ` coordinate prefixes that are
+presentation metadata, not plan text. Cite it only as `plan:<line>` or
+`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as
+`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned
+filesystem repository root is the `repository/` directory relative to your current directory;
+read repository files through that directory, not from the workspace root."""
 
 BRANCH_EVIDENCE_ANCHORS = """This is a branch review and there is no `plan:` evidence alias.
-Cite every supplied file as `repository/<path>:<line>` (the literal `repository/` prefix is
-required), including plans, contracts, and documentation stored in the repository."""
+Cite every supplied file as `repository/<path>:<line>` or a range; the literal `repository/`
+prefix is required, including plans, contracts, and documentation."""
 
 
 def staged_census_instructions(mode: str, lane: str) -> str:
@@ -334,118 +337,49 @@ def staged_followup_instructions(mode: str) -> str:
 
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
 Read the complete supplied artifact and repository. Own every checklist item from your lane's
-perspective. Report all in-scope severities; do not defer issues to another lane. ANCHOR_POLICY
-Every evidence anchor must resolve. Return only:
-=== REVIEW CENSUS JSON ===
-{"lane":"LANE","coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable","summary":"why","evidence":["path:line"],"finding_ids":[]}],"findings":[{"id":"LANE-1","severity":"FATAL|BLOCKER|MAJOR|MINOR|OUT-OF-SCOPE","summary":"atomic root issue","evidence":["path:line"],"remedy":"bounded repair"}],"class_assessments":[{"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}]}
-Include all nine checklist IDs named in the task. Non-integrity lanes return an empty
-class_assessments array; integrity assesses every supplied active class exactly once and a violated
-assessment names one of its findings. A coverage row with status finding names one or more lane
-finding IDs; all other rows use an empty finding_ids array, and every lane finding is named by at
-least one coverage row."""
+perspective and report every in-scope severity; do not defer issues to another lane. ANCHOR_POLICY
+Every evidence anchor must resolve. The provider-supplied JSON Schema is the sole structural
+contract; return only its object, without a marker, fence, or prose.
+
+Cover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded
+repair and is named by at least one finding-status coverage row; non-finding coverage names no
+findings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active
+class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
-review. Map every source finding at least once and every class assessment exactly once. Preserve
-the highest severity of merged findings. Every blocking governing finding and every governing finding referenced by a
-violated class assessment needs exactly one open debt record, regardless of severity. Advisory debt
-is tracked but does not block convergence. If existing_debt is supplied, update every item exactly
-once; preserve it open with a concrete reason or close it with current evidence. Return only
-=== REVIEW SETTLEMENT JSON === followed by
-one JSON object with: role, source_dispositions, assessment_dispositions, findings, debt,
-debt_updates, class_dispositions, and class_records. A finding is a reusable class when the
-reasoning that condemns this site or passage would condemn another occurrence; a genuinely unique
-wrong value or site is one-off. Classify every governing finding exactly once as
-{"finding_id":"G1","kind":"one_off","reason":"why it cannot recur"},
-{"finding_id":"G1","kind":"new_class","record_index":0}, or
-{"finding_id":"G1","kind":"existing_class","class_id":"active-id"}. Every new class record
-must be referenced by exactly one new_class disposition. A violated existing-class assessment must
-disposition its governing finding to that same existing class. Consolidate same-class occurrences into one governing
-finding in census as well as correction; every existing_class finding has exactly one matching
-violated assessment and assessment disposition. Class record op is one of
-new, close, reopen, reclassify, replace. Use replace as one atomic predecessor-to-open-successor
-operation. A branch new/replace record has op, invariant, severity and exactly one of
-pattern+pathspec or procedure; a plan record has procedure. A replace additionally has class_id.
-Close/reopen has only op and class_id; reclassify additionally has severity. A closed mechanized
-class that is violated must use replace with a corrected predicate—reopen is only for unmechanized
-classes. Use these exact row shapes:
-source_dispositions=[{"source_id":"lane:id","governing_id":"G1"}]; one source_id may appear
-again with a distinct governing_id when one atomic lane finding is an occurrence of multiple active
-classes. Every target of a repeated source_id must be an existing_class finding backed by a distinct
-violated assessment that cites that source. Never split a finding into one_off or new_class targets,
-or duplicate the same source_id/governing_id pair;
-assessment_dispositions=[{"assessment_id":"class-id","governing_id":null}];
-findings=[{"id":"G1","severity":"MAJOR","summary":"issue","evidence":["path:1"],"remedy":"repair"}];
-debt=[{"id":"D1","finding_id":"G1","status":"open"}];
-debt_updates=[]; class_dispositions=[{"finding_id":"G1","kind":"one_off","reason":"unique site"}];
-class_records=[]. A violated assessment must map to the same governing finding as
-its cited lane finding; a satisfied assessment maps to null. A satisfied active class that is
-currently open and unmechanized must also have {"op":"close","class_id":"that-id"} in
-class_records; an already-closed satisfied class needs no record. The server derives that close if
-it is omitted, but emitting it makes the settlement's lifecycle explicit. Do not emit prose."""
+review. The provider-supplied JSON Schema is the sole structural contract; return only its object,
+without a marker, fence, or prose.
+
+Map every source through governing_findings.source_ids and preserve the highest merged severity.
+Classify each governing finding once: one_off only when its reasoning cannot recur; new_class with a
+complete reusable definition and explicit class severity; or existing_class naming the active
+class. One source may fan out only to distinct existing-class findings for distinct violated
+assessments that cited it. Consolidate all occurrences of one existing class into one finding.
+
+Preserve every integrity verdict in class_outcomes. A violation uses new_finding and names the
+governing finding following its cited lane source; satisfaction has no basis. Return one
+debt_outcome for every supplied open debt: open needs current evidence and a concrete remaining
+condition; closed needs current evidence. Do not invent debt or IDs. Use class_actions only for an
+independent lifecycle/severity decision. Closed mechanized violation requires replace with a
+corrected violation-only predicate; reopen applies only to unmechanized classes."""
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
-is targeted to every open debt item and effects of its repair. Final is a fresh cold whole-artifact
-review using the complete checklist and every active class. Return only === REVIEW SETTLEMENT JSON
-followed by one JSON object with role, source_dispositions, assessment_dispositions, findings,
-debt, debt_updates, class_dispositions, class_records and class_assessments; final also has coverage.
-Account for every
-governing finding through class_dispositions using the same one_off, new_class, or existing_class
-shapes as census; omission is invalid. Account for every supplied open debt exactly once. Final
-must include all nine checklist IDs and assess every active class
-exactly once; a violated class creates a finding and open debt. Use the same exact row shapes as the
-census settlement. A closed debt update is
-{"id":"D1","status":"closed","evidence":["path:1"]}; an open debt update is
-{"id":"D1","status":"open","evidence":["path:1"],"reason":"exact remaining defect"}.
-The open reason must state the concrete unresolved condition so the operator can repair it directly.
-Correction returns empty source dispositions. Consolidate all occurrences of the same reusable
-class into at most one existing_class governing finding per active class per settlement. For each
-active class with that one governing finding, class_assessments and assessment_dispositions contain
-exactly one violated row; they contain no other classes. The assessment finding_id and disposition
-governing_id both name the consolidated finding. In correction the exact disposition shape is
-assessment_dispositions=[{"assessment_id":"class-id","governing_id":"G1"}] — exactly these
-two keys, with no class_id, finding_id, verdict, disposition, or other extra key. Its paired
-assessment is class_assessments=[{"class_id":"class-id","verdict":"violated",
-"evidence":["path:1"],"finding_id":"G1"}].
-Final returns empty source dispositions and one assessment disposition per active class. A closed
-unmechanized class also requires reopen and a closed mechanized class requires replace. The task's
-checklist array is governing. The exact
-final-only fields are "coverage":[{"id":"artifact-complete","status":"covered|finding|not_applicable",
-"summary":"why","evidence":["path:line"],"finding_ids":[]}],"class_assessments":[{
-"class_id":"id","verdict":"satisfied|violated","evidence":["path:line"],"finding_id":null}].
-ANCHOR_POLICY
-Every anchor must resolve.
-A finding row names one or more findings, all other coverage rows name none, and every finding is
-named by coverage."""
+targets every open debt item, its classes, the claimed repairs, and transitive effects. Final is a
+fresh cold whole-artifact review over all nine checklist items and every active class. ANCHOR_POLICY
+Every anchor must resolve. The provider-supplied JSON Schema is the sole structural contract;
+return only its object, without a marker, fence, or prose.
 
-
-STAGED_LANE_RETRY_GUIDANCE = (
-    "Coverage rows have exactly id,status,summary,evidence,finding_ids. Lane finding rows have "
-    "exactly id,severity,summary,evidence,remedy. Class assessment rows have exactly "
-    "class_id,verdict,evidence,finding_id. Lane manifests never contain settlement debt, debt "
-    "updates, dispositions, or class records."
-)
-
-
-STAGED_SETTLEMENT_RETRY_GUIDANCE = (
-    "Every blocking finding and every governing finding referenced by a violated class "
-    "assessment needs exactly one open debt row, including MINOR and OUT-OF-SCOPE; advisory "
-    "debt is tracked but does not block convergence. Finding rows have exactly "
-    "id,severity,summary,evidence,remedy (never class_id). Debt rows have exactly "
-    "id,finding_id,status. Closed debt updates have exactly id,status,evidence; open updates "
-    "also require reason. Every governing finding has exactly one class_dispositions row: "
-    "one_off adds reason, new_class adds record_index, existing_class adds class_id. Every new "
-    "class record is referenced once. Correction consolidates same-class occurrences into one "
-    "governing finding; each existing_class finding also needs one matching violated "
-    "class_assessments row and an assessment_dispositions row with exactly assessment_id and "
-    "governing_id — never class_id, finding_id, verdict, disposition, or another extra key. "
-    "Class records are "
-    "operations: close/reopen have only op,class_id; reclassify adds severity; new/replace use "
-    "the exact invariant and severity plus procedure or pattern/pathspec as allowed by the mode "
-    "and predecessor mechanism. A violated closed mechanized class uses replace, not reopen. "
-    "They never contain status,finding_ids,debt_ids."
-)
+Classify every new governing finding once as one_off, new_class with an explicit definition and
+class severity, or existing_class. Consolidate one existing class to at most one new finding.
+Every supplied open debt receives exactly one outcome; open needs current evidence and a concrete
+remaining condition, closed needs current evidence. A violated class uses new_finding for a new
+occurrence, or carried_debt naming exactly one representative open debt; other historical debts
+remain independent outcomes. Satisfaction has no basis. Correction covers exactly affected
+classes; final covers every active class and all checklist rows. Use class_actions for independent
+close, reopen, non-downgrading reclassify, or replacement decisions. Open unmechanized satisfaction
+may omit its redundant close; the server derives it. Closed mechanized violation requires replace."""
 
 
 # ── class closure ─────────────────────────────────────────────────────────────

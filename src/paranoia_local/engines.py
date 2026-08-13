@@ -12,12 +12,14 @@ The impure subprocess call is injected via `runner` (see runner.py).
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from .runner import RunResult, run_capture, run_streaming
 
@@ -116,9 +118,12 @@ class Engine(ABC):
         runner: Runner | None = None,
         timeout: int | None = None,
         on_progress: Callable[[str], None] | None = None,
+        response_schema: dict[str, Any] | None = None,
     ) -> Review:
         argv = self.build_argv(cwd, model, effort, web_search)
-        return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+        return self._execute(
+            argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+        )
 
     def resume(
         self,
@@ -131,9 +136,12 @@ class Engine(ABC):
         runner: Runner | None = None,
         timeout: int | None = None,
         on_progress: Callable[[str], None] | None = None,
+        response_schema: dict[str, Any] | None = None,
     ) -> Review:
         argv = self.build_resume_argv(session_ref, cwd, model, effort, web_search)
-        return self._execute(argv, prompt, cwd, runner, timeout, on_progress)
+        return self._execute(
+            argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+        )
 
     def _execute(
         self,
@@ -143,9 +151,11 @@ class Engine(ABC):
         runner: Runner | None,
         timeout: int | None,
         on_progress: Callable[[str], None] | None = None,
+        response_schema: dict[str, Any] | None = None,
     ) -> Review:
         from .runner import DEFAULT_TIMEOUT_SEC
 
+        final_argv, cleanup = self._structured_argv(argv, response_schema)
         if on_progress is not None:
             def _on_line(line: str) -> None:
                 msg = self.progress_from_line(line)
@@ -153,12 +163,35 @@ class Engine(ABC):
                     on_progress(msg)
 
             streaming = runner or run_streaming
-            result = streaming(
-                argv, prompt, cwd, timeout or DEFAULT_TIMEOUT_SEC, on_line=_on_line
-            )
+            try:
+                result = streaming(
+                    final_argv, prompt, cwd, timeout or DEFAULT_TIMEOUT_SEC, on_line=_on_line
+                )
+            finally:
+                cleanup()
         else:
-            result = (runner or run_capture)(argv, prompt, cwd, timeout or DEFAULT_TIMEOUT_SEC)
+            try:
+                result = (runner or run_capture)(
+                    final_argv, prompt, cwd, timeout or DEFAULT_TIMEOUT_SEC
+                )
+            finally:
+                cleanup()
         review = self.parse_output(result.stdout)
+        if response_schema is not None and self.name == "claude" and not review.error:
+            try:
+                envelope = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                envelope = None
+            if not isinstance(envelope, dict) or not isinstance(
+                envelope.get("structured_output"), dict
+            ):
+                review = replace(
+                    review,
+                    error=True,
+                    failure_detail=(
+                        "claude did not return the requested structured_output object"
+                    ),
+                )
         # A review is failed if the process exited non-zero OR the engine reported an
         # in-band error (e.g. Claude's is_error) — the latter can occur with rc 0 and
         # non-empty stdout, which the old "rc != 0 AND empty stdout" gate silently
@@ -190,6 +223,41 @@ class Engine(ABC):
             review, returncode=result.returncode, error=failed,
             failure_detail=failure_detail, stderr=stderr,
         )
+
+    def _structured_argv(
+        self, argv: list[str], schema: dict[str, Any] | None,
+    ) -> tuple[list[str], Callable[[], None]]:
+        """Add provider-native structured output without changing capability flags."""
+        if schema is None:
+            return argv, lambda: None
+        rendered = json.dumps(
+            schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        )
+        if self.name == "claude":
+            # Claude's --tools/--allowedTools are variadic.  A later --json-schema
+            # is consumed as another tool value; insert before the first variadic
+            # flag, exactly as the pinned-CLI live probe requires.
+            indexes = [
+                argv.index(flag) for flag in ("--tools", "--allowedTools") if flag in argv
+            ]
+            index = min(indexes) if indexes else len(argv)
+            return [*argv[:index], "--json-schema", rendered, *argv[index:]], lambda: None
+        descriptor, path = tempfile.mkstemp(prefix="paranoia-schema-", suffix=".json")
+        try:
+            os.write(descriptor, rendered.encode("utf-8"))
+        finally:
+            os.close(descriptor)
+        os.chmod(path, 0o400)
+        index = len(argv) - 1 if argv and argv[-1] == "-" else len(argv)
+        final = [*argv[:index], "--output-schema", path, *argv[index:]]
+
+        def cleanup() -> None:
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                pass
+
+        return final, cleanup
 
 
 class CodexEngine(Engine):
@@ -458,7 +526,11 @@ class ClaudeEngine(Engine):
         tokens, cost = data.get("usage"), data.get("total_cost_usd")
         if tokens is not None or cost is not None:
             usage = {"tokens": tokens, "cost_usd": cost}
-        text = str(data.get("result", ""))
+        structured = data.get("structured_output")
+        text = (
+            json.dumps(structured, ensure_ascii=False, separators=(",", ":"))
+            if isinstance(structured, dict) else str(data.get("result", ""))
+        )
         is_error = bool(data.get("is_error", False))
         denied = {
             item.get("tool_name")
