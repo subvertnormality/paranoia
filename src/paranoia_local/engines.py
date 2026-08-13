@@ -58,6 +58,7 @@ class Review:
     usage: dict | None = None
     duration_ms: int | None = None
     failure_detail: str | None = None
+    stderr: str | None = None
 
 
 class Engine(ABC):
@@ -163,9 +164,10 @@ class Engine(ABC):
         # non-empty stdout, which the old "rc != 0 AND empty stdout" gate silently
         # swallowed, defeating any downstream fallback.
         failed = result.returncode != 0 or review.error
+        stderr = result.stderr if result.stderr else None
         failure_detail = (
             (
-                (result.stderr if result.stderr.strip() else None) or review.failure_detail
+                review.failure_detail or (result.stderr if result.stderr.strip() else None)
                 or f"{self.name} exited with return code {result.returncode}"
             ) if result.returncode != 0
             else review.failure_detail
@@ -178,14 +180,15 @@ class Engine(ABC):
                     f"{detail.strip()[:2000]}"
                 ),
                 session_ref=review.session_ref,
-                raw=result.stderr or result.stdout,
+                raw=result.stdout,
                 returncode=result.returncode,
                 error=True,
                 failure_detail=detail,
+                stderr=stderr,
             )
         return replace(
             review, returncode=result.returncode, error=failed,
-            failure_detail=failure_detail,
+            failure_detail=failure_detail, stderr=stderr,
         )
 
 

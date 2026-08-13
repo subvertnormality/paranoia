@@ -67,6 +67,18 @@ def test_packet_union_is_deterministic_and_governing():
     assert ar.digest(packets) == ar.digest(tuple(reversed(packets)))
 
 
+def test_packet_digest_is_total_on_model_controlled_surrogates():
+    claims = ar.parse_discovery(discovery())
+    capture = captured(claims[0])
+    bound = es.BoundSource(
+        claims[0].candidate, capture, "section-\udcff",
+        "The API retries twice.",
+    )
+    packets = ar.packets([(claims, (bound,))])
+    assert "\udcff" in ar.render(packets)
+    assert len(ar.digest(packets)) == 64
+
+
 def test_discovery_prompt_contains_no_pipe_delimited_pseudo_enum():
     assert not re.search(
         r'"(?:kind|source_kind|relation)":"[^"]*\|[^"]*"',
@@ -102,3 +114,32 @@ def test_a_fenced_discovery_payload_parses_too():
     marker, body = bare.split("\n", 1)
     assert (ar.parse_discovery(f"{marker}\n```json\n{body}\n```")
             == ar.parse_discovery(bare))
+
+
+def test_binding_accepts_only_a_missing_outer_object_close():
+    claims = ar.parse_discovery(discovery())
+    captures = [captured(claims[0])]
+    body = json.dumps({"bindings": [{
+        "claim_index": 0, "usable": True, "location": "API behavior",
+        "passage": "The API retries twice.",
+    }]})
+    complete = ar.parse_binding(f"{ar.BINDING_MARKER}\n{body}", claims, captures)
+
+    assert ar.parse_binding(
+        f"{ar.BINDING_MARKER}\n{body[:-1]}", claims, captures,
+    ) == complete
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        '{"bindings":[{"claim_index":0 "usable":false}]}',
+        '{"bindings":[{"claim_index":0,"usable":false]',
+        '{"bindings":[{"claim_index":0,"usable":"unterminated}]}',
+    ],
+)
+def test_binding_does_not_guess_at_internal_or_multi_character_json_repairs(broken):
+    claims = ar.parse_discovery(discovery())
+    captures = [captured(claims[0])]
+    with pytest.raises(ar.ResearchError, match="invalid JSON"):
+        ar.parse_binding(f"{ar.BINDING_MARKER}\n{broken}", claims, captures)

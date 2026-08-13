@@ -3,6 +3,7 @@ clearance, and citation reads. Each case is a way the recorded snapshot could
 fail to describe what the deciders actually read."""
 
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -114,6 +115,22 @@ def test_refs_digest_is_stable_across_a_file_edit(repo: Path):
     before = evidence.refs_digest(repo)
     (repo / "app.py").write_text("changed\n")
     assert evidence.refs_digest(repo) == before
+
+
+@pytest.mark.parametrize("failing_command", ["for-each-ref", "reflog"])
+def test_refs_digest_fails_closed_when_a_git_observation_fails(
+    repo: Path, monkeypatch, failing_command: str,
+):
+    real = evidence.inert_git.invoke
+
+    def invoke(cwd, args, **kwargs):
+        if args[0] == failing_command:
+            return subprocess.CompletedProcess(args, 1, b"", b"observation unavailable")
+        return real(cwd, args, **kwargs)
+
+    monkeypatch.setattr(evidence.inert_git, "invoke", invoke)
+    with pytest.raises(ArbitrationError, match="ref provenance unavailable"):
+        evidence.refs_digest(repo)
 
 
 def test_advance_and_restore_is_still_detected(repo: Path):

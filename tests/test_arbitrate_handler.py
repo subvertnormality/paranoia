@@ -5,6 +5,7 @@ both deciders, that labels are cleared against the real repository, that the
 round-2 gate is consulted before spending, and that the trailer tells the truth.
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -46,6 +47,28 @@ class FakeEngine(eng.Engine):
 
     def parse_output(self, stdout):  # pragma: no cover - unused
         raise NotImplementedError
+
+
+class ScriptedResearchEngine(FakeEngine):
+    def __init__(self, name: str, reviews: list[eng.Review | Exception]):
+        super().__init__(name)
+        self.reviews = list(reviews)
+
+    def for_role(self, role: str):
+        self.role = role
+        return self
+
+    def run(self, *args, **kwargs):
+        item = self.reviews.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def resume(self, *args, **kwargs):
+        item = self.reviews.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
 
 
 ENGINES = [FakeEngine("codex"), FakeEngine("claude")]
@@ -286,6 +309,8 @@ def test_decider_reply_fails_after_exactly_one_correction(
     failed = record["failed_round"]["deciders"]["claude"]
     assert failed["status"] == "failed"
     assert len(failed["attempts"]) == 2
+    assert len(record["refs_before"]) == 64
+    assert len(record["refs_after"]) == 64
 
 
 def test_decider_execution_failure_is_not_retried(repo: Path, tmp_path: Path):
@@ -304,6 +329,128 @@ def test_decider_execution_failure_is_not_retried(repo: Path, tmp_path: Path):
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "provider unavailable" in report
     assert claude_calls == 1
+
+
+def test_decider_path_prefers_structured_failure_detail_over_partial_text(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    class AdapterEngine:
+        def __init__(self, name: str):
+            self.name = name
+            self.calls = 0
+            self.prompts = []
+
+        def for_role(self, _role: str):
+            return self
+
+        def run(self, prompt, *args, **kwargs):
+            self.calls += 1
+            self.prompts.append(prompt)
+            if self.name == "claude":
+                return eng.Review(
+                    text="SELECTED: partial-provider-output\n",
+                    session_ref="partial-session",
+                    raw="raw provider envelope",
+                    returncode=1,
+                    error=True,
+                    failure_detail="provider credit exhausted before completion",
+                )
+            label = next(
+                line.split(":", 1)[0]
+                for line in prompt.splitlines()
+                if line.startswith(arb.LABEL_PREFIX) and "Decimal" in line
+            )
+            return eng.Review(
+                text=decider_reply(label), session_ref="codex-session", raw="", returncode=0,
+            )
+
+    adapters = {name: AdapterEngine(name) for name in ("codex", "claude")}
+    monkeypatch.setattr(
+        ah.eng, "get_engine", lambda name, text_only=False: adapters[name]
+    )
+
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        now=lambda: "20260727T120000",
+    )
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "provider credit exhausted before completion" in report
+    assert "partial-provider-output" not in report
+    assert adapters["claude"].calls == 1
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    failed = record["failed_round"]["deciders"]["claude"]
+    assert "provider credit exhausted before completion" in failed["error"]
+    assert "provider credit exhausted before completion" in failed["attempts"][0]["rejection"]
+    assert "partial-provider-output" not in failed["error"]
+    attempt = failed["attempts"][0]
+    exact_prompt = adapters["claude"].prompts[0]
+    assert attempt["prompt_sha256"] == hashlib.sha256(
+        exact_prompt.encode("utf-8", "surrogatepass")
+    ).hexdigest()
+    assert attempt["prompt_excerpt"] == exact_prompt
+
+
+def test_failure_after_round_one_preserves_completed_decider_artifacts(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    def broken_substantiation(*args, **kwargs):
+        raise RuntimeError("resolution bridge failed")
+
+    monkeypatch.setattr(ah.arb, "substantiation", broken_substantiation)
+    report = run(repo, Agent(lambda engine, rnd: "opt-decimal"), tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "resolution bridge failed" in report
+    assert trailer_field(report, "ROUNDS") == "1"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert sorted(record["rounds"][0]) == ["claude", "codex"]
+    assert record["rounds"][0]["codex"]["reply"]
+    assert record["rounds"][0]["claude"]["prompt"]
+    assert sorted(record["label_maps"]) == ["claude", "codex"]
+
+
+def test_post_fanout_failure_preserves_completed_research_packet_and_digest(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(ah.eng, "require_evidence_profile", lambda engine: "test")
+    candidate = es.CandidateSource(
+        "https://docs.example.com/api", "API docs", "Example", "primary",
+        "Example defines the API", "supports_claim",
+    )
+    claim = ar.DiscoveryClaim("behavior", "The API retries twice.", candidate)
+    capture = es.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        "The API retries twice.",
+    )
+    bound = es.BoundSource(candidate, capture, "API", "The API retries twice.")
+
+    def researcher(**kwargs):
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (claim,), (bound,), (capture,),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    def broken_substantiation(*args, **kwargs):
+        raise RuntimeError("post-research resolution failed")
+
+    monkeypatch.setattr(ah.arb, "substantiation", broken_substantiation)
+    args = {key: value for key, value in BASE.items() if key != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo), "clean": False},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        run_agent=Agent(lambda engine, rnd: "opt-decimal"),
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert trailer_field(report, "RESEARCH") == "complete 1 packets"
+    assert trailer_field(report, "RESEARCH-DIGEST") == record["research"]["digest"]
+    assert record["research"]["packets"]
+    assert record["research"]["packets"] == ar.render(
+        ar.packets([((claim,), (bound,))])
+    )
 
 
 def test_correction_execution_failure_preserves_the_rejected_reply(
@@ -328,7 +475,7 @@ def test_correction_execution_failure_preserves_the_rejected_reply(
     report = run(repo, failed_correction, tmp_path, clean=False)
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "correction execution failed after a rejected reply" in report
+    assert "correction attempt failed after a rejected reply" in report
     assert claude_calls == 2
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     failure = record["failed_round"]["deciders"]["claude"]
@@ -336,7 +483,12 @@ def test_correction_execution_failure_preserves_the_rejected_reply(
     assert "reply mentions AUTHORITY:" in failure["attempts"][0]["rejection"]
     assert "FORMAT CORRECTION" in failure["attempts"][1]["body"]
     assert failure["attempts"][1]["raw"] == ""
-    assert "execution failure" in failure["attempts"][1]["rejection"]
+
+
+    assert "provider unavailable" in failure["attempts"][1]["rejection"]
+    assert failure["attempts"][1]["status"] == "provider-failed"
+    assert failure["attempts"][1]["admitted"] is True
+    assert failure["attempts"][1]["invoked"] is True
     assert record["failed_round"]["deciders"]["codex"]["selected"] == "opt-decimal"
 
 
@@ -350,6 +502,60 @@ def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "insufficient time to start a 420s agent phase" in report
     assert not agent.calls
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["phase_attempts"][0]["status"] == "admission-refused"
+    assert record["phase_attempts"][0]["invoked"] is False
+
+
+def test_cleaner_execution_exception_keeps_pending_attempt_binding(
+    repo: Path, tmp_path: Path,
+):
+    def failed_cleaner(**kwargs):
+        raise RuntimeError("cleaner provider unavailable")
+
+    report = run(repo, failed_cleaner, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert record["phase_attempts"][0]["role"] == "cleaner"
+    assert record["phase_attempts"][0]["prompt_excerpt"]
+    assert len(record["phase_attempts"][0]["prompt_sha256"]) == 64
+    assert "cleaner provider unavailable" in record["phase_attempts"][0]["rejection"]
+
+
+def test_cleaner_execution_failure_keeps_distinct_engine_channels(
+    repo: Path, tmp_path: Path,
+):
+    channels = {
+        "engine": "codex", "returncode": 9,
+        "failure_detail": "structured cleaner failure", "text": "partial cleaner text",
+        "raw": "raw cleaner envelope", "stderr": "cleaner stderr",
+    }
+
+    def failed_cleaner(**kwargs):
+        raise ah.EngineCallError("cleaner failed", channels)
+
+    report = run(repo, failed_cleaner, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["phase_attempts"][0]["engine_failure"] == channels
+
+
+def test_attester_execution_exception_keeps_pending_attempt_binding(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+
+    def failed_attester(**kwargs):
+        if "TEXT AUDITOR" in kwargs["instructions"]:
+            raise RuntimeError("attester provider unavailable")
+        return scripted(**kwargs)
+
+    report = run(repo, failed_attester, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert [item["role"] for item in record["phase_attempts"]] == [
+        "cleaner", "attester",
+    ]
+    assert record["phase_attempts"][1]["prompt_excerpt"]
+    assert "attester provider unavailable" in record["phase_attempts"][1]["rejection"]
 
 
 def test_default_research_injects_one_shared_captured_packet_before_voting(
@@ -405,6 +611,457 @@ def test_default_research_injects_one_shared_captured_packet_before_voting(
     assert all(packet_id in call["body"] for call in decider_calls)
 
 
+def test_capture_failure_retains_completed_sibling_in_research_record(monkeypatch):
+    discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({
+        "claims": [{
+            "kind": "behavior",
+            "proposition": "The API retries twice.",
+            "candidate": {
+                "url": "https://docs.example.com/api", "title": "API docs",
+                "publisher": "Example", "source_kind": "primary",
+                "authority_basis": "Example defines the API",
+                "relation": "supports_claim",
+            },
+        }],
+    })
+    engine = ScriptedResearchEngine("codex", [
+        eng.Review(discovery, "discovery-session", "raw discovery"),
+    ])
+
+    def capture_all(candidates, **kwargs):
+        item = candidates[0]
+        completed = es.Capture(
+            item, item.url, 200, "text/html", "a" * 64, "b" * 64,
+            "The API retries twice.",
+        )
+        raise es.CaptureGroupError("RuntimeError: sibling exploded", (completed,))
+
+    monkeypatch.setattr(ah.external_sources, "capture_all", capture_all)
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+    assert caught.value.record["phase"] == "capture"
+    assert caught.value.record["captures"][0]["final_url"] == "https://docs.example.com/api"
+
+
+def test_binding_validation_failure_retains_both_rejected_replies(
+    monkeypatch,
+):
+    discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({
+        "claims": [{
+            "kind": "behavior",
+            "proposition": "The API retries twice.",
+            "candidate": {
+                "url": "https://docs.example.com/api",
+                "title": "API docs",
+                "publisher": "Example",
+                "source_kind": "primary",
+                "authority_basis": "Example defines the API",
+                "relation": "supports_claim",
+            },
+        }],
+    })
+    first = ar.BINDING_MARKER + "\n" + json.dumps({"bindings": []})
+    second = ar.BINDING_MARKER + "\n" + "not-json"
+    engine = ScriptedResearchEngine("claude", [
+        eng.Review(discovery, "discovery-session", "raw discovery"),
+        eng.Review(first, "binding-session", "raw first binding"),
+        eng.Review(second, "binding-session", "raw second binding"),
+    ])
+
+    def capture_all(candidates, **kwargs):
+        candidate = candidates[0]
+        return [es.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            "The API retries twice.",
+        )]
+
+    monkeypatch.setattr(ah.external_sources, "capture_all", capture_all)
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+
+    record = caught.value.record
+    assert record["phase"] == "binding-validation-retry"
+    assert record["calls"] == 3
+    assert [item["phase"] for item in record["rejected_replies"]] == [
+        "binding", "binding-validation-retry",
+    ]
+    assert record["rejected_replies"][0]["extracted_excerpt"] == first
+    assert record["rejected_replies"][0]["raw_excerpt"] == "raw first binding"
+    assert record["rejected_replies"][1]["extracted_excerpt"] == second
+    assert record["accepted_claims"][0]["proposition"] == "The API retries twice."
+    assert record["captures"][0]["final_url"] == "https://docs.example.com/api"
+    assert [attempt["session_ref"] for attempt in record["attempts"]] == [
+        "discovery-session", "binding-session", "binding-session",
+    ]
+
+
+def test_research_execution_failure_surfaces_engine_detail():
+    engine = ScriptedResearchEngine("claude", [eng.Review(
+        "", None, "provider envelope", returncode=1, error=True,
+        failure_detail="Credit balance is too low to run this request.",
+    )])
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+
+    assert "Credit balance is too low" in str(caught.value)
+    assert caught.value.record["message"] == (
+        "Credit balance is too low to run this request."
+    )
+    assert caught.value.record["attempts"][-1]["raw_excerpt"] == "provider envelope"
+    assert caught.value.record["attempts"][-1]["failure_detail"] == (
+        "Credit balance is too low to run this request."
+    )
+    assert caught.value.record["attempts"][-1]["status"] == "provider-failed"
+
+
+@pytest.mark.parametrize("phase", [
+    "discovery", "discovery-validation-retry",
+    "binding", "binding-validation-retry",
+])
+def test_structured_research_provider_failure_has_failed_lifecycle_status(phase: str):
+    review = eng.Review(
+        "partial", "session", "raw", returncode=1, error=True,
+        failure_detail="provider failed",
+    )
+    record = ah._research_reply_record(phase, review, "provider failed")
+
+    assert record["phase"] == phase
+    assert record["status"] == "provider-failed"
+    assert record["invoked"] is True
+
+
+def test_research_invocation_exception_is_counted_with_prompt_binding():
+    engine = ScriptedResearchEngine("claude", [RuntimeError("provider offline")])
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+
+    record = caught.value.record
+    assert record["calls"] == 1
+    assert len(record["attempts"]) == 1
+    assert record["attempts"][0]["phase"] == "discovery"
+    assert record["attempts"][0]["prompt_excerpt"]
+    assert len(record["attempts"][0]["prompt_sha256"]) == 64
+    assert record["attempts"][0]["intended_session_ref"] is None
+    assert "provider offline" in record["attempts"][0]["failure_detail"]
+
+
+def test_validation_retry_exception_is_counted_with_session_and_prompt():
+    engine = ScriptedResearchEngine("claude", [
+        eng.Review("not discovery JSON", "discovery-session", "raw invalid"),
+        RuntimeError("retry provider offline"),
+    ])
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+
+    record = caught.value.record
+    assert record["calls"] == 2
+    assert [item["phase"] for item in record["attempts"]] == [
+        "discovery", "discovery-validation-retry",
+    ]
+    retry = record["attempts"][1]
+    assert retry["intended_session_ref"] == "discovery-session"
+    assert retry["prompt_excerpt"]
+    assert "retry provider offline" in retry["failure_detail"]
+    assert record["rejected_replies"][0]["raw_excerpt"] == "raw invalid"
+
+
+def test_research_deadline_admits_discovery_cap_before_invocation(monkeypatch):
+    engine = ScriptedResearchEngine("codex", [RuntimeError("must not run")])
+    monkeypatch.setattr(ah.time, "monotonic", lambda: 100.0)
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium", deadline=339.0,
+        )
+
+    assert caught.value.record["phase"] == "discovery"
+    assert "insufficient time" in caught.value.record["message"]
+    assert caught.value.record["calls"] == 0
+    assert caught.value.record["kind"] == "admission"
+    assert caught.value.record["attempts"][0]["status"] == "admission-refused"
+    assert caught.value.record["attempts"][0]["invoked"] is False
+    assert len(engine.reviews) == 1
+
+
+def test_research_deadline_admits_discovery_retry_cap_before_resume(monkeypatch):
+    engine = ScriptedResearchEngine("codex", [
+        eng.Review("not discovery JSON", "discovery-session", "raw invalid"),
+        RuntimeError("must not resume"),
+    ])
+    ticks = iter([0.0, 100.0])
+    monkeypatch.setattr(ah.time, "monotonic", lambda: next(ticks))
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium", deadline=339.0,
+        )
+
+    assert caught.value.record["phase"] == "discovery-validation-retry"
+    assert caught.value.record["calls"] == 1
+    assert caught.value.record["kind"] == "admission"
+    assert caught.value.record["attempts"][-1]["status"] == "admission-refused"
+    assert caught.value.record["attempts"][-1]["invoked"] is False
+    assert len(engine.reviews) == 1
+    assert caught.value.record["rejected_replies"][0]["raw_excerpt"] == "raw invalid"
+
+
+@pytest.mark.parametrize("retry", [False, True])
+def test_research_deadline_admits_each_binding_cap_before_resume(monkeypatch, retry):
+    discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({
+        "claims": [{
+            "kind": "behavior", "proposition": "The API retries twice.",
+            "candidate": {
+                "url": "https://docs.example.com/api", "title": "API docs",
+                "publisher": "Example", "source_kind": "primary",
+                "authority_basis": "Example defines the API",
+                "relation": "supports_claim",
+            },
+        }],
+    })
+    invalid_binding = eng.Review(
+        ar.BINDING_MARKER + "\n" + json.dumps({"bindings": []}),
+        "binding-session", "raw invalid binding",
+    )
+    reviews = [eng.Review(discovery, "discovery-session", "raw discovery")]
+    if retry:
+        reviews.append(invalid_binding)
+    reviews.append(RuntimeError("must not resume"))
+    engine = ScriptedResearchEngine("claude", reviews)
+    ticks = iter([0.0, 0.0, 100.0] if retry else [0.0, 100.0])
+    monkeypatch.setattr(ah.time, "monotonic", lambda: next(ticks))
+
+    def capture_all(candidates, **kwargs):
+        candidate = candidates[0]
+        return [es.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            "The API retries twice.",
+        )]
+
+    monkeypatch.setattr(ah.external_sources, "capture_all", capture_all)
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium", deadline=459.0,
+        )
+
+    expected = "binding-validation-retry" if retry else "binding"
+    assert caught.value.record["phase"] == expected
+    assert caught.value.record["calls"] == (2 if retry else 1)
+    assert caught.value.record["kind"] == "admission"
+    assert caught.value.record["attempts"][-1]["status"] == "admission-refused"
+    assert caught.value.record["attempts"][-1]["invoked"] is False
+    assert len(engine.reviews) == 1
+    if retry:
+        assert caught.value.record["rejected_replies"][0]["raw_excerpt"] == (
+            "raw invalid binding"
+        )
+
+
+def test_successful_corrected_lane_keeps_the_initial_parser_error(monkeypatch):
+    valid_discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({
+        "claims": [{
+            "kind": "behavior",
+            "proposition": "The API retries twice.",
+            "candidate": {
+                "url": "https://docs.example.com/api", "title": "API docs",
+                "publisher": "Example", "source_kind": "primary",
+                "authority_basis": "Example defines the API",
+                "relation": "supports_claim",
+            },
+        }],
+    })
+    valid_binding = ar.BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "usable": True, "location": "API behavior",
+            "passage": "The API retries twice.",
+        }],
+    })
+    engine = ScriptedResearchEngine("codex", [
+        eng.Review("not discovery JSON", "s1", "raw rejected discovery"),
+        eng.Review(valid_discovery, "s1", "raw corrected discovery"),
+        eng.Review(valid_binding, "s1", "raw binding"),
+    ])
+
+    def capture_all(candidates, **kwargs):
+        candidate = candidates[0]
+        return [es.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            "API behavior\nThe API retries twice.",
+        )]
+
+    monkeypatch.setattr(ah.external_sources, "capture_all", capture_all)
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+    run_record = ah._research_one(
+        engine=engine, model="m", packet=packet, options=("A", "B"),
+        forbidden=("a", "b"), effort="medium",
+    )
+
+    assert run_record.attempts[0]["phase"] == "discovery"
+    assert run_record.attempts[0]["error"]
+    assert run_record.attempts[0]["raw_excerpt"] == "raw rejected discovery"
+    assert run_record.attempts[1]["error"] == ""
+
+
+def test_valid_discovery_without_session_retains_the_accepted_claim():
+    discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({
+        "claims": [{
+            "kind": "behavior",
+            "proposition": "The API retries twice.",
+            "candidate": {
+                "url": "https://docs.example.com/api",
+                "title": "API docs",
+                "publisher": "Example",
+                "source_kind": "primary",
+                "authority_basis": "Example defines the API",
+                "relation": "supports_claim",
+            },
+        }],
+    })
+    engine = ScriptedResearchEngine(
+        "claude", [eng.Review(discovery, None, "raw valid discovery")],
+    )
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=engine, model="m", packet=packet, options=("A", "B"),
+            forbidden=("a", "b"), effort="medium",
+        )
+
+    assert caught.value.record["kind"] == "protocol"
+    assert caught.value.record["accepted_claims"][0]["proposition"] == (
+        "The API retries twice."
+    )
+    assert caught.value.record["attempts"][0]["raw_excerpt"] == "raw valid discovery"
+
+
+def test_terminal_research_failure_is_written_to_gate_audit(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(ah.eng, "require_evidence_profile", lambda engine: "test")
+
+    def researcher(**kwargs):
+        if kwargs["engine"].name == "claude":
+            raise ah.ResearchFailure(
+                "claude binding validation retry rejected: malformed JSON",
+                record={
+                    "engine": "claude",
+                    "model": kwargs["model"],
+                    "phase": "binding-validation-retry",
+                    "kind": "validation",
+                    "message": "malformed JSON",
+                    "calls": 3,
+                    "rejected_replies": [{"raw_excerpt": "the rejected body"}],
+                },
+            )
+        candidate = es.CandidateSource(
+            "https://docs.example.com/api", "API docs", "Example", "primary",
+            "Example defines the API", "supports_claim",
+        )
+        claim = ar.DiscoveryClaim("behavior", "The API retries twice.", candidate)
+        capture = es.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            "The API retries twice.",
+        )
+        bound = es.BoundSource(candidate, capture, "API", "The API retries twice.")
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], (claim,), (bound,), (capture,),
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+            ({"phase": "discovery", "session_ref": "peer-session"},),
+        )
+
+    args = {key: value for key, value in BASE.items() if key != "research"}
+    report = ah.arbitrate(
+        {**args, "repo_path": str(repo), "clean": False},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        run_agent=Agent(lambda engine, rnd: "opt-decimal"),
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert trailer_field(report, "CLEANING") == "skipped"
+    assert trailer_field(report, "RESEARCH") == "failed"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["snapshot"] == trailer_field(report, "SNAPSHOT")
+    assert record["cleaning"] == "skipped"
+    assert record["research"]["failures"][0]["phase"] == "binding-validation-retry"
+    assert record["research"]["failures"][0]["rejected_replies"][0][
+        "raw_excerpt"
+    ] == "the rejected body"
+    assert record["research"]["runs"][0]["engine"] == "codex"
+    assert record["research"]["runs"][0]["claims"][0]["proposition"] == (
+        "The API retries twice."
+    )
+    assert record["research"]["runs"][0]["bindings"][0]["passage"] == (
+        "The API retries twice."
+    )
+    assert record["research"]["runs"][0]["attempts"][0]["session_ref"] == (
+        "peer-session"
+    )
+    assert len(record["refs_before"]) == 64
+    assert len(record["refs_after"]) == 64
+
+
+def test_attester_execution_failure_keeps_distinct_engine_channels(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+    channels = {
+        "engine": "claude", "returncode": 8,
+        "failure_detail": "structured attester failure", "text": "partial attester text",
+        "raw": "raw attester envelope", "stderr": "attester stderr",
+    }
+
+    def failed_attester(**kwargs):
+        if "TEXT AUDITOR" in kwargs["instructions"]:
+            raise ah.EngineCallError("attester failed", channels)
+        return scripted(**kwargs)
+
+    report = run(repo, failed_attester, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["phase_attempts"][1]["engine_failure"] == channels
+
+
 def test_research_false_is_the_explicit_repository_only_switch(
     repo: Path, tmp_path: Path,
 ):
@@ -420,6 +1077,29 @@ def test_research_false_is_the_explicit_repository_only_switch(
 
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
     assert trailer_field(report, "RESEARCH") == "repository-only"
+
+
+def test_repository_only_rejects_unsupported_decider_profile_before_snapshot_or_vote(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    checked: list[str] = []
+
+    def reject(engine):
+        checked.append(engine.name)
+        if engine.name == "claude":
+            raise RuntimeError("claude evidence mode supports a different CLI")
+
+    monkeypatch.setattr(ah.eng, "require_evidence_profile", reject)
+    monkeypatch.setattr(
+        ah, "_snapshot", lambda repo: pytest.fail("snapshot must not be created"),
+    )
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    report = run(repo, agent, tmp_path, clean=False)
+
+    assert checked == ["codex", "claude"]
+    assert not agent.calls
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "supports a different CLI" in report
 
 
 def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(
@@ -452,6 +1132,16 @@ def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "reserved token 'opt-decimal' appears in 'research packet'" in report
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert trailer_field(report, "CLEANING") == "attested"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["research"]["failures"][0]["phase"] == "packet-validation"
+    assert record["research"]["packets"]
+    assert trailer_field(report, "RESEARCH-DIGEST") == record["research"]["digest"]
+    assert len(record["research"]["digest"]) == 64
+    assert record["snapshot"] == trailer_field(report, "SNAPSHOT")
+    assert len(record["refs_before"]) == 64
+    assert len(record["refs_after"]) == 64
     assert not [call for call in agent.calls if call["cwd"] is not None]
 
 
@@ -489,7 +1179,7 @@ def test_both_deciders_run_against_the_same_snapshot(repo: Path, tmp_path: Path)
     run(repo, agent, tmp_path)
     cwds = [c["cwd"] for c in agent.calls if c["cwd"] is not None]
     assert len(cwds) == 2
-    assert cwds[0] != cwds[1]  # separate worktrees
+    assert cwds[0] != cwds[1]  # separate inert materializations
     for wt in cwds:
         assert (Path(wt) / "app.py").exists() or True  # torn down after the call
 
@@ -569,6 +1259,59 @@ def test_labels_are_cleared_against_the_repository(repo: Path, tmp_path: Path, m
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
     assert planted["n"] >= 2  # it re-derived rather than proceeding
+
+
+def test_label_collision_history_survives_later_decider_failure(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    scans = 0
+    real_scan = evidence.scan_for_tokens
+
+    def scan(repo_, commit, tokens):
+        nonlocal scans
+        scans += 1
+        return [tokens[0]] if scans == 1 else real_scan(repo_, commit, tokens)
+
+    scripted = Agent(lambda e, r: "opt-float")
+
+    def failed_decider(**kwargs):
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            raise RuntimeError("decider unavailable after label recovery")
+        return scripted(**kwargs)
+
+    monkeypatch.setattr(ah.evidence, "scan_for_tokens", scan)
+    report = run(repo, failed_decider, tmp_path, clean=False)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert [item["status"] for item in record["label_attempt_records"]] == [
+        "collision", "selected",
+    ]
+    assert record["failed_round"]["deciders"]["claude"]["status"] == "failed"
+
+
+def test_later_label_scan_failure_keeps_completed_attempts(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    scans = 0
+
+    def scan(_repo, _commit, tokens):
+        nonlocal scans
+        scans += 1
+        if scans == 1:
+            return [tokens[0]]
+        raise RuntimeError("second label scan failed")
+
+    monkeypatch.setattr(ah.evidence, "scan_for_tokens", scan)
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "second label scan failed" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attempts = record["label_attempt_records"]
+    assert attempts[0]["status"] == "collision"
+    assert attempts[0]["repository_collisions"]
+    assert attempts[1]["status"] == "repository-scan-pending"
+    assert attempts[1]["repository_collisions"] is None
 
 
 def test_escaping_symlink_fails_before_spending(repo: Path, tmp_path: Path):
@@ -766,6 +1509,41 @@ def test_round_two_carries_bytes_and_no_model_prose(repo: Path, tmp_path: Path):
     assert round2[0].split("=== OPTIONS")[0] == round2[1].split("=== OPTIONS")[0]
 
 
+def test_later_carried_region_failure_keeps_earlier_bytes(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    (repo / "other.py").write_text("A = 1\nB = 2\nC = 3\nD = 4\nE = 5\n")
+    commit_all(repo, "other")
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+    agent = Agent(
+        lambda engine, rnd: picks.get((engine, rnd), "opt-float"),
+        extra={
+            ("codex", 1): {"decisive": "app.py:4"},
+            ("claude", 1): {"decisive": "other.py:3"},
+        },
+    )
+    real_read = ah.evidence.read_region
+    reads = 0
+
+    def read_region(repo_, region):
+        nonlocal reads
+        reads += 1
+        # Substantiation and union derivation resolve both anchors before the two
+        # round-two transport reads.
+        if reads == 6:
+            raise RuntimeError("second carried region failed")
+        return real_read(repo_, region)
+
+    monkeypatch.setattr(ah.evidence, "read_region", read_region)
+    report = run(repo, agent, tmp_path, clean=False)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "second carried region failed" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert len(record["carried_evidence"]) == 1
+    assert record["carried_evidence"][0]["body"]
+
+
 def test_round_two_carries_the_same_union_to_both(repo: Path, tmp_path: Path):
     """Round-3 FATAL: withholding a decider's own region stripped its decisive
     evidence from its own cold final vote."""
@@ -782,9 +1560,51 @@ def test_round_two_carries_the_same_union_to_both(repo: Path, tmp_path: Path):
         assert "app.py" in body and "other.py" in body
 
 
-def test_refs_moving_mid_run_fails(repo: Path, tmp_path: Path):
-    """A CONVERGED whose evidence base the recorded snapshot cannot describe is the
-    audit laundering this detection exists to prevent."""
+def test_dual_round_two_execution_failure_keeps_carried_and_phase_artifacts(
+    repo: Path, tmp_path: Path,
+):
+    (repo / "other.py").write_text("A = 1\nB = 2\nC = 3\nD = 4\nE = 5\n")
+    commit_all(repo, "other")
+    picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
+
+    class RoundTwoFails(Agent):
+        def __call__(self, **kwargs):
+            reply = super().__call__(**kwargs)
+            if kwargs["cwd"] is not None and "CODE REGIONS RELEVANT" in kwargs["body"]:
+                raise RuntimeError(f"{kwargs['engine_name']} unavailable in round two")
+            return reply
+
+    agent = RoundTwoFails(
+        lambda engine, rnd: picks.get((engine, rnd), "opt-decimal"),
+        extra={
+            ("codex", 1): {"decisive": "app.py:4"},
+            ("claude", 1): {"decisive": "other.py:3"},
+        },
+    )
+    report = run(repo, agent, tmp_path)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "ROUNDS") == "1"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert sorted(record["failed_round"]["deciders"]) == ["claude", "codex"]
+    assert all(
+        item["attempts"][0]["body"]
+        and item["attempts"][0]["status"] == "provider-failed"
+        and item["attempts"][0]["invoked"] is True
+        for item in record["failed_round"]["deciders"].values()
+    )
+    assert {item["path"] for item in record["carried_evidence"]} == {
+        "app.py", "other.py",
+    }
+    assert [item["role"] for item in record["phase_attempts"]] == [
+        "cleaner", "attester",
+    ]
+
+
+def test_refs_moving_mid_run_is_reported_without_invalidating_snapshot(
+    repo: Path, tmp_path: Path,
+):
+    """The recorded snapshot still exactly describes both inert decider views."""
 
     class Moving(Agent):
         def __call__(self, **kw):
@@ -795,7 +1615,7 @@ def test_refs_moving_mid_run_fails(repo: Path, tmp_path: Path):
             return out
 
     report = run(repo, Moving(lambda e, r: "opt-float"), tmp_path)
-    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
     assert trailer_field(report, "REFS-MOVED") == "yes"
 
 
@@ -808,6 +1628,27 @@ def test_decider_failure_names_its_engine(repo: Path, tmp_path: Path):
 
     report = run(repo, Broken(lambda e, r: "opt-float"), tmp_path)
     assert "claude" in report and "cli exploded" in report
+
+
+def test_decider_workspace_setup_failure_opens_a_noninvoked_prompt_attempt(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    def fail_workspace(*args, **kwargs):
+        raise RuntimeError("materialization unavailable")
+
+    monkeypatch.setattr(ah.inert_tree, "evidence_workspace", fail_workspace)
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert not [call for call in agent.calls if call["cwd"] is not None]
+    for failure in record["failed_round"]["deciders"].values():
+        [attempt] = failure["attempts"]
+        assert attempt["status"] == "setup-failed"
+        assert attempt["admitted"] is False
+        assert attempt["invoked"] is False
+        assert len(attempt["prompt_sha256"]) == 64
 
 
 def test_non_member_selected_fails_rather_than_mapping(repo: Path, tmp_path: Path):
@@ -829,6 +1670,9 @@ def test_cleaner_dropping_an_option_fails(repo: Path, tmp_path: Path):
                   cleaner=cleaner_reply({"opt-float": "Use a float."}))
     report = run(repo, agent, tmp_path)
     assert "changed the option id set" in report
+    assert trailer_field(report, "CLEANING") == "cleaner-rejected"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaning"] == "cleaner-rejected"
 
 
 def test_cleaner_refusal_short_circuits(repo: Path, tmp_path: Path):
@@ -865,6 +1709,16 @@ def test_attestation_failure_retries_once_then_fails(repo: Path, tmp_path: Path)
     report = run(repo, agent, tmp_path)
     assert "failed attestation twice" in report
     assert len([c for c in agent.calls if "TEXT AUDITOR" in c["instructions"]]) == 2
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert trailer_field(report, "RESEARCH") == "not reached"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["snapshot"] == trailer_field(report, "SNAPSHOT")
+    assert record["cleaning"] == "attestation-rejected"
+    assert [attempt["role"] for attempt in record["phase_attempts"]] == [
+        "cleaner", "attester", "cleaner", "attester",
+    ]
+    assert record["phase_attempts"][-1]["rejection"]
 
 
 def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
@@ -902,6 +1756,9 @@ def test_audit_failure_is_surfaced_not_swallowed(repo: Path, tmp_path: Path, mon
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
     assert trailer_field(report, "AUDIT").startswith("FAILED")
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"  # verdict still returned
+    assert "## Audit fallback" in report
+    assert '"outcome":"CONVERGED"' in report
+    assert '"rounds"' in report
 
 
 def test_terminal_correction_audit_failure_is_surfaced(
@@ -922,6 +1779,171 @@ def test_terminal_correction_audit_failure_is_surfaced(
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert trailer_field(report, "AUDIT") == "FAILED could not write log"
+    assert "## Audit fallback" in report
+    assert '"failed_round"' in report
+    assert '"attempts"' in report
+
+
+def test_research_run_audit_bounds_and_hashes_raw_provider_envelopes():
+    oversized = "provider-envelope-" * 2_000
+    run_record = ah.ResearchRun(
+        "codex", "model", (), (), (), oversized, oversized, 2, (), (), (),
+    )
+    [record] = ah._research_run_records([run_record])
+    expected = hashlib.sha256(oversized.encode()).hexdigest()
+    assert record["discovery_raw_sha256"] == expected
+    assert record["binding_raw_sha256"] == expected
+    assert len(record["discovery_raw_excerpt"]) < len(oversized)
+    assert len(record["binding_raw_excerpt"]) < len(oversized)
+
+
+def test_run_agent_preserves_all_engine_failure_channels(monkeypatch, tmp_path: Path):
+    class FailedEngine:
+        def for_role(self, _role):
+            return self
+
+        def run(self, *args, **kwargs):
+            return eng.Review(
+                text="partial model text", session_ref="session", raw="raw envelope",
+                returncode=9, error=True, failure_detail="structured failure",
+                stderr="process stderr",
+            )
+
+    monkeypatch.setattr(ah.eng, "get_engine", lambda *a, **k: FailedEngine())
+    with pytest.raises(ah.EngineCallError) as caught:
+        ah._run_agent(
+            engine_name="codex", model="m", instructions="i", body="b",
+            cwd=tmp_path, effort="high", web_search=False, timeout=1,
+            text_only=False,
+        )
+    assert caught.value.record == {
+        "engine": "codex", "returncode": 9,
+        "failure_detail": "structured failure", "text": "partial model text",
+        "raw": "raw envelope", "stderr": "process stderr",
+    }
+
+
+def test_run_agent_marks_engine_setup_failure_before_provider_invocation(
+    monkeypatch, tmp_path: Path,
+):
+    lifecycle = {"status": "admitted", "admitted": True, "invoked": False}
+    monkeypatch.setattr(
+        ah.eng, "get_engine", lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("engine setup unavailable")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="engine setup unavailable"):
+        ah._run_agent(
+            engine_name="codex", model="m", instructions="i", body="b",
+            cwd=tmp_path, effort="high", web_search=False, timeout=1,
+            text_only=False, _attempt_lifecycle=lifecycle,
+        )
+
+    assert lifecycle == {
+        "status": "setup-failed", "admitted": True, "invoked": False,
+    }
+
+
+def test_research_role_setup_failure_is_prompt_bound_and_counts_zero_calls():
+    class SetupFails(FakeEngine):
+        def for_role(self, role: str):
+            raise RuntimeError("research role unavailable")
+
+    packet = ah.Packet("Choose.", "Local tool.", "", [], {"a": "A", "b": "B"},
+                       "skipped", "skipped")
+    with pytest.raises(ah.ResearchFailure) as caught:
+        ah._research_one(
+            engine=SetupFails("claude"), model="m", packet=packet,
+            options=("A", "B"), forbidden=("a", "b"), effort="medium",
+        )
+
+    record = caught.value.record
+    assert record["kind"] == "setup"
+    assert record["calls"] == 0
+    assert record["attempts"][0]["status"] == "setup-failed"
+    assert record["attempts"][0]["invoked"] is False
+    assert len(record["attempts"][0]["prompt_sha256"]) == 64
+
+
+def test_decider_audit_preserves_structured_engine_failure_channels(
+    repo: Path, tmp_path: Path,
+):
+    scripted = Agent(lambda e, r: "opt-float")
+    channels = {
+        "engine": "claude", "returncode": 9,
+        "failure_detail": "structured failure", "text": "partial text",
+        "raw": "raw envelope", "stderr": "process stderr",
+    }
+
+    def failed_agent(**kwargs):
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            raise ah.EngineCallError("claude failed", channels)
+        return scripted(**kwargs)
+
+    report = run(repo, failed_agent, tmp_path, clean=False)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attempt = record["failed_round"]["deciders"]["claude"]["attempts"][0]
+    assert attempt["failure"] == channels
+
+
+def test_aggregate_audit_fallback_is_bounded_and_schema_preserving(
+    tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(ah.logs, "write_log", lambda *a, **k: None)
+    huge = "reply-" * 20_000
+    failures = [
+        {"engine": f"lane-{index}", "attempts": [{"raw": huge}] * 40}
+        for index in range(40)
+    ]
+    record = {
+        "outcome": "FAILED",
+        "research": {
+            "failures": failures,
+            "runs": [{"engine": "completed-peer", "captures": [{"text": huge}]}],
+        },
+    }
+    audit, fallback = ah._write_bounded_audit(
+        tmp_path, record=record, timestamp="20260812T000000",
+    )
+    assert audit is None and fallback is not None
+    assert len(fallback) <= ah.MAX_AUDIT_FALLBACK_CHARS
+    parsed = json.loads(fallback)
+    assert parsed["research"]["runs"][0]["engine"] == "completed-peer"
+    assert parsed["research"]["failures"][-1]["_omitted_items"] > 0
+
+
+def test_audit_fallback_bounds_wide_nested_provider_mappings(
+    tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(ah.logs, "write_log", lambda *a, **k: None)
+    wide = {
+        f"field-{index}": {f"nested-{inner}": "x" * 10_000 for inner in range(100)}
+        for index in range(100)
+    }
+    audit, fallback = ah._write_bounded_audit(
+        tmp_path,
+        record={"outcome": "FAILED", "research": {"failures": [{"usage": wide}]}},
+        timestamp="20260812T000000",
+    )
+    assert audit is None and fallback is not None
+    assert len(fallback) <= ah.MAX_AUDIT_FALLBACK_CHARS
+    parsed = json.loads(fallback)
+    usage = parsed["research"]["failures"][0]["usage"]
+    assert usage["_omitted_fields"] > 0
+    assert len(usage["_omitted_fields_sha256"]) == 64
+
+
+def test_durable_audit_keeps_exact_large_packet_bytes(tmp_path: Path):
+    packet = "packet-byte-" * 2_000
+    audit, fallback = ah._write_bounded_audit(
+        tmp_path,
+        record={"outcome": "CONVERGED", "research": {"packets": packet}},
+        timestamp="20260812T000000",
+    )
+    assert audit is not None and fallback is None
+    record = json.loads(audit.read_text())
+    assert record["research"]["packets"] == packet
 
 
 def test_report_pairs_original_with_cleaned(repo: Path, tmp_path: Path):
@@ -996,6 +2018,12 @@ def test_cleaned_hint_reason_reaches_the_deciders_not_the_original(repo: Path):
             continue
         assert "the module under discussion" in call["body"]
         assert "APPROVED" not in call["body"]
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["hints"] == [
+        {"path": "app.py", "reason": "the module under discussion"}
+    ]
+    assert len(record["cleaned"]["sha256"]) == 64
+    assert all(len(item["reply_sha256"]) == 64 for item in record["phase_attempts"])
 
 
 def test_attester_sees_the_real_original_hints(repo: Path, tmp_path: Path):
@@ -1067,16 +2095,20 @@ def test_engine_error_with_output_still_fails(monkeypatch):
 
         def run(self, *a, **k):
             return Review(
-                text="SELECTED: whatever\n", session_ref=None, raw="",
+                text="SELECTED: whatever\n", session_ref=None, raw="raw fallback",
                 returncode=1, error=True,
+                failure_detail="provider credit exhausted before completion",
             )
 
     monkeypatch.setattr(ah.eng, "get_engine", lambda name, text_only=False: Failing())
-    with pytest.raises(Exception, match="failed"):
+    with pytest.raises(Exception) as caught:
         ah._run_agent(
             engine_name="codex", model="m", instructions="i", body="b", cwd=None,
             effort="low", web_search=False, timeout=5, text_only=True,
         )
+    assert "provider credit exhausted before completion" in str(caught.value)
+    assert "SELECTED: whatever" not in str(caught.value)
+    assert "raw fallback" not in str(caught.value)
 
 
 def test_cleaner_model_override_is_honoured(repo: Path, tmp_path: Path):
@@ -1096,6 +2128,21 @@ def test_failure_still_returns_the_full_trailer(repo: Path, tmp_path: Path):
         assert trailer_field(report, field)
 
 
+def test_non_object_file_hint_fails_before_snapshot_with_complete_audit(
+    repo: Path, tmp_path: Path,
+):
+    report = run(
+        repo, Agent(lambda e, r: "opt-float"), tmp_path,
+        files=["app.py"],
+    )
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "SNAPSHOT") == "none"
+    assert "every file hint must be an object" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["outcome"] == "FAILED"
+    assert record["raw_input"]["files"] == ["app.py"]
+
+
 def test_audit_holds_the_prompts_replies_and_carried_bytes(repo: Path, tmp_path: Path):
     """SNAPSHOT is provenance only, so if the log does not hold these the run is
     unauditable once gc reclaims the wrapper commit."""
@@ -1110,6 +2157,9 @@ def test_audit_holds_the_prompts_replies_and_carried_bytes(repo: Path, tmp_path:
     )
     report = run(repo, agent, tmp_path)
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert [item["role"] for item in record["phase_attempts"]] == [
+        "cleaner", "attester",
+    ]
     assert len(record["rounds"]) == 2
     for rnd in record["rounds"]:
         for engine, entry in rnd.items():
@@ -1183,7 +2233,127 @@ def test_a_commit_landing_during_the_snapshot_fails(repo: Path, tmp_path: Path, 
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert "while the snapshot was being taken" in report
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert trailer_field(report, "CLEANING") == "not reached"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["snapshot"] == trailer_field(report, "SNAPSHOT")
+    assert len(record["refs_before"]) == 64
+    assert len(record["refs_after"]) == 64
     assert agent.calls == []  # nothing spent
+
+
+def test_second_setup_ref_failure_is_recorded_without_retry(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    real = evidence.refs_digest
+    calls = 0
+
+    def digest(repo_):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise arb.ArbitrationError("setup boundary unavailable")
+        return real(repo_)
+
+    monkeypatch.setattr(ah.evidence, "refs_digest", digest)
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, clean=False)
+    assert calls == 2
+    assert trailer_field(report, "REFS-MOVED") == "unavailable"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["refs_after"] is None
+    assert "setup boundary unavailable" in record["ref_provenance_error"]
+
+
+def test_unavailable_ref_provenance_during_setup_fails_before_snapshot(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(
+        ah.evidence, "refs_digest",
+        lambda _repo: (_ for _ in ()).throw(arb.ArbitrationError("ref provenance unavailable")),
+    )
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "SNAPSHOT") == "none"
+    assert trailer_field(report, "REFS-MOVED") == "unavailable"
+    assert "ref provenance unavailable" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["refs_before"] is None
+    assert record["refs_after"] is None
+    assert record["refs_moved"] is None
+    assert "ref provenance unavailable" in record["ref_provenance_error"]
+
+
+def test_unavailable_final_ref_provenance_preserves_established_failure(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    real = evidence.refs_digest
+    calls = 0
+
+    def digest(repo_):
+        nonlocal calls
+        calls += 1
+        if calls >= 3:
+            raise arb.ArbitrationError("final ref provenance unavailable")
+        return real(repo_)
+
+    monkeypatch.setattr(ah.evidence, "refs_digest", digest)
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "SNAPSHOT") != "none"
+    assert "final ref provenance unavailable" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["refs_after"] is None
+    assert "final ref provenance unavailable" in record["ref_provenance_error"]
+    assert record["rounds"]
+
+
+def test_failed_final_ref_observation_is_not_retried(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    real = evidence.refs_digest
+    calls = 0
+
+    def digest(repo_):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise arb.ArbitrationError("one-shot final provenance failure")
+        return real(repo_)
+
+    monkeypatch.setattr(ah.evidence, "refs_digest", digest)
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path, clean=False)
+    assert calls == 3
+    assert trailer_field(report, "REFS-MOVED") == "unavailable"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["refs_after"] is None
+    assert "one-shot final provenance failure" in record["ref_provenance_error"]
+
+
+def test_other_failure_plus_unavailable_final_refs_renders_unavailable(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    real = evidence.refs_digest
+    calls = 0
+
+    def digest(repo_):
+        nonlocal calls
+        calls += 1
+        if calls >= 3:
+            raise arb.ArbitrationError("final refs unreadable")
+        return real(repo_)
+
+    def failed_decider(**kwargs):
+        if kwargs["cwd"] is not None and kwargs["engine_name"] == "claude":
+            raise RuntimeError("provider unavailable")
+        return scripted(**kwargs)
+
+    scripted = Agent(lambda e, r: "opt-float")
+    monkeypatch.setattr(ah.evidence, "refs_digest", digest)
+    report = run(repo, failed_decider, tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "REFS-MOVED") == "unavailable"
+    assert "provider unavailable" in report
+    assert "final ref provenance unavailable" in report
 
 
 def test_retain_snapshot_ref_is_not_mistaken_for_operator_movement(repo: Path, tmp_path: Path):
@@ -1216,8 +2386,8 @@ def test_retain_ref_is_created_only_after_the_final_check(repo: Path, tmp_path: 
     assert "refs/paranoia/arbitrate/" in git(["for-each-ref", "--format=%(refname)"], repo)
 
 
-def test_retain_ref_is_not_created_when_refs_moved(repo: Path, tmp_path: Path):
-    """A failed run leaves no trace in the audited repo."""
+def test_refs_moving_after_snapshot_is_provenance_only(repo: Path, tmp_path: Path):
+    """Deciders see inert snapshot materializations, never the moving live refs."""
 
     class Moving(Agent):
         def __call__(self, **kw):
@@ -1228,8 +2398,11 @@ def test_retain_ref_is_not_created_when_refs_moved(repo: Path, tmp_path: Path):
             return out
 
     report = run(repo, Moving(lambda e, r: "opt-float"), tmp_path, retain_snapshot=True)
-    assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "refs/paranoia" not in git(["for-each-ref", "--format=%(refname)"], repo)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "REFS-MOVED") == "yes"
+    assert "refs/paranoia/arbitrate/" in git(
+        ["for-each-ref", "--format=%(refname)"], repo
+    )
 
 
 @pytest.mark.parametrize(

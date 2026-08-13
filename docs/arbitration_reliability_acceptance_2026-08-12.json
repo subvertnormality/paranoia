@@ -1,0 +1,136 @@
+{
+  "date": "2026-08-12",
+  "implementation_branch": "codex/fix-arbitration-reliability",
+  "frozen_stakes": "Trusted single operator and OS; repository, report, model, and fetched content are untrusted data; normal tests and configured reviewer CLIs may execute; no hostile local path race or compromised OS; ordinary concurrency and existing network boundary; tens to low hundreds of findings or claims; useful evidence within minutes; false convergence, wrong evidence binding, and lost diagnostics are high impact while recoverable blocking is acceptable; excludes multi-tenancy, hostile same-user processes, deliberate state corruption recovery, formal proof, and unrelated hardening.",
+  "environment": {
+    "codex_cli": "0.144.6",
+    "codex_model": "gpt-5.6-sol",
+    "claude_cli": "2.1.197",
+    "claude_model": "claude-opus-5"
+  },
+  "delivery_metrics": {
+    "production_diff": {
+      "files": 9,
+      "lines_added": 1269,
+      "lines_removed": 226,
+      "net_lines": 1043
+    },
+    "largest_production_modules": [
+      {"path": "src/paranoia_local/handlers.py", "lines": 2661},
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2603},
+      {"path": "src/paranoia_local/plan_claims.py", "lines": 1399},
+      {"path": "src/paranoia_local/class_closure.py", "lines": 1021},
+      {"path": "src/paranoia_local/arbitration.py", "lines": 990},
+      {"path": "src/paranoia_local/review_census.py", "lines": 894}
+    ],
+    "architecture_checkpoint": {
+      "trigger": "The production change is 1,269 additions and 226 removals across nine files, concentrated in the 2,603-line arbitration handler.",
+      "patterns_reviewed": [
+        "established-run provenance and terminal serialization",
+        "research and decider attempt ledgers",
+        "immutable snapshot and post-snapshot ref provenance",
+        "cleaner and attester lifecycle state"
+      ],
+      "disposition": "Keep one orchestration owner in arbitrate_handler.py for this correction rather than introduce a new subsystem or persistence protocol. The added records share one established-run state and one failure renderer; extracting them during the reliability repair would widen the trust and serialization boundary. Limit this PR to the report's arbitration invariants and schedule any handler decomposition as a behavior-preserving follow-up after these audited schemas settle."
+    }
+  },
+  "primary_path": {
+    "decision": "Choose how Python should parse a decimal string when the represented base-10 value must remain exact.",
+    "research": true,
+    "clean": true,
+    "cleaning": "attested-after-retry",
+    "result": "CONVERGED",
+    "selected": "choice-decimal",
+    "rounds": 1,
+    "snapshot": "cd0c0f6e210ecec67938b99193f3e369680172e6",
+    "production_source_sha256": {
+      "src/paranoia_local/arbitrate_handler.py": "91216c5f443ff7e7ddb21d546cdedd3789425d76d67b6ec623945934f86be8f9",
+      "src/paranoia_local/arbitration.py": "a578be1fd4cec518570a2947fa54bebb818c47e5cc666c1bc41c96612df0c8fd",
+      "src/paranoia_local/arbitration_research.py": "0b40a6b035b09f904969c49b7f9b5b08e7bf582810034a5dfd1a2624f6f53cb9",
+      "src/paranoia_local/engines.py": "2e2f8eedaf618af2cf0aa2f683132976c5ab39a5a1d9fed5daaed85527dd6db1",
+      "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
+      "src/paranoia_local/external_sources.py": "b203a5efbcc16af295568bda227c4b5cf47ec414468fe0905fae2977ee49c4ec",
+      "src/paranoia_local/handlers.py": "825b46ff3877a3efce408cae71c3c9d2b437436e41b56cc0dc91babf5ed237e1",
+      "src/paranoia_local/plan_claims.py": "daa490ddb9b5be6b8996670a79b1e03f2dae55c3eb984def9c805e0b996a41fe",
+      "src/paranoia_local/review_census.py": "d786b087a1bec1880e5ab97e0552f3377097304837478fe0b5441279e182c833"
+    },
+    "refs_moved": false,
+    "elapsed_seconds": 195.0,
+    "model_calls": {
+      "research": {
+        "codex": 2,
+        "claude": 2
+      },
+      "deciders": {
+        "codex": 1,
+        "claude": 1
+      },
+      "cleaner": 2,
+      "attester": 2,
+      "total": 10
+    },
+    "captured_packets": [
+      "src-cb21c77725651035",
+      "src-174c6b779afa3c3a",
+      "src-4ad4bb010b4be20c",
+      "src-66e6c7a9f0d8b101",
+      "src-ff5e1f384998790d",
+      "src-985081c11236fba8",
+      "src-4571c1fc33ee707b"
+    ],
+    "captured_urls": [
+      "https://docs.python.org/3/tutorial/floatingpoint.html",
+      "https://docs.python.org/3/tutorial/floatingpoint.html#representation-error"
+    ],
+    "research_digest": "aa1b5f3f2daec2481d910349eb07a295d056eb0f1774feead8af14587be29a07",
+    "decisive_evidence": {
+      "codex": "SOURCE:src-174c6b779afa3c3a",
+      "claude": "README.md:4"
+    },
+    "audit": "/tmp/paranoia-arbitration-profile-deadline-acceptance-logs/20260812T230000-arbitrate-ef42ef6b.json",
+    "audit_reconciliation": {
+      "audit_sha256": "a9b450b8a8f055e6921fa6545f6fb33f9516da799bef325d640085b7193c8209",
+      "research_attempts": {"codex": 2, "claude": 2},
+      "framing_attempts": 4,
+      "decider_attempts": 2,
+      "total_provider_calls": 10,
+      "packet_count": 7,
+      "packet_digest_matches": true,
+      "packet_ids_match": true,
+      "production_hashes_match": true
+    },
+    "preceding_failed_closed_attempt": {
+      "result": "FAILED",
+      "reason": "research failure — claude binding-validation-retry validation failed: invalid JSON after === EVIDENCE BINDING JSON ===: Expecting ',' delimiter: line 1 column 1970 (char 1969)",
+      "cleaning": "attested-after-retry",
+      "snapshot": "cd0c0f6e210ecec67938b99193f3e369680172e6",
+      "audit": "/tmp/paranoia-arbitration-profile-deadline-acceptance-logs/20260812T230000-arbitrate-07865b43.json",
+      "audit_sha256": "ad49752c75651c266c7814e31eb6664477efd0f20590dc84bbed17866903ded3"
+    },
+    "observations": [
+      "Both signed-in providers completed the current branch's snapshot, shared research, server capture, same-session binding, and cold independent decider path. The audit mechanically reconciles two research calls per vendor, four framing calls, two decider calls, seven packets, and ten calls overall.",
+      "The default path completed one bounded cleaner/attester correction before research; the final independent attester reported preserved fidelity, neutral framing, and no stakes advocacy.",
+      "An earlier failed-closed Opus run retained both malformed binding replies; the successful run exercised the narrow one-character terminal recovery without weakening schema validation.",
+      "A Fable attempt failed before discovery with a structured usage-credit diagnostic, which the audit preserved without retrying or substituting partial output.",
+      "Both deciders received the identical normalized seven-packet research corpus with live web disabled and independently selected the same option from pinned evidence.",
+      "The result remained bound to the immutable snapshot and recorded the post-decision refs comparison as provenance.",
+      "The recorded production-source digests bind the run to the final handler, engine adapter, and arbitration modules; only this acceptance record changed after the successful run."
+    ]
+  },
+  "failure_provenance": {
+    "result": "verified by current-branch focused acceptance tests",
+    "command": "/home/andy/tools/paranoia-local/.venv/bin/python -m pytest -q tests/test_arbitration_research.py tests/test_arbitrate_handler.py tests/test_acceptance_validator.py tests/test_plan_claims.py tests/test_review_census.py tests/test_converge.py",
+    "result_count": "365 passed",
+    "observations": [
+      "Cleaner and attester execution exceptions retain pre-call phase entries, prompt digests, prompt excerpts, attempt counts, and exact failure kinds and messages.",
+      "Discovery, binding, and validation-retry failures retain bounded raw and extracted replies, completed sibling lanes, captures, sessions, usage, durations, and the exact failing role.",
+      "Decider execution failures prefer bounded Review.failure_detail over partial model text or raw output, including provider credit exhaustion, without adding a retry.",
+      "Failures after snapshot establishment retain the real snapshot, seed, before and after ref digests, cleaning and attestation state, research state, labels, rounds, carried evidence, and phase attempts."
+    ]
+  },
+  "full_suite": {
+    "command": "env GIT_CONFIG_GLOBAL=/tmp/paranoia-local-test-gitconfig /home/andy/tools/paranoia-local/.venv/bin/python -m pytest -q",
+    "result": "872 passed",
+    "elapsed_seconds": 68.67
+  }
+}

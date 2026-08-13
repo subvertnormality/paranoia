@@ -98,10 +98,19 @@ class TestConvergeBranch:
         class FailEngine(FakeEngine):
             def run(self, prompt, cwd, model, effort, web_search, **kw):
                 self.calls.append({"prompt": prompt, "cwd": Path(cwd)})
-                return Review(text="boom", session_ref=None, raw="", returncode=1, error=True)
+                return Review(
+                    text="boom", session_ref=None, raw="provider stdout",
+                    returncode=1, error=True, failure_detail="structured failure",
+                    stderr="process stderr",
+                )
 
         fe = FailEngine()
         out = handlers.critique_branch(_args(repo, converge=True), engine=fe, log_dir=tmp_path)
         assert "REVIEW FAILED" in out
         rec = json.loads(next(tmp_path.glob("*.json")).read_text())
         assert rec["error"] is True and rec["returncode"] == 1
+        assert rec["raw_excerpt"] == "provider stdout"
+        assert rec["failure_detail_excerpt"] == "structured failure"
+        assert rec["stderr_excerpt"] == "process stderr"
+        assert len({rec["raw_sha256"], rec["failure_detail_sha256"],
+                    rec["stderr_sha256"]}) == 3

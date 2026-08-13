@@ -679,9 +679,8 @@ def test_blocked_beats_unsubstantiated():
     assert got.outcome == arb.BLOCKED
 
 
-def test_refs_moved_and_failure_fail():
+def test_execution_failure_and_missing_votes_fail():
     votes = [vote("codex", "opt-a"), vote("claude", "opt-a")]
-    assert arb.compute_outcome(votes, substantiated=SUB, refs_moved=True).outcome == arb.FAILED
     assert arb.compute_outcome(votes, substantiated=SUB, failure="boom").outcome == arb.FAILED
     assert arb.compute_outcome([], substantiated={}).outcome == arb.FAILED
 

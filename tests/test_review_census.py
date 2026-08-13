@@ -802,10 +802,12 @@ def test_staged_timeout_preserves_kind_message_state_and_trailer(tmp_path):
         closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
     )
     closure.release()
-    assert closure.lineage.review_state["staged_failure"] == {
+    failure = closure.lineage.review_state["staged_failure"]
+    assert {key: failure[key] for key in ("role", "kind", "message")} == {
         "role":"consolidation", "kind":"timeout",
         "message":"[paranoia-local error] timed out after 1800s",
     }
+    assert failure["engine_failure"]["returncode"] == 124
     assert "STRUCTURAL-FAILURE: role=consolidation kind=timeout" in trailer
     assert "CONVERGENCE: BLOCKED — staged timeout failure did not settle." in trailer
 
@@ -840,9 +842,11 @@ def test_staged_cancellation_preserves_exact_kind_and_message(tmp_path, returnco
         closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
     )
     closure.release()
-    assert closure.lineage.review_state["staged_failure"] == {
+    failure = closure.lineage.review_state["staged_failure"]
+    assert {key: failure[key] for key in ("role", "kind", "message")} == {
         "role":"coverage", "kind":"cancellation", "message":message,
     }
+    assert failure["engine_failure"]["returncode"] == returncode
     assert f"STRUCTURAL-ERROR: {message}" in trailer
     assert "CONVERGENCE: BLOCKED — staged cancellation failure did not settle." in trailer
 
@@ -1094,10 +1098,48 @@ def test_empty_or_whitespace_stderr_process_exit_reaches_staged_trailer(
         closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
     )
     closure.release()
-    assert closure.lineage.review_state["staged_failure"] == {
+    failure = closure.lineage.review_state["staged_failure"]
+    assert {key: failure[key] for key in ("role", "kind", "message")} == {
         "role":"consolidation", "kind":"execution", "message":expected_detail,
     }
+    projection = failure["engine_failure"]
+    assert projection["returncode"] == 9
+    assert projection["raw_excerpt"] == stdout
+    assert projection["failure_detail_excerpt"] == expected_detail
+    assert projection["stderr_excerpt"] == stderr
     assert f"STRUCTURAL-ERROR: {expected_detail}" in trailer
+
+
+@pytest.mark.parametrize(("returncode", "detail", "stderr", "kind"), [
+    (124, "provider timed out", "timed out after 420s", "timeout"),
+    (127, "provider unavailable", "executable not found: codex", "unavailable"),
+])
+def test_staged_failure_persists_all_engine_channels(
+    tmp_path, returncode, detail, stderr, kind,
+):
+    review = Review(
+        text="partial", session_ref=None, raw="provider stdout", returncode=returncode,
+        error=True, failure_detail=detail, stderr=stderr,
+    )
+    error = handlers._engine_failure_error(review, role="consolidation")
+    closure = handlers._PlanClassClosure(
+        f"engine-channels-{returncode}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+
+    failure = closure.lineage.review_state["staged_failure"]
+    assert failure["kind"] == kind
+    projection = failure["engine_failure"]
+    assert projection["returncode"] == returncode
+    assert projection["raw_excerpt"] == "provider stdout"
+    assert projection["failure_detail_excerpt"] == detail
+    assert projection["stderr_excerpt"] == stderr
+    assert len({projection["raw_sha256"], projection["failure_detail_sha256"],
+                projection["stderr_sha256"]}) == 3
 
 
 def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):

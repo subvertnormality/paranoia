@@ -62,9 +62,9 @@ The caller hands over a decision: 2–4 options **each with its own stable id**,
 context, stakes, the repo, and the files that bear on it. The server:
 
 1. **Pins the evidence.** One immutable snapshot commit of the working tree,
-   materialized as a worktree per decider. Both search freely; both search the
-   same pinned tree, and ref movement during the run is detected and fails the
-   run rather than passing unrecorded (§3.1).
+   materialized as a separate inert tree per decider. Both search the same pinned
+   bytes and snapshot-derived bounded history. Ref movement during setup fails;
+   later movement is reported without changing the pinned verdict (§3.1).
 2. **Cleans** the framing with an Opus agent — strips advocacy, equalizes the
    options, normalizes format. Never touches `stakes`. Never judges the merits.
 3. **Attests** the cleaned framing with the *other* vendor, field by field. One
@@ -234,7 +234,8 @@ prevent.
      label strings are searched for in the final framing (including hint paths),
      the pinned snapshot's **blob contents** (`git grep -F` over the snapshot
      commit) and its **pathnames** (`git ls-tree -r --name-only`), and reachable
-     **commit messages** (`git log --all --format=%B`). On any hit, the next label
+     **commit messages** (`git log --all --format=%B`, a conservative superset of
+     the bounded snapshot history exposed to deciders). On any hit, the next label
      set is derived from the seed and the scan repeats; after a bounded number of
      attempts the run fails. Deterministic given the seed, so a replay derives the
      same labels.
@@ -243,21 +244,15 @@ prevent.
      the other decider is **not a member of the receiving decider's set**, so rule
      5 rejects it outright — a loud `FAILED` rather than a silent mapping.
 
-   **What the scan does not cover, stated rather than implied.** Revision 4
-   claimed a label echoed "from anywhere" would fail membership. That was too
-   strong twice over: `git grep <commit>` reads blob contents only — not
-   pathnames, not commit messages — and the Claude engine is granted `Glob`,
-   `git ls-files`, `git log`, and `git show` (`engines.py:243-248`), so a decider
-   can see more than one blob scan covers. The first three of those channels are
-   now scanned. **Historical blob contents (`git log -p` over prior revisions) are
-   not**, because scanning every historical blob is unbounded work for a 64-bit
-   accidental-collision risk. The residual is: an own-set label would have to
-   occur in a prior revision's contents *and* the decider would have to emit it as
-   a reference to that occurrence. At 64 bits, with no adversarial input in scope,
-   that is negligible — but it is a residual, not a proof, and the README says so.
-   Restricting deciders to a snapshot-only evidence environment would close it and
-   is declined: git history is legitimate decision evidence, and this repo's own
-   review prompt treats reading it as a duty (`prompts.py:53`).
+   **What the scan covers.** `git grep <commit>` reads blob contents only — not
+   pathnames or commit messages — so those channels are scanned separately.
+   Deciders receive only the inert snapshot tree and a bounded metadata-only
+   history derived from the snapshot; they cannot browse historical blobs or live
+   refs. Scanning all current commit messages is therefore conservative. The
+   64-bit labels remain an accidental-collision control under the supported stakes,
+   not a defense against an active input author choosing a colliding token.
+   Snapshot-derived metadata history remains available because this repo's own
+   review prompt treats reading relevant history as a duty (`prompts.py:53`).
 
    Cost: less readable transcripts. The report prints both maps beside each
    transcript, and the operator reads caller-stable ids everywhere else.
@@ -485,8 +480,8 @@ drift, or agreement on a state that no longer exists, with a verdict nobody can
 reproduce. This repo already treats mixed-revision evidence as unacceptable and
 solves it: `handlers.py:198` materializes an immutable worktree for exactly this
 reason, over `orientation.snapshot_tree` / `wrap_commit` / `worktree.worktree_at`.
-Closed by one snapshot commit resolved at request time, one worktree per decider,
-and every citation read against that commit (§3.1). Independent search is
+Closed by one snapshot commit resolved at request time, one inert materialization
+per decider, and every citation read against that commit (§3.1). Independent search is
 preserved in full; only the bytes are pinned.
 
 **`clean: false` silently restored the anchoring vector.** It removes all
@@ -569,39 +564,25 @@ gave the schema no way to choose, so an implementation could return unanimous
 decisions about stale bytes while the operator meant current uncommitted work.
 Current code makes that choice explicitly through `target.is_dirty`
 (`handlers.py:202`); `arbitrate` removes the choice instead, at the cost of one
-deterministic wrapper commit. One worktree per decider from that commit; every
-decider turn, both rounds, and every citation read use it. Teardown is the
-existing best-effort `worktree_at` contract. `repo_path` is **required**.
+deterministic wrapper commit. Each decider receives a separately materialized,
+read-only tree plus a bounded `HISTORY.txt` rendered from that commit. No live
+`.git` directory is exposed, and every citation read resolves against the same
+pinned objects. `repo_path` is **required**.
 
-**Ref movement during the run is detected and fails the run.** The snapshot pins
-a *tree*, not the repository: `worktree_at` runs `git worktree add --detach`
-against the original repo (`worktree.py:31-40`), so a decider's `git log --all` /
-`git show` — both allowlisted (`engines.py:243-248`) — sees any commit the
-operator lands mid-run. Revision 5 claimed both deciders "search the same bytes",
-which is false for history, and a `CONVERGED` reached partly on post-snapshot
-commits while the record reports the old `SNAPSHOT` is precisely the audit
-laundering this design exists to prevent.
-
-The server therefore digests `git for-each-ref` **and `git reflog --all`** before
-the snapshot, again immediately after it (a commit landing during snapshot setup
-would otherwise become part of the baseline, leaving it invisible), and once more
-after the last decider returns. If either changed, the
-trailer carries `REFS-MOVED: yes` and the outcome is `FAILED`. The reflog is
-included because comparing ref tips alone is defeated by an advance-and-restore
-cycle — a rebase that lands and then resets a branch inside the window leaves both
-endpoint digests identical while the deciders could have read the transient commit.
-Residual: a repository with reflogs disabled loses that detection. Failing costs one call; the stakes are explicit that a
-self-announcing failure is cheap and a silently wrong `CONVERGED` is not.
-Freezing refs properly — a temporary namespace or local clone materialized per
-arbitration — would *prevent* rather than detect, and is declined: it adds a clone
-plus cleanup per call and changes the history the deciders legitimately read
-(restricting that was already declined in §2.4). Detection is the proportionate
-control here, and it makes the failure loud.
+**Ref movement is provenance once snapshot setup completes.** The server digests
+`git for-each-ref` and `git reflog --all` before the snapshot, immediately after
+it, and after the last decider returns. A change during snapshot construction
+fails before model spend because it makes the setup boundary ambiguous. Movement
+after that boundary renders `REFS-MOVED: yes`, but it does not alter the outcome:
+the later commit cannot enter either inert decider view, its metadata history, or
+citation resolution. An advance-and-restore cycle remains visible when reflogs are
+enabled. `retain_snapshot: true` may safely create the durable ref after the final
+digest because it preserves exactly the already-decided snapshot.
 
 **File hints must live inside the snapshot.** Every `files` entry is required to
 be a normalized, repo-relative path **present in the snapshot tree**; anything
 else is rejected before spending. Two concrete holes this closes: an absolute or
-`../` path points both deciders at live mutable bytes outside the worktree, and
+`../` path would point outside the evidence tree, and
 `git add -A` excludes *ignored untracked* files (`orientation.py:63-76`), so a
 hint naming one would silently reference something the recorded commit does not
 contain. Rejection is preferred over force-capturing the ignored file, which would
@@ -609,16 +590,10 @@ change what a snapshot means.
 
 **Escaping symlinks are rejected, because tree membership does not bound what a
 path resolves to.** Revision 6 claimed membership closed the escape; it does not.
-This repository already records the hole: *"a touched **symlink** is embedded as
-its target string without being flagged as a symlink; `ChangeEntry` carries no git
-object mode, so a reviewer could follow a link to live/external bytes rather than
-the snapshot"* (`docs/orientation_reuse_plan.md:77`). `worktree_at` materializes
-symlinks normally (`worktree.py:39`) and the Claude decider has `Read`, `Grep`,
-`Glob` (`engines.py:243-248`), so a *tracked* symlink whose target is absolute or
-escapes the root passes membership while both deciders read the same mutable,
-unrecorded file. Ref digests do not move, so the run would return `CONVERGED` with
-a `SNAPSHOT` that does not contain the evidence that produced the agreement — the
-one failure class these stakes single out.
+The server validates targets before materialization, then renders accepted
+symlinks as inert target text rather than executable filesystem links. This keeps
+the validation invariant explicit and prevents either decider from following a
+tracked path into mutable bytes outside the snapshot.
 
 Before spending, the server enumerates the snapshot's mode-`120000` entries
 (`git ls-tree -r`), reads each target string, and **rejects the run if any target
@@ -701,8 +676,8 @@ says it is a text auditor.
 ### 3.4 The deciders
 
 Both receive the attested packet — identical but for option order and local
-labels (§2.3, §2.4) — plus the file hints, and each searches its own worktree of
-the pinned snapshot freely: **shared revision, independent search**.
+labels (§2.3, §2.4) — plus the file hints, and each searches its own inert
+materialization of the pinned snapshot: **shared revision, independent search**.
 
 The search asymmetry is deliberate and the one real measurement supports it. The
 P12 probe (adjudication §5) found round-1 divergence came *not* from disagreement
@@ -713,9 +688,10 @@ discovery that made the mechanism work. **Identity belongs in the framing and th
 revision, where drift is noise; not in the search path, where asymmetry is the
 product.**
 
-Six verbatim trailing lines. Adjudication §5 establishes empirically that both
-engines honour a trailing-format contract: *"Both engines emitted `SELECTED:` and
-`CLASSIFICATION:` in exact verbatim position, parseable, on every trial."*
+Ten verbatim trailing lines. The original adjudication established that both
+engines honour a trailing-format contract; the shipped grammar extends it with
+three cold source judgements so a captured source cannot govern merely because a
+decider named its packet id.
 
 ```
 SELECTED: <one of the OPTION-xxxxxxxx labels issued to you above, verbatim>
@@ -723,7 +699,10 @@ SELECTED-RISK: NONE | [MINOR] <one line> | [MAJOR] <one line> | [FATAL] <one lin
 AUTHORITY: technical | human-owner
 NEW-OPTION: NONE | <one-line description of an unlisted option that is strictly better>
 CONSTRAINT: <one decisive fact about the system, in prose>
-DECISIVE-CITATION: NONE | <path>:<line>
+PUBLISHER-AUTHORITY: YES | NO — <reason>
+PASSAGE-ENTAILMENT: YES | NO — <reason>
+DECISION-RELEVANCE: YES | NO — <reason>
+DECISIVE-CITATION: NONE | <path>:<line> | SOURCE:<packet-id>
 CITATIONS: NONE | <path>:<line>[, …]   (max 3, supporting, non-gating)
 ```
 
@@ -787,7 +766,7 @@ Unanimity across all registered engines; currently two.
 | `BLOCKED` | same option, but some decider tags it `[MAJOR]`/`[FATAL]` |
 | `REFRAME_REQUIRED` | any decider surfaced a `NEW-OPTION`, at any round (§2.8) |
 | `UNRESOLVED` | selections differ after round 2; divergence with no novel evidence to reconcile (§2.11); **or agreement that is not substantiated** |
-| `FAILED` | preflight, cleaner `INSUFFICIENT`, failed attestation, unparseable trailer, non-member `SELECTED`, refs moved during the run (§3.1), or an engine error |
+| `FAILED` | preflight, cleaner `INSUFFICIENT`, failed attestation, unparseable trailer, non-member `SELECTED`, ambiguous snapshot setup, or an engine error |
 
 **Substantiation: convergence must be *reached* on evidence, not merely *offered*
 it.** Revision 8's headline claim — no convergence except on evidence — was false,
@@ -835,12 +814,12 @@ already demands *"the single decisive constraint behind your selection, with a
 `file:line` citation"*; a vote that cannot point at anything is not a technical
 adjudication.
 
-**Consequence, stated rather than discovered later:** a decision that genuinely
-does not turn on repository-verifiable grounds will never return `CONVERGED` here.
-That is consistent with the rest of the design — `repo_path` is required and every
-constraint must be repo-verifiable — so `arbitrate` is for decisions with evidence
-in the tree, and the README says so. The cost is cheap, visible non-convergence
-when a model does not substantiate its vote.
+**Consequence, stated rather than discovered later:** a decision must turn on
+pinned evidence. That may be a line in the inert repository snapshot or a governing
+server-captured `SOURCE:<packet-id>`. A source reference substantiates only when its
+publisher-authority, passage-entailment, and decision-relevance judgements are all
+`YES`; repository-authored URLs and unknown packet ids do not qualify. The cost of
+missing support is cheap, visible non-convergence.
 
 **Evaluation order**, since several conditions can hold at once: `FAILED` →
 `REFRAME_REQUIRED` → selections differ → `BLOCKED` → unsubstantiated → `CONVERGED`.
@@ -887,14 +866,16 @@ field is a pure token and always present**, so nothing is signalled by absence:
 ```
 ARBITRATION: CONVERGED | BLOCKED | REFRAME_REQUIRED | UNRESOLVED | FAILED
 SELECTED: <caller-stable-id> | none
-ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: both) | split
+ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: claude) | human-owner (flagged by: both)
 AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not
-CLEANING: attested | attested-after-retry | skipped
-SNAPSHOT: <commit-id>
-REFS-MOVED: no | yes
+CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | skipped
+SNAPSHOT: <commit-id> | none
+REFS-MOVED: no | yes | unavailable
 ORDER-SEED: <seed>
 AUDIT: <path> | FAILED <reason>
-ROUNDS: 1 | 2
+ROUNDS: 0 | 1 | 2
+RESEARCH: not reached | running | failed | complete <N> packets | repository-only
+RESEARCH-DIGEST: <sha256> | none
 ```
 
 `AUDIT` exists because `logs.write_log` swallows every failure and returns `None`
@@ -941,12 +922,16 @@ was installed into — a prerequisite change from today, where `--engine codex` 
 Claude Code needs only `codex`. Checked before anything is spent; the missing
 binary is named. No degraded single-vendor mode: two rounds against one vendor is
 not arbitration, and Parallax's rule is unambiguous — *"never run the driver's own
-vendor twice."*
+vendor twice."* Every mode, including `research: false`, also admits both deciders
+against the exact supported evidence-isolation CLI profile before snapshotting or
+model spend.
 
 **Time budget.** The client's tool timeout bounds the *whole* arbitration, not
 each subprocess, so `DEFAULT_TIMEOUT_SEC = 7200` per call is not a budget.
-Per-phase timeouts (cleaner and attester 420s each, ×2 for the retry; deciders
-1,800s per round) put the worst serial path below 7,200s. `engines.Engine.run`
+Per-attempt caps are cleaner and attester 420s, discovery 240s, binding 360s,
+and deciders 1,800s. Each permitted validation retry uses the same cap. The handler
+checks the remaining monotonic whole-run deadline immediately before every model
+invocation and refuses an attempt whose complete cap cannot fit. `engines.Engine.run`
 already accepts `timeout` and `runner.run_capture` enforces it. Progress is also
 not the reassurance revision 1 assumed — notifications require a client progress
 token (`server.py:269`) and the Claude engine emits one JSON blob at completion
@@ -977,8 +962,8 @@ own reading. That is what a function removes.
 | Ids meaning different things across calls | Caller-supplied stable ids are the only ids in the record. |
 | A label collision between id spaces | Disjoint namespace + three rejection rules (§2.4). |
 | Unstated stakes silently changing severity | `stakes` required, verbatim, screened for advocacy. `stakes: "unstated"` injects one fixed sentence, identical every call. |
-| Evidence changing under the deciders | One pinned snapshot, one worktree each (§3.1). |
-| History drifting past the snapshot | `git for-each-ref` digest before and after; `REFS-MOVED: yes` → `FAILED` (§3.1). |
+| Evidence changing under the deciders | One pinned snapshot, one inert materialization each (§3.1). |
+| History drifting past the snapshot | Inert per-decider trees and snapshot-derived bounded history; `REFS-MOVED` records later movement (§3.1). |
 | Hints pointing outside the snapshot | Every hint must be a repo-relative path present in the snapshot tree (§3.1). |
 | Symlinks resolving outside the snapshot | Mode-`120000` targets enumerated and escaping ones rejected before spending (§3.1). |
 | Stale-vs-current evidence ambiguity | Always snapshot the working tree (§3.1). |
@@ -1025,18 +1010,20 @@ verdict, verbatim record"** — not "no interpretation".
 | Clean | 1 | `text_only`, 420s |
 | Attest | 1 | `text_only`, `effort: low`, 420s |
 | Clean + attest retry, if it fires | 2 | 420s each |
-| Round 1 (parallel) | 2 | snapshot worktree, `effort: medium`, 1,800s |
+| Shared research (parallel) | 4 typical; up to 8 with validation retries | discovery, capture, same-session binding |
+| Round 1 (parallel) | 2 | inert snapshot materialization, `effort: medium`, 1,800s |
 | Round 2, gated (parallel) | 2 | 1,800s |
-| **Typical** | **4** | |
-| **Worst case** | **8** | retry *and* gated-through divergence |
+| **Typical** | **8** | cleaner, attester, four research calls, two deciders |
+| **Maximum call count** | **20** | four framing, eight research, and eight decider attempts; the whole-run deadline may stop this path before all calls start |
 
-Only decider runs are expensive. Wall clock is
-`clean + attest + max(decider) [+ max(decider)]` — rounds fan out in parallel, new
+Research and decider calls dominate cost. Wall clock is
+`clean + attest + research groups + max(decider) [+ max(decider)]` — vendor lanes fan out in parallel, new
 for this repo, whose handlers are all a single `engine.run`. Realistically 5–18
-minutes; the 7,200-second whole-call deadline remains the hard stop. `clean: false` drops to 2 or 4 runs;
+minutes; the 7,200-second whole-call deadline remains the hard stop. With default research,
+`clean: false` removes two typical framing calls but still uses four research calls and two
+round-one deciders (six typical calls, up to sixteen across all validation retries and round 2);
 `REFRAME_REQUIRED` and the §2.11 gate both terminate early. The README's
-rate-limit section needs a line: one arbitration is up to eight agent turns across
-two subscriptions.
+rate-limit section accounts for bounded research and validation turns across two subscriptions.
 
 ---
 
@@ -1083,7 +1070,7 @@ injected.
   `text_only` capability profile; pinned `CLEANER_MODEL` / attester constants.
 - **`handlers.py`**: `arbitrate` — preflight → snapshot → clean (skipped on
   `clean: false`) → attest → fan out → verdict → §2.11 gate → maybe round 2 →
-  verdict → report. Fan-out via `ThreadPoolExecutor`, one worktree per decider; a
+  verdict → report. Fan-out via `ThreadPoolExecutor`, one inert tree per decider; a
   single decider failure does not lose the other's work (`FAILED`, naming the
   engine).
 - **`server.py`**: fifth `Tool`, own dispatch path (§3.8). Schema: `options`
@@ -1198,8 +1185,9 @@ where `BLOCKED` and unsubstantiated both hold and `BLOCKED` wins, and one where
 *Verdict.* Every table row, including `BLOCKED` from a single `[MAJOR]` on an
 otherwise unanimous pick; `REFRAME_REQUIRED` at round 1 *or* round 2, evaluated
 before the selection comparison, including when selections agreed; `human-owner`
-changes no outcome but appears on `ADVISORY:`, including on `UNRESOLVED`; `split`
-renders on disagreement; `ARBITRATION:` is always a bare enum token; every trailer
+changes no outcome but appears on `ADVISORY:`, including on `UNRESOLVED`; selection
+disagreement is represented by `ARBITRATION: UNRESOLVED`, not an advisory token;
+`ARBITRATION:` is always a bare enum token; every trailer
 field is always present; unparseable or missing trailer → `FAILED`; hard stop at
 two rounds.
 
@@ -1210,16 +1198,13 @@ free-text `options` rejected; missing `stakes` or `repo_path` rejected;
 and reports `CLEANING: skipped`; the record block contains no model-authored prose.
 
 **Process.** Both deciders run against the same snapshot commit, and a live-repo
-edit mid-run changes neither worktree; the snapshot is taken from the working tree
+edit mid-run changes neither inert materialization; the snapshot is taken from the working tree
 even when clean.
 
-*Pinning limits (§3.1).* A **branch advanced mid-run** changes the
-`git for-each-ref` digest, so the trailer reports `REFS-MOVED: yes` and the
-outcome is `FAILED` — asserted with a real commit landed between snapshot and
-teardown, not just a file edit, since the existing pinning test only rewrites a
-checked-out file (`tests/test_snapshot.py:120-126`). An **advance-and-restore**
-cycle, which leaves the ref digest identical, is caught by the reflog digest and
-also reports `REFS-MOVED: yes`. A hint path that is
+*Pinning limits (§3.1).* A **branch advanced mid-run** changes the digest, so the
+trailer reports `REFS-MOVED: yes` while a valid decision over the inert snapshot
+remains valid. An **advance-and-restore** cycle, which leaves the ref-tip digest
+identical, is caught by the reflog digest when reflogs are enabled. A hint path that is
 **absolute**, escapes the repo via `../`, or names an **ignored untracked file**
 (absent from the snapshot because `git add -A` skips it — distinct from the
 ordinary-untracked and tracked-but-ignored cases already covered at
@@ -1236,8 +1221,8 @@ linked worktree (this repo is used from a linked worktree); per-phase timeouts f
 under 7,200s; a `logs.write_log` failure yields `AUDIT: FAILED …` and still returns
 the verdict; preflight fails when either binary is absent and spends nothing; a
 single decider failure names its engine. Integration against the existing fake
-CLIs on `PATH`: both engines invoked once per round, in parallel; no worktree
-leaked (`git worktree list` clean).
+CLIs on `PATH`: both engines invoked once per round, in parallel; no evidence
+materialization or worktree registration leaked (`git worktree list` clean).
 
 Mutation pass on `presentation_for`, `canonical_order`, `derive_labels`,
 `parse_verdict`, `parse_citations`, `merge_regions`, `gains_for`,

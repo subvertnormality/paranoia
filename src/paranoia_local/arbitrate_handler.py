@@ -16,6 +16,7 @@ itself read.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 import tempfile
@@ -33,7 +34,6 @@ from . import engines as eng
 from . import evidence, external_sources, inert_git, inert_tree, logs, orientation, prompts
 from .arbitration import ArbitrationError, Citation, Option, Presentation, Region, Vote
 from .config import load_repo_config, resolve
-from .worktree import worktree_at
 
 Clock = Callable[[], str]
 
@@ -47,6 +47,9 @@ WHOLE_TIMEOUT_SEC = 7200
 TEARDOWN_RESERVE_SEC = 120
 
 SNAPSHOT_REF_PREFIX = "refs/paranoia/arbitrate"
+MAX_REJECTED_RESEARCH_CHARS = 12_000
+MAX_AUDIT_FALLBACK_CHARS = 1_000_000
+MAX_AUDIT_COLLECTION_ITEMS = 24
 
 
 def _default_clock() -> str:
@@ -55,11 +58,17 @@ def _default_clock() -> str:
 
 @dataclass(frozen=True)
 class DeciderAttempt:
-    """One complete decider reply, including why a superseded reply was rejected."""
+    """One provider attempt with an exact composed-prompt binding and outcome."""
 
     body: str
     raw: str
     rejection: str | None = None
+    prompt_sha256: str = ""
+    prompt_excerpt: str = ""
+    failure: dict[str, Any] | None = None
+    status: str = "provider-completed"
+    admitted: bool = True
+    invoked: bool = True
 
 
 @dataclass(frozen=True)
@@ -114,6 +123,24 @@ class Packet:
     research_enabled: bool = False
 
 
+def _cleaned_packet_record(packet: Packet) -> dict[str, Any]:
+    fields = {
+        "decision": packet.decision,
+        "context": packet.context,
+        "hints": list(packet.hints),
+        "statements": dict(packet.statements),
+    }
+    encoded = json.dumps(
+        fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return {
+        **fields,
+        "sha256": hashlib.sha256(
+            encoded.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+    }
+
+
 @dataclass(frozen=True)
 class ResearchRun:
     engine: str
@@ -126,6 +153,259 @@ class ResearchRun:
     calls: int
     usage: tuple[dict | None, ...]
     durations_ms: tuple[int | None, ...]
+    attempts: tuple[dict[str, Any], ...] = ()
+
+
+class ResearchFailure(ArbitrationError):
+    """One researcher's terminal failure with bounded accumulated artifacts."""
+
+    def __init__(self, message: str, *, record: Mapping[str, Any]) -> None:
+        super().__init__(message)
+        self.record = dict(record)
+
+
+class InitialRefProvenanceError(ArbitrationError):
+    """The run could not establish its initial ref/reflog observation."""
+
+
+class EngineCallError(ArbitrationError):
+    def __init__(self, message: str, record: Mapping[str, Any]) -> None:
+        super().__init__(message)
+        self.record = dict(record)
+
+
+class ProviderAdmissionError(ArbitrationError):
+    """A prepared prompt was refused before crossing the provider boundary."""
+
+
+def _attach_engine_failure(attempt: dict[str, Any], exc: Exception) -> None:
+    """Retain the engine adapter's distinct bounded diagnostic channels."""
+    if isinstance(exc, EngineCallError):
+        attempt["engine_failure"] = dict(exc.record)
+
+
+def _bounded_research_text(text: str) -> str:
+    if len(text) <= MAX_REJECTED_RESEARCH_CHARS:
+        return text
+    half = MAX_REJECTED_RESEARCH_CHARS // 2
+    return text[:half] + "\n… [bounded research output] …\n" + text[-half:]
+
+
+def _bounded_audit_value(
+    value: Any, *, string_limit: int = 2_000,
+    item_limit: int = MAX_AUDIT_COLLECTION_ITEMS,
+    depth_limit: int = 8, depth: int = 0,
+) -> Any:
+    """Bound every free-form string while retaining an exact digest."""
+    if depth >= depth_limit and isinstance(value, (Mapping, list, tuple)):
+        serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        return {
+            "_omitted_nested": True,
+            "_omitted_sha256": hashlib.sha256(
+                serialized.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "_omitted_chars": len(serialized),
+        }
+    if isinstance(value, str) and len(value) > string_limit:
+        half = string_limit // 2
+        return {
+            "sha256": hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest(),
+            "excerpt": value[:half] + "\n… [bounded] …\n" + value[-half:],
+            "original_chars": len(value),
+        }
+    if isinstance(value, Mapping):
+        items = list(value.items())
+        kept = {
+            str(key): _bounded_audit_value(
+                item, string_limit=string_limit, item_limit=item_limit,
+                depth_limit=depth_limit, depth=depth + 1,
+            ) for key, item in items[:item_limit]
+        }
+        if len(items) > item_limit:
+            omitted = json.dumps(
+                dict(items[item_limit:]), sort_keys=True, separators=(",", ":"), default=str,
+            )
+            kept["_omitted_fields"] = len(items) - item_limit
+            kept["_omitted_fields_sha256"] = hashlib.sha256(
+                omitted.encode("utf-8", "surrogatepass")
+            ).hexdigest()
+        return kept
+    if isinstance(value, (list, tuple)):
+        kept = [
+            _bounded_audit_value(
+                item, string_limit=string_limit, item_limit=item_limit,
+                depth_limit=depth_limit, depth=depth + 1,
+            ) for item in value[:item_limit]
+        ]
+        if len(value) > item_limit:
+            omitted = json.dumps(
+                list(value[item_limit:]), sort_keys=True, separators=(",", ":"), default=str,
+            )
+            kept.append({
+                "_omitted_items": len(value) - item_limit,
+                "_omitted_sha256": hashlib.sha256(
+                    omitted.encode("utf-8", "surrogatepass")
+                ).hexdigest(),
+            })
+        return kept
+    return value
+
+
+def _write_bounded_audit(
+    log_dir: Path, *, record: Mapping[str, Any], timestamp: str,
+) -> tuple[Path | None, str | None]:
+    audit = logs.write_log(
+        log_dir, tool="arbitrate", record=dict(record), timestamp=timestamp,
+    )
+    if audit is not None:
+        return audit, None
+    bounded = _bounded_audit_value(dict(record))
+    serialized = json.dumps(bounded, sort_keys=True, separators=(",", ":"), default=str)
+    for string_limit, item_limit, depth_limit in ((512, 12, 6), (128, 4, 3)):
+        if len(serialized) <= MAX_AUDIT_FALLBACK_CHARS:
+            break
+        bounded = _bounded_audit_value(
+            dict(record), string_limit=string_limit, item_limit=item_limit,
+            depth_limit=depth_limit,
+        )
+        serialized = json.dumps(
+            bounded, sort_keys=True, separators=(",", ":"), default=str,
+        )
+    if len(serialized) > MAX_AUDIT_FALLBACK_CHARS:
+        serialized = json.dumps({
+            key: _bounded_audit_value(
+                value, string_limit=64, item_limit=2, depth_limit=2,
+            ) for key, value in list(record.items())[:MAX_AUDIT_COLLECTION_ITEMS]
+        }, sort_keys=True, separators=(",", ":"), default=str)
+    return None, serialized
+
+
+def _research_reply_record(
+    phase: str, review: eng.Review, error: Exception | str, *,
+    prompt: str = "", intended_session_ref: str | None = None,
+) -> dict[str, Any]:
+    extracted = review.text or ""
+    raw = review.raw or ""
+    return {
+        "phase": phase,
+        "status": "provider-failed" if review.error else "provider-completed",
+        "admitted": True,
+        "invoked": True,
+        "error": str(error),
+        "extracted_sha256": hashlib.sha256(
+            extracted.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "extracted_excerpt": _bounded_research_text(extracted),
+        "raw_sha256": hashlib.sha256(
+            raw.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "raw_excerpt": _bounded_research_text(raw),
+        "session_ref": review.session_ref,
+        "returncode": review.returncode,
+        "execution_error": review.error,
+        "failure_detail": _bounded_research_text(review.failure_detail or ""),
+        "failure_detail_sha256": hashlib.sha256(
+            (review.failure_detail or "").encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "stderr": _bounded_research_text(review.stderr or ""),
+        "stderr_sha256": hashlib.sha256(
+            (review.stderr or "").encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "usage": review.usage,
+        "duration_ms": review.duration_ms,
+        "prompt_sha256": hashlib.sha256(
+            prompt.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "prompt_excerpt": _bounded_research_text(prompt),
+        "intended_session_ref": intended_session_ref,
+    }
+
+
+def _pending_research_attempt(
+    phase: str, prompt: str, session_ref: str | None,
+) -> dict[str, Any]:
+    return {
+        "phase": phase,
+        "status": "prepared",
+        "admitted": False,
+        "invoked": False,
+        "error": "pending",
+        "extracted_sha256": None,
+        "extracted_excerpt": "",
+        "raw_sha256": None,
+        "raw_excerpt": "",
+        "session_ref": None,
+        "returncode": None,
+        "execution_error": None,
+        "failure_detail": "",
+        "failure_detail_sha256": None,
+        "stderr": "",
+        "stderr_sha256": None,
+        "usage": None,
+        "duration_ms": None,
+        "prompt_sha256": hashlib.sha256(
+            prompt.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "prompt_excerpt": _bounded_research_text(prompt),
+        "intended_session_ref": session_ref,
+    }
+
+
+def _fail_pending_attempt(attempt: dict[str, Any], exc: Exception) -> None:
+    detail = f"{type(exc).__name__}: {exc}"
+    invoked = bool(attempt.get("invoked"))
+    attempt.update({
+        "status": "provider-failed" if invoked else "admission-refused",
+        "error": detail,
+        "execution_error": invoked,
+        "failure_detail": _bounded_research_text(detail),
+    })
+
+
+def _research_failure(
+    *, engine: eng.Engine, model: str, phase: str, kind: str, message: str,
+    attempts: Sequence[Mapping[str, Any]],
+    rejected: Sequence[Mapping[str, Any]],
+    claims: Sequence[research_core.DiscoveryClaim] = (),
+    captures: Sequence[external_sources.Capture] = (),
+) -> ResearchFailure:
+    bounded_message = _bounded_research_text(message)
+    return ResearchFailure(
+        f"{engine.name} {phase} {kind} failed: {bounded_message}",
+        record={
+            "engine": engine.name,
+            "model": model,
+            "phase": phase,
+            "kind": kind,
+            "message": bounded_message,
+            "calls": sum(bool(attempt.get("invoked")) for attempt in attempts),
+            "rejected_replies": [dict(item) for item in rejected],
+            "attempts": [dict(attempt) for attempt in attempts],
+            "accepted_claims": [asdict(claim) for claim in claims],
+            "captures": [asdict(capture) for capture in captures],
+        },
+    )
+
+
+def _research_execution_failure(
+    *, engine: eng.Engine, model: str, phase: str,
+    attempts: list[dict[str, Any]], review: eng.Review,
+    rejected: Sequence[Mapping[str, Any]],
+    claims: Sequence[research_core.DiscoveryClaim] = (),
+    captures: Sequence[external_sources.Capture] = (),
+) -> ResearchFailure:
+    detail = review.failure_detail or review.text or review.raw or "engine returned no detail"
+    pending = attempts[-1]
+    completed = _research_reply_record(
+        phase, review, detail, intended_session_ref=pending.get("intended_session_ref"),
+    )
+    completed["prompt_sha256"] = pending["prompt_sha256"]
+    completed["prompt_excerpt"] = pending["prompt_excerpt"]
+    attempts[-1] = completed
+    return _research_failure(
+        engine=engine, model=model, phase=phase, kind="execution", message=detail,
+        attempts=attempts, rejected=rejected, claims=claims, captures=captures,
+    )
 
 
 # --- preflight and snapshot -------------------------------------------------
@@ -467,7 +747,7 @@ def render_trailer(
     cleaning: str,
     snapshot: str,
     seed: str,
-    refs_moved: bool,
+    refs_moved: bool | None,
     audit: str,
     rounds: int,
     research: str = "repository-only",
@@ -486,12 +766,25 @@ def render_trailer(
             f"CLEANING: {cleaning}",
             f"SNAPSHOT: {snapshot}",
             f"ORDER-SEED: {seed}",
-            f"REFS-MOVED: {'yes' if refs_moved else 'no'}",
+            f"REFS-MOVED: {'unavailable' if refs_moved is None else ('yes' if refs_moved else 'no')}",
             f"AUDIT: {audit}",
             f"ROUNDS: {rounds}",
             f"RESEARCH: {research}",
             f"RESEARCH-DIGEST: {research_digest}",
         ]
+    )
+
+
+def _attach_audit_fallback(report: str, fallback: str | None) -> str:
+    if fallback is None:
+        return report
+    marker = "\nARBITRATION: "
+    body, separator, trailer = report.rpartition(marker)
+    if not separator:
+        return report + "\n\n## Audit fallback\n\n```json\n" + fallback + "\n```"
+    return (
+        body + "\n\n## Audit fallback\n\n```json\n" + fallback + "\n```\n"
+        + "ARBITRATION: " + trailer
     )
 
 
@@ -548,13 +841,31 @@ def arbitrate(
     deciders = list(engines) if engines is not None else list(eng.all_engines())
     agent = run_agent or _run_agent
     progress = on_progress or (lambda _msg: None)
+    established: dict[str, Any] = {}
 
     try:
         return _arbitrate(
             arguments, deciders, agent, run_research or _research_one,
-            log_dir, now, progress,
+            log_dir, now, progress, established,
         )
-    except ArbitrationError as exc:
+    except Exception as exc:  # every ordinary failure becomes an auditable FAILED result
+        if established:
+            return _failed_established_report(
+                reason=str(exc),
+                failures=[{
+                    "engine": "server", "phase": "established-run",
+                    "kind": type(exc).__name__, "message": str(exc),
+                }],
+                completed=established.get("research_runs", ()),
+                repo=established["repo"], snapshot=established["snapshot"],
+                refs_before=established["refs_before"], seed=established["seed"],
+                packet=established["packet"], originals=established["originals"],
+                decision=established["decision"], stakes=established["stakes"],
+                context=established["context"], hints=established["hints"],
+                log_dir=log_dir, now=now,
+                research_status=established.get("research_status", "not reached"),
+                artifacts=established,
+            )
         # A failure still returns the full trailer. "Every field is always present"
         # must hold on the error path too, or a caller that parses `ARBITRATION:`
         # gets nothing and has to fall back to reading prose.
@@ -563,14 +874,20 @@ def arbitrate(
         # framings and left nothing on disk, so gate churn could only be reconstructed
         # from terminal scrollback (issue #8, fix 7). A rejection is the cheapest thing
         # this tool produces and the most useful thing to count.
-        audit = logs.write_log(
+        ref_error = f"{type(exc).__name__}: {exc}" if isinstance(
+            exc, InitialRefProvenanceError
+        ) else None
+        audit, fallback = _write_bounded_audit(
             log_dir,
-            tool="arbitrate",
             record={
                 "outcome": arb.FAILED,
                 "reason": str(exc),
                 "gate": type(exc).__name__,
                 "rounds": [],
+                "refs_before": None if ref_error else "not observed",
+                "refs_after": None if ref_error else "not observed",
+                "ref_provenance_error": ref_error,
+                "refs_moved": None if ref_error else False,
                 "raw_input": {
                     k: arguments.get(k)
                     for k in ("decision", "options", "context", "stakes", "files")
@@ -578,24 +895,25 @@ def arbitrate(
             },
             timestamp=now(),
         )
-        return "\n".join(
-            [
+        parts = [
                 "# Arbitration: FAILED",
                 "",
                 str(exc),
                 "",
-                render_trailer(
+        ]
+        if fallback is not None:
+            parts.extend(["## Audit fallback", "", "```json", fallback, "```", ""])
+        parts.append(render_trailer(
                     arb.Outcome(arb.FAILED, None, str(exc)),
                     advisory="none",
                     cleaning="not reached",
                     snapshot="none",
                     seed=str(arguments.get("order_seed") or "none"),
-                    refs_moved=False,
-                    audit=str(audit) if audit else "none",
+                    refs_moved=None if ref_error else False,
+                    audit=str(audit) if audit else "FAILED could not write log",
                     rounds=0,
-                ),
-            ]
-        )
+                ))
+        return "\n".join(parts)
 
 
 def _arbitrate(
@@ -606,16 +924,35 @@ def _arbitrate(
     log_dir: Path,
     now: Clock,
     progress: Callable[[str], None],
+    established: dict[str, Any],
 ) -> str:
     deadline = time.monotonic() + WHOLE_TIMEOUT_SEC
 
     def budgeted_agent(**kwargs: Any) -> str:
+        lifecycle = kwargs.pop("_attempt_lifecycle", None)
         cap = int(kwargs.get("timeout", 0))
         if time.monotonic() + cap + TEARDOWN_RESERVE_SEC > deadline:
-            raise ArbitrationError(
+            if lifecycle is not None:
+                lifecycle.update(status="admission-refused", admitted=False, invoked=False)
+            raise ProviderAdmissionError(
                 f"whole-run deadline leaves insufficient time to start a {cap}s agent phase"
             )
-        return agent(**kwargs)
+        if lifecycle is not None:
+            lifecycle.update(status="admitted", admitted=True, invoked=False)
+        if lifecycle is not None and agent is not _run_agent:
+            lifecycle.update(status="provider-invoked", invoked=True)
+        try:
+            result = (
+                agent(**kwargs, _attempt_lifecycle=lifecycle)
+                if agent is _run_agent else agent(**kwargs)
+            )
+        except Exception:
+            if lifecycle is not None and lifecycle.get("invoked"):
+                lifecycle["status"] = "provider-failed"
+            raise
+        if lifecycle is not None:
+            lifecycle["status"] = "provider-completed"
+        return result
 
     repo_path = arguments.get("repo_path")
     if not repo_path:
@@ -646,6 +983,10 @@ def _arbitrate(
     do_research = bool(arguments.get("research", True))
     if do_research and not web_search:
         raise ArbitrationError("research: true requires web_search: true")
+    raw_hints = list(arguments.get("files") or [])
+    if any(not isinstance(item, Mapping) for item in raw_hints):
+        raise ArbitrationError("every file hint must be an object with a path and optional reason")
+    raw_hints = [dict(item) for item in raw_hints]
 
     # Input-only defects, checked before a single agent call: three of the first four
     # production invocations died after two Opus attempts each on exactly these
@@ -657,25 +998,48 @@ def _arbitrate(
     _preflight(deciders)
     try:
         inert_git.require_supported_version()
-        if do_research:
-            for engine in deciders:
-                eng.require_evidence_profile(engine)
+        for engine in deciders:
+            eng.require_evidence_profile(engine)
     except RuntimeError as exc:
         raise ArbitrationError(str(exc)) from exc
 
     progress("snapshotting the working tree")
-    # Digest BEFORE the snapshot, and again after it: a commit landing while the
-    # snapshot is being built would otherwise become part of the baseline, so both
-    # deciders could read it through `git log --all` and the run would still report
-    # REFS-MOVED: no against an older SNAPSHOT.
-    refs_at_start = evidence.refs_digest(repo)
+    # Digest BEFORE the snapshot, and again after it. A ref landing while tree and
+    # bounded-history inputs are being assembled makes the setup boundary ambiguous,
+    # so reject it before either inert decider view is materialized.
+    try:
+        refs_at_start = evidence.refs_digest(repo)
+    except Exception as exc:
+        raise InitialRefProvenanceError(
+            f"initial ref provenance unavailable: {type(exc).__name__}: {exc}"
+        ) from exc
     snapshot = _snapshot(repo)
-    refs_before = evidence.refs_digest(repo)
+    originals = {o.id: o.statement for o in canonical}
+    established.update({
+        "repo": repo, "snapshot": snapshot, "refs_before": refs_at_start,
+        "seed": seed, "decision": decision, "stakes": stakes, "context": context,
+        "hints": raw_hints, "originals": originals,
+        "packet": Packet(
+            decision=decision, stakes=stakes, context=context, hints=raw_hints,
+            statements=dict(originals), cleaning="not reached", attestation="not reached",
+        ),
+        "research_runs": [], "research_status": "not reached",
+    })
+    try:
+        refs_before = evidence.refs_digest(repo)
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        established["final_ref_observation"] = (None, None, error)
+        raise ArbitrationError(
+            f"post-snapshot setup ref provenance unavailable: {error}"
+        ) from exc
     if refs_before != refs_at_start:
+        established["final_ref_observation"] = (refs_before, True, None)
         raise ArbitrationError(
             "repository refs moved while the snapshot was being taken, so the "
             "snapshot cannot describe what the deciders would read"
         )
+    established["refs_before"] = refs_before
     # The post-snapshot digest IS the baseline — re-reading it would reopen the very
     # window just closed, letting a commit that landed in between become accepted
     # history. The opt-in retain ref is therefore created after the final check, at
@@ -692,7 +1056,9 @@ def _arbitrate(
             "deciders could read unrecorded bytes: "
             + ", ".join(evidence.printable(e) for e in escaping)
         )
-    hints = evidence.validate_hints(repo, snapshot, list(arguments.get("files") or []))
+    hints = evidence.validate_hints(repo, snapshot, raw_hints)
+    established["hints"] = hints
+    established["packet"].hints = hints
 
     # Caller-side token hygiene: option ids may not appear in anything a decider
     # reads. Options are shown in DIFFERENT orders, so a statement referring to
@@ -707,7 +1073,7 @@ def _arbitrate(
     }
     arb.reject_reserved_tokens(visible, caller_ids)
 
-    originals = {o.id: o.statement for o in canonical}
+    established["packet"].cleaning = "in progress"
     packet, cleaning_note = _clean_and_attest(
         agent=budgeted_agent,
         repo=repo,
@@ -719,7 +1085,11 @@ def _arbitrate(
         do_clean=do_clean,
         cleaner_model=cleaner_model,
         progress=progress,
+        established=established,
     )
+    established["packet"] = packet
+    if not do_research:
+        established["research_status"] = "repository-only"
 
     research_runs: list[ResearchRun] = []
     if do_research:
@@ -727,6 +1097,7 @@ def _arbitrate(
             raise ArbitrationError(
                 "whole-run deadline leaves insufficient time to start shared research"
             )
+        established["research_status"] = "running"
         progress("shared research: discovering and capturing authoritative sources")
         orders = _research_orders(shown=arb.canonical_order(
             Option(id=o.id, statement=packet.statements[o.id]) for o in canonical
@@ -746,20 +1117,61 @@ def _arbitrate(
                 for engine in deciders
             }
         failures: list[str] = []
+        failure_records: list[dict[str, Any]] = []
         for name, future in futures.items():
             try:
                 research_runs.append(future.result())
+                established["research_runs"] = list(research_runs)
+            except ResearchFailure as exc:
+                failures.append(str(exc))
+                failure_records.append(dict(exc.record))
             except Exception as exc:  # noqa: BLE001
                 failures.append(f"{name}: {type(exc).__name__}: {exc}")
+                failure_records.append({
+                    "engine":name, "kind":"unexpected", "message":str(exc),
+                    "rejected_replies":[],
+                })
         if failures:
-            raise ArbitrationError("research failure — " + "; ".join(failures))
-        normalized = research_core.packets(
-            [(run.claims, run.bound) for run in research_runs]
-        )
-        packet.research_packets = normalized
-        packet.research_text = research_core.render(normalized)
-        arb.reject_reserved_tokens({"research packet": packet.research_text}, caller_ids)
-        packet.research_enabled = True
+            return _failed_established_report(
+                reason="research failure — " + "; ".join(failures),
+                failures=failure_records, completed=research_runs,
+                repo=repo, snapshot=snapshot, refs_before=refs_before,
+                seed=seed, packet=packet, originals=originals,
+                decision=decision, stakes=stakes, context=context, hints=hints,
+                log_dir=log_dir, now=now, research_status="failed",
+                artifacts=established,
+            )
+        try:
+            normalized = research_core.packets(
+                [(run.claims, run.bound) for run in research_runs]
+            )
+            packet.research_packets = normalized
+            packet.research_text = research_core.render(normalized)
+            # Normalization and rendering establish these exact bytes even if the
+            # next server-side safety validation rejects them. Failure provenance
+            # must retain what was rejected, not pretend no packet existed.
+            packet.research_enabled = True
+            established["packet"] = packet
+            arb.reject_reserved_tokens({"research packet": packet.research_text}, caller_ids)
+        except Exception as exc:
+            return _failed_established_report(
+                reason=f"research packet validation failed: {type(exc).__name__}: {exc}",
+                failures=[{
+                    "engine": "shared",
+                    "phase": "packet-validation",
+                    "kind": "validation",
+                    "message": str(exc),
+                }],
+                completed=research_runs, repo=repo, snapshot=snapshot,
+                refs_before=refs_before, seed=seed, packet=packet,
+                originals=originals, decision=decision, stakes=stakes,
+                context=context, hints=hints, log_dir=log_dir, now=now,
+                research_status="failed",
+                artifacts=established,
+            )
+        established["packet"] = packet
+        established["research_runs"] = list(research_runs)
+        established["research_status"] = "complete"
         progress(f"shared research: {len(normalized)} captured packet(s) ready")
 
     # Present the CLEANED statements, not the caller's originals — the presentation
@@ -779,7 +1191,13 @@ def _arbitrate(
         deciders=deciders,
         seed=seed,
         packet=packet,
+        established=established,
     )
+    established["label_maps"] = {
+        presentation.engine: dict(presentation.label_to_id)
+        for presentation in presentations
+    }
+    established["label_attempts"] = attempts
 
     engine_names = [p.engine for p in presentations]
     progress(f"round 1: {', '.join(engine_names)}")
@@ -795,12 +1213,13 @@ def _arbitrate(
             refs_before=refs_before, cleaning_note=cleaning_note, packet=packet,
             research_runs=research_runs, presentations=presentations,
             label_attempts=attempts, log_dir=log_dir,
-            now=now, raw_input={
+            now=now, artifacts=established, raw_input={
                 "decision": decision, "stakes": stakes, "context": context,
                 "options": originals, "files": hints,
             },
         )
     round1 = [c.vote for c in casts1]
+    established["transcripts"] = [casts1]
 
     def resolve_region(citation: Citation) -> Region | None:
         got = evidence.resolve_citation(
@@ -830,7 +1249,8 @@ def _arbitrate(
         union = arb.region_union(own)
         if arb.round_two_permitted(union, own):
             progress("round 2: reconciling on carried evidence")
-            carried_bodies = _read_union(repo, union)
+            established["carried_evidence"] = []
+            carried_bodies = _read_union(repo, union, established=established)
             # Substantiate against what was ACTUALLY carried, not the pre-transport
             # union: a region whose bytes failed to read was never sent, so it
             # cannot be the evidence a vote was reconciled by.
@@ -848,13 +1268,14 @@ def _arbitrate(
                     seed=seed, refs_before=refs_before, cleaning_note=cleaning_note,
                     packet=packet, research_runs=research_runs,
                     presentations=presentations, label_attempts=attempts,
-                    log_dir=log_dir, now=now, raw_input={
+                    log_dir=log_dir, now=now, artifacts=established, raw_input={
                         "decision": decision, "stakes": stakes, "context": context,
                         "options": originals, "files": hints,
                     },
                 )
             round2 = [c.vote for c in casts2]
             transcripts.append(casts2)
+            established["transcripts"] = list(transcripts)
             per_round.append({v.engine: v for v in round2})
             gained = {e: arb.gains_for(e, sent, own[e]) for e in own}
             # Carried grounding is anti-capitulation, so it is owed only by a vendor
@@ -885,76 +1306,77 @@ def _arbitrate(
                 "so a second round would be a fresh sample rather than a reconciliation"
             )
 
-    refs_moved = evidence.refs_digest(repo) != refs_before
-    if retain and not refs_moved:
+    refs_after, refs_moved, refs_error = _final_ref_observation(repo, refs_before)
+    established["final_ref_observation"] = (refs_after, refs_moved, refs_error)
+    if refs_error:
+        raise ArbitrationError(f"final ref provenance unavailable: {refs_error}")
+    if retain:
         # The ONE mode that writes a ref, and only once the run is known clean:
         # `wrap_commit` deliberately creates none and the README promises as much,
         # so durable evidence replay is opt-in rather than a promise quietly broken.
         evidence.retain_snapshot(repo, snapshot, now())
     final_votes = list(per_round[-1].values())
-    if refs_moved:
-        outcome = arb.compute_outcome(
-            final_votes,
-            substantiated={v.engine: True for v in final_votes},
-            refs_moved=True,
-        )
-
     advisory = arb.advisory_line(final_votes)
     record = render_record_block(
         outcome, subject=subject, rounds=rounds, per_round=per_round, advisory=advisory
     )
-    audit = logs.write_log(
-        log_dir,
-        tool="arbitrate",
-        record={
-            "repo": str(repo),
-            "snapshot": snapshot,
-            "order_seed": seed,
-            "label_attempts": attempts,
-            "cleaning": cleaning_note,
-            "attestation": packet.attestation,
-            "research": _research_record(packet, research_runs),
-            "raw_input": {
-                "decision": decision, "stakes": stakes, "context": context,
-                "options": originals, "files": hints,
-            },
-            "cleaned": {
-                "decision": packet.decision, "context": packet.context,
-                "statements": packet.statements,
-            },
-            "label_maps": {p.engine: dict(p.label_to_id) for p in presentations},
-            # The prompts, the replies, and the bytes that crossed — everything the
-            # decision was actually made on. `SNAPSHOT` is provenance only (the
-            # wrapper commit is unreferenced and gc reclaims it), so if this record
-            # does not hold them, the run is unauditable once that happens.
-            "rounds": [
-                {
-                    cast.vote.engine: _cast_record(cast)
-                    for cast in casts
-                }
-                for casts in transcripts
-            ],
-            "carried_evidence": [
-                {
-                    "commit": region.commit, "path": region.path,
-                    "lo": region.lo, "hi": region.hi, "body": body,
-                }
-                for region, body in carried_regions
-            ],
-            "outcome": outcome.outcome,
-            "selected": outcome.selected,
-            "reason": outcome.reason,
-            "refs_moved": refs_moved,
+    audit_record = {
+        "repo": str(repo),
+        "snapshot": snapshot,
+        "order_seed": seed,
+        **_established_audit_fields(established),
+        "cleaning": cleaning_note,
+        "attestation": packet.attestation,
+        "research": _research_record(packet, research_runs),
+        "raw_input": {
+            "decision": decision, "stakes": stakes, "context": context,
+            "options": originals, "files": hints,
         },
-        timestamp=now(),
+        "cleaned": _cleaned_packet_record(packet),
+        "outcome": outcome.outcome,
+        "selected": outcome.selected,
+        "reason": outcome.reason,
+        "refs_before": refs_before,
+        "refs_after": refs_after,
+        "ref_provenance_error": None,
+        "refs_moved": refs_moved,
+    }
+    audit, fallback = _write_bounded_audit(
+        log_dir, record=audit_record, timestamp=now(),
     )
 
-    return _render_report(
+    report = _render_report(
         outcome=outcome, packet=packet, originals=originals, presentations=presentations,
         per_round=per_round, advisory=advisory, snapshot=snapshot, seed=seed,
         refs_moved=refs_moved, audit=str(audit) if audit else "FAILED could not write log",
         rounds=rounds, record=record, carried_note=carried_note,
     )
+    return _attach_audit_fallback(report, fallback)
+
+
+def _research_run_records(runs: Sequence[ResearchRun]) -> list[dict[str, Any]]:
+    return [
+        {
+            "engine": run.engine,
+            "model": run.model,
+            "discovery_raw_sha256": hashlib.sha256(
+                run.discovery_raw.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "discovery_raw_excerpt": _bounded_research_text(run.discovery_raw),
+            "binding_raw_sha256": hashlib.sha256(
+                run.binding_raw.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "binding_raw_excerpt": _bounded_research_text(run.binding_raw),
+            "calls": run.calls,
+            "usage": run.usage,
+            "durations_ms": run.durations_ms,
+            "captures": [asdict(capture) for capture in run.captures],
+            "claims": [asdict(claim) for claim in run.claims],
+            "bindings": [asdict(item) if item is not None else None for item in run.bound],
+            "attempts": [dict(item) for item in run.attempts],
+        }
+        for run in runs
+    ]
 
 
 def _research_record(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, Any]:
@@ -965,20 +1387,131 @@ def _research_record(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, A
             if packet.research_enabled else None
         ),
         "packets": packet.research_text if packet.research_enabled else None,
-        "runs": [
+        "runs": _research_run_records(runs),
+    }
+
+
+def _established_audit_fields(artifacts: Mapping[str, Any]) -> dict[str, Any]:
+    """One projection of incremental run state shared by every terminal outcome."""
+    return {
+        "phase_attempts": list(artifacts.get("phase_attempts", ())),
+        "label_attempts": artifacts.get("label_attempts"),
+        "label_attempt_records": list(artifacts.get("label_attempt_records", ())),
+        "label_maps": dict(artifacts.get("label_maps", {})),
+        "rounds": [
+            {cast.vote.engine: _cast_record(cast) for cast in casts}
+            for casts in artifacts.get("transcripts", ())
+        ],
+        "carried_evidence": [
             {
-                "engine": run.engine,
-                "model": run.model,
-                "discovery_raw": run.discovery_raw,
-                "binding_raw": run.binding_raw,
-                "calls": run.calls,
-                "usage": run.usage,
-                "durations_ms": run.durations_ms,
-                "captures": [asdict(capture) for capture in run.captures],
+                "commit": region.commit, "path": region.path,
+                "lo": region.lo, "hi": region.hi, "body": body,
             }
-            for run in runs
+            for region, body in artifacts.get("carried_evidence", ())
         ],
     }
+
+
+def _final_ref_observation(repo: Path, refs_before: str) -> tuple[str | None, bool | None, str | None]:
+    """A terminal audit must survive the observation failure it is reporting."""
+    try:
+        refs_after = evidence.refs_digest(repo)
+    except Exception as exc:  # noqa: BLE001 - preserve the exact unavailable diagnostic
+        return None, None, f"{type(exc).__name__}: {exc}"
+    return refs_after, refs_after != refs_before, None
+
+
+def _failed_established_report(
+    *,
+    reason: str,
+    failures: Sequence[Mapping[str, Any]],
+    completed: Sequence[ResearchRun],
+    repo: Path,
+    snapshot: str,
+    refs_before: str,
+    seed: str,
+    packet: Packet,
+    originals: Mapping[str, str],
+    decision: str,
+    stakes: str,
+    context: str,
+    hints: Sequence[Mapping[str, str]],
+    log_dir: Path,
+    now: Clock,
+    research_status: str,
+    artifacts: Mapping[str, Any] | None = None,
+) -> str:
+    """Fail after snapshot setup without erasing any established run state."""
+    recorded = (artifacts or {}).get("final_ref_observation")
+    if recorded is None:
+        refs_after, refs_moved, refs_error = _final_ref_observation(repo, refs_before)
+    else:
+        refs_after, refs_moved, refs_error = recorded
+    if refs_error:
+        reason = f"{reason}; final ref provenance unavailable: {refs_error}"
+    outcome = arb.Outcome(arb.FAILED, None, reason)
+    completed_digest = (
+        research_core.digest(packet.research_packets)
+        if packet.research_enabled else None
+    )
+    rendered_research_status = (
+        f"complete {len(packet.research_packets)} packets"
+        if research_status == "complete" and packet.research_enabled
+        else research_status
+    )
+    research = {
+        "enabled": research_status in {"running", "complete", "failed"},
+        "status": research_status,
+        "digest": completed_digest,
+        "packets": packet.research_text if packet.research_enabled else None,
+        "runs": _research_run_records(completed),
+        "failures": [dict(item) for item in failures],
+    }
+    artifacts = artifacts or {}
+    established_fields = _established_audit_fields(artifacts)
+    audit_record = {
+            "repo": str(repo),
+            "snapshot": snapshot,
+            "order_seed": seed,
+            "cleaning": packet.cleaning,
+            "attestation": packet.attestation,
+            **established_fields,
+            "research": research,
+            "raw_input": {
+                "decision": decision,
+                "stakes": stakes,
+                "context": context,
+                "options": dict(originals),
+                "files": list(hints),
+            },
+            "cleaned": _cleaned_packet_record(packet),
+            "outcome": outcome.outcome,
+            "selected": None,
+            "reason": reason,
+            "refs_before": refs_before,
+            "refs_after": refs_after,
+            "ref_provenance_error": refs_error,
+            "refs_moved": refs_moved,
+        }
+    audit, fallback = _write_bounded_audit(
+        log_dir, record=audit_record, timestamp=now(),
+    )
+    parts = [
+        "# Arbitration: FAILED",
+        "",
+        reason,
+        "",
+    ]
+    if fallback is not None:
+        parts.extend(["## Audit fallback", "", "```json", fallback, "```", ""])
+    parts.append(render_trailer(
+            outcome, advisory="none", cleaning=packet.cleaning,
+            snapshot=snapshot, seed=seed, refs_moved=refs_moved,
+            audit=str(audit) if audit else "FAILED could not write log",
+            rounds=len(established_fields["rounds"]), research=rendered_research_status,
+            research_digest=completed_digest or "none",
+        ))
+    return "\n".join(parts)
 
 
 def _failed_decision_report(
@@ -997,9 +1530,15 @@ def _failed_decision_report(
     raw_input: Mapping[str, Any],
     log_dir: Path,
     now: Clock,
+    artifacts: Mapping[str, Any] | None = None,
 ) -> str:
     """Report a failed decider round without erasing work completed before it."""
-    refs_moved = evidence.refs_digest(repo) != refs_before
+    refs_after, refs_moved, refs_error = _final_ref_observation(repo, refs_before)
+    failure_reason = str(failure)
+    if refs_error:
+        failure_reason += f"; final ref provenance unavailable: {refs_error}"
+    artifacts = artifacts or {}
+    established_fields = _established_audit_fields(artifacts)
     partial = {cast.vote.engine: _cast_record(cast) for cast in failure.casts}
     partial.update({
         item.engine: {
@@ -1009,38 +1548,30 @@ def _failed_decision_report(
         }
         for item in failure.failures
     })
-    audit = logs.write_log(
-        log_dir,
-        tool="arbitrate",
-        record={
+    audit_record = {
             "repo": str(repo),
             "snapshot": snapshot,
             "order_seed": seed,
-            "label_attempts": label_attempts,
+            **established_fields,
             "cleaning": cleaning_note,
             "attestation": packet.attestation,
             "research": _research_record(packet, research_runs),
             "raw_input": dict(raw_input),
-            "cleaned": {
-                "decision": packet.decision,
-                "context": packet.context,
-                "statements": packet.statements,
-            },
-            "label_maps": {p.engine: dict(p.label_to_id) for p in presentations},
-            "rounds": [
-                {cast.vote.engine: _cast_record(cast) for cast in casts}
-                for casts in completed
-            ],
+            "cleaned": _cleaned_packet_record(packet),
             "failed_round": {
                 "number": len(completed) + 1,
                 "deciders": partial,
             },
             "outcome": arb.FAILED,
             "selected": None,
-            "reason": str(failure),
+            "reason": failure_reason,
+            "refs_before": refs_before,
+            "refs_after": refs_after,
+            "ref_provenance_error": refs_error,
             "refs_moved": refs_moved,
-        },
-        timestamp=now(),
+        }
+    audit, fallback = _write_bounded_audit(
+        log_dir, record=audit_record, timestamp=now(),
     )
     research = (
         f"complete {len(packet.research_packets)} packets"
@@ -1050,13 +1581,16 @@ def _failed_decision_report(
         research_core.digest(packet.research_packets)
         if packet.research_enabled else "none"
     )
-    return "\n".join([
+    parts = [
         "# Arbitration: FAILED",
         "",
-        str(failure),
+        failure_reason,
         "",
-        render_trailer(
-            arb.Outcome(arb.FAILED, None, str(failure)),
+    ]
+    if fallback is not None:
+        parts.extend(["## Audit fallback", "", "```json", fallback, "```", ""])
+    parts.append(render_trailer(
+            arb.Outcome(arb.FAILED, None, failure_reason),
             advisory="none",
             cleaning=cleaning_note,
             snapshot=snapshot,
@@ -1066,8 +1600,8 @@ def _failed_decision_report(
             rounds=len(completed),
             research=research,
             research_digest=digest,
-        ),
-    ])
+        ))
+    return "\n".join(parts)
 
 
 def _cited(vote: Vote) -> list[Citation]:
@@ -1102,7 +1636,12 @@ def _cast_record(cast: Cast) -> dict[str, Any]:
     }
 
 
-def _read_union(repo: Path, union: Sequence[Region]) -> list[tuple[Region, str]]:
+def _read_union(
+    repo: Path,
+    union: Sequence[Region],
+    *,
+    established: dict[str, Any] | None = None,
+) -> list[tuple[Region, str]]:
     """Read each merged region as EXACTLY `lo..hi`.
 
     Re-deriving the window from the anchor would under-carry a merged region — two
@@ -1115,6 +1654,8 @@ def _read_union(repo: Path, union: Sequence[Region]) -> list[tuple[Region, str]]
         body = evidence.read_region(repo, region)
         if body:
             out.append((region, body))
+            if established is not None:
+                established.setdefault("carried_evidence", []).append((region, body))
     return out
 
 
@@ -1159,71 +1700,268 @@ def _research_one(
     effort: str,
     deadline: float | None = None,
 ) -> ResearchRun:
-    launch = Path(tempfile.mkdtemp(prefix=f"paranoia-research-{engine.name}-"))
+    launch: Path | None = None
     reviews: list[eng.Review] = []
+    attempts: list[dict[str, Any]] = []
     discovery_raw: list[str] = []
     binding_raw: list[str] = []
+    rejected: list[dict[str, Any]] = []
+    claims: tuple[research_core.DiscoveryClaim, ...] = ()
+    captures: tuple[external_sources.Capture, ...] = ()
+
+    def admit(phase: str, cap: int, attempt: dict[str, Any]) -> None:
+        if deadline is not None and time.monotonic() + cap > deadline:
+            attempt["status"] = "admission-refused"
+            raise ProviderAdmissionError(
+                f"whole-run deadline leaves insufficient time to start the {phase} "
+                f"research phase with its {cap}s cap"
+            )
+        attempt.update(status="admitted", admitted=True)
+
+    def invoke(attempt: dict[str, Any]) -> None:
+        attempt.update(status="provider-invoked", invoked=True)
+
     try:
-        discoverer = engine.for_role(eng.ROLE_DISCOVERY)
-        review = discoverer.run(
-            prompts.compose(
-                prompts.ARBITRATION_DISCOVERY_INSTRUCTIONS,
-                _research_body(packet, options),
-            ),
-            launch, model, effort, True, timeout=240,
+        discovery_prompt = prompts.compose(
+            prompts.ARBITRATION_DISCOVERY_INSTRUCTIONS,
+            _research_body(packet, options),
         )
+        attempts.append(_pending_research_attempt("discovery", discovery_prompt, None))
+        try:
+            discoverer = engine.for_role(eng.ROLE_DISCOVERY)
+            launch = Path(tempfile.mkdtemp(prefix=f"paranoia-research-{engine.name}-"))
+        except Exception as exc:
+            attempts[-1].update(
+                status="setup-failed", admitted=False, invoked=False,
+                error=f"{type(exc).__name__}: {exc}", execution_error=False,
+                failure_detail=_bounded_research_text(f"{type(exc).__name__}: {exc}"),
+            )
+            raise _research_failure(
+                engine=engine, model=model, phase="discovery", kind="setup",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected,
+            ) from exc
+        try:
+            admit("discovery", 240, attempts[-1])
+            invoke(attempts[-1])
+            review = discoverer.run(
+                discovery_prompt,
+                launch, model, effort, True, timeout=240,
+            )
+        except Exception as exc:
+            _fail_pending_attempt(attempts[-1], exc)
+            raise _research_failure(
+                engine=engine, model=model, phase="discovery",
+                kind="execution" if attempts[-1]["invoked"] else "admission",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected,
+            ) from exc
         reviews.append(review)
+        attempts[-1] = _research_reply_record(
+            "discovery", review, "", prompt=discovery_prompt,
+        )
         discovery_raw.append(review.raw)
-        if review.error or not review.session_ref:
-            raise ArbitrationError(f"{engine.name} discovery failed")
+        if review.error:
+            raise _research_execution_failure(
+                engine=engine, model=model, phase="discovery", attempts=attempts,
+                review=review, rejected=rejected,
+            )
         try:
             claims = research_core.parse_discovery(review.text, forbidden=forbidden)
         except research_core.ResearchError as first:
-            correction = discoverer.resume(
-                review.session_ref,
-                f"Your discovery JSON was rejected: {first}. Return one complete corrected "
-                f"{research_core.DISCOVERY_MARKER} object and nothing else.",
-                launch, model, effort, True, timeout=240,
+            attempts[-1] = _research_reply_record(
+                "discovery", review, first, prompt=discovery_prompt,
             )
+            rejected.append(dict(attempts[-1]))
+            if not review.session_ref:
+                raise _research_failure(
+                    engine=engine, model=model, phase="discovery", kind="validation",
+                    message=f"rejected without a resumable session: {first}",
+                    attempts=attempts, rejected=rejected,
+                ) from first
+            correction_prompt = (
+                f"Your discovery JSON was rejected: {first}. Return one complete corrected "
+                f"{research_core.DISCOVERY_MARKER} object and nothing else."
+            )
+            attempts.append(_pending_research_attempt(
+                "discovery-validation-retry", correction_prompt, review.session_ref,
+            ))
+            try:
+                admit("discovery-validation-retry", 240, attempts[-1])
+                invoke(attempts[-1])
+                correction = discoverer.resume(
+                    review.session_ref, correction_prompt,
+                    launch, model, effort, True, timeout=240,
+                )
+            except Exception as exc:
+                _fail_pending_attempt(attempts[-1], exc)
+                raise _research_failure(
+                    engine=engine, model=model, phase="discovery-validation-retry",
+                    kind="execution" if attempts[-1]["invoked"] else "admission",
+                    message=f"{type(exc).__name__}: {exc}",
+                    attempts=attempts, rejected=rejected,
+            ) from exc
             reviews.append(correction)
+            attempts[-1] = _research_reply_record(
+                "discovery-validation-retry", correction, "",
+                prompt=correction_prompt, intended_session_ref=review.session_ref,
+            )
             discovery_raw.append(correction.raw)
             if correction.error:
-                raise ArbitrationError(f"{engine.name} discovery correction failed")
-            claims = research_core.parse_discovery(correction.text, forbidden=forbidden)
+                raise _research_execution_failure(
+                    engine=engine, model=model, phase="discovery-validation-retry",
+                    attempts=attempts, review=correction, rejected=rejected,
+                )
+            try:
+                claims = research_core.parse_discovery(correction.text, forbidden=forbidden)
+            except research_core.ResearchError as second:
+                attempts[-1] = _research_reply_record(
+                    "discovery-validation-retry", correction, second,
+                    prompt=correction_prompt, intended_session_ref=review.session_ref,
+                )
+                rejected.append(dict(attempts[-1]))
+                raise _research_failure(
+                    engine=engine, model=model, phase="discovery-validation-retry",
+                    kind="validation", message=str(second), attempts=attempts,
+                    rejected=rejected,
+                ) from second
             session_ref = correction.session_ref or review.session_ref
         else:
+            if not review.session_ref:
+                raise _research_failure(
+                    engine=engine, model=model, phase="discovery", kind="protocol",
+                    message="valid discovery completed without a resumable session",
+                    attempts=attempts, rejected=rejected, claims=claims,
+                )
             session_ref = review.session_ref
 
-        captures = tuple(external_sources.capture_all(
-            [claim.candidate for claim in claims], deadline=deadline,
-        ))
-        rendered = research_core.binding_input(claims, captures)
-        binder = engine.for_role(eng.ROLE_BINDING)
-        binding = binder.resume(
-            session_ref,
-            prompts.compose(prompts.ARBITRATION_BINDING_INSTRUCTIONS, rendered),
-            launch, model, effort, False, timeout=360,
-        )
+        try:
+            captures = tuple(external_sources.capture_all(
+                [claim.candidate for claim in claims], deadline=deadline,
+            ))
+        except Exception as exc:
+            completed_captures = tuple(
+                getattr(exc, "completed", ())
+            )
+            raise _research_failure(
+                engine=engine, model=model, phase="capture", kind="execution",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected, claims=claims, captures=completed_captures,
+            ) from exc
+        try:
+            rendered = research_core.binding_input(claims, captures)
+        except Exception as exc:
+            raise _research_failure(
+                engine=engine, model=model, phase="binding-input", kind="validation",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected, claims=claims, captures=captures,
+            ) from exc
+        binding_prompt = prompts.compose(prompts.ARBITRATION_BINDING_INSTRUCTIONS, rendered)
+        attempts.append(_pending_research_attempt("binding", binding_prompt, session_ref))
+        try:
+            binder = engine.for_role(eng.ROLE_BINDING)
+        except Exception as exc:
+            attempts[-1].update(
+                status="setup-failed", admitted=False, invoked=False,
+                error=f"{type(exc).__name__}: {exc}", execution_error=False,
+                failure_detail=_bounded_research_text(f"{type(exc).__name__}: {exc}"),
+            )
+            raise _research_failure(
+                engine=engine, model=model, phase="binding", kind="setup",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected, claims=claims, captures=captures,
+            ) from exc
+        try:
+            admit("binding", 360, attempts[-1])
+            invoke(attempts[-1])
+            binding = binder.resume(
+                session_ref, binding_prompt,
+                launch, model, effort, False, timeout=360,
+            )
+        except Exception as exc:
+            _fail_pending_attempt(attempts[-1], exc)
+            raise _research_failure(
+                engine=engine, model=model, phase="binding",
+                kind="execution" if attempts[-1]["invoked"] else "admission",
+                message=f"{type(exc).__name__}: {exc}", attempts=attempts,
+                rejected=rejected, claims=claims, captures=captures,
+            ) from exc
         reviews.append(binding)
+        attempts[-1] = _research_reply_record(
+            "binding", binding, "", prompt=binding_prompt,
+            intended_session_ref=session_ref,
+        )
         binding_raw.append(binding.raw)
         if binding.error:
-            raise ArbitrationError(f"{engine.name} binding failed")
+            raise _research_execution_failure(
+                engine=engine, model=model, phase="binding", attempts=attempts,
+                review=binding, rejected=rejected, claims=claims, captures=captures,
+            )
         try:
             bound = research_core.parse_binding(binding.text, claims, captures)
         except research_core.ResearchError as first:
-            if not binding.session_ref:
-                raise
-            correction = binder.resume(
-                binding.session_ref,
-                f"Your binding JSON was rejected: {first}. Return one complete corrected "
-                f"{research_core.BINDING_MARKER} object and nothing else.\n\n{rendered}",
-                launch, model, effort, False, timeout=360,
+            attempts[-1] = _research_reply_record(
+                "binding", binding, first, prompt=binding_prompt,
+                intended_session_ref=session_ref,
             )
+            rejected.append(dict(attempts[-1]))
+            if not binding.session_ref:
+                raise _research_failure(
+                    engine=engine, model=model, phase="binding", kind="validation",
+                    message=f"rejected without a resumable session: {first}",
+                    attempts=attempts, rejected=rejected, claims=claims,
+                    captures=captures,
+                ) from first
+            correction_prompt = (
+                f"Your binding JSON was rejected: {first}. Return one complete corrected "
+                f"{research_core.BINDING_MARKER} object and nothing else. The captured text "
+                "and claim indexes are already present in this resumed session; do not add "
+                "commentary or repeat the capture packet."
+            )
+            attempts.append(_pending_research_attempt(
+                "binding-validation-retry", correction_prompt, binding.session_ref,
+            ))
+            try:
+                admit("binding-validation-retry", 360, attempts[-1])
+                invoke(attempts[-1])
+                correction = binder.resume(
+                    binding.session_ref, correction_prompt,
+                    launch, model, effort, False, timeout=360,
+                )
+            except Exception as exc:
+                _fail_pending_attempt(attempts[-1], exc)
+                raise _research_failure(
+                    engine=engine, model=model, phase="binding-validation-retry",
+                    kind="execution" if attempts[-1]["invoked"] else "admission",
+                    message=f"{type(exc).__name__}: {exc}",
+                    attempts=attempts, rejected=rejected, claims=claims,
+                    captures=captures,
+            ) from exc
             reviews.append(correction)
+            attempts[-1] = _research_reply_record(
+                "binding-validation-retry", correction, "",
+                prompt=correction_prompt, intended_session_ref=binding.session_ref,
+            )
             binding_raw.append(correction.raw)
             if correction.error:
-                raise ArbitrationError(f"{engine.name} binding correction failed")
-            bound = research_core.parse_binding(correction.text, claims, captures)
+                raise _research_execution_failure(
+                    engine=engine, model=model, phase="binding-validation-retry",
+                    attempts=attempts, review=correction, rejected=rejected, claims=claims,
+                    captures=captures,
+                )
+            try:
+                bound = research_core.parse_binding(correction.text, claims, captures)
+            except research_core.ResearchError as second:
+                attempts[-1] = _research_reply_record(
+                    "binding-validation-retry", correction, second,
+                    prompt=correction_prompt, intended_session_ref=binding.session_ref,
+                )
+                rejected.append(dict(attempts[-1]))
+                raise _research_failure(
+                    engine=engine, model=model, phase="binding-validation-retry",
+                    kind="validation", message=str(second), attempts=attempts,
+                    rejected=rejected, claims=claims, captures=captures,
+                ) from second
         return ResearchRun(
             engine=engine.name,
             model=model,
@@ -1235,9 +1973,11 @@ def _research_one(
             calls=len(reviews),
             usage=tuple(item.usage for item in reviews),
             durations_ms=tuple(item.duration_ms for item in reviews),
+            attempts=tuple(dict(attempt) for attempt in attempts),
         )
     finally:
-        shutil.rmtree(launch, ignore_errors=True)
+        if launch is not None:
+            shutil.rmtree(launch, ignore_errors=True)
 
 
 def _clear_labels(
@@ -1248,6 +1988,7 @@ def _clear_labels(
     deciders: Sequence[eng.Engine],
     seed: str,
     packet: Packet,
+    established: dict[str, Any] | None = None,
 ) -> tuple[tuple[Presentation, ...], int]:
     framing = "\n".join(
         [packet.decision, packet.stakes, packet.context, *packet.statements.values()]
@@ -1255,11 +1996,22 @@ def _clear_labels(
         + [packet.research_text]
     )
     names = [e.name for e in deciders]
+    ledger = established.setdefault("label_attempt_records", []) if established is not None else []
     for attempt in range(arb.MAX_LABEL_ATTEMPTS):
         presentations = arb.build_presentations(canonical, names, seed, attempt)
         labels = list(arb.all_labels(presentations))
         in_framing = [t for t in labels if t in framing]
+        record = {
+            "attempt": attempt,
+            "labels": labels,
+            "framing_collisions": in_framing,
+            "repository_collisions": None,
+            "status": "repository-scan-pending",
+        }
+        ledger.append(record)
         in_repo = evidence.scan_for_tokens(repo, snapshot, labels)
+        record["repository_collisions"] = list(in_repo)
+        record["status"] = "collision" if in_framing or in_repo else "selected"
         if not in_framing and not in_repo:
             return presentations, attempt
     raise ArbitrationError(
@@ -1280,6 +2032,7 @@ def _clean_and_attest(
     do_clean: bool,
     cleaner_model: str,
     progress: Callable[[str], None],
+    established: dict[str, Any] | None = None,
 ) -> tuple[Packet, str]:
     if not do_clean:
         return (
@@ -1303,17 +2056,46 @@ def _clean_and_attest(
 
     complaint = ""
     last_error: str | None = None
+    phase_attempts = established.setdefault("phase_attempts", []) if established is not None else []
     # One retry only, and deliberately: a longer loop would hill-climb the framing
     # against the attester until it passed, which is optimization, not attestation.
     for attempt in range(2):
         progress("cleaning the framing" if attempt == 0 else "re-cleaning after attestation")
-        cleaned_raw = agent(
-            engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
-            instructions=prompts.CLEANER_INSTRUCTIONS,
-            body=_clean_body(decision, stakes, context, hints, originals, complaint),
-            cwd=None, effort="medium", web_search=False,
-            timeout=CLEAN_TIMEOUT_SEC, text_only=True,
-        )
+        if established is not None:
+            established["packet"].cleaning = "cleaning"
+        cleaner_body = _clean_body(decision, stakes, context, hints, originals, complaint)
+        cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
+        cleaner_record = {
+            "role": "cleaner", "attempt": attempt + 1,
+            "status": "prepared", "admitted": False, "invoked": False,
+            "prompt_sha256": hashlib.sha256(
+                cleaner_prompt.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "prompt_excerpt": _bounded_research_text(cleaner_prompt),
+            "reply": "", "reply_sha256": None, "rejection": "pending",
+        }
+        phase_attempts.append(cleaner_record)
+        try:
+            cleaned_raw = agent(
+                engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
+                instructions=prompts.CLEANER_INSTRUCTIONS,
+                body=cleaner_body, cwd=None, effort="medium", web_search=False,
+                timeout=CLEAN_TIMEOUT_SEC, text_only=True,
+                _attempt_lifecycle=cleaner_record,
+            )
+        except Exception as exc:
+            _attach_engine_failure(cleaner_record, exc)
+            cleaner_record["rejection"] = (
+                f"{cleaner_record['status']}: {type(exc).__name__}: {exc}"
+            )
+            if established is not None:
+                established["packet"].cleaning = "cleaner-rejected"
+            raise ArbitrationError(cleaner_record["rejection"]) from exc
+        cleaner_record["reply"] = _bounded_research_text(cleaned_raw)
+        cleaner_record["reply_sha256"] = hashlib.sha256(
+            cleaned_raw.encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        cleaner_record["rejection"] = None
         try:
             parsed = parse_cleaned_packet(
                 cleaned_raw, list(originals), caller_gave_context=bool(context)
@@ -1346,24 +2128,70 @@ def _clean_and_attest(
             )
         except ArbitrationError as exc:
             last_error = str(exc)
+            cleaner_record["rejection"] = last_error
+            if established is not None:
+                established["packet"].cleaning = "cleaner-rejected"
             complaint = f"Your previous attempt was rejected: {exc}\nFix exactly that."
             continue
 
+        if established is not None:
+            established["packet"] = Packet(
+                decision=parsed["decision"], stakes=stakes, context=parsed["context"],
+                hints=cleaned_hints, statements=parsed["statements"],
+                cleaning="cleaned-awaiting-attestation", attestation="not reached",
+            )
+
         progress("attesting the cleaned framing (cross-vendor)")
-        attested_raw = agent(
-            engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
-            instructions=prompts.ATTEST_INSTRUCTIONS,
-            body=_attest_body(decision, stakes, context, hints, cleaned_hints, originals, parsed),
-            cwd=None, effort="low", web_search=False,
-            timeout=CLEAN_TIMEOUT_SEC, text_only=True,
+        attester_body = _attest_body(
+            decision, stakes, context, hints, cleaned_hints, originals, parsed,
         )
+        attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
+        attester_record = {
+            "role": "attester", "attempt": attempt + 1,
+            "status": "prepared", "admitted": False, "invoked": False,
+            "prompt_sha256": hashlib.sha256(
+                attester_prompt.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "prompt_excerpt": _bounded_research_text(attester_prompt),
+            "reply": "", "reply_sha256": None, "rejection": "pending",
+        }
+        phase_attempts.append(attester_record)
+        try:
+            attested_raw = agent(
+                engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
+                instructions=prompts.ATTEST_INSTRUCTIONS,
+                body=attester_body, cwd=None, effort="low", web_search=False,
+                timeout=CLEAN_TIMEOUT_SEC, text_only=True,
+                _attempt_lifecycle=attester_record,
+            )
+        except Exception as exc:
+            _attach_engine_failure(attester_record, exc)
+            attester_record["rejection"] = (
+                f"{attester_record['status']}: {type(exc).__name__}: {exc}"
+            )
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
+            raise ArbitrationError(attester_record["rejection"]) from exc
+        attester_record["reply"] = _bounded_research_text(attested_raw)
+        attester_record["reply_sha256"] = hashlib.sha256(
+            attested_raw.encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        attester_record["rejection"] = None
+        if established is not None:
+            established["packet"].attestation = attested_raw
         try:
             attestation = parse_attestation(attested_raw, attest_fields)
         except ArbitrationError as exc:
             last_error = f"attestation unusable: {exc}"
+            attester_record["rejection"] = last_error
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
             complaint = f"An independent auditor's reply was unusable: {exc}\nRe-clean and try again."
             continue
         if attestation.stakes_advocacy:
+            attester_record["rejection"] = attestation.stakes_advocacy
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
             raise ArbitrationError(
                 "the stakes text advocates for an option, and stakes is not the "
                 f"cleaner's to rewrite — fix it and re-run: {attestation.stakes_advocacy}"
@@ -1382,6 +2210,9 @@ def _clean_and_attest(
             f"fidelity changed: {attestation.changed}; neutrality: "
             f"{'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}"
         )
+        attester_record["rejection"] = last_error
+        if established is not None:
+            established["packet"].cleaning = "attestation-rejected"
         complaint = f"An independent auditor rejected your previous attempt: {last_error}\nFix exactly that."
 
     raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
@@ -1475,11 +2306,48 @@ def _fan_out(
     def one(engine: eng.Engine) -> Cast:
         presentation = by_name[engine.name]
         body = render_decider_body(packet, presentation, tuple(carried.get(engine.name, ())))
-        with inert_tree.evidence_workspace(repo, snapshot) as workspace:
-            review_cwd = workspace.cwd_for(engine.name)
+        first_prompt = prompts.compose(prompts.ARBITRATE_INSTRUCTIONS, body)
+        attempts: list[DeciderAttempt] = [DeciderAttempt(
+            body, "", "pending",
+            hashlib.sha256(first_prompt.encode("utf-8", "surrogatepass")).hexdigest(),
+            _bounded_research_text(first_prompt), None, "prepared", False, False,
+        )]
+        try:
+            workspace_manager = inert_tree.evidence_workspace(repo, snapshot)
+            workspace = workspace_manager.__enter__()
+        except Exception as exc:
+            current = attempts[-1]
+            attempts[-1] = DeciderAttempt(
+                current.body, "", f"workspace setup failure: {exc}",
+                current.prompt_sha256, current.prompt_excerpt, None,
+                "setup-failed", False, False,
+            )
+            raise DeciderAttemptFailure(
+                f"workspace setup failed before provider invocation: "
+                f"{type(exc).__name__}: {exc}", attempts,
+            ) from exc
+        try:
+            try:
+                review_cwd = workspace.cwd_for(engine.name)
+            except Exception as exc:
+                current = attempts[-1]
+                attempts[-1] = DeciderAttempt(
+                    current.body, "", f"workspace setup failure: {exc}",
+                    current.prompt_sha256, current.prompt_excerpt, None,
+                    "setup-failed", False, False,
+                )
+                raise DeciderAttemptFailure(
+                    f"workspace setup failed before provider invocation: "
+                    f"{type(exc).__name__}: {exc}", attempts,
+                ) from exc
             attempt_body = body
-            attempts: list[DeciderAttempt] = []
             for attempt in range(2):
+                current = attempts[-1]
+                lifecycle = {
+                    "status": current.status,
+                    "admitted": current.admitted,
+                    "invoked": current.invoked,
+                }
                 try:
                     text = agent(
                         engine_name=engine.name,
@@ -1487,21 +2355,32 @@ def _fan_out(
                         instructions=prompts.ARBITRATE_INSTRUCTIONS,
                         body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
                         timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
+                        _attempt_lifecycle=lifecycle,
                     )
                 except Exception as exc:
-                    if attempts:
-                        attempts.append(DeciderAttempt(
-                            attempt_body, "", f"execution failure: {type(exc).__name__}: {exc}",
-                        ))
+                    failure_record = getattr(exc, "record", None)
+                    attempts[-1] = DeciderAttempt(
+                        attempt_body, "", f"{lifecycle['status']}: {exc}",
+                        current.prompt_sha256, current.prompt_excerpt,
+                        dict(failure_record) if failure_record is not None else None,
+                        lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                    )
+                    if attempt:
                         raise DeciderAttemptFailure(
-                            f"correction execution failed after a rejected reply: "
+                            f"correction attempt failed after a rejected reply: "
                             f"{type(exc).__name__}: {exc}", attempts,
                         ) from exc
-                    raise
+                    raise DeciderAttemptFailure(
+                        f"initial attempt failed: {type(exc).__name__}: {exc}", attempts,
+                    ) from exc
                 try:
                     vote = arb.parse_verdict(text, presentation)
                 except ArbitrationError as exc:
-                    attempts.append(DeciderAttempt(attempt_body, text, str(exc)))
+                    attempts[-1] = DeciderAttempt(
+                        attempt_body, text, str(exc),
+                        current.prompt_sha256, current.prompt_excerpt, None,
+                        lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                    )
                     if attempt == 1:
                         raise DeciderAttemptFailure(
                             f"reply remained invalid after one correction: {exc}", attempts,
@@ -1514,11 +2393,26 @@ def _fan_out(
                         "quote, preview, or discuss any trailer field name in the prose before "
                         "the final trailer block."
                     )
+                    next_prompt = prompts.compose(prompts.ARBITRATE_INSTRUCTIONS, attempt_body)
+                    attempts.append(DeciderAttempt(
+                        attempt_body, "", "pending",
+                        hashlib.sha256(
+                            next_prompt.encode("utf-8", "surrogatepass")
+                        ).hexdigest(),
+                        _bounded_research_text(next_prompt), None,
+                        "prepared", False, False,
+                    ))
                     continue
-                attempts.append(DeciderAttempt(attempt_body, text))
+                attempts[-1] = DeciderAttempt(
+                    attempt_body, text, None,
+                    current.prompt_sha256, current.prompt_excerpt, None,
+                    lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                )
                 return Cast(
                     vote=vote, body=attempt_body, raw=text, attempts=tuple(attempts),
                 )
+        finally:
+            workspace_manager.__exit__(None, None, None)
         raise AssertionError("bounded decider correction loop did not return")
 
     with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
@@ -1555,21 +2449,41 @@ def _run_agent(
     timeout: int,
     text_only: bool,
     role: str = eng.ROLE_DEFAULT,
+    _attempt_lifecycle: dict[str, Any] | None = None,
 ) -> str:
     import tempfile
 
-    engine = eng.get_engine(engine_name, text_only=text_only)
-    if hasattr(engine, "for_role"):
-        engine = engine.for_role(role)
-    # text_only roles get a fresh EMPTY directory: for Claude the empty allowlist is
-    # the boundary; for Codex, whose read-only sandbox paranoia cannot narrow, an
-    # empty cwd plus instruction is a bound, not a boundary.
-    scratch = tempfile.mkdtemp(prefix="paranoia-txt-") if cwd is None else None
-    where = Path(cwd) if cwd is not None else Path(scratch)
+    lifecycle = _attempt_lifecycle
+    scratch: str | None = None
     try:
-        review = engine.run(
-            prompts.compose(instructions, body), where, model, effort, web_search, timeout=timeout
-        )
+        if lifecycle is not None:
+            lifecycle["status"] = "setup-running"
+        engine = eng.get_engine(engine_name, text_only=text_only)
+        if hasattr(engine, "for_role"):
+            engine = engine.for_role(role)
+        # text_only roles get a fresh EMPTY directory: for Claude the empty allowlist is
+        # the boundary; for Codex, whose read-only sandbox paranoia cannot narrow, an
+        # empty cwd plus instruction is a bound, not a boundary.
+        scratch = tempfile.mkdtemp(prefix="paranoia-txt-") if cwd is None else None
+        where = Path(cwd) if cwd is not None else Path(scratch)
+    except Exception:
+        if lifecycle is not None:
+            lifecycle.update(status="setup-failed", invoked=False)
+        raise
+    try:
+        if lifecycle is not None:
+            lifecycle.update(status="provider-invoked", invoked=True)
+        try:
+            review = engine.run(
+                prompts.compose(instructions, body), where, model, effort, web_search,
+                timeout=timeout,
+            )
+        except Exception:
+            if lifecycle is not None:
+                lifecycle["status"] = "provider-failed"
+            raise
+        if lifecycle is not None:
+            lifecycle["status"] = "provider-completed"
     finally:
         if scratch:
             shutil.rmtree(scratch, ignore_errors=True)
@@ -1577,9 +2491,23 @@ def _run_agent(
     # deliberately preserves in-band error text (see tests/test_instrumentation.py),
     # so accepting non-empty output here would let a failed process cast a vote.
     if review.error:
-        raise ArbitrationError(
+        detail = _bounded_research_text(
+            review.failure_detail
+            or review.text
+            or review.raw
+            or "engine returned no detail"
+        )
+        record = {
+            "engine": engine_name,
+            "returncode": review.returncode,
+            "failure_detail": _bounded_audit_value(review.failure_detail or ""),
+            "text": _bounded_audit_value(review.text or ""),
+            "raw": _bounded_audit_value(review.raw or ""),
+            "stderr": _bounded_audit_value(review.stderr or ""),
+        }
+        raise EngineCallError(
             f"{engine_name} failed (exit {review.returncode}): "
-            f"{(review.text or '').strip()[:500]}"
+            f"{detail}", record,
         )
     return review.text
 

@@ -619,8 +619,9 @@ What it does, in order:
    Every Git evidence read—including citation resolution, label scans, refs, trees, symlinks,
    and blobs—uses the shared inert launcher with lazy fetching disabled, so a missing promised
    object cannot execute a repository-configured transport.
-   Git refs and the reflog are digested before and after; if anything moved, the
-   run returns `FAILED` rather than reporting agreement it cannot describe.
+   Git refs and the reflog are digested before and after. Movement while the snapshot
+   is being built fails before model spend; later movement is reported as
+   `REFS-MOVED: yes` provenance and cannot change the inert views the deciders saw.
 2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
    equalized in detail — then has the *other* vendor attest that field by field.
    `stakes` is passed through verbatim, never rewritten.
@@ -695,6 +696,57 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
 - **`SNAPSHOT` is provenance, not a replay handle.** The snapshot commit is
   unreferenced and `git gc` reclaims it. The audit log holds both prompts, both
   replies, and the carried evidence. `retain_snapshot: true` pins it behind a ref.
+- **`REFS-MOVED` is provenance after snapshot setup.** Deciders receive no live Git
+  directory: each sees a separate inert tree and bounded history rendered from
+  `SNAPSHOT`. A later branch advance therefore does not invalidate their votes. If
+  the initial or final ref/reflog observation fails, the run reports
+  `REFS-MOVED: unavailable` and records null digests plus the structured error; it
+  never aliases unavailable provenance to `no`.
+- **Research failures keep the state already established.** Their trailer and audit
+  retain the real snapshot, order seed, cleaning/attestation result, final ref digest,
+  completed peer research, bounded attempt replies, accepted discovery/capture
+  artifacts, bindings, sessions, usage, durations, and the engine or parser diagnostic.
+  Raw provider envelopes are stored as SHA-256 plus bounded excerpts. Structured
+  provider failure detail and process stderr remain distinct. Shared packet-union
+  and reserved-token failures use the same stateful path. If the durable audit sink
+  fails, the response includes a bounded, hashed fallback record containing the
+  accumulated attempts and accepted artifacts before the machine trailer.
+- **Captured claim-binding debt preserves all engine diagnostic channels.** Initial
+  and correction binding failures hash and bound provider stdout, structured failure
+  detail, and process stderr separately, so timeout and unavailable-executable debt
+  remains actionable even when the provider emitted no stdout.
+- **Every ordinary failure after snapshot setup uses that stateful path.** Cleaner,
+  attester, budget, label, evidence-resolution, and decision-setup failures therefore
+  cannot fall back to `SNAPSHOT: none` or erase cleaner/attester attempts, completed
+  research, label maps, decider prompts/replies/votes, or carried evidence.
+  Round-two carried bytes are recorded before either second-round call starts, and
+  even an initial execution failure retains the exact prompt as an attempt.
+  Failed staged attempts and their durable failure record retain return code, raw provider
+  stdout, structured failure detail, and process stderr as distinct bounded, hashed channels.
+  Once shared research completes, later failures retain the normalized packet bytes
+  and real `RESEARCH-DIGEST` as well as the per-lane ledger.
+  The packet becomes established immediately after normalization/rendering, so a
+  subsequent reserved-token rejection audits the exact rejected bytes and digest.
+- **Research attempts start before provider invocation.** The ledger binds phase,
+  intended session, and bounded prompt/digest before `run` or `resume`; a thrown
+  provider exception therefore counts as the attempted call and retains its binding.
+  Immediately before every discovery/binding invocation or validation resume, the
+  handler admits that attempt's full cap against the remaining monotonic whole-run
+  deadline; a refused call retains the already-established lane attempts. Research
+  JSON accepts markdown fencing and one measured terminal truncation only: a complete
+  outer object missing its final `}`. Internal or multi-character JSON damage remains
+  invalid and receives the one same-session correction before failing closed.
+- **Attempt state distinguishes preparation from spend.** Cleaner, attester,
+  research, and decider records expose whether a prompt was prepared, admitted,
+  invoked, completed, refused by the deadline, or blocked during inert-workspace
+  setup. Call counts include only attempts that crossed the provider boundary.
+- **Cleaned packet audits are complete.** Success and late-failure records retain
+  cleaned decision, context, hints, and statements plus one digest of that exact
+  normalized packet. Bounded cleaner and attester reply copies carry full-reply
+  digests.
+- **Cleaner and attester attempts use the same before-call discipline.** Provider
+  exceptions retain prompt bindings. Research becomes `running` only after deadline
+  admission, and packet digesting remains total on model-controlled Unicode.
 - **On divergence, only a decider that *moved* must ground in the carried
   evidence.** One that held its round-1 position needs only a citation that
   resolves — provided its round-1 decisive citation resolved too. A holder that
@@ -819,7 +871,7 @@ or missing entailment blocks; it never becomes an empty successful register.
 | `BLOCKED` | They agree on an option and one of them tags it `[MAJOR]`/`[FATAL]` |
 | `REFRAME_REQUIRED` | A decider surfaced a better unlisted option. Give it an id and re-run |
 | `UNRESOLVED` | Still split, or agreement nobody could substantiate |
-| `FAILED` | Preflight, cleaning, parsing, or the repo's refs moved mid-run |
+| `FAILED` | Preflight, execution, cleaning, parsing, capture, or protocol failure |
 
 The reply ends with a machine-readable trailer whose fields are always present:
 `ARBITRATION`, `SELECTED`, `ADVISORY`, `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`,
@@ -928,7 +980,9 @@ regression gate.
 
 `arbitrate` is the expensive one and the only tool that spends from **both**
 subscriptions in a single call. Research is on unless `research: false` explicitly
-selects repository-only mode. A parser-rejected decider reply receives one
+selects repository-only mode. Both modes validate each decider's exact supported
+evidence-isolation CLI profile before snapshot creation or model spend. A
+parser-rejected decider reply receives one
 complete correction attempt while the sibling result and completed cleaning/research
 work are retained. If correction still fails, the audit records both rejected replies,
 the completed sibling, and the actual phase provenance; execution failures are not
@@ -937,6 +991,17 @@ retried. Every attempt remains subject to the phase cap and 7,200-second whole-c
 ---
 
 ## Development
+
+Validate a checked-in arbitration acceptance record against its exact durable audit
+and current production sources before treating it as release evidence:
+
+```bash
+python scripts/validate_arbitration_acceptance.py \
+  docs/arbitration_reliability_acceptance_2026-08-12.json .
+```
+
+The command fails on stale provider-call counts, packet identities/count/digest,
+audit digest, outcome/selection/snapshot, or production hashes.
 
 ```bash
 pip install -e '.[dev]'

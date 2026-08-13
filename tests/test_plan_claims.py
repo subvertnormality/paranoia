@@ -934,6 +934,35 @@ def _repo(tmp_path: Path) -> Path:
 
 
 class TestHandlerFlow:
+    @pytest.mark.parametrize(("returncode", "diagnostic"), [
+        (124, "timed out after 3600s"),
+        (127, "executable not found: codex"),
+    ])
+    def test_outer_claim_retry_persists_all_failure_channels(
+        self, tmp_path: Path, returncode: int, diagnostic: str,
+    ) -> None:
+        failed = Review(
+            text="partial", session_ref="session", raw="retry stdout",
+            returncode=returncode, error=True,
+            failure_detail="structured provider failure", stderr=diagnostic,
+        )
+        state, status = handlers._verify_plan_claims(
+            PLAN, pc.empty_state(), lineage_id="outer-retry", round_no=1,
+            stakes="trusted local tool",
+            engine=ScriptedEngine("not a claim audit", failed),
+            repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+            on_progress=None,
+        )
+
+        assert status == "retry-failed"
+        debt = state["debt"]
+        assert debt["returncode"] == returncode
+        assert debt["rejected_excerpt"] == "retry stdout"
+        assert debt["failure_detail"] == "structured provider failure"
+        assert debt["stderr"] == diagnostic
+        assert len({debt["raw_sha256"], debt["failure_detail_sha256"],
+                    debt["stderr_sha256"]}) == 3
+
     def test_invalid_disposition_scalar_gets_one_correction_and_recovers(
         self, tmp_path: Path,
     ) -> None:
@@ -1555,6 +1584,118 @@ def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:
             adapter._parse_indexed_binding(omitted, batch, captures)
     finally:
         adapter.close()
+
+
+@pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [
+    (False, 124, "timed out after 420s"),
+    (True, 127, "executable not found: codex"),
+])
+def test_binding_engine_failure_preserves_structured_diagnostics(
+    tmp_path: Path, correction: bool, returncode: int, diagnostic: str,
+) -> None:
+    audit = pc.parse_audit(_audit(_claim()), PLAN)
+    item = audit.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        item["quote"],
+    )
+    failed = Review(
+        text="", session_ref="session" if correction else None, raw="",
+        returncode=returncode, error=True, failure_detail=diagnostic,
+        stderr=diagnostic,
+    )
+    replies = ([Review("invalid", "session", "provider stdout"), failed]
+               if correction else [failed])
+
+    class BindingEngine:
+        def resume(self, *args, **kwargs):
+            return replies.pop(0)
+
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = BindingEngine()
+    try:
+        with pytest.raises(pc.AuditError) as caught:
+            adapter._bind_indexed(
+                "session", audit, {(0, 0): capture}, "m", "high", {"timeout": 300},
+            )
+        debt = caught.value.debt(1)
+        assert debt["returncode"] == returncode
+        assert debt["rejected_excerpt"] == ""
+        assert debt["failure_detail"] == diagnostic
+        assert debt["stderr"] == diagnostic
+        assert debt["failure_detail_sha256"] != debt["raw_sha256"]
+        assert debt["stderr_sha256"] != debt["raw_sha256"]
+    finally:
+        adapter.close()
+
+
+@pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [
+    (False, 124, "timed out after 420s"),
+    (True, 127, "executable not found: codex"),
+])
+def test_outer_claim_verification_persists_binding_failure_channels(
+    tmp_path: Path, monkeypatch, correction: bool, returncode: int, diagnostic: str,
+) -> None:
+    source = _source()
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        source["quote"],
+    )
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
+    )
+    failed = Review(
+        text="", session_ref="binding-session" if correction else None, raw="",
+        returncode=returncode, error=True, failure_detail=diagnostic, stderr=diagnostic,
+    )
+    binding = ([Review("invalid", "binding-session", "invalid binding"), failed]
+               if correction else [failed])
+
+    class FailureEngine:
+        name = "codex"
+        default_model = "test"
+        native_web = True
+
+        def __init__(self, role="default"):
+            self.role = role
+
+        def for_role(self, role):
+            return FailureEngine(role)
+
+        def run(self, *args, **kwargs):
+            assert self.role == "evidence-discovery"
+            text = _audit(_claim())
+            return Review(text, "discovery-session", text)
+
+        def resume(self, *args, **kwargs):
+            assert self.role == "evidence-binding"
+            return binding.pop(0)
+
+    monkeypatch.setattr(handlers.eng, "CodexEngine", FailureEngine)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="binding-failure", round_no=1,
+        stakes="trusted local tool", engine=FailureEngine(), repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "failed"
+    debt = state["debt"]
+    assert debt["returncode"] == returncode
+    assert debt["rejected_excerpt"] == ""
+    assert debt["failure_detail"] == diagnostic
+    assert debt["stderr"] == diagnostic
+    assert debt["failure_detail_sha256"] != debt["raw_sha256"]
+    assert debt["stderr_sha256"] != debt["raw_sha256"]
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:

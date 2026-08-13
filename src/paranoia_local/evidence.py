@@ -84,8 +84,11 @@ def refs_digest(repo: Path) -> str:
     while the deciders could have read the transient commit. The reflog records the
     movement. A repository with reflogs disabled loses that half of the detection.
     """
-    refs = _git(["for-each-ref", "--format=%(refname) %(objectname)"], repo, check=False)
-    reflog = _git(["reflog", "--all", "--format=%H %gd"], repo, check=False)
+    try:
+        refs = _git(["for-each-ref", "--format=%(refname) %(objectname)"], repo)
+        reflog = _git(["reflog", "--all", "--format=%H %gd"], repo)
+    except RuntimeError as exc:
+        raise ArbitrationError(f"repository ref provenance unavailable: {exc}") from exc
     return hashlib.sha256((refs + "\n--\n" + reflog).encode("utf-8", "replace")).hexdigest()
 
 
