@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE cold-final finding repaired; correction and final convergence pending**
+Status: **CODE round-10 findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -25,7 +25,7 @@ Draft 2020-12 schema independently.
 | Provider | Evidence actually observed |
 |---|---|
 | Codex | Fresh and resumed minimal objects returned structured JSON. Exact production lane and census-decision schemas returned structured objects in sessions `019ffc6b-c700-7de1-8307-63b5a9f36cac` and `019ffc71-9f7b-7c31-8813-cfab1a85f805`. A full schema containing `uniqueItems` failed explicitly with `invalid_json_schema`, proving it was not silently ignored. |
-| Claude | Fresh and resumed minimal objects returned `structured_output` in session `99654842-8875-4335-998f-516202b4c43d`. The exact production lane schema returned `structured_output` in session `93f031db-2577-4959-bce1-66d85f33f90f`. A probe retaining `$schema` returned ordinary prose and no `structured_output`, so `$schema` and Codex-unsupported `uniqueItems` are removed from the common provider projection; no other bound was removed. |
+| Claude | Fresh and resumed minimal objects returned `structured_output` in session `99654842-8875-4335-998f-516202b4c43d`. The exact production lane schema returned `structured_output` in session `93f031db-2577-4959-bce1-66d85f33f90f`. Exact production census and final decision schemas materialized in sessions `805533c1-241a-4917-b3a0-de983fafe63d` and `f1cb1870-f62e-4368-8f4e-3dbd6f52e75b`; correction completed a real same-session validation retry in `f9ab6c74-ca5c-4fc0-a7b9-f61cbe18b795`. A probe retaining `$schema` returned ordinary prose and no `structured_output`, so `$schema` and Codex-unsupported `uniqueItems` are removed from the common provider projection; no other bound was removed. |
 
 The local schema still enforces uniqueness, exact key closure, length/count bounds, enums, tagged
 unions, and the single-anchor grammar. The engine now also treats a Claude response as failed when
@@ -39,6 +39,15 @@ decision. The executable pre-decode limits are now role-specific: 240,000 charac
 context, and 50,000 characters of instruction/envelope reserve fit the 1,000,000-character
 consolidation circuit breaker. These are failure-cost bounds with substantial measured headroom,
 not review-quality budgets.
+
+The Claude decision probes used pinned CLI `2.1.197`, explicit model alias `sonnet`, high effort,
+and web disabled. Provider-schema SHA-256 values were `58f614ba…c01ab` (census),
+`4d3b30f0…49d1c` (correction), and `52b01f64…1925` (final); retained response hashes were
+`2b3b8df7…59144`, `6cf6179d…124a`, and `5ae606ea…425`. The correction attempt ledger was exactly
+`correction: validation-invalid` then `correction-validation-retry: completed`. The configured
+default Fable model was also attempted and explicitly refused the call because the account had no
+remaining Fable usage credits; this report therefore establishes the Claude engine/CLI path with
+the available explicit `sonnet` model and makes no current Fable-lifecycle claim.
 
 ## Real Codex primary lifecycle
 
@@ -66,10 +75,28 @@ The final durable state is phase `clear`, three historical debts all `closed`, a
 `closed`. The rejected delimiter round did not increment durable rounds or apply either attempted
 payload.
 
+## Real Claude primary lifecycle
+
+The same disposable repository and contradictory/corrected plan pair then exercised the complete
+path with pinned Claude CLI `2.1.197`, explicit `sonnet`, high effort, claim verification and web
+disabled, and a fresh lineage:
+
+| Invocation | Artifact result | Audit SHA-256 |
+|---|---|---|
+| 1, census + consolidation | One BLOCKER, one new class, one open debt; correction required | `cf29adde97ad96412ceb436f3916fbbf56e90bc18b09815ca4ff6bce480b7451` |
+| 2, correction | Contradiction class and debt closed; final required | `dea31cbb6b67a2808f0e4302ea391529b9fd69194079b15a2b56b410c4508cd7` |
+| 3, cold final | `CONVERGENCE: NOT-BLOCKED`; zero blocking debt, class closed | `c7d1b289f91ecf2ae2666fed3c7a90400731c3724391840ad5c0146cf5b037c3` |
+
+The lifecycle made six model attempts: three concurrent lanes, consolidation, correction, and
+final. All completed without a validation retry; the separate exact correction probe above owns
+the real resume/retry evidence. Audit cost totaled `$1.19994`; observable provider time was about
+256 seconds with concurrent lanes. Final durable-state SHA-256 is
+`e2ba49e060bbfc2130eaa423f7b773f16f1c4ce22d9214864ef515bc97c50474`, phase `clear`.
+
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **992 passed in 61.78 seconds**. An initial
+commits did not inherit the operator's signing key: **994 passed in 62.33 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -167,16 +194,27 @@ now permits those actions when no class outcome is required, while retaining com
 whenever an outcome is present. Independently authored V1/V2 close and reopen fixtures apply both
 through the canonical engine and durable settlement and compare class state, phase, and trailer.
 
+CODE round 9 closed that compatibility class. Round 10's second broad cold final found three
+release-gate defects: some semantic diagnostics used IDs rather than numeric array components;
+unpaired surrogates could pass schema validation and later fail strict UTF-8 subprocess transport;
+and the Claude decision/lifecycle acceptance required by the plan was missing. Semantic errors now
+use model-owned numeric JSON Pointers, and a regression mechanically resolves every reported
+pointer against the rejected object. Recursive validation rejects unpaired surrogates at their
+exact pointer before an accepted manifest can reach a later prompt, cache, persistence, or process
+boundary. The exact-schema, retry, and full Claude evidence is recorded above. The round's advisory
+README mismatch now names the actual 240,000 lane, 1,000,000 decision, and separate 5,000,000 prompt
+limits.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+484 net lines** and current sizes 2,783, 450, 501, 616, and 865 lines. The increase is
+modules to **+525 net lines** and current sizes 2,783, 450, 501, 616, and 906 lines. The increase is
 bounded cross-layer issue accumulation, provider-envelope closure, and coherent packet limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the current diff is **+504 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+545 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 
