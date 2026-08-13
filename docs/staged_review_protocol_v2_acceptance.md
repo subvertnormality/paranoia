@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-10 findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-11 held findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -49,6 +49,15 @@ default Fable model was also attempted and explicitly refused the call because t
 remaining Fable usage credits; this report therefore establishes the Claude engine/CLI path with
 the available explicit `sonnet` model and makes no current Fable-lifecycle claim.
 
+The machine-readable
+[`staged_review_protocol_v2_claude_acceptance.json`](staged_review_protocol_v2_claude_acceptance.json)
+retains the full schema/response hashes, exact probe response objects, retry roles/outcomes,
+lifecycle round/plan/audit/response hashes, attempt durations and costs, state transitions, final
+state hash, and the Fable rejection. A test regenerates every exact production provider schema,
+re-hashes and locally materializes every retained response, and validates the complete attempt and
+state sequence. The artifact is intentionally a bounded acceptance projection, not a claim that
+the external provider transcript can be replayed offline.
+
 ## Real Codex primary lifecycle
 
 The disposable repository contained one pure Python function, its README contract, and one test.
@@ -96,7 +105,7 @@ the real resume/retry evidence. Audit cost totaled `$1.19994`; observable provid
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **994 passed in 62.33 seconds**. An initial
+commits did not inherit the operator's signing key: **999 passed in 62.34 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -204,6 +213,15 @@ exact pointer before an accepted manifest can reach a later prompt, cache, persi
 boundary. The exact-schema, retry, and full Claude evidence is recorded above. The round's advisory
 README mismatch now names the actual 240,000 lane, 1,000,000 decision, and separate 5,000,000 prompt
 limits.
+
+CODE round 11 retained the Unicode and Claude classes because only one high-surrogate value was
+tested and the live evidence existed only outside the repository; it also found that a duplicate
+integrity assessment could point a retained first-row error at the last duplicate. The pointer map
+now follows `_unique`'s first-row rule and the duplicate regression pins both numeric locations.
+Unicode tests cover high and low unpaired values, property names without unsafe echo, a valid astral
+scalar, composed prompt encoding, cache/state persistence, review rendering, and both real capture
+and streaming subprocess boundaries. The retained Claude artifact and its executable binding test
+provide the independently inspectable evidence described above.
 
 ## Size and architecture checkpoint
 

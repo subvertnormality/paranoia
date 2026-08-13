@@ -456,7 +456,7 @@ def parse_lane(text: str, *, mode: str, lane: str,
         )
     assessment_pointers = {
         row["class_id"]: f"/class_assessments/{index}"
-        for index, row in enumerate(value["class_assessments"])
+        for index, row in reversed(list(enumerate(value["class_assessments"])))
     }
     for cid, row in assessments.items():
         if row["verdict"] == "violated" and row["finding_id"] not in findings:

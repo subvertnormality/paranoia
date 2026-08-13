@@ -1,0 +1,134 @@
+{
+  "acceptance_kind": "staged-review-protocol-v2-claude",
+  "version": 1,
+  "recorded_at": "2026-08-13T23:00:00+01:00",
+  "implementation_commit": "251dc38b9bae7e645bf17fd7879c5dde415b065c",
+  "provider": {
+    "engine": "claude",
+    "cli_version": "2.1.197",
+    "model": "sonnet",
+    "effort": "high",
+    "web_search": false,
+    "fable_probe": {
+      "accepted": false,
+      "reason": "You're out of usage credits. Run /usage-credits to keep using Fable 5 or /model to switch models."
+    }
+  },
+  "schema_probes": [
+    {
+      "role": "census",
+      "schema_sha256": "58f614ba82018f7e15b058dc1dfac06a1771ffe0a203d0b36a49de80e73c01ab",
+      "response_sha256": "2b3b8df780193ec1c9fdf293b25ec13916e6fb84194bcb1f50751f93c7759144",
+      "session_ref": "805533c1-241a-4917-b3a0-de983fafe63d",
+      "duration_ms": 3154,
+      "response": {
+        "role": "census",
+        "governing_findings": [],
+        "debt_outcomes": [],
+        "class_outcomes": [],
+        "class_actions": []
+      }
+    },
+    {
+      "role": "correction",
+      "schema_sha256": "4d3b30f0c10da683b5b87a1f88bb9d4be6a46f43319c29e9d19a78689d049d1c",
+      "response_sha256": "6cf6179df699f92e6525f774bf2ef17fc26c144fe2384eafa32fcf8b7ff6124a",
+      "session_ref": "f9ab6c74-ca5c-4fc0-a7b9-f61cbe18b795",
+      "duration_ms": 15523,
+      "attempts": [
+        {"role": "correction", "outcome": "validation-invalid"},
+        {"role": "correction-validation-retry", "outcome": "completed"}
+      ],
+      "response": {
+        "role": "correction",
+        "governing_findings": [],
+        "debt_outcomes": [],
+        "class_outcomes": [],
+        "class_actions": []
+      }
+    },
+    {
+      "role": "final",
+      "schema_sha256": "52b01f64805a582e63895b220aae4a34ff5f0c0cd968dccf9b1c390ac1831925",
+      "response_sha256": "5ae606eadd19c39652b1c3002f73ea5f1c999927bf3bb12529d755873f4bb425",
+      "session_ref": "f1cb1870-f62e-4368-8f4e-3dbd6f52e75b",
+      "duration_ms": 5784,
+      "response": {
+        "role": "final",
+        "governing_findings": [],
+        "debt_outcomes": [],
+        "class_outcomes": [],
+        "class_actions": [],
+        "coverage": [
+          {"id": "artifact-complete", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "repository-premises", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "transformations", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "consumers", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "failure-recovery", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "tests-acceptance", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "docs-operations", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "consistency", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "proportionality", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []}
+        ]
+      }
+    }
+  ],
+  "lifecycle": {
+    "lineage": "protocol-v2-real-claude-sonnet-plan",
+    "repository_head": "d7d357fa0378760321cf1c843757a98c3c89d430",
+    "rounds": [
+      {
+        "round": 1,
+        "plan_sha256": "04887982c719f935b10b8f5d42de609322dc6c0933f6343c49fb12a17ff97baf",
+        "audit_sha256": "cf29adde97ad96412ceb436f3916fbbf56e90bc18b09815ca4ff6bce480b7451",
+        "session_ref": "336451b8-68a5-4a2e-a19d-2180625e95fa",
+        "attempts": [
+          {"role": "census-domain", "outcome": "completed", "duration_ms": 90339, "response_sha256": "062d76b9fd51884423f3d8d703ce83e5df81a117ae1c7ba4319a1591894ed4b4", "cost_usd": 0.2094428},
+          {"role": "census-execution", "outcome": "completed", "duration_ms": 85971, "response_sha256": "c8db5653c2a4e7a38bdf014c782c1cc91e8a00245a03a82f3c0ec7577106eb40", "cost_usd": 0.2101498},
+          {"role": "census-integrity", "outcome": "completed", "duration_ms": 103466, "response_sha256": "be58aae2ee7310316af19c35ef7cd4940591f1e4d6ab4ca2b75c21795e9ac4ee", "cost_usd": 0.229273},
+          {"role": "consolidation", "outcome": "completed", "duration_ms": 46934, "response_sha256": "d185228ab416ea27490ebf697288ea2a91f8a68bc25446e43005adbd6efe2720", "cost_usd": 0.183641}
+        ],
+        "register_status": "staged census parsed — NEW 8a29b30d",
+        "class_id": "8a29b30d",
+        "class_status": "open",
+        "structural_phase": "correction",
+        "blocking_debt": 1,
+        "convergence": "BLOCKED"
+      },
+      {
+        "round": 2,
+        "plan_sha256": "117c6b9a864ba377b253257cbc571b0c55a740477cdd9ed170b49c6d9ad38a58",
+        "audit_sha256": "dea31cbb6b67a2808f0e4302ea391529b9fd69194079b15a2b56b410c4508cd7",
+        "session_ref": "05e83bf3-aebf-4be9-b2bb-843aeb63c1fb",
+        "attempts": [
+          {"role": "correction", "outcome": "completed", "duration_ms": 36559, "response_sha256": "7a8b1acfb3d36198a0f913b2df89c196ada866e6f51fa631456cdaaf8c7f0af1", "cost_usd": 0.151118}
+        ],
+        "register_status": "staged correction parsed — CLOSE 8a29b30d",
+        "class_id": "8a29b30d",
+        "class_status": "closed",
+        "structural_phase": "final",
+        "blocking_debt": 0,
+        "convergence": "BLOCKED"
+      },
+      {
+        "round": 3,
+        "plan_sha256": "117c6b9a864ba377b253257cbc571b0c55a740477cdd9ed170b49c6d9ad38a58",
+        "audit_sha256": "c7d1b289f91ecf2ae2666fed3c7a90400731c3724391840ad5c0146cf5b037c3",
+        "session_ref": "9e6940ab-6898-4fc0-b001-2f0e8f06bcb9",
+        "attempts": [
+          {"role": "final", "outcome": "completed", "duration_ms": 69118, "response_sha256": "60bd9a19484e195f04a940dc04aeb94f102ecfa22be73e68b8fe1ef8a6e46695", "cost_usd": 0.2163154}
+        ],
+        "register_status": "staged final parsed — NONE",
+        "class_id": "8a29b30d",
+        "class_status": "closed",
+        "structural_phase": "clear",
+        "blocking_debt": 0,
+        "convergence": "NOT-BLOCKED"
+      }
+    ],
+    "attempt_count": 6,
+    "cost_usd": 1.19994,
+    "observable_provider_ms": 256077,
+    "final_state_sha256": "e2ba49e060bbfc2130eaa423f7b773f16f1c4ce22d9214864ef515bc97c50474"
+  }
+}

@@ -7,7 +7,7 @@ import pytest
 
 from paranoia_local import (
     class_closure as cc, engines, handlers, plan_claims as pc, prompts,
-    review_census as rc, staged_protocol as sp,
+    review_census as rc, runner, staged_protocol as sp,
 )
 from paranoia_local.engines import Review
 from paranoia_local.runner import RunResult
@@ -671,6 +671,42 @@ def test_schema_valid_surrogate_object_fails_before_later_prompt_transport(tmp_p
     assert str(caught.value).startswith(
         "/coverage/0/summary: string contains an unpaired surrogate"
     )
+
+
+def test_valid_astral_text_crosses_prompt_state_render_and_real_runner_boundaries(tmp_path):
+    value = payload(lane("domain"))
+    value["coverage"][0]["summary"] = "valid astral \U0001f600 text"
+    parsed = sp.parse_lane(
+        wire(value), mode=cc.PLAN_MODE, lane="domain",
+    )
+    prompt = json.dumps({"manifests":[parsed]}, ensure_ascii=False)
+    assert "\U0001f600" in prompt
+    assert prompt.encode("utf-8").decode("utf-8") == prompt
+
+    captured = runner.run_capture(["/bin/sh", "-c", "cat"], prompt, tmp_path, 10)
+    streamed = runner.run_streaming(["/bin/sh", "-c", "cat"], prompt, tmp_path, 10)
+    assert (captured.returncode, captured.stdout) == (0, prompt)
+    assert (streamed.returncode, streamed.stdout) == (0, prompt)
+
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["census_cache"] = {"manifests":[parsed]}
+    lineage = cc.Lineage(
+        "astral-boundaries", mode=cc.PLAN_MODE, review_state=state,
+    )
+    cc.save_lineage(tmp_path, lineage)
+    loaded = cc.load_lineage(
+        tmp_path, "astral-boundaries", stamp="later", mode=cc.PLAN_MODE,
+    )
+    assert loaded.review_state["census_cache"]["manifests"][0] == parsed
+
+    rendered = rc.render_review({
+        "findings":[{
+            "severity":"MINOR", "summary":"valid \U0001f600 finding",
+            "evidence":["plan:1"], "remedy":"none",
+        }],
+    })
+    assert "valid \U0001f600 finding" in rendered
+    rendered.encode("utf-8")
 
 
 def test_parallel_lane_failure_fan_in_retains_all_rejected_payloads_in_sequence_order(

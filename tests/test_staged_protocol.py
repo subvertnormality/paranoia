@@ -1,5 +1,8 @@
+import hashlib
 import json
+import re
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -7,6 +10,9 @@ from jsonschema import Draft202012Validator
 from paranoia_local import class_closure as cc
 from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def coverage(*finding_ids: str, anchor: str = "plan:1"):
@@ -116,6 +122,78 @@ def materialize(value, **kwargs):
         json.dumps(value), mode=kwargs.pop("mode", cc.PLAN_MODE),
         role=value["role"], **kwargs,
     )
+
+
+def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle():
+    artifact = json.loads(
+        (ROOT / "docs/staged_review_protocol_v2_claude_acceptance.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == "staged-review-protocol-v2-claude"
+    assert artifact["version"] == 1
+    assert artifact["provider"] == {
+        "engine":"claude", "cli_version":"2.1.197", "model":"sonnet",
+        "effort":"high", "web_search":False,
+        "fable_probe":{
+            "accepted":False,
+            "reason":(
+                "You're out of usage credits. Run /usage-credits to keep using "
+                "Fable 5 or /model to switch models."
+            ),
+        },
+    }
+    for probe in artifact["schema_probes"]:
+        role = probe["role"]
+        schema = sp.provider_schema(sp.decision_schema(cc.PLAN_MODE, role))
+        assert hashlib.sha256(
+            sp.canonical_schema(schema).encode("utf-8")
+        ).hexdigest() == probe["schema_sha256"]
+        rendered = json.dumps(
+            probe["response"], ensure_ascii=False, separators=(",", ":"),
+        )
+        assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
+            "response_sha256"
+        ]
+        assert sp.materialize_decision(
+            rendered, mode=cc.PLAN_MODE, role=role,
+        )["role"] == role
+        assert re.fullmatch(r"[0-9a-f]{64}", probe["schema_sha256"])
+        assert re.fullmatch(r"[0-9a-f]{64}", probe["response_sha256"])
+    assert artifact["schema_probes"][1]["attempts"] == [
+        {"role":"correction", "outcome":"validation-invalid"},
+        {"role":"correction-validation-retry", "outcome":"completed"},
+    ]
+
+    lifecycle = artifact["lifecycle"]
+    assert [row["round"] for row in lifecycle["rounds"]] == [1, 2, 3]
+    assert [row["structural_phase"] for row in lifecycle["rounds"]] == [
+        "correction", "final", "clear",
+    ]
+    assert [row["convergence"] for row in lifecycle["rounds"]] == [
+        "BLOCKED", "BLOCKED", "NOT-BLOCKED",
+    ]
+    assert [row["class_status"] for row in lifecycle["rounds"]] == [
+        "open", "closed", "closed",
+    ]
+    assert [
+        attempt["role"] for row in lifecycle["rounds"] for attempt in row["attempts"]
+    ] == [
+        "census-domain", "census-execution", "census-integrity",
+        "consolidation", "correction", "final",
+    ]
+    attempts = [
+        attempt for row in lifecycle["rounds"] for attempt in row["attempts"]
+    ]
+    assert lifecycle["attempt_count"] == len(attempts) == 6
+    assert all(attempt["outcome"] == "completed" for attempt in attempts)
+    assert lifecycle["cost_usd"] == pytest.approx(
+        sum(attempt["cost_usd"] for attempt in attempts)
+    )
+    for row in lifecycle["rounds"]:
+        assert re.fullmatch(r"[0-9a-f]{64}", row["audit_sha256"])
+        assert re.fullmatch(r"[0-9a-f]{64}", row["plan_sha256"])
+        for attempt in row["attempts"]:
+            assert re.fullmatch(r"[0-9a-f]{64}", attempt["response_sha256"])
+    assert re.fullmatch(r"[0-9a-f]{64}", lifecycle["final_state_sha256"])
 
 
 @pytest.mark.parametrize(
@@ -756,9 +834,10 @@ def test_semantic_validation_reports_all_independent_issues():
         resolve_pointer(pointer)
 
 
-def test_unpaired_surrogates_are_rejected_at_the_model_owned_pointer():
+@pytest.mark.parametrize("surrogate", ["\ud800", "\udcff"])
+def test_unpaired_surrogates_are_rejected_at_the_model_owned_pointer(surrogate):
     value = lane_value()
-    value["coverage"][0]["summary"] = "otherwise valid \ud800 text"
+    value["coverage"][0]["summary"] = f"otherwise valid {surrogate} text"
     with pytest.raises(
         sp.ProtocolError,
         match=r"/coverage/0/summary: string contains an unpaired surrogate",
@@ -766,6 +845,39 @@ def test_unpaired_surrogates_are_rejected_at_the_model_owned_pointer():
         sp.parse_lane(
             json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
         )
+
+
+def test_unpaired_surrogate_property_name_is_rejected_without_echoing_it():
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"^/: property name contains an unpaired surrogate$",
+    ):
+        sp.decode('{"\\ud800":"value"}', {"type":"object"}, max_chars=100)
+
+
+def test_duplicate_assessment_diagnostics_bind_the_retained_first_row():
+    value = lane_value(
+        "integrity",
+        assessments=[
+            {
+                "class_id":"class-a", "verdict":"violated",
+                "evidence":["plan:1"], "finding_id":"missing",
+            },
+            {
+                "class_id":"class-a", "verdict":"satisfied",
+                "evidence":["plan:1"], "finding_id":None,
+            },
+        ],
+    )
+    with pytest.raises(sp.ProtocolError) as caught:
+        sp.parse_lane(
+            json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+            class_ids=["class-a"],
+        )
+    assert str(caught.value).splitlines() == [
+        "/class_assessments/0/finding_id: must name a lane finding",
+        "/class_assessments/1/class_id: duplicate value 'class-a'",
+    ]
 
 
 def test_class_and_debt_outcome_completeness_are_independent_controls():
