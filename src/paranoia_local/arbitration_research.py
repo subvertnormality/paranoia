@@ -8,7 +8,22 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from . import external_sources as sources
-from .review_census import unfence
+
+
+def _unfence(raw: str) -> str:
+    """Narrowly unwrap an optional JSON markdown fence."""
+    if not raw.startswith("```"):
+        return raw
+    newline = raw.find("\n")
+    if newline == -1:
+        return raw
+    language = raw[3:newline].strip()
+    if language and not language.isidentifier():
+        return raw
+    closing = raw.rfind("```")
+    if closing <= newline:
+        return raw
+    return raw[newline + 1:closing].strip()
 
 
 DISCOVERY_MARKER = "=== RESEARCH DISCOVERY JSON ==="
@@ -61,7 +76,7 @@ def _json_after(text: str, marker: str) -> object:
     # Measured 2026-08-13: two arbitrations failed here with `ROUNDS: 0`, so the
     # deciders never voted and the run was lost to formatting. Same tolerance,
     # same helper, as the settlement and lane parsers.
-    tail = unfence(text.split(marker, 1)[1].strip())
+    tail = _unfence(text.split(marker, 1)[1].strip())
     decoder = json.JSONDecoder()
     try:
         value, end = decoder.raw_decode(tail)

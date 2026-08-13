@@ -21,6 +21,13 @@ CLAUDE_JSON = (
     '"total_cost_usd":0.01}'
 )
 
+STRUCTURED_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {"answer": {"type": "string"}},
+    "required": ["answer"],
+}
+
 
 class TestFactory:
     def test_get_codex(self) -> None:
@@ -325,6 +332,70 @@ class TestRunWithInjectedRunner:
             model="m", effort="high", web_search=False, runner=fake_runner,
         )
         assert "--resume" in captured["argv"]
+
+    @pytest.mark.parametrize("resumed", [False, True])
+    def test_codex_structured_schema_is_readable_for_call_then_removed(self, resumed) -> None:
+        engine = engines.CodexEngine()
+        captured = {}
+
+        def fake_runner(argv, stdin_text, cwd, timeout):
+            schema_path = Path(argv[argv.index("--output-schema") + 1])
+            captured["path"] = schema_path
+            captured["schema"] = json.loads(schema_path.read_text())
+            captured["mode"] = schema_path.stat().st_mode & 0o777
+            return RunResult(
+                returncode=0,
+                stdout=(
+                    '{"type":"thread.started","thread_id":"structured"}\n'
+                    '{"type":"item.completed","item":{"type":"agent_message",'
+                    '"text":"{\\"answer\\":\\"ok\\"}"}}\n'
+                    '{"type":"turn.completed","usage":{}}\n'
+                ),
+                stderr="",
+            )
+
+        kwargs = dict(
+            prompt="respond", cwd=Path("/repo"), model="m", effort="low",
+            web_search=False, runner=fake_runner, response_schema=STRUCTURED_SCHEMA,
+        )
+        review = (
+            engine.resume(session_ref="structured", **kwargs)
+            if resumed else engine.run(**kwargs)
+        )
+        assert json.loads(review.text) == {"answer": "ok"}
+        assert captured["schema"] == STRUCTURED_SCHEMA
+        assert captured["mode"] == 0o400
+        assert not captured["path"].exists()
+
+    @pytest.mark.parametrize("resumed", [False, True])
+    def test_claude_structured_schema_precedes_variadic_tool_flags(self, resumed) -> None:
+        engine = engines.ClaudeEngine()
+        captured = {}
+
+        def fake_runner(argv, stdin_text, cwd, timeout):
+            captured["argv"] = argv
+            return RunResult(
+                returncode=0,
+                stdout=json.dumps({
+                    "type": "result", "subtype": "success", "is_error": False,
+                    "result": "prose is not authoritative",
+                    "structured_output": {"answer": "ok"}, "session_id": "structured",
+                }),
+                stderr="",
+            )
+
+        kwargs = dict(
+            prompt="respond", cwd=Path("/repo"), model="m", effort="low",
+            web_search=False, runner=fake_runner, response_schema=STRUCTURED_SCHEMA,
+        )
+        review = (
+            engine.resume(session_ref="structured", **kwargs)
+            if resumed else engine.run(**kwargs)
+        )
+        argv = captured["argv"]
+        assert argv.index("--json-schema") < argv.index("--allowedTools")
+        assert json.loads(argv[argv.index("--json-schema") + 1]) == STRUCTURED_SCHEMA
+        assert json.loads(review.text) == {"answer": "ok"}
 
 
 def test_every_claude_deny_rule_is_a_tool_the_cli_knows():

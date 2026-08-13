@@ -15,6 +15,7 @@ dependencies = [
     # MCP 2.0 renamed Tool.inputSchema and is not API-compatible with this server.
     "mcp>=1.2.0,<2",
     "trafilatura>=2.0,<3",
+    "jsonschema>=4.23,<5",
 ]
 
 [project.optional-dependencies]

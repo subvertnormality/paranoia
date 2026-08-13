@@ -27,6 +27,7 @@ from typing import Any, Callable
 from . import arbitration, class_closure as cc
 from . import engines as eng, external_sources, inert_git, inert_tree
 from . import logs, orientation, plan_claims as pc, prompts, review_census as rc
+from . import staged_protocol as sp
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
 from .worktree import worktree_at
@@ -52,34 +53,6 @@ PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
-
-
-def _allocate_fresh_debt_ids(
-    debt: list[dict[str, Any]], reserved: set[str | None],
-) -> None:
-    """Re-key model-local debt labels that collide with durable history.
-
-    A staged response has no reason to know every closed identifier retained by
-    the server.  Its debt IDs are local labels; durable identity is assigned at
-    settlement.  Preserve non-colliding labels for readable audits and allocate
-    deterministic D<n> labels only where history already owns the proposed ID.
-    """
-    unavailable = {item for item in reserved if isinstance(item, str)}
-    unavailable.update(
-        item["id"] for item in debt
-        if isinstance(item.get("id"), str) and item["id"] not in unavailable
-    )
-    next_number = 1
-    for item in debt:
-        if item["id"] not in reserved:
-            continue
-        while f"D{next_number}" in unavailable:
-            next_number += 1
-        item["id"] = f"D{next_number}"
-        unavailable.add(item["id"])
-        next_number += 1
-
-
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
 ) -> rc.Attempt:
@@ -135,15 +108,17 @@ def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
 def _staged_call(
     *, role: str, engine: Engine, prompt: str, cwd: Path, model: str, effort: str,
     timeout: int, parser: Callable[[str], dict[str, Any]],
-    retry_guidance: str,
-    on_progress: Callable[[str], None] | None,
+    on_progress: Callable[[str], None] | None = None,
     next_sequence: Callable[[], int] | None = None,
     web_search: bool = False,
+    response_schema: dict[str, Any] | None = None,
 ) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
-    """One staged call plus exactly one same-session schema correction."""
+    """One schema-constrained staged call plus one same-session correction."""
     sequence = next_sequence() if next_sequence else None
-    review = engine.run(prompt, cwd, model, effort, web_search, timeout=timeout,
-                        **_progress_kwargs(on_progress))
+    review = engine.run(
+        prompt, cwd, model, effort, web_search, timeout=timeout,
+        response_schema=response_schema, **_progress_kwargs(on_progress),
+    )
     attempts = [_attempt(role, engine, review, sequence=sequence)]
     if review.error:
         error = _engine_failure_error(review, role=role)
@@ -169,10 +144,11 @@ def _staged_call(
         retry = engine.resume(
             review.session_ref,
             "Your staged JSON was rejected: " + str(first) +
-            "\nFix every schema violation in the complete object, not only the first one. "
-            + retry_guidance + " Return only the required marker and complete JSON object.",
+            "\nFix every reported violation in the complete object, not only the first one. "
+            "Return the complete schema-conforming JSON object.",
             cwd, model, effort, web_search,
             timeout=min(STAGED_FORMAT_RETRY_TIMEOUT_SEC, timeout),
+            response_schema=response_schema,
             **_progress_kwargs(on_progress),
         )
         attempts.append(_attempt(
@@ -234,7 +210,7 @@ def _staged_lane_prompt(
 ) -> str:
     instructions = prompts.staged_census_instructions(mode, lane)
     lane_body = (
-        f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(rc.CHECKLIST)}\n"
+        f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(sp.CHECKLIST)}\n"
         "ACTIVE CLASSES: "
         f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
     )
@@ -257,6 +233,10 @@ def _census_cache_binding(
         "engine":engine_name, "model":model, "effort":effort,
         "web_search":web_search, "plan_lines":plan_lines,
         "lane_prompts":lane_prompts,
+        "lane_schemas":{
+            lane:sp.canonical_schema(sp.provider_schema(sp.lane_schema(mode, lane)))
+            for lane in sp.LANES[mode]
+        },
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {
         "version":rc.CENSUS_CACHE_VERSION,
@@ -287,10 +267,7 @@ def _cached_census_manifests(
     validated: list[dict[str, Any]] = []
     try:
         for lane in lanes:
-            validated.append(validate(
-                rc.LANE_MARKER + "\n" + json.dumps(by_lane[lane], ensure_ascii=False),
-                lane,
-            ))
+            validated.append(validate(json.dumps(by_lane[lane], ensure_ascii=False), lane))
     except rc.CensusError:
         return None
     return validated
@@ -454,9 +431,6 @@ def _staged_structural_review(
         for c in lineage.active()
     ]
     active_ids = [c["class_id"] for c in active_classes]
-    class_states = {
-        c.class_id: (c.status, c.mechanized, c.severity) for c in lineage.active()
-    }
     debt_class_ids = {
         cid for debt in state.get("debt", []) if debt.get("status") == "open"
         for cid in debt.get("class_ids", [])
@@ -489,9 +463,13 @@ def _staged_structural_review(
             return sequence_value
 
     def validate_lane(text: str, lane: str) -> dict[str, Any]:
-        parsed = rc.parse_lane(
-            text, lane=lane, class_ids=active_ids if lane == "integrity" else (),
-        )
+        try:
+            parsed = sp.parse_lane(
+                text, mode=mode, lane=lane,
+                class_ids=active_ids if lane == "integrity" else (),
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
         trusted_roots = None
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
@@ -510,14 +488,18 @@ def _staged_structural_review(
         assessment_findings: dict[str, str | None] | None = None,
         known_debt: list[str] | None = None, role: str,
     ) -> dict[str, Any]:
-        parsed = rc.parse_settlement(
-            text, source_ids=source_ids, source_severities=source_severities,
-            assessment_ids=assessment_ids, assessment_verdicts=assessment_verdicts,
-            assessment_findings=assessment_findings,
-            class_states=class_states,
-            class_mechanized=None if mode == cc.BRANCH_MODE else False,
-            known_debt=known_debt or (), role=role,
-        )
+        del assessment_ids, known_debt
+        try:
+            parsed = sp.materialize_decision(
+                text, mode=mode, role=role,
+                source_ids=source_ids, source_severities=source_severities,
+                assessment_verdicts=assessment_verdicts,
+                assessment_findings=assessment_findings,
+                active_classes=active_classes,
+                durable_debt=state.get("debt", []),
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
         trusted_roots = None
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
@@ -527,10 +509,6 @@ def _staged_structural_review(
         rc.resolve_anchors(
             parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
         )
-        reserved_debt = {
-            item.get("id") for item in state.get("debt", []) if isinstance(item, dict)
-        }
-        _allocate_fresh_debt_ids(parsed["debt"], reserved_debt)
         try:
             register = rc.register_from_records(
                 parsed["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
@@ -541,7 +519,7 @@ def _staged_structural_review(
         return parsed
 
     if phase == "census":
-        lanes = rc.LANES[mode]
+        lanes = sp.LANES[mode]
         lane_prompts = {
             lane:_staged_lane_prompt(
                 mode=mode, lane=lane, active_classes=active_classes, body=body,
@@ -570,8 +548,8 @@ def _staged_structural_review(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CENSUS_LANE_TIMEOUT_SEC,
                 on_progress=on_progress,
-                retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
                 web_search=web_search,
+                response_schema=sp.provider_schema(sp.lane_schema(mode, lane)),
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -657,8 +635,8 @@ def _staged_structural_review(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
                 on_progress=on_progress,
-                retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
                 web_search=web_search,
+                response_schema=sp.provider_schema(sp.decision_schema(mode, "census")),
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
@@ -690,7 +668,7 @@ def _staged_structural_review(
         stage_body = json.dumps({
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
-            "checklist": list(rc.CHECKLIST) if role == "final" else [],
+            "checklist": list(sp.CHECKLIST) if role == "final" else [],
             "artifact": body,
         }, ensure_ascii=False)
         prompt = prompts.compose(prompts.staged_followup_instructions(mode), stage_body)
@@ -703,8 +681,8 @@ def _staged_structural_review(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=STAGED_FOLLOWUP_TIMEOUT_SEC, on_progress=on_progress,
             next_sequence=next_sequence,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
             web_search=web_search,
+            response_schema=sp.provider_schema(sp.decision_schema(mode, role)),
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
                 assessment_ids=active_ids if role == "final" else [],
@@ -1172,7 +1150,7 @@ def _converge_branch_review(
 
 
 def _plan_body(
-    plan_text: str,
+    plan: sp.ArtifactView,
     context: str | None,
     focus: str | None,
     already: list[str],
@@ -1190,7 +1168,10 @@ def _plan_body(
         parts.append(f"=== CONTEXT ===\n{context}")
     if focus:
         parts.append(f"=== REVIEWER FOCUS ===\n{focus}")
-    parts.append(f"=== PLAN ===\n{plan_text}")
+    parts.append(
+        "=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\n"
+        + plan.rendered
+    )
     if already:
         rendered = "\n".join(f"- {c}" for c in already)
         parts.append(
@@ -1221,6 +1202,7 @@ def critique_plan(
             plan_text = Path(plan_path).read_text(encoding="utf-8", errors="replace")
         except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
             raise ValueError(f"cannot read plan_path: {exc}") from exc
+    plan_view = sp.ArtifactView.from_text(plan_text)
 
     context = arguments.get("context")
     focus = arguments.get("focus")
@@ -1386,7 +1368,7 @@ def critique_plan(
 
     trailer: str | None = None
     try:
-        body = _plan_body(plan_text, context, focus, already, repo_grounded=bool(repo),
+        body = _plan_body(plan_view, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
         instructions = prompts.PLAN_REVIEW_INSTRUCTIONS
         if closure:
@@ -1459,7 +1441,7 @@ def critique_plan(
                             body=f"=== REVIEW STAKES ===\n{stakes or ''}\n\n{staged_body}",
                             closure=closure, stakes=stakes or "", snapshot=structural_snapshot,
                             round_no=arguments.get("round") or 1, on_progress=on_progress,
-                            plan_lines=len(plan_text.splitlines()),
+                            plan_lines=plan_view.line_count,
                         )
                     except rc.CensusError as error:
                         review, trailer, structural_attempts = _settle_staged_failure(

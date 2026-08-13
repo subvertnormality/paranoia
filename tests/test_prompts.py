@@ -118,6 +118,7 @@ class TestStagedReviewInstructions:
             assert "never by its repository path" in text
             assert "`repository/<path>:<line>`" in text
             assert "literal `repository/` prefix is required" in text
+            assert "read repository files through that directory" in text
 
 
 def test_branch_staged_prompts_forbid_the_plan_alias():

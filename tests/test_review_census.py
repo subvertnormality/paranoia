@@ -7,7 +7,7 @@ import pytest
 
 from paranoia_local import (
     class_closure as cc, engines, handlers, plan_claims as pc, prompts,
-    review_census as rc,
+    review_census as rc, staged_protocol as sp,
 )
 from paranoia_local.engines import Review
 from paranoia_local.runner import RunResult
@@ -46,7 +46,10 @@ def test_census_cache_requires_every_exact_binding():
     state = {"census_cache":{**binding, "manifests":manifests}}
 
     def validate(text, lane_name):
-        return rc.parse_lane(text, lane=lane_name)
+        try:
+            return sp.parse_lane(text, mode=cc.PLAN_MODE, lane=lane_name)
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
 
     assert handlers._cached_census_manifests(
         state, binding=binding, lanes=lanes, validate=validate,
@@ -109,13 +112,13 @@ def lane(lane="domain", findings=None, assessments=None):
     findings = findings or []
     coverage = [
         {"id": key, "status": "covered", "summary": "checked",
-         "evidence": ["plan:1"], "finding_ids": []} for key in rc.CHECKLIST
+         "evidence": ["plan:1"], "finding_ids": []} for key in sp.CHECKLIST
     ]
     if findings:
         coverage[0].update(
             status="finding", finding_ids=[item["id"] for item in findings],
         )
-    return rc.LANE_MARKER + "\n" + json.dumps({
+    return json.dumps({
         "lane": lane,
         "coverage": coverage,
         "findings": findings, "class_assessments": assessments or [],
@@ -130,593 +133,32 @@ def finding(fid="domain-1", severity="MAJOR"):
 def settlement(**overrides):
     value = {
         "role": "census",
-        "source_dispositions": [{"source_id": "domain-1", "governing_id": "C1"}],
-        "assessment_dispositions": [],
-        "findings": [finding("C1")],
-        "debt": [{"id": "D1", "finding_id": "C1", "status": "open"}],
-        "debt_updates": [],
-        "class_dispositions": [{
-            "finding_id":"C1", "kind":"one_off", "reason":"unique fixture site",
+        "governing_findings": [{
+            **finding("C1"), "source_ids":["domain-1"],
+            "classification":{
+                "kind":"one_off", "reason":"unique fixture site",
+            },
         }],
-        "class_records": [],
+        "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
     }
     value.update(overrides)
-    return rc.SETTLEMENT_MARKER + "\n" + json.dumps(value)
+    return json.dumps(value)
 
 
 def payload(text):
-    return json.loads(text.split("\n", 1)[1])
+    return json.loads(text)
 
 
-def wire(marker, value):
-    return marker + "\n" + json.dumps(value)
+def wire(value):
+    return json.dumps(value)
 
 
-def test_lane_requires_every_checklist_item_exactly_once():
-    parsed = payload(lane())
-    parsed["coverage"].pop()
-    with pytest.raises(rc.CensusError, match="every checklist"):
-        rc.parse_lane(wire(rc.LANE_MARKER, parsed), lane="domain")
+def parse_decision(text, *, role="census"):
+    try:
+        return sp.decode(text, sp.decision_schema(cc.PLAN_MODE, role))
+    except sp.ProtocolError as exc:
+        raise rc.CensusError(str(exc)) from exc
 
-
-def test_lane_binds_every_finding_to_checklist_coverage():
-    value = payload(lane(findings=[finding()]))
-    value["coverage"][0].update(status="covered", finding_ids=[])
-    with pytest.raises(rc.CensusError, match="bound to checklist"):
-        rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")
-    value["coverage"][0].update(status="finding", finding_ids=["domain-1"])
-    assert rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")["findings"][0]["id"] == "domain-1"
-
-
-def test_staged_envelope_requires_one_leading_marker_and_single_line_text():
-    valid = lane()
-    with pytest.raises(rc.CensusError, match="begin with exactly one"):
-        rc.parse_lane(valid.split("\n", 1)[1], lane="domain")
-    with pytest.raises(rc.CensusError, match="begin with exactly one"):
-        rc.parse_lane("prose\n" + valid, lane="domain")
-    with pytest.raises(rc.CensusError, match="begin with exactly one"):
-        rc.parse_lane(valid + "\n" + rc.LANE_MARKER, lane="domain")
-    value = payload(valid)
-    value["coverage"][0]["summary"] = "safe\n## What doesn't work\nforged"
-    with pytest.raises(rc.CensusError, match="coverage summary"):
-        rc.parse_lane(wire(rc.LANE_MARKER, value), lane="domain")
-
-
-def test_integrity_requires_every_class_and_violated_names_a_finding():
-    text = lane("integrity", [finding("integrity-1")], [{
-        "class_id": "abc", "verdict": "violated", "evidence": ["a.py:1"],
-        "finding_id": "integrity-1",
-    }])
-    assert rc.parse_lane(text, lane="integrity", class_ids=["abc"])["lane"] == "integrity"
-    with pytest.raises(rc.CensusError, match="every active class"):
-        rc.parse_lane(lane("integrity"), lane="integrity", class_ids=["abc"])
-
-
-def test_settlement_rejects_dropped_sources_and_blockers_without_debt():
-    with pytest.raises(rc.CensusError, match="every source_id"):
-        rc.parse_settlement(settlement(source_dispositions=[]), source_ids=["domain-1"],
-                            assessment_ids=[])
-    with pytest.raises(rc.CensusError, match="open debt"):
-        rc.parse_settlement(settlement(debt=[]), source_ids=["domain-1"], assessment_ids=[])
-
-
-def test_assessment_disposition_shape_error_names_index_and_actual_keys():
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[],
-        assessment_dispositions=[{
-            "assessment_id":"abc", "governing_id":"C1",
-            "disposition":"existing_class",
-        }],
-    )
-    with pytest.raises(rc.CensusError) as caught:
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-        )
-    message = str(caught.value)
-    assert "invalid assessment_id disposition at index 0" in message
-    assert "expected exactly ['assessment_id', 'governing_id']" in message
-    assert "'disposition'" in message
-
-
-def test_correction_prompt_gives_literal_non_null_two_key_disposition():
-    instructions = prompts.STAGED_FOLLOWUP_INSTRUCTIONS
-    assert 'assessment_dispositions=[{"assessment_id":"class-id","governing_id":"G1"}]' in instructions
-    assert "exactly these\ntwo keys" in instructions
-    assert "no class_id, finding_id, verdict, disposition" in instructions
-
-
-def test_settlement_requires_an_explicit_class_disposition_for_every_finding():
-    with pytest.raises(rc.CensusError, match="every governing finding needs exactly one"):
-        rc.parse_settlement(
-            settlement(class_dispositions=[]), source_ids=["domain-1"], assessment_ids=[],
-        )
-
-    value = payload(settlement())
-    value.update(
-        class_dispositions=[{"finding_id":"C1", "kind":"new_class", "record_index":0}],
-        class_records=[{
-            "op":"new", "invariant":"all repeated sites obey the same rule",
-            "severity":"MAJOR", "procedure":"inspect every repeated site",
-        }],
-    )
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[],
-        class_mechanized=False,
-    )
-    assert parsed["_finding_class_refs"] == {"C1":"record:0"}
-
-    value["class_dispositions"] = [{
-        "finding_id":"C1", "kind":"one_off", "reason":"incorrectly declared unique",
-    }]
-    with pytest.raises(rc.CensusError, match="every new class record must be bound"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"], assessment_ids=[],
-        )
-
-
-def test_existing_class_disposition_cannot_contradict_satisfied_or_closed_state():
-    assert "at most one existing_class governing finding per active class" in (
-        prompts.STAGED_FOLLOWUP_INSTRUCTIONS
-    )
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
-        class_dispositions=[{
-            "finding_id":"C1", "kind":"existing_class", "class_id":"abc",
-        }],
-    )
-    with pytest.raises(rc.CensusError, match="satisfied class assessment"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"satisfied"},
-            class_states={"abc":(cc.CLOSED, False, "MAJOR")},
-        )
-
-
-def test_open_unmechanized_satisfied_class_gets_deterministic_close():
-    assert "currently open and unmechanized must also have" in (
-        prompts.STAGED_CONSOLIDATION_INSTRUCTIONS
-    )
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[], findings=[], debt=[], class_dispositions=[],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
-        class_records=[],
-    )
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-        assessment_verdicts={"abc":"satisfied"},
-        class_states={"abc":(cc.OPEN, False, "MAJOR")},
-    )
-    assert parsed["class_records"] == [{"op":"close", "class_id":"abc"}]
-    register = rc.register_from_records(parsed["class_records"], mechanized=False)
-    assert register.transitions[0].kind == "CLOSED"
-
-    with pytest.raises(rc.CensusError, match="mechanized open class cannot be model-closed"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"satisfied"},
-            class_states={"abc":(cc.OPEN, True, "MAJOR")},
-        )
-
-
-def test_correction_existing_class_binding_requires_a_matching_violated_assessment():
-    value = payload(settlement())
-    value.update(
-        role="correction", source_dispositions=[],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
-        class_dispositions=[{
-            "finding_id":"C1", "kind":"existing_class", "class_id":"abc",
-        }],
-        class_assessments=[{
-            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
-            "finding_id":"C1",
-        }],
-    )
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-        class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
-    )
-    assert parsed["_finding_class_refs"] == {"C1":"abc"}
-    with pytest.raises(rc.CensusError, match="closed violated class must reopen or replace"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-            class_states={"abc":(cc.CLOSED, False, "MAJOR")}, role="correction",
-        )
-    value["class_records"] = [{"op":"reopen", "class_id":"abc"}]
-    assert rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-        class_states={"abc":(cc.CLOSED, False, "MAJOR")}, role="correction",
-    )["_finding_class_refs"] == {"C1":"abc"}
-    value["class_records"] = []
-
-    value["class_assessments"] = []
-    value["assessment_dispositions"] = []
-    with pytest.raises(rc.CensusError, match="matching violated assessment"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
-        )
-
-    value = payload(settlement())
-    value.update(
-        role="correction", source_dispositions=[],
-        findings=[finding("C1"), finding("C2")],
-        debt=[
-            {"id":"D1", "finding_id":"C1", "status":"open"},
-            {"id":"D2", "finding_id":"C2", "status":"open"},
-        ],
-        class_dispositions=[
-            {"finding_id":"C1", "kind":"existing_class", "class_id":"abc"},
-            {"finding_id":"C2", "kind":"existing_class", "class_id":"abc"},
-        ],
-        class_assessments=[{
-            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
-            "finding_id":"C1",
-        }],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
-    )
-    with pytest.raises(rc.CensusError, match="consolidate same-class occurrences"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="correction",
-        )
-
-
-def test_census_rejects_an_extra_existing_class_finding_without_an_assessment():
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[
-            {"source_id":"integrity:F1", "governing_id":"C1"},
-            {"source_id":"domain:F2", "governing_id":"C2"},
-        ],
-        findings=[finding("C1"), finding("C2")],
-        debt=[
-            {"id":"D1", "finding_id":"C1", "status":"open"},
-            {"id":"D2", "finding_id":"C2", "status":"open"},
-        ],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
-        class_dispositions=[
-            {"finding_id":"C1", "kind":"existing_class", "class_id":"abc"},
-            {"finding_id":"C2", "kind":"existing_class", "class_id":"abc"},
-        ],
-    )
-    with pytest.raises(rc.CensusError, match="consolidate same-class occurrences"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value),
-            source_ids=["integrity:F1", "domain:F2"], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"violated"},
-            assessment_findings={"abc":"integrity:F1"},
-            class_states={"abc":(cc.OPEN, False, "MAJOR")}, role="census",
-        )
-
-
-def test_census_source_finding_can_fan_out_only_to_violated_classes():
-    source = "integrity:F1"
-    classes = ["class-a", "class-b"]
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[
-            {"source_id":source, "governing_id":"G1"},
-            {"source_id":source, "governing_id":"G2"},
-        ],
-        assessment_dispositions=[
-            {"assessment_id":classes[0], "governing_id":"G1"},
-            {"assessment_id":classes[1], "governing_id":"G2"},
-        ],
-        findings=[finding("G1"), finding("G2")],
-        debt=[
-            {"id":"D1", "finding_id":"G1", "status":"open"},
-            {"id":"D2", "finding_id":"G2", "status":"open"},
-        ],
-        class_dispositions=[
-            {"finding_id":"G1", "kind":"existing_class", "class_id":classes[0]},
-            {"finding_id":"G2", "kind":"existing_class", "class_id":classes[1]},
-        ],
-    )
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
-        source_severities={source:"MAJOR"}, assessment_ids=classes,
-        assessment_verdicts={cid:"violated" for cid in classes},
-        assessment_findings={cid:source for cid in classes},
-        class_states={cid:(cc.OPEN, False, "MAJOR") for cid in classes},
-        class_mechanized=None, role="census",
-    )
-    assert parsed["_finding_class_refs"] == {"G1":classes[0], "G2":classes[1]}
-    state = rc.settle_state(
-        rc.normalize_state({}, stakes="s", snapshot="p"), parsed,
-        phase="census", snapshot="p", round_no=1,
-    )
-    assert [row["source_ids"] for row in state["debt"]] == [[source], [source]]
-
-    value["source_dispositions"].append(
-        {"source_id":source, "governing_id":"G2"},
-    )
-    with pytest.raises(rc.CensusError, match="duplicate source_id disposition"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
-            assessment_ids=classes,
-        )
-
-    value["source_dispositions"].pop()
-    value["class_dispositions"][1] = {
-        "finding_id":"G2", "kind":"one_off", "reason":"unique site",
-    }
-    value["assessment_dispositions"][1]["governing_id"] = None
-    verdicts = {classes[0]:"violated", classes[1]:"satisfied"}
-    cited_findings = {classes[0]:source, classes[1]:None}
-    with pytest.raises(
-        rc.CensusError,
-        match="source fan-out requires distinct violated existing-class findings",
-    ):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[source],
-            source_severities={source:"MAJOR"}, assessment_ids=classes,
-            assessment_verdicts=verdicts,
-            assessment_findings=cited_findings,
-            class_states={cid:(cc.OPEN, False, "MAJOR") for cid in classes},
-            class_mechanized=None, role="census",
-        )
-
-
-def test_settlement_accepts_only_the_observed_decorative_marker_variant():
-    short = rc.SETTLEMENT_MARKER.removesuffix(" ===")
-    text = settlement().replace(rc.SETTLEMENT_MARKER, short, 1)
-    assert rc.parse_settlement(
-        text, source_ids=["domain-1"], assessment_ids=[],
-    )["role"] == "census"
-    with pytest.raises(rc.CensusError, match="begin with exactly one"):
-        rc.parse_settlement(
-            "prose\n" + text, source_ids=["domain-1"], assessment_ids=[],
-        )
-
-
-def test_lane_accepts_only_the_observed_decorative_marker_variant():
-    short = rc.LANE_MARKER.removesuffix(" ===")
-    text = lane().replace(rc.LANE_MARKER, short, 1)
-    assert rc.parse_lane(text, lane="domain")["lane"] == "domain"
-    with pytest.raises(rc.CensusError, match="begin with exactly one"):
-        rc.parse_lane("prose\n" + text, lane="domain")
-
-
-def test_settlement_cannot_downgrade_source_and_derives_debt_fields():
-    value = payload(settlement())
-    value["findings"][0]["severity"] = "MINOR"
-    value["debt"] = []
-    with pytest.raises(rc.CensusError, match="downgrade"):
-        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=["domain-1"],
-                            source_severities={"domain-1": "MAJOR"}, assessment_ids=[])
-    parsed = rc.parse_settlement(
-        settlement(), source_ids=["domain-1"], assessment_ids=[],
-    )
-    assert parsed["debt"][0] == {
-        "id":"D1", "finding_id":"C1", "status":"open", "severity":"MAJOR",
-        "summary":"broken", "evidence":["a.py:1"], "remedy":"fix it",
-    }
-
-    fatal = payload(settlement())
-    fatal["findings"][0]["severity"] = "BLOCKER"
-    with pytest.raises(rc.CensusError, match="downgrade"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, fatal), source_ids=["domain-1"],
-            source_severities={"domain-1": "FATAL"}, assessment_ids=[],
-        )
-
-
-def test_correction_cannot_clear_without_updating_every_existing_debt():
-    value = payload(settlement())
-    value.update(role="correction", source_dispositions=[], findings=[], debt=[], debt_updates=[])
-    value.update(class_dispositions=[], class_assessments=[])
-    with pytest.raises(rc.CensusError, match="every existing debt"):
-        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-                            known_debt=["D1"], role="correction")
-
-
-def test_open_debt_update_requires_and_renders_an_actionable_reason():
-    value = payload(settlement())
-    value.update(
-        role="correction", source_dispositions=[], assessment_dispositions=[],
-        findings=[], debt=[],
-        debt_updates=[{"id":"D1", "status":"open", "evidence":["a.py:2"]}],
-        class_dispositions=[], class_assessments=[],
-    )
-    with pytest.raises(rc.CensusError, match="debt update fields"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-            known_debt=["D1"], role="correction",
-        )
-    value["debt_updates"][0]["reason"] = "the stale-head path still bypasses validation"
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-        known_debt=["D1"], role="correction",
-    )
-    state = {
-        "phase":"correction", "debt":[{
-            "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
-            "summary":"validate the selected head", "evidence":["a.py:1"],
-            "remedy":"reject a stale head", "source_ids":[],
-        }],
-    }
-    updated = rc.settle_state(
-        state, parsed, phase="correction", snapshot="p", round_no=2,
-    )
-    rendered = rc.render_review(parsed, updated)
-    what_doesnt_work = rendered.split("## What doesn't work\n\n", 1)[1].split("\n\n## Risks", 1)[0]
-    assert what_doesnt_work != "Nothing notable."
-    assert "stale-head path still bypasses validation" in rendered
-    assert "validate the selected head" in rendered
-
-    advisory = finding("A1", "MINOR")
-    advisory["summary"] = "current advisory finding"
-    rendered = rc.render_review(
-        {"findings":[advisory]},
-        {"debt":updated["debt"]},
-    )
-    assert "current advisory finding" in rendered
-    assert "validate the selected head" in rendered
-    rendered = rc.render_review({"findings":[]}, {"debt":[
-        {"id":"D1", "finding_id":"F1", "status":"open", "severity":"MAJOR",
-         "summary":"first durable debt", "evidence":[], "remedy":"fix first"},
-        {"id":"D2", "finding_id":"F1", "status":"open", "severity":"MAJOR",
-         "summary":"second durable debt", "evidence":[], "remedy":"fix second"},
-    ]})
-    assert "first durable debt" in rendered
-    assert "second durable debt" in rendered
-
-
-def test_correction_cannot_downgrade_a_class_or_reuse_durable_debt():
-    value = payload(settlement())
-    value.update(
-        role="correction", source_dispositions=[], assessment_dispositions=[],
-        findings=[], debt=[],
-        debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}],
-        class_dispositions=[], class_assessments=[],
-        class_records=[{"op":"reclassify","class_id":"abc","severity":"MINOR"}],
-    )
-    with pytest.raises(rc.CensusError, match="cannot downgrade"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=[],
-            class_states={"abc": (cc.OPEN, False, "MAJOR")},
-            class_mechanized=False, known_debt=["D1"], role="correction",
-        )
-
-    first = rc.parse_settlement(settlement(), source_ids=["domain-1"], assessment_ids=[])
-    state = rc.settle_state(
-        rc.normalize_state({}, stakes="s", snapshot="p"), first,
-        phase="census", snapshot="p", round_no=1,
-    )
-    duplicate = rc.parse_settlement(
-        settlement(), source_ids=["domain-1"], assessment_ids=[],
-    )
-    duplicate.update(source_dispositions=[], findings=[finding("C2")])
-    duplicate["debt"][0].update(finding_id="C2")
-    with pytest.raises(rc.CensusError, match="reuses durable id"):
-        rc.settle_state(state, duplicate, phase="correction", snapshot="p2", round_no=2)
-    assert state["debt"][0]["source_ids"] == ["domain-1"]
-
-
-def test_every_staged_role_rejects_a_satisfied_class_downgrade():
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[], findings=[], debt=[],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":None}],
-        class_dispositions=[],
-        class_records=[{"op":"reclassify", "class_id":"abc", "severity":"MINOR"}],
-    )
-    with pytest.raises(rc.CensusError, match="cannot downgrade"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"satisfied"},
-            assessment_findings={"abc":None},
-            class_states={"abc": (cc.CLOSED, False, "MAJOR")}, role="census",
-        )
-
-
-def test_replace_carries_corrected_severity_in_one_transition():
-    register = rc.register_from_records([{
-        "op": "replace", "class_id": "old", "invariant": "better invariant",
-        "severity": "MINOR", "procedure": "check all sites",
-    }], mechanized=False)
-    lineage = cc.Lineage("x", classes={
-        "old": cc.TrackedClass("old", "old invariant", "MAJOR", 1, cc.CLOSED,
-                               procedure="old check")
-    }, next_seq=2, mode=cc.PLAN_MODE)
-    minted = cc.apply_register(lineage, register, round_no=3)
-    assert lineage.classes["old"].status == cc.SUPERSEDED
-    assert lineage.classes[minted[0]].severity == "MINOR"
-    assert lineage.classes[minted[0]].status == cc.OPEN
-
-
-def test_branch_records_allow_procedure_classes_and_reject_mechanized_reopen():
-    created = rc.register_from_records([{
-        "op":"new", "invariant":"new semantic invariant", "severity":"MAJOR",
-        "procedure":"inspect every generated record",
-    }], mechanized=None)
-    assert created.new_classes[0].procedure == "inspect every generated record"
-    assert created.new_classes[0].pattern is None
-
-    register = rc.register_from_records([{
-        "op":"replace", "class_id":"old", "invariant":"semantic invariant",
-        "severity":"MAJOR", "procedure":"inspect every transition",
-    }], mechanized=None)
-    lineage = cc.Lineage("branch", classes={
-        "old": cc.TrackedClass(
-            "old", "legacy semantic invariant", "MAJOR", 1, cc.CLOSED,
-            procedure="inspect one transition",
-        ),
-    }, next_seq=2, mode=cc.BRANCH_MODE)
-    minted = cc.apply_register(lineage, register, round_no=2)
-    assert lineage.classes[minted[0]].procedure == "inspect every transition"
-
-    to_procedure = rc.register_from_records([{
-        "op":"replace", "class_id":"regex", "invariant":"semantic successor",
-        "severity":"MAJOR", "procedure":"inspect semantics",
-    }], mechanized=None)
-    conversion = cc.Lineage("conversion", classes={
-        "regex":cc.TrackedClass(
-            "regex", "regex predecessor", "MAJOR", 1, cc.CLOSED,
-            pattern="BAD", pathspec="*.py",
-        ),
-    }, next_seq=2, mode=cc.BRANCH_MODE)
-    successor = cc.apply_register(conversion, to_procedure, round_no=2)[0]
-    assert conversion.classes[successor].procedure == "inspect semantics"
-
-    to_pattern = rc.register_from_records([{
-        "op":"replace", "class_id":"semantic", "invariant":"regex successor",
-        "severity":"MAJOR", "pattern":"BAD", "pathspec":"*.py",
-    }], mechanized=None)
-    conversion = cc.Lineage("conversion-2", classes={
-        "semantic":cc.TrackedClass(
-            "semantic", "semantic predecessor", "MAJOR", 1, cc.CLOSED,
-            procedure="inspect semantics",
-        ),
-    }, next_seq=2, mode=cc.BRANCH_MODE)
-    successor = cc.apply_register(conversion, to_pattern, round_no=2)[0]
-    assert conversion.classes[successor].pattern == "BAD"
-
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[],
-        assessment_dispositions=[{"assessment_id":"abc", "governing_id":"C1"}],
-        class_dispositions=[{"finding_id":"C1", "kind":"existing_class", "class_id":"abc"}],
-        class_records=[{"op":"reopen", "class_id":"abc"}],
-    )
-    with pytest.raises(rc.CensusError, match="mechanized class must replace"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"violated"},
-            class_states={"abc": (cc.CLOSED, True, "MAJOR")},
-        )
-
-
-def test_correction_requires_a_final_before_clearance():
-    state = rc.normalize_state({}, stakes="s", snapshot="p")
-    first = rc.parse_settlement(settlement(), source_ids=["domain-1"], assessment_ids=[])
-    state = rc.settle_state(state, first, phase="census", snapshot="p", round_no=1)
-    assert state["phase"] == "correction"
-    close = payload(settlement())
-    close.update(role="correction", source_dispositions=[], findings=[], debt=[],
-                 debt_updates=[{"id":"D1","status":"closed","evidence":["a.py:2"]}],
-                 class_dispositions=[], class_assessments=[])
-    state = rc.settle_state(
-        state, rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, close), source_ids=[], assessment_ids=[],
-                                   known_debt=["D1"], role="correction"),
-        phase="correction", snapshot="p2", round_no=2,
-    )
-    assert state["phase"] == "final"
-    assert "FINAL-REGRESSION: required" in rc.trailer(state)
-
-
-def test_final_requires_complete_checklist_and_class_verdict():
-    value = payload(settlement())
-    value.update(role="final", source_dispositions=[], findings=[], debt=[], debt_updates=[],
-                 assessment_dispositions=[{"assessment_id":"abc","governing_id":None}],
-                 class_dispositions=[],
-                 class_assessments=[], coverage=[])
-    with pytest.raises(rc.CensusError, match="every checklist"):
-        rc.parse_settlement(wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"], role="final")
 
 
 def test_evidence_anchors_resolve_against_snapshot(tmp_path):
@@ -781,17 +223,14 @@ def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
         name = "fake"
 
         def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            text = wire({"role":"census"})
             return Review(text=text, session_ref=None, raw=text)
 
     with pytest.raises(rc.CensusError, match="validation invalid") as caught:
         handlers._staged_call(
             role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=10, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-            parser=lambda text: rc.parse_settlement(
-                text, source_ids=[], assessment_ids=[],
-            ),
+            parser=parse_decision,
         )
     assert "format invalid" not in str(caught.value)
     assert caught.value.stage_role == "consolidation"
@@ -813,7 +252,6 @@ def test_staged_timeout_preserves_kind_message_state_and_trailer(tmp_path):
         handlers._staged_call(
             role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=1800, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
             parser=lambda text: {},
         )
     assert caught.value.stage_role == "consolidation"
@@ -853,7 +291,6 @@ def test_staged_cancellation_preserves_exact_kind_and_message(tmp_path, returnco
         handlers._staged_call(
             role="coverage", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=1800, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
             parser=lambda text: {},
         )
     assert str(caught.value) == message
@@ -880,7 +317,7 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
         name = "fake"
 
         def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+            text = wire({"role":"census"})
             return Review(text=text, session_ref="s", raw=text)
 
         def resume(self, *args, **kwargs):
@@ -893,10 +330,7 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
         handlers._staged_call(
             role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=1800, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-            parser=lambda text: rc.parse_settlement(
-                text, source_ids=[], assessment_ids=[],
-            ),
+            parser=parse_decision,
         )
     assert caught.value.stage_role == "consolidation-validation-retry"
     assert caught.value.failure_kind == "timeout"
@@ -912,7 +346,7 @@ def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
             "disposition":"existing_class",
         }],
     )
-    first_text = wire(rc.SETTLEMENT_MARKER, invalid)
+    first_text = wire(invalid)
     retry_text = first_text.replace('"disposition": "existing_class"', '"verdict": "violated"')
 
     class Engine:
@@ -928,10 +362,7 @@ def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
         handlers._staged_call(
             role="correction", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=10, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-            parser=lambda text: rc.parse_settlement(
-                text, source_ids=[], assessment_ids=["abc"], role="correction",
-            ),
+            parser=lambda text: parse_decision(text, role="correction"),
         )
     rejected = caught.value.rejected_payloads
     assert [item["role"] for item in rejected] == [
@@ -988,10 +419,7 @@ def test_staged_rejection_with_unpaired_surrogate_retries_and_persists(tmp_path)
         handlers._staged_call(
             role="correction", engine=Engine(), prompt="p", cwd=tmp_path,
             model="m", effort="high", timeout=10, on_progress=None,
-            retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-            parser=lambda text: rc.parse_settlement(
-                text, source_ids=[], assessment_ids=[], role="correction",
-            ),
+            parser=lambda text: parse_decision(text, role="correction"),
         )
     rejected = caught.value.rejected_payloads
     assert [item["excerpt"] for item in rejected] == [first_text, retry_text]
@@ -1188,283 +616,6 @@ def test_oversized_class_preflight_persists_exact_validation_identity(tmp_path):
     assert "STRUCTURAL-FAILURE: role=active-class-preflight kind=validation" in trailer
 
 
-def test_empty_debt_id_gets_one_same_session_format_retry(tmp_path):
-    invalid = payload(settlement())
-    invalid["debt"][0]["id"] = ""
-
-    class Engine:
-        name = "fake"
-
-        def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, invalid)
-            return Review(text=text, session_ref="s", raw=text)
-
-        def resume(self, session_ref, prompt, *args, **kwargs):
-            assert "debt id must be" in prompt
-            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
-
-    _, parsed, attempts = handlers._staged_call(
-        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
-        model="m", effort="high", timeout=10, on_progress=None,
-        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-        parser=lambda text: rc.parse_settlement(
-            text, source_ids=["domain-1"], assessment_ids=[],
-        ),
-    )
-    assert parsed["debt"][0]["id"] == "D1"
-    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
-
-
-def test_staged_retry_repeats_exact_shapes_after_multirow_schema_drift(tmp_path):
-    invalid = payload(settlement())
-    invalid["findings"][0].pop("remedy")
-    invalid["findings"][0]["class_id"] = "wrong"
-    invalid["class_records"] = [{
-        "class_id":"wrong", "status":"open", "finding_ids":["C1"],
-        "debt_ids":["D1"],
-    }]
-
-    class Engine:
-        name = "fake"
-
-        def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, invalid)
-            return Review(text=text, session_ref="s", raw=text)
-
-        def resume(self, session_ref, prompt, *args, **kwargs):
-            assert "missing ['remedy']" in prompt
-            assert "Finding rows have exactly id,severity,summary,evidence,remedy" in prompt
-            assert "They never contain status,finding_ids,debt_ids" in prompt
-            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
-
-    _, parsed, attempts = handlers._staged_call(
-        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
-        model="m", effort="high", timeout=10, on_progress=None,
-        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-        parser=lambda text: rc.parse_settlement(
-            text, source_ids=["domain-1"], assessment_ids=[],
-        ),
-    )
-    assert parsed["findings"][0]["remedy"] == "fix it"
-    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
-
-
-def test_malformed_referenced_new_class_row_stays_in_bounded_format_retry(tmp_path):
-    invalid = payload(settlement())
-    invalid.update(
-        class_dispositions=[{"finding_id":"C1", "kind":"new_class", "record_index":0}],
-        class_records=["not an object"],
-    )
-
-    class Engine:
-        name = "fake"
-
-        def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, invalid)
-            return Review(text=text, session_ref="s", raw=text)
-
-        def resume(self, session_ref, prompt, *args, **kwargs):
-            assert "new-class disposition must uniquely reference" in prompt
-            return Review(text=settlement(), session_ref=session_ref, raw=settlement())
-
-    _, parsed, attempts = handlers._staged_call(
-        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
-        model="m", effort="high", timeout=10, on_progress=None,
-        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-        parser=lambda text: rc.parse_settlement(
-            text, source_ids=["domain-1"], assessment_ids=[],
-        ),
-    )
-    assert parsed["class_dispositions"][0]["kind"] == "one_off"
-    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
-
-
-def test_staged_retry_names_advisory_class_debt_invariant(tmp_path):
-    invalid = payload(settlement())
-    invalid.update(
-        source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
-        findings=[finding("G1", "OUT-OF-SCOPE")], debt=[],
-        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
-        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
-    )
-    repaired = dict(invalid)
-    repaired["debt"] = [{"id":"D1","finding_id":"G1","status":"open"}]
-
-    class Engine:
-        name = "fake"
-
-        def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, invalid)
-            return Review(text=text, session_ref="s", raw=text)
-
-        def resume(self, session_ref, prompt, *args, **kwargs):
-            assert "every violated class needs exactly one open debt record" in prompt
-            assert "including MINOR and OUT-OF-SCOPE" in prompt
-            text = wire(rc.SETTLEMENT_MARKER, repaired)
-            return Review(text=text, session_ref=session_ref, raw=text)
-
-    _, parsed, attempts = handlers._staged_call(
-        role="consolidation", engine=Engine(), prompt="p", cwd=tmp_path,
-        model="m", effort="high", timeout=10, on_progress=None,
-        retry_guidance=prompts.STAGED_SETTLEMENT_RETRY_GUIDANCE,
-        parser=lambda text: rc.parse_settlement(
-            text, source_ids=["integrity:F1"], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"violated"},
-            assessment_findings={"abc":"integrity:F1"},
-        ),
-    )
-    assert parsed["debt"][0]["severity"] == "OUT-OF-SCOPE"
-    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
-
-
-def test_violated_class_cannot_be_replaced_at_lower_severity():
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[], findings=[], debt=[],
-        assessment_dispositions=[{"assessment_id":"abc","governing_id":"C1"}],
-        class_dispositions=[{"finding_id":"C1", "kind":"existing_class", "class_id":"abc"}],
-        class_records=[{
-            "op":"replace", "class_id":"abc", "invariant":"narrower invariant",
-            "severity":"MINOR", "procedure":"inspect it",
-        }],
-    )
-    value["findings"] = [finding("C1", "MAJOR")]
-    value["debt"] = [{"id":"D1", "finding_id":"C1", "status":"open"}]
-    with pytest.raises(rc.CensusError, match="downgrade"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            assessment_verdicts={"abc":"violated"},
-            class_states={"abc": (cc.CLOSED, False, "MAJOR")},
-        )
-
-
-def test_violated_class_mapping_follows_cited_finding_and_reopens_atomically():
-    value = payload(settlement())
-    value.update(
-        role="final", source_dispositions=[],
-        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
-        findings=[finding("G1", "BLOCKER")],
-        debt=[{"id":"D1", "finding_id":"G1", "status":"open"}],
-        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
-        debt_updates=[], class_records=[{"op":"reopen", "class_id":"abc"}],
-        coverage=payload(lane(findings=[finding("G1", "BLOCKER")]))["coverage"],
-        class_assessments=[{
-            "class_id":"abc", "verdict":"violated", "evidence":["a.py:1"],
-            "finding_id":"G1",
-        }],
-    )
-    parsed = rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-        class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
-    )
-    assert parsed["class_records"] == [{"op":"reopen", "class_id":"abc"}]
-    value["assessment_dispositions"][0]["governing_id"] = "G2"
-    value["findings"].append(finding("G2", "BLOCKER"))
-    value["class_dispositions"].append({
-        "finding_id":"G2", "kind":"one_off", "reason":"unique second fixture",
-    })
-    value["debt"].append({"id":"D2", "finding_id":"G2", "status":"open"})
-    value["coverage"][0]["finding_ids"].append("G2")
-    with pytest.raises(rc.CensusError, match="matching violated assessment"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=[], assessment_ids=["abc"],
-            class_states={"abc": (cc.CLOSED, False, "BLOCKER")}, role="final",
-        )
-
-
-def test_violated_advisory_class_still_requires_concrete_debt():
-    assert "every governing finding referenced by a\nviolated class assessment" in (
-        prompts.STAGED_CONSOLIDATION_INSTRUCTIONS
-    )
-    value = payload(settlement())
-    value.update(
-        source_dispositions=[{"source_id":"integrity:F1","governing_id":"G1"}],
-        findings=[finding("G1", "MINOR")], debt=[],
-        assessment_dispositions=[{"assessment_id":"abc","governing_id":"G1"}],
-        class_dispositions=[{"finding_id":"G1", "kind":"existing_class", "class_id":"abc"}],
-        class_records=[{"op":"reopen", "class_id":"abc"}],
-    )
-    with pytest.raises(rc.CensusError, match="violated class needs exactly one open debt"):
-        rc.parse_settlement(
-            wire(rc.SETTLEMENT_MARKER, value), source_ids=["integrity:F1"],
-            assessment_ids=["abc"], assessment_verdicts={"abc":"violated"},
-            assessment_findings={"abc":"integrity:F1"},
-            class_states={"abc": (cc.CLOSED, False, "MINOR")}, role="census",
-        )
-    value["debt"] = [{"id":"D1", "finding_id":"G1", "status":"open"}]
-    assert rc.parse_settlement(
-        wire(rc.SETTLEMENT_MARKER, value), source_ids=["integrity:F1"],
-        assessment_ids=["abc"], assessment_verdicts={"abc":"violated"},
-        assessment_findings={"abc":"integrity:F1"},
-        class_states={"abc": (cc.CLOSED, False, "MINOR")}, role="census",
-    )["debt"][0]["severity"] == "MINOR"
-
-
-def test_class_records_require_the_exact_mode_specific_shape():
-    with pytest.raises(rc.CensusError, match="new class record"):
-        rc.register_from_records([{
-            "op":"new", "invariant":"x", "severity":"MAJOR", "procedure":"inspect",
-            "extra":"ignored",
-        }], mechanized=False)
-    with pytest.raises(rc.CensusError, match="pattern"):
-        rc.register_from_records([{
-            "op":"new", "invariant":"x", "severity":"MAJOR",
-            "pattern":"", "pathspec":".",
-        }], mechanized=True)
-
-
-def test_anchor_rejection_gets_one_same_session_retry_with_diagnostics(tmp_path):
-    class Engine:
-        name = "fake"
-
-        def run(self, *args, **kwargs):
-            value = payload(lane(findings=[finding("F1")]))
-            value["coverage"][0]["evidence"] = ["missing.py:1"]
-            value["findings"][0]["evidence"] = ["missing.py:1"]
-            text = wire(rc.LANE_MARKER, value)
-            return Review(text=text, session_ref="session", raw=text)
-
-        def resume(self, session_ref, prompt, *args, **kwargs):
-            assert session_ref == "session"
-            assert "unresolvable repository anchor" in prompt
-            assert "Lane manifests never contain settlement debt" in prompt
-            assert "open debt" not in prompt
-            (tmp_path / "ok.py").write_text("ok\n")
-            value = payload(lane(findings=[finding("F1")]))
-            for row in value["coverage"]:
-                row["evidence"] = ["ok.py:1"]
-            value["findings"][0]["evidence"] = ["ok.py:1"]
-            text = wire(rc.LANE_MARKER, value)
-            return Review(text=text, session_ref="session", raw=text)
-
-    def parse(text):
-        value = rc.parse_lane(text, lane="domain")
-        rc.resolve_anchors(value, root=tmp_path)
-        return value
-
-    _, _, attempts = handlers._staged_call(
-        role="census-domain", engine=Engine(), prompt="review", cwd=tmp_path,
-        model="m", effort="high", timeout=10, parser=parse, on_progress=None,
-        retry_guidance=prompts.STAGED_LANE_RETRY_GUIDANCE,
-    )
-    assert [attempt.role for attempt in attempts] == [
-        "census-domain", "census-domain-validation-retry",
-    ]
-    assert [attempt.sequence for attempt in attempts] == [None, None]
-    assert [attempt.outcome for attempt in attempts] == ["validation-invalid", "completed"]
-    assert all(attempt.response_sha256 and attempt.response_excerpt for attempt in attempts)
-
-
-def test_new_debt_labels_are_rekeyed_when_durable_history_owns_them():
-    debt = [
-        {"id":"D1", "finding_id":"G1", "status":"open"},
-        {"id":"local", "finding_id":"G2", "status":"open"},
-        {"id":"D3", "finding_id":"G3", "status":"open"},
-    ]
-    handlers._allocate_fresh_debt_ids(debt, {"D1", "D2", "local"})
-    assert [item["id"] for item in debt] == ["D4", "D5", "D3"]
-
-
 def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_path):
     closure = handlers._PlanClassClosure(
         "pending-plan", round_no=1, state_root=tmp_path, stamp="T",
@@ -1632,12 +783,12 @@ def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
         name = "fake"
 
         def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"correction", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                    "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
-                    "class_dispositions":[], "class_assessments":[],
-                "class_records":[],
+            text = wire({
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D1", "status":"closed", "evidence":["plan:1"],
+                }],
+                "class_outcomes":[], "class_actions":[],
             })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -1701,10 +852,9 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
             )
             text = lane(lane_name)
         else:
-            text = rc.SETTLEMENT_MARKER + "\n" + json.dumps({
-                "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_dispositions":[], "class_records":[],
+            text = wire({
+                "role":"census", "governing_findings":[], "debt_outcomes":[],
+                "class_outcomes":[], "class_actions":[],
             })
         return Review(text=text, session_ref="s", raw=text)
 
@@ -1754,10 +904,9 @@ def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
                 )
                 text = lane(lane_name)
             else:
-                text = wire(rc.SETTLEMENT_MARKER, {
-                    "role":"census", "source_dispositions":[],
-                    "assessment_dispositions":[], "findings":[], "debt":[],
-                    "debt_updates":[], "class_dispositions":[], "class_records":[],
+                text = wire({
+                    "role":"census", "governing_findings":[], "debt_outcomes":[],
+                    "class_outcomes":[], "class_actions":[],
                 })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -1859,36 +1008,32 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
             }] if lane_name == "domain" else [])
             text = lane(lane_name, findings=findings)
         elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
-            text = wire(rc.SETTLEMENT_MARKER, {
+            text = wire({
                 "role":"census",
-                "source_dispositions":[{"source_id":"domain:F1","governing_id":"G1"}],
-                "assessment_dispositions":[],
-                "findings":[{
+                "governing_findings":[{
                     "id":"G1", "severity":"MAJOR", "summary":"repair the plan",
                     "evidence":["plan:1"], "remedy":"edit the plan",
+                    "source_ids":["domain:F1"],
+                    "classification":{
+                        "kind":"one_off", "reason":"unique plan edit",
+                    },
                 }],
-                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[],
-                "class_dispositions":[{
-                    "finding_id":"G1", "kind":"one_off", "reason":"unique plan edit",
-                }],
-                "class_records":[],
+                "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
             })
         elif '"role": "correction"' in prompt:
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"correction", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                    "debt_updates":[{"id":"D1","status":"closed","evidence":["plan:1"]}],
-                    "class_dispositions":[], "class_assessments":[],
-                "class_records":[],
+            text = wire({
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D1", "status":"closed", "evidence":["plan:1"],
+                }],
+                "class_outcomes":[], "class_actions":[],
             })
         else:
             assert '"role": "final"' in prompt
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"final", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[], "class_dispositions":[], "class_records":[],
-                "coverage": payload(lane())["coverage"], "class_assessments":[],
+            text = wire({
+                "role":"final", "governing_findings":[], "debt_outcomes":[],
+                "class_outcomes":[], "class_actions":[],
+                "coverage": payload(lane())["coverage"],
             })
         return Review(text=text, session_ref=f"s{len(calls)}", raw=text)
 
@@ -1919,8 +1064,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
     assert '"existing_debt": []' in calls[5]
-    assert all(key in calls[5] for key in rc.CHECKLIST)
-    assert '"finding_ids"' in calls[5] and '"class_assessments"' in calls[5]
+    assert all(key in calls[5] for key in sp.CHECKLIST)
     assert third.count("## What works") == 1
     audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
@@ -1952,13 +1096,12 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
     accept_settlement = False
 
     def invalid_settlement():
-        return wire(rc.SETTLEMENT_MARKER, {"role":"census"})
+        return wire({"role":"census"})
 
     def valid_settlement():
-        return wire(rc.SETTLEMENT_MARKER, {
-            "role":"census", "source_dispositions":[],
-            "assessment_dispositions":[], "findings":[], "debt":[],
-            "debt_updates":[], "class_dispositions":[], "class_records":[],
+        return wire({
+            "role":"census", "governing_findings":[], "debt_outcomes":[],
+            "class_outcomes":[], "class_actions":[],
         })
 
     def run(self, prompt, *args, **kwargs):
@@ -1972,7 +1115,7 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
             value = payload(lane(lane_name))
             for row in value["coverage"]:
                 row["evidence"] = ["repository/README.md:1"]
-            text = wire(rc.LANE_MARKER, value)
+            text = wire(value)
         else:
             calls.append("consolidation")
             text = valid_settlement() if accept_settlement else invalid_settlement()
@@ -2052,18 +1195,18 @@ def test_branch_codex_runs_the_staged_census_path(
             value = payload(lane(lane_name))
             for row in value["coverage"]:
                 row["evidence"] = ["repository/README.md:1"]
-            text = wire(rc.LANE_MARKER, value)
+            text = wire(value)
         else:
-            debt_updates = []
+            debt_outcomes = []
             if '"id": "legacy-register"' in prompt:
-                debt_updates = [{
-                    "id":"legacy-register", "status":"closed",
+                debt_outcomes = [{
+                    "debt_id":"legacy-register", "status":"closed",
                     "evidence":["repository/README.md:1"],
                 }]
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":debt_updates, "class_dispositions":[], "class_records":[],
+            text = wire({
+                "role":"census", "governing_findings":[],
+                "debt_outcomes":debt_outcomes,
+                "class_outcomes":[], "class_actions":[],
             })
         return Review(text=text, session_ref="branch-session", raw=text)
 
@@ -2140,29 +1283,33 @@ def test_branch_settlement_persists_a_new_procedure_class(
             value = payload(lane(lane_name))
             for row in value["coverage"]:
                 row["evidence"] = ["repository/README.md:1"]
+            if lane_name == "behaviour":
+                value["findings"] = [{
+                    "id":"F1", "severity":"MAJOR",
+                    "summary":"transition ownership is inconsistent",
+                    "evidence":["repository/README.md:1"],
+                    "remedy":"make transition ownership consistent",
+                }]
+                value["coverage"][0].update(status="finding", finding_ids=["F1"])
         else:
             value = {
-                "role":"census", "source_dispositions":[],
-                "assessment_dispositions":[],
-                "findings":[{
+                "role":"census", "governing_findings":[{
                     "id":"G1", "severity":"MAJOR",
                     "summary":"transition ownership is inconsistent",
                     "evidence":["repository/README.md:1"],
                     "remedy":"make transition ownership consistent",
+                    "source_ids":["behaviour:F1"],
+                    "classification":{
+                        "kind":"new_class", "definition":{
+                            "invariant":"semantic transition ownership",
+                            "severity":"MAJOR",
+                            "procedure":"inspect every transition owner",
+                        },
+                    },
                 }],
-                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[],
-                "class_dispositions":[{
-                    "finding_id":"G1", "kind":"new_class", "record_index":0,
-                }],
-                "class_records":[{
-                    "op":"new", "invariant":"semantic transition ownership",
-                    "severity":"MAJOR", "procedure":"inspect every transition owner",
-                }],
+                "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
             }
-        text = wire(
-            rc.LANE_MARKER if "lane" in value else rc.SETTLEMENT_MARKER, value,
-        )
+        text = wire(value)
         return Review(text=text, session_ref="branch-session", raw=text)
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
@@ -2226,27 +1373,27 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
             findings[0]["evidence"] = ["repository/a.py:1"]
             for row in coverage:
                 row["evidence"] = ["repository/a.py:1"]
+            coverage[0].update(status="finding", finding_ids=["G1"])
             value = {
-                "role":"final", "source_dispositions":[],
-                "assessment_dispositions":[{"assessment_id":"abc", "governing_id":"G1"}],
-                "findings":findings,
-                "debt":[{"id":"D1", "finding_id":"G1", "status":"open"}],
-                "debt_updates":[],
-                "class_dispositions":[{
-                    "finding_id":"G1", "kind":"existing_class", "class_id":"abc",
+                "role":"final", "governing_findings":[{
+                    **findings[0],
+                    "classification":{"kind":"existing_class", "class_id":"abc"},
                 }],
-                "class_records":[{
-                    "op":"replace", "class_id":"abc", "invariant":"new invariant",
-                    "severity":"MAJOR", "procedure":"inspect new behavior",
+                "debt_outcomes":[],
+                "class_actions":[{
+                    "kind":"replace", "class_id":"abc", "definition":{
+                        "invariant":"new invariant", "severity":"MAJOR",
+                        "procedure":"inspect new behavior",
+                    },
                 }],
                 "coverage":coverage,
-                "class_assessments":[{
+                "class_outcomes":[{
                     "class_id":"abc", "verdict":"violated",
                     "evidence":["repository/a.py:1"],
-                    "finding_id":"G1",
+                    "basis":{"kind":"new_finding", "finding_id":"G1"},
                 }],
             }
-            text = wire(rc.SETTLEMENT_MARKER, value)
+            text = wire(value)
             return Review(text=text, session_ref="s", raw=text)
 
     closure = Closure()
@@ -2309,14 +1456,12 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
         name = "fake"
 
         def run(self, *args, **kwargs):
-            text = wire(rc.SETTLEMENT_MARKER, {
-                "role":"correction", "source_dispositions":[],
-                "assessment_dispositions":[], "findings":[], "debt":[],
-                "debt_updates":[{
-                    "id":"D0", "status":"closed", "evidence":["repository/a.py:1"],
+            text = wire({
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D0", "status":"closed", "evidence":["repository/a.py:1"],
                 }],
-                "class_dispositions":[], "class_records":[],
-                "class_assessments":[],
+                "class_outcomes":[], "class_actions":[],
             })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -2336,36 +1481,3 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
     assert "STRUCTURAL-DEBT: 0 blocking open" in trailer
     assert "class closure remains open" in trailer
     assert "CONVERGENCE: BLOCKED" in trailer
-
-
-def test_a_markdown_fenced_payload_parses_like_a_bare_one():
-    """Engines intermittently wrap the payload in a markdown fence.
-
-    Observed 2026-08-12 on `claude-opus-5`: a complete, correct `final`
-    settlement arrived as ```` ```json ```` + the object + ```` ``` ````, and
-    `json.loads` failed at `char 0`. The review had already run — 9.5 minutes and
-    47k output tokens — so rejecting the reply discarded a finished verdict over
-    a formatting artifact, not a disagreement about content.
-    """
-    bare = settlement()
-    marker, body = bare.split("\n", 1)
-    for opening in ("```json", "```"):
-        fenced = f"{marker}\n{opening}\n{body}\n```"
-        assert (rc.parse_settlement(fenced, source_ids=["domain-1"], assessment_ids=[])
-                == rc.parse_settlement(bare, source_ids=["domain-1"], assessment_ids=[]))
-
-    # Lanes take the same extraction path, so they gain the same tolerance.
-    lane_bare = lane()
-    lane_marker, lane_body = lane_bare.split("\n", 1)
-    assert (rc.parse_lane(f"{lane_marker}\n```json\n{lane_body}\n```", lane="domain")
-            == rc.parse_lane(lane_bare, lane="domain"))
-
-
-def test_an_unclosed_or_non_fence_payload_is_still_rejected():
-    """The tolerance is for a FENCE, not for arbitrary prose around the object."""
-    marker, body = settlement().split("\n", 1)
-    for broken in (f"{marker}\n```json\n{body}",          # never closed
-                   f"{marker}\n```json not-a-language\n{body}\n```",
-                   f"{marker}\nhere you go:\n{body}"):     # prose, no fence
-        with pytest.raises(rc.CensusError, match="invalid JSON"):
-            rc.parse_settlement(broken, source_ids=["domain-1"], assessment_ids=[])

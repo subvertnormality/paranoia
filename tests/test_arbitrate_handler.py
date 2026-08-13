@@ -203,6 +203,7 @@ def run(repo: Path, agent, tmp_path: Path, **overrides):
 def _no_preflight(monkeypatch):
     """The fake engines are not on PATH; preflight is exercised separately."""
     monkeypatch.setattr(ah, "_preflight", lambda engines: None)
+    monkeypatch.setattr(ah.eng, "require_evidence_profile", lambda engine: "test")
 
 
 def _options_by_engine(agent) -> dict:
