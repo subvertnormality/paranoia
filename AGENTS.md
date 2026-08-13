@@ -83,6 +83,12 @@ review/class state while retaining required failure diagnostics. Prove historica
 materialization equivalence, and do not ship a permissive alias normalizer, partial settlement,
 durable dual protocol, extra model call, or new persistence mechanism. A structured-output
 capability failure blocks the cutover rather than falling back to unconstrained prose.
+Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
+`structured_output`; a successful process plus result prose is not structured success. Branch
+class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement
+must remain mechanized. Semantic validation must report independent safe-to-detect issues together
+within its bounded diagnostic so the one retry can repair them. The census decision schema must
+represent the complete aggregate admitted by all three lane bounds and active-class fan-out.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

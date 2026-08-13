@@ -31,6 +31,12 @@ MAX_SUMMARY_CHARS = 2_000
 MAX_ANCHOR_CHARS = 512
 MAX_ISSUES = 24
 MAX_ISSUE_CHARS = 8_000
+MAX_LANE_FINDINGS = 100
+MAX_ACTIVE_CLASSES = 100
+MAX_CENSUS_SOURCES = len(LANES[cc.PLAN_MODE]) * MAX_LANE_FINDINGS
+# One source normally produces one governing finding.  Fan-out may additionally
+# produce one distinct existing-class finding for every active class.
+MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
 
 
 class ProtocolError(ValueError):
@@ -96,6 +102,14 @@ def _anchor() -> dict[str, Any]:
     }
 
 
+def _pathspec() -> dict[str, Any]:
+    value = _string(1_000)
+    # A leading colon invokes Git pathspec magic (including exclusions) rather
+    # than naming the literal branch-review scope the model is allowed to own.
+    value["pattern"] = r"^[^:\r\n][^\r\n]*$"
+    return value
+
+
 def _evidence() -> dict[str, Any]:
     return _array(_anchor(), maximum=100, minimum=1, unique=True)
 
@@ -120,7 +134,7 @@ def _finding(*, mode: str, census: bool) -> dict[str, Any]:
     }
     if census:
         properties["source_ids"] = _array(
-            _string(240), maximum=100, minimum=1, unique=True,
+            _string(240), maximum=MAX_CENSUS_SOURCES, minimum=1, unique=True,
         )
     properties["classification"] = _classification(mode)
     return _object(properties)
@@ -145,7 +159,7 @@ def _definition(mode: str) -> dict[str, Any]:
     if mode == cc.PLAN_MODE:
         return procedure
     pattern = _object({
-        **common, "pattern": _string(2_000), "pathspec": _string(1_000),
+        **common, "pattern": _string(2_000), "pathspec": _pathspec(),
     })
     return {"anyOf": [procedure, pattern]}
 
@@ -251,8 +265,8 @@ def lane_schema(mode: str, lane: str) -> dict[str, Any]:
     return _root(_object({
         "lane": _string(32, const=lane),
         "coverage": _array(_coverage(), maximum=len(CHECKLIST), minimum=len(CHECKLIST)),
-        "findings": _array(_lane_finding(), maximum=100),
-        "class_assessments": _array(_lane_assessment(), maximum=100),
+        "findings": _array(_lane_finding(), maximum=MAX_LANE_FINDINGS),
+        "class_assessments": _array(_lane_assessment(), maximum=MAX_ACTIVE_CLASSES),
     }))
 
 
@@ -265,11 +279,11 @@ def decision_schema(mode: str, role: str) -> dict[str, Any]:
         "role": _string(32, const=role),
         "governing_findings": _array(
             _finding(mode=mode, census=role == "census"),
-            maximum=100,
+            maximum=MAX_CENSUS_FINDINGS if role == "census" else MAX_LANE_FINDINGS,
         ),
         "debt_outcomes": _array(_debt_outcome(), maximum=500),
-        "class_outcomes": _array(_class_outcome(), maximum=100),
-        "class_actions": _array(_class_action(mode), maximum=100),
+        "class_outcomes": _array(_class_outcome(), maximum=MAX_ACTIVE_CLASSES),
+        "class_actions": _array(_class_action(mode), maximum=MAX_ACTIVE_CLASSES),
     }
     if role == "final":
         properties["coverage"] = _array(
@@ -335,52 +349,79 @@ def decode(text: str, schema: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _unique(rows: Sequence[dict[str, Any]], key: str, label: str) -> dict[str, dict[str, Any]]:
+def _raise_semantic_issues(issues: Sequence[str]) -> None:
+    if not issues:
+        return
+    ordered = sorted(dict.fromkeys(issues))
+    shown = list(ordered[:MAX_ISSUES])
+    if len(ordered) > MAX_ISSUES:
+        shown.append(f"/: {len(ordered) - MAX_ISSUES} additional semantic errors omitted")
+    raise ProtocolError("\n".join(shown)[:MAX_ISSUE_CHARS])
+
+
+def _unique(
+    rows: Sequence[dict[str, Any]], key: str, label: str,
+    issues: list[str] | None = None,
+) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for index, row in enumerate(rows):
         value = row[key]
         if value in result:
-            raise ProtocolError(f"/{label}: duplicate {key} {value!r}")
+            message = f"/{label}/{index}/{key}: duplicate value {value!r}"
+            if issues is None:
+                raise ProtocolError(message)
+            issues.append(message)
+            continue
         result[value] = row
     return result
 
 
 def _validate_coverage(
     coverage: Sequence[dict[str, Any]], findings: dict[str, dict[str, Any]],
+    issues: list[str] | None = None,
 ) -> None:
+    found: list[str] = []
     got = [row["id"] for row in coverage]
     if set(got) != set(CHECKLIST) or len(got) != len(set(got)):
-        raise ProtocolError("/coverage: every checklist id must occur exactly once")
+        found.append("/coverage: every checklist id must occur exactly once")
     referenced: set[str] = set()
     for index, row in enumerate(coverage):
         links = row["finding_ids"]
         if any(fid not in findings for fid in links):
-            raise ProtocolError(f"/coverage/{index}/finding_ids: unknown finding id")
+            found.append(f"/coverage/{index}/finding_ids: unknown finding id")
         if (row["status"] == "finding") != bool(links):
-            raise ProtocolError(
+            found.append(
                 f"/coverage/{index}: finding status and finding_ids must agree"
             )
         referenced.update(links)
     if referenced != set(findings):
-        raise ProtocolError("/coverage: every finding must be bound to coverage")
+        found.append("/coverage: every finding must be bound to coverage")
+    if issues is None:
+        _raise_semantic_issues(found)
+    else:
+        issues.extend(found)
 
 
 def parse_lane(text: str, *, mode: str, lane: str,
                class_ids: Sequence[str] = ()) -> dict[str, Any]:
     value = decode(text, lane_schema(mode, lane))
-    findings = _unique(value["findings"], "id", "findings")
-    _validate_coverage(value["coverage"], findings)
-    assessments = _unique(value["class_assessments"], "class_id", "class_assessments")
+    issues: list[str] = []
+    findings = _unique(value["findings"], "id", "findings", issues)
+    _validate_coverage(value["coverage"], findings, issues)
+    assessments = _unique(
+        value["class_assessments"], "class_id", "class_assessments", issues,
+    )
     expected = set(class_ids) if lane == "integrity" else set()
     if set(assessments) != expected:
-        raise ProtocolError(
+        issues.append(
             "/class_assessments: must assess every required active class exactly once"
         )
     for cid, row in assessments.items():
         if row["verdict"] == "violated" and row["finding_id"] not in findings:
-            raise ProtocolError(
+            issues.append(
                 f"/class_assessments/{cid}/finding_id: must name a lane finding"
             )
+    _raise_semantic_issues(issues)
     return value
 
 
@@ -413,13 +454,14 @@ def materialize_decision(
     """Validate one semantic decision and project it to the durable V1 shape."""
 
     value = decode(text, decision_schema(mode, role))
+    issues: list[str] = []
     findings = value["governing_findings"]
-    by_finding = _unique(findings, "id", "governing_findings")
+    by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
-        _validate_coverage(value["coverage"], by_finding)
+        _validate_coverage(value["coverage"], by_finding, issues)
     classes = {row["class_id"]: row for row in active_classes}
     if len(classes) != len(active_classes):
-        raise ProtocolError("/active_classes: duplicate class_id")
+        issues.append("/active_classes: duplicate class_id")
     debt_by_id = {
         row["id"]: row for row in durable_debt
         if isinstance(row, dict) and isinstance(row.get("id"), str)
@@ -431,7 +473,7 @@ def materialize_decision(
     }
     reused = sorted(set(by_finding) & historic_finding_ids)
     if reused:
-        raise ProtocolError(
+        issues.append(
             f"/governing_findings: new findings reuse durable identities {reused}"
         )
 
@@ -442,19 +484,20 @@ def materialize_decision(
         for finding in findings:
             for source in finding["source_ids"]:
                 if source not in expected_sources:
-                    raise ProtocolError(
+                    issues.append(
                         f"/governing_findings/{finding['id']}/source_ids: unknown source {source!r}"
                     )
+                    continue
                 source_rows.append({"source_id": source, "governing_id": finding["id"]})
                 governing_by_source.setdefault(source, []).append(finding["id"])
                 severity = (source_severities or {}).get(source)
                 if severity and _rank(finding["severity"]) < _rank(severity):
-                    raise ProtocolError(
+                    issues.append(
                         f"/governing_findings/{finding['id']}/severity: cannot downgrade {source}"
                     )
         if set(governing_by_source) != expected_sources:
             missing = sorted(expected_sources - set(governing_by_source))
-            raise ProtocolError(
+            issues.append(
                 f"/governing_findings: every source must be mapped; missing {missing}"
             )
 
@@ -473,22 +516,27 @@ def materialize_decision(
         else:
             cid = classification["class_id"]
             if cid not in classes:
-                raise ProtocolError(
+                issues.append(
                     f"/governing_findings/{finding['id']}/classification/class_id: "
                     f"unknown active class {cid!r}"
                 )
+                finding_class[finding["id"]] = None
+                continue
             if cid in existing_findings:
-                raise ProtocolError(
+                issues.append(
                     f"/governing_findings: multiple findings classify to active class {cid!r}"
                 )
-            existing_findings[cid] = finding["id"]
+            else:
+                existing_findings[cid] = finding["id"]
             finding_class[finding["id"]] = cid
 
-    debt_outcomes = _unique(value["debt_outcomes"], "debt_id", "debt_outcomes")
+    debt_outcomes = _unique(
+        value["debt_outcomes"], "debt_id", "debt_outcomes", issues,
+    )
     if set(debt_outcomes) != set(open_debt):
         missing = sorted(set(open_debt) - set(debt_outcomes))
         unknown = sorted(set(debt_outcomes) - set(open_debt))
-        raise ProtocolError(
+        issues.append(
             f"/debt_outcomes: must update every supplied open debt exactly once; "
             f"missing={missing}, unknown={unknown}"
         )
@@ -497,7 +545,9 @@ def materialize_decision(
         for row in value["debt_outcomes"]
     ]
 
-    outcomes = _unique(value["class_outcomes"], "class_id", "class_outcomes")
+    outcomes = _unique(
+        value["class_outcomes"], "class_id", "class_outcomes", issues,
+    )
     expected_classes = (
         set(assessment_verdicts or {}) if role == "census"
         else set(classes) if role == "final"
@@ -507,7 +557,7 @@ def materialize_decision(
         } | set(existing_findings)
     )
     if set(outcomes) != expected_classes:
-        raise ProtocolError(
+        issues.append(
             f"/class_outcomes: expected exactly {sorted(expected_classes)}, "
             f"got {sorted(outcomes)}"
         )
@@ -517,8 +567,11 @@ def materialize_decision(
     violated: set[str] = set()
     target_by_class: dict[str, str | None] = {}
     for cid, outcome in outcomes.items():
-        if role == "census" and outcome["verdict"] != (assessment_verdicts or {})[cid]:
-            raise ProtocolError(
+        expected_verdict = (assessment_verdicts or {}).get(cid)
+        if role == "census" and expected_verdict is not None and (
+            outcome["verdict"] != expected_verdict
+        ):
+            issues.append(
                 f"/class_outcomes/{cid}/verdict: must preserve integrity-lane verdict"
             )
         target: str | None = None
@@ -529,31 +582,33 @@ def materialize_decision(
                 target = basis["finding_id"]
                 finding = by_finding.get(target)
                 if finding is None or finding_class.get(target) != cid:
-                    raise ProtocolError(
+                    issues.append(
                         f"/class_outcomes/{cid}/basis: finding must classify to this class"
                     )
-                if role == "census":
+                if role == "census" and finding is not None:
                     cited = (assessment_findings or {}).get(cid)
                     if cited not in finding["source_ids"]:
-                        raise ProtocolError(
+                        issues.append(
                             f"/class_outcomes/{cid}/basis: must follow cited lane finding {cited!r}"
                         )
             else:
                 if role == "census":
-                    raise ProtocolError(
+                    issues.append(
                         f"/class_outcomes/{cid}/basis: census violations require a new finding"
                     )
                 debt_id = basis["debt_id"]
                 debt = open_debt.get(debt_id)
                 if debt is None or cid not in debt.get("class_ids", []):
-                    raise ProtocolError(
+                    issues.append(
                         f"/class_outcomes/{cid}/basis/debt_id: debt must already bind this class"
                     )
-                if debt_outcomes[debt_id]["status"] != "open":
-                    raise ProtocolError(
+                outcome_row = debt_outcomes.get(debt_id)
+                if outcome_row is not None and outcome_row["status"] != "open":
+                    issues.append(
                         f"/class_outcomes/{cid}/basis/debt_id: carried debt must remain open"
                     )
-                target = debt["finding_id"]
+                if debt is not None:
+                    target = debt["finding_id"]
         target_by_class[cid] = target
         assessment_rows.append({"assessment_id": cid, "governing_id": target})
         materialized_assessments.append({
@@ -564,7 +619,7 @@ def materialize_decision(
     if set(existing_findings) != {
         cid for cid, target in target_by_class.items() if target in set(existing_findings.values())
     }:
-        raise ProtocolError(
+        issues.append(
             "/governing_findings: every existing-class finding needs one matching violated outcome"
         )
 
@@ -580,66 +635,82 @@ def materialize_decision(
             and not str(finding_class[target]).startswith("record:")
         }
         if len(target_classes) != len(targets) or target_classes != cited_classes:
-            raise ProtocolError(
+            issues.append(
                 f"/governing_findings: source fan-out for {source!r} requires distinct "
                 "matching violated existing classes"
             )
 
     for debt_id, debt in open_debt.items():
-        if debt_outcomes[debt_id]["status"] != "open":
+        debt_outcome = debt_outcomes.get(debt_id)
+        if debt_outcome is None or debt_outcome["status"] != "open":
             continue
         bound = [item for item in debt.get("class_ids", []) if item in classes]
         if bound and not any(
             cid in outcomes and outcomes[cid]["verdict"] == "violated"
             for cid in bound
         ):
-            raise ProtocolError(
+            issues.append(
                 f"/debt_outcomes/{debt_id}: open class-bound debt needs a violated class"
             )
 
-    actions = _unique(value["class_actions"], "class_id", "class_actions")
+    actions = _unique(
+        value["class_actions"], "class_id", "class_actions", issues,
+    )
     for cid, action in actions.items():
         if cid not in classes:
-            raise ProtocolError(f"/class_actions/{cid}: unknown active class")
+            issues.append(f"/class_actions/{cid}: unknown active class")
+            continue
         status = classes[cid]["status"]
         if action["kind"] == "close" and (
             cid not in outcomes or outcomes[cid]["verdict"] != "satisfied"
         ):
-            raise ProtocolError(f"/class_actions/{cid}: close requires satisfied outcome")
+            issues.append(f"/class_actions/{cid}: close requires satisfied outcome")
         if action["kind"] == "reopen" and status != cc.CLOSED:
-            raise ProtocolError(f"/class_actions/{cid}: reopen requires closed class")
+            issues.append(f"/class_actions/{cid}: reopen requires closed class")
         if action["kind"] == "reopen" and (
             cid not in outcomes or outcomes[cid]["verdict"] != "violated"
         ):
-            raise ProtocolError(f"/class_actions/{cid}: reopen requires violated outcome")
+            issues.append(f"/class_actions/{cid}: reopen requires violated outcome")
         if action["kind"] in {"reclassify", "replace"}:
             severity = (
                 action["severity"] if action["kind"] == "reclassify"
                 else action["definition"]["severity"]
             )
             if _rank(severity) < _rank(classes[cid]["severity"]):
-                raise ProtocolError(f"/class_actions/{cid}: cannot downgrade active class")
+                issues.append(f"/class_actions/{cid}: cannot downgrade active class")
+        if (
+            action["kind"] == "replace" and classes[cid]["mechanized"]
+            and "pattern" not in action["definition"]
+        ):
+            issues.append(
+                f"/class_actions/{cid}/definition: mechanized class replacement "
+                "requires pattern and pathspec"
+            )
 
     for cid, outcome in outcomes.items():
-        cls = classes[cid]
+        cls = classes.get(cid)
+        if cls is None:
+            continue
         action = actions.get(cid)
         if outcome["verdict"] == "satisfied" and cls["status"] in cc.UNPROVEN_STATUSES:
             if cls["mechanized"]:
-                raise ProtocolError(
+                issues.append(
                     f"/class_outcomes/{cid}: mechanized open class cannot be model-closed"
                 )
             if action is None:
                 actions[cid] = {"kind": "close", "class_id": cid}
-            elif action["kind"] != "close":
-                raise ProtocolError(
+            elif action["kind"] not in {"close", "reclassify", "replace"}:
+                issues.append(
                     f"/class_actions/{cid}: open satisfied class must close"
                 )
         if outcome["verdict"] == "violated" and cls["status"] == cc.CLOSED:
             allowed = {"replace"} if cls["mechanized"] else {"reopen", "replace"}
             if action is None or action["kind"] not in allowed:
-                raise ProtocolError(
+                issues.append(
                     f"/class_actions/{cid}: closed violated class requires {sorted(allowed)}"
                 )
+
+    _raise_semantic_issues(issues)
 
     for action in actions.values():
         kind = action["kind"]

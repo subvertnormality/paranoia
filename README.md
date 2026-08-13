@@ -149,6 +149,11 @@ Codex schema subset lacks `uniqueItems`, and Claude must not receive the draft-i
 uniqueness remains mandatory in local validation, so duplicates can trigger the existing
 same-session correction but can never settle. There is no prose/marker fallback. One-shot reviews
 retain the single broad review.
+For Claude, schema success additionally requires an object in the provider envelope's
+`structured_output`; a zero exit status with only result prose is a provider failure. Branch class
+schemas reject leading-colon Git pathspec magic, and replacements of mechanized classes must retain
+a pattern plus literal pathspec. The local semantic pass returns bounded, deterministically ordered
+independent issues so the single validation retry can repair more than the first defect.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
@@ -1040,6 +1045,7 @@ audit digest, outcome/selection/snapshot, or production hashes.
 ```bash
 pip install -e '.[dev]'
 python -m pytest        # unit + integration; integration uses fake CLIs, no quota
+python scripts/run_staged_protocol_mutation_checks.py  # bounded Protocol v2 release gate
 ```
 
 The engine subprocess boundary is dependency-injected, so the whole stack is

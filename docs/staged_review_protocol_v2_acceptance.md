@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **local implementation acceptance complete; CODE convergence pending**
+Status: **CODE round-1 findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -28,8 +28,10 @@ Draft 2020-12 schema independently.
 | Claude | Fresh and resumed minimal objects returned `structured_output` in session `99654842-8875-4335-998f-516202b4c43d`. The exact production lane schema returned `structured_output` in session `93f031db-2577-4959-bce1-66d85f33f90f`. A probe retaining `$schema` returned ordinary prose and no `structured_output`, so `$schema` and Codex-unsupported `uniqueItems` are removed from the common provider projection; no other bound was removed. |
 
 The local schema still enforces uniqueness, exact key closure, length/count bounds, enums, tagged
-unions, and the single-anchor grammar. A provider omission can therefore cause only the existing
-validation correction/failure path, never settlement.
+unions, and the single-anchor grammar. The engine now also treats a Claude response as failed when
+a schema was requested but the provider envelope lacks an object-valued `structured_output`; result
+prose cannot enter local settlement validation. Fresh and resumed negative tests cover absent and
+non-object structured output.
 
 ## Real Codex primary lifecycle
 
@@ -60,23 +62,57 @@ payload.
 ## Automated verification
 
 The environment's command wrapper terminates a single process after roughly 30 seconds, so the
-full collection was run in three exhaustive groups with identical environment and Git isolation:
+final 967-test collection was run in four exhaustive groups with identical environment and Git
+isolation:
 
-- 159 arbitration-handler tests passed in 22.33 seconds;
-- 438 core/engine/handler tests passed in 27.0 seconds;
-- 356 integration/plan/staged/server tests passed in 12.14 seconds.
+- 159 arbitration-handler tests passed;
+- 306 acceptance/arbitration/class-closure tests passed in 27.35 seconds;
+- 136 engine/evidence/handler/inert-tree tests passed in 12.51 seconds;
+- 366 integration/plan/staged/server tests passed in 13.37 seconds.
 
-Total: **953 passed**. Focused V2/engine/prompt/plan tests also passed independently, and
-`git diff --check` is clean.
+Total: **967 passed**. The nine-mutation bounded gate also passed, focused
+V2/engine/prompt/plan tests passed independently, and `git diff --check` is clean.
+
+After the first CODE census, focused gates cover the accepted findings:
+
+- frozen pre-V2 projections for census, correction, and final compare source/class dispositions,
+  findings, debt content after the documented fresh-ID normalization, debt updates, class records,
+  assessments, and final coverage;
+- the existing legal-shape suite covers one-off/new/existing classes, plan procedure and branch
+  procedure/pattern definitions, advisory class debt, fan-out, carried debt, action kinds, severity,
+  and closure/reopen behavior;
+- `scripts/run_staged_protocol_mutation_checks.py` owns nine enumerated mutations: coverage binding,
+  occurrence severity floor, literal pathspec, class/debt completeness, mechanized replacement,
+  standalone actions, derived close, and advisory violated-class debt. All nine are killed by named
+  focused tests. This is a bounded gate over those controls, not a claim that every possible mutant
+  or every historical model payload was exercised.
+
+## CODE review checkpoint
+
+Codex CODE round 1 (CLI 0.144.6, `gpt-5.6-sol`, high effort, web disabled) reviewed committed
+snapshot `edc5c8a` against `main` under the frozen stakes. It opened seven blocking classes:
+provider-envelope fallback; Git pathspec magic; mechanized-to-manual replacement; compatible
+standalone class actions; first-error-only semantic diagnostics; census aggregate capacity; and
+missing executable historical/mutation gates. The implementation treats all seven as accepted.
+
+One coherent contract-completion pass now fails Claude schema calls closed, rejects pathspec magic,
+preserves mechanization on replacement, permits compatible reclassify/replace actions beside a
+satisfied outcome, accumulates independent semantic issues, admits the calculated 300-source plus
+100-active-class census bound, and adds the narrowly described differential/mutation evidence.
+No provider call, retry, phase, persistence format, trust boundary, or subsystem was added.
 
 ## Size and architecture checkpoint
 
-The reviewed checkpoint covers `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
-`staged_protocol.py`. Against `main` those five modules are **+198 net lines**, within the reviewed
-`+200` stop threshold. Their current sizes are 2,689, 434, 501, 601, and 704 lines respectively.
-Across all production Python and dependency-manifest changes the diff is +218 net lines; this also
-includes relocating arbitration's independent fence helper and making the existing numbering helper
-accept an already-split line collection.
+The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
+`staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
+checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
+modules to **+284 net lines** and current sizes 2,689, 434, 501, 616, and 775 lines. The increase is
+bounded semantic issue accumulation, provider-envelope closure, and the corrected schema limits;
+the larger differential and mutation evidence lives in tests/scripts rather than production.
+There is still no new subsystem, and the largest existing handler was not expanded by this pass.
+Across all production Python and dependency-manifest changes the final diff is **+304 net lines**;
+the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
+helper change, and dependency declaration already described above.
 
 The model-facing top-level settlement relationships fall from seven mirrored tables to four
 semantic tables. There is no new persistence layer, model phase, provider call, trust boundary, or

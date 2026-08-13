@@ -397,6 +397,42 @@ class TestRunWithInjectedRunner:
         assert json.loads(argv[argv.index("--json-schema") + 1]) == STRUCTURED_SCHEMA
         assert json.loads(review.text) == {"answer": "ok"}
 
+    @pytest.mark.parametrize("resumed", [False, True])
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"result": '{"answer":"prose"}'},
+            {"result": "fallback", "structured_output": ["not", "an", "object"]},
+        ],
+    )
+    def test_claude_schema_call_fails_closed_without_structured_object(
+        self, resumed, payload,
+    ) -> None:
+        engine = engines.ClaudeEngine()
+
+        def fake_runner(argv, stdin_text, cwd, timeout):
+            return RunResult(
+                returncode=0,
+                stdout=json.dumps({
+                    "type": "result", "subtype": "success", "is_error": False,
+                    "session_id": "structured", **payload,
+                }),
+                stderr="",
+            )
+
+        kwargs = dict(
+            prompt="respond", cwd=Path("/repo"), model="m", effort="low",
+            web_search=False, runner=fake_runner, response_schema=STRUCTURED_SCHEMA,
+        )
+        review = (
+            engine.resume(session_ref="structured", **kwargs)
+            if resumed else engine.run(**kwargs)
+        )
+        assert review.error
+        assert review.failure_detail == (
+            "claude did not return the requested structured_output object"
+        )
+
 
 def test_every_claude_deny_rule_is_a_tool_the_cli_knows():
     """An unknown deny rule contaminates the engine's structured output.

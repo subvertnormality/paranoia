@@ -312,6 +312,27 @@ def test_branch_supports_pattern_and_procedure_definitions():
         rc.register_from_records(parsed["class_records"], mechanized=None)
 
 
+def test_branch_schema_rejects_git_pathspec_magic_for_new_and_replacement_classes():
+    bad_definition = {
+        "invariant": "no generated files", "severity": "MAJOR",
+        "pattern": "BAD", "pathspec": ":(exclude)generated/**",
+    }
+    census = decision("census", governing_findings=[finding(
+        source_ids=["behaviour:F1"],
+        classification={"kind": "new_class", "definition": bad_definition},
+    )])
+    correction = decision("correction", class_actions=[{
+        "kind": "replace", "class_id": "class-a", "definition": bad_definition,
+    }])
+    for value in (census, correction):
+        with pytest.raises(sp.ProtocolError, match="not valid under any"):
+            materialize(
+                value, mode="branch", source_ids=["behaviour:F1"],
+                source_severities={"behaviour:F1": "MAJOR"},
+                active_classes=[active_class(mechanized=True)],
+            )
+
+
 def test_carried_debt_preserves_one_identity_without_minting():
     debts = [durable_debt("D7", finding_id="old-7"), durable_debt("D8", finding_id="old-8")]
     value = decision(
@@ -372,6 +393,37 @@ def test_satisfied_open_unmechanized_class_derives_close():
     assert parsed["class_records"] == [{"op": "close", "class_id": "class-a"}]
 
 
+@pytest.mark.parametrize(
+    "action",
+    [
+        {"kind": "reclassify", "class_id": "class-a", "severity": "BLOCKER"},
+        {
+            "kind": "replace", "class_id": "class-a",
+            "definition": {
+                "invariant": "replacement invariant", "severity": "BLOCKER",
+                "procedure": "inspect the replacement invariant",
+            },
+        },
+    ],
+)
+def test_satisfied_open_class_preserves_compatible_standalone_action(action):
+    value = decision(
+        "correction",
+        debt_outcomes=[{
+            "debt_id": "D7", "status": "closed", "evidence": ["plan:1"],
+        }],
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:1"],
+        }],
+        class_actions=[action],
+    )
+    parsed = materialize(
+        value, active_classes=[active_class()], durable_debt=[durable_debt()],
+    )
+    assert parsed["class_records"][0]["op"] == action["kind"]
+    assert parsed["debt_updates"][0]["status"] == "closed"
+
+
 def test_satisfied_open_mechanized_class_cannot_be_model_closed():
     value = decision(
         "final", coverage=coverage(),
@@ -419,6 +471,31 @@ def test_closed_violated_class_requires_reopen_or_replace():
     assert parsed["class_records"] == [{"op": "reopen", "class_id": "class-a"}]
 
 
+def test_closed_mechanized_class_cannot_be_replaced_by_manual_procedure():
+    value = decision(
+        "final", coverage=coverage("G1"),
+        governing_findings=[finding(classification={
+            "kind": "existing_class", "class_id": "class-a",
+        })],
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "G1"},
+        }],
+        class_actions=[{
+            "kind": "replace", "class_id": "class-a",
+            "definition": {
+                "invariant": "manual replacement", "severity": "MAJOR",
+                "procedure": "inspect manually",
+            },
+        }],
+    )
+    with pytest.raises(sp.ProtocolError, match="requires pattern and pathspec"):
+        materialize(
+            value, mode="branch",
+            active_classes=[active_class(status=cc.CLOSED, mechanized=True)],
+        )
+
+
 def test_source_fanout_requires_distinct_cited_existing_classes():
     classes = [active_class("class-a"), active_class("class-b")]
     findings = [
@@ -455,3 +532,236 @@ def test_new_finding_cannot_reuse_durable_finding_identity():
     value = decision("correction", governing_findings=[finding("old-finding")])
     with pytest.raises(sp.ProtocolError, match="reuse durable identities"):
         materialize(value, durable_debt=[durable_debt()])
+
+
+def test_census_schema_represents_full_three_lane_aggregate_and_fanout():
+    findings = [
+        finding(
+            fid=f"G{index}", source_ids=[f"behaviour:F{index}"],
+            classification={"kind": "one_off", "reason": "one source"},
+        )
+        for index in range(sp.MAX_CENSUS_SOURCES)
+    ]
+    findings.extend(
+        finding(
+            fid=f"C{index}", source_ids=["behaviour:F0"],
+            classification={"kind": "existing_class", "class_id": f"class-{index}"},
+        )
+        for index in range(sp.MAX_ACTIVE_CLASSES)
+    )
+    value = decision("census", governing_findings=findings)
+    assert not list(
+        Draft202012Validator(sp.decision_schema("branch", "census")).iter_errors(value)
+    )
+    value["governing_findings"].append(finding(
+        fid="overflow", source_ids=["behaviour:F0"],
+    ))
+    assert list(
+        Draft202012Validator(sp.decision_schema("branch", "census")).iter_errors(value)
+    )
+
+
+def test_semantic_validation_reports_all_independent_issues():
+    value = decision(
+        "census",
+        governing_findings=[
+            finding(
+                fid="G1", severity="MINOR", source_ids=["domain:F1"],
+                classification={"kind": "existing_class", "class_id": "missing"},
+            ),
+            finding(
+                fid="G1", source_ids=["unknown:F2"],
+                classification={"kind": "one_off", "reason": "one site"},
+            ),
+        ],
+    )
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(
+            value, source_ids=["domain:F1"],
+            source_severities={"domain:F1": "MAJOR"},
+        )
+    message = str(caught.value)
+    assert "duplicate value 'G1'" in message
+    assert "cannot downgrade domain:F1" in message
+    assert "unknown active class 'missing'" in message
+    assert "unknown source 'unknown:F2'" in message
+
+
+def test_class_and_debt_outcome_completeness_are_independent_controls():
+    with pytest.raises(sp.ProtocolError, match="class_outcomes: expected exactly"):
+        materialize(
+            decision("final", coverage=coverage()),
+            active_classes=[active_class()],
+        )
+    with pytest.raises(sp.ProtocolError, match="debt_outcomes: must update every"):
+        materialize(decision("correction"), durable_debt=[durable_debt(cid=None)])
+
+
+def v1_projection(parsed):
+    """Normalize only V1's model-chosen fresh debt label for frozen comparisons."""
+    projected = {
+        key: parsed[key]
+        for key in (
+            "role", "source_dispositions", "assessment_dispositions", "findings",
+            "debt", "debt_updates", "class_dispositions", "class_records",
+            "class_assessments",
+        )
+    }
+    projected["debt"] = [
+        {key: value for key, value in row.items() if key != "id"}
+        for row in projected["debt"]
+    ]
+    if "coverage" in parsed:
+        projected["coverage"] = parsed["coverage"]
+    return projected
+
+
+def test_frozen_historical_v1_census_projection_is_preserved():
+    """Projection captured from the pre-V2 settlement contract at 83fc1e6."""
+    classes = [active_class(severity="MINOR")]
+    values = [
+        finding("G1", "MAJOR", source_ids=["domain:F1"]),
+        finding(
+            "G2", "MINOR", source_ids=["integrity:F2"],
+            classification={"kind": "existing_class", "class_id": "class-a"},
+        ),
+        finding(
+            "G3", "MAJOR", source_ids=["execution:F3"],
+            classification={
+                "kind": "new_class",
+                "definition": {
+                    "invariant": "identity survives copies", "severity": "BLOCKER",
+                    "procedure": "inspect every copy boundary",
+                },
+            },
+        ),
+    ]
+    raw = decision(
+        "census", governing_findings=values,
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "G2"},
+        }],
+    )
+    parsed = materialize(
+        raw,
+        source_ids=["domain:F1", "integrity:F2", "execution:F3"],
+        source_severities={
+            "domain:F1": "MAJOR", "integrity:F2": "MINOR",
+            "execution:F3": "MAJOR",
+        },
+        assessment_verdicts={"class-a": "violated"},
+        assessment_findings={"class-a": "integrity:F2"},
+        active_classes=classes,
+    )
+    expected_debt = [
+        {
+            "finding_id": row["id"], "status": "open", "severity": row["severity"],
+            "summary": row["summary"], "evidence": row["evidence"],
+            "remedy": row["remedy"],
+        }
+        for row in values
+    ]
+    assert v1_projection(parsed) == {
+        "role": "census",
+        "source_dispositions": [
+            {"source_id": "domain:F1", "governing_id": "G1"},
+            {"source_id": "integrity:F2", "governing_id": "G2"},
+            {"source_id": "execution:F3", "governing_id": "G3"},
+        ],
+        "assessment_dispositions": [
+            {"assessment_id": "class-a", "governing_id": "G2"},
+        ],
+        "findings": [
+            {key: row[key] for key in ("id", "severity", "summary", "evidence", "remedy")}
+            for row in values
+        ],
+        "debt": expected_debt,
+        "debt_updates": [],
+        "class_dispositions": [
+            {"finding_id": "G1", "kind": "one_off", "reason": "this fixture has one site"},
+            {"finding_id": "G2", "kind": "existing_class", "class_id": "class-a"},
+            {"finding_id": "G3", "kind": "new_class", "record_index": 0},
+        ],
+        "class_records": [{
+            "op": "new", "invariant": "identity survives copies", "severity": "BLOCKER",
+            "procedure": "inspect every copy boundary",
+        }],
+        "class_assessments": [{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "finding_id": "G2",
+        }],
+    }
+
+
+def test_frozen_historical_v1_correction_projection_is_preserved():
+    debts = [durable_debt("D7"), durable_debt("D8", cid=None, finding_id="old-8")]
+    new = finding(
+        "G4", "MAJOR",
+        classification={"kind": "existing_class", "class_id": "class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[new],
+        debt_outcomes=[
+            {"debt_id": "D7", "status": "closed", "evidence": ["plan:1"]},
+            {"debt_id": "D8", "status": "closed", "evidence": ["plan:1"]},
+        ],
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "G4"},
+        }],
+        class_actions=[{
+            "kind": "reclassify", "class_id": "class-a", "severity": "BLOCKER",
+        }],
+    )
+    parsed = materialize(raw, active_classes=[active_class()], durable_debt=debts)
+    assert v1_projection(parsed) == {
+        "role": "correction", "source_dispositions": [],
+        "assessment_dispositions": [
+            {"assessment_id": "class-a", "governing_id": "G4"},
+        ],
+        "findings": [{
+            key: new[key] for key in ("id", "severity", "summary", "evidence", "remedy")
+        }],
+        "debt": [{
+            "finding_id": "G4", "status": "open", "severity": "MAJOR",
+            "summary": "reachable defect", "evidence": ["plan:1"],
+            "remedy": "repair the reachable path",
+        }],
+        "debt_updates": [
+            {"id": "D7", "status": "closed", "evidence": ["plan:1"]},
+            {"id": "D8", "status": "closed", "evidence": ["plan:1"]},
+        ],
+        "class_dispositions": [
+            {"finding_id": "G4", "kind": "existing_class", "class_id": "class-a"},
+        ],
+        "class_records": [
+            {"op": "reclassify", "class_id": "class-a", "severity": "BLOCKER"},
+        ],
+        "class_assessments": [{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "finding_id": "G4",
+        }],
+    }
+
+
+def test_frozen_historical_v1_final_projection_is_preserved():
+    raw = decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:1"],
+        }],
+    )
+    parsed = materialize(raw, active_classes=[active_class()])
+    assert v1_projection(parsed) == {
+        "role": "final", "source_dispositions": [], "assessment_dispositions": [
+            {"assessment_id": "class-a", "governing_id": None},
+        ],
+        "findings": [], "debt": [], "debt_updates": [], "class_dispositions": [],
+        "class_records": [{"op": "close", "class_id": "class-a"}],
+        "class_assessments": [{
+            "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:1"],
+            "finding_id": None,
+        }],
+        "coverage": coverage(),
+    }

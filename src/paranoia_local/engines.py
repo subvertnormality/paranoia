@@ -177,6 +177,21 @@ class Engine(ABC):
             finally:
                 cleanup()
         review = self.parse_output(result.stdout)
+        if response_schema is not None and self.name == "claude" and not review.error:
+            try:
+                envelope = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                envelope = None
+            if not isinstance(envelope, dict) or not isinstance(
+                envelope.get("structured_output"), dict
+            ):
+                review = replace(
+                    review,
+                    error=True,
+                    failure_detail=(
+                        "claude did not return the requested structured_output object"
+                    ),
+                )
         # A review is failed if the process exited non-zero OR the engine reported an
         # in-band error (e.g. Claude's is_error) — the latter can occur with rc 0 and
         # non-empty stdout, which the old "rc != 0 AND empty stdout" gate silently
