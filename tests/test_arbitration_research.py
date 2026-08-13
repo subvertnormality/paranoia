@@ -72,3 +72,33 @@ def test_discovery_prompt_contains_no_pipe_delimited_pseudo_enum():
         r'"(?:kind|source_kind|relation)":"[^"]*\|[^"]*"',
         prompts.ARBITRATION_DISCOVERY_INSTRUCTIONS,
     )
+
+
+def test_a_markdown_fenced_binding_parses_like_a_bare_one():
+    """The research phase takes the same fence as the settlement parser did.
+
+    Measured 2026-08-13: an arbitration this delivery needed returned
+    `ResearchError: invalid JSON after === EVIDENCE BINDING JSON ===` twice on
+    `claude-opus-5`, at different offsets, with `ROUNDS: 0` — the deciders never
+    voted. The engine had wrapped the object in a fence, exactly as it does for
+    settlements, and `raw_decode` stops at the first backtick.
+    """
+    claims = ar.parse_discovery(discovery())
+    captures = [captured(claims[0])]
+    body = json.dumps({"bindings": [{
+        "claim_index": 0, "usable": True, "location": "API behavior",
+        "passage": "The API retries twice.",
+    }]})
+    bare = f"{ar.BINDING_MARKER}\n{body}"
+    for opening in ("```json", "```"):
+        fenced = f"{ar.BINDING_MARKER}\n{opening}\n{body}\n```"
+        assert (ar.parse_binding(fenced, claims, captures)
+                == ar.parse_binding(bare, claims, captures))
+
+
+def test_a_fenced_discovery_payload_parses_too():
+    """Discovery shares the extractor, so it gains the same tolerance."""
+    bare = discovery()
+    marker, body = bare.split("\n", 1)
+    assert (ar.parse_discovery(f"{marker}\n```json\n{body}\n```")
+            == ar.parse_discovery(bare))

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from . import external_sources as sources
+from .review_census import unfence
 
 
 DISCOVERY_MARKER = "=== RESEARCH DISCOVERY JSON ==="
@@ -55,7 +56,12 @@ def _one_line(value: object, field: str, limit: int) -> str:
 def _json_after(text: str, marker: str) -> object:
     if text.count(marker) != 1:
         raise ResearchError(f"expected exactly one {marker!r} marker")
-    tail = text.split(marker, 1)[1].strip()
+    # Engines intermittently wrap the object in a markdown fence despite the
+    # prompt asking for bare JSON, and `raw_decode` stops at the first backtick.
+    # Measured 2026-08-13: two arbitrations failed here with `ROUNDS: 0`, so the
+    # deciders never voted and the run was lost to formatting. Same tolerance,
+    # same helper, as the settlement and lane parsers.
+    tail = unfence(text.split(marker, 1)[1].strip())
     try:
         value, end = json.JSONDecoder().raw_decode(tail)
     except json.JSONDecodeError as exc:

@@ -768,7 +768,7 @@ def _walk_dicts(value: Any):
             yield from _walk_dicts(child)
 
 
-def _unfence(raw: str) -> str:
+def unfence(raw: str) -> str:
     """Strip a markdown code fence the engine wrapped the payload in.
 
     The prompt asks for bare JSON after the marker, and engines mostly comply —
@@ -802,7 +802,7 @@ def _object(text: str, marker: str, cap: int) -> dict[str, Any]:
     stripped = text.strip()
     if text.count(marker) != 1 or not stripped.startswith(marker):
         raise CensusError(f"reply must begin with exactly one {marker!r} marker")
-    raw = _unfence(stripped[len(marker):].strip())
+    raw = unfence(stripped[len(marker):].strip())
     try: obj = json.loads(raw)
     except json.JSONDecodeError as exc: raise CensusError(f"invalid JSON: {exc}") from exc
     if not isinstance(obj, dict): raise CensusError("JSON result must be an object")
