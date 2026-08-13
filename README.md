@@ -662,7 +662,11 @@ What it does, in order:
 
 `research: true` requires `web_search: true`; the incompatible combination is rejected before
 any model call. `web_search` authorizes only the isolated discovery roles. Binding and every
-decider call run with web disabled, and only server-captured packets can affect substantiation.
+decider call run with web disabled, and other evidence roles retain their narrower tool surface.
+Claude evidence roles use matching
+availability and permission allowlists on fresh and resumed calls; denial of a tool required by
+the active role is a visible provider-capability failure, never an empty-search success. Binding
+and text roles use explicit empty allowlists. Only server-captured packets can affect substantiation.
 The signed-in end-to-end record, including exact versions, packet digest, source references,
 plan-claim closure, repository-only closure, and defects found by the first real runs, is
 [`docs/evidence_capture_acceptance_2026-08-10.json`](docs/evidence_capture_acceptance_2026-08-10.json).

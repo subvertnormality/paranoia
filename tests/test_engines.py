@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -177,16 +178,54 @@ class TestClaudeArgv:
         assert "sess-xyz" in argv
 
     def test_evidence_role_tool_sets_repeat_on_resume(self) -> None:
+        expected = {
+            engines.ROLE_DISCOVERY: "WebSearch",
+            engines.ROLE_REPOSITORY: "Read,Grep,Glob",
+            engines.ROLE_BINDING: "",
+            engines.ROLE_TEXT: "",
+        }
+        for role, tools in expected.items():
+            engine = engines.get_engine("claude").for_role(role)
+            calls = (
+                engine.build_argv(Path("/launch"), "m", "high", role == engines.ROLE_DISCOVERY),
+                engine.build_resume_argv(
+                    "s", Path("/launch"), "m", "high", role == engines.ROLE_DISCOVERY,
+                ),
+            )
+            for argv in calls:
+                assert argv[argv.index("--tools") + 1] == tools
+                assert argv[argv.index("--allowedTools") + 1] == tools
+                assert "--safe-mode" in argv and "--strict-mcp-config" in argv
+        discovery_tools = expected[engines.ROLE_DISCOVERY]
+        assert "WebFetch" not in discovery_tools
+        assert "Read" not in discovery_tools
+
+    def test_required_evidence_tool_denial_is_a_capability_failure(self) -> None:
         discovery = engines.get_engine("claude").for_role(engines.ROLE_DISCOVERY)
-        fresh = discovery.build_argv(Path("/launch"), "m", "high", True)
-        assert fresh[fresh.index("--tools") + 1] == "WebSearch"
-        assert "--safe-mode" in fresh and "--strict-mcp-config" in fresh
+        payload = json.dumps({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": "fallback claims", "session_id": "s",
+            "permission_denials": [{"tool_name": "WebSearch"}],
+        })
+
+        review = discovery.parse_output(payload)
+
+        assert review.error is True
+        assert review.text == "fallback claims"
+        assert review.failure_detail == "required evidence tool permission denied: WebSearch"
+
+    def test_tool_less_role_denial_remains_expected_enforcement(self) -> None:
         binding = engines.get_engine("claude").for_role(engines.ROLE_BINDING)
-        resumed = binding.build_resume_argv("s", Path("/launch"), "m", "high", False)
-        assert resumed[resumed.index("--tools") + 1] == ""
-        repository = engines.get_engine("claude").for_role(engines.ROLE_REPOSITORY)
-        argv = repository.build_argv(Path("/launch"), "m", "high", False)
-        assert argv[argv.index("--tools") + 1] == "Read,Grep,Glob"
+        payload = json.dumps({
+            "type": "result", "subtype": "success", "is_error": False,
+            "result": "bound without tools", "session_id": "s",
+            "permission_denials": [{"tool_name": "WebSearch"}],
+        })
+
+        review = binding.parse_output(payload)
+
+        assert review.error is False
+        assert review.failure_detail is None
 
     def test_parse_output_extracts_result_and_session(self) -> None:
         e = engines.get_engine("claude")

@@ -116,6 +116,10 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   attestation. Claude `WebFetch` must not be enabled in plan verification or arbitration
   research. No placeholder endpoint, optional plugin, or caller adapter may stand in for this
   primary path.
+  Claude discovery must both expose and allow only `WebSearch`; repository evidence may expose
+  and allow only `Read,Grep,Glob`; binding and text evidence roles must remain tool-less. A
+  permission denial of a tool required by the active evidence role is an execution failure, not
+  an unverified-claim result.
   Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
   digests plus cold authority/entailment decisions before support may freeze.
   Validate retained inventory before capture; attest replacement wording as its own exact
