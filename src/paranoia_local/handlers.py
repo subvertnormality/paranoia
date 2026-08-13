@@ -223,24 +223,26 @@ def _validate_materialized_class_records(
     """Collect independent canonical-engine faults before spending the one retry."""
     issues: list[str] = []
     pointers = parsed.get("_class_record_pointers", [])
+    valid_records: list[dict[str, Any]] = []
     for index, record in enumerate(parsed["class_records"]):
         try:
             single = rc.register_from_records(
                 [record], mechanized=None if mode == cc.BRANCH_MODE else False,
             )
             cc.apply_register(cc.copy_lineage(lineage), single, round_no=round_no)
+            valid_records.append(record)
         except (cc.RegisterError, rc.CensusError) as exc:
             pointer = pointers[index] if index < len(pointers) else f"/class_records/{index}"
             issues.append(f"{pointer}: invalid class operation: {exc}")
-    if not issues:
+    if valid_records:
         try:
             register = rc.register_from_records(
-                parsed["class_records"],
+                valid_records,
                 mechanized=None if mode == cc.BRANCH_MODE else False,
             )
             cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
         except (cc.RegisterError, rc.CensusError) as exc:
-            issues.append(f"/class_actions: invalid operation set: {exc}")
+            issues.append(f"/: invalid combined class operation set: {exc}")
     if issues:
         raise rc.CensusError(
             "\n".join(sorted(dict.fromkeys(issues)))[:sp.MAX_ISSUE_CHARS]

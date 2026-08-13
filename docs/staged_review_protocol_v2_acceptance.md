@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-4 held findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-5 held finding repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -69,7 +69,7 @@ payload.
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **988 passed in 61.82 seconds**. An initial
+commits did not inherit the operator's signing key: **988 passed in 62.52 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -143,6 +143,13 @@ satisfied and both violated-outcome bases, all action kinds, advisory debt, fan-
 mechanization. The fallback now extracts both embedded definitions and explicit actions; a terminal
 retry test combines graph debt-completeness, two bad anchors, an unknown action, and a new-class
 attempt against the canonical 100-class cap in one bounded pointer diagnostic.
+
+CODE round 5 closed the historical-equivalence class. It retained one exact cross-layer case:
+canonical aggregate validation was skipped when any individual record was invalid, so at 99 active
+classes two individually valid new definitions plus one independently invalid action omitted the
+combined cap failure. Canonical validation now always runs the individually valid subset as a set;
+the same terminal retry regression proves the invalid action and aggregate cap failure are both
+reported without applying either.
 
 ## Size and architecture checkpoint
 
