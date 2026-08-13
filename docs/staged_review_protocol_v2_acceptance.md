@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-6 held finding repaired at architecture checkpoint; convergence pending**
+Status: **CODE cold-final finding repaired; correction and final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -69,7 +69,7 @@ payload.
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **988 passed in 61.74 seconds**. An initial
+commits did not inherit the operator's signing key: **992 passed in 61.78 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -137,7 +137,7 @@ CODE round 4 closed the aggregate-capacity class and response-limit advisory. It
 historical gate because three later fixtures copied their V1 side from the V2 materialization, and
 retained cross-layer diagnostics because the semantic-failure fallback extracted explicit actions
 but not embedded new-class definitions. The V1 fixtures are now independently authored for every
-group. The seven-group executable matrix covers census, correction, final, one-off/new/existing
+group. The eight-group executable matrix covers census, correction, final, one-off/new/existing
 classification, plan and branch procedure definitions, branch patterns, open/closed debt outcomes,
 satisfied and both violated-outcome bases, all action kinds, advisory debt, fan-out, and replacement
 mechanization. The fallback now extracts both embedded definitions and explicit actions; a terminal
@@ -160,16 +160,23 @@ set is checked only when those independent groups pass. The terminal retry fixtu
 same-class actions with two new definitions at 99 active classes and verifies both aggregate errors,
 the semantic duplicate pointer, debt incompleteness, and anchor failures in one diagnostic.
 
+CODE round 7 closed the last correction blocker, but the round-8 broad cold final found one omitted
+V1 lifecycle shape: correction rejected outcome-independent standalone `close` and `reopen` even
+though both are valid canonical operations and the accepted plan promises them. The materializer
+now permits those actions when no class outcome is required, while retaining compatibility checks
+whenever an outcome is present. Independently authored V1/V2 close and reopen fixtures apply both
+through the canonical engine and durable settlement and compare class state, phase, and trailer.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+482 net lines** and current sizes 2,783, 450, 501, 616, and 863 lines. The increase is
+modules to **+484 net lines** and current sizes 2,783, 450, 501, 616, and 865 lines. The increase is
 bounded cross-layer issue accumulation, provider-envelope closure, and coherent packet limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the current diff is **+502 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+504 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 

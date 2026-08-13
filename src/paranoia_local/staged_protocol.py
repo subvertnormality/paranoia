@@ -736,14 +736,16 @@ def materialize_decision_value(
             issues.append(f"/class_actions/{cid}: unknown active class")
             continue
         status = classes[cid]["status"]
-        if action["kind"] == "close" and (
-            cid not in outcomes or outcomes[cid]["verdict"] != "satisfied"
+        if (
+            action["kind"] == "close" and cid in outcomes
+            and outcomes[cid]["verdict"] != "satisfied"
         ):
             issues.append(f"/class_actions/{cid}: close requires satisfied outcome")
         if action["kind"] == "reopen" and status != cc.CLOSED:
             issues.append(f"/class_actions/{cid}: reopen requires closed class")
-        if action["kind"] == "reopen" and (
-            cid not in outcomes or outcomes[cid]["verdict"] != "violated"
+        if (
+            action["kind"] == "reopen" and cid in outcomes
+            and outcomes[cid]["verdict"] != "violated"
         ):
             issues.append(f"/class_actions/{cid}: reopen requires violated outcome")
         if action["kind"] in {"reclassify", "replace"}:

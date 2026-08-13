@@ -512,6 +512,30 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
         assert lineage.classes[minted[0]].procedure == "inspect the replacement invariant"
 
 
+@pytest.mark.parametrize(("status", "kind", "expected"), [
+    (cc.OPEN, "close", cc.CLOSED),
+    (cc.CLOSED, "reopen", cc.OPEN),
+])
+def test_correction_preserves_outcome_independent_standalone_lifecycle(
+    status, kind, expected,
+):
+    active = active_class(status=status)
+    parsed = materialize(
+        decision("correction", class_actions=[{
+            "kind":kind, "class_id":"class-a",
+        }]),
+        active_classes=[active],
+    )
+    assert parsed["class_assessments"] == []
+    assert parsed["class_records"] == [{"op":kind, "class_id":"class-a"}]
+    lineage = lineage_with_active(active)
+    cc.apply_register(
+        lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
+        round_no=2,
+    )
+    assert lineage.classes["class-a"].status == expected
+
+
 def test_satisfied_open_mechanized_class_cannot_be_model_closed():
     value = decision(
         "final", coverage=coverage(),
@@ -1393,3 +1417,40 @@ def test_historical_v1_v2_remaining_legal_shape_matrix_is_equivalent():
         legacy, active=classes, prior_debt=debts, phase="correction",
         mode=cc.BRANCH_MODE,
     )
+
+
+@pytest.mark.parametrize(("status", "kind", "expected"), [
+    (cc.OPEN, "close", cc.CLOSED),
+    (cc.CLOSED, "reopen", cc.OPEN),
+])
+def test_historical_v1_v2_standalone_close_reopen_are_equivalent(
+    status, kind, expected,
+):
+    active = active_class(status=status)
+    parsed = materialize(
+        decision("correction", class_actions=[{
+            "kind":kind, "class_id":"class-a",
+        }]),
+        active_classes=[active],
+    )
+    legacy = {
+        "role":"correction", "source_dispositions":[],
+        "assessment_dispositions":[], "findings":[], "debt":[],
+        "debt_updates":[], "class_dispositions":[],
+        "class_records":[{"op":kind, "class_id":"class-a"}],
+        "class_assessments":[],
+    }
+    legacy = historical_v1_reference(
+        legacy, role="correction", active=[active],
+    )
+    v2_durable = durable_projection(
+        parsed, active=[active], phase="correction",
+    )
+    v1_durable = durable_projection(
+        legacy, active=[active], phase="correction",
+    )
+    assert v2_durable == v1_durable
+    assert next(
+        row for row in v2_durable[1] if row["class_id"] == "class-a"
+    )["status"] == expected
+    assert "STRUCTURAL-PHASE: final" in v2_durable[2]
