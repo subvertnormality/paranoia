@@ -170,6 +170,7 @@ def test_provider_projection_only_removes_unsupported_uniqueness():
     assert '"$schema"' not in sp.canonical_schema(projected)
     assert projected["properties"]["coverage"]["maxItems"] == len(sp.CHECKLIST)
     assert projected["additionalProperties"] is False
+    assert "(?=" not in sp.canonical_schema(projected)
 
 
 def test_schema_error_names_json_pointer_and_does_not_accept_alias():

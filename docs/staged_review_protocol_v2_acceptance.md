@@ -112,6 +112,13 @@ and canonical-action faults with model-owned pointers. Derived mirror debt is om
 diagnostics so retry pointers remain repairable. Five-million-character lane/decision pre-decode
 caps and non-whitespace semantic strings close the two advisory observations without adding a call.
 
+The first attempt to run CODE round 3 never reached review: Codex rejected the initial
+non-whitespace schema expression because its provider dialect does not support regex lookaround.
+The failure was recorded as execution failure, did not increment lineage rounds, and settled no
+debt or class. The expression was replaced with the equivalent lookaround-free
+`^[^\\r\\n]*\\S[^\\r\\n]*$`; the provider projection is regression-tested to contain no
+lookaround before the same round is retried.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and

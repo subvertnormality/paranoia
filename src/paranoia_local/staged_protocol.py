@@ -67,7 +67,7 @@ def _string(max_length: int, *, enum: Sequence[str] | None = None,
             const: str | None = None) -> dict[str, Any]:
     value: dict[str, Any] = {
         "type": "string", "minLength": 1, "maxLength": max_length,
-        "pattern": r"^(?=.*\S)[^\r\n]+$",
+        "pattern": r"^[^\r\n]*\S[^\r\n]*$",
     }
     if enum is not None:
         value["enum"] = list(enum)
