@@ -388,10 +388,14 @@ class ClaudeEngine(Engine):
         return ""
 
     def _evidence_argv(self, model: str, effort: str) -> list[str]:
+        tools = self._evidence_tools()
         return [
             "--output-format", "json", "--model", model, "--effort", effort,
             "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
-            "--tools", self._evidence_tools(),
+            # `--tools` narrows availability; it does not grant permission in
+            # headless `-p` mode. Keep both boundaries identical so discovery can
+            # actually use WebSearch while binding/text remain genuinely tool-less.
+            "--tools", tools, "--allowedTools", tools,
         ]
 
     def _allowed(self, web_search: bool) -> str:
@@ -456,14 +460,25 @@ class ClaudeEngine(Engine):
             usage = {"tokens": tokens, "cost_usd": cost}
         text = str(data.get("result", ""))
         is_error = bool(data.get("is_error", False))
+        denied = {
+            item.get("tool_name")
+            for item in data.get("permission_denials", [])
+            if isinstance(item, dict) and isinstance(item.get("tool_name"), str)
+        } if isinstance(data.get("permission_denials", []), list) else set()
+        required = set(filter(None, self._evidence_tools().split(",")))
+        denied_required = sorted(required & denied)
+        permission_failure = (
+            "required evidence tool permission denied: " + ", ".join(denied_required)
+            if self.role in EVIDENCE_ROLES and denied_required else None
+        )
         return Review(
             text=text,
             session_ref=data.get("session_id"),
             raw=stdout,
-            error=is_error,
+            error=is_error or permission_failure is not None,
             usage=usage,
             duration_ms=data.get("duration_ms"),
-            failure_detail=text if is_error else None,
+            failure_detail=text if is_error else permission_failure,
         )
 
 
