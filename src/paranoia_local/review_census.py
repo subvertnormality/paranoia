@@ -726,9 +726,21 @@ def resolve_anchors(
             continue
         for anchor in evidence:
             path, sep, raw_line = anchor.rpartition(":")
-            if not sep or not raw_line.isdigit() or int(raw_line) < 1:
+            # `path:start-end` is accepted alongside `path:line`. The prompt asks
+            # reviewers to quote the offending *lines*, so a range is the natural
+            # citation for a multi-line defect and engines emit one unprompted.
+            # Rejecting it discarded whole staged reviews — two rounds lost on
+            # 2026-08-13 to anchors whose file and lines both existed.
+            raw_start, dash, raw_end = raw_line.partition("-")
+            # An empty tail after a dash is a malformed range, not a bare line.
+            raw_end = raw_end if dash else raw_start
+            if (
+                not sep or not raw_start.isdigit() or not raw_end.isdigit()
+                or int(raw_start) < 1 or int(raw_end) < int(raw_start)
+            ):
                 raise CensusError(f"unresolvable evidence anchor {anchor!r}")
-            line = int(raw_line)
+            # Bound-check the END: a range ending inside the file starts inside it.
+            line = int(raw_end)
             if path == "plan":
                 if plan_lines is None or line > plan_lines:
                     raise CensusError(f"unresolvable plan anchor {anchor!r}")

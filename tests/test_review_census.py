@@ -752,6 +752,30 @@ def test_evidence_anchors_resolve_against_snapshot(tmp_path):
     )
 
 
+def test_a_line_range_anchor_resolves_like_a_single_line(tmp_path):
+    # Reviewers cite ranges because the prompt asks them to "quote the offending
+    # lines", and a range is the natural citation for a multi-line defect.
+    # Measured 2026-08-13: `repository/scripts/lib/delivery_state.py:253-268`
+    # was rejected outright, discarding a whole staged review over the hyphen.
+    (tmp_path / "a.py").write_text("one\ntwo\nthree\n")
+    rc.resolve_anchors({"evidence":["a.py:1-3"]}, root=tmp_path)
+    rc.resolve_anchors(
+        {"evidence":["repository/a.py:2-3"]}, root=tmp_path,
+        trusted_roots={"repository":tmp_path},
+    )
+    rc.resolve_anchors({"evidence":["plan:1-2"]}, root=tmp_path, plan_lines=2)
+    # The END of the range is what must land inside the file, and a range whose
+    # end overruns is out of range exactly as a bare line would be.
+    with pytest.raises(rc.CensusError, match="out-of-range"):
+        rc.resolve_anchors({"evidence":["a.py:2-4"]}, root=tmp_path)
+    with pytest.raises(rc.CensusError, match="unresolvable plan"):
+        rc.resolve_anchors({"evidence":["plan:1-3"]}, root=tmp_path, plan_lines=2)
+    # Widening the grammar must not admit anything that is not a real range.
+    for bad in ("a.py:3-1", "a.py:0-2", "a.py:1-", "a.py:-2", "a.py:1-2-3", "a.py:1-x"):
+        with pytest.raises(rc.CensusError, match="unresolvable evidence anchor"):
+            rc.resolve_anchors({"evidence":[bad]}, root=tmp_path)
+
+
 def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
     class Engine:
         name = "fake"
