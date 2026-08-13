@@ -220,6 +220,13 @@ counts and retry diagnostics remain exact.
 Apply the same before-invocation ledger rule to cleaner and attester calls. Mark research running
 only after deadline admission, and keep established packet digest computation total on
 model-controlled Unicode so the failure serializer cannot throw.
+Treat arbitration context as caller-owned shared specification/data: preserve its exact bytes,
+ignore any cleaner rewrite or omission, and gate its advocacy independently rather than asking the
+cleaner to alter it. A changed fidelity verdict is actionable only when a per-field structured entry
+names every changed field, binds exact original and cleaned substrings to that field's actual pair,
+classifies the semantic delta with the closed change enum, and repeats that classification in the
+deterministic `<field>: <change>` reason label. Do not use a free-text heuristic as a semantic gate. Keep valid
+`raw_input.options` as the same ID-to-statement mapping on every success and failure path.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid

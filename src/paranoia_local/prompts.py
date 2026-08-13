@@ -158,7 +158,8 @@ You MUST:
 - Strip advocacy, loaded adjectives, and rhetorical framing ("the obvious choice", "the clean way", "unfortunately").
 - Remove the requester's own recommendation and any attribution ("I think", "we prefer", "X suggested").
 - EQUALIZE the level of detail across options. A four-line option beside a six-word option is an argument regardless of wording. Bring them to the same altitude: same tense, same voice, same kind of specificity, comparable length.
-- Neutralize argumentative text in the context and in file-hint reasons, keeping the factual content.
+- Reproduce the CONTEXT byte-for-byte. It is shared specification/data, not cleaner-owned prose.
+- Neutralize argumentative text in file-hint reasons, keeping the factual content.
 - Emit every option under EXACTLY the id it was given.
 
 You MUST NOT:
@@ -166,7 +167,9 @@ You MUST NOT:
 - Change what any option MEANS. Neutralizing wording is your job; changing substance is a failure.
 - Add facts, caveats, or qualifications that were not in the input.
 - Hint at a preference, by wording, ordering, emphasis, or omission.
-- Touch the STAKES text. Reproduce it byte-for-byte.
+- Rewrite or return the STAKES text. It is server-owned read-only input and is
+  passed directly to the attester and deciders.
+- Rewrite, summarize, reflow, or omit CONTEXT. Reproduce it byte-for-byte.
 - Investigate a repository. You have no repository access and need none.
 
 Output EXACTLY these blocks, in this order, nothing before or after:
@@ -179,7 +182,7 @@ Output EXACTLY these blocks, in this order, nothing before or after:
 <id>: <neutral statement>
 
 === CONTEXT ===
-<neutral background, or "None.">
+<copy the supplied CONTEXT byte-for-byte, or "None.">
 
 === HINTS ===
 - <path>: <neutral reason, or the path alone>
@@ -197,18 +200,28 @@ You are given, field by field, the ORIGINAL text and the CLEANED text. Judge two
 1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.
 2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option, through wording, emphasis, asymmetric detail, or what it leaves out? If so, say which option and quote the words that do it.
 
-Separately, read the STAKES text, which was deliberately NOT cleaned. Does it advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary is not advocacy; steering the answer is.
+Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is.
 
-Output EXACTLY these three lines, nothing before or after. The FIDELITY line must
+Output EXACTLY these five lines, nothing before or after. The FIDELITY line must
 name EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —
 fields absent from it were never supplied and are not yours to judge:
 
 FIDELITY: <one "<field> PRESERVED" or "<field> CHANGED" per field, semicolon-separated>
+FIDELITY-DETAIL: NONE
+FIDELITY-DETAIL: <one JSON object keyed by every CHANGED field and no others; each value is {"original":"<exact non-empty ORIGINAL passage>","cleaned":"<exact non-empty CLEANED passage>","change":"<added|removed|narrowed|widened|altered-qualification>","reason":"<field>: <repeat the exact change token>"}>
 NEUTRALITY: PASS
 NEUTRALITY: FAIL <which option the packet favours, and the words that do it>
 STAKES-ADVOCACY: NONE
+CONTEXT-ADVOCACY: NONE
 
-Emit ONE of the two NEUTRALITY lines, not both. Use STAKES-ADVOCACY: PRESENT <the advocating words> when the stakes text steers the decision."""
+Emit ONE FIDELITY-DETAIL line and ONE of the two NEUTRALITY lines. FIDELITY-DETAIL
+reason is a deterministic label, exactly "<field>: <change>". The closed change token
+plus the two exact passages is the semantic explanation; do not add free-form reason prose.
+must be NONE only when no field is CHANGED. The JSON must stay on that one line;
+passages must be exact substrings of the named field. Use STAKES-ADVOCACY: PRESENT <the
+advocating words> when stakes steers the decision. Use CONTEXT-ADVOCACY: PRESENT
+<the advocating words> when unchanged context steers the decision; emit NONE when
+no context was supplied or it does not steer."""
 
 
 ARBITRATE_INSTRUCTIONS = """You are adjudicating a decision. Choose the best of the options given, on the evidence, and justify it from the repository.

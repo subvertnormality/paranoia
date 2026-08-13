@@ -48,6 +48,7 @@ TEARDOWN_RESERVE_SEC = 120
 
 SNAPSHOT_REF_PREFIX = "refs/paranoia/arbitrate"
 MAX_REJECTED_RESEARCH_CHARS = 12_000
+MAX_PHASE_REPLY_CHARS = 32_000
 MAX_AUDIT_FALLBACK_CHARS = 1_000_000
 MAX_AUDIT_COLLECTION_ITEMS = 24
 
@@ -189,6 +190,16 @@ def _bounded_research_text(text: str) -> str:
         return text
     half = MAX_REJECTED_RESEARCH_CHARS // 2
     return text[:half] + "\n… [bounded research output] …\n" + text[-half:]
+
+
+def _bounded_phase_reply(text: str) -> str:
+    """Retain a complete normal cleaner/attester protocol reply for audit binding."""
+    if len(text) <= MAX_PHASE_REPLY_CHARS:
+        return text
+    marker = "\n… [bounded phase output] …\n"
+    retained = MAX_PHASE_REPLY_CHARS - len(marker)
+    head = retained // 2
+    return text[:head] + marker + text[-(retained - head):]
 
 
 def _bounded_audit_value(
@@ -442,7 +453,7 @@ def _snapshot(repo: Path) -> str:
 # --- cleaning and attestation ----------------------------------------------
 
 
-_BLOCK_RE = re.compile(r"^===\s*(?P<name>[A-Z]+)\s*===\s*$")
+_BLOCK_RE = re.compile(r"^===\s*(?P<name>.+?)\s*===\s*$")
 
 
 def parse_cleaned_packet(
@@ -458,11 +469,16 @@ def parse_cleaned_packet(
         raise ArbitrationError(f"cleaner refused: {stripped[len('INSUFFICIENT:'):].strip()}")
 
     blocks: dict[str, list[str]] = {}
+    allowed_blocks = {"DECISION", "OPTIONS", "CONTEXT", "HINTS"}
     current: str | None = None
     for line in stripped.splitlines():
         m = _BLOCK_RE.match(line.strip())
         if m:
             current = m.group("name")
+            if current not in allowed_blocks:
+                raise ArbitrationError(f"cleaner output has unexpected === {current} === block")
+            if current in blocks:
+                raise ArbitrationError(f"cleaner output repeats === {current} === block")
             blocks[current] = []
             continue
         if current:
@@ -583,9 +599,12 @@ def check_length_bands(cleaned: Mapping[str, str], original: Mapping[str, str]) 
 @dataclass(frozen=True)
 class Attestation:
     fidelity: dict[str, str]
+    fidelity_detail: str
+    fidelity_diagnostics: dict[str, dict[str, str]]
     neutrality_pass: bool
     neutrality_note: str
     stakes_advocacy: str | None
+    context_advocacy: str | None
     raw: str
 
     @property
@@ -594,12 +613,19 @@ class Attestation:
 
     @property
     def ok(self) -> bool:
-        return self.neutrality_pass and not self.changed and self.stakes_advocacy is None
+        return (
+            self.neutrality_pass and not self.changed
+            and self.stakes_advocacy is None and self.context_advocacy is None
+        )
 
 
-def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
+def parse_attestation(
+    text: str,
+    expected: Mapping[str, tuple[str, str]],
+) -> Attestation:
     """Strict: every expected field exactly once, each `PRESERVED` or `CHANGED`,
-    exactly one neutrality verdict, and a stakes verdict.
+    one detailed fidelity explanation, and exactly one neutrality, stakes-advocacy,
+    and context-advocacy verdict.
 
     A lenient parser made an *incomplete* attestation look like a passing one:
     `FIDELITY: decision PRESERVED` alone, or a value of `UNKNOWN`, would satisfy
@@ -608,23 +634,45 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
     attested packet steers both deciders silently.
     """
     fidelity: dict[str, str] = {}
+    fidelity_detail: str | None = None
+    fidelity_diagnostics: dict[str, dict[str, str]] = {}
     neutrality: bool | None = None
     note = ""
     stakes: str | None = None
     stakes_seen = False
-    for raw in (text or "").splitlines():
-        line = raw.strip()
-        if not line:
-            continue
+    context_advocacy: str | None = None
+    context_seen = False
+    lines = [raw.strip() for raw in (text or "").splitlines()]
+    expected_prefixes = (
+        "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:",
+        "STAKES-ADVOCACY:", "CONTEXT-ADVOCACY:",
+    )
+    if len(lines) != 5 or any(not line for line in lines):
+        raise ArbitrationError("attestation must contain exactly five non-empty verdict lines")
+    for line, expected_prefix in zip(lines, expected_prefixes):
         upper = line.upper()
-        if not upper.startswith(("FIDELITY:", "NEUTRALITY:", "STAKES-ADVOCACY:")):
+        if not upper.startswith(expected_prefix):
+            raise ArbitrationError(
+                f"attestation verdict lines must be ordered {expected_prefixes}; "
+                f"expected {expected_prefix}, got {line!r}"
+            )
+        if not upper.startswith((
+            "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:",
+            "STAKES-ADVOCACY:", "CONTEXT-ADVOCACY:",
+        )):
             # No commentary. `NEUTRALITY: PASS` followed by "The cleaned wording still
             # favors option A." was otherwise accepted as clean, and the biased packet
             # went to both deciders stamped `attested`.
             raise ArbitrationError(
-                f"attestation contains text outside its three verdict lines: {line!r}"
+                f"attestation contains text outside its five verdict lines: {line!r}"
             )
-        if upper.startswith("FIDELITY:"):
+        if upper.startswith("FIDELITY-DETAIL:"):
+            if fidelity_detail is not None:
+                raise ArbitrationError("attestation gave two FIDELITY-DETAIL verdicts")
+            fidelity_detail = line[len("FIDELITY-DETAIL:"):].strip()
+            if not fidelity_detail:
+                raise ArbitrationError("FIDELITY-DETAIL must not be empty")
+        elif upper.startswith("FIDELITY:"):
             for part in line[len("FIDELITY:"):].split(";"):
                 field, _, verdict = part.strip().rpartition(" ")
                 field, verdict = field.strip(), verdict.strip().upper()
@@ -670,6 +718,20 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
                     "STAKES-ADVOCACY must be exactly NONE, or PRESENT with the "
                     f"advocating words, got {body!r}"
                 )
+        elif upper.startswith("CONTEXT-ADVOCACY:"):
+            if context_seen:
+                raise ArbitrationError("attestation gave two CONTEXT-ADVOCACY verdicts")
+            context_seen = True
+            body = line[len("CONTEXT-ADVOCACY:"):].strip()
+            if body.upper() == "NONE":
+                context_advocacy = None
+            elif body.upper().startswith("PRESENT") and body[len("PRESENT"):].strip():
+                context_advocacy = body[len("PRESENT"):].strip()
+            else:
+                raise ArbitrationError(
+                    "CONTEXT-ADVOCACY must be exactly NONE, or PRESENT with the "
+                    f"advocating words, got {body!r}"
+                )
 
     missing = [f for f in expected if f not in fidelity]
     if missing:
@@ -681,7 +743,82 @@ def parse_attestation(text: str, expected: Sequence[str]) -> Attestation:
         raise ArbitrationError("attestation has no NEUTRALITY verdict")
     if not stakes_seen:
         raise ArbitrationError("attestation has no STAKES-ADVOCACY verdict")
-    return Attestation(fidelity, neutrality, note, stakes, (text or "").strip())
+    if not context_seen:
+        raise ArbitrationError("attestation has no CONTEXT-ADVOCACY verdict")
+    changed = sorted(k for k, value in fidelity.items() if value == "CHANGED")
+    if fidelity_detail is None:
+        raise ArbitrationError("attestation has no FIDELITY-DETAIL verdict")
+    if not changed and fidelity_detail.upper() != "NONE":
+        raise ArbitrationError("FIDELITY-DETAIL must be NONE when no field is CHANGED")
+    if changed:
+        if fidelity_detail.upper() == "NONE":
+            raise ArbitrationError("changed fidelity requires a specific FIDELITY-DETAIL")
+        try:
+            detail_value = json.loads(fidelity_detail, object_pairs_hook=_unique_json_object)
+        except json.JSONDecodeError as exc:
+            raise ArbitrationError(
+                f"FIDELITY-DETAIL must be one JSON object: {exc}"
+            ) from exc
+        if not isinstance(detail_value, dict):
+            raise ArbitrationError("FIDELITY-DETAIL must be one JSON object")
+        if set(detail_value) != set(changed):
+            raise ArbitrationError(
+                "FIDELITY-DETAIL fields must exactly equal CHANGED fields; "
+                f"expected {changed}, got {sorted(map(str, detail_value))}"
+            )
+        required = {"original", "cleaned", "change", "reason"}
+        allowed_changes = {
+            "added", "removed", "narrowed", "widened", "altered-qualification",
+        }
+        for field in changed:
+            item = detail_value[field]
+            if not isinstance(item, dict) or set(item) != required:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} must contain exactly original, cleaned, change, reason"
+                )
+            if any(not isinstance(item[key], str) or not item[key].strip() for key in required):
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} values must be non-empty strings"
+                )
+            if item["change"] not in allowed_changes:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} change must be one of {sorted(allowed_changes)}"
+                )
+            original_text, cleaned_text = expected[field]
+            if item["original"] not in original_text:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} original passage is not in that field"
+                )
+            if item["cleaned"] not in cleaned_text:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} cleaned passage is not in that field"
+                )
+            if item["original"] == item["cleaned"]:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} passages do not demonstrate a change"
+                )
+            expected_reason = f"{field}: {item['change']}"
+            if item["reason"].strip() != expected_reason:
+                raise ArbitrationError(
+                    f"FIDELITY-DETAIL {field!r} reason must be exactly "
+                    f"{expected_reason!r}; the closed change enum and bound passages "
+                    "are the mechanically enforceable semantic explanation"
+                )
+            fidelity_diagnostics[field] = dict(item)
+    return Attestation(
+        fidelity, fidelity_detail, fidelity_diagnostics,
+        neutrality, note, stakes, context_advocacy,
+        (text or "").strip(),
+    )
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ArbitrationError(f"FIDELITY-DETAIL contains duplicate key {key!r}")
+        result[key] = value
+    return result
 
 
 # --- rendering --------------------------------------------------------------
@@ -827,6 +964,28 @@ def render_record_block(
 # --- the handler ------------------------------------------------------------
 
 
+def _raw_options_record(value: Any) -> Any:
+    """Use one audit shape for valid option arrays even on preflight failures.
+
+    Malformed inputs remain verbatim enough to diagnose; validation still owns their
+    rejection. A well-shaped caller array is rendered exactly like established runs.
+    """
+    if not isinstance(value, list):
+        return value
+    mapped: dict[str, str] = {}
+    for item in value:
+        if not isinstance(item, Mapping):
+            return value
+        option_id = item.get("id")
+        statement = item.get("statement")
+        if not isinstance(option_id, str) or not isinstance(statement, str):
+            return value
+        if option_id in mapped:
+            return value
+        mapped[option_id] = statement
+    return mapped
+
+
 def arbitrate(
     arguments: dict[str, Any],
     *,
@@ -889,8 +1048,11 @@ def arbitrate(
                 "ref_provenance_error": ref_error,
                 "refs_moved": None if ref_error else False,
                 "raw_input": {
-                    k: arguments.get(k)
-                    for k in ("decision", "options", "context", "stakes", "files")
+                    **{
+                        k: arguments.get(k)
+                        for k in ("decision", "context", "stakes", "files")
+                    },
+                    "options": _raw_options_record(arguments.get("options")),
                 },
             },
             timestamp=now(),
@@ -971,7 +1133,9 @@ def _arbitrate(
     options = arb.validate_options(arguments.get("options"))
     canonical = arb.canonical_order(options)
     stakes = arb.resolve_stakes(resolve("stakes", arguments.get("stakes"), cfg, None))
-    context = str(arguments.get("context", "") or "").strip()
+    # Context is caller-owned shared specification/data. Preserve its bytes rather
+    # than applying the whitespace normalization used for scalar control fields.
+    context = str(arguments.get("context", "") or "")
     subject = str(arguments.get("subject", "") or "").strip()
     do_clean = bool(arguments.get("clean", True))
     seed = str(arguments.get("order_seed") or uuid.uuid4().hex)
@@ -2044,16 +2208,8 @@ def _clean_and_attest(
             "skipped",
         )
 
-    # Only fields the caller supplied are attestable. Naming `context` when none was
-    # passed produced `fidelity changed: ['context']` on the first production run —
-    # an error about a field the caller had no control over (issue #8, fix 4).
-    attest_fields = ["decision"]
-    if context:
-        attest_fields.append("context")
-    if hints:
-        attest_fields.append("hints")
-    attest_fields.extend(originals)
-
+    # Only cleaner-owned fields the caller supplied are attestable. Context is
+    # caller-owned and receives its own advocacy verdict instead of fidelity scoring.
     complaint = ""
     last_error: str | None = None
     phase_attempts = established.setdefault("phase_attempts", []) if established is not None else []
@@ -2091,7 +2247,7 @@ def _clean_and_attest(
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
             raise ArbitrationError(cleaner_record["rejection"]) from exc
-        cleaner_record["reply"] = _bounded_research_text(cleaned_raw)
+        cleaner_record["reply"] = _bounded_phase_reply(cleaned_raw)
         cleaner_record["reply_sha256"] = hashlib.sha256(
             cleaned_raw.encode("utf-8", "surrogatepass")
         ).hexdigest()
@@ -2100,21 +2256,10 @@ def _clean_and_attest(
             parsed = parse_cleaned_packet(
                 cleaned_raw, list(originals), caller_gave_context=bool(context)
             )
-            if context and not parsed["context"]:
-                # Dropping a supplied context is invisible downstream: rendered back to
-                # the attester as "None." it matches a caller context that also reads
-                # "None.", so fidelity passes while the deciders receive nothing.
-                raise ArbitrationError(
-                    "the cleaner dropped the supplied context block; it may neutralize "
-                    "the context but not remove it"
-                )
-            if parsed["context"] and not context:
-                # A context the caller never wrote is the cleaner adding facts, which
-                # it is forbidden to do — and it cannot be attested against anything.
-                raise ArbitrationError(
-                    "the cleaner invented a context block; no context was supplied, "
-                    "and the cleaner may not add facts to the framing"
-                )
+            # Context is caller-owned shared specification/data. The cleaner's emitted
+            # copy is non-authoritative: always restore the exact caller string so a
+            # rewrite, omission, or whitespace normalization cannot reach deciders.
+            parsed["context"] = context
             check_length_bands(parsed["statements"], originals)
             cleaned_hints = _merge_hints(hints, parsed["hints"])
             arb.reject_reserved_tokens(
@@ -2140,6 +2285,16 @@ def _clean_and_attest(
                 hints=cleaned_hints, statements=parsed["statements"],
                 cleaning="cleaned-awaiting-attestation", attestation="not reached",
             )
+
+        attest_fields: dict[str, tuple[str, str]] = {
+            "decision": (decision, parsed["decision"]),
+            **{
+                field: (originals[field], parsed["statements"][field])
+                for field in originals
+            },
+        }
+        if hints:
+            attest_fields["hints"] = (_render_hints(hints), _render_hints(cleaned_hints))
 
         progress("attesting the cleaned framing (cross-vendor)")
         attester_body = _attest_body(
@@ -2172,7 +2327,7 @@ def _clean_and_attest(
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
             raise ArbitrationError(attester_record["rejection"]) from exc
-        attester_record["reply"] = _bounded_research_text(attested_raw)
+        attester_record["reply"] = _bounded_phase_reply(attested_raw)
         attester_record["reply_sha256"] = hashlib.sha256(
             attested_raw.encode("utf-8", "surrogatepass")
         ).hexdigest()
@@ -2196,6 +2351,14 @@ def _clean_and_attest(
                 "the stakes text advocates for an option, and stakes is not the "
                 f"cleaner's to rewrite — fix it and re-run: {attestation.stakes_advocacy}"
             )
+        if attestation.context_advocacy:
+            attester_record["rejection"] = attestation.context_advocacy
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
+            raise ArbitrationError(
+                "the context text advocates for an option, and context is preserved "
+                f"verbatim — fix it and re-run: {attestation.context_advocacy}"
+            )
         if attestation.ok:
             return (
                 Packet(
@@ -2207,7 +2370,8 @@ def _clean_and_attest(
                 "attested" if attempt == 0 else "attested-after-retry",
             )
         last_error = (
-            f"fidelity changed: {attestation.changed}; neutrality: "
+            f"fidelity changed: {attestation.changed}; detail: "
+            f"{attestation.fidelity_detail}; neutrality: "
             f"{'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}"
         )
         attester_record["rejection"] = last_error
@@ -2234,13 +2398,14 @@ def _clean_body(
         "=== OPTIONS (neutralize; emit each under EXACTLY this id) ===\n"
         + "\n".join(f"{k}: {v}" for k, v in originals.items())
     )
-    parts.append("=== CONTEXT (neutralize) ===\n" + (context or "None."))
+    parts.append("=== CONTEXT (COPY VERBATIM) ===\n" + (context or "None."))
     parts.append(
         "=== HINTS (neutralize the reasons, keep the paths EXACTLY) ===\n"
         + _render_hints(hints)
     )
     parts.append(
-        "=== STAKES (REPRODUCE VERBATIM — do not alter one character) ===\n" + stakes
+        "=== STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return) ===\n"
+        + stakes
     )
     return "\n\n".join(parts)
 
@@ -2270,8 +2435,6 @@ def _attest_body(
     # Only fields the caller supplied. Listing an empty `context` invited the attester
     # to score empty→anything as a fidelity change, and the run then failed naming a
     # field the caller had no control over (issue #8, fix 4).
-    if context:
-        pairs.append(f"[context]\nORIGINAL: {context}\nCLEANED:  {parsed['context']}")
     if original_hints:
         # The real originals, not a placeholder: an auditor shown "(as given)"
         # cannot compare anything, so hint reasons went unchecked.
@@ -2284,6 +2447,8 @@ def _attest_body(
     return (
         "=== FIELD BY FIELD ===\n" + "\n\n".join(pairs)
         + "\n\n=== STAKES (NOT cleaned — judge only whether it advocates) ===\n" + stakes
+        + "\n\n=== CONTEXT (NOT cleaned — judge only whether it advocates) ===\n"
+        + (context or "None.")
     )
 
 

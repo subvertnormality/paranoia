@@ -53,6 +53,13 @@ class TestToolListing:
         assert set(props["models"]["properties"]) == {"codex", "claude"}
         assert props["research"]["default"] is True
 
+    def test_arbitrate_schema_describes_context_as_verbatim_and_advocacy_gated(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "arbitrate")
+        description = tool.inputSchema["properties"]["context"]["description"]
+        assert "Preserved byte-for-byte" in description
+        assert "attester independently rejects" in description
+        assert "Neutralized" not in description
+
     def test_critique_branch_requires_repo_path(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
         assert "repo_path" in tool.inputSchema["required"]

@@ -1,0 +1,120 @@
+{
+  "acceptance_kind": "cleaning-attestation-v1",
+  "acceptance_scope": {
+    "proves": [
+      "caller context and normalized options reached both deciders in the recorded runs",
+      "cleaner and attester lifecycle, prompts, replies, diagnostics, and call counts match the audits",
+      "the recorded production result and selection are reproduced from the checked-in audits"
+    ],
+    "does_not_prove": [
+      "that a resolved repository citation entails a decider constraint",
+      "that the positive fixture independently substantiates the selected option",
+      "that the original run exercised agreed-but-unsubstantiated fail-closed behavior"
+    ]
+  },
+  "delivery_metrics": {
+    "diff_base": "8c77b9d6ba2120aad13d13a19b92fe42f7dbc607",
+    "production_diff": {"files": 3, "lines_added": 233, "lines_removed": 55, "net_lines": 178},
+    "all_changed_files_diff": {
+      "files": 28,
+      "lines_added": 5393,
+      "lines_removed": 186,
+      "net_lines": 5207
+    },
+    "largest_production_modules": [
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2768},
+      {"path": "src/paranoia_local/handlers.py", "lines": 2707},
+      {"path": "src/paranoia_local/plan_claims.py", "lines": 1417},
+      {"path": "src/paranoia_local/class_closure.py", "lines": 1021},
+      {"path": "src/paranoia_local/arbitration.py", "lines": 990},
+      {"path": "src/paranoia_local/review_census.py", "lines": 901}
+    ],
+    "model_calls": {
+      "positive": {"cleaner": 1, "attester": 1, "codex_decider": 1, "claude_decider": 1, "total": 4},
+      "original_input": {"cleaner": 2, "attester": 2, "codex_decider": 1, "claude_decider": 1, "total": 6}
+    }
+  },
+  "positive_long_context": {
+    "context_chars": 6742,
+    "result": "CONVERGED",
+    "selected": "choice-decimal",
+    "outcome_basis": "observed unanimous production result; citation entailment not independently attested",
+    "cleaning": "attested",
+    "attestation": [
+      "FIDELITY: decision PRESERVED; choice-decimal PRESERVED; choice-float PRESERVED",
+      "FIDELITY-DETAIL: NONE",
+      "NEUTRALITY: PASS",
+      "STAKES-ADVOCACY: NONE",
+      "CONTEXT-ADVOCACY: NONE"
+    ],
+    "rounds": 1,
+    "research": "repository-only",
+    "options": {
+      "choice-decimal": "Parse input with decimal.Decimal and retain the decimal value.",
+      "choice-float": "Parse input with Python float and retain the binary floating-point value."
+    },
+    "snapshot": "6d9b02f48c6b09ebdd773856d9ed0d1ff0f2635c",
+    "refs_moved": false,
+    "audit": "docs/cleaning_attestation_evidence/positive-audit.json",
+    "audit_sha256": "861ae51c2e7b8e9a5737534732e20684f72a2d14090a9334f090f327f975576a"
+  },
+  "original_report_input": {
+    "context_chars": 6846,
+    "result": "UNRESOLVED",
+    "selected": null,
+    "outcome_basis": "decider selection divergence",
+    "cleaning": "attested-after-retry",
+    "snapshot": "6d9b02f48c6b09ebdd773856d9ed0d1ff0f2635c",
+    "refs_moved": false,
+    "rounds": 1,
+    "research": "repository-only",
+    "options": {
+      "campaign_all_23": "All 23 changed or new definitions of scripts/delivery_driver.py are this card's mutation scope: 3379 owned mutants, including the 1614 in _loop, main and run_card. The card builds whatever exact mutant-ID file and contract coverage that requires, pays the module's generation cost on every pilot invocation however long it runs, and drives every owned mutant either to a direct killer or to an individually recorded equivalent or redundant disposition naming its exact mutant id. Nothing about this module is deferred, no successor card is created for it, and the certificate records a complete lane for scripts/delivery_driver.py alongside the three settled modules. No budget override is recorded, because nothing leaves scope.",
+      "campaign_boundary_defer_entrypoints": "The 20 definitions of scripts/delivery_driver.py that are testable at their own boundary are this card's mutation scope: the 3 prompt-rendering functions and the 17 command-channel definitions, 1765 owned mutants, each driven to a killer or to an individually recorded disposition naming its exact mutant id. The 3 orchestration entrypoints _loop, main and run_card, 1614 mutants, leave scope under a recorded budget override: the certificate and mutation evidence name those exact DefinitionIds, a named successor card as their future owner, the reason, and the alternate evidence relied on. The other three modules are unaffected.",
+      "defer_whole_module": "No definition of scripts/delivery_driver.py is this card's mutation scope and the card records no lane for it. All 23 changed or new DefinitionIds leave scope under a recorded budget override, following the disposition a prior governed card already recorded for this same module: it exceeds all three pilot ceilings and is absent from the canonical mutation inventory. The certificate and mutation evidence name every one of the 23 exact DefinitionIds, a named successor card as their future owner, the measured reason including the generation cost, and the alternate evidence relied on. The card's campaign covers the other three modules, and the promoted commits are still reviewed at both governed seam stages and certified."
+    },
+    "attestation": [
+      "FIDELITY: decision PRESERVED; campaign_all_23 PRESERVED; campaign_boundary_defer_entrypoints PRESERVED; defer_whole_module PRESERVED",
+      "FIDELITY-DETAIL: NONE",
+      "NEUTRALITY: PASS",
+      "STAKES-ADVOCACY: NONE",
+      "CONTEXT-ADVOCACY: NONE"
+    ],
+    "reason": "codex selected defer_whole_module; claude selected campaign_boundary_defer_entrypoints",
+    "audit": "docs/cleaning_attestation_evidence/original-audit.json",
+    "audit_sha256": "dcec2610bbe833bec0fb1cee94159330eda642339b452df435d5f0ac41b7a3f0"
+  },
+  "production_source_sha256": {
+    "src/paranoia_local/arbitrate_handler.py": "5115af1a4319a303d95f5acdf14ed940efdefe83ce54d811fd572c2ebbfc09ff",
+    "src/paranoia_local/prompts.py": "f7ee13b35b50545ebf691c9178f9b3f5d92f0bf6f53f07ef2553480e3c2cdff9",
+    "src/paranoia_local/server.py": "cf76ef9fa6c9fa0089226362b7cec9880a386afe50b07c4cbf601543cd822083"
+  },
+  "timing_record": {
+    "path": "docs/cleaning_attestation_timing_2026-08-13.json",
+    "sha256": "09bc75a5f1ad305bf30d6350d972630b70354462b00c88aeeca24675293bfd20",
+    "runs": {
+      "original": {"audit":"docs/cleaning_attestation_evidence/original-audit.json","audit_sha256":"dcec2610bbe833bec0fb1cee94159330eda642339b452df435d5f0ac41b7a3f0","command":["{python}","docs/cleaning_attestation_evidence/run_original_acceptance.py"],"exit_status":0,"finished_utc":"2026-08-13T13:22:44.039327Z","monotonic_elapsed_seconds":256.129,"started_utc":"2026-08-13T13:18:27.910620Z"},
+      "positive": {"audit":"docs/cleaning_attestation_evidence/positive-audit.json","audit_sha256":"861ae51c2e7b8e9a5737534732e20684f72a2d14090a9334f090f327f975576a","command":["{python}","docs/cleaning_attestation_evidence/run_positive_acceptance.py"],"exit_status":0,"finished_utc":"2026-08-13T13:24:40.057066Z","monotonic_elapsed_seconds":116.016,"started_utc":"2026-08-13T13:22:44.041426Z"}
+    },
+    "runner_sources": {
+      "wrapper": {"path": "docs/cleaning_attestation_evidence/run_timed_acceptances.py", "sha256": "51dbcce778aafe14a84a994fdc83af0b3a3f196dc9afc3305e1945b3bf393e48"},
+      "original": {"path": "docs/cleaning_attestation_evidence/run_original_acceptance.py", "sha256": "7b602e918495cf9c35d05f6dfe4cf611e456469d86fb8d3ff6dad20dd379ef31"},
+      "positive": {"path": "docs/cleaning_attestation_evidence/run_positive_acceptance.py", "sha256": "5edc04d747be66b999570de2d882a207efe3e394b3cfef47ceb09dfc0263bd4f"},
+      "fixture": {"path": "docs/cleaning_attestation_evidence/acceptance_fixture.py", "sha256": "9917a230fdc787c4acadfbc65266e83511ce3361b58cab40bd9c46bb59612cc8"},
+      "tests": {"path": "scripts/run_cleaning_acceptance_checks.py", "sha256": "b82fe7811b16b50cd74198fa8116052113b8152a347378be675f21437f4f85a7"},
+      "validator": {"path": "scripts/validate_cleaning_attestation_acceptance.py", "sha256": "b9c108449544270e4e86b4090bdbbc6db0e1c6b74ad7d223a9b8eebe3ebad5dc"}
+    }
+  },
+  "tests": {
+    "focused_result": "249 passed in 66.48s (0:01:06)",
+    "focused_log": "docs/cleaning_attestation_evidence/focused-tests.log",
+    "focused_log_sha256": "9312cf70c3e0e82ca4c189207d1ea9ca07da0fb07ab5b7ba9e12dc21911c39e4",
+    "focused_exit_status": 0,
+    "full_result": "947 passed in 101.06s (0:01:41)",
+    "full_log": "docs/cleaning_attestation_evidence/full-tests.log",
+    "full_log_sha256": "ccd558037e475f06044dec253ad5cf6df0816962643578532276cb893d9dadb4",
+    "full_exit_status": 0,
+    "runner_manifest": "docs/cleaning_attestation_evidence/test-runner-manifest.json",
+    "runner_manifest_sha256": "fad0855f8d9c40810c17c0e492b9482b0ff1866296fd7ec90a76ec4988030b71"
+  }
+}

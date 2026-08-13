@@ -338,7 +338,7 @@ TOOLS: list[Tool] = [
                     "description": "2-4 mutually exclusive options, each with a caller-stable id. Array order is irrelevant — canonical order is derived by sorting ids.",
                 },
                 "stakes": _STAKES_REQUIRED,
-                "context": {"type": "string", "description": "Background the deciders need, and the designated home for detail: the shared facts, and the full specification of whatever only one option adopts (max 20000 chars). Not per-option, so its length cannot be a vote between options. Neutralized before they see it.",},
+                "context": {"type": "string", "description": "Background the deciders need, and the designated home for detail: shared facts and the full specification of whatever only one option adopts (max 20000 chars). Preserved byte-for-byte rather than cleaned; the cross-vendor attester independently rejects context that advocates for an option.",},
                 "files": {
                     "type": "array",
                     "items": {

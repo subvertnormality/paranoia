@@ -1,0 +1,26 @@
+{
+  "original": {
+    "audit": "docs/cleaning_attestation_evidence/original-audit.json",
+    "audit_sha256": "dcec2610bbe833bec0fb1cee94159330eda642339b452df435d5f0ac41b7a3f0",
+    "command": [
+      "{python}",
+      "docs/cleaning_attestation_evidence/run_original_acceptance.py"
+    ],
+    "exit_status": 0,
+    "finished_utc": "2026-08-13T13:22:44.039327Z",
+    "monotonic_elapsed_seconds": 256.129,
+    "started_utc": "2026-08-13T13:18:27.910620Z"
+  },
+  "positive": {
+    "audit": "docs/cleaning_attestation_evidence/positive-audit.json",
+    "audit_sha256": "861ae51c2e7b8e9a5737534732e20684f72a2d14090a9334f090f327f975576a",
+    "command": [
+      "{python}",
+      "docs/cleaning_attestation_evidence/run_positive_acceptance.py"
+    ],
+    "exit_status": 0,
+    "finished_utc": "2026-08-13T13:24:40.057066Z",
+    "monotonic_elapsed_seconds": 116.016,
+    "started_utc": "2026-08-13T13:22:44.041426Z"
+  }
+}
