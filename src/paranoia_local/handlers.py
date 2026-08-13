@@ -563,12 +563,10 @@ def _staged_structural_review(
             issues.extend(str(exc).splitlines())
         class_view = parsed
         if class_view is None:
+            records, pointers = sp.class_record_candidates(value)
             class_view = {
-                "class_records": sp.class_records_from_actions(value["class_actions"]),
-                "_class_record_pointers": [
-                    f"/class_actions/{index}"
-                    for index in range(len(value["class_actions"]))
-                ],
+                "class_records": records,
+                "_class_record_pointers": pointers,
             }
         try:
             _validate_materialized_class_records(

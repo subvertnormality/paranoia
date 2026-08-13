@@ -1111,8 +1111,37 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
         raw, mode=cc.BRANCH_MODE, active_classes=[active],
     )
     legacy = {
-        key: deepcopy(value) for key, value in parsed.items()
-        if not key.startswith("_")
+        "role":"correction", "source_dispositions":[],
+        "assessment_dispositions":[{
+            "assessment_id":"class-a", "governing_id":"G5",
+        }],
+        "findings":[{
+            "id":"G5", "severity":"MAJOR", "summary":"reachable defect",
+            "evidence":["plan:1"], "remedy":"repair the reachable path",
+        }],
+        "debt":[{
+            "id":"legacy-G5", "finding_id":"G5", "status":"open",
+            "severity":"MAJOR", "summary":"reachable defect",
+            "evidence":["plan:1"], "remedy":"repair the reachable path",
+        }],
+        "debt_updates":[],
+        "class_dispositions":[{
+            "finding_id":"G5", "kind":"existing_class", "class_id":"class-a",
+        }],
+        "class_records":[
+            (
+                {"op":"reopen", "class_id":"class-a"}
+                if not mechanized else {
+                    "op":"replace", "class_id":"class-a",
+                    "invariant":"replacement invariant", "severity":"MAJOR",
+                    "pattern":"BROKEN", "pathspec":"*.py",
+                }
+            ),
+        ],
+        "class_assessments":[{
+            "class_id":"class-a", "verdict":"violated",
+            "evidence":["plan:1"], "finding_id":"G5",
+        }],
     }
     legacy = historical_v1_reference(
         legacy, role="correction",
@@ -1136,8 +1165,13 @@ def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():
         durable_debt=debts,
     )
     legacy = {
-        key: deepcopy(value) for key, value in parsed.items()
-        if not key.startswith("_")
+        "role":"correction", "source_dispositions":[],
+        "assessment_dispositions":[], "findings":[], "debt":[],
+        "debt_updates":[{
+            "id":"D9", "status":"open", "evidence":["plan:1"],
+            "reason":"the one-off occurrence remains reachable",
+        }],
+        "class_dispositions":[], "class_records":[], "class_assessments":[],
     }
     legacy = historical_v1_reference(
         legacy, role="correction", prior_debt=debts,
@@ -1178,8 +1212,53 @@ def test_historical_v1_v2_census_fanout_shape_is_equivalent():
         active_classes=classes,
     )
     legacy = {
-        key: deepcopy(value) for key, value in parsed.items()
-        if not key.startswith("_")
+        "role":"census",
+        "source_dispositions":[
+            {"source_id":"integrity:F1", "governing_id":"G1"},
+            {"source_id":"integrity:F1", "governing_id":"G2"},
+        ],
+        "assessment_dispositions":[
+            {"assessment_id":"class-a", "governing_id":"G1"},
+            {"assessment_id":"class-b", "governing_id":"G2"},
+        ],
+        "findings":[
+            {
+                "id":"G1", "severity":"MINOR", "summary":"reachable defect",
+                "evidence":["plan:1"], "remedy":"repair the reachable path",
+            },
+            {
+                "id":"G2", "severity":"MAJOR", "summary":"reachable defect",
+                "evidence":["plan:1"], "remedy":"repair the reachable path",
+            },
+        ],
+        "debt":[
+            {
+                "id":"legacy-G1", "finding_id":"G1", "status":"open",
+                "severity":"MINOR", "summary":"reachable defect",
+                "evidence":["plan:1"], "remedy":"repair the reachable path",
+            },
+            {
+                "id":"legacy-G2", "finding_id":"G2", "status":"open",
+                "severity":"MAJOR", "summary":"reachable defect",
+                "evidence":["plan:1"], "remedy":"repair the reachable path",
+            },
+        ],
+        "debt_updates":[],
+        "class_dispositions":[
+            {"finding_id":"G1", "kind":"existing_class", "class_id":"class-a"},
+            {"finding_id":"G2", "kind":"existing_class", "class_id":"class-b"},
+        ],
+        "class_records":[],
+        "class_assessments":[
+            {
+                "class_id":"class-a", "verdict":"violated",
+                "evidence":["plan:1"], "finding_id":"G1",
+            },
+            {
+                "class_id":"class-b", "verdict":"violated",
+                "evidence":["plan:1"], "finding_id":"G2",
+            },
+        ],
     }
     legacy = historical_v1_reference(
         legacy, role="census", source_ids=["integrity:F1"],
@@ -1191,4 +1270,126 @@ def test_historical_v1_v2_census_fanout_shape_is_equivalent():
         parsed, active=classes,
     ) == durable_projection(
         legacy, active=classes,
+    )
+
+
+def test_historical_v1_v2_remaining_legal_shape_matrix_is_equivalent():
+    """Cover tagged outcomes and branch definitions absent from frozen fixtures."""
+    classes = [active_class("class-a"), active_class("class-b")]
+    debts = [
+        durable_debt("D10", cid="class-a", finding_id="old-a"),
+        durable_debt("D11", cid="class-b", finding_id="old-b"),
+    ]
+    procedure = finding(
+        "G-procedure", "OUT-OF-SCOPE",
+        classification={
+            "kind":"new_class", "definition":{
+                "invariant":"manual branch invariant", "severity":"MINOR",
+                "procedure":"inspect the branch path",
+            },
+        },
+    )
+    pattern = finding(
+        "G-pattern", "FATAL",
+        classification={
+            "kind":"new_class", "definition":{
+                "invariant":"mechanized branch invariant", "severity":"BLOCKER",
+                "pattern":"BROKEN", "pathspec":"*.py",
+            },
+        },
+    )
+    raw = decision(
+        "correction", governing_findings=[procedure, pattern],
+        debt_outcomes=[
+            {
+                "debt_id":"D10", "status":"open", "evidence":["plan:1"],
+                "reason":"the class remains violated",
+            },
+            {"debt_id":"D11", "status":"closed", "evidence":["plan:1"]},
+        ],
+        class_outcomes=[
+            {
+                "class_id":"class-a", "verdict":"violated",
+                "evidence":["plan:1"],
+                "basis":{"kind":"carried_debt", "debt_id":"D10"},
+            },
+            {
+                "class_id":"class-b", "verdict":"satisfied",
+                "evidence":["plan:1"],
+            },
+        ],
+        class_actions=[
+            {"kind":"reclassify", "class_id":"class-a", "severity":"BLOCKER"},
+            {
+                "kind":"replace", "class_id":"class-b", "definition":{
+                    "invariant":"manual replacement invariant", "severity":"BLOCKER",
+                    "procedure":"inspect the replacement path",
+                },
+            },
+        ],
+    )
+    parsed = materialize(
+        raw, mode=cc.BRANCH_MODE, active_classes=classes, durable_debt=debts,
+    )
+    legacy = {
+        "role":"correction", "source_dispositions":[],
+        # V1 could update carried debt and apply standalone class operations
+        # without restating those relationships as correction assessments.
+        "assessment_dispositions":[],
+        "findings":[
+            {
+                "id":"G-procedure", "severity":"OUT-OF-SCOPE",
+                "summary":"reachable defect", "evidence":["plan:1"],
+                "remedy":"repair the reachable path",
+            },
+            {
+                "id":"G-pattern", "severity":"FATAL",
+                "summary":"reachable defect", "evidence":["plan:1"],
+                "remedy":"repair the reachable path",
+            },
+        ],
+        "debt":[{
+            "id":"legacy-pattern", "finding_id":"G-pattern", "status":"open",
+            "severity":"FATAL", "summary":"reachable defect",
+            "evidence":["plan:1"], "remedy":"repair the reachable path",
+        }],
+        "debt_updates":[
+            {
+                "id":"D10", "status":"open", "evidence":["plan:1"],
+                "reason":"the class remains violated",
+            },
+            {"id":"D11", "status":"closed", "evidence":["plan:1"]},
+        ],
+        "class_dispositions":[
+            {"finding_id":"G-procedure", "kind":"new_class", "record_index":0},
+            {"finding_id":"G-pattern", "kind":"new_class", "record_index":1},
+        ],
+        "class_records":[
+            {
+                "op":"new", "invariant":"manual branch invariant",
+                "severity":"MINOR", "procedure":"inspect the branch path",
+            },
+            {
+                "op":"new", "invariant":"mechanized branch invariant",
+                "severity":"BLOCKER", "pattern":"BROKEN", "pathspec":"*.py",
+            },
+            {"op":"reclassify", "class_id":"class-a", "severity":"BLOCKER"},
+            {
+                "op":"replace", "class_id":"class-b",
+                "invariant":"manual replacement invariant", "severity":"BLOCKER",
+                "procedure":"inspect the replacement path",
+            },
+        ],
+        "class_assessments":[],
+    }
+    legacy = historical_v1_reference(
+        legacy, role="correction", active=classes, prior_debt=debts,
+        mode=cc.BRANCH_MODE,
+    )
+    assert durable_projection(
+        parsed, active=classes, prior_debt=debts, phase="correction",
+        mode=cc.BRANCH_MODE,
+    ) == durable_projection(
+        legacy, active=classes, prior_debt=debts, phase="correction",
+        mode=cc.BRANCH_MODE,
     )

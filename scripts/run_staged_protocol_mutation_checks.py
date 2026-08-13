@@ -26,6 +26,7 @@ DIFFERENTIAL_TESTS = (
     "test_historical_v1_v2_branch_transition_shapes_are_equivalent",
     "test_historical_v1_v2_open_unbound_debt_shape_is_equivalent",
     "test_historical_v1_v2_census_fanout_shape_is_equivalent",
+    "test_historical_v1_v2_remaining_legal_shape_matrix_is_equivalent",
 )
 
 MUTATIONS = (

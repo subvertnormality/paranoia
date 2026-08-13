@@ -265,11 +265,19 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
         "remedy":"repair it", "source_ids":[], "class_ids":[],
         "first_round":1, "last_round":1,
     }])
+    tracked = {
+        f"class-{index}": cc.TrackedClass(
+            f"class-{index}", f"existing invariant {index}", "MINOR", 1,
+            cc.OPEN, procedure="inspect it",
+        )
+        for index in range(cc.MAX_ACTIVE_CLASSES)
+    }
     cc.save_lineage(
         tmp_path,
         cc.Lineage(
             "cross-layer-errors", rounds=1, mode=cc.PLAN_MODE,
-            review_state=state,
+            review_state=state, classes=tracked,
+            next_seq=cc.MAX_ACTIVE_CLASSES + 1,
         ),
     )
     closure = handlers._PlanClassClosure(
@@ -278,11 +286,23 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     closure.prepare()
     invalid = wire({
         "role":"correction",
-        "governing_findings":[{
-            "id":"G1", "severity":"MAJOR", "summary":"new defect",
-            "evidence":["repository/missing.py:1"], "remedy":"repair it",
-            "classification":{"kind":"one_off", "reason":"one site"},
-        }],
+        "governing_findings":[
+            {
+                "id":"G1", "severity":"MAJOR", "summary":"new defect",
+                "evidence":["repository/missing.py:1"], "remedy":"repair it",
+                "classification":{"kind":"one_off", "reason":"one site"},
+            },
+            {
+                "id":"G2", "severity":"MINOR", "summary":"recurring defect",
+                "evidence":["repository/missing.py:1"], "remedy":"repair it",
+                "classification":{
+                    "kind":"new_class", "definition":{
+                        "invariant":"new recurring invariant", "severity":"MINOR",
+                        "procedure":"inspect it",
+                    },
+                },
+            },
+        ],
         "debt_outcomes":[], "class_outcomes":[],
         "class_actions":[{"kind":"close", "class_id":"missing-class"}],
     })
@@ -305,6 +325,8 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     message = str(caught.value)
     assert "/debt_outcomes: must update every supplied open debt" in message
     assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
+    assert "/governing_findings/1/classification/definition: invalid class operation" in message
+    assert "100 non-superseded classes already tracked" in message
     assert "/class_actions/0: invalid class operation" in message
     assert caught.value.stage_role == "correction-validation-retry"
     assert [row.outcome for row in caught.value.attempts] == [

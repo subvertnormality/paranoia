@@ -483,6 +483,31 @@ def class_records_from_actions(
     return records
 
 
+def class_record_candidates(
+    value: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Extract every schema-valid model-owned class operation before graph validation.
+
+    This view lets the canonical engine report independent definition/cap faults even
+    when another semantic relationship prevents full materialization.
+    """
+    records: list[dict[str, Any]] = []
+    pointers: list[str] = []
+    for index, finding in enumerate(value["governing_findings"]):
+        classification = finding["classification"]
+        if classification["kind"] != "new_class":
+            continue
+        records.append({"op": "new", **classification["definition"]})
+        pointers.append(
+            f"/governing_findings/{index}/classification/definition"
+        )
+    records.extend(class_records_from_actions(value["class_actions"]))
+    pointers.extend(
+        f"/class_actions/{index}" for index in range(len(value["class_actions"]))
+    )
+    return records, pointers
+
+
 def materialize_decision_value(
     value: dict[str, Any], *, mode: str, role: str,
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,

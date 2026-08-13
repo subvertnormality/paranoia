@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-3 held findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-4 held findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -69,7 +69,7 @@ payload.
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **987 passed in 65.13 seconds**. An initial
+commits did not inherit the operator's signing key: **988 passed in 61.82 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -133,16 +133,27 @@ and sends 150 independent sources through all three real lane parsers and consol
 measured response limits and visible persisted oversize-failure tests address the advisory without
 adding a phase or retry.
 
+CODE round 4 closed the aggregate-capacity class and response-limit advisory. It retained the
+historical gate because three later fixtures copied their V1 side from the V2 materialization, and
+retained cross-layer diagnostics because the semantic-failure fallback extracted explicit actions
+but not embedded new-class definitions. The V1 fixtures are now independently authored for every
+group. The seven-group executable matrix covers census, correction, final, one-off/new/existing
+classification, plan and branch procedure definitions, branch patterns, open/closed debt outcomes,
+satisfied and both violated-outcome bases, all action kinds, advisory debt, fan-out, and replacement
+mechanization. The fallback now extracts both embedded definitions and explicit actions; a terminal
+retry test combines graph debt-completeness, two bad anchors, an unknown action, and a new-class
+attempt against the canonical 100-class cap in one bounded pointer diagnostic.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+436 net lines** and current sizes 2,762, 450, 501, 616, and 838 lines. The increase is
+modules to **+459 net lines** and current sizes 2,760, 450, 501, 616, and 863 lines. The increase is
 bounded cross-layer issue accumulation, provider-envelope closure, and coherent packet limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the current diff is **+456 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+479 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 
