@@ -267,7 +267,7 @@ prevent.
    error with a clear message — never mechanical prose rewriting, which would risk
    substring collisions.
 4. **Rules 1 and 3 are applied to cleaner output, not just caller input.** The
-   cleaner rewrites `decision`, `context`, statements, and hint reasons, so it can
+   cleaner rewrites `decision`, statements, and hint reasons, so it can
    introduce a caller id or reproduce a label even when the caller did not. Same
    checks, same failure path (one retry, then fail).
 5. **`SELECTED` must be an exact member of the label set issued to that
@@ -608,17 +608,24 @@ symlink.
 
 **MUST**: strip advocacy and loaded adjectives; remove the caller's own
 recommendation and any attribution; equalize detail across options; normalize
-tense, voice, altitude; neutralize argumentative text in `context` and hint
-reasons; echo each option under the caller-stable id the server gives it.
+tense, voice, altitude; neutralize argumentative hint reasons; reproduce caller
+`context` byte-for-byte; echo each option under the caller-stable id the server
+gives it.
 
 **MUST NOT**: add, remove, merge, split, or reorder options; change any option's
 meaning; add facts not in the input; express or hint at a preference; investigate
-the repo; **touch `stakes`**.
+the repo; **touch `stakes` or rewrite, reflow, summarize, or omit `context`**.
 
-`stakes` passes through **verbatim**. It is the highest-leverage input to
+`stakes` and `context` pass through **verbatim**. Stakes are server-owned read-only
+input: the cleaner uses them for calibration but must not return a `STAKES` block.
+The parser rejects undeclared output blocks. The cleaner's emitted context is
+non-authoritative and the server restores the exact caller bytes before attestation
+and voting. `stakes` is the highest-leverage input to
 `SELECTED-RISK`, and severity is the one axis that gates — a model silently
 reshaping it recalibrates both deciders in the same direction. Advocacy inside
 `stakes` is *detected* by the attester and pushed back to the caller to fix.
+Advocacy in unchanged context is detected independently and likewise pushed back
+to the caller; it is never converted into a request for the cleaner to alter shared data.
 
 **Model defaults are explicit constants, not resolved from the engine.**
 `CLEANER_MODEL = "claude-opus-5"`. Revision 2 left `cleaner_model` merely
@@ -651,26 +658,36 @@ judgement, because neither role is asked which option is better.
 Cleaned framing goes to the vendor that did **not** clean it — `text_only`,
 `effort: low` — with caller-originals beside cleaned text, **field by field**.
 Revision 1 attested per-option fidelity plus one global neutrality verdict, so
-`decision`, `context`, and hint reasons went unchecked for meaning even though the
-cleaner rewrites them.
+`decision` and hint reasons went unchecked for meaning even though the cleaner
+rewrites them. Context no longer belongs to the fidelity set because it is not a
+cleaner-owned field; its unchanged bytes receive a separate advocacy verdict.
 
 ```
-FIDELITY: decision PRESERVED|CHANGED; context PRESERVED|CHANGED; hints PRESERVED|CHANGED; <caller-id> PRESERVED|CHANGED; …
+FIDELITY: decision PRESERVED|CHANGED; hints PRESERVED|CHANGED; <caller-id> PRESERVED|CHANGED; …
+FIDELITY-DETAIL: NONE | {"<field>":{"original":"<exact passage>","cleaned":"<exact passage>","change":"<added|removed|narrowed|widened|altered-qualification>","reason":"<field>: <exact change token>"}, …}
 NEUTRALITY: PASS | FAIL <which option the packet favours, and the words that do it>
 STAKES-ADVOCACY: NONE | PRESENT <the advocating words>
+CONTEXT-ADVOCACY: NONE | PRESENT <the advocating words>
 ```
 
-The attestation must contain **only** its three verdict lines, each once: a
+The attestation must contain **only** its five verdict lines, each once: a
 contradicting sentence beside `NEUTRALITY: PASS` would otherwise be ignored and the
 packet stamped `attested`. Verdicts are matched **exactly**: `PASS` and `NONE` must be the whole value, and
-`FAIL`/`PRESENT` must carry a note. A prefix match accepted
+`FAIL`/`PRESENT` must carry a note. `FIDELITY-DETAIL` must be `NONE` exactly when
+every field is preserved. Otherwise it is one JSON object whose keys exactly equal
+the changed fields. Every value must contain non-empty `original`, `cleaned`, `change`,
+and `reason` strings; `change` is a closed semantic-delta enum and `reason` must equal
+`<field>: <change>`. The enum plus exact before/after passages is the mechanically
+enforceable semantic explanation; no free-text heuristic gates it. Both passages are mechanically checked as exact substrings of that
+field's actual pair, and identical passages cannot demonstrate a change. A prefix match accepted
 `NEUTRALITY: PASS but the wording favors option A` as a clean bill of health and
 stamped a biased packet `attested` — sending that same bias to both deciders.
 
-Any `CHANGED` or `FAIL` → one cleaner retry with the attester's exact complaint;
+Any well-formed `CHANGED` or `FAIL` → one cleaner retry with the attester's exact complaint;
 a second failure ends the run `FAILED` with complaint and packet returned.
 `STAKES-ADVOCACY: PRESENT` fails immediately to the caller — `stakes` is not the
-cleaner's to fix. The attester is never asked which option is better; its prompt
+cleaner's to fix. `CONTEXT-ADVOCACY: PRESENT` does the same for the unchanged
+context. The attester is never asked which option is better; its prompt
 says it is a text auditor.
 
 ### 3.4 The deciders
@@ -1158,9 +1175,9 @@ is the round-3 FATAL as a regression test. Interval merging is asserted per path
 including touching-but-not-overlapping windows and clamping at file bounds.
 
 *Framing.* Cleaned options outside either numeric band retry once then fail; a
-`CHANGED` on `decision`/`context`/`hints`/any option, a `FAIL` neutrality, and
-`STAKES-ADVOCACY: PRESENT` each take their specified path; the attester is always
-the non-cleaning vendor; `stakes` reaches the deciders byte-identical to the
+`CHANGED` on `decision`/`hints`/any option, a `FAIL` neutrality,
+`STAKES-ADVOCACY: PRESENT`, and `CONTEXT-ADVOCACY: PRESENT` each take their specified
+path; the attester is always the non-cleaning vendor; `stakes` and `context` reach the deciders byte-identical to the
 caller's input; the cleaner model default is `claude-opus-5` and is *not*
 inherited from `ClaudeEngine.default_model`.
 

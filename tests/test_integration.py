@@ -113,7 +113,7 @@ prompt="$(cat)"
 if printf '%s' "$prompt" | grep -q 'You are a NEUTRALIZER'; then
   body=$(printf '=== DECISION ===\nPick one.\n\n=== OPTIONS ===\nopt-a: Alpha approach.\nopt-b: Bravo approach.\n\n=== CONTEXT ===\nNone.\n\n=== HINTS ===\nNone.\n')
 elif printf '%s' "$prompt" | grep -q 'You are a TEXT AUDITOR'; then
-  body=$(printf 'FIDELITY: decision PRESERVED; opt-a PRESERVED; opt-b PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE')
+  body=$(printf 'FIDELITY: decision PRESERVED; opt-a PRESERVED; opt-b PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE')
 else
   label=$(printf '%s' "$prompt" | grep -o 'OPTION-[0-9a-f]\{16\}' | head -1)
   body=$(printf 'Reasoning.\n\nSELECTED: %s\nSELECTED-RISK: NONE\nAUTHORITY: technical\nNEW-OPTION: NONE\nCONSTRAINT: A fact.\nPUBLISHER-AUTHORITY: NO — repository citation\nPASSAGE-ENTAILMENT: NO — repository citation\nDECISION-RELEVANCE: YES — directly decides the option\nDECISIVE-CITATION: app.py:4\nCITATIONS: NONE' "$label")

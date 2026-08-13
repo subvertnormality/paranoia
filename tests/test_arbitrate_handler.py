@@ -17,6 +17,7 @@ from paranoia_local import arbitration_research as ar
 from paranoia_local import engines as eng
 from paranoia_local import evidence
 from paranoia_local import external_sources as es
+from paranoia_local import prompts
 
 from .conftest import commit_all, git
 
@@ -85,11 +86,32 @@ def cleaner_reply(ids_to_statements: dict[str, str]) -> str:
     )
 
 
+def test_cleaner_stakes_are_read_only_input_and_not_an_output_block():
+    body = ah._clean_body("decision", "stakes", "context", [], {"one": "first"}, "")
+    assert "=== STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return) ===" in body
+    assert "=== STAKES ===" not in prompts.CLEANER_INSTRUCTIONS
+    assert "Rewrite or return the STAKES text" in prompts.CLEANER_INSTRUCTIONS
+
+
+@pytest.mark.parametrize("heading", [
+    "STAKES",
+    "STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return)",
+    "stakes",
+    "EXTRA NOTES",
+])
+def test_cleaner_rejects_an_undeclared_output_block(heading: str):
+    reply = cleaner_reply({"one": "first"}) + f"\n=== {heading} ===\nchanged\n"
+    with pytest.raises(ah.ArbitrationError, match="unexpected ==="):
+        ah.parse_cleaned_packet(reply, ["one"], caller_gave_context=True)
+
+
 ATTEST_OK = (
     "FIDELITY: decision PRESERVED; "
     "opt-float PRESERVED; opt-decimal PRESERVED\n"
+    "FIDELITY-DETAIL: NONE\n"
     "NEUTRALITY: PASS\n"
     "STAKES-ADVOCACY: NONE\n"
+    "CONTEXT-ADVOCACY: NONE\n"
 )
 
 
@@ -97,8 +119,10 @@ ATTEST_OK = (
 ATTEST_OK_WITH_HINTS = (
     "FIDELITY: decision PRESERVED; hints PRESERVED; "
     "opt-float PRESERVED; opt-decimal PRESERVED\n"
+    "FIDELITY-DETAIL: NONE\n"
     "NEUTRALITY: PASS\n"
     "STAKES-ADVOCACY: NONE\n"
+    "CONTEXT-ADVOCACY: NONE\n"
 )
 
 
@@ -1721,13 +1745,181 @@ def test_attestation_failure_retries_once_then_fails(repo: Path, tmp_path: Path)
     assert record["phase_attempts"][-1]["rejection"]
 
 
+def test_fidelity_rejection_names_exact_passages_and_reason(repo: Path, tmp_path: Path):
+    detail = json.dumps({"opt-float": {
+        "original": "Store the threshold as a float",
+        "cleaned": "Store an approximate threshold",
+        "change": "altered-qualification",
+        "reason": "opt-float: altered-qualification",
+    }}, separators=(",", ":"))
+    agent = Agent(lambda e, r: "opt-float", cleaner=cleaner_reply({
+        "opt-float": "Store an approximate threshold.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    }), attest=(
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path)
+
+    assert detail in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert detail in record["phase_attempts"][-1]["rejection"]
+    assert record["phase_attempts"][-1]["reply"]
+
+
+def test_changed_fidelity_without_detail_is_unusable_not_empty_changed(
+    repo: Path, tmp_path: Path,
+):
+    agent = Agent(lambda e, r: "opt-float", attest=(
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path)
+
+    assert "changed fidelity requires a specific FIDELITY-DETAIL" in report
+    assert "fidelity changed: []" not in report
+
+
+def test_changed_fidelity_detail_must_identify_both_passages_and_reason(
+    repo: Path, tmp_path: Path,
+):
+    agent = Agent(lambda e, r: "opt-float", attest=(
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        'FIDELITY-DETAIL: {"opt-float":{"reason":"wording differs"}}\n'
+        "NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    ))
+    report = run(repo, agent, tmp_path)
+
+    assert "must contain exactly original, cleaned, change, reason" in report
+
+
+def test_changed_fidelity_detail_rejects_duplicate_json_keys():
+    reply = (
+        "FIDELITY: first CHANGED\n"
+        'FIDELITY-DETAIL: {"first":{"original":"alpha","cleaned":"beta",'
+        '"change":"narrowed","reason":"first: narrowed"},'
+        '"first":{"original":"alpha","cleaned":"invented",'
+        '"change":"widened","reason":"first: widened"}}\n'
+        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
+    )
+    with pytest.raises(ah.ArbitrationError, match="duplicate key 'first'"):
+        ah.parse_attestation(reply, {"first": ("alpha original", "beta cleaned")})
+
+
+def test_attestation_rejects_split_or_reordered_verdict_lines():
+    split = (
+        "FIDELITY: first PRESERVED\nFIDELITY: second PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
+    )
+    with pytest.raises(ah.ArbitrationError, match="exactly five"):
+        ah.parse_attestation(split, {"first": ("a", "a"), "second": ("b", "b")})
+    reordered = (
+        "FIDELITY: first PRESERVED\nNEUTRALITY: PASS\nFIDELITY-DETAIL: NONE\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
+    )
+    with pytest.raises(ah.ArbitrationError, match="must be ordered"):
+        ah.parse_attestation(reordered, {"first": ("a", "a")})
+
+
+@pytest.mark.parametrize(("detail", "message"), [
+    (
+        {"first": {"original": "alpha", "cleaned": "beta", "change": "narrowed", "reason": "first: narrowed"}},
+        "fields must exactly equal CHANGED fields",
+    ),
+    (
+        {
+                "first": {"original": "gamma", "cleaned": "beta", "change": "narrowed", "reason": "first: narrowed"},
+                "second": {"original": "gamma", "cleaned": "delta", "change": "narrowed", "reason": "second: narrowed"},
+        },
+        "original passage is not in that field",
+    ),
+    (
+        {
+                "first": {"original": "alpha", "cleaned": "invented", "change": "narrowed", "reason": "first: narrowed"},
+                "second": {"original": "gamma", "cleaned": "delta", "change": "narrowed", "reason": "second: narrowed"},
+        },
+        "cleaned passage is not in that field",
+    ),
+    (
+        {
+            "first": {"original": "alpha", "cleaned": "beta", "change": "narrowed", "reason": ""},
+            "second": {"original": "gamma", "cleaned": "delta", "change": "narrowed", "reason": "second: narrowed"},
+        },
+        "values must be non-empty strings",
+    ),
+    (
+        {
+            "first": {"original": "alpha", "cleaned": "beta", "change": "changed", "reason": "first: the wording is materially changed"},
+            "second": {"original": "gamma", "cleaned": "delta", "change": "narrowed", "reason": "second: narrowed"},
+        },
+        "change must be one of",
+    ),
+    (
+        {
+            "first": {"original": "alpha", "cleaned": "beta", "change": "narrowed", "reason": "first: the wording is materially changed"},
+            "second": {"original": "gamma", "cleaned": "delta", "change": "narrowed", "reason": "second: narrowed"},
+        },
+        "reason must be exactly 'first: narrowed'",
+    ),
+])
+def test_changed_fidelity_diagnostics_are_bound_per_field(detail, message):
+    reply = (
+        "FIDELITY: first CHANGED; second CHANGED\n"
+        f"FIDELITY-DETAIL: {json.dumps(detail, separators=(',', ':'))}\n"
+        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    with pytest.raises(ah.ArbitrationError, match=message):
+        ah.parse_attestation(reply, {
+            "first": ("alpha original", "beta cleaned"),
+            "second": ("gamma original", "delta cleaned"),
+        })
+
+
+def test_cleaner_prompt_never_calls_context_neutralized_background():
+    from paranoia_local import prompts
+
+    context_block = prompts.CLEANER_INSTRUCTIONS.split("=== CONTEXT ===", 1)[1].split(
+        "=== HINTS ===", 1
+    )[0]
+    assert "copy the supplied CONTEXT byte-for-byte" in context_block
+    assert "neutral background" not in prompts.CLEANER_INSTRUCTIONS
+
+
+def test_phase_reply_bound_retains_complete_normal_protocol_and_marks_overflow():
+    normal = "x" * ah.MAX_PHASE_REPLY_CHARS
+    assert ah._bounded_phase_reply(normal) == normal
+    overflow = normal + "tail"
+    bounded = ah._bounded_phase_reply(overflow)
+    assert len(bounded) == ah.MAX_PHASE_REPLY_CHARS
+    assert "[bounded phase output]" in bounded
+
+
+def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
+    repo: Path, tmp_path: Path,
+):
+    agent = Agent(lambda e, r: "opt-float", attest=(
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "CONTEXT-ADVOCACY: PRESENT 'obviously choose binary floating point'\n"
+    ))
+    report = run(repo, agent, tmp_path, context="Obviously choose binary floating point.")
+
+    assert "context text advocates" in report
+    assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 1
+
+
 def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
     """stakes is not the cleaner's to fix, so this goes back to the caller."""
     agent = Agent(
         lambda e, r: "opt-float",
         attest=("FIDELITY: decision PRESERVED; "
-                "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"),
+                "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
+                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
@@ -2434,8 +2626,9 @@ def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: 
     agent = Agent(
         lambda e, r: "opt-float",
         attest=("FIDELITY: decision PRESERVED; "
-                "opt-float PRESERVED; opt-decimal PRESERVED\nNEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"),
+                "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
+                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
@@ -2509,7 +2702,8 @@ def test_attestation_does_not_cover_fields_the_caller_never_supplied(repo: Path,
     the caller had no control over."""
     agent = Agent(lambda e, r: "opt-float", attest=(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
-        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "CONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
@@ -2517,9 +2711,8 @@ def test_attestation_does_not_cover_fields_the_caller_never_supplied(repo: Path,
     assert attest_bodies and "context" not in attest_bodies[0].lower().split("=== stakes")[0]
 
 
-def test_a_cleaner_invented_context_is_rejected(repo: Path, tmp_path: Path):
-    """The other half of fix 4: if the caller supplied no context, a populated one is
-    the cleaner ADDING facts, which it is forbidden to do."""
+def test_a_cleaner_invented_context_is_ignored(repo: Path, tmp_path: Path):
+    """Cleaner context is never authoritative, including when the caller supplied none."""
     agent = Agent(lambda e, r: "opt-float", cleaner=(
         "=== DECISION ===\nd\n\n"
         "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
@@ -2528,8 +2721,9 @@ def test_a_cleaner_invented_context_is_rejected(repo: Path, tmp_path: Path):
         "=== HINTS ===\nNone.\n"
     ))
     report = run(repo, agent, tmp_path)
-    assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "context" in report.lower()
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["context"] == ""
 
 
 def test_a_failed_run_writes_an_audit_record(repo: Path, tmp_path: Path):
@@ -2547,7 +2741,9 @@ def test_a_failed_run_writes_an_audit_record(repo: Path, tmp_path: Path):
     rec = json.loads(written[0].read_text())
     assert rec["outcome"] == "FAILED"
     assert "not equalized" in rec["reason"]
-    assert rec["raw_input"]["options"]
+    assert rec["raw_input"]["options"] == {
+        "A": "x" * 400, "B": "y" * 1300,
+    }
 
 
 def test_preflight_runs_before_any_cleaner_call(repo: Path, tmp_path: Path):
@@ -2572,8 +2768,9 @@ def test_the_cleaner_may_compress_narration_without_tripping_the_floor(repo: Pat
             f"=== OPTIONS ===\nA: {'a' * 90}\nB: {'b' * 120}\n\n"
             "=== HINTS ===\nNone.\n"
         ),
-        attest=("FIDELITY: decision PRESERVED; A PRESERVED; B PRESERVED\n"
-                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"),
+            attest=("FIDELITY: decision PRESERVED; A PRESERVED; B PRESERVED\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path,
                  options=[{"id": "A", "statement": long_a}, {"id": "B", "statement": long_b}])
@@ -2633,8 +2830,9 @@ def test_a_caller_context_that_reads_None_is_not_swallowed(repo: Path, tmp_path:
         "=== CONTEXT ===\nNone.\n\n"
         "=== HINTS ===\nNone.\n"
     ), attest=(
-        "FIDELITY: decision PRESERVED; context PRESERVED; opt-float PRESERVED; "
-        "opt-decimal PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; "
+        "opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path, context="None.")
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
@@ -2642,6 +2840,41 @@ def test_a_caller_context_that_reads_None_is_not_swallowed(repo: Path, tmp_path:
         if call["cwd"] is None:
             continue
         assert "None." in call["body"], "the caller's context must reach the deciders"
+
+
+def test_cleaner_context_rewrite_is_ignored_and_caller_bytes_reach_deciders(
+    repo: Path, tmp_path: Path,
+):
+    original = "Shared specification:\n- MUST preserve `x == y`\n- Do not reflow this list."
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        "=== DECISION ===\nd\n\n"
+        "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
+        "opt-decimal: Store the threshold as a Decimal.\n\n"
+        "=== CONTEXT ===\nA shortened paraphrase.\n\n"
+        "=== HINTS ===\nNone.\n"
+    ))
+    report = run(repo, agent, tmp_path, context=original)
+
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["context"] == original
+
+
+def test_context_leading_and_trailing_whitespace_reaches_deciders_unchanged(
+    repo: Path, tmp_path: Path,
+):
+    original = "\n  Shared table heading\n\nrow | value  \n"
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path, context=original)
+
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["raw_input"]["context"] == original
+    assert record["cleaned"]["context"] == original
+    assert all(original in call["body"] for call in agent.calls if call["cwd"] is not None)
+    assert all(
+        original in call["body"] for call in agent.calls if call["cwd"] is not None
+    )
 
 
 def test_clean_false_is_not_subject_to_cleaner_capacity_bounds(repo: Path, tmp_path: Path):
@@ -2665,10 +2898,8 @@ def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):
     assert "not equalized" in report
 
 
-def test_a_cleaner_that_omits_a_supplied_context_block_fails(repo: Path, tmp_path: Path):
-    """Round-2 review blocker: omitting the block entirely was invisible. Rendered back
-    to the attester as `None.` it matched a caller context that also reads `None.`, so
-    fidelity passed while the deciders received nothing."""
+def test_a_cleaner_that_omits_context_cannot_change_it(repo: Path, tmp_path: Path):
+    """Context is caller-owned and restored verbatim regardless of cleaner output."""
     agent = Agent(lambda e, r: "opt-float", cleaner=(
         "=== DECISION ===\nd\n\n"
         "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
@@ -2676,8 +2907,9 @@ def test_a_cleaner_that_omits_a_supplied_context_block_fails(repo: Path, tmp_pat
         "=== HINTS ===\nNone.\n"
     ))
     report = run(repo, agent, tmp_path, context="None.")
-    assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "dropped the supplied context" in report
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["context"] == "None."
 
 
 def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, tmp_path: Path):
@@ -2703,7 +2935,8 @@ def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, 
                 ]
                 self.attest = (
                     "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
-                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
                 )
             return super().__call__(**kw)
 
@@ -2712,9 +2945,8 @@ def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, 
     assert "[context]" not in seen["body"] and "[hints]" not in seen["body"]
 
 
-def test_the_attester_template_covers_context_and_hints_when_supplied(repo: Path, tmp_path: Path):
-    """The other half: when the caller DOES supply them, they must be in the body and
-    the parser must expect them."""
+def test_attester_checks_verbatim_context_advocacy_and_hint_fidelity(repo: Path, tmp_path: Path):
+    """Context is outside fidelity scoring but remains visible to the advocacy check."""
     seen: dict[str, str] = {}
 
     class Recorder(Agent):
@@ -2727,7 +2959,8 @@ def test_the_attester_template_covers_context_and_hints_when_supplied(repo: Path
                 ]
                 self.attest = (
                     "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
-                    "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
                 )
             if "NEUTRALIZER" in kw["instructions"]:
                 opts = "\n".join(f"{k}: {v}" for k, v in self.statements.items())
@@ -2743,4 +2976,5 @@ def test_the_attester_template_covers_context_and_hints_when_supplied(repo: Path
                  context="The threshold is written to a log line.",
                  files=[{"path": "app.py", "reason": "the module"}])
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
-    assert "[context]" in seen["body"] and "[hints]" in seen["body"]
+    assert "[context]" not in seen["body"] and "[hints]" in seen["body"]
+    assert "=== CONTEXT (NOT cleaned" in seen["body"]

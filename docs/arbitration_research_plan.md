@@ -417,8 +417,12 @@ and receive at most the one same-session correction.
 
 The established cleaned-packet projection includes decision, context, normalized hints, and option
 statements plus a digest of their exact deterministic encoding on success and every late failure.
-Cleaner and attester replies may be excerpted for bounded diagnostics, but each excerpt is paired
-with the SHA-256 of the full reply.
+Cleaner and attester replies retain complete normal protocol outputs up to a 32,000-character
+circuit breaker and are paired with the SHA-256 of the full reply. Caller context is never a cleaner-owned projection: the server
+restores its exact bytes and the attester gives it a separate advocacy verdict. Fidelity rejection
+must name every changed field, identify original and cleaned passages, classify the semantic
+change with the closed enum, and use the deterministic `<field>: <change>` reason label. Valid
+option arrays use one ID-to-statement audit shape on both success and failure.
 
 Checked-in acceptance summaries are not authoritative by assertion. Before delivery,
 `scripts/validate_arbitration_acceptance.py` reads the referenced durable audit and current source

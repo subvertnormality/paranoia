@@ -624,7 +624,10 @@ What it does, in order:
    `REFS-MOVED: yes` provenance and cannot change the inert views the deciders saw.
 2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
    equalized in detail — then has the *other* vendor attest that field by field.
-   `stakes` is passed through verbatim, never rewritten.
+   `stakes` and caller `context` are passed through verbatim, never rewritten.
+   Stakes are server-owned read-only cleaner input and are not part of the cleaner's
+   output schema; undeclared cleaner output blocks are rejected.
+   The attester separately rejects advocacy in either caller-owned field.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
@@ -742,8 +745,23 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
   setup. Call counts include only attempts that crossed the provider boundary.
 - **Cleaned packet audits are complete.** Success and late-failure records retain
   cleaned decision, context, hints, and statements plus one digest of that exact
-  normalized packet. Bounded cleaner and attester reply copies carry full-reply
-  digests.
+  normalized packet. Cleaner and attester reply copies retain complete normal
+  protocol outputs up to a 32,000-character circuit breaker and always carry full-reply
+  digests. The cleaner's context copy is non-authoritative: the server always
+  restores the caller's exact context, including leading and trailing whitespace,
+  before attestation and voting. A changed fidelity verdict must name each field,
+  quote the original and cleaned passages, classify the semantic change with the
+  closed enum, and use the exact `<field>: <change>` reason label. The enum and bound
+  passages are the enforceable explanation; free-form semantic heuristics are not used. Valid option arrays are
+  audited as the same ID-to-statement mapping on success and every failure path.
+  Signed-in reproductions are recorded in
+  [`docs/cleaning_attestation_acceptance_2026-08-13.json`](docs/cleaning_attestation_acceptance_2026-08-13.json).
+  They prove that exact caller context and normalized options reached both deciders and
+  that the recorded cleaning lifecycle and production results are reproducible. The
+  positive run records a unanimous production result but does not independently attest
+  that its resolved repository citation entails either constraint. The original run
+  records ordinary decider selection divergence; it does not claim to exercise the
+  agreed-but-unsubstantiated fail-closed path.
 - **Cleaner and attester attempts use the same before-call discipline.** Provider
   exceptions retain prompt bindings. Research becomes `running` only after deadline
   admission, and packet digesting remains total on model-controlled Unicode.
