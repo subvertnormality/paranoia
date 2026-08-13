@@ -742,6 +742,31 @@ def test_semantic_validation_reports_all_independent_issues():
     assert "unknown active class 'missing'" in message
     assert "unknown source 'unknown:F2'" in message
 
+    def resolve_pointer(pointer):
+        current = value
+        if pointer == "/":
+            return current
+        for raw in pointer.removeprefix("/").split("/"):
+            part = raw.replace("~1", "/").replace("~0", "~")
+            current = current[int(part)] if isinstance(current, list) else current[part]
+        return current
+
+    for line in message.splitlines():
+        pointer = line.split(": ", 1)[0]
+        resolve_pointer(pointer)
+
+
+def test_unpaired_surrogates_are_rejected_at_the_model_owned_pointer():
+    value = lane_value()
+    value["coverage"][0]["summary"] = "otherwise valid \ud800 text"
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"/coverage/0/summary: string contains an unpaired surrogate",
+    ):
+        sp.parse_lane(
+            json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
+        )
+
 
 def test_class_and_debt_outcome_completeness_are_independent_controls():
     with pytest.raises(sp.ProtocolError, match="class_outcomes: expected exactly"):

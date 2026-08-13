@@ -634,6 +634,45 @@ def test_staged_rejection_with_unpaired_surrogate_retries_and_persists(tmp_path)
     assert closure.lineage.review_state["staged_failure"]["rejected_payloads"] == rejected
 
 
+def test_schema_valid_surrogate_object_fails_before_later_prompt_transport(tmp_path):
+    value = payload(lane("domain"))
+    value["coverage"][0]["summary"] = "model text \ud800"
+    text = wire(value)
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=text, session_ref="s", raw="provider-envelope")
+
+        def resume(self, *args, **kwargs):
+            return Review(text=text, session_ref="s", raw="provider-envelope")
+
+    def parser(reply):
+        try:
+            return sp.parse_lane(
+                reply, mode=cc.PLAN_MODE, lane="domain",
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    with pytest.raises(rc.CensusError, match="unpaired surrogate") as caught:
+        handlers._staged_call(
+            role="census-domain", engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, parser=parser,
+        )
+    assert caught.value.stage_role == "census-domain-validation-retry"
+    assert caught.value.failure_kind == "validation"
+    assert [row.outcome for row in caught.value.attempts] == [
+        "validation-invalid", "validation-invalid",
+    ]
+    # The model object is rejected at the lane boundary; no accepted manifest
+    # can be serialized into a later consolidation prompt or subprocess stdin.
+    assert str(caught.value).startswith(
+        "/coverage/0/summary: string contains an unpaired surrogate"
+    )
+
+
 def test_parallel_lane_failure_fan_in_retains_all_rejected_payloads_in_sequence_order(
     tmp_path, monkeypatch,
 ):

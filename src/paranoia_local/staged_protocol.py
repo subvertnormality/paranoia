@@ -343,6 +343,28 @@ def _schema_issues(value: Any, schema: dict[str, Any]) -> list[str]:
     return issues
 
 
+def _unicode_issues(value: Any, parts: tuple[Any, ...] = ()) -> list[str]:
+    """Reject Unicode scalar violations before any later UTF-8 boundary."""
+    issues: list[str] = []
+    if isinstance(value, str):
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            issues.append(f"{_pointer(parts)}: string contains an unpaired surrogate")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            issues.extend(_unicode_issues(child, (*parts, index)))
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            if isinstance(key, str) and any(
+                0xD800 <= ord(char) <= 0xDFFF for char in key
+            ):
+                issues.append(
+                    f"{_pointer(parts)}: property name contains an unpaired surrogate"
+                )
+                continue
+            issues.extend(_unicode_issues(child, (*parts, key)))
+    return issues
+
+
 def decode(text: str, schema: dict[str, Any], *, max_chars: int) -> dict[str, Any]:
     if len(text) > max_chars:
         raise ProtocolError(
@@ -352,9 +374,14 @@ def decode(text: str, schema: dict[str, Any], *, max_chars: int) -> dict[str, An
         value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise ProtocolError(f"/: invalid JSON at line {exc.lineno} column {exc.colno}") from exc
-    issues = _schema_issues(value, schema)
+    issues = _schema_issues(value, schema) + _unicode_issues(value)
     if issues:
-        message = "\n".join(issues)
+        ordered = sorted(dict.fromkeys(issues))
+        if len(ordered) > MAX_ISSUES:
+            ordered = ordered[:MAX_ISSUES] + [
+                f"/: {len(ordered) - MAX_ISSUES} additional validation errors omitted"
+            ]
+        message = "\n".join(ordered)
         raise ProtocolError(message[:MAX_ISSUE_CHARS])
     assert isinstance(value, dict)
     return value
@@ -427,10 +454,14 @@ def parse_lane(text: str, *, mode: str, lane: str,
         issues.append(
             "/class_assessments: must assess every required active class exactly once"
         )
+    assessment_pointers = {
+        row["class_id"]: f"/class_assessments/{index}"
+        for index, row in enumerate(value["class_assessments"])
+    }
     for cid, row in assessments.items():
         if row["verdict"] == "violated" and row["finding_id"] not in findings:
             issues.append(
-                f"/class_assessments/{cid}/finding_id: must name a lane finding"
+                f"{assessment_pointers[cid]}/finding_id: must name a lane finding"
             )
     _raise_semantic_issues(issues)
     return value
@@ -544,11 +575,12 @@ def materialize_decision_value(
     governing_by_source: dict[str, list[str]] = {}
     if role == "census":
         expected_sources = set(source_ids)
-        for finding in findings:
+        for finding_index, finding in enumerate(findings):
+            finding_pointer = f"/governing_findings/{finding_index}"
             for source in finding["source_ids"]:
                 if source not in expected_sources:
                     issues.append(
-                        f"/governing_findings/{finding['id']}/source_ids: unknown source {source!r}"
+                        f"{finding_pointer}/source_ids: unknown source {source!r}"
                     )
                     continue
                 source_rows.append({"source_id": source, "governing_id": finding["id"]})
@@ -556,7 +588,7 @@ def materialize_decision_value(
                 severity = (source_severities or {}).get(source)
                 if severity and _rank(finding["severity"]) < _rank(severity):
                     issues.append(
-                        f"/governing_findings/{finding['id']}/severity: cannot downgrade {source}"
+                        f"{finding_pointer}/severity: cannot downgrade {source}"
                     )
         if set(governing_by_source) != expected_sources:
             missing = sorted(expected_sources - set(governing_by_source))
@@ -584,7 +616,7 @@ def materialize_decision_value(
             cid = classification["class_id"]
             if cid not in classes:
                 issues.append(
-                    f"/governing_findings/{finding['id']}/classification/class_id: "
+                    f"/governing_findings/{finding_index}/classification/class_id: "
                     f"unknown active class {cid!r}"
                 )
                 finding_class[finding["id"]] = None
@@ -597,6 +629,10 @@ def materialize_decision_value(
                 existing_findings[cid] = finding["id"]
             finding_class[finding["id"]] = cid
 
+    debt_outcome_pointers = {
+        row["debt_id"]: f"/debt_outcomes/{index}"
+        for index, row in reversed(list(enumerate(value["debt_outcomes"])))
+    }
     debt_outcomes = _unique(
         value["debt_outcomes"], "debt_id", "debt_outcomes", issues,
     )
@@ -638,12 +674,13 @@ def materialize_decision_value(
     violated: set[str] = set()
     target_by_class: dict[str, str | None] = {}
     for cid, outcome in outcomes.items():
+        outcome_pointer = outcome_pointers[cid]
         expected_verdict = (assessment_verdicts or {}).get(cid)
         if role == "census" and expected_verdict is not None and (
             outcome["verdict"] != expected_verdict
         ):
             issues.append(
-                f"/class_outcomes/{cid}/verdict: must preserve integrity-lane verdict"
+                f"{outcome_pointer}/verdict: must preserve integrity-lane verdict"
             )
         target: str | None = None
         if outcome["verdict"] == "violated":
@@ -654,29 +691,29 @@ def materialize_decision_value(
                 finding = by_finding.get(target)
                 if finding is None or finding_class.get(target) != cid:
                     issues.append(
-                        f"/class_outcomes/{cid}/basis: finding must classify to this class"
+                        f"{outcome_pointer}/basis: finding must classify to this class"
                     )
                 if role == "census" and finding is not None:
                     cited = (assessment_findings or {}).get(cid)
                     if cited not in finding["source_ids"]:
                         issues.append(
-                            f"/class_outcomes/{cid}/basis: must follow cited lane finding {cited!r}"
+                            f"{outcome_pointer}/basis: must follow cited lane finding {cited!r}"
                         )
             else:
                 if role == "census":
                     issues.append(
-                        f"/class_outcomes/{cid}/basis: census violations require a new finding"
+                        f"{outcome_pointer}/basis: census violations require a new finding"
                     )
                 debt_id = basis["debt_id"]
                 debt = open_debt.get(debt_id)
                 if debt is None or cid not in debt.get("class_ids", []):
                     issues.append(
-                        f"/class_outcomes/{cid}/basis/debt_id: debt must already bind this class"
+                        f"{outcome_pointer}/basis/debt_id: debt must already bind this class"
                     )
                 outcome_row = debt_outcomes.get(debt_id)
                 if outcome_row is not None and outcome_row["status"] != "open":
                     issues.append(
-                        f"/class_outcomes/{cid}/basis/debt_id: carried debt must remain open"
+                        f"{outcome_pointer}/basis/debt_id: carried debt must remain open"
                     )
                 if debt is not None:
                     target = debt["finding_id"]
@@ -721,7 +758,7 @@ def materialize_decision_value(
             for cid in bound
         ):
             issues.append(
-                f"/debt_outcomes/{debt_id}: open class-bound debt needs a violated class"
+                f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
 
     action_pointers = {
@@ -732,39 +769,41 @@ def materialize_decision_value(
         value["class_actions"], "class_id", "class_actions", issues,
     )
     for cid, action in actions.items():
+        action_pointer = action_pointers[cid]
         if cid not in classes:
-            issues.append(f"/class_actions/{cid}: unknown active class")
+            issues.append(f"{action_pointer}/class_id: unknown active class")
             continue
         status = classes[cid]["status"]
         if (
             action["kind"] == "close" and cid in outcomes
             and outcomes[cid]["verdict"] != "satisfied"
         ):
-            issues.append(f"/class_actions/{cid}: close requires satisfied outcome")
+            issues.append(f"{action_pointer}: close requires satisfied outcome")
         if action["kind"] == "reopen" and status != cc.CLOSED:
-            issues.append(f"/class_actions/{cid}: reopen requires closed class")
+            issues.append(f"{action_pointer}: reopen requires closed class")
         if (
             action["kind"] == "reopen" and cid in outcomes
             and outcomes[cid]["verdict"] != "violated"
         ):
-            issues.append(f"/class_actions/{cid}: reopen requires violated outcome")
+            issues.append(f"{action_pointer}: reopen requires violated outcome")
         if action["kind"] in {"reclassify", "replace"}:
             severity = (
                 action["severity"] if action["kind"] == "reclassify"
                 else action["definition"]["severity"]
             )
             if _rank(severity) < _rank(classes[cid]["severity"]):
-                issues.append(f"/class_actions/{cid}: cannot downgrade active class")
+                issues.append(f"{action_pointer}: cannot downgrade active class")
         if (
             action["kind"] == "replace" and classes[cid]["mechanized"]
             and "pattern" not in action["definition"]
         ):
             issues.append(
-                f"/class_actions/{cid}/definition: mechanized class replacement "
+                f"{action_pointer}/definition: mechanized class replacement "
                 "requires pattern and pathspec"
             )
 
     for cid, outcome in outcomes.items():
+        outcome_pointer = outcome_pointers[cid]
         cls = classes.get(cid)
         if cls is None:
             continue
@@ -772,19 +811,21 @@ def materialize_decision_value(
         if outcome["verdict"] == "satisfied" and cls["status"] in cc.UNPROVEN_STATUSES:
             if cls["mechanized"]:
                 issues.append(
-                    f"/class_outcomes/{cid}: mechanized open class cannot be model-closed"
+                    f"{outcome_pointer}: mechanized open class cannot be model-closed"
                 )
             if action is None:
                 actions[cid] = {"kind": "close", "class_id": cid}
             elif action["kind"] not in {"close", "reclassify", "replace"}:
                 issues.append(
-                    f"/class_actions/{cid}: open satisfied class must close"
+                    f"{action_pointers.get(cid, outcome_pointer)}: "
+                    "open satisfied class must close"
                 )
         if outcome["verdict"] == "violated" and cls["status"] == cc.CLOSED:
             allowed = {"replace"} if cls["mechanized"] else {"reopen", "replace"}
             if action is None or action["kind"] not in allowed:
                 issues.append(
-                    f"/class_actions/{cid}: closed violated class requires {sorted(allowed)}"
+                    f"{action_pointers.get(cid, outcome_pointer)}: "
+                    f"closed violated class requires {sorted(allowed)}"
                 )
 
     _raise_semantic_issues(issues)
