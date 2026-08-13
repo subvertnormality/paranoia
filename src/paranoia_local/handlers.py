@@ -234,15 +234,36 @@ def _validate_materialized_class_records(
         except (cc.RegisterError, rc.CensusError) as exc:
             pointer = pointers[index] if index < len(pointers) else f"/class_records/{index}"
             issues.append(f"{pointer}: invalid class operation: {exc}")
-    if valid_records:
+    def validate_group(records: list[dict[str, Any]], pointer: str) -> bool:
         try:
             register = rc.register_from_records(
-                valid_records,
+                records,
                 mechanized=None if mode == cc.BRANCH_MODE else False,
             )
             cc.apply_register(cc.copy_lineage(lineage), register, round_no=round_no)
         except (cc.RegisterError, rc.CensusError) as exc:
-            issues.append(f"/: invalid combined class operation set: {exc}")
+            issues.append(f"{pointer}: {exc}")
+            return False
+        return True
+
+    new_records = [record for record in valid_records if record.get("op") == "new"]
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for record in valid_records:
+        class_id = record.get("class_id")
+        if isinstance(class_id, str):
+            groups.setdefault(class_id, []).append(record)
+    group_valid = True
+    if len(new_records) > 1:
+        group_valid = validate_group(
+            new_records, "/: invalid combined new-class set",
+        ) and group_valid
+    for class_id, records in sorted(groups.items()):
+        if len(records) > 1:
+            group_valid = validate_group(
+                records, f"/: invalid combined class actions for {class_id!r}",
+            ) and group_valid
+    if valid_records and group_valid:
+        validate_group(valid_records, "/: invalid combined class operation set")
     if issues:
         raise rc.CensusError(
             "\n".join(sorted(dict.fromkeys(issues)))[:sp.MAX_ISSUE_CHARS]

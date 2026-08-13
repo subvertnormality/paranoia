@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-5 held finding repaired; correction and cold-final convergence pending**
+Status: **CODE round-6 held finding repaired at architecture checkpoint; convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -69,7 +69,7 @@ payload.
 ## Automated verification
 
 The current complete collection ran with global and system Git configuration disabled so fixture
-commits did not inherit the operator's signing key: **988 passed in 62.52 seconds**. An initial
+commits did not inherit the operator's signing key: **988 passed in 61.74 seconds**. An initial
 unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
 commits without an available askpass helper; it is not counted as a product result. The bounded
 historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
@@ -151,16 +151,25 @@ combined cap failure. Canonical validation now always runs the individually vali
 the same terminal retry regression proves the invalid action and aggregate cap failure are both
 reported without applying either.
 
+CODE round 6 showed that one fail-fast aggregate call could still mask a second aggregate
+interaction: duplicate transitions could hide the independently detectable new-class cap. The
+architecture checkpoint replaces that call with bounded canonical partitions, not pairwise subset
+search: every record is checked alone, each same-class transition group is checked through the
+canonical engine, all new definitions are checked together for the single global cap, and the full
+set is checked only when those independent groups pass. The terminal retry fixture now combines two
+same-class actions with two new definitions at 99 active classes and verifies both aggregate errors,
+the semantic duplicate pointer, debt incompleteness, and anchor failures in one diagnostic.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+459 net lines** and current sizes 2,760, 450, 501, 616, and 863 lines. The increase is
+modules to **+482 net lines** and current sizes 2,783, 450, 501, 616, and 863 lines. The increase is
 bounded cross-layer issue accumulation, provider-envelope closure, and coherent packet limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the current diff is **+479 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+502 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 

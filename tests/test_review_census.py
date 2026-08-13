@@ -314,7 +314,15 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
             },
         ],
         "debt_outcomes":[], "class_outcomes":[],
-        "class_actions":[{"kind":"close", "class_id":"missing-class"}],
+        "class_actions":[
+            {"kind":"reclassify", "class_id":"class-0", "severity":"BLOCKER"},
+            {
+                "kind":"replace", "class_id":"class-0", "definition":{
+                    "invariant":"replacement invariant", "severity":"BLOCKER",
+                    "procedure":"inspect the replacement",
+                },
+            },
+        ],
     })
 
     class Engine:
@@ -335,9 +343,10 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     message = str(caught.value)
     assert "/debt_outcomes: must update every supplied open debt" in message
     assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
-    assert "/: invalid combined class operation set" in message
+    assert "/: invalid combined class actions for 'class-0'" in message
+    assert "/: invalid combined new-class set" in message
     assert "100 non-superseded classes already tracked" in message
-    assert "/class_actions/0: invalid class operation" in message
+    assert "/class_actions/1/class_id: duplicate value 'class-0'" in message
     assert caught.value.stage_role == "correction-validation-retry"
     assert [row.outcome for row in caught.value.attempts] == [
         "validation-invalid", "validation-invalid",
