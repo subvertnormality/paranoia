@@ -254,6 +254,24 @@ class TestRunWithInjectedRunner:
         assert review.error is True
         assert review.text == "partial reviewer output"
         assert review.failure_detail == "terminal process diagnostic\n"
+        assert review.stderr == "terminal process diagnostic\n"
+
+    def test_structured_failure_detail_is_not_overwritten_by_stderr(self) -> None:
+        e = engines.get_engine("codex")
+        payload = (
+            '{"type":"turn.failed","error":{"message":"structured provider failure"}}\n'
+        )
+
+        def fake_runner(argv, stdin_text, cwd, timeout):
+            return RunResult(returncode=9, stdout=payload, stderr="process stderr\n")
+
+        review = e.run(
+            prompt="x", cwd=Path("/repo"), model="m", effort="high",
+            web_search=False, runner=fake_runner,
+        )
+        assert review.error is True
+        assert review.failure_detail == "structured provider failure"
+        assert review.stderr == "process stderr\n"
 
     def test_resume_uses_resume_argv(self) -> None:
         e = engines.get_engine("claude")

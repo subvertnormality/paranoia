@@ -83,12 +83,37 @@ def _allocate_fresh_debt_ids(
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
 ) -> rc.Attempt:
-    response = review.raw or review.text or ""
-    return rc.Attempt(role, engine.name, review.session_ref,
-                      "failed" if review.error else "completed",
-                      review.duration_ms, review.usage,
-                      rc.digest(response) if response else None,
-                      response[:4000] if response else None, sequence)
+    response = review.text or ""
+    projection = _review_failure_projection(review) if review.error else {}
+    return rc.Attempt(
+        role, engine.name, review.session_ref,
+        "failed" if review.error else "completed",
+        review.duration_ms, review.usage,
+        hashlib.sha256(response.encode("utf-8", "surrogatepass")).hexdigest()
+        if response else None,
+        response[:4000] if response else None, sequence,
+        **projection,
+    )
+
+
+def _review_failure_projection(review: Review) -> dict[str, Any]:
+    def channel(text: str | None) -> tuple[str, str]:
+        value = text or ""
+        return (
+            hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest(),
+            value[:4000],
+        )
+
+    raw_sha, raw_excerpt = channel(getattr(review, "raw", None))
+    detail_sha, detail_excerpt = channel(getattr(review, "failure_detail", None))
+    stderr_sha, stderr_excerpt = channel(getattr(review, "stderr", None))
+    return {
+        "returncode": getattr(review, "returncode", None),
+        "raw_sha256": raw_sha, "raw_excerpt": raw_excerpt,
+        "failure_detail_sha256": detail_sha,
+        "failure_detail_excerpt": detail_excerpt,
+        "stderr_sha256": stderr_sha, "stderr_excerpt": stderr_excerpt,
+    }
 
 
 def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
@@ -103,6 +128,7 @@ def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
     error = rc.CensusError(detail)
     error.stage_role = role  # type: ignore[attr-defined]
     error.failure_kind = kind  # type: ignore[attr-defined]
+    error.engine_failure = _review_failure_projection(review)  # type: ignore[attr-defined]
     return error
 
 
@@ -307,6 +333,9 @@ def _settle_staged_failure(
             "kind":getattr(error, "failure_kind", "unknown"),
             "message":str(error),
         }
+        engine_failure = getattr(error, "engine_failure", None)
+        if isinstance(engine_failure, dict):
+            state["staged_failure"]["engine_failure"] = deepcopy(engine_failure)
     failure_key = "validation_debt" if isinstance(cache, dict) else "staged_failure"
     if rejected_payloads:
         state[failure_key]["rejected_payloads"] = deepcopy(rejected_payloads)
@@ -924,6 +953,7 @@ def _log(
             "returncode": review.returncode,
             "error": review.error,
             "text": review.text,
+            **(_review_failure_projection(review) if review.error else {}),
             **extra,
         },
         timestamp=now(),
@@ -1580,7 +1610,10 @@ def _verify_plan_claims(
         attempt_ledger.append(_attempt("claim-audit", engine, review).json())
     if review.error:
         error = pc.AuditError(
-            f"claim-audit reviewer failed (exit {review.returncode})", review.raw or review.text
+            f"claim-audit reviewer failed (exit {review.returncode})",
+            review.raw,
+            failure_detail=review.failure_detail or "", stderr=review.stderr or "",
+            returncode=review.returncode,
         )
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
@@ -1621,7 +1654,9 @@ def _verify_plan_claims(
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
                 f"(exit {retry.returncode})",
-                (review.text or "") + "\n--- CORRECTION ---\n" + (retry.raw or retry.text),
+                retry.raw,
+                failure_detail=retry.failure_detail or "", stderr=retry.stderr or "",
+                returncode=retry.returncode,
             )
             return pc.with_debt(
                 prior_state, second, round_no=round_no, plan_text=plan_text,
@@ -1782,7 +1817,9 @@ class _CapturedClaimEngine:
         except pc.AuditError as error:
             return Review(
                 text=f"[paranoia-local error] binding audit invalid: {error}",
-                session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts), error=True,
+                session_ref=session_ref, raw=error.raw, error=True,
+                failure_detail=error.failure_detail_raw, stderr=error.stderr_raw,
+                returncode=error.returncode if error.returncode is not None else 1,
             )
         raw_parts.extend(item.raw for item in binding_reviews)
 
@@ -1981,7 +2018,11 @@ class _CapturedClaimEngine:
             self._record("claim-binding", self.binding_engine, review)
             reviews.append(review)
             if review.error or not review.session_ref:
-                raise pc.AuditError("captured-text binding call failed", review.raw)
+                raise pc.AuditError(
+                    "captured-text binding call failed", review.raw,
+                    failure_detail=review.failure_detail or "", stderr=review.stderr or "",
+                    returncode=review.returncode,
+                )
             try:
                 parsed = self._parse_indexed_binding(review.text, batch, captures)
             except pc.AuditError as first:
@@ -1995,7 +2036,12 @@ class _CapturedClaimEngine:
                 self._record("claim-binding-retry", self.binding_engine, correction)
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
-                    raise pc.AuditError("captured-text binding correction failed", correction.raw)
+                    raise pc.AuditError(
+                        "captured-text binding correction failed", correction.raw,
+                        failure_detail=correction.failure_detail or "",
+                        stderr=correction.stderr or "",
+                        returncode=correction.returncode,
+                    )
                 parsed = self._parse_indexed_binding(correction.text, batch, captures)
                 review = correction
             decisions.update(parsed)

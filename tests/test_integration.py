@@ -116,11 +116,13 @@ elif printf '%s' "$prompt" | grep -q 'You are a TEXT AUDITOR'; then
   body=$(printf 'FIDELITY: decision PRESERVED; opt-a PRESERVED; opt-b PRESERVED\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE')
 else
   label=$(printf '%s' "$prompt" | grep -o 'OPTION-[0-9a-f]\{16\}' | head -1)
-  body=$(printf 'Reasoning.\n\nSELECTED: %s\nSELECTED-RISK: NONE\nAUTHORITY: technical\nNEW-OPTION: NONE\nCONSTRAINT: A fact.\nDECISIVE-CITATION: app.py:4\nCITATIONS: NONE' "$label")
+  body=$(printf 'Reasoning.\n\nSELECTED: %s\nSELECTED-RISK: NONE\nAUTHORITY: technical\nNEW-OPTION: NONE\nCONSTRAINT: A fact.\nPUBLISHER-AUTHORITY: NO — repository citation\nPASSAGE-ENTAILMENT: NO — repository citation\nDECISION-RELEVANCE: YES — directly decides the option\nDECISIVE-CITATION: app.py:4\nCITATIONS: NONE' "$label")
 fi
 """
 
-FAKE_CODEX_ARB = "#!/bin/bash\n" + _ARB_SCRIPT + """
+FAKE_CODEX_ARB = """#!/bin/bash
+if [ "$1" = "--version" ]; then echo "codex-cli 0.144.6"; exit 0; fi
+""" + _ARB_SCRIPT + """
 python3 -c "
 import json,sys
 print(json.dumps({'type':'thread.started','thread_id':'t'}))
@@ -129,7 +131,9 @@ print(json.dumps({'type':'turn.completed','usage':{}}))
 " "$body"
 """
 
-FAKE_CLAUDE_ARB = "#!/bin/bash\n" + _ARB_SCRIPT + """
+FAKE_CLAUDE_ARB = """#!/bin/bash
+if [ "$1" = "--version" ]; then echo "claude 2.1.197"; exit 0; fi
+""" + _ARB_SCRIPT + """
 python3 -c "
 import json,sys
 print(json.dumps({'type':'result','subtype':'success','is_error':False,'result':sys.argv[1],'session_id':'s'}))

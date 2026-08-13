@@ -54,6 +54,8 @@ and message, not validation debt. Preserve timeout, unavailable executable, prov
 other execution outcomes distinctly, including the validation-retry role.
 Attempt telemetry must use that same `*-validation-retry` role.
 Terminal validation debt must persist and render the identical structured role, kind, and message.
+Every failed engine Review projected into staged or claim state must also retain return code, raw
+stdout, structured failure detail, and process stderr as distinct bounded, hashed channels.
 Persist terminally rejected staged model replies separately from provider envelopes as bounded
 head-and-tail excerpts plus full-reply SHA-256 in both lineage failure/debt state and the top-level
 audit record. Correction instructions and retry diagnostics must state the exact two-key
@@ -121,6 +123,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   become visible debt rather than an hours-long run.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
+  Captured binding failure debt must retain raw provider stdout, structured failure detail, and
+  process stderr as distinct hashed and bounded channels, including initial and correction calls.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external
   facts; design principles/requirements issued by a governing external authority; and behavior
   promised by an external API, dependency, platform, protocol, service, or runtime. Reject
@@ -189,6 +193,33 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   computed `CONVERGENCE: NOT-BLOCKED` line.
 
 ## Delivery discipline
+
+Arbitration deciders operate only on separate inert materializations of the pinned snapshot and
+its bounded snapshot-derived history. Ref movement during snapshot construction fails before
+spend; movement after that boundary is audit provenance (`REFS-MOVED: yes`), not grounds to discard
+an otherwise valid decision. A terminal research validation failure must retain bounded raw and
+extracted replies plus the exact parser errors for both the initial attempt and its single retry,
+and all accepted discovery, capture, session, usage, and duration artifacts accumulated before it;
+an execution failure must preserve the engine's structured failure detail. Once snapshot or
+cleaning state exists, a research failure must render and persist that actual run provenance rather
+than preflight defaults, including binding-input and shared packet validation, with exact baseline
+and final ref digests. Successful and failed lanes use the same structured attempt and accepted-
+artifact ledger; never rebuild a successful corrected lane in a way that drops its initial parser
+error. Establish the run record immediately after snapshot setup and route every later ordinary
+failure through it. Transition that record after every cleaner/attester attempt, label assignment,
+fan-out, and carried-evidence step so later failure cannot erase completed artifacts. Do not add a
+third research retry. Store round-two carried bytes before starting either second-round call, and
+record the prompt for an initial decider execution failure.
+After shared research normalization succeeds, every later failure must retain the exact rendered
+packet bytes and computed digest in addition to the lane ledger.
+Treat normalization/rendering as establishment before reserved-token validation, so rejection of
+the rendered packet retains its exact bytes and digest.
+Open every research attempt record before provider invocation with phase, intended session, and
+prompt digest/excerpt; complete that same record from either the Review or caught exception so call
+counts and retry diagnostics remain exact.
+Apply the same before-invocation ledger rule to cleaner and attester calls. Mark research running
+only after deadline admission, and keep established packet digest computation total on
+model-controlled Unicode so the failure serializer cannot throw.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid

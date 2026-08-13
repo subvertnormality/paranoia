@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for implementation after tracked plan convergence.
+Implemented and covered by the current arbitration acceptance record.
 
 ## Frozen stakes
 
@@ -11,7 +11,7 @@ framing, and fetched web text are untrusted data, but no repository-selected cod
 no hostile local process races files or refs. Both signed-in reviewer CLIs are available. An
 ordinary arbitration has 2–4 options, Git 2.36 or newer, a repository small enough for the existing
 pinned-snapshot workflow, 0–12 decision-critical external claims, and must remain useful within minutes and below
-the existing one-hour whole-call ceiling. A false `CONVERGED`, weak authority treated as
+the 7,200-second whole-call ceiling. A false `CONVERGED`, weak authority treated as
 governing, unequal evidence shown to the deciders, or external research that cannot be audited is
 high impact. A visible `UNRESOLVED` or failed run is recoverable.
 
@@ -251,6 +251,14 @@ corresponding captured text. Binding has the same one-resume correction rule for
 This makes Claude `WebSearch` sufficient for discovery without trusting `WebFetch` or asking the
 model to guess text it has not read.
 
+If either validation retry is rejected, the failure audit retains bounded raw and
+extracted excerpts, their digests, the parser error, phase, engine, model, and call
+count for both attempts, along with accepted discovery claims, captures, session
+references, usage, and durations accumulated before the failure. It does not make
+a third model call. Execution failures surface the engine's structured failure
+detail (for example provider quota or credit exhaustion) and retain a bounded
+terminal reply instead of collapsing to a generic discovery/binding failure.
+
 The research-only call seam returns a structured result containing final text, raw CLI output,
 session reference, usage, duration, engine, and model. Its injected resume callback consumes the
 exact preceding session reference for discovery correction, capture binding, and binding
@@ -304,6 +312,11 @@ The maximum accepted field payload plus fixed rendering overhead is below that u
 Exceeding a producer, field, capture, binding-input, or union budget fails visibly rather than
 truncating evidence and calling the result complete. These limits compose without assuming that
 independently worded claims deduplicate.
+
+The shared engine diagnostic contract also applies to captured plan-claim binding: durable debt
+stores provider stdout, structured failure detail, and process stderr as separate hashed, bounded
+channels for both the initial binding and its one correction. A timeout or missing executable has
+empty stdout but still leaves an actionable durable diagnostic.
 
 ### 4. Identical evidence for both deciders
 
@@ -375,14 +388,19 @@ result; the caller may improve the framing and start a new arbitration.
 
 Cleaner and attester calls use 420-second caps. Discovery calls use 240-second caps and binding
 calls use 360-second caps; each may have one same-session correction at the same cap. Server
-capture has a 240-second phase cap. The explicit worst path is therefore: cleaner initial/retry
-840 seconds, attester initial/retry 840, discovery initial/correction 480, capture 240, binding
-initial/correction 720, decision round one 1,800, and decision round two 1,800 = 6,720 seconds.
-Parallel vendors count once per group. This
-leaves 480 seconds of the 7,200-second whole-call ceiling for validation, git
-materialization, logging, and teardown. The handler tracks one monotonic whole-run deadline and
-will not start a phase whose cap plus reserved teardown margin cannot fit; that produces a visible
-bounded failure rather than a client timeout.
+capture has a 240-second phase cap. Cleaner initial/retry and attester initial/retry can each
+consume 840 seconds; discovery initial/correction 480; capture 240; and binding
+initial/correction 720. Each decider attempt has a 1,800-second cap, including the one permitted
+validation retry in either round. Those independent maxima cannot all fit inside one call.
+Parallel vendors count once per group, and the 7,200-second whole-call ceiling governs their
+composition. The handler tracks one monotonic whole-run deadline and reserves teardown time. It
+checks immediately before every discovery run, discovery validation resume, binding resume, and
+binding validation resume, as well as before each cleaner, attester, and decider call; it will not
+invoke a provider when that attempt's full cap cannot fit. The refusal preserves prior attempts in
+a visible bounded failure rather than drifting into a client timeout. Each prompt-bound attempt is
+opened before setup or admission and records prepared, admitted, invoked, and terminal status;
+call counts include only records that crossed the provider invocation boundary. Inert decider
+workspace setup failures therefore retain the prompt binding but count as zero provider calls.
 
 A parser-rejected decider reply receives one complete correction attempt against the same inert
 snapshot and shared research packet. The completed sibling vote and all cleaning and research work
@@ -391,17 +409,65 @@ provenance remain in the failure audit. This correction is still subject to the 
 and whole-call deadline; it is not additional unbounded budget. Provider execution failures are not
 retried.
 
+Research discovery and binding payloads use the same bounded correction policy. The parser accepts
+bare or markdown-fenced JSON and one mechanically unambiguous measured truncation: an otherwise
+complete outer object missing only its final `}`. It does not synthesize internal commas, quotes,
+brackets, or multi-character closures; those remain validation failures, retain the rejected reply,
+and receive at most the one same-session correction.
+
+The established cleaned-packet projection includes decision, context, normalized hints, and option
+statements plus a digest of their exact deterministic encoding on success and every late failure.
+Cleaner and attester replies may be excerpted for bounded diagnostics, but each excerpt is paired
+with the SHA-256 of the full reply.
+
+Checked-in acceptance summaries are not authoritative by assertion. Before delivery,
+`scripts/validate_arbitration_acceptance.py` reads the referenced durable audit and current source
+files and rejects disagreement in provider invocation counts, packet identities/count/digest,
+audit digest, outcome/selection/snapshot, or production hashes. Its focused test also proves a
+self-authored stale total fails the gate.
+
 ### 7. Audit and progress
 
-Add progress events for shared research and validation. Add trailer fields:
+Shared research and validation emit progress events. The trailer fields are:
 
-- `RESEARCH: complete <N> packets | repository-only`
+- `RESEARCH: not reached | running | failed | complete <N> packets | repository-only`
 - `RESEARCH-DIGEST: <sha256> | none`
+- `REFS-MOVED: no | yes | unavailable`
+- `AUDIT: <path> | FAILED could not write log`; an audit-write failure also returns a
+  bounded, hashed in-band fallback record before the trailer.
 
-The audit log records raw discovery, correction, binding, and binding-correction replies; every
+The audit log records raw discovery, correction, binding, and binding-correction replies; terminal
+validation failures retain bounded raw/extracted excerpts and errors for both rejected attempts;
+execution failures retain the engine's structured detail and bounded terminal reply; every
 capture result; normalized packets; packet digest; research model names; call count; duration; and
 the exact shared bytes shown to each decider. The existing snapshot/ref movement, cleaner,
 attestation, order, label, vote, and round records remain intact.
+Failures after snapshot and cleaning use that same stateful record and trailer; they never fall
+back to the preflight shell's `SNAPSHOT: none` or `CLEANING: not reached` defaults. This includes
+binding-input, shared packet-union, rendering, and reserved-token validation. The failure audit
+stores both the baseline and final ref digests, not only their comparison.
+The public handler establishes this record immediately after the snapshot boundary and uses it
+for every later ordinary exception, including cleaner, attester, budget, label, evidence, and
+decision setup. Attempt records are created once; a successfully corrected lane carries the exact
+initial parser rejection unchanged when it is serialized beside a failed peer.
+The same record transitions after every cleaner and attester attempt, label assignment, completed
+fan-out, and evidence-carry step. Its failure serializer emits those accumulated attempts, maps,
+prompts, replies, votes, and carried bytes rather than an empty-round placeholder.
+Round-two carried evidence transitions before fan-out. The specialized partial-decider failure
+record includes that evidence and the shared phase ledger, and records a prompt-bearing attempt
+even when a provider fails before returning its first reply.
+After packet normalization completes, the established run record owns the exact rendered packet
+and digest. Any later failure emits both in its audit and trailer instead of reducing completed
+research to lane telemetry with a `none` digest.
+Normalization/rendering is the packet-establishment boundary, before reserved-token validation;
+if that validation rejects the packet, the failure audit still binds the exact rejected bytes and
+digest.
+Every provider attempt is opened before invoking `run` or `resume`, with phase, intended session,
+and bounded prompt plus digest. The returned review or caught exception completes that same entry,
+so execution exceptions and failed validation retries are counted and bound without another retry.
+Cleaner and attester attempts follow the same before-invocation transition. Research changes to
+`running` only after its deadline admission succeeds. Packet digest encoding uses a total,
+deterministic surrogate-preserving policy so failure serialization cannot fail on model Unicode.
 
 ## Code shape
 
@@ -532,6 +598,11 @@ Codex/Claude versions and effective fresh/resumed tool inventories with the acce
 Run the complete local test suite, then Codex paranoia convergence over the implementation branch
 under the frozen stakes above. Open and merge a PR only after real acceptance, tests, documentation,
 and computed code-review convergence are all clear.
+
+The signed-in acceptance for the arbitration reliability correction is recorded in
+`docs/arbitration_reliability_acceptance_2026-08-12.json`. It captures the supported CLI/model
+versions, exact shared packet identities and digest, provider call counts, elapsed time, decisive
+citations, computed result, and the focused current-branch checks for terminal failure provenance.
 
 ## Acceptance criteria
 

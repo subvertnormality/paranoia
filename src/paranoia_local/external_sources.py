@@ -42,6 +42,14 @@ class SourceError(ValueError):
     pass
 
 
+class CaptureGroupError(RuntimeError):
+    """A capture task failed unexpectedly after zero or more siblings completed."""
+
+    def __init__(self, message: str, completed: tuple["Capture", ...]):
+        super().__init__(message)
+        self.completed = completed
+
+
 @dataclass(frozen=True)
 class CandidateSource:
     url: str
@@ -266,15 +274,32 @@ def capture_all(
     deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> list[Capture]:
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 
     rows = list(candidates)
     invoke = (
         (lambda candidate: capture(candidate, deadline=deadline, clock=clock))
         if capture_one is capture else capture_one
     )
+    completed: dict[int, Capture] = {}
+    failure: Exception | None = None
     with ThreadPoolExecutor(max_workers=min(workers, max(1, len(rows)))) as pool:
-        return list(pool.map(invoke, rows))
+        futures = {pool.submit(invoke, row): index for index, row in enumerate(rows)}
+        for future in as_completed(futures):
+            index = futures[future]
+            try:
+                completed[index] = future.result()
+            except CancelledError:
+                continue
+            except Exception as exc:  # unexpected capture implementation failure
+                if failure is None:
+                    failure = exc
+                    for pending in futures:
+                        pending.cancel()
+    ordered = tuple(completed[index] for index in sorted(completed))
+    if failure is not None:
+        raise CaptureGroupError(f"{type(failure).__name__}: {failure}", ordered) from failure
+    return list(ordered)
 
 
 def packet_id(proposition: str, source: BoundSource) -> str:

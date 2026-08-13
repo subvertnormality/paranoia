@@ -62,10 +62,23 @@ def _json_after(text: str, marker: str) -> object:
     # deciders never voted and the run was lost to formatting. Same tolerance,
     # same helper, as the settlement and lane parsers.
     tail = unfence(text.split(marker, 1)[1].strip())
+    decoder = json.JSONDecoder()
     try:
-        value, end = json.JSONDecoder().raw_decode(tail)
+        value, end = decoder.raw_decode(tail)
     except json.JSONDecodeError as exc:
-        raise ResearchError(f"invalid JSON after {marker}: {exc}") from exc
+        # Claude has repeatedly emitted a complete binding array while omitting
+        # only the outer object's final `}` — including on the one permitted
+        # correction. Accept that single mechanically unambiguous truncation;
+        # schema and exact-row validation still run below. Do not guess at an
+        # internal quote, comma, bracket, or any multi-character repair.
+        if tail.startswith("{") and not tail.endswith("}"):
+            try:
+                value, end = decoder.raw_decode(tail + "}")
+                tail += "}"
+            except json.JSONDecodeError:
+                raise ResearchError(f"invalid JSON after {marker}: {exc}") from exc
+        else:
+            raise ResearchError(f"invalid JSON after {marker}: {exc}") from exc
     if tail[end:].strip():
         raise ResearchError(f"unexpected text after {marker} JSON")
     return value
@@ -240,4 +253,7 @@ def render(items: Sequence[Packet]) -> str:
 
 
 def digest(items: Sequence[Packet]) -> str:
-    return hashlib.sha256(render(items).encode("utf-8")).hexdigest()
+    # Model-controlled fields can contain lone surrogates. JSON can represent them,
+    # and audit logging escapes them; the digest must remain total on the same bytes
+    # instead of making the failure serializer fail while reporting their rejection.
+    return hashlib.sha256(render(items).encode("utf-8", "surrogatepass")).hexdigest()

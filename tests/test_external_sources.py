@@ -1,10 +1,57 @@
 from email.message import Message
+import threading
+import time
+
+import pytest
 
 from paranoia_local import external_sources as es
 
 
 def candidate(url="https://docs.example.com/page", kind="primary"):
     return es.CandidateSource(url, "Docs", "Example", kind, "Example defines it", "supports_claim")
+
+
+def test_parallel_capture_failure_retains_completed_sibling():
+    first = candidate("https://docs.example.com/first")
+    second = candidate("https://docs.example.com/second")
+    completed = threading.Event()
+
+    def capture_one(item):
+        if item is second:
+            assert completed.wait(2)
+            raise RuntimeError("second capture exploded")
+        result = es.Capture(
+            item, item.url, 200, "text/html", "a" * 64, "b" * 64, "captured text",
+        )
+        completed.set()
+        return result
+
+    with pytest.raises(es.CaptureGroupError) as caught:
+        es.capture_all([first, second], capture_one=capture_one, workers=2)
+    assert [item.candidate.url for item in caught.value.completed] == [first.url]
+
+
+def test_parallel_capture_failure_waits_for_running_sibling_record():
+    first = candidate("https://docs.example.com/first")
+    second = candidate("https://docs.example.com/second")
+    sibling_started = threading.Event()
+    failed = threading.Event()
+
+    def capture_one(item):
+        if item is first:
+            assert sibling_started.wait(2)
+            failed.set()
+            raise RuntimeError("first capture exploded")
+        sibling_started.set()
+        assert failed.wait(2)
+        time.sleep(0.05)
+        return es.Capture(
+            item, item.url, 200, "text/html", "a" * 64, "b" * 64, "captured text",
+        )
+
+    with pytest.raises(es.CaptureGroupError) as caught:
+        es.capture_all([first, second], capture_one=capture_one, workers=2)
+    assert [item.candidate.url for item in caught.value.completed] == [second.url]
 
 
 def test_known_ugc_is_mechanically_demoted():

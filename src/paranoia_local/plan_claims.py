@@ -46,18 +46,36 @@ UGC_HOSTS = sources.UGC_HOSTS
 class AuditError(ValueError):
     """The claim audit is absent, malformed, or makes an unsupported transition."""
 
-    def __init__(self, reason: str, raw: str = "") -> None:
+    def __init__(
+        self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
+        returncode: int | None = None,
+    ) -> None:
         self.reason = reason
+        self.raw = raw
+        self.failure_detail_raw = failure_detail
+        self.stderr_raw = stderr
+        self.returncode = returncode
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
         self.excerpt = _excerpt(raw)
+        self.failure_detail_sha256 = hashlib.sha256(
+            failure_detail.encode("utf-8", "replace")
+        ).hexdigest()
+        self.failure_detail = _excerpt(failure_detail)
+        self.stderr_sha256 = hashlib.sha256(stderr.encode("utf-8", "replace")).hexdigest()
+        self.stderr = _excerpt(stderr)
         super().__init__(reason)
 
     def debt(self, round_no: int) -> dict[str, Any]:
         return {
             "round": round_no,
             "reason": self.reason,
+            "returncode": self.returncode,
             "raw_sha256": self.raw_sha256,
             "rejected_excerpt": self.excerpt,
+            "failure_detail_sha256": self.failure_detail_sha256,
+            "failure_detail": self.failure_detail,
+            "stderr_sha256": self.stderr_sha256,
+            "stderr": self.stderr,
         }
 
 

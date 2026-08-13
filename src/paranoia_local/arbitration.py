@@ -861,7 +861,6 @@ def compute_outcome(
     votes: Sequence[Vote],
     *,
     substantiated: Mapping[str, bool],
-    refs_moved: bool = False,
     failure: str | None = None,
 ) -> Outcome:
     """The whole verdict, in evaluation order.
@@ -874,8 +873,6 @@ def compute_outcome(
     """
     if failure:
         return Outcome(FAILED, None, failure)
-    if refs_moved:
-        return Outcome(FAILED, None, "repository refs moved during the run")
     if not votes:
         return Outcome(FAILED, None, "no decider replies")
 

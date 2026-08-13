@@ -51,6 +51,13 @@ class Attempt:
     response_sha256: str | None = None
     response_excerpt: str | None = None
     sequence: int | None = None
+    returncode: int | None = None
+    raw_sha256: str | None = None
+    raw_excerpt: str | None = None
+    failure_detail_sha256: str | None = None
+    failure_detail_excerpt: str | None = None
+    stderr_sha256: str | None = None
+    stderr_excerpt: str | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)
