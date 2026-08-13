@@ -67,6 +67,20 @@ Hash rejected extracted model text with a total, documented encoding for every P
 engine JSON parser can produce, including unpaired surrogates; do not change historical structural
 or state digest encoding as a side effect of diagnostic capture.
 
+For the staged Protocol v2 cutover, give plan reviewers a displayed line-number view derived from
+the same line collection used by anchor bounds while retaining original unnumbered bytes for
+digests, claims, and persistence. Constrain fresh and resumed provider output with the same closed,
+role-specific JSON Schema the server validates. Ask the model for each semantic judgement once;
+derive mirror debt, disposition, binding, and lifecycle rows deterministically, then dry-run the
+canonical class engine before the single atomic state transition. Preserve every current legal
+semantic outcome, including carried-debt identity, independent new-class severity, and standalone
+class actions. Preserve stored debt IDs; allocate new IDs canonically and compare historical fresh
+V1 labels through an explicit semantic bijection. Define rejection atomicity over substantive
+review/class state while retaining required failure diagnostics. Prove historical V1/V2
+materialization equivalence, and do not ship a permissive alias normalizer, partial settlement,
+durable dual protocol, extra model call, or new persistence mechanism. A structured-output
+capability failure blocks the cutover rather than falling back to unconstrained prose.
+
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
 active class. Bind each new class record to one finding, apply it through the canonical class engine,

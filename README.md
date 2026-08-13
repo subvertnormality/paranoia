@@ -1038,7 +1038,9 @@ Design documents for the two non-obvious subsystems live in
 [`docs/`](docs/): [`class_closure_plan.md`](docs/class_closure_plan.md),
 [`plan_class_closure_proposal.md`](docs/plan_class_closure_proposal.md), and
 [`claim_verification.md`](docs/claim_verification.md), and
-[`arbitration_plan.md`](docs/arbitration_plan.md).
+[`arbitration_plan.md`](docs/arbitration_plan.md). The proposed simplification of the
+staged model contract is specified in
+[`staged_review_protocol_v2_plan.md`](docs/staged_review_protocol_v2_plan.md).
 The latest real Codex verification evidence is recorded in
 [`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 
