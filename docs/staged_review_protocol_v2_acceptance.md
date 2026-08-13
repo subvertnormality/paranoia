@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-11 held findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-12 held finding repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -25,7 +25,7 @@ Draft 2020-12 schema independently.
 | Provider | Evidence actually observed |
 |---|---|
 | Codex | Fresh and resumed minimal objects returned structured JSON. Exact production lane and census-decision schemas returned structured objects in sessions `019ffc6b-c700-7de1-8307-63b5a9f36cac` and `019ffc71-9f7b-7c31-8813-cfab1a85f805`. A full schema containing `uniqueItems` failed explicitly with `invalid_json_schema`, proving it was not silently ignored. |
-| Claude | Fresh and resumed minimal objects returned `structured_output` in session `99654842-8875-4335-998f-516202b4c43d`. The exact production lane schema returned `structured_output` in session `93f031db-2577-4959-bce1-66d85f33f90f`. Exact production census and final decision schemas materialized in sessions `805533c1-241a-4917-b3a0-de983fafe63d` and `f1cb1870-f62e-4368-8f4e-3dbd6f52e75b`; correction completed a real same-session validation retry in `f9ab6c74-ca5c-4fc0-a7b9-f61cbe18b795`. A probe retaining `$schema` returned ordinary prose and no `structured_output`, so `$schema` and Codex-unsupported `uniqueItems` are removed from the common provider projection; no other bound was removed. |
+| Claude | Fresh and resumed minimal objects returned `structured_output` in session `99654842-8875-4335-998f-516202b4c43d`. The exact production plan/domain lane schema and response are retained from session `dc5dd7c9-a8fe-4978-bc65-d7ec5b96679c`. Exact production census and final decision schemas materialized in sessions `805533c1-241a-4917-b3a0-de983fafe63d` and `f1cb1870-f62e-4368-8f4e-3dbd6f52e75b`; correction completed a real same-session validation retry in `f9ab6c74-ca5c-4fc0-a7b9-f61cbe18b795`. A probe retaining `$schema` returned ordinary prose and no `structured_output`, so `$schema` and Codex-unsupported `uniqueItems` are removed from the common provider projection; no other bound was removed. |
 
 The local schema still enforces uniqueness, exact key closure, length/count bounds, enums, tagged
 unions, and the single-anchor grammar. The engine now also treats a Claude response as failed when
@@ -57,6 +57,12 @@ state hash, and the Fable rejection. A test regenerates every exact production p
 re-hashes and locally materializes every retained response, and validates the complete attempt and
 state sequence. The artifact is intentionally a bounded acceptance projection, not a claim that
 the external provider transcript can be replayed offline.
+
+The retained lane probe binds provider-schema SHA-256
+`d871043c9de3ddff4cf33c6839d3111354d8891c32e632e06fd52828fc4f6655` to exact response
+SHA-256 `d683a2d0a1897d186c2b4076dc4c2ebfe25d5af9aab00e2bc53dfa6d83705a81`;
+the executable test regenerates `lane_schema("plan", "domain")`, re-hashes the compact response,
+and parses it through the production lane validator.
 
 ## Real Codex primary lifecycle
 
@@ -222,6 +228,11 @@ Unicode tests cover high and low unpaired values, property names without unsafe 
 scalar, composed prompt encoding, cache/state persistence, review rendering, and both real capture
 and streaming subprocess boundaries. The retained Claude artifact and its executable binding test
 provide the independently inspectable evidence described above.
+
+CODE round 12 closed the Unicode and pointer classes. It retained only the provider-acceptance class
+because the versioned artifact bound decision schemas and the lifecycle but not the exact lane
+schema previously cited in prose. The retained lane probe and executable binding immediately above
+close that finite evidence gap; no implementation behavior changed in this correction.
 
 ## Size and architecture checkpoint
 

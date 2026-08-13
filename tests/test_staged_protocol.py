@@ -141,6 +141,20 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
             ),
         },
     }
+    for probe in artifact["lane_probes"]:
+        schema = sp.provider_schema(sp.lane_schema(probe["mode"], probe["lane"]))
+        assert hashlib.sha256(
+            sp.canonical_schema(schema).encode("utf-8")
+        ).hexdigest() == probe["schema_sha256"]
+        rendered = json.dumps(
+            probe["response"], ensure_ascii=False, separators=(",", ":"),
+        )
+        assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
+            "response_sha256"
+        ]
+        assert sp.parse_lane(
+            rendered, mode=probe["mode"], lane=probe["lane"],
+        ) == probe["response"]
     for probe in artifact["schema_probes"]:
         role = probe["role"]
         schema = sp.provider_schema(sp.decision_schema(cc.PLAN_MODE, role))

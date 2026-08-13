@@ -14,6 +14,33 @@
       "reason": "You're out of usage credits. Run /usage-credits to keep using Fable 5 or /model to switch models."
     }
   },
+  "lane_probes": [
+    {
+      "mode": "plan",
+      "lane": "domain",
+      "schema_sha256": "d871043c9de3ddff4cf33c6839d3111354d8891c32e632e06fd52828fc4f6655",
+      "response_sha256": "d683a2d0a1897d186c2b4076dc4c2ebfe25d5af9aab00e2bc53dfa6d83705a81",
+      "session_ref": "dc5dd7c9-a8fe-4978-bc65-d7ec5b96679c",
+      "duration_ms": 6766,
+      "cost_usd": 0.209054,
+      "response": {
+        "lane": "domain",
+        "coverage": [
+          {"id": "artifact-complete", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "repository-premises", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "transformations", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "consumers", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "failure-recovery", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "tests-acceptance", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "docs-operations", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "consistency", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []},
+          {"id": "proportionality", "status": "covered", "summary": "checked", "evidence": ["plan:1"], "finding_ids": []}
+        ],
+        "findings": [],
+        "class_assessments": []
+      }
+    }
+  ],
   "schema_probes": [
     {
       "role": "census",
