@@ -1,6 +1,6 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-2 held findings repaired; correction and cold-final convergence pending**
+Status: **CODE round-3 held findings repaired; correction and cold-final convergence pending**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -33,6 +33,13 @@ a schema was requested but the provider envelope lacks an object-valued `structu
 prose cannot enter local settlement validation. Fresh and resumed negative tests cover absent and
 non-object structured output.
 
+The real lifecycle's largest retained response was 3,265 characters for a lane and 3,140 for a
+decision. The executable pre-decode limits are now role-specific: 240,000 characters per lane and
+1,000,000 per decision. Three maximum lane replies, a separately bounded 200,000-character static
+context, and 50,000 characters of instruction/envelope reserve fit the 1,000,000-character
+consolidation circuit breaker. These are failure-cost bounds with substantial measured headroom,
+not review-quality budgets.
+
 ## Real Codex primary lifecycle
 
 The disposable repository contained one pure Python function, its README contract, and one test.
@@ -61,26 +68,23 @@ payload.
 
 ## Automated verification
 
-The environment's command wrapper terminates a single process after roughly 30 seconds, so the
-final 978-test collection was run in four exhaustive groups with identical environment and Git
-isolation:
-
-- 159 arbitration-handler tests passed;
-- 306 acceptance/arbitration/class-closure tests passed in 23.84 seconds;
-- 136 engine/evidence/handler/inert-tree tests passed in 7.19 seconds;
-- 377 integration/plan/staged/server tests passed in 11.78 seconds.
-
-Total: **978 passed**. The nine-mutation bounded gate also passed, focused
-V2/engine/prompt/plan tests passed independently, and `git diff --check` is clean.
+The current complete collection ran with global and system Git configuration disabled so fixture
+commits did not inherit the operator's signing key: **987 passed in 65.13 seconds**. An initial
+unisolated invocation reached 931 passes and then failed only when 56 Git fixtures attempted signed
+commits without an available askpass helper; it is not counted as a product result. The bounded
+historical differential plus nine-mutation gate also passed, focused V2/staged-census tests passed
+independently, and `git diff --check` is clean.
 
 After the first CODE census, focused gates cover the accepted findings:
 
-- frozen pre-V2 projections for census, correction, and final compare source/class dispositions,
-  findings, debt content after the documented fresh-ID normalization, debt updates, class records,
-  assessments, and final coverage;
+- a test-only executable reference for the V1 settlement relationships at `83fc1e6` consumes the
+  redundant V1 tables independently of the V2 materializer. The bounded differential gate compares
+  census, correction, final, branch reopen, mechanized replacement, open unbound debt, and census
+  fan-out through durable phase, debt, class state, trailer, and the documented fresh-ID bijection;
 - the existing legal-shape suite covers one-off/new/existing classes, plan procedure and branch
   procedure/pattern definitions, advisory class debt, fan-out, carried debt, action kinds, severity,
-  and closure/reopen behavior;
+  and closure/reopen behavior. This is an enumerated compatibility corpus, not proof about every
+  historical model payload;
 - `scripts/run_staged_protocol_mutation_checks.py` owns nine enumerated mutations: coverage binding,
   occurrence severity floor, literal pathspec, class/debt completeness, mechanized replacement,
   standalone actions, derived close, and advisory violated-class debt. All nine are killed by named
@@ -119,16 +123,26 @@ debt or class. The expression was replaced with the equivalent lookaround-free
 `^[^\\r\\n]*\\S[^\\r\\n]*$`; the provider projection is regression-tested to contain no
 lookaround before the same round is retried.
 
+The resumed CODE round 3 closed pathspec, mechanized replacement, standalone action, and
+non-whitespace classes. It retained three blocking assurance classes and the response-size
+advisory: the historical comparisons did not execute a V1 validator; semantic, anchor, and class
+validation still stopped between layers; and the 150-source fixture bypassed real consolidation.
+The bounded correction now executes the V1 relationship reference before all nine owned mutants,
+combines independently detectable semantic/anchor/canonical errors into one stable-pointer retry,
+and sends 150 independent sources through all three real lane parsers and consolidation. The
+measured response limits and visible persisted oversize-failure tests address the advisory without
+adding a phase or retry.
+
 ## Size and architecture checkpoint
 
 The pre-review checkpoint covered `handlers.py`, `review_census.py`, `prompts.py`, `engines.py`, and
 `staged_protocol.py` at +198 net lines. CODE round 1 then triggered the documented architecture
 checkpoint rather than another open-ended patch loop. The accepted completion pass moves those five
-modules to **+352 net lines** and current sizes 2,715, 450, 501, 616, and 801 lines. The increase is
-bounded graph/anchor/class issue accumulation, provider-envelope closure, and corrected schema limits;
+modules to **+436 net lines** and current sizes 2,762, 450, 501, 616, and 838 lines. The increase is
+bounded cross-layer issue accumulation, provider-envelope closure, and coherent packet limits;
 the larger differential and mutation evidence lives in tests/scripts rather than production.
 There is still no new subsystem, and the largest existing handler was not expanded by this pass.
-Across all production Python and dependency-manifest changes the current diff is **+372 net lines**;
+Across all production Python and dependency-manifest changes the current diff is **+456 net lines**;
 the remaining 20 lines are the independent arbitration fence-helper relocation, existing numbering
 helper change, and dependency declaration already described above.
 

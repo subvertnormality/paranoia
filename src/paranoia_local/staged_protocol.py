@@ -37,8 +37,13 @@ MAX_CENSUS_SOURCES = len(LANES[cc.PLAN_MODE]) * MAX_LANE_FINDINGS
 # One source normally produces one governing finding.  Fan-out may additionally
 # produce one distinct existing-class finding for every active class.
 MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
-MAX_LANE_RESPONSE_CHARS = 5_000_000
-MAX_DECISION_RESPONSE_CHARS = 5_000_000
+# The real Protocol v2 lifecycle peaked at 3,265 lane characters and 3,140
+# decision characters (2026-08-13 acceptance run).  These role-specific caps
+# retain more than two orders of magnitude of headroom while bounding JSON
+# decoding and Draft 2020-12 traversal before either begins.
+MAX_LANE_RESPONSE_CHARS = 240_000
+MAX_DECISION_RESPONSE_CHARS = 1_000_000
+MAX_CONSOLIDATION_CONTEXT_CHARS = 200_000
 
 
 class ProtocolError(ValueError):
@@ -431,6 +436,13 @@ def parse_lane(text: str, *, mode: str, lane: str,
     return value
 
 
+def decode_decision(text: str, *, mode: str, role: str) -> dict[str, Any]:
+    """Decode and structurally validate a decision before semantic layers run."""
+    return decode(
+        text, decision_schema(mode, role), max_chars=MAX_DECISION_RESPONSE_CHARS,
+    )
+
+
 def _rank(severity: str) -> int:
     return {cc.OUT_OF_SCOPE: 0, cc.MINOR: 1, cc.MAJOR: 2,
             cc.BLOCKER: 3, cc.FATAL: 4}[severity]
@@ -449,19 +461,37 @@ def _fresh_debt_ids(count: int, reserved: set[str]) -> list[str]:
     return result
 
 
-def materialize_decision(
-    text: str, *, mode: str, role: str,
+def class_records_from_actions(
+    actions: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Project explicit semantic class actions to canonical register records."""
+    records: list[dict[str, Any]] = []
+    for action in actions:
+        kind = action["kind"]
+        if kind in {"close", "reopen"}:
+            records.append({"op": kind, "class_id": action["class_id"]})
+        elif kind == "reclassify":
+            records.append({
+                "op": kind, "class_id": action["class_id"],
+                "severity": action["severity"],
+            })
+        else:
+            records.append({
+                "op": "replace", "class_id": action["class_id"],
+                **action["definition"],
+            })
+    return records
+
+
+def materialize_decision_value(
+    value: dict[str, Any], *, mode: str, role: str,
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
     assessment_findings: dict[str, str | None] | None = None,
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
-    """Validate one semantic decision and project it to the durable V1 shape."""
-
-    value = decode(
-        text, decision_schema(mode, role), max_chars=MAX_DECISION_RESPONSE_CHARS,
-    )
+    """Validate a decoded semantic decision and project it to durable V1 shape."""
     issues: list[str] = []
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
@@ -732,20 +762,8 @@ def materialize_decision(
 
     _raise_semantic_issues(issues)
 
+    class_records.extend(class_records_from_actions(list(actions.values())))
     for action in actions.values():
-        kind = action["kind"]
-        if kind in {"close", "reopen"}:
-            class_records.append({"op": kind, "class_id": action["class_id"]})
-        elif kind == "reclassify":
-            class_records.append({
-                "op": kind, "class_id": action["class_id"],
-                "severity": action["severity"],
-            })
-        else:
-            class_records.append({
-                "op": "replace", "class_id": action["class_id"],
-                **action["definition"],
-            })
         class_record_pointers.append(
             action_pointers.get(
                 action["class_id"], outcome_pointers.get(action["class_id"], "/class_actions"),
@@ -799,3 +817,22 @@ def materialize_decision(
     if role == "final":
         result["coverage"] = value["coverage"]
     return result
+
+
+def materialize_decision(
+    text: str, *, mode: str, role: str,
+    source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
+    assessment_verdicts: dict[str, str] | None = None,
+    assessment_findings: dict[str, str | None] | None = None,
+    active_classes: Sequence[dict[str, Any]] = (),
+    durable_debt: Sequence[dict[str, Any]] = (),
+) -> dict[str, Any]:
+    """Decode one semantic decision and project it to the durable V1 shape."""
+    value = decode_decision(text, mode=mode, role=role)
+    return materialize_decision_value(
+        value, mode=mode, role=role, source_ids=source_ids,
+        source_severities=source_severities,
+        assessment_verdicts=assessment_verdicts,
+        assessment_findings=assessment_findings,
+        active_classes=active_classes, durable_debt=durable_debt,
+    )

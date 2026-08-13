@@ -257,6 +257,119 @@ def test_canonical_class_validation_reports_independent_action_pointers():
     ]
 
 
+def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":"MAJOR",
+        "summary":"old defect", "evidence":["repository/old.py:1"],
+        "remedy":"repair it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(
+        tmp_path,
+        cc.Lineage(
+            "cross-layer-errors", rounds=1, mode=cc.PLAN_MODE,
+            review_state=state,
+        ),
+    )
+    closure = handlers._PlanClassClosure(
+        "cross-layer-errors", round_no=2, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    invalid = wire({
+        "role":"correction",
+        "governing_findings":[{
+            "id":"G1", "severity":"MAJOR", "summary":"new defect",
+            "evidence":["repository/missing.py:1"], "remedy":"repair it",
+            "classification":{"kind":"one_off", "reason":"one site"},
+        }],
+        "debt_outcomes":[], "class_outcomes":[],
+        "class_actions":[{"kind":"close", "class_id":"missing-class"}],
+    })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+    with pytest.raises(rc.CensusError) as caught:
+        handlers._staged_structural_review(
+            engine=Engine(), cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=closure, stakes="s",
+            snapshot="p", round_no=2, on_progress=None,
+        )
+    message = str(caught.value)
+    assert "/debt_outcomes: must update every supplied open debt" in message
+    assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
+    assert "/class_actions/0: invalid class operation" in message
+    assert caught.value.stage_role == "correction-validation-retry"
+    assert [row.outcome for row in caught.value.attempts] == [
+        "validation-invalid", "validation-invalid",
+    ]
+    _, trailer, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value,
+        mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    failure = closure.lineage.review_state["staged_failure"]
+    assert failure["message"] == message
+    assert "STRUCTURAL-FAILURE: role=correction-validation-retry" in trailer
+
+
+@pytest.mark.parametrize(("role", "limit", "parser"), [
+    (
+        "census-domain", sp.MAX_LANE_RESPONSE_CHARS,
+        lambda text: sp.parse_lane(text, mode=cc.PLAN_MODE, lane="domain"),
+    ),
+    (
+        "correction", sp.MAX_DECISION_RESPONSE_CHARS,
+        lambda text: sp.materialize_decision(
+            text, mode=cc.PLAN_MODE, role="correction",
+        ),
+    ),
+])
+def test_role_response_caps_fail_before_decode_and_persist(
+    tmp_path, role, limit, parser,
+):
+    oversized = "{" + ("x" * limit)
+
+    def census_parser(text):
+        try:
+            return parser(text)
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=oversized, session_ref="s", raw=oversized)
+
+        def resume(self, *args, **kwargs):
+            return Review(text=oversized, session_ref="s", raw=oversized)
+
+    with pytest.raises(rc.CensusError, match=f"maximum is {limit}") as caught:
+        handlers._staged_call(
+            role=role, engine=Engine(), prompt="p", cwd=tmp_path,
+            model="m", effort="high", timeout=10, parser=census_parser,
+        )
+    assert caught.value.stage_role == f"{role}-validation-retry"
+    assert caught.value.failure_kind == "validation"
+    closure = handlers._PlanClassClosure(
+        f"oversized-{role}", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+    assert closure.lineage.review_state["staged_failure"]["message"] == str(caught.value)
+
+
 def test_no_session_validation_failure_is_not_mislabeled_as_format(tmp_path):
     class Engine:
         name = "fake"
@@ -800,6 +913,76 @@ def test_consolidation_prompt_ceiling_is_noncacheable_structured_validation(
     assert "census_cache" not in closure.lineage.review_state
 
 
+def test_real_consolidation_path_accepts_150_independent_sources(tmp_path):
+    closure = handlers._PlanClassClosure(
+        "aggregate-150", round_no=1, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    lanes = sp.LANES[cc.PLAN_MODE]
+    source_ids = [f"{lane_name}:F{index}" for lane_name in lanes for index in range(50)]
+    calls: list[str] = []
+
+    class Engine:
+        name = "fake"
+
+        def run(self, prompt, *args, **kwargs):
+            calls.append(prompt)
+            if "ROLE: census lane" in prompt:
+                lane_name = next(
+                    row.split()[-1] for row in prompt.splitlines()
+                    if row.startswith("ROLE: census lane")
+                )
+                findings = [
+                    {
+                        "id":f"F{index}", "severity":"MAJOR",
+                        "summary":f"defect {index}", "evidence":["plan:1"],
+                        "remedy":"repair it",
+                    }
+                    for index in range(50)
+                ]
+                text = lane(lane_name, findings=findings)
+            else:
+                text = wire({
+                    "role":"census",
+                    "governing_findings":[
+                        {
+                            "id":f"G{index}", "severity":"MAJOR",
+                            "summary":f"defect {index}", "evidence":["plan:1"],
+                            "remedy":"repair it", "source_ids":[source_id],
+                            "classification":{
+                                "kind":"one_off", "reason":"one fixture site",
+                            },
+                        }
+                        for index, source_id in enumerate(source_ids)
+                    ],
+                    "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
+                })
+            return Review(text=text, session_ref="s", raw=text)
+
+    review, trailer, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high",
+        mode=cc.PLAN_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=1, on_progress=None, plan_lines=1,
+    )
+    closure.release()
+    assert not review.error
+    assert len(calls) == 4
+    assert len(attempts) == 4
+    assert len(closure.staged_settlement["findings"]) == 150
+    assert len(closure.lineage.review_state["debt"]) == 150
+    assert "STRUCTURAL-DEBT: 150 blocking open" in trailer
+
+
+def test_consolidation_packet_budgets_are_coherent():
+    # Three independently valid lane replies plus the separately bounded static
+    # context and prompt instructions fit the one consolidation circuit breaker.
+    assert (
+        len(sp.LANES[cc.PLAN_MODE]) * sp.MAX_LANE_RESPONSE_CHARS
+        + sp.MAX_CONSOLIDATION_CONTEXT_CHARS
+        + 50_000
+    ) <= rc.MAX_CONSOLIDATION_PROMPT_CHARS
+
+
 def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
     tmp_path, monkeypatch,
 ):
@@ -1237,7 +1420,7 @@ def test_branch_codex_runs_the_staged_census_path(
             text = wire(value)
         else:
             debt_outcomes = []
-            if '"id": "legacy-register"' in prompt:
+            if '"legacy-register"' in prompt:
                 debt_outcomes = [{
                     "debt_id":"legacy-register", "status":"closed",
                     "evidence":["repository/README.md:1"],

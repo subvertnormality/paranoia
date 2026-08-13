@@ -19,6 +19,14 @@ from tempfile import TemporaryDirectory
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "paranoia_local" / "staged_protocol.py"
 TEST = "tests/test_staged_protocol.py"
+DIFFERENTIAL_TESTS = (
+    "test_frozen_historical_v1_census_projection_is_preserved",
+    "test_frozen_historical_v1_correction_projection_is_preserved",
+    "test_frozen_historical_v1_final_projection_is_preserved",
+    "test_historical_v1_v2_branch_transition_shapes_are_equivalent",
+    "test_historical_v1_v2_open_unbound_debt_shape_is_equivalent",
+    "test_historical_v1_v2_census_fanout_shape_is_equivalent",
+)
 
 MUTATIONS = (
     (
@@ -79,6 +87,22 @@ MUTATIONS = (
 
 
 def main() -> int:
+    differential = subprocess.run(
+        [
+            sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
+            *(f"{ROOT / TEST}::{name}" for name in DIFFERENTIAL_TESTS),
+        ],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    if differential.returncode:
+        print("Historical V1/V2 differential gate failed.", file=sys.stderr)
+        print(differential.stdout, file=sys.stderr)
+        print(differential.stderr, file=sys.stderr)
+        return 1
+    print(
+        f"Historical V1/V2 differential gate passed for "
+        f"{len(DIFFERENTIAL_TESTS)} role/shape groups."
+    )
     original = SOURCE.read_text(encoding="utf-8")
     failures: list[str] = []
     for name, before, after, test_name in MUTATIONS:

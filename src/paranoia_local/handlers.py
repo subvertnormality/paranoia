@@ -247,6 +247,19 @@ def _validate_materialized_class_records(
         )
 
 
+def _raise_staged_validation_issues(issues: list[str]) -> None:
+    """Raise one bounded deterministic diagnostic spanning validation layers."""
+    ordered = sorted(dict.fromkeys(issues))
+    if not ordered:
+        return
+    shown = ordered[:sp.MAX_ISSUES]
+    if len(ordered) > sp.MAX_ISSUES:
+        shown.append(
+            f"/: {len(ordered) - sp.MAX_ISSUES} additional validation errors omitted"
+        )
+    raise rc.CensusError("\n".join(shown)[:sp.MAX_ISSUE_CHARS])
+
+
 def _census_cache_binding(
     *, mode: str, snapshot: str, stakes: str, body: str,
     active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
@@ -520,8 +533,14 @@ def _staged_structural_review(
     ) -> dict[str, Any]:
         del assessment_ids, known_debt
         try:
-            parsed = sp.materialize_decision(
-                text, mode=mode, role=role,
+            value = sp.decode_decision(text, mode=mode, role=role)
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+        issues: list[str] = []
+        parsed: dict[str, Any] | None = None
+        try:
+            parsed = sp.materialize_decision_value(
+                value, mode=mode, role=role,
                 source_ids=source_ids, source_severities=source_severities,
                 assessment_verdicts=assessment_verdicts,
                 assessment_findings=assessment_findings,
@@ -529,19 +548,36 @@ def _staged_structural_review(
                 durable_debt=state.get("debt", []),
             )
         except sp.ProtocolError as exc:
-            raise rc.CensusError(str(exc)) from exc
+            issues.extend(str(exc).splitlines())
         trusted_roots = None
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
             trusted_roots = {"repository": repository_alias.resolve(strict=True)}
         elif mode == cc.BRANCH_MODE:
             trusted_roots = {"repository": cwd.resolve(strict=True)}
-        rc.resolve_anchors(
-            parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
-        )
-        _validate_materialized_class_records(
-            parsed, mode=mode, lineage=lineage, round_no=round_no,
-        )
+        try:
+            rc.resolve_anchors(
+                value, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
+            )
+        except rc.CensusError as exc:
+            issues.extend(str(exc).splitlines())
+        class_view = parsed
+        if class_view is None:
+            class_view = {
+                "class_records": sp.class_records_from_actions(value["class_actions"]),
+                "_class_record_pointers": [
+                    f"/class_actions/{index}"
+                    for index in range(len(value["class_actions"]))
+                ],
+            }
+        try:
+            _validate_materialized_class_records(
+                class_view, mode=mode, lineage=lineage, round_no=round_no,
+            )
+        except rc.CensusError as exc:
+            issues.extend(str(exc).splitlines())
+        _raise_staged_validation_issues(issues)
+        assert parsed is not None
         return parsed
 
     if phase == "census":
@@ -555,6 +591,17 @@ def _staged_structural_review(
         existing_debt = [
             d for d in state.get("debt", []) if d.get("status") == "open"
         ]
+        consolidation_context = json.dumps({
+            "role": "census", "stakes": stakes,
+            "active_classes": active_classes, "existing_debt": existing_debt,
+        }, ensure_ascii=False, separators=(",", ":"))
+        if len(consolidation_context) > sp.MAX_CONSOLIDATION_CONTEXT_CHARS:
+            raise _staged_error(
+                "consolidation static context is "
+                f"{len(consolidation_context)} characters; maximum is "
+                f"{sp.MAX_CONSOLIDATION_CONTEXT_CHARS}",
+                role="consolidation-input", kind="validation",
+            )
         cache_binding = _census_cache_binding(
             mode=mode, snapshot=snapshot, stakes=stakes, body=body,
             active_classes=active_classes, existing_debt=existing_debt,
@@ -649,7 +696,7 @@ def _staged_structural_review(
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
             "existing_debt": existing_debt,
-        }, ensure_ascii=False)
+        }, ensure_ascii=False, separators=(",", ":"))
         try:
             prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
             if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:

@@ -748,17 +748,129 @@ def v1_projection(parsed):
     return projected
 
 
-def durable_projection(settlement, *, active=None, prior_debt=(), phase="census"):
+def historical_v1_reference(
+    value, *, role, source_ids=(), assessment_verdicts=None,
+    assessment_findings=None, active=(), prior_debt=(), mode=cc.PLAN_MODE,
+):
+    """Executable reference for the settlement contract at commit 83fc1e6.
+
+    This deliberately consumes the redundant V1 tables, validates their
+    historical cross-table relationships, and emits the private finding/class
+    binding used by durable settlement.  It is test-only and independent of
+    Protocol v2's semantic materializer.
+    """
+    obj = deepcopy(value)
+    expected_keys = {
+        "role", "source_dispositions", "assessment_dispositions", "findings",
+        "debt", "debt_updates", "class_dispositions", "class_records",
+        "class_assessments",
+    } | ({"coverage"} if role == "final" else set())
+    assert set(obj) == expected_keys
+    assert obj["role"] == role
+    findings = {row["id"]: row for row in obj["findings"]}
+    assert len(findings) == len(obj["findings"])
+
+    source_rows = obj["source_dispositions"]
+    assert {row["source_id"] for row in source_rows} == set(source_ids)
+    assert all(row["governing_id"] in findings for row in source_rows)
+    expected_verdicts = assessment_verdicts or {}
+    assessment_rows = obj["assessment_dispositions"]
+    assert {row["assessment_id"] for row in assessment_rows} == set(expected_verdicts)
+    assert all(
+        row["governing_id"] is None or row["governing_id"] in findings
+        for row in assessment_rows
+    )
+
+    dispositions = {row["finding_id"]: row for row in obj["class_dispositions"]}
+    assert set(dispositions) == set(findings)
+    refs = {}
+    referenced_records = set()
+    for finding_id, row in dispositions.items():
+        if row["kind"] == "one_off":
+            refs[finding_id] = None
+        elif row["kind"] == "existing_class":
+            assert row["class_id"] in {item["class_id"] for item in active}
+            refs[finding_id] = row["class_id"]
+        else:
+            index = row["record_index"]
+            assert obj["class_records"][index]["op"] == "new"
+            assert index not in referenced_records
+            referenced_records.add(index)
+            refs[finding_id] = f"record:{index}"
+    assert referenced_records == {
+        index for index, row in enumerate(obj["class_records"])
+        if row["op"] == "new"
+    }
+
+    debt_by_finding = {}
+    for row in obj["debt"]:
+        assert row["finding_id"] in findings and row["status"] in {"open", "closed"}
+        debt_by_finding.setdefault(row["finding_id"], []).append(row)
+    violated_targets = {
+        row["governing_id"] for row in assessment_rows
+        if expected_verdicts.get(row["assessment_id"]) == "violated"
+    }
+    for finding_id, finding_row in findings.items():
+        if finding_row["severity"] in sp.BLOCKING or finding_id in violated_targets:
+            assert len([
+                row for row in debt_by_finding.get(finding_id, [])
+                if row["status"] == "open"
+            ]) == 1
+
+    known = {row["id"] for row in prior_debt if row["status"] == "open"}
+    assert {row["id"] for row in obj["debt_updates"]} == known
+    assessments = {row["class_id"]: row for row in obj["class_assessments"]}
+    assert set(assessments) == set(expected_verdicts)
+    disposition_targets = {
+        row["assessment_id"]: row["governing_id"] for row in assessment_rows
+    }
+    for class_id, verdict in expected_verdicts.items():
+        row = assessments[class_id]
+        assert row["verdict"] == verdict
+        assert row["finding_id"] == disposition_targets[class_id]
+        if assessment_findings is not None and verdict == "violated":
+            cited = assessment_findings[class_id]
+            governed = {
+                item["governing_id"] for item in source_rows
+                if item["source_id"] == cited
+            }
+            if role == "census":
+                assert row["finding_id"] in governed
+        if row["finding_id"] is not None:
+            assert refs[row["finding_id"]] == class_id
+
+    register = rc.register_from_records(
+        obj["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
+    )
+    lineage = cc.Lineage(
+        "v1-reference", mode=mode,
+        classes={
+            item["class_id"]: lineage_with_active(item).classes[item["class_id"]]
+            for item in active
+        },
+        next_seq=len(active) + 1,
+    )
+    cc.apply_register(lineage, register, round_no=2)
+    obj["_finding_class_refs"] = refs
+    return obj
+
+
+def durable_projection(
+    settlement, *, active=None, prior_debt=(), phase="census", mode=cc.PLAN_MODE,
+):
     active = active or []
     lineage = cc.Lineage(
-        lineage_id="v1-v2-durable", mode=cc.PLAN_MODE,
+        lineage_id="v1-v2-durable", mode=mode,
         classes={
             row["class_id"]: lineage_with_active(row).classes[row["class_id"]]
             for row in active
         },
         next_seq=len(active) + 1,
     )
-    register = rc.register_from_records(settlement["class_records"], mechanized=False)
+    register = rc.register_from_records(
+        settlement["class_records"],
+        mechanized=None if mode == cc.BRANCH_MODE else False,
+    )
     minted = cc.apply_register(lineage, register, round_no=2)
     minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
     state = rc.normalize_state({}, stakes="s", snapshot="before")
@@ -861,9 +973,12 @@ def test_frozen_historical_v1_census_projection_is_preserved():
     legacy = deepcopy(expected)
     for index, row in enumerate(legacy["debt"], 1):
         row["id"] = f"legacy-local-{index}"
-    legacy["_finding_class_refs"] = {
-        "G1": None, "G2": "class-a", "G3": "record:0",
-    }
+    legacy = historical_v1_reference(
+        legacy, role="census",
+        source_ids=["domain:F1", "integrity:F2", "execution:F3"],
+        assessment_verdicts={"class-a": "violated"},
+        assessment_findings={"class-a": "integrity:F2"}, active=classes,
+    )
     assert durable_projection(parsed, active=classes) == durable_projection(
         legacy, active=classes,
     )
@@ -921,7 +1036,11 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
     assert v1_projection(parsed) == expected
     legacy = deepcopy(expected)
     legacy["debt"][0]["id"] = "legacy-local-new"
-    legacy["_finding_class_refs"] = {"G4": "class-a"}
+    legacy = historical_v1_reference(
+        legacy, role="correction",
+        assessment_verdicts={"class-a": "violated"},
+        active=[active_class()], prior_debt=debts,
+    )
     assert durable_projection(
         parsed, active=[active_class()], prior_debt=debts, phase="correction",
     ) == durable_projection(
@@ -951,9 +1070,125 @@ def test_frozen_historical_v1_final_projection_is_preserved():
     }
     assert v1_projection(parsed) == expected
     legacy = deepcopy(expected)
-    legacy["_finding_class_refs"] = {}
+    legacy = historical_v1_reference(
+        legacy, role="final",
+        assessment_verdicts={"class-a": "satisfied"},
+        active=[active_class()],
+    )
     assert durable_projection(
         parsed, active=[active_class()], phase="final",
     ) == durable_projection(
         legacy, active=[active_class()], phase="final",
+    )
+
+
+@pytest.mark.parametrize(("mechanized", "action"), [
+    (False, {"kind":"reopen", "class_id":"class-a"}),
+    (True, {
+        "kind":"replace", "class_id":"class-a", "definition":{
+            "invariant":"replacement invariant", "severity":"MAJOR",
+            "pattern":"BROKEN", "pathspec":"*.py",
+        },
+    }),
+])
+def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
+    mechanized, action,
+):
+    active = active_class(status=cc.CLOSED, mechanized=mechanized)
+    current = finding(
+        "G5", "MAJOR",
+        classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[current],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G5"},
+        }],
+        class_actions=[action],
+    )
+    parsed = materialize(
+        raw, mode=cc.BRANCH_MODE, active_classes=[active],
+    )
+    legacy = {
+        key: deepcopy(value) for key, value in parsed.items()
+        if not key.startswith("_")
+    }
+    legacy = historical_v1_reference(
+        legacy, role="correction",
+        assessment_verdicts={"class-a":"violated"}, active=[active],
+        mode=cc.BRANCH_MODE,
+    )
+    assert durable_projection(
+        parsed, active=[active], phase="correction", mode=cc.BRANCH_MODE,
+    ) == durable_projection(
+        legacy, active=[active], phase="correction", mode=cc.BRANCH_MODE,
+    )
+
+
+def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():
+    debts = [durable_debt("D9", cid=None)]
+    parsed = materialize(
+        decision("correction", debt_outcomes=[{
+            "debt_id":"D9", "status":"open", "evidence":["plan:1"],
+            "reason":"the one-off occurrence remains reachable",
+        }]),
+        durable_debt=debts,
+    )
+    legacy = {
+        key: deepcopy(value) for key, value in parsed.items()
+        if not key.startswith("_")
+    }
+    legacy = historical_v1_reference(
+        legacy, role="correction", prior_debt=debts,
+    )
+    assert durable_projection(
+        parsed, prior_debt=debts, phase="correction",
+    ) == durable_projection(
+        legacy, prior_debt=debts, phase="correction",
+    )
+
+
+def test_historical_v1_v2_census_fanout_shape_is_equivalent():
+    classes = [active_class("class-a"), active_class("class-b")]
+    values = [
+        finding(
+            "G1", "MINOR", source_ids=["integrity:F1"],
+            classification={"kind":"existing_class", "class_id":"class-a"},
+        ),
+        finding(
+            "G2", "MAJOR", source_ids=["integrity:F1"],
+            classification={"kind":"existing_class", "class_id":"class-b"},
+        ),
+    ]
+    outcomes = [
+        {
+            "class_id":row["classification"]["class_id"],
+            "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":row["id"]},
+        }
+        for row in values
+    ]
+    parsed = materialize(
+        decision("census", governing_findings=values, class_outcomes=outcomes),
+        source_ids=["integrity:F1"],
+        source_severities={"integrity:F1":"MINOR"},
+        assessment_verdicts={item["class_id"]:"violated" for item in outcomes},
+        assessment_findings={item["class_id"]:"integrity:F1" for item in outcomes},
+        active_classes=classes,
+    )
+    legacy = {
+        key: deepcopy(value) for key, value in parsed.items()
+        if not key.startswith("_")
+    }
+    legacy = historical_v1_reference(
+        legacy, role="census", source_ids=["integrity:F1"],
+        assessment_verdicts={item["class_id"]:"violated" for item in outcomes},
+        assessment_findings={item["class_id"]:"integrity:F1" for item in outcomes},
+        active=classes,
+    )
+    assert durable_projection(
+        parsed, active=classes,
+    ) == durable_projection(
+        legacy, active=classes,
     )
