@@ -1868,6 +1868,26 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
         "deleted_lines": 9,
         "net_lines": 33,
     }
+    final = artifact["final_revision_acceptance"]
+    assert final["implementation_commit"] == (
+        "31149deb8570863f874ef363119064e487212cd2"
+    )
+    assert final["model_calls"] == 3
+    assert final["omitted_keys"] == [[1, 0]]
+    assert final["capture_failed_keys"] == [[2, 0]]
+    assert [row["kind"] for row in final["attempts"]] == [
+        "signed-in-provider", "controlled-partial-binding", "signed-in-provider",
+    ]
+    assert [row["verdict"] for row in final["durable_state"]["claims"]] == [
+        "supported", "unverified", "unverified",
+    ]
+    assert final["durable_state"]["claims"][1]["location"] == (
+        "No binding row returned for captured source"
+    )
+    assert final["durable_state"]["claims"][2]["location"] == (
+        "Server capture unavailable"
+    )
+    assert final["durable_state"]["blocked"] is True
 
 
 @pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [
