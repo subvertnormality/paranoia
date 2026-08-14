@@ -218,6 +218,13 @@ cold attestation and canonical atomic persistence then produced one supported cl
 three model calls and 42.151 seconds; its sessions, response hashes, state hash, and exact durable
 outcomes are retained in the artifact.
 
+A second controlled failure run on the same `ac50c47` behavior commit used signed-in discovery,
+real server capture, and signed-in binding for two claims, then supplied a Boolean-alias identity at
+the cold-attestation boundary. Exact identity validation rejected the response before settlement.
+Canonical durable state remained blocked with zero applied claims and retained debt bound to the
+exact rejected-response hash, so the valid sibling row could not be misbound or partially applied.
+The run used two signed-in calls plus the controlled attestation boundary and 38.555 seconds.
+
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an

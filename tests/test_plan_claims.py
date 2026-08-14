@@ -2011,6 +2011,24 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
         "Server capture unavailable"
     )
     assert final["durable_state"]["blocked"] is True
+    invalid = artifact["invalid_attestation_acceptance"]
+    assert invalid["implementation_commit"] == (
+        "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb"
+    )
+    assert invalid["expected_parser_error"] == (
+        "attestation row indices must be integers"
+    )
+    assert [row["kind"] for row in invalid["attempts"]] == [
+        "signed-in-provider", "signed-in-provider", "controlled-boolean-identity",
+    ]
+    assert invalid["durable_state"]["blocked"] is True
+    assert invalid["durable_state"]["claim_count"] == 0
+    assert invalid["durable_state"]["debt"]["raw_sha256"] == invalid[
+        "controlled_attestation_response_sha256"
+    ]
+    assert invalid["durable_state"]["debt"]["rejected_identity"] == {
+        "claim_index": True, "evidence_index": 0,
+    }
 
 
 @pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [
