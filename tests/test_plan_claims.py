@@ -1766,6 +1766,50 @@ def test_explicit_unusable_binding_has_distinct_durable_provenance(
         adapter.close()
 
 
+def test_explicit_unusable_binding_preserves_capture_failure_provenance(
+    tmp_path: Path,
+) -> None:
+    discovery = pc.parse_audit(_audit(_claim()), PLAN)
+    item = discovery.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, None, None, None, None, None, None,
+        error="capture timed out\nwhile reading response",
+    )}
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": False,
+            "location": None, "passage": None,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 1
+        state = pc.reconcile(
+            {}, audit, lineage_id="capture-failed", round_no=1, plan_text=PLAN,
+        )
+        record = next(iter(state["claims"].values()))
+        assert record["verdict"] == "unverified"
+        assert record["evidence"][0]["relation"] == "context"
+        assert record["evidence"][0]["location"] == "Server capture unavailable"
+        assert record["evidence"][0]["quote"] == (
+            "Server capture unavailable: capture timed out while reading response"
+        )
+        assert pc.is_blocked(state)
+    finally:
+        adapter.close()
+
+
 def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
     artifact = json.loads(
         (Path(__file__).parents[1] / "docs" / "claim_binding_acceptance_2026-08-14.json")
@@ -1820,9 +1864,9 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
     assert controlled["durable_state"]["blocked"] is True
     assert artifact["measurements"]["production_diff"] == {
         "files": ["src/paranoia_local/handlers.py"],
-        "added_lines": 35,
+        "added_lines": 42,
         "deleted_lines": 9,
-        "net_lines": 26,
+        "net_lines": 33,
     }
 
 

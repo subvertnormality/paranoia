@@ -2147,8 +2147,15 @@ class _CapturedClaimEngine:
                     item["quote"] = "The model omitted this captured-source binding."
                 elif binding is None:
                     item["relation"] = "context"
-                    item["location"] = "Captured source explicitly marked unusable"
-                    item["quote"] = "No usable captured-text passage was returned."
+                    if not capture.usable:
+                        detail = " ".join(
+                            (capture.error or "capture contained no extracted text").split()
+                        )
+                        item["location"] = "Server capture unavailable"
+                        item["quote"] = f"Server capture unavailable: {detail}"
+                    else:
+                        item["location"] = "Captured source explicitly marked unusable"
+                        item["quote"] = "No usable captured-text passage was returned."
                 else:
                     item["location"], item["quote"] = binding
         combined = pc.Audit(

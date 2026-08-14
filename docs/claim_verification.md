@@ -204,7 +204,8 @@ with no claim debt. A second production-backed controlled run on commit `8e24587
 Codex discovery and cold attestation plus real server captures, deliberately omitted expected key
 `(1,0)` at the model boundary, and durably produced one supported claim plus one context-only
 `unverified` claim. Explicit `usable:false` and omission also have separate durable provenance.
-The artifact records the +35/-9 production diff and the three largest production modules. The
+An explicit unusable row retains server capture-failure provenance when capture itself failed.
+The artifact records the +42/-9 production diff and the three largest production modules. The
 disposable plan later opened unrelated structural findings, so the artifact claims current-revision
 claim-path acceptance, not whole-plan convergence.
 

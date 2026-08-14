@@ -156,6 +156,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   Treat an omitted expected indexed binding row as unusable for that exact source and demote only
   the affected claim when it has no other qualifying evidence. Preserve omission as a distinct
   conservative outcome from an explicit `usable:false` row so durable provenance remains truthful.
+  For an explicit unusable row, retain a server-owned capture failure reason when capture failed;
+  use model-rejection provenance only when the server capture was actually available.
   Non-integer, unknown, or duplicate identities, malformed rows, unavailable captures claimed as
   usable, and passage mismatches still reject through the bounded correction path.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
