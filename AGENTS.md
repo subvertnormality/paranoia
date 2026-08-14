@@ -160,6 +160,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   use model-rejection provenance only when the server capture was actually available.
   Non-integer, unknown, or duplicate identities, malformed rows, unavailable captures claimed as
   usable, and passage mismatches still reject through the bounded correction path.
+  Apply the same exact-integer identity rule before constructing cold-attestation keys; no JSON
+  scalar or container alias may bind authority or entailment to another claim or evidence row.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
   Captured binding failure debt must retain raw provider stdout, structured failure detail, and

@@ -1212,6 +1212,40 @@ def test_only_server_attested_supported_packets_freeze() -> None:
     )) == 1
 
 
+def test_capture_attestation_boolean_index_cannot_parse_or_freeze() -> None:
+    evidence = [
+        _source(url="https://docs.python.org/3/whatsnew/3.11.html"),
+        _source(),
+    ]
+    attestation = {
+        "evidence_index": 1,
+        "final_url": evidence[1]["url"],
+        "text_sha256": "a" * 64,
+        "relation": "supports_claim",
+        "publisher_authority": True,
+        "authority_reason": "The publisher owns the release record.",
+        "passage_entailment": True,
+        "entailment_reason": "The passage states the release date.",
+    }
+    audit = pc.parse_audit(_audit(_claim(
+        evidence=evidence, capture_attestations=[attestation],
+    )), PLAN)
+    state = pc.reconcile(
+        {}, audit, lineage_id="capture-index", round_no=1, plan_text=PLAN,
+    )
+    record = next(iter(state["claims"].values()))
+    record["capture_attestations"][0]["evidence_index"] = True
+    assert not pc.frozen_supported_ids(
+        state, PLAN, require_capture_attestation=True,
+    )
+
+    forged = dict(attestation, evidence_index=True)
+    with pytest.raises(pc.AuditError, match="evidence_index is invalid or duplicated"):
+        pc.parse_audit(_audit(_claim(
+            evidence=evidence, capture_attestations=[forged],
+        )), PLAN)
+
+
 def test_negative_attestation_removes_exact_replacement_but_keeps_refutation(
     tmp_path: Path,
 ) -> None:
@@ -1260,6 +1294,92 @@ def test_negative_attestation_removes_exact_replacement_but_keeps_refutation(
         assert f'"proposition":"{replacement}"' in attester_prompt
     finally:
         adapter.close()
+
+
+def _run_indexed_attestation_rows(
+    tmp_path: Path, rows: list[dict[str, object]],
+) -> pc.Audit | Review:
+    second_anchor = "Python documentation also records the release date."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    evidence = [
+        _source(),
+        _source(url="https://docs.python.org/3/whatsnew/3.11.html"),
+    ]
+    audit = pc.parse_audit(_audit(
+        _claim(evidence=evidence),
+        _claim(anchor=second_anchor, proposition=second_anchor, evidence=evidence),
+    ), plan)
+    response = (
+        "=== EVIDENCE ATTESTATION JSON ===\n"
+        + json.dumps({"attestations": rows})
+    )
+    engine = _RoleScript({"evidence-text": [response]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    for claim_index, claim in enumerate(audit.claims):
+        for evidence_index, item in enumerate(claim["evidence"]):
+            candidate = external_sources.CandidateSource(
+                item["url"], item["title"], item["publisher"], item["source_kind"],
+                item["authority_basis"], item["relation"],
+            )
+            adapter.captures[(claim_index, evidence_index)] = (
+                external_sources.Capture(
+                    candidate, candidate.url, 200, "text/html", "a" * 64,
+                    f"{claim_index * 2 + evidence_index + 1:064x}", item["quote"],
+                )
+            )
+    try:
+        return adapter._attest(audit, "m", "high")
+    finally:
+        adapter.close()
+
+
+def _valid_attestation_rows() -> list[dict[str, object]]:
+    return [{
+        "claim_index": claim_index,
+        "evidence_index": evidence_index,
+        "publisher_authority": True,
+        "authority_reason": "official owner",
+        "passage_entailment": True,
+        "entailment_reason": "direct statement",
+    } for claim_index in range(2) for evidence_index in range(2)]
+
+
+@pytest.mark.parametrize("field", ["claim_index", "evidence_index"])
+@pytest.mark.parametrize("invalid_index", [True, 1.0, "1", None, [], {}])
+def test_attestation_index_types_fail_before_identity_binding(
+    tmp_path: Path, field: str, invalid_index: object,
+) -> None:
+    rows = _valid_attestation_rows()
+    rows[-1][field] = invalid_index
+    result = _run_indexed_attestation_rows(tmp_path, rows)
+    assert isinstance(result, Review)
+    assert result.error
+    assert result.session_ref == "session"
+    assert "attestation row indices must be integers" in result.text
+
+
+@pytest.mark.parametrize(("case", "message"), [
+    ("unknown", "unknown or duplicate attestation row"),
+    ("duplicate", "unknown or duplicate attestation row"),
+    ("omitted", "attestation inventory differs"),
+])
+def test_attestation_identity_inventory_fails_recoverably(
+    tmp_path: Path, case: str, message: str,
+) -> None:
+    rows = _valid_attestation_rows()
+    if case == "unknown":
+        rows[-1]["claim_index"] = 9
+    elif case == "duplicate":
+        rows[-1] = dict(rows[0])
+    else:
+        rows.pop()
+    result = _run_indexed_attestation_rows(tmp_path, rows)
+    assert isinstance(result, Review)
+    assert result.error
+    assert result.session_ref == "session"
+    assert message in result.text
 
 
 def test_retained_inventory_is_corrected_before_capture(
@@ -1863,10 +1983,13 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
     }
     assert controlled["durable_state"]["blocked"] is True
     assert artifact["measurements"]["production_diff"] == {
-        "files": ["src/paranoia_local/handlers.py"],
-        "added_lines": 42,
-        "deleted_lines": 9,
-        "net_lines": 33,
+        "files": [
+            "src/paranoia_local/handlers.py",
+            "src/paranoia_local/plan_claims.py",
+        ],
+        "added_lines": 48,
+        "deleted_lines": 11,
+        "net_lines": 37,
     }
     final = artifact["final_revision_acceptance"]
     assert final["implementation_commit"] == (

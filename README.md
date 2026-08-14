@@ -387,6 +387,8 @@ context records that server-owned failure reason instead. Valid rows in the same
 Non-integer, unknown, or duplicate keys, malformed rows, unavailable captures claimed as usable,
 and passages absent from the capture still reject the batch and receive the bounded same-session
 correction.
+Cold-attestation rows apply the same exact-integer identity rule before key construction; Boolean,
+float, string, null, array, and object aliases cannot bind authority or entailment to another claim.
 If the bounded correction retry still contains an unbindable anchor, that item is
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item

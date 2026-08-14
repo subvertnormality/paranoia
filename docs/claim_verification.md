@@ -205,7 +205,7 @@ Codex discovery and cold attestation plus real server captures, deliberately omi
 `(1,0)` at the model boundary, and durably produced one supported claim plus one context-only
 `unverified` claim. Explicit `usable:false` and omission also have separate durable provenance.
 An explicit unusable row retains server capture-failure provenance when capture itself failed.
-The artifact records the +42/-9 production diff and the three largest production modules. The
+The artifact records the +48/-11 production diff and the three largest production modules. The
 disposable plan later opened unrelated structural findings, so the artifact claims current-revision
 claim-path acceptance, not whole-plan convergence.
 

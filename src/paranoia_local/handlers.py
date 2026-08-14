@@ -2331,6 +2331,10 @@ class _CapturedClaimEngine:
                     "authority_reason", "passage_entailment", "entailment_reason",
                 }:
                     raise ValueError("invalid attestation row")
+                if type(row["claim_index"]) is not int or type(
+                    row["evidence_index"]
+                ) is not int:
+                    raise ValueError("attestation row indices must be integers")
                 key = (row["claim_index"], row["evidence_index"])
                 if key not in expected or key in decisions:
                     raise ValueError("unknown or duplicate attestation row")

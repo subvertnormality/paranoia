@@ -209,13 +209,16 @@
   },
   "measurements": {
     "production_diff": {
-      "files": ["src/paranoia_local/handlers.py"],
-      "added_lines": 42,
-      "deleted_lines": 9,
-      "net_lines": 33
+      "files": [
+        "src/paranoia_local/handlers.py",
+        "src/paranoia_local/plan_claims.py"
+      ],
+      "added_lines": 48,
+      "deleted_lines": 11,
+      "net_lines": 37
     },
     "largest_production_modules": [
-      {"path": "src/paranoia_local/handlers.py", "lines": 2816},
+      {"path": "src/paranoia_local/handlers.py", "lines": 2820},
       {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2768},
       {"path": "src/paranoia_local/plan_claims.py", "lines": 1417}
     ]
