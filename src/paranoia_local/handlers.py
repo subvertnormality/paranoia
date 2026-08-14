@@ -2161,8 +2161,8 @@ class _CapturedClaimEngine:
             raise pc.AuditError("invalid indexed binding envelope", text)
         raw = value["bindings"]
         expected = {(row["claim_index"], row["evidence_index"]) for row in batch}
-        if not isinstance(raw, list) or len(raw) != len(expected):
-            raise pc.AuditError("indexed binding inventory differs from its batch", text)
+        if not isinstance(raw, list):
+            raise pc.AuditError("indexed binding rows must be an array", text)
         result: dict[tuple[int, int], tuple[str, str] | None] = {}
         for row in raw:
             if not isinstance(row, dict) or set(row) != {
@@ -2188,6 +2188,12 @@ class _CapturedClaimEngine:
             if not external_sources.passage_matches(passage, capture.text):
                 raise pc.AuditError("indexed binding passage is not in captured text", text)
             result[key] = (location, passage)
+        # Exhaustive identity remains server-owned. A model omission cannot support a
+        # claim, but it also need not discard independently valid rows from this batch.
+        # Materialize each missing expected key as the existing unusable-binding value;
+        # unknown and duplicate keys have already failed above.
+        for key in sorted(expected - result.keys()):
+            result[key] = None
         return result
 
     def _parse_bound(

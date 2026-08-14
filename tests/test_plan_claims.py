@@ -1556,7 +1556,9 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert "CLAIM-AUDIT-DEBT" in result
 
 
-def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:
+def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(
+    tmp_path: Path,
+) -> None:
     claim = _claim(evidence=[_source(), _source(url="https://docs.python.org/3/whatsnew/3.11.html")])
     audit = pc.parse_audit(_audit(claim), PLAN)
     adapter = handlers._CapturedClaimEngine(
@@ -1574,13 +1576,80 @@ def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:
                 item["quote"],
             )
         batch = adapter._binding_batches(audit, captures)[0]
-        omitted = (
-            handlers.PLAN_BINDING_MARKER
-            + '\n{"bindings":[{"claim_index":0,"evidence_index":0,'
-            '"usable":false,"location":null,"passage":null}]}'
+        passage = audit.claims[0]["evidence"][0]["quote"]
+        omitted = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+            "bindings": [{
+                "claim_index": 0, "evidence_index": 0, "usable": True,
+                "location": "release record", "passage": passage,
+            }],
+        })
+        assert adapter._parse_indexed_binding(omitted, batch, captures) == {
+            (0, 0): ("release record", passage),
+            (0, 1): None,
+        }
+
+        unknown = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+            "bindings": [{
+                "claim_index": 9, "evidence_index": 0, "usable": False,
+                "location": None, "passage": None,
+            }],
+        })
+        with pytest.raises(pc.AuditError, match="identity is invalid or duplicated"):
+            adapter._parse_indexed_binding(unknown, batch, captures)
+    finally:
+        adapter.close()
+
+
+def test_indexed_binding_omission_preserves_valid_claim_and_demotes_affected_claim(
+    tmp_path: Path,
+) -> None:
+    second_anchor = "Python documentation also records the release date."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    discovery = pc.parse_audit(_audit(
+        _claim(),
+        _claim(
+            anchor=second_anchor,
+            proposition=second_anchor,
+            evidence=[_source(url="https://docs.python.org/3/whatsnew/3.11.html")],
+        ),
+    ), plan)
+    captures = {}
+    for claim_index, claim in enumerate(discovery.claims):
+        item = claim["evidence"][0]
+        candidate = external_sources.CandidateSource(
+            item["url"], item["title"], item["publisher"], item["source_kind"],
+            item["authority_basis"], item["relation"],
         )
-        with pytest.raises(pc.AuditError, match="inventory differs"):
-            adapter._parse_indexed_binding(omitted, batch, captures)
+        captures[(claim_index, 0)] = external_sources.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64,
+            f"{claim_index + 1:064x}", item["quote"],
+        )
+    passage = discovery.claims[0]["evidence"][0]["quote"]
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": "release record", "passage": passage,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 1
+        assert [role for role, _ in engine.calls] == ["evidence-binding"]
+        assert [claim["verdict"] for claim in audit.claims] == [
+            "supported", "unverified",
+        ]
+        assert audit.claims[0]["evidence"][0]["relation"] == "supports_claim"
+        assert audit.claims[1]["evidence"][0]["relation"] == "context"
+        assert audit.claims[1]["evidence"][0]["location"] == (
+            "Server capture unavailable"
+        )
     finally:
         adapter.close()
 
