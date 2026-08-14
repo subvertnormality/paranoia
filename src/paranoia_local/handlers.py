@@ -2132,8 +2132,8 @@ class _CapturedClaimEngine:
                 binding = decisions.get((claim_index, evidence_index))
                 if binding is None:
                     item["relation"] = "context"
-                    item["location"] = "Server capture unavailable"
-                    item["quote"] = "No server-captured passage was available."
+                    item["location"] = "No accepted captured-text binding"
+                    item["quote"] = "No accepted captured-text passage was returned."
                 else:
                     item["location"], item["quote"] = binding
         combined = pc.Audit(
@@ -2169,6 +2169,8 @@ class _CapturedClaimEngine:
                 "claim_index", "evidence_index", "usable", "location", "passage",
             }:
                 raise pc.AuditError("indexed binding row fields are invalid", text)
+            if type(row["claim_index"]) is not int or type(row["evidence_index"]) is not int:
+                raise pc.AuditError("indexed binding row indices must be integers", text)
             key = (row["claim_index"], row["evidence_index"])
             if key not in expected or key in result or type(row["usable"]) is not bool:
                 raise pc.AuditError("indexed binding row identity is invalid or duplicated", text)

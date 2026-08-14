@@ -380,9 +380,10 @@ does not invalidate the rest of the audit.
 Other valid claims in the same response are still registered.
 If an indexed captured-text binding response omits an expected source key, the server materializes
 that key as unusable: its source becomes context and any claim left without qualifying evidence is
-forced to blocking `unverified`. Valid rows in the same batch survive. Unknown or duplicate keys,
-malformed rows, unavailable captures claimed as usable, and passages absent from the capture still
-reject the batch and receive the bounded same-session correction.
+forced to blocking `unverified`, with neutral provenance that no accepted captured-text binding was
+returned. Valid rows in the same batch survive. Non-integer, unknown, or duplicate keys, malformed
+rows, unavailable captures claimed as usable, and passages absent from the capture still reject the
+batch and receive the bounded same-session correction.
 If the bounded correction retry still contains an unbindable anchor, that item is
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item
