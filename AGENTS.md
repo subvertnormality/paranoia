@@ -154,8 +154,9 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.
   Treat an omitted expected indexed binding row as unusable for that exact source and demote only
-  the affected claim when it has no other qualifying evidence. Record neutral omission provenance;
-  non-integer, unknown, or duplicate identities, malformed rows, unavailable captures claimed as
+  the affected claim when it has no other qualifying evidence. Preserve omission as a distinct
+  conservative outcome from an explicit `usable:false` row so durable provenance remains truthful.
+  Non-integer, unknown, or duplicate identities, malformed rows, unavailable captures claimed as
   usable, and passage mismatches still reject through the bounded correction path.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.

@@ -1585,7 +1585,7 @@ def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(
         })
         assert adapter._parse_indexed_binding(omitted, batch, captures) == {
             (0, 0): ("release record", passage),
-            (0, 1): None,
+            (0, 1): handlers._OMITTED_BINDING,
         }
 
         unknown = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
@@ -1713,8 +1713,54 @@ def test_binding_omission_survives_capture_attestation_and_reconciliation(
         assert records[second_anchor]["verdict"] == "unverified"
         omitted = records[second_anchor]["evidence"][0]
         assert omitted["relation"] == "context"
-        assert omitted["location"] == "No accepted captured-text binding"
-        assert omitted["quote"] == "No accepted captured-text passage was returned."
+        assert omitted["location"] == "No binding row returned for captured source"
+        assert omitted["quote"] == "The model omitted this captured-source binding."
+        assert pc.is_blocked(state)
+    finally:
+        adapter.close()
+
+
+def test_explicit_unusable_binding_has_distinct_durable_provenance(
+    tmp_path: Path,
+) -> None:
+    discovery = pc.parse_audit(_audit(_claim()), PLAN)
+    item = discovery.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        item["quote"],
+    )}
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": False,
+            "location": None, "passage": None,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 1
+        state = pc.reconcile(
+            {}, audit, lineage_id="explicit-unusable", round_no=1, plan_text=PLAN,
+        )
+        record = next(iter(state["claims"].values()))
+        assert record["verdict"] == "unverified"
+        assert record["evidence"][0]["relation"] == "context"
+        assert record["evidence"][0]["location"] == (
+            "Captured source explicitly marked unusable"
+        )
+        assert record["evidence"][0]["quote"] == (
+            "No usable captured-text passage was returned."
+        )
         assert pc.is_blocked(state)
     finally:
         adapter.close()
