@@ -250,7 +250,7 @@ def _captured_support(record: dict[str, Any]) -> bool:
         if not isinstance(row, dict):
             continue
         index = row.get("evidence_index")
-        if not isinstance(index, int) or not 0 <= index < len(evidence):
+        if type(index) is not int or not 0 <= index < len(evidence):
             continue
         item = evidence[index]
         if (
@@ -505,7 +505,7 @@ def _validate_capture_attestations(
         if not isinstance(row, dict) or set(row) != required:
             raise ValueError("capture_attestation fields are invalid")
         index = row["evidence_index"]
-        if not isinstance(index, int) or not 0 <= index < len(evidence) or index in seen:
+        if type(index) is not int or not 0 <= index < len(evidence) or index in seen:
             raise ValueError("capture_attestation evidence_index is invalid or duplicated")
         seen.add(index)
         final_url = _one_line(row["final_url"], "capture_attestation.final_url")

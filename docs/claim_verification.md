@@ -194,6 +194,37 @@ failure does not restart research.
 
 ## Recorded real acceptance
 
+The indexed binding correction is recorded in
+[`claim_binding_acceptance_2026-08-14.json`](claim_binding_acceptance_2026-08-14.json).
+On implementation commit `0479336`, a fresh signed-in `critique_plan` run completed discovery,
+server capture, tool-less indexed binding, independent cold attestation, stable-ID reconciliation,
+and durable persistence for one official Python Software Foundation claim in 39.877 seconds and
+three claim-model calls. The persisted claim count is one supported, zero refuted, zero unverified,
+with no claim debt. A second production-backed controlled run on commit `8e24587` used signed-in
+Codex discovery and cold attestation plus real server captures, deliberately omitted expected key
+`(1,0)` at the model boundary, and durably produced one supported claim plus one context-only
+`unverified` claim. Explicit `usable:false` and omission also have separate durable provenance.
+An explicit unusable row retains server capture-failure provenance when capture itself failed.
+The artifact records the +48/-11 production diff and the three largest production modules. The
+disposable plan later opened unrelated structural findings, so the artifact claims current-revision
+claim-path acceptance, not whole-plan convergence.
+
+The final acceptance run is bound to behavior commit `ac50c47`. Signed-in Codex discovered three
+official Python release claims and the server captured all three pages. A controlled production
+model boundary preserved one valid binding, omitted key `(1,0)`, and returned `usable:false` for
+key `(2,0)` after replacing that real capture with a deterministic failed-capture record. Signed-in
+cold attestation and canonical atomic persistence then produced one supported claim, one omitted
+`unverified` claim, and one capture-failed `unverified` claim with distinct provenance. The run used
+three model calls and 42.151 seconds; its sessions, response hashes, state hash, and exact durable
+outcomes are retained in the artifact.
+
+A second controlled failure run on the same `ac50c47` behavior commit used signed-in discovery,
+real server capture, and signed-in binding for two claims, then supplied a Boolean-alias identity at
+the cold-attestation boundary. Exact identity validation rejected the response before settlement.
+Canonical durable state remained blocked with zero applied claims and retained debt bound to the
+exact rejected-response hash, so the valid sibling row could not be misbound or partially applied.
+The run used two signed-in calls plus the controlled attestation boundary and 38.555 seconds.
+
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an

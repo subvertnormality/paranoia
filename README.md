@@ -378,6 +378,17 @@ Likewise, evidence that does not entail the model's `supported`/`refuted` verdic
 only as context and that individual claim is forced to blocking `unverified`. One bad packet
 does not invalidate the rest of the audit.
 Other valid claims in the same response are still registered.
+If an indexed captured-text binding response omits an expected source key, the server materializes
+that omission as a distinct conservative outcome: its source becomes context and any claim left
+without qualifying evidence is forced to blocking `unverified`, with provenance that the binding
+row was omitted. A returned `usable:false` row instead records that the model explicitly marked the
+captured source unusable when a capture exists; if the server capture itself failed, the durable
+context records that server-owned failure reason instead. Valid rows in the same batch survive.
+Non-integer, unknown, or duplicate keys, malformed rows, unavailable captures claimed as usable,
+and passages absent from the capture still reject the batch and receive the bounded same-session
+correction.
+Cold-attestation rows apply the same exact-integer identity rule before key construction; Boolean,
+float, string, null, array, and object aliases cannot bind authority or entailment to another claim.
 If the bounded correction retry still contains an unbindable anchor, that item is
 recorded as explicit blocking audit debt while the retry's valid claims and valid
 removal dispositions are persisted. The next round therefore repairs one item

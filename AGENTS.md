@@ -153,6 +153,15 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   Validate retained inventory before capture; attest replacement wording as its own exact
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.
+  Treat an omitted expected indexed binding row as unusable for that exact source and demote only
+  the affected claim when it has no other qualifying evidence. Preserve omission as a distinct
+  conservative outcome from an explicit `usable:false` row so durable provenance remains truthful.
+  For an explicit unusable row, retain a server-owned capture failure reason when capture failed;
+  use model-rejection provenance only when the server capture was actually available.
+  Non-integer, unknown, or duplicate identities, malformed rows, unavailable captures claimed as
+  usable, and passage mismatches still reject through the bounded correction path.
+  Apply the same exact-integer identity rule before constructing cold-attestation keys; no JSON
+  scalar or container alias may bind authority or entailment to another claim or evidence row.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
   Captured binding failure debt must retain raw provider stdout, structured failure detail, and

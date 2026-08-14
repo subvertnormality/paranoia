@@ -53,6 +53,15 @@ PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
 MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
+
+
+class _OmittedBinding:
+    __slots__ = ()
+
+
+_OMITTED_BINDING = _OmittedBinding()
+
+
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
 ) -> rc.Attempt:
@@ -2070,7 +2079,9 @@ class _CapturedClaimEngine:
         model: str, effort: str, binding_kwargs: dict[str, Any],
     ) -> tuple[pc.Audit, list[Review]]:
         assert self.binding_engine is not None
-        decisions: dict[tuple[int, int], tuple[str, str] | None] = {}
+        decisions: dict[
+            tuple[int, int], tuple[str, str] | None | _OmittedBinding
+        ] = {}
         reviews: list[Review] = []
         current_session = session_ref
         for batch in self._binding_batches(discovery, captures):
@@ -2129,11 +2140,22 @@ class _CapturedClaimEngine:
             for evidence_index, item in enumerate(claim["evidence"]):
                 capture = captures[(claim_index, evidence_index)]
                 item["url"] = capture.final_url or item["url"]
-                binding = decisions.get((claim_index, evidence_index))
-                if binding is None:
+                binding = decisions[(claim_index, evidence_index)]
+                if binding is _OMITTED_BINDING:
                     item["relation"] = "context"
-                    item["location"] = "Server capture unavailable"
-                    item["quote"] = "No server-captured passage was available."
+                    item["location"] = "No binding row returned for captured source"
+                    item["quote"] = "The model omitted this captured-source binding."
+                elif binding is None:
+                    item["relation"] = "context"
+                    if not capture.usable:
+                        detail = " ".join(
+                            (capture.error or "capture contained no extracted text").split()
+                        )
+                        item["location"] = "Server capture unavailable"
+                        item["quote"] = f"Server capture unavailable: {detail}"
+                    else:
+                        item["location"] = "Captured source explicitly marked unusable"
+                        item["quote"] = "No usable captured-text passage was returned."
                 else:
                     item["location"], item["quote"] = binding
         combined = pc.Audit(
@@ -2149,7 +2171,7 @@ class _CapturedClaimEngine:
     def _parse_indexed_binding(
         self, text: str, batch: list[dict[str, Any]],
         captures: dict[tuple[int, int], external_sources.Capture],
-    ) -> dict[tuple[int, int], tuple[str, str] | None]:
+    ) -> dict[tuple[int, int], tuple[str, str] | None | _OmittedBinding]:
         if text.count(PLAN_BINDING_MARKER) != 1:
             raise pc.AuditError(f"expected exactly one {PLAN_BINDING_MARKER} marker", text)
         tail = text.split(PLAN_BINDING_MARKER, 1)[1].strip()
@@ -2161,14 +2183,18 @@ class _CapturedClaimEngine:
             raise pc.AuditError("invalid indexed binding envelope", text)
         raw = value["bindings"]
         expected = {(row["claim_index"], row["evidence_index"]) for row in batch}
-        if not isinstance(raw, list) or len(raw) != len(expected):
-            raise pc.AuditError("indexed binding inventory differs from its batch", text)
-        result: dict[tuple[int, int], tuple[str, str] | None] = {}
+        if not isinstance(raw, list):
+            raise pc.AuditError("indexed binding rows must be an array", text)
+        result: dict[
+            tuple[int, int], tuple[str, str] | None | _OmittedBinding
+        ] = {}
         for row in raw:
             if not isinstance(row, dict) or set(row) != {
                 "claim_index", "evidence_index", "usable", "location", "passage",
             }:
                 raise pc.AuditError("indexed binding row fields are invalid", text)
+            if type(row["claim_index"]) is not int or type(row["evidence_index"]) is not int:
+                raise pc.AuditError("indexed binding row indices must be integers", text)
             key = (row["claim_index"], row["evidence_index"])
             if key not in expected or key in result or type(row["usable"]) is not bool:
                 raise pc.AuditError("indexed binding row identity is invalid or duplicated", text)
@@ -2188,6 +2214,13 @@ class _CapturedClaimEngine:
             if not external_sources.passage_matches(passage, capture.text):
                 raise pc.AuditError("indexed binding passage is not in captured text", text)
             result[key] = (location, passage)
+        # Exhaustive identity remains server-owned. A model omission cannot support a
+        # claim, but it also need not discard independently valid rows from this batch.
+        # Materialize each missing expected key as a distinct conservative outcome;
+        # unknown and duplicate keys have already failed above. Keeping omission
+        # separate from an explicit unusable judgement preserves truthful provenance.
+        for key in sorted(expected - result.keys()):
+            result[key] = _OMITTED_BINDING
         return result
 
     def _parse_bound(
@@ -2298,6 +2331,10 @@ class _CapturedClaimEngine:
                     "authority_reason", "passage_entailment", "entailment_reason",
                 }:
                     raise ValueError("invalid attestation row")
+                if type(row["claim_index"]) is not int or type(
+                    row["evidence_index"]
+                ) is not int:
+                    raise ValueError("attestation row indices must be integers")
                 key = (row["claim_index"], row["evidence_index"])
                 if key not in expected or key in decisions:
                     raise ValueError("unknown or duplicate attestation row")

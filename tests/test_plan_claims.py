@@ -1212,6 +1212,40 @@ def test_only_server_attested_supported_packets_freeze() -> None:
     )) == 1
 
 
+def test_capture_attestation_boolean_index_cannot_parse_or_freeze() -> None:
+    evidence = [
+        _source(url="https://docs.python.org/3/whatsnew/3.11.html"),
+        _source(),
+    ]
+    attestation = {
+        "evidence_index": 1,
+        "final_url": evidence[1]["url"],
+        "text_sha256": "a" * 64,
+        "relation": "supports_claim",
+        "publisher_authority": True,
+        "authority_reason": "The publisher owns the release record.",
+        "passage_entailment": True,
+        "entailment_reason": "The passage states the release date.",
+    }
+    audit = pc.parse_audit(_audit(_claim(
+        evidence=evidence, capture_attestations=[attestation],
+    )), PLAN)
+    state = pc.reconcile(
+        {}, audit, lineage_id="capture-index", round_no=1, plan_text=PLAN,
+    )
+    record = next(iter(state["claims"].values()))
+    record["capture_attestations"][0]["evidence_index"] = True
+    assert not pc.frozen_supported_ids(
+        state, PLAN, require_capture_attestation=True,
+    )
+
+    forged = dict(attestation, evidence_index=True)
+    with pytest.raises(pc.AuditError, match="evidence_index is invalid or duplicated"):
+        pc.parse_audit(_audit(_claim(
+            evidence=evidence, capture_attestations=[forged],
+        )), PLAN)
+
+
 def test_negative_attestation_removes_exact_replacement_but_keeps_refutation(
     tmp_path: Path,
 ) -> None:
@@ -1260,6 +1294,92 @@ def test_negative_attestation_removes_exact_replacement_but_keeps_refutation(
         assert f'"proposition":"{replacement}"' in attester_prompt
     finally:
         adapter.close()
+
+
+def _run_indexed_attestation_rows(
+    tmp_path: Path, rows: list[dict[str, object]],
+) -> pc.Audit | Review:
+    second_anchor = "Python documentation also records the release date."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    evidence = [
+        _source(),
+        _source(url="https://docs.python.org/3/whatsnew/3.11.html"),
+    ]
+    audit = pc.parse_audit(_audit(
+        _claim(evidence=evidence),
+        _claim(anchor=second_anchor, proposition=second_anchor, evidence=evidence),
+    ), plan)
+    response = (
+        "=== EVIDENCE ATTESTATION JSON ===\n"
+        + json.dumps({"attestations": rows})
+    )
+    engine = _RoleScript({"evidence-text": [response]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    for claim_index, claim in enumerate(audit.claims):
+        for evidence_index, item in enumerate(claim["evidence"]):
+            candidate = external_sources.CandidateSource(
+                item["url"], item["title"], item["publisher"], item["source_kind"],
+                item["authority_basis"], item["relation"],
+            )
+            adapter.captures[(claim_index, evidence_index)] = (
+                external_sources.Capture(
+                    candidate, candidate.url, 200, "text/html", "a" * 64,
+                    f"{claim_index * 2 + evidence_index + 1:064x}", item["quote"],
+                )
+            )
+    try:
+        return adapter._attest(audit, "m", "high")
+    finally:
+        adapter.close()
+
+
+def _valid_attestation_rows() -> list[dict[str, object]]:
+    return [{
+        "claim_index": claim_index,
+        "evidence_index": evidence_index,
+        "publisher_authority": True,
+        "authority_reason": "official owner",
+        "passage_entailment": True,
+        "entailment_reason": "direct statement",
+    } for claim_index in range(2) for evidence_index in range(2)]
+
+
+@pytest.mark.parametrize("field", ["claim_index", "evidence_index"])
+@pytest.mark.parametrize("invalid_index", [True, 1.0, "1", None, [], {}])
+def test_attestation_index_types_fail_before_identity_binding(
+    tmp_path: Path, field: str, invalid_index: object,
+) -> None:
+    rows = _valid_attestation_rows()
+    rows[-1][field] = invalid_index
+    result = _run_indexed_attestation_rows(tmp_path, rows)
+    assert isinstance(result, Review)
+    assert result.error
+    assert result.session_ref == "session"
+    assert "attestation row indices must be integers" in result.text
+
+
+@pytest.mark.parametrize(("case", "message"), [
+    ("unknown", "unknown or duplicate attestation row"),
+    ("duplicate", "unknown or duplicate attestation row"),
+    ("omitted", "attestation inventory differs"),
+])
+def test_attestation_identity_inventory_fails_recoverably(
+    tmp_path: Path, case: str, message: str,
+) -> None:
+    rows = _valid_attestation_rows()
+    if case == "unknown":
+        rows[-1]["claim_index"] = 9
+    elif case == "duplicate":
+        rows[-1] = dict(rows[0])
+    else:
+        rows.pop()
+    result = _run_indexed_attestation_rows(tmp_path, rows)
+    assert isinstance(result, Review)
+    assert result.error
+    assert result.session_ref == "session"
+    assert message in result.text
 
 
 def test_retained_inventory_is_corrected_before_capture(
@@ -1556,7 +1676,9 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert "CLAIM-AUDIT-DEBT" in result
 
 
-def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:
+def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(
+    tmp_path: Path,
+) -> None:
     claim = _claim(evidence=[_source(), _source(url="https://docs.python.org/3/whatsnew/3.11.html")])
     audit = pc.parse_audit(_audit(claim), PLAN)
     adapter = handlers._CapturedClaimEngine(
@@ -1574,15 +1696,339 @@ def test_indexed_plan_binding_rejects_an_omitted_source(tmp_path: Path) -> None:
                 item["quote"],
             )
         batch = adapter._binding_batches(audit, captures)[0]
-        omitted = (
-            handlers.PLAN_BINDING_MARKER
-            + '\n{"bindings":[{"claim_index":0,"evidence_index":0,'
-            '"usable":false,"location":null,"passage":null}]}'
-        )
-        with pytest.raises(pc.AuditError, match="inventory differs"):
-            adapter._parse_indexed_binding(omitted, batch, captures)
+        passage = audit.claims[0]["evidence"][0]["quote"]
+        omitted = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+            "bindings": [{
+                "claim_index": 0, "evidence_index": 0, "usable": True,
+                "location": "release record", "passage": passage,
+            }],
+        })
+        assert adapter._parse_indexed_binding(omitted, batch, captures) == {
+            (0, 0): ("release record", passage),
+            (0, 1): handlers._OMITTED_BINDING,
+        }
+
+        unknown = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+            "bindings": [{
+                "claim_index": 9, "evidence_index": 0, "usable": False,
+                "location": None, "passage": None,
+            }],
+        })
+        with pytest.raises(pc.AuditError, match="identity is invalid or duplicated"):
+            adapter._parse_indexed_binding(unknown, batch, captures)
     finally:
         adapter.close()
+
+
+@pytest.mark.parametrize("field", ["claim_index", "evidence_index"])
+@pytest.mark.parametrize("invalid_index", [True, 0.0, "0", None, [], {}])
+def test_invalid_binding_index_type_uses_bounded_correction(
+    tmp_path: Path, field: str, invalid_index: object,
+) -> None:
+    discovery = pc.parse_audit(_audit(_claim()), PLAN)
+    item = discovery.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        item["quote"],
+    )}
+    invalid_row = {
+        "claim_index": 0, "evidence_index": 0, "usable": False,
+        "location": None, "passage": None,
+    }
+    invalid_row[field] = invalid_index
+    invalid = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [invalid_row],
+    })
+    corrected = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": False,
+            "location": None, "passage": None,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [invalid, corrected]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 2
+        assert [role for role, _ in engine.calls] == [
+            "evidence-binding", "evidence-binding",
+        ]
+        assert audit.claims[0]["verdict"] == "unverified"
+    finally:
+        adapter.close()
+
+
+def test_binding_omission_survives_capture_attestation_and_reconciliation(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    second_anchor = "Python documentation also records the release date."
+    plan = PLAN + "\n" + second_anchor + "\n"
+    discovery_payload = _audit(
+        _claim(),
+        _claim(
+            anchor=second_anchor,
+            proposition=second_anchor,
+            evidence=[_source(url="https://docs.python.org/3/whatsnew/3.11.html")],
+        ),
+    )
+    discovery = pc.parse_audit(discovery_payload, plan)
+    passage = discovery.claims[0]["evidence"][0]["quote"]
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": "release record", "passage": passage,
+        }],
+    })
+    attestation = (
+        '=== EVIDENCE ATTESTATION JSON ===\n'
+        '{"attestations":[{"claim_index":0,"evidence_index":0,'
+        '"publisher_authority":true,"authority_reason":"official release owner",'
+        '"passage_entailment":true,"entailment_reason":"states the release date"}]}'
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [discovery_payload],
+        "evidence-binding": [binding],
+        "evidence-text": [attestation],
+    })
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                f"{index + 1:064x}", passage,
+            )
+            for index, candidate in enumerate(candidates)
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    ledger: list[dict] = []
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+        attempt_ledger=ledger,
+    )
+    try:
+        review = adapter.run("audit", tmp_path, "m", "high", True)
+        assert not review.error
+        audit = pc.parse_audit(review.text, plan)
+        state = pc.reconcile(
+            {}, audit, lineage_id="omitted-binding", round_no=1, plan_text=plan,
+        )
+        assert [role for role, _ in engine.calls] == [
+            "evidence-discovery", "evidence-binding", "evidence-text",
+        ]
+        assert [row["role"] for row in ledger] == [
+            "claim-discovery", "claim-binding", "claim-attestation",
+        ]
+        records = {row["anchor"]: row for row in state["claims"].values()}
+        assert records[PLAN.splitlines()[-1]]["verdict"] == "supported"
+        assert records[second_anchor]["verdict"] == "unverified"
+        omitted = records[second_anchor]["evidence"][0]
+        assert omitted["relation"] == "context"
+        assert omitted["location"] == "No binding row returned for captured source"
+        assert omitted["quote"] == "The model omitted this captured-source binding."
+        assert pc.is_blocked(state)
+    finally:
+        adapter.close()
+
+
+def test_explicit_unusable_binding_has_distinct_durable_provenance(
+    tmp_path: Path,
+) -> None:
+    discovery = pc.parse_audit(_audit(_claim()), PLAN)
+    item = discovery.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        item["quote"],
+    )}
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": False,
+            "location": None, "passage": None,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 1
+        state = pc.reconcile(
+            {}, audit, lineage_id="explicit-unusable", round_no=1, plan_text=PLAN,
+        )
+        record = next(iter(state["claims"].values()))
+        assert record["verdict"] == "unverified"
+        assert record["evidence"][0]["relation"] == "context"
+        assert record["evidence"][0]["location"] == (
+            "Captured source explicitly marked unusable"
+        )
+        assert record["evidence"][0]["quote"] == (
+            "No usable captured-text passage was returned."
+        )
+        assert pc.is_blocked(state)
+    finally:
+        adapter.close()
+
+
+def test_explicit_unusable_binding_preserves_capture_failure_provenance(
+    tmp_path: Path,
+) -> None:
+    discovery = pc.parse_audit(_audit(_claim()), PLAN)
+    item = discovery.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, None, None, None, None, None, None,
+        error="capture timed out\nwhile reading response",
+    )}
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": False,
+            "location": None, "passage": None,
+        }],
+    })
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        audit, reviews = adapter._bind_indexed(
+            "session", discovery, captures, "m", "high", {},
+        )
+        assert len(reviews) == 1
+        state = pc.reconcile(
+            {}, audit, lineage_id="capture-failed", round_no=1, plan_text=PLAN,
+        )
+        record = next(iter(state["claims"].values()))
+        assert record["verdict"] == "unverified"
+        assert record["evidence"][0]["relation"] == "context"
+        assert record["evidence"][0]["location"] == "Server capture unavailable"
+        assert record["evidence"][0]["quote"] == (
+            "Server capture unavailable: capture timed out while reading response"
+        )
+        assert pc.is_blocked(state)
+    finally:
+        adapter.close()
+
+
+def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
+    artifact = json.loads(
+        (Path(__file__).parents[1] / "docs" / "claim_binding_acceptance_2026-08-14.json")
+        .read_text(encoding="utf-8")
+    )
+    assert artifact["implementation_commit"] == (
+        "0479336c647b026f023c8ee0a1a514f1148c229a"
+    )
+    assert artifact["provider"] == {
+        "engine": "codex",
+        "cli_version": "0.144.6",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "web_discovery": True,
+        "binding_web_access": False,
+        "attestation_web_access": False,
+    }
+    assert artifact["claim_phase"]["counts"] == {
+        "supported": 1, "refuted": 0, "unverified": 0,
+    }
+    assert artifact["claim_phase"]["debt"] is None
+    assert artifact["claim_phase"]["claim"]["verdict"] == "supported"
+    assert len(artifact["claim_phase"]["claim"]["evidence"][
+        "captured_text_sha256"
+    ]) == 64
+    assert [row["role"] for row in artifact["attempts"]] == [
+        "claim-discovery", "claim-binding", "claim-attestation",
+    ]
+    assert all(row["outcome"] == "completed" for row in artifact["attempts"])
+    assert artifact["attempts"][0]["session_ref"] == artifact["attempts"][1][
+        "session_ref"
+    ]
+    assert artifact["durable_artifacts"]["tool_returncode"] == 0
+    assert artifact["durable_artifacts"]["tool_error"] is False
+    controlled = artifact["controlled_omission"]
+    assert controlled["implementation_commit"] == (
+        "8e24587536ebf624bed93b3095bcaa967198ebae"
+    )
+    assert controlled["omitted_keys"] == [[1, 0]]
+    assert [row["kind"] for row in controlled["attempts"]] == [
+        "signed-in-provider", "controlled-omission", "signed-in-provider",
+    ]
+    assert controlled["durable_state"]["supported_claim"]["verdict"] == "supported"
+    assert controlled["durable_state"]["omitted_claim"] == {
+        "claim_id": "C-01c0486e7a",
+        "verdict": "unverified",
+        "relation": "context",
+        "location": "No binding row returned for captured source",
+        "quote": "The model omitted this captured-source binding.",
+        "capture_attestations": [],
+    }
+    assert controlled["durable_state"]["blocked"] is True
+    assert artifact["measurements"]["production_diff"] == {
+        "files": [
+            "src/paranoia_local/handlers.py",
+            "src/paranoia_local/plan_claims.py",
+        ],
+        "added_lines": 48,
+        "deleted_lines": 11,
+        "net_lines": 37,
+    }
+    final = artifact["final_revision_acceptance"]
+    assert final["implementation_commit"] == (
+        "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb"
+    )
+    assert final["model_calls"] == 3
+    assert final["omitted_keys"] == [[1, 0]]
+    assert final["capture_failed_keys"] == [[2, 0]]
+    assert [row["kind"] for row in final["attempts"]] == [
+        "signed-in-provider", "controlled-partial-binding", "signed-in-provider",
+    ]
+    assert [row["verdict"] for row in final["durable_state"]["claims"]] == [
+        "supported", "unverified", "unverified",
+    ]
+    assert final["durable_state"]["claims"][1]["location"] == (
+        "No binding row returned for captured source"
+    )
+    assert final["durable_state"]["claims"][2]["location"] == (
+        "Server capture unavailable"
+    )
+    assert final["durable_state"]["blocked"] is True
+    invalid = artifact["invalid_attestation_acceptance"]
+    assert invalid["implementation_commit"] == (
+        "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb"
+    )
+    assert invalid["expected_parser_error"] == (
+        "attestation row indices must be integers"
+    )
+    assert [row["kind"] for row in invalid["attempts"]] == [
+        "signed-in-provider", "signed-in-provider", "controlled-boolean-identity",
+    ]
+    assert invalid["durable_state"]["blocked"] is True
+    assert invalid["durable_state"]["claim_count"] == 0
+    assert invalid["durable_state"]["debt"]["raw_sha256"] == invalid[
+        "controlled_attestation_response_sha256"
+    ]
+    assert invalid["durable_state"]["debt"]["rejected_identity"] == {
+        "claim_index": True, "evidence_index": 0,
+    }
 
 
 @pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [

@@ -1,0 +1,286 @@
+{
+  "acceptance_kind": "indexed-claim-binding-current-revision",
+  "recorded_at": "2026-08-14T05:19:22+01:00",
+  "implementation_commit": "0479336c647b026f023c8ee0a1a514f1148c229a",
+  "provider": {
+    "engine": "codex",
+    "cli_version": "0.144.6",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "web_discovery": true,
+    "binding_web_access": false,
+    "attestation_web_access": false
+  },
+  "fixture": {
+    "repository_head": "fa3c9e6320e7069f7b70c3f9143780a9bfe3bcf8",
+    "plan_digest": "76ce6d80bbe0eb86",
+    "lineage": "claim-binding-live-acceptance-20260814",
+    "round": 1
+  },
+  "claim_phase": {
+    "status": "parsed 1 new + 0 targeted retained + 0 frozen",
+    "model_calls": 3,
+    "duration_ms": 39877,
+    "counts": {
+      "supported": 1,
+      "refuted": 0,
+      "unverified": 0
+    },
+    "debt": null,
+    "claim": {
+      "claim_id": "C-203733f1cc",
+      "anchor": "Python 3.11.0 was released on October 24, 2022.",
+      "proposition": "Python 3.11.0 was released on October 24, 2022.",
+      "verdict": "supported",
+      "evidence": {
+        "url": "https://www.python.org/downloads/release/python-3110/",
+        "publisher": "Python Software Foundation",
+        "source_kind": "primary",
+        "location": "Lines 1–2, release-date field and stable-release heading",
+        "passage": "Release date: Oct. 24, 2022 This is the stable release of Python 3.11.0",
+        "relation": "supports_claim",
+        "captured_text_sha256": "a229306f4b004059a6e046f6d62cc112b4ad327011c2448b52b596c454a28f3a"
+      },
+      "cold_attestation": {
+        "publisher_authority": true,
+        "authority_reason": "The Python Software Foundation operates Python's official website and governs the official release record for Python 3.11.0.",
+        "passage_entailment": true,
+        "entailment_reason": "The passage explicitly identifies Python 3.11.0 as the stable release and gives its release date as Oct. 24, 2022, directly supporting the proposition."
+      },
+      "verified_round": 1
+    }
+  },
+  "attempts": [
+    {
+      "role": "claim-discovery",
+      "session_ref": "019ffe7b-9c3a-7661-ad30-c619e011df8c",
+      "outcome": "completed",
+      "response_sha256": "bc8be9f082dda5cd824784d18dcf326d0c4c1471680e7f2052a88895029a52ae",
+      "input_tokens": 50524,
+      "cached_input_tokens": 30976,
+      "output_tokens": 958,
+      "reasoning_output_tokens": 545
+    },
+    {
+      "role": "claim-binding",
+      "session_ref": "019ffe7b-9c3a-7661-ad30-c619e011df8c",
+      "outcome": "completed",
+      "response_sha256": "bdd0959dbb4976c52f4be1e9716aa653b0245131dc96f5488c5237496f89b669",
+      "input_tokens": 71523,
+      "cached_input_tokens": 33792,
+      "output_tokens": 1124,
+      "reasoning_output_tokens": 629
+    },
+    {
+      "role": "claim-attestation",
+      "session_ref": "019ffe7c-1f73-72c1-99c5-459ab137ba99",
+      "outcome": "completed",
+      "response_sha256": "d6fc8d22e885038c374f298e16b251e4418024ed1a3b56883ff4d5cf4e257d15",
+      "input_tokens": 8989,
+      "cached_input_tokens": 0,
+      "output_tokens": 114,
+      "reasoning_output_tokens": 0
+    }
+  ],
+  "durable_artifacts": {
+    "lineage_state_sha256": "89aed308aa56b0335bf993f6ec9b2e0e19966774da14f674d15dca508402c1b5",
+    "audit_log_sha256": "2f6d49076200c99b9f81c8b99ca7ffd4b533f16d8952601b993a3e2c36145f9f",
+    "tool_returncode": 0,
+    "tool_error": false
+  },
+  "controlled_omission": {
+    "recorded_at": "2026-08-14T05:32:27+01:00",
+    "implementation_commit": "8e24587536ebf624bed93b3095bcaa967198ebae",
+    "kind": "production-backed controlled model boundary",
+    "control": "After signed-in Codex discovery and real server capture, the harness returned the production binding parser one valid captured-text row and deliberately omitted expected key [1,0]. Signed-in Codex cold attestation and canonical reconciliation then ran unchanged.",
+    "duration_ms": 38016,
+    "omitted_keys": [[1, 0]],
+    "binding_response_sha256": "2a4161895b8158001d35ce847e3667104861b2cd394ff9a9e4df1d71f475d0f9",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffe8a-16f8-7733-9f24-21d304c4f5d3",
+        "response_sha256": "eb3b64042f6933f27a62dd267abcc6ebbc38d978fabb5acb703125386a9e8fa5"
+      },
+      {
+        "role": "claim-binding",
+        "kind": "controlled-omission",
+        "session_ref": "019ffe8a-16f8-7733-9f24-21d304c4f5d3",
+        "response_sha256": "2a4161895b8158001d35ce847e3667104861b2cd394ff9a9e4df1d71f475d0f9"
+      },
+      {
+        "role": "claim-attestation",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffe8a-92be-7130-ad4e-d517919b8fa8",
+        "response_sha256": "6e143a646ac0eba6b7d809c9a554e3b4bf34b7d4b18ce45e8faf4f8bdb8a6fad"
+      }
+    ],
+    "durable_state": {
+      "state_sha256": "065fc063af5f9085e317172d1471894e7105137e5bac58862e7c93f766dd1581",
+      "blocked": true,
+      "debt": null,
+      "supported_claim": {
+        "claim_id": "C-875be98074",
+        "verdict": "supported",
+        "captured_text_sha256": "a229306f4b004059a6e046f6d62cc112b4ad327011c2448b52b596c454a28f3a",
+        "publisher_authority": true,
+        "passage_entailment": true
+      },
+      "omitted_claim": {
+        "claim_id": "C-01c0486e7a",
+        "verdict": "unverified",
+        "relation": "context",
+        "location": "No binding row returned for captured source",
+        "quote": "The model omitted this captured-source binding.",
+        "capture_attestations": []
+      }
+    }
+  },
+  "final_revision_acceptance": {
+    "recorded_at": "2026-08-14T06:05:06+01:00",
+    "implementation_commit": "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb",
+    "kind": "production-backed controlled three-outcome binding run",
+    "control": "Signed-in Codex discovered three claims and the server captured all three official pages. The controlled model boundary returned one valid binding, omitted key [1,0], and returned usable:false for key [2,0] after deterministically replacing that real capture with a failed Capture. Signed-in Codex cold attestation, canonical reconciliation, and atomic lineage persistence then ran unchanged.",
+    "model_calls": 3,
+    "duration_ms": 42151,
+    "omitted_keys": [[1, 0]],
+    "capture_failed_keys": [[2, 0]],
+    "binding_response_sha256": "84ad675552ecbf66b79410d177a37255f3c13fe96e360044fe19acabeeae6202",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffea8-183a-7ca2-9b28-90832fe26586",
+        "response_sha256": "626db8fe724cf4c20a5546a2cdaf3acbea94a58f4efe44114fa75bcfd971223b",
+        "input_tokens": 65706,
+        "cached_input_tokens": 38144,
+        "output_tokens": 1427,
+        "reasoning_output_tokens": 565
+      },
+      {
+        "role": "claim-binding",
+        "kind": "controlled-partial-binding",
+        "session_ref": "019ffea8-183a-7ca2-9b28-90832fe26586",
+        "response_sha256": "84ad675552ecbf66b79410d177a37255f3c13fe96e360044fe19acabeeae6202"
+      },
+      {
+        "role": "claim-attestation",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffea8-a1aa-7460-bf9c-824765b9e06f",
+        "response_sha256": "82df9eb7fcd26832ed2055caf948bb804288f969fcc610b808bab0989f7cc069",
+        "input_tokens": 8990,
+        "cached_input_tokens": 2816,
+        "output_tokens": 121,
+        "reasoning_output_tokens": 0
+      }
+    ],
+    "durable_state": {
+      "state_sha256": "22147a080652dbcdd7269f3db6a9ef8d5848609d178618281b36f4f87e1482b9",
+      "blocked": true,
+      "debt": null,
+      "claims": [
+        {
+          "claim_id": "C-76a83a1cd5",
+          "verdict": "supported",
+          "relation": "supports_claim",
+          "captured_text_sha256": "6de6e0bddabfb7a291003b98b69fdcd1c131a7edf2320355ffeca8aa88289a39",
+          "publisher_authority": true,
+          "passage_entailment": true
+        },
+        {
+          "claim_id": "C-370b619781",
+          "verdict": "unverified",
+          "relation": "context",
+          "location": "No binding row returned for captured source",
+          "quote": "The model omitted this captured-source binding.",
+          "capture_attestations": []
+        },
+        {
+          "claim_id": "C-43a88af1f4",
+          "verdict": "unverified",
+          "relation": "context",
+          "location": "Server capture unavailable",
+          "quote": "Server capture unavailable: controlled capture failure after real server capture",
+          "capture_attestations": []
+        }
+      ]
+    }
+  },
+  "invalid_attestation_acceptance": {
+    "recorded_at": "2026-08-14T06:11:47+01:00",
+    "implementation_commit": "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb",
+    "kind": "production-backed controlled invalid-attestation run",
+    "control": "Signed-in Codex discovered and bound two official claims from real server captures. The controlled cold-attestation boundary returned one exact row and one Boolean claim_index alias. The production parser and outer claim lifecycle then ran unchanged.",
+    "model_calls": 3,
+    "signed_in_model_calls": 2,
+    "duration_ms": 38555,
+    "controlled_attestation_response_sha256": "9a68aba2dff53f0ae3a5e289d7ee42a1dff00c4b4caede500579f8b86eb6f452",
+    "expected_parser_error": "attestation row indices must be integers",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffeae-3b5a-7252-967d-a656fbbce275",
+        "response_sha256": "56327bad95733163d4d23438fd01c1cabf3726c4630e539458d495ac3863946c",
+        "input_tokens": 33496,
+        "cached_input_tokens": 2816,
+        "output_tokens": 906,
+        "reasoning_output_tokens": 358
+      },
+      {
+        "role": "claim-binding",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffeae-3b5a-7252-967d-a656fbbce275",
+        "response_sha256": "be9b385445e7c2120ab8d38757af94954198ec66559caf76583f5e062c15997a",
+        "input_tokens": 55787,
+        "cached_input_tokens": 5632,
+        "output_tokens": 1076,
+        "reasoning_output_tokens": 402
+      },
+      {
+        "role": "claim-attestation",
+        "kind": "controlled-boolean-identity",
+        "session_ref": "controlled-invalid-attestation",
+        "response_sha256": "9a68aba2dff53f0ae3a5e289d7ee42a1dff00c4b4caede500579f8b86eb6f452"
+      }
+    ],
+    "durable_state": {
+      "state_sha256": "446c518435713007689bef7f5eb2b47fed9e5656578eb44a3a7b672b333d18bb",
+      "status": "failed",
+      "blocked": true,
+      "claim_count": 0,
+      "debt": {
+        "reason": "claim-audit reviewer failed (exit 0)",
+        "round": 1,
+        "returncode": 0,
+        "raw_sha256": "9a68aba2dff53f0ae3a5e289d7ee42a1dff00c4b4caede500579f8b86eb6f452",
+        "rejected_identity": {
+          "claim_index": true,
+          "evidence_index": 0
+        }
+      }
+    }
+  },
+  "measurements": {
+    "production_diff": {
+      "files": [
+        "src/paranoia_local/handlers.py",
+        "src/paranoia_local/plan_claims.py"
+      ],
+      "added_lines": 48,
+      "deleted_lines": 11,
+      "net_lines": 37
+    },
+    "largest_production_modules": [
+      {"path": "src/paranoia_local/handlers.py", "lines": 2820},
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2768},
+      {"path": "src/paranoia_local/plan_claims.py", "lines": 1417}
+    ]
+  },
+  "scope": {
+    "proved": "The committed production path completed signed-in discovery, server capture, indexed binding with browsing disabled, exact-identity cold attestation, stable-ID reconciliation, and durable claim-state persistence. The final controlled run on commit ac50c47 exercised valid, omitted, and capture-failed explicit-unusable outcomes together.",
+    "omission_path": "The ordinary live provider returned its sole requested row. A separate controlled production-backed run on commit 8e24587 used signed-in discovery and cold attestation plus real server captures, deliberately omitted expected key [1,0] at the model boundary, and durably retained one supported sibling while blocking the omitted claim as unverified.",
+    "structural_review": "The disposable fixture plan opened unrelated structural debt after claim settlement; this artifact is claim-path acceptance, not whole-plan convergence."
+  }
+}
