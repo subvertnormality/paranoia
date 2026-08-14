@@ -209,13 +209,13 @@ The artifact records the +48/-11 production diff and the three largest productio
 disposable plan later opened unrelated structural findings, so the artifact claims current-revision
 claim-path acceptance, not whole-plan convergence.
 
-The final acceptance run is bound to behavior commit `31149de`. Signed-in Codex discovered three
+The final acceptance run is bound to behavior commit `ac50c47`. Signed-in Codex discovered three
 official Python release claims and the server captured all three pages. A controlled production
 model boundary preserved one valid binding, omitted key `(1,0)`, and returned `usable:false` for
 key `(2,0)` after replacing that real capture with a deterministic failed-capture record. Signed-in
 cold attestation and canonical atomic persistence then produced one supported claim, one omitted
 `unverified` claim, and one capture-failed `unverified` claim with distinct provenance. The run used
-three model calls and 48.010 seconds; its sessions, response hashes, state hash, and exact durable
+three model calls and 42.151 seconds; its sessions, response hashes, state hash, and exact durable
 outcomes are retained in the artifact.
 
 The current Codex acceptance record is

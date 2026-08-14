@@ -138,12 +138,12 @@
     }
   },
   "final_revision_acceptance": {
-    "recorded_at": "2026-08-14T05:50:32+01:00",
-    "implementation_commit": "31149deb8570863f874ef363119064e487212cd2",
+    "recorded_at": "2026-08-14T06:05:06+01:00",
+    "implementation_commit": "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb",
     "kind": "production-backed controlled three-outcome binding run",
     "control": "Signed-in Codex discovered three claims and the server captured all three official pages. The controlled model boundary returned one valid binding, omitted key [1,0], and returned usable:false for key [2,0] after deterministically replacing that real capture with a failed Capture. Signed-in Codex cold attestation, canonical reconciliation, and atomic lineage persistence then ran unchanged.",
     "model_calls": 3,
-    "duration_ms": 48010,
+    "duration_ms": 42151,
     "omitted_keys": [[1, 0]],
     "capture_failed_keys": [[2, 0]],
     "binding_response_sha256": "84ad675552ecbf66b79410d177a37255f3c13fe96e360044fe19acabeeae6202",
@@ -151,32 +151,32 @@
       {
         "role": "claim-discovery",
         "kind": "signed-in-provider",
-        "session_ref": "019ffe9a-ad1d-73c2-8b38-0529db530901",
-        "response_sha256": "a1e77fd72062101634e67c03dd2edc8c3c91819e7e1b9d57efb4de6dfd12a987",
-        "input_tokens": 65408,
-        "cached_input_tokens": 32256,
-        "output_tokens": 1730,
-        "reasoning_output_tokens": 860
+        "session_ref": "019ffea8-183a-7ca2-9b28-90832fe26586",
+        "response_sha256": "626db8fe724cf4c20a5546a2cdaf3acbea94a58f4efe44114fa75bcfd971223b",
+        "input_tokens": 65706,
+        "cached_input_tokens": 38144,
+        "output_tokens": 1427,
+        "reasoning_output_tokens": 565
       },
       {
         "role": "claim-binding",
         "kind": "controlled-partial-binding",
-        "session_ref": "019ffe9a-ad1d-73c2-8b38-0529db530901",
+        "session_ref": "019ffea8-183a-7ca2-9b28-90832fe26586",
         "response_sha256": "84ad675552ecbf66b79410d177a37255f3c13fe96e360044fe19acabeeae6202"
       },
       {
         "role": "claim-attestation",
         "kind": "signed-in-provider",
-        "session_ref": "019ffe9b-4f87-7482-9132-a58dc7565198",
-        "response_sha256": "a0df9f8f08f59d97e9888aaa7644896cf48ba94442938c12b2f3377faf721cdc",
-        "input_tokens": 8975,
+        "session_ref": "019ffea8-a1aa-7460-bf9c-824765b9e06f",
+        "response_sha256": "82df9eb7fcd26832ed2055caf948bb804288f969fcc610b808bab0989f7cc069",
+        "input_tokens": 8990,
         "cached_input_tokens": 2816,
-        "output_tokens": 113,
+        "output_tokens": 121,
         "reasoning_output_tokens": 0
       }
     ],
     "durable_state": {
-      "state_sha256": "e75a2a24ed6ea2cd7f881a59e88bef97aa5036e9ea5ce5186d98eac8a1b2f2c0",
+      "state_sha256": "22147a080652dbcdd7269f3db6a9ef8d5848609d178618281b36f4f87e1482b9",
       "blocked": true,
       "debt": null,
       "claims": [
@@ -224,7 +224,7 @@
     ]
   },
   "scope": {
-    "proved": "The committed production path completed signed-in discovery, server capture, indexed binding with browsing disabled, cold attestation, stable-ID reconciliation, and durable claim-state persistence. The final controlled run on commit 31149de exercised valid, omitted, and capture-failed explicit-unusable outcomes together.",
+    "proved": "The committed production path completed signed-in discovery, server capture, indexed binding with browsing disabled, exact-identity cold attestation, stable-ID reconciliation, and durable claim-state persistence. The final controlled run on commit ac50c47 exercised valid, omitted, and capture-failed explicit-unusable outcomes together.",
     "omission_path": "The ordinary live provider returned its sole requested row. A separate controlled production-backed run on commit 8e24587 used signed-in discovery and cold attestation plus real server captures, deliberately omitted expected key [1,0] at the model boundary, and durably retained one supported sibling while blocking the omitted claim as unverified.",
     "structural_review": "The disposable fixture plan opened unrelated structural debt after claim settlement; this artifact is claim-path acceptance, not whole-plan convergence."
   }

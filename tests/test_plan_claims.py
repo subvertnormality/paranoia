@@ -1993,7 +1993,7 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
     }
     final = artifact["final_revision_acceptance"]
     assert final["implementation_commit"] == (
-        "31149deb8570863f874ef363119064e487212cd2"
+        "ac50c479dd536ba6d3e3e2253e9af321ba62fbdb"
     )
     assert final["model_calls"] == 3
     assert final["omitted_keys"] == [[1, 0]]
