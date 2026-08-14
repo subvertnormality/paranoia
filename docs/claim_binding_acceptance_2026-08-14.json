@@ -1,0 +1,96 @@
+{
+  "acceptance_kind": "indexed-claim-binding-current-revision",
+  "recorded_at": "2026-08-14T05:19:22+01:00",
+  "implementation_commit": "0479336c647b026f023c8ee0a1a514f1148c229a",
+  "provider": {
+    "engine": "codex",
+    "cli_version": "0.144.6",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "web_discovery": true,
+    "binding_web_access": false,
+    "attestation_web_access": false
+  },
+  "fixture": {
+    "repository_head": "fa3c9e6320e7069f7b70c3f9143780a9bfe3bcf8",
+    "plan_digest": "76ce6d80bbe0eb86",
+    "lineage": "claim-binding-live-acceptance-20260814",
+    "round": 1
+  },
+  "claim_phase": {
+    "status": "parsed 1 new + 0 targeted retained + 0 frozen",
+    "model_calls": 3,
+    "duration_ms": 39877,
+    "counts": {
+      "supported": 1,
+      "refuted": 0,
+      "unverified": 0
+    },
+    "debt": null,
+    "claim": {
+      "claim_id": "C-203733f1cc",
+      "anchor": "Python 3.11.0 was released on October 24, 2022.",
+      "proposition": "Python 3.11.0 was released on October 24, 2022.",
+      "verdict": "supported",
+      "evidence": {
+        "url": "https://www.python.org/downloads/release/python-3110/",
+        "publisher": "Python Software Foundation",
+        "source_kind": "primary",
+        "location": "Lines 1–2, release-date field and stable-release heading",
+        "passage": "Release date: Oct. 24, 2022 This is the stable release of Python 3.11.0",
+        "relation": "supports_claim",
+        "captured_text_sha256": "a229306f4b004059a6e046f6d62cc112b4ad327011c2448b52b596c454a28f3a"
+      },
+      "cold_attestation": {
+        "publisher_authority": true,
+        "authority_reason": "The Python Software Foundation operates Python's official website and governs the official release record for Python 3.11.0.",
+        "passage_entailment": true,
+        "entailment_reason": "The passage explicitly identifies Python 3.11.0 as the stable release and gives its release date as Oct. 24, 2022, directly supporting the proposition."
+      },
+      "verified_round": 1
+    }
+  },
+  "attempts": [
+    {
+      "role": "claim-discovery",
+      "session_ref": "019ffe7b-9c3a-7661-ad30-c619e011df8c",
+      "outcome": "completed",
+      "response_sha256": "bc8be9f082dda5cd824784d18dcf326d0c4c1471680e7f2052a88895029a52ae",
+      "input_tokens": 50524,
+      "cached_input_tokens": 30976,
+      "output_tokens": 958,
+      "reasoning_output_tokens": 545
+    },
+    {
+      "role": "claim-binding",
+      "session_ref": "019ffe7b-9c3a-7661-ad30-c619e011df8c",
+      "outcome": "completed",
+      "response_sha256": "bdd0959dbb4976c52f4be1e9716aa653b0245131dc96f5488c5237496f89b669",
+      "input_tokens": 71523,
+      "cached_input_tokens": 33792,
+      "output_tokens": 1124,
+      "reasoning_output_tokens": 629
+    },
+    {
+      "role": "claim-attestation",
+      "session_ref": "019ffe7c-1f73-72c1-99c5-459ab137ba99",
+      "outcome": "completed",
+      "response_sha256": "d6fc8d22e885038c374f298e16b251e4418024ed1a3b56883ff4d5cf4e257d15",
+      "input_tokens": 8989,
+      "cached_input_tokens": 0,
+      "output_tokens": 114,
+      "reasoning_output_tokens": 0
+    }
+  ],
+  "durable_artifacts": {
+    "lineage_state_sha256": "89aed308aa56b0335bf993f6ec9b2e0e19966774da14f674d15dca508402c1b5",
+    "audit_log_sha256": "2f6d49076200c99b9f81c8b99ca7ffd4b533f16d8952601b993a3e2c36145f9f",
+    "tool_returncode": 0,
+    "tool_error": false
+  },
+  "scope": {
+    "proved": "The committed production path completed signed-in discovery, server capture, indexed binding with browsing disabled, cold attestation, stable-ID reconciliation, and durable claim-state persistence.",
+    "omission_path": "The live provider returned its sole requested row. Omission degradation is established by the executable full-lifecycle regression, not claimed from this live sample.",
+    "structural_review": "The disposable fixture plan opened unrelated structural debt after claim settlement; this artifact is claim-path acceptance, not whole-plan convergence."
+  }
+}

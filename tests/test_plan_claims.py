@@ -1720,6 +1720,43 @@ def test_binding_omission_survives_capture_attestation_and_reconciliation(
         adapter.close()
 
 
+def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
+    artifact = json.loads(
+        (Path(__file__).parents[1] / "docs" / "claim_binding_acceptance_2026-08-14.json")
+        .read_text(encoding="utf-8")
+    )
+    assert artifact["implementation_commit"] == (
+        "0479336c647b026f023c8ee0a1a514f1148c229a"
+    )
+    assert artifact["provider"] == {
+        "engine": "codex",
+        "cli_version": "0.144.6",
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "web_discovery": True,
+        "binding_web_access": False,
+        "attestation_web_access": False,
+    }
+    assert artifact["claim_phase"]["counts"] == {
+        "supported": 1, "refuted": 0, "unverified": 0,
+    }
+    assert artifact["claim_phase"]["debt"] is None
+    assert artifact["claim_phase"]["claim"]["verdict"] == "supported"
+    assert len(artifact["claim_phase"]["claim"]["evidence"][
+        "captured_text_sha256"
+    ]) == 64
+    assert [row["role"] for row in artifact["attempts"]] == [
+        "claim-discovery", "claim-binding", "claim-attestation",
+    ]
+    assert all(row["outcome"] == "completed" for row in artifact["attempts"])
+    assert artifact["attempts"][0]["session_ref"] == artifact["attempts"][1][
+        "session_ref"
+    ]
+    assert artifact["durable_artifacts"]["tool_returncode"] == 0
+    assert artifact["durable_artifacts"]["tool_error"] is False
+    assert "not claimed from this live sample" in artifact["scope"]["omission_path"]
+
+
 @pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [
     (False, 124, "timed out after 420s"),
     (True, 127, "executable not found: codex"),

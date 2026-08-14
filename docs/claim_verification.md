@@ -194,6 +194,17 @@ failure does not restart research.
 
 ## Recorded real acceptance
 
+The indexed binding correction is recorded in
+[`claim_binding_acceptance_2026-08-14.json`](claim_binding_acceptance_2026-08-14.json).
+On implementation commit `0479336`, a fresh signed-in `critique_plan` run completed discovery,
+server capture, tool-less indexed binding, independent cold attestation, stable-ID reconciliation,
+and durable persistence for one official Python Software Foundation claim in 39.877 seconds and
+three claim-model calls. The persisted claim count is one supported, zero refuted, zero unverified,
+with no claim debt. The live provider returned the requested row; the separate executable
+full-lifecycle regression proves that an omitted row becomes neutral context and blocks only its
+affected claim as `unverified`. The disposable plan later opened unrelated structural findings, so
+the artifact claims current-revision claim-path acceptance, not whole-plan convergence.
+
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an
