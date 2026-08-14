@@ -1800,7 +1800,30 @@ def test_recorded_claim_binding_acceptance_is_narrow_and_complete() -> None:
     ]
     assert artifact["durable_artifacts"]["tool_returncode"] == 0
     assert artifact["durable_artifacts"]["tool_error"] is False
-    assert "not claimed from this live sample" in artifact["scope"]["omission_path"]
+    controlled = artifact["controlled_omission"]
+    assert controlled["implementation_commit"] == (
+        "8e24587536ebf624bed93b3095bcaa967198ebae"
+    )
+    assert controlled["omitted_keys"] == [[1, 0]]
+    assert [row["kind"] for row in controlled["attempts"]] == [
+        "signed-in-provider", "controlled-omission", "signed-in-provider",
+    ]
+    assert controlled["durable_state"]["supported_claim"]["verdict"] == "supported"
+    assert controlled["durable_state"]["omitted_claim"] == {
+        "claim_id": "C-01c0486e7a",
+        "verdict": "unverified",
+        "relation": "context",
+        "location": "No binding row returned for captured source",
+        "quote": "The model omitted this captured-source binding.",
+        "capture_attestations": [],
+    }
+    assert controlled["durable_state"]["blocked"] is True
+    assert artifact["measurements"]["production_diff"] == {
+        "files": ["src/paranoia_local/handlers.py"],
+        "added_lines": 35,
+        "deleted_lines": 9,
+        "net_lines": 26,
+    }
 
 
 @pytest.mark.parametrize(("correction", "returncode", "diagnostic"), [

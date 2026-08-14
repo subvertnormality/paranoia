@@ -200,10 +200,13 @@ On implementation commit `0479336`, a fresh signed-in `critique_plan` run comple
 server capture, tool-less indexed binding, independent cold attestation, stable-ID reconciliation,
 and durable persistence for one official Python Software Foundation claim in 39.877 seconds and
 three claim-model calls. The persisted claim count is one supported, zero refuted, zero unverified,
-with no claim debt. The live provider returned the requested row; the separate executable
-full-lifecycle regression proves that an omitted row becomes neutral context and blocks only its
-affected claim as `unverified`. The disposable plan later opened unrelated structural findings, so
-the artifact claims current-revision claim-path acceptance, not whole-plan convergence.
+with no claim debt. A second production-backed controlled run on commit `8e24587` used signed-in
+Codex discovery and cold attestation plus real server captures, deliberately omitted expected key
+`(1,0)` at the model boundary, and durably produced one supported claim plus one context-only
+`unverified` claim. Explicit `usable:false` and omission also have separate durable provenance.
+The artifact records the +35/-9 production diff and the three largest production modules. The
+disposable plan later opened unrelated structural findings, so the artifact claims current-revision
+claim-path acceptance, not whole-plan convergence.
 
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).

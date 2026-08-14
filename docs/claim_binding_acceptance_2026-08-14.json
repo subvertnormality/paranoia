@@ -88,9 +88,71 @@
     "tool_returncode": 0,
     "tool_error": false
   },
+  "controlled_omission": {
+    "recorded_at": "2026-08-14T05:32:27+01:00",
+    "implementation_commit": "8e24587536ebf624bed93b3095bcaa967198ebae",
+    "kind": "production-backed controlled model boundary",
+    "control": "After signed-in Codex discovery and real server capture, the harness returned the production binding parser one valid captured-text row and deliberately omitted expected key [1,0]. Signed-in Codex cold attestation and canonical reconciliation then ran unchanged.",
+    "duration_ms": 38016,
+    "omitted_keys": [[1, 0]],
+    "binding_response_sha256": "2a4161895b8158001d35ce847e3667104861b2cd394ff9a9e4df1d71f475d0f9",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffe8a-16f8-7733-9f24-21d304c4f5d3",
+        "response_sha256": "eb3b64042f6933f27a62dd267abcc6ebbc38d978fabb5acb703125386a9e8fa5"
+      },
+      {
+        "role": "claim-binding",
+        "kind": "controlled-omission",
+        "session_ref": "019ffe8a-16f8-7733-9f24-21d304c4f5d3",
+        "response_sha256": "2a4161895b8158001d35ce847e3667104861b2cd394ff9a9e4df1d71f475d0f9"
+      },
+      {
+        "role": "claim-attestation",
+        "kind": "signed-in-provider",
+        "session_ref": "019ffe8a-92be-7130-ad4e-d517919b8fa8",
+        "response_sha256": "6e143a646ac0eba6b7d809c9a554e3b4bf34b7d4b18ce45e8faf4f8bdb8a6fad"
+      }
+    ],
+    "durable_state": {
+      "state_sha256": "065fc063af5f9085e317172d1471894e7105137e5bac58862e7c93f766dd1581",
+      "blocked": true,
+      "debt": null,
+      "supported_claim": {
+        "claim_id": "C-875be98074",
+        "verdict": "supported",
+        "captured_text_sha256": "a229306f4b004059a6e046f6d62cc112b4ad327011c2448b52b596c454a28f3a",
+        "publisher_authority": true,
+        "passage_entailment": true
+      },
+      "omitted_claim": {
+        "claim_id": "C-01c0486e7a",
+        "verdict": "unverified",
+        "relation": "context",
+        "location": "No binding row returned for captured source",
+        "quote": "The model omitted this captured-source binding.",
+        "capture_attestations": []
+      }
+    }
+  },
+  "measurements": {
+    "production_diff": {
+      "files": ["src/paranoia_local/handlers.py"],
+      "added_lines": 35,
+      "deleted_lines": 9,
+      "net_lines": 26
+    },
+    "largest_production_modules": [
+      {"path": "src/paranoia_local/handlers.py", "lines": 2809},
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2768},
+      {"path": "src/paranoia_local/plan_claims.py", "lines": 1417}
+    ]
+  },
   "scope": {
     "proved": "The committed production path completed signed-in discovery, server capture, indexed binding with browsing disabled, cold attestation, stable-ID reconciliation, and durable claim-state persistence.",
-    "omission_path": "The live provider returned its sole requested row. Omission degradation is established by the executable full-lifecycle regression, not claimed from this live sample.",
+    "omission_path": "The ordinary live provider returned its sole requested row. A separate controlled production-backed run on commit 8e24587 used signed-in discovery and cold attestation plus real server captures, deliberately omitted expected key [1,0] at the model boundary, and durably retained one supported sibling while blocking the omitted claim as unverified.",
     "structural_review": "The disposable fixture plan opened unrelated structural debt after claim settlement; this artifact is claim-path acceptance, not whole-plan convergence."
   }
 }
