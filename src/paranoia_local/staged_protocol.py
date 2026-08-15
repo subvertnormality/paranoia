@@ -446,10 +446,15 @@ def _validate_coverage(
         issues.extend(found)
 
 
-def parse_lane(text: str, *, mode: str, lane: str,
-               class_ids: Sequence[str] = (),
-               active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
-    value = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+def decode_lane(text: str, *, mode: str, lane: str) -> dict[str, Any]:
+    """Decode a lane response before independent semantic/anchor validation."""
+    return decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+
+
+def validate_lane_value(value: dict[str, Any], *, lane: str,
+                        class_ids: Sequence[str] = (),
+                        active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
+    """Validate lane-owned relationships on an already schema-valid object."""
     issues: list[str] = []
     findings = _unique(value["findings"], "id", "findings", issues)
     _validate_coverage(value["coverage"], findings, issues)
@@ -487,6 +492,15 @@ def parse_lane(text: str, *, mode: str, lane: str,
             )
     _raise_semantic_issues(issues)
     return value
+
+
+def parse_lane(text: str, *, mode: str, lane: str,
+               class_ids: Sequence[str] = (),
+               active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
+    value = decode_lane(text, mode=mode, lane=lane)
+    return validate_lane_value(
+        value, lane=lane, class_ids=class_ids, active_classes=active_classes,
+    )
 
 
 def decode_decision(text: str, *, mode: str, role: str) -> dict[str, Any]:
@@ -762,12 +776,6 @@ def materialize_decision_value(
                         if finding["id"] == matches[0]
                     )
             outcomes[cid] = outcome
-        expected_classes = set(assessment_verdicts or {})
-        if set(outcomes) != expected_classes:
-            issues.append(
-                f"/governing_findings: derived assessments must cover exactly "
-                f"{sorted(expected_classes)}; got {sorted(outcomes)}"
-            )
     else:
         outcome_pointers = {
             row["class_id"]: f"/class_outcomes/{index}"

@@ -144,7 +144,7 @@ final remain model-owned.
 - `scripts/run_staged_protocol_mutation_checks.py`: add owned mutants for census-schema exclusion
   of authored `class_outcomes`, integrity-lane rejection of satisfied assessments for unproven
   mechanized classes, cited-source/class cardinality, exact manifest-verdict projection, exact
-  manifest-evidence projection, and derived assessment completeness. These six mutants exhaust the
+  manifest-evidence projection, and integrity-lane assessment completeness. These six mutants exhaust the
   new trusted schema/lane/derivation controls; retain the existing differential corpus and require
   this independent gate alongside the ordinary suite before PR.
 

@@ -240,6 +240,25 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
     assert hashlib.sha256(
         sp.canonical_schema(schema).encode("utf-8")
     ).hexdigest() == artifact["schema_sha256"]
+    primary = artifact["primary_census"]
+    primary_bytes = json.dumps(
+        primary["audit_projection"], ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"),
+    )
+    assert hashlib.sha256(primary_bytes.encode("utf-8")).hexdigest() == (
+        primary["audit_projection_sha256"]
+    )
+    assert primary["model_call_count"] == len(
+        primary["audit_projection"]["attempts"]
+    ) == 4
+    assert primary["audit_projection"]["class_assessments"][0]["verdict"] == (
+        "satisfied"
+    )
+    assert re.fullmatch(r"[0-9a-f]{64}", primary["audit_sha256"])
+    assert primary["elapsed_seconds"] > 0
+    assert primary["production_diff"] == {
+        "added_lines":101, "deleted_lines":70, "net_lines":31,
+    }
     server_inputs = artifact["server_inputs"]
     assert [probe["engine"] for probe in artifact["probes"]] == ["codex", "claude"]
     for probe in artifact["probes"]:
@@ -1232,6 +1251,18 @@ def test_integrity_lane_rejects_satisfied_unproven_mechanized_class():
         json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
         active_classes=[active_class(status=cc.CLOSED, mechanized=True)],
     ) == value
+
+
+def test_integrity_lane_requires_every_active_class_assessment():
+    with pytest.raises(
+        sp.ProtocolError,
+        match="must assess every required active class exactly once",
+    ):
+        sp.parse_lane(
+            json.dumps(lane_value("integrity")),
+            mode=cc.PLAN_MODE, lane="integrity",
+            active_classes=[active_class()],
+        )
 
 
 def test_class_and_debt_outcome_completeness_are_independent_controls():

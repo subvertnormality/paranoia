@@ -293,7 +293,7 @@ ordinary suite passed **1,048 tests in 201.58 seconds**. The historical differen
 eight V1/V2 role/shape groups, and the expanded release gate killed all **15** owned mutations:
 the original nine plus census schema exclusion, lane/class-state compatibility, governing-match
 cardinality, exact verdict projection, exact ordered-evidence projection, and assessment
-completeness.
+completeness at the integrity-lane boundary.
 
 [`derive_census_class_outcomes_acceptance_2026-08-15.json`](derive_census_class_outcomes_acceptance_2026-08-15.json)
 retains the exact current provider schema, schema hash, exact response objects and hashes,
@@ -306,3 +306,13 @@ self-asserting transport success. Both calls had web disabled. The executable te
 compares the exact schema, validates and hashes each retained response, verifies the Claude envelope
 projection, and replays each through the current local decoder and materializer with the recorded
 inputs.
+
+The current signed-in primary acceptance used the real tracked branch handler at snapshot
+`f5950327303e9278829ca789b68577b5eb2b3be1` with active class `f7da2428`. Three Codex lanes plus
+consolidation completed in 208.165 seconds (four model calls). The persisted settlement assessed the
+class satisfied with repository evidence, derived its canonical close, and the audit file hashes to
+`d148bfd9fbf6bde6cb5a4d6cfeb7a60af640143b8e817f29f4c111baaea36d1e`. The retained bounded audit
+projection binds the base/head commits, attempt roles/outcomes/response hashes, lineage/round, and
+materialized assessment; its executable digest is verified in the suite. For that exact snapshot,
+production Python changed by +101/-70 (net +31); `staged_protocol.py` was the largest changed
+production module at +94/-63, while `handlers.py` was the largest production module at 2,836 lines.

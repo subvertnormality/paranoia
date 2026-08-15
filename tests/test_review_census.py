@@ -1801,7 +1801,9 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
         ),
     )
     anchor = "repository/README.md:1"
+    invalid_anchor = "repository/missing.py:999"
     calls: list[str] = []
+    retry_guidance: list[str] = []
     allow_valid = False
 
     def lane_response(lane_name):
@@ -1820,7 +1822,7 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
             else:
                 assessments = [{
                     "class_id":"class-a", "verdict":"satisfied",
-                    "evidence":[anchor], "finding_id":None,
+                    "evidence":[invalid_anchor], "finding_id":None,
                 }]
         value = payload(lane(lane_name, findings=findings, assessments=assessments))
         for row in value["coverage"]:
@@ -1851,6 +1853,7 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
     def resume(self, session_ref, prompt, *args, **kwargs):
         assert session_ref == "lane-integrity"
         calls.append("lane:integrity-retry")
+        retry_guidance.append(prompt)
         text = lane_response("integrity")
         return Review(text=text, session_ref=session_ref, raw=text)
 
@@ -1865,6 +1868,11 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
         log_dir=tmp_path / "logs", now=lambda:"NC1",
     )
     assert "STRUCTURAL-FAILURE: role=census-integrity-validation-retry" in first
+    assert "/class_assessments/0/verdict: satisfied cannot close" in retry_guidance[0]
+    assert (
+        f"/class_assessments/0/evidence/0: unresolvable repository anchor "
+        f"{invalid_anchor!r}"
+    ) in retry_guidance[0]
     persisted = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="NC2", mode=cc.BRANCH_MODE,
     )

@@ -116,10 +116,10 @@ MUTATIONS = (
         "test_census_derives_exact_verdict_evidence_and_basis",
     ),
     (
-        "census-assessment-completeness",
-        "for cid, verdict in (assessment_verdicts or {}).items():",
-        "for cid, verdict in list((assessment_verdicts or {}).items())[:1]:",
-        "test_source_fanout_requires_distinct_cited_existing_classes",
+        "integrity-assessment-completeness",
+        "if set(assessments) != expected:",
+        "if False:",
+        "test_integrity_lane_requires_every_active_class_assessment",
     ),
 )
 

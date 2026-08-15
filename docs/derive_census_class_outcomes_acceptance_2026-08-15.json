@@ -1,6 +1,69 @@
 {
   "acceptance_kind": "derived-census-class-outcomes-provider-acceptance",
   "date": "2026-08-15",
+  "primary_census": {
+    "audit_projection": {
+      "attempts": [
+        {
+          "outcome": "completed",
+          "response_sha256": "1ca100bd01a54561eb008d70038f7bf65ef1a8a5f9ed245e2a55c31ba9d9f028",
+          "role": "census-behaviour"
+        },
+        {
+          "outcome": "completed",
+          "response_sha256": "4a66ca29dc03a00851b0e659018aa99230f83667970f2d240153e4f77b753b32",
+          "role": "census-execution"
+        },
+        {
+          "outcome": "completed",
+          "response_sha256": "51c4f03a9ccd2d24622d5ad34e4290749763785f6c68d5e8eff94dad43356ab2",
+          "role": "census-integrity"
+        },
+        {
+          "outcome": "completed",
+          "response_sha256": "93ff9dae7956107ed034066433f70130987774684c188a9de22b831ca40ce4fb",
+          "role": "consolidation"
+        }
+      ],
+      "base_id": "b492ac23ddeec649d8014d3862e4d30840a24bec",
+      "class_assessments": [
+        {
+          "class_id": "f7da2428",
+          "evidence": [
+            "repository/src/paranoia_local/staged_protocol.py:284-305",
+            "repository/src/paranoia_local/staged_protocol.py:449-488",
+            "repository/src/paranoia_local/staged_protocol.py:694-770",
+            "repository/src/paranoia_local/staged_protocol.py:792-843",
+            "repository/src/paranoia_local/handlers.py:326-348",
+            "repository/src/paranoia_local/handlers.py:541-581"
+          ],
+          "finding_id": null,
+          "verdict": "satisfied"
+        }
+      ],
+      "head_id": "f5950327303e9278829ca789b68577b5eb2b3be1",
+      "lineage": "derive-census-class-outcomes-active-code-20260815",
+      "round": 1
+    },
+    "audit_projection_sha256": "ed33dc9663ed615fbf19991703b98ec328992a1220ceb5ec064d9790b6d3b288",
+    "audit_sha256": "d148bfd9fbf6bde6cb5a4d6cfeb7a60af640143b8e817f29f4c111baaea36d1e",
+    "elapsed_seconds": 208.165,
+    "largest_changed_production_module": {
+      "added_lines": 94,
+      "deleted_lines": 63,
+      "path": "src/paranoia_local/staged_protocol.py"
+    },
+    "largest_production_module": {
+      "lines": 2836,
+      "path": "src/paranoia_local/handlers.py"
+    },
+    "model_call_count": 4,
+    "production_diff": {
+      "added_lines": 101,
+      "deleted_lines": 70,
+      "net_lines": 31
+    }
+  },
   "probes": [
     {
       "cli_version": "codex-cli 0.144.6",
