@@ -3,6 +3,7 @@ import gzip
 import hashlib
 import json
 import re
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
@@ -258,9 +259,37 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
         "satisfied"
     )
     assert re.fullmatch(r"[0-9a-f]{64}", primary["audit_sha256"])
-    assert primary["elapsed_seconds"] > 0
+    base = primary["audit_projection"]["base_id"]
+    head = primary["audit_projection"]["head_id"]
+    diff = subprocess.run(
+        ["git", "diff", "--numstat", base, head, "--", "src/paranoia_local"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    changed = [
+        (int(added), int(deleted), path)
+        for row in diff for added, deleted, path in [row.split("\t")]
+    ]
     assert primary["production_diff"] == {
-        "added_lines":101, "deleted_lines":70, "net_lines":31,
+        "added_lines":sum(row[0] for row in changed),
+        "deleted_lines":sum(row[1] for row in changed),
+        "net_lines":sum(row[0] - row[1] for row in changed),
+    }
+    largest_changed = max(changed, key=lambda row: row[0] + row[1])
+    assert primary["largest_changed_production_module"] == {
+        "added_lines":largest_changed[0], "deleted_lines":largest_changed[1],
+        "path":largest_changed[2],
+    }
+    module_paths = [row[2] for row in changed]
+    module_sizes = {
+        path:len(subprocess.run(
+            ["git", "show", f"{head}:{path}"], cwd=ROOT, check=True,
+            capture_output=True, text=True,
+        ).stdout.splitlines())
+        for path in module_paths
+    }
+    largest_module = max(module_sizes.items(), key=lambda row: row[1])
+    assert primary["largest_production_module"] == {
+        "path":largest_module[0], "lines":largest_module[1],
     }
     server_inputs = artifact["server_inputs"]
     assert [probe["engine"] for probe in artifact["probes"]] == ["codex", "claude"]
@@ -281,18 +310,6 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
             probe["materialized_class_assessments"]
         )
         assert materialized["class_records"] == probe["materialized_class_records"]
-        if probe["engine"] == "claude":
-            projection = probe["provider_envelope_projection"]
-            assert projection["structured_output"] == response
-            assert projection["is_error"] is False
-            assert projection["permission_denials"] == []
-            projection_bytes = json.dumps(
-                projection, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-            )
-            assert hashlib.sha256(projection_bytes.encode("utf-8")).hexdigest() == (
-                probe["provider_envelope_projection_sha256"]
-            )
-        assert re.fullmatch(r"[0-9a-f]{64}", probe["raw_envelope_sha256"])
 
 
 def test_derived_census_authenticated_material_recomputes_every_digest():

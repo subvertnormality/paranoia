@@ -286,10 +286,10 @@ finding that both contains the cited integrity source and classifies to that act
 Correction and final schemas, materialization, branch lifecycle, evidence anchors, durable state,
 and provider call count are unchanged.
 
-The combined focused protocol/handler suite passed 135 tests, including an unchanged-input
+The combined focused protocol/handler suite passed 140 tests, including an unchanged-input
 cross-invocation case proving a satisfied assessment for an unproven mechanized class exhausts its
 lane retry, persists no census cache, and causes the next invocation to execute fresh lanes. The
-ordinary suite passed **1,048 tests in 201.58 seconds**. The historical differential passed all
+ordinary suite passed **1,054 tests in 191.46 seconds**. The historical differential passed all
 eight V1/V2 role/shape groups, and the expanded release gate killed all **15** owned mutations:
 the original nine plus census schema exclusion, lane/class-state compatibility, governing-match
 cardinality, exact verdict projection, exact ordered-evidence projection, and assessment
@@ -298,14 +298,11 @@ completeness at the integrity-lane boundary.
 [`derive_census_class_outcomes_acceptance_2026-08-15.json`](derive_census_class_outcomes_acceptance_2026-08-15.json)
 retains the exact current provider schema, schema hash, exact response objects and hashes,
 server-owned materialization inputs, and replayed class assessments/records for both supported
-transports. Codex CLI 0.144.6 with `gpt-5.6-sol`/high returned the valid response in 18.994 seconds.
-Claude Code 2.1.197 with Sonnet/high returned the same response as an object in
-`structured_output`; the retained envelope-evidence call took 28.036 seconds at $0.2085383. Its
-bounded exact envelope projection and digest bind that object to the replayed response rather than
-self-asserting transport success. Both calls had web disabled. The executable test regenerates and
-compares the exact schema, validates and hashes each retained response, verifies the Claude envelope
-projection, and replays each through the current local decoder and materializer with the recorded
-inputs.
+transports. Codex CLI 0.144.6 with `gpt-5.6-sol`/high and Claude Code 2.1.197 with Sonnet/high both
+returned the same valid response with web disabled. The executable test regenerates and compares the
+exact schema, validates and hashes each retained response, and replays each through the current local
+decoder and materializer with the recorded inputs. Raw-envelope transport claims are made only from
+the separately retained exact material below.
 
 [`derive_census_class_outcomes_authenticated_material_2026-08-15.json`](derive_census_class_outcomes_authenticated_material_2026-08-15.json)
 retains gzip-compressed exact bytes for the primary census audit and fresh raw Codex and Claude
@@ -316,10 +313,13 @@ responses. The Claude check additionally reads `structured_output` directly from
 
 The current signed-in primary acceptance used the real tracked branch handler at snapshot
 `f5950327303e9278829ca789b68577b5eb2b3be1` with active class `f7da2428`. Three Codex lanes plus
-consolidation completed in 208.165 seconds (four model calls). The persisted settlement assessed the
+consolidation completed in an operator-measured 208.165 seconds (four model calls). The elapsed value
+is an operational observation, not an authenticated timing claim. The persisted settlement assessed the
 class satisfied with repository evidence, derived its canonical close, and the audit file hashes to
 `d148bfd9fbf6bde6cb5a4d6cfeb7a60af640143b8e817f29f4c111baaea36d1e`. The retained bounded audit
 projection binds the base/head commits, attempt roles/outcomes/response hashes, lineage/round, and
 materialized assessment; its executable digest is verified in the suite. For that exact snapshot,
 production Python changed by +101/-70 (net +31); `staged_protocol.py` was the largest changed
-production module at +94/-63, while `handlers.py` was the largest production module at 2,836 lines.
+production module at +94/-63, while `handlers.py` was the largest changed production module by size
+at 2,827 lines. The executable acceptance test recomputes those diff and module metrics directly from
+the retained base/head Git objects.
