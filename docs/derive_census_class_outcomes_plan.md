@@ -140,9 +140,10 @@ final remain model-owned.
   cutover without changing correction/final documentation.
 - `scripts/run_staged_protocol_mutation_checks.py`: add owned mutants for census-schema exclusion
   of authored `class_outcomes`, integrity-lane rejection of satisfied assessments for unproven
-  mechanized classes, cited-source/class cardinality, exact manifest-evidence projection, and
-  derived assessment completeness; retain the existing differential corpus and require this
-  independent gate before PR.
+  mechanized classes, cited-source/class cardinality, exact manifest-verdict projection, exact
+  manifest-evidence projection, and derived assessment completeness. These six mutants exhaust the
+  new trusted schema/lane/derivation controls; retain the existing differential corpus and require
+  this independent gate alongside the ordinary suite before PR.
 
 No change is required to `review_census.settle_state`, class persistence, provider engines, retry
 count, timeout, cache storage, evidence anchors, claim verification, arbitration, or branch/plan
@@ -154,7 +155,7 @@ Focused schema tests prove census rejects an authored `class_outcomes` key while
 still require and accept it. Materializer tests cover:
 
 1. satisfied derivation with exact ordered integrity evidence;
-2. violated derivation with the single cited-source/class match;
+2. exact satisfied and violated verdict projection plus the single cited-source/class match;
 3. zero matching governing findings;
 4. multiple matching governing findings;
 5. a governing finding targeting a satisfied class;
