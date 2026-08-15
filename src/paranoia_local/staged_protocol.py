@@ -669,6 +669,21 @@ def materialize_decision_value(
                 )
                 finding_class[finding["id"]] = None
                 continue
+            if role == "census":
+                expected_verdict = (assessment_verdicts or {}).get(cid)
+                cited_source = (assessment_findings or {}).get(cid)
+                if expected_verdict != "violated":
+                    issues.append(
+                        f"/governing_findings/{finding_index}/classification/class_id: "
+                        f"cannot target active class {cid!r}; its integrity assessment "
+                        f"verdict is {expected_verdict!r}, so reclassify this finding"
+                    )
+                elif cited_source not in finding.get("source_ids", []):
+                    issues.append(
+                        f"/governing_findings/{finding_index}/source_ids: existing class "
+                        f"{cid!r} requires its cited violated integrity source "
+                        f"{cited_source!r}"
+                    )
             if cid in existing_findings:
                 issues.append(
                     f"/governing_findings: multiple findings classify to active class {cid!r}"
@@ -700,6 +715,17 @@ def materialize_decision_value(
         row["class_id"]: f"/class_outcomes/{index}"
         for index, row in reversed(list(enumerate(value["class_outcomes"])))
     }
+    seen_outcomes: set[str] = set()
+    for outcome_index, outcome in enumerate(value["class_outcomes"]):
+        cid = outcome["class_id"]
+        if cid in seen_outcomes and role == "census":
+            expected_verdict = (assessment_verdicts or {}).get(cid)
+            issues.append(
+                f"/class_outcomes/{outcome_index}: duplicate class outcome for {cid!r}; "
+                "emit exactly one census projection preserving integrity verdict "
+                f"{expected_verdict!r}"
+            )
+        seen_outcomes.add(cid)
     outcomes = _unique(
         value["class_outcomes"], "class_id", "class_outcomes", issues,
     )

@@ -143,8 +143,10 @@ three-lane census, targeted correction rounds over durable debt and changed code
 broad, cold final regression before clearance. Every staged branch role retains the established
 code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
 structured output contract changes. The staged roles use closed, role-specific provider schemas,
-then the server validates the complete bounded schema and semantic graph independently. The pinned
-Codex schema subset lacks `uniqueItems`, and Claude must not receive the draft-identifying
+then the server validates the complete bounded schema and semantic graph independently. The
+consolidator projects each integrity-lane class assessment exactly once; cross-lane findings cannot
+append a second outcome or override an integrity-lane satisfaction judgement. The pinned Codex
+schema subset lacks `uniqueItems`, and Claude must not receive the draft-identifying
 `$schema` metadata. Those two non-semantic keywords are removed only from the provider projection;
 uniqueness remains mandatory in local validation, so duplicates can trigger the existing
 same-session correction but can never settle. There is no prose/marker fallback. One-shot reviews

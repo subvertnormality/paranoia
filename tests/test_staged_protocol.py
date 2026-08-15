@@ -8,6 +8,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from paranoia_local import class_closure as cc
+from paranoia_local import prompts
 from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
 
@@ -754,6 +755,54 @@ def test_source_fanout_requires_distinct_cited_existing_classes():
         active_classes=classes,
     )
     assert len(parsed["debt"]) == 2
+
+
+def test_census_duplicate_outcome_names_integrity_projection_repair():
+    value = decision(
+        "census",
+        governing_findings=[finding(
+            fid="execution:F1", source_ids=["execution:F1"],
+            classification={"kind": "existing_class", "class_id": "class-a"},
+        )],
+        class_outcomes=[
+            {
+                "class_id": "class-a", "verdict": "satisfied",
+                "evidence": ["plan:1"],
+            },
+            {
+                "class_id": "class-a", "verdict": "violated",
+                "evidence": ["plan:2"],
+                "basis": {"kind": "new_finding", "finding_id": "execution:F1"},
+            },
+        ],
+    )
+
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(
+            value,
+            source_ids=["execution:F1"],
+            source_severities={"execution:F1": "MAJOR"},
+            assessment_verdicts={"class-a": "satisfied"},
+            assessment_findings={"class-a": None},
+            active_classes=[active_class()],
+        )
+
+    message = str(caught.value)
+    assert (
+        "/governing_findings/0/classification/class_id: cannot target active class "
+        "'class-a'; its integrity assessment verdict is 'satisfied', so reclassify "
+        "this finding"
+    ) in message
+    assert (
+        "/class_outcomes/1: duplicate class outcome for 'class-a'; emit exactly one "
+        "census projection preserving integrity verdict 'satisfied'"
+    ) in message
+
+
+def test_consolidation_prompt_forbids_cross_lane_duplicate_class_outcomes():
+    contract = " ".join(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.split())
+    assert "exact projection of the integrity manifest" in contract
+    assert "must not gain a second outcome from another lane" in contract
 
 
 def test_final_coverage_binds_every_new_finding():

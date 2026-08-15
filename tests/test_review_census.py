@@ -530,6 +530,84 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert not handlers._cacheable_consolidation_error(caught.value)
 
 
+def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_path):
+    active = [{
+        "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",
+        "status": "open", "mechanized": False, "pattern": None,
+        "pathspec": None, "procedure": "inspect the class",
+    }]
+    finding_row = {
+        "id": "execution:F1", "severity": "MAJOR", "summary": "cross-lane defect",
+        "evidence": ["plan:1"], "remedy": "repair the defect",
+        "source_ids": ["execution:F1"],
+        "classification": {"kind": "existing_class", "class_id": "class-a"},
+    }
+    invalid = {
+        "role": "census", "governing_findings": [finding_row],
+        "debt_outcomes": [], "class_actions": [],
+        "class_outcomes": [
+            {
+                "class_id": "class-a", "verdict": "satisfied",
+                "evidence": ["plan:1"],
+            },
+            {
+                "class_id": "class-a", "verdict": "violated",
+                "evidence": ["plan:1"],
+                "basis": {"kind": "new_finding", "finding_id": "execution:F1"},
+            },
+        ],
+    }
+    corrected = json.loads(json.dumps(invalid))
+    corrected["governing_findings"][0]["classification"] = {
+        "kind": "one_off", "reason": "not the satisfied active class",
+    }
+    corrected["class_outcomes"] = corrected["class_outcomes"][:1]
+    retry_prompts = []
+
+    def parser(text):
+        value = sp.decode_decision(text, mode=cc.BRANCH_MODE, role="census")
+        try:
+            return sp.materialize_decision_value(
+                value, mode=cc.BRANCH_MODE, role="census",
+                source_ids=["execution:F1"],
+                source_severities={"execution:F1": "MAJOR"},
+                assessment_verdicts={"class-a": "satisfied"},
+                assessment_findings={"class-a": None},
+                active_classes=active,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(invalid)
+            return Review(text=text, session_ref="session", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "session"
+            retry_prompts.append(prompt)
+            text = wire(corrected)
+            return Review(text=text, session_ref="session", raw=text)
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="consolidate", cwd=tmp_path,
+        model="m", effort="high", timeout=1200, on_progress=None, parser=parser,
+    )
+
+    assert parsed["class_assessments"] == [{
+        "class_id": "class-a", "verdict": "satisfied",
+        "evidence": ["plan:1"], "finding_id": None,
+    }]
+    assert [attempt.outcome for attempt in attempts] == [
+        "validation-invalid", "completed",
+    ]
+    guidance = retry_prompts[0]
+    assert "emit exactly one census projection preserving integrity verdict 'satisfied'" in guidance
+    assert "its integrity assessment verdict is 'satisfied', so reclassify this finding" in guidance
+
+
 def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
     invalid = payload(settlement())
     invalid.update(
