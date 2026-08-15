@@ -107,7 +107,10 @@ decisions or materialized assessment rows, so no migration is required. Exact ma
 Lane prompts change because integrity validation now receives and explains bounded class-state
 metadata. That exact prompt binding invalidates pre-cutover caches. An impossible satisfied/open-
 mechanized assessment is rejected in the lane's own same-session retry before a manifest can become
-cacheable. After all lanes validate, every remaining derived-outcome failure is repairable solely by
+cacheable. If both integrity-lane attempts return that impossible assessment, the terminal lane
+failure persists no census cache. A cross-invocation handler test repeats the request byte-for-byte
+and proves that all lanes execute again rather than replaying the rejected integrity manifest.
+After all lanes validate, every remaining derived-outcome failure is repairable solely by
 governing-finding classification/source mapping or `class_actions`, so a terminal consolidation
 validation rejection may retain the existing exact-bound lane cache. Tests cover both cache
 invalidation across the prompt cutover and same-input recovery from a consolidation-only rejection
@@ -163,13 +166,19 @@ assert the consolidation response schema has no class outcomes, and verify exact
 assessment projection. A consolidation response with the removed field must enter the existing
 same-session schema retry; a corrected response without it must settle. Another test reuses cached
 lanes created before consolidation rejection and proves the new derivation settles without rerunning
-lanes.
+lanes. A separate unchanged-input recovery test makes both integrity attempts return a satisfied
+assessment for an unproven mechanized class, asserts the terminal lane failure wrote no census cache,
+then invokes the handler again and proves fresh lane calls occur before a valid settlement.
 
 Run the historical differential plus expanded mutation release gate independently of pytest.
 Before PR, exercise the exact new provider census schema through both supported transports: pinned
 Codex structured output and Claude's object-valued `structured_output`. For each, retain the exact
-provider schema and response hashes and locally decode/materialize the response with server-owned
-assessment inputs. Run a signed-in Codex primary census with active classes; use both a satisfied and
+provider schema, the exact returned response object, both hashes, and the server-owned assessment
+inputs used for local materialization. An executable acceptance test must regenerate the current
+role schema, recompute both hashes, schema-validate the retained response, and decode/materialize
+that exact object with those recorded inputs for **each** provider artifact. A process exit plus
+prose is not Claude structured-output acceptance: its envelope must contain the retained object in
+`structured_output`. Run a signed-in Codex primary census with active classes; use both a satisfied and
 a violated class only if the controlled fixture can establish them without inventing product
 defects, otherwise limit the live lifecycle claim to what it observes and let deterministic tests
 own the other case. Retain audit hashes, model-call count, real elapsed time, production diff size,
