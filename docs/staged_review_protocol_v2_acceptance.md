@@ -300,6 +300,9 @@ retains the exact current provider schema, schema hash, exact response objects a
 server-owned materialization inputs, and replayed class assessments/records for both supported
 transports. Codex CLI 0.144.6 with `gpt-5.6-sol`/high returned the valid response in 18.994 seconds.
 Claude Code 2.1.197 with Sonnet/high returned the same response as an object in
-`structured_output` in 9.371 seconds at $0.217897. Both calls had web disabled. The executable test
-regenerates and compares the exact schema, validates and hashes each retained response, and replays
-each through the current local decoder and materializer with the recorded inputs.
+`structured_output`; the retained envelope-evidence call took 28.036 seconds at $0.2085383. Its
+bounded exact envelope projection and digest bind that object to the replayed response rather than
+self-asserting transport success. Both calls had web disabled. The executable test regenerates and
+compares the exact schema, validates and hashes each retained response, verifies the Claude envelope
+projection, and replays each through the current local decoder and materializer with the recorded
+inputs.

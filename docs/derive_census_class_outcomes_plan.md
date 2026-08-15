@@ -104,12 +104,15 @@ Existing durable lineage state contains debt, phase, and resulting class state, 
 decisions or materialized assessment rows, so no migration is required. Exact materialized
 `class_assessments` remain in the audit's `staged_settlement`.
 
-Lane prompts change because integrity validation now receives and explains bounded class-state
-metadata. That exact prompt binding invalidates pre-cutover caches. An impossible satisfied/open-
-mechanized assessment is rejected in the lane's own same-session retry before a manifest can become
-cacheable. If both integrity-lane attempts return that impossible assessment, the terminal lane
-failure persists no census cache. A cross-invocation handler test repeats the request byte-for-byte
-and proves that all lanes execute again rather than replaying the rejected integrity manifest.
+Integrity lane prompts already carried bounded class-state metadata, so compatible pre-cutover
+manifests may remain reusable under the existing exact cache binding. Every cached manifest is
+revalidated by the current lane parser before reuse; an old satisfied assessment for an unproven
+mechanized class is therefore rejected and fresh lanes run. A seeded pre-cutover-cache test proves
+that semantic revalidation, rather than a claimed prompt-byte change, rejects that manifest. A fresh
+impossible assessment is rejected in the lane's own same-session retry before it can become
+cacheable. If both integrity-lane attempts return it, the terminal lane failure persists no census
+cache. A cross-invocation handler test repeats the request byte-for-byte and proves that all lanes
+execute again rather than replaying the rejected integrity manifest.
 After all lanes validate, every remaining derived-outcome failure is repairable solely by
 governing-finding classification/source mapping or `class_actions`, so a terminal consolidation
 validation rejection may retain the existing exact-bound lane cache. Tests cover both cache
@@ -169,7 +172,9 @@ assert the consolidation response schema has no class outcomes, and verify exact
 assessment projection. A consolidation response with the removed field must enter the existing
 same-session schema retry; a corrected response without it must settle. Another test reuses cached
 lanes created before consolidation rejection and proves the new derivation settles without rerunning
-lanes. A separate unchanged-input recovery test makes both integrity attempts return a satisfied
+lanes. A seeded compatible-binding cache test presents a pre-cutover satisfied/unproven-mechanized
+manifest and proves current semantic revalidation refuses it. A separate unchanged-input recovery
+test makes both integrity attempts return a satisfied
 assessment for an unproven mechanized class, asserts the terminal lane failure wrote no census cache,
 then invokes the handler again and proves fresh lane calls occur before a valid settlement.
 

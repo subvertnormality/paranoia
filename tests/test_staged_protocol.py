@@ -259,7 +259,17 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
             probe["materialized_class_assessments"]
         )
         assert materialized["class_records"] == probe["materialized_class_records"]
-        assert probe["structured_output_object"] is True
+        if probe["engine"] == "claude":
+            projection = probe["provider_envelope_projection"]
+            assert projection["structured_output"] == response
+            assert projection["is_error"] is False
+            assert projection["permission_denials"] == []
+            projection_bytes = json.dumps(
+                projection, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )
+            assert hashlib.sha256(projection_bytes.encode("utf-8")).hexdigest() == (
+                probe["provider_envelope_projection_sha256"]
+            )
         assert re.fullmatch(r"[0-9a-f]{64}", probe["raw_envelope_sha256"])
 
 
@@ -909,6 +919,36 @@ def test_census_collision_rekey_does_not_depend_on_authored_outcome():
     )
     assert parsed["_finding_id_renames"] == {"old-finding": "F1"}
     assert parsed["class_assessments"][0]["finding_id"] == "F1"
+
+
+@pytest.mark.parametrize("mechanized", [False, True])
+def test_census_closed_violation_points_missing_action_to_collection(mechanized):
+    kwargs = {
+        "source_ids":["integrity:F1"],
+        "source_severities":{"integrity:F1":"MAJOR"},
+        "assessment_verdicts":{"class-a":"violated"},
+        "assessment_findings":{"class-a":"integrity:F1"},
+        "assessment_evidence":{"class-a":["plan:1"]},
+        "active_classes":[active_class(status=cc.CLOSED, mechanized=mechanized)],
+    }
+    value = decision("census", governing_findings=[finding(
+        source_ids=["integrity:F1"],
+        classification={"kind":"existing_class", "class_id":"class-a"},
+    )])
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(value, **kwargs)
+    assert any(
+        line.startswith("/class_actions: closed violated class requires")
+        for line in str(caught.value).splitlines()
+    )
+
+    value["class_actions"] = [{"kind":"close", "class_id":"class-a"}]
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(value, **kwargs)
+    assert any(
+        line.startswith("/class_actions/0: closed violated class requires")
+        for line in str(caught.value).splitlines()
+    )
 
 
 def test_consolidation_prompt_delegates_census_projection_to_server():

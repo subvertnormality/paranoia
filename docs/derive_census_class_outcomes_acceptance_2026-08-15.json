@@ -43,7 +43,7 @@
     },
     {
       "cli_version": "2.1.197 (Claude Code)",
-      "duration_ms": 8071,
+      "duration_ms": 28036,
       "effort": "high",
       "engine": "claude",
       "materialized_class_assessments": [
@@ -63,7 +63,18 @@
         }
       ],
       "model": "sonnet",
-      "raw_envelope_sha256": "0cf63a26c70522f04c9ae79a17542625dfec22a71415384651cf8f3fc1e6fe8f",
+      "provider_envelope_projection": {
+        "is_error": false,
+        "permission_denials": [],
+        "structured_output": {
+          "class_actions": [],
+          "debt_outcomes": [],
+          "governing_findings": [],
+          "role": "census"
+        }
+      },
+      "provider_envelope_projection_sha256": "32e87d96f2945a9ae5d446301a64a0812b3857492271cf068a672acb58b13d0d",
+      "raw_envelope_sha256": "d5eaa74bafbd94a6b6281fab0e55c1334da9d03f8b4f340938d40c34104b5787",
       "response": {
         "class_actions": [],
         "debt_outcomes": [],
@@ -73,14 +84,14 @@
       "response_sha256": "bb4530d8c200888893c21c5d058f902dfb42e0bf19d364d1d66606afabb6c16d",
       "structured_output_object": true,
       "usage": {
-        "cache_creation_input_tokens": 33026,
-        "cost_usd": 0.217897,
-        "input_tokens": 2570,
-        "output_tokens": 761,
+        "cache_creation_input_tokens": 18085,
+        "cache_read_input_tokens": 186811,
+        "cost_usd": 0.2085383,
+        "input_tokens": 2798,
+        "output_tokens": 2331,
         "web_fetch_requests": 0,
         "web_search_requests": 0
       },
-      "wall_seconds": 9.371,
       "web_search": false
     }
   ],

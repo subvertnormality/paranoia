@@ -76,6 +76,40 @@ def test_census_cache_requires_every_exact_binding():
     ) is None
 
 
+def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
+    lanes = rc.LANES[cc.PLAN_MODE]
+    active = [{
+        "class_id":"class-a", "invariant":"the invariant", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":True, "pattern":"BAD", "pathspec":"*.py",
+        "procedure":None,
+    }]
+    manifests = [payload(lane(name)) for name in lanes]
+    manifests[-1]["class_assessments"] = [{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }]
+    lane_prompts = {name:f"pre-cutover-{name}" for name in lanes}
+    binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=active, existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
+    )
+    state = {"census_cache":{**binding, "manifests":manifests}}
+
+    def validate(text, lane_name):
+        try:
+            return sp.parse_lane(
+                text, mode=cc.PLAN_MODE, lane=lane_name,
+                active_classes=active if lane_name == "integrity" else (),
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    assert handlers._cached_census_manifests(
+        state, binding=binding, lanes=lanes, validate=validate,
+    ) is None
+
+
 def test_only_terminal_validation_rejection_can_cache_completed_lanes():
     def error(*outcomes):
         value = rc.CensusError("rejected")

@@ -934,8 +934,11 @@ def materialize_decision_value(
         if outcome["verdict"] == "violated" and cls["status"] == cc.CLOSED:
             allowed = {"replace"} if cls["mechanized"] else {"reopen", "replace"}
             if action is None or action["kind"] not in allowed:
+                repair_pointer = (
+                    "/class_actions" if action is None else action_pointers[cid]
+                )
                 issues.append(
-                    f"{action_pointers.get(cid, outcome_pointer)}: "
+                    f"{repair_pointer}: "
                     f"closed violated class requires {sorted(allowed)}"
                 )
 
