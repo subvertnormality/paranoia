@@ -138,9 +138,11 @@ final remain model-owned.
   the one semantic classification obligation.
 - Tests, README, AGENTS, and bounded acceptance artifacts: update the public contract and prove the
   cutover without changing correction/final documentation.
-- `scripts/run_staged_protocol_mutation_checks.py`: add owned mutants for cited-source/class
-  cardinality, exact manifest-evidence projection, and derived assessment completeness; retain the
-  existing differential corpus and require this independent gate before PR.
+- `scripts/run_staged_protocol_mutation_checks.py`: add owned mutants for census-schema exclusion
+  of authored `class_outcomes`, integrity-lane rejection of satisfied assessments for unproven
+  mechanized classes, cited-source/class cardinality, exact manifest-evidence projection, and
+  derived assessment completeness; retain the existing differential corpus and require this
+  independent gate before PR.
 
 No change is required to `review_census.settle_state`, class persistence, provider engines, retry
 count, timeout, cache storage, evidence anchors, claim verification, arbitration, or branch/plan
