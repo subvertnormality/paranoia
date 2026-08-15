@@ -325,6 +325,13 @@ Replace the mixed `parse_settlement` path with three pure phases:
    derive source/class bindings and permitted lifecycle operations, enrich durable debt from
    governing findings, and dry-run the canonical class engine against a copied lineage.
 
+Governing-finding IDs are response-local labels, not authority over durable history. After the
+response graph has established that those labels are unique and internally bound, materialization
+rekeys any label that collides with a retained historical finding ID to the lowest unused `F<n>`
+and rewrites its coverage and `new_finding` basis references. The rename is retained in the audit
+settlement. Historical updates still name durable `debt_id` values, so rekeying cannot overwrite or
+impersonate an earlier finding. Unknown, duplicate, and misbound response references still reject.
+
 V2 owns one fresh-ID allocator: visit newly debt-bearing governing findings in their
 validated response order and assign the lowest unused `D<n>` against every retained open or
 closed durable ID. One finding receives exactly one new debt. Existing V1 debt IDs are never

@@ -220,7 +220,12 @@ that survives the round.
 Tracked staged plan and branch reviews return provider-constrained semantic JSON. The model emits
 each source mapping, classification, debt outcome, class outcome, and independent class action once;
 the server validates the graph, allocates new debt IDs, derives the internal mirror rows, and applies
-class operations through the same durable class engine used by the legacy terminal register. Every
+class operations through the same durable class engine used by the legacy terminal register.
+Decision-level finding IDs are response-local references: if a cold response reuses a historical
+finding ID it was not shown, the server deterministically rekeys that fresh finding and all of its
+coverage/class references before materialization, retaining the rename in the audit settlement.
+Durable history updates remain keyed only by supplied debt IDs. Duplicate response-local IDs and
+unknown or misbound references still reject the decision. Every
 governing finding must explicitly declare whether it is a genuine one-off, a new reusable class,
 or an occurrence of an active class. Every embedded new-class definition is bound to exactly one
 finding; omission or an unbound definition rejects the settlement instead of silently treating its

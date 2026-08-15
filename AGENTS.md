@@ -78,7 +78,11 @@ derive mirror debt, disposition, binding, and lifecycle rows deterministically, 
 canonical class engine before the single atomic state transition. Preserve every current legal
 semantic outcome, including carried-debt identity, independent new-class severity, and standalone
 class actions. Preserve stored debt IDs; allocate new IDs canonically and compare historical fresh
-V1 labels through an explicit semantic bijection. Define rejection atomicity over substantive
+V1 labels through an explicit semantic bijection. Treat fresh governing-finding labels as
+response-local: after validating response-local uniqueness and bindings, deterministically rekey
+collisions with durable historical finding IDs and rewrite every in-response reference. Historical
+updates remain debt-ID keyed; unknown, duplicate, and misbound references still reject. Define
+rejection atomicity over substantive
 review/class state while retaining required failure diagnostics. Prove historical V1/V2
 materialization equivalence, and do not ship a permissive alias normalizer, partial settlement,
 durable dual protocol, extra model call, or new persistence mechanism. A structured-output

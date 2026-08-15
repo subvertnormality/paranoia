@@ -762,10 +762,82 @@ def test_final_coverage_binds_every_new_finding():
         materialize(value)
 
 
-def test_new_finding_cannot_reuse_durable_finding_identity():
-    value = decision("correction", governing_findings=[finding("old-finding")])
-    with pytest.raises(sp.ProtocolError, match="reuse durable identities"):
-        materialize(value, durable_debt=[durable_debt()])
+def test_new_finding_collision_is_rekeyed_without_changing_durable_history():
+    value = decision(
+        "correction",
+        governing_findings=[finding("old-finding")],
+        debt_outcomes=[{
+            "debt_id": "D7", "status": "closed", "evidence": ["plan:1"],
+        }],
+    )
+
+    parsed = materialize(value, durable_debt=[durable_debt()])
+
+    assert parsed["findings"][0]["id"] == "F1"
+    assert parsed["debt_updates"] == [{
+        "id": "D7", "status": "closed", "evidence": ["plan:1"],
+    }]
+    assert parsed["_finding_id_renames"] == {"old-finding": "F1"}
+
+
+def test_finding_collision_rekeys_every_response_local_reference():
+    value = decision(
+        "final",
+        governing_findings=[finding("old-finding")],
+        coverage=coverage("old-finding"),
+    )
+
+    parsed = materialize(
+        value,
+        active_classes=[],
+        durable_debt=[durable_debt(status="closed")],
+    )
+
+    assert parsed["findings"][0]["id"] == "F1"
+    assert parsed["coverage"][0]["finding_ids"] == ["F1"]
+
+
+def test_finding_collision_rekeys_new_finding_class_basis():
+    cls = active_class(status=cc.CLOSED)
+    value = decision(
+        "final",
+        governing_findings=[finding(
+            "old-finding",
+            classification={"kind": "existing_class", "class_id": "class-a"},
+        )],
+        coverage=coverage("old-finding"),
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "old-finding"},
+        }],
+        class_actions=[{"kind": "reopen", "class_id": "class-a"}],
+    )
+
+    parsed = materialize(
+        value,
+        active_classes=[cls],
+        durable_debt=[durable_debt(status="closed")],
+    )
+
+    assert parsed["class_assessments"][0]["finding_id"] == "F1"
+    assert parsed["debt"][0]["finding_id"] == "F1"
+
+
+def test_finding_collision_allocator_skips_response_and_durable_identities():
+    value = decision(
+        "correction",
+        governing_findings=[finding("old-finding"), finding("F1")],
+    )
+
+    parsed = materialize(
+        value,
+        durable_debt=[
+            durable_debt("D7", status="closed"),
+            durable_debt("D8", cid=None, status="closed", finding_id="F2"),
+        ],
+    )
+
+    assert [row["id"] for row in parsed["findings"]] == ["F3", "F1"]
 
 
 def test_census_schema_represents_full_three_lane_aggregate_and_fanout():
