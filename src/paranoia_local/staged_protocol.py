@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
@@ -492,6 +493,43 @@ def _fresh_debt_ids(count: int, reserved: set[str]) -> list[str]:
     return result
 
 
+def _rekey_finding_collisions(
+    value: dict[str, Any], historic_ids: set[str],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Make response-local finding labels safe for durable materialization."""
+    finding_ids = [row["id"] for row in value["governing_findings"]]
+    reserved = set(finding_ids) | historic_ids
+    renamed: dict[str, str] = {}
+    candidate = 1
+    for finding_id in finding_ids:
+        if finding_id not in historic_ids:
+            continue
+        while f"F{candidate}" in reserved:
+            candidate += 1
+        replacement = f"F{candidate}"
+        candidate += 1
+        reserved.add(replacement)
+        renamed[finding_id] = replacement
+    if not renamed:
+        return value, {}
+
+    rewritten = deepcopy(value)
+    for finding in rewritten["governing_findings"]:
+        finding["id"] = renamed.get(finding["id"], finding["id"])
+    for outcome in rewritten["class_outcomes"]:
+        basis = outcome.get("basis")
+        if basis and basis["kind"] == "new_finding":
+            basis["finding_id"] = renamed.get(
+                basis["finding_id"], basis["finding_id"],
+            )
+    for coverage in rewritten.get("coverage", []):
+        coverage["finding_ids"] = [
+            renamed.get(finding_id, finding_id)
+            for finding_id in coverage["finding_ids"]
+        ]
+    return rewritten, renamed
+
+
 def class_records_from_actions(
     actions: Sequence[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -553,6 +591,16 @@ def materialize_decision_value(
     by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
         _validate_coverage(value["coverage"], by_finding, issues)
+    for outcome_index, outcome in enumerate(value["class_outcomes"]):
+        basis = outcome.get("basis")
+        if (
+            basis and basis["kind"] == "new_finding"
+            and basis["finding_id"] not in by_finding
+        ):
+            issues.append(
+                f"/class_outcomes/{outcome_index}/basis/finding_id: "
+                "must name a governing finding"
+            )
     classes = {row["class_id"]: row for row in active_classes}
     if len(classes) != len(active_classes):
         issues.append("/active_classes: duplicate class_id")
@@ -565,11 +613,11 @@ def materialize_decision_value(
         row.get("finding_id") for row in debt_by_id.values()
         if isinstance(row.get("finding_id"), str)
     }
-    reused = sorted(set(by_finding) & historic_finding_ids)
-    if reused:
-        issues.append(
-            f"/governing_findings: new findings reuse durable identities {reused}"
-        )
+    value, finding_id_renames = _rekey_finding_collisions(
+        value, historic_finding_ids,
+    )
+    findings = value["governing_findings"]
+    by_finding = _unique(findings, "id", "governing_findings", issues)
 
     source_rows: list[dict[str, Any]] = []
     governing_by_source: dict[str, list[str]] = {}
@@ -884,6 +932,8 @@ def materialize_decision_value(
     }
     if role == "final":
         result["coverage"] = value["coverage"]
+    if finding_id_renames:
+        result["_finding_id_renames"] = finding_id_renames
     return result
 
 
