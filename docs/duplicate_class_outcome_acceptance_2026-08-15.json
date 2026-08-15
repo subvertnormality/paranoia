@@ -1,0 +1,57 @@
+{
+  "kind": "bounded-real-provider-acceptance-projection",
+  "date": "2026-08-15",
+  "engine": "codex",
+  "model": "gpt-5.6-sol",
+  "effort": "high",
+  "web_search": false,
+  "implementation_commit": "6bdae17770f31c56e62be3f9f5fb3d687e47e309",
+  "lineage": "duplicate-class-outcome-acceptance-20260815",
+  "active_class_id": "89308d49",
+  "audit": {
+    "filename": "20260815T193925-critique_branch-1f341fa7.json",
+    "sha256": "54e6dfb1b75d1e15c62f285ab1c26a82fc8389b34a42f7d3a9ef298d76221169"
+  },
+  "attempts": [
+    {"role": "census-behaviour", "outcome": "completed", "response_sha256": "0eac0a10e95a07338fddef7779ef4692b3773942e9fca8a9ebaa76149866b25c"},
+    {"role": "census-execution", "outcome": "validation-invalid", "response_sha256": "b7abb2055bcac7b030b490c58d8af753ca994ae881f48a2f282be226452c8e48"},
+    {"role": "census-integrity", "outcome": "completed", "response_sha256": "80b890cf4c8579832220d7ae71a4bb1eb2b3f3a33169ec55aaa2c1b3c602bbe6"},
+    {"role": "census-execution-validation-retry", "outcome": "completed", "response_sha256": "08ba3f33ad6acc514fbb97278477eda9e2a5eb5682105365ed91e411cbaec691"},
+    {"role": "consolidation", "outcome": "completed", "response_sha256": "90b95f63feb27c703a769952af8e0db8c915b89abdd47f91ac93fbaf6c1551f0"}
+  ],
+  "accepted_class_assessment": {
+    "class_id": "89308d49",
+    "verdict": "satisfied",
+    "evidence": [
+      "repository/src/paranoia_local/prompts.py:360-365",
+      "repository/src/paranoia_local/handlers.py:721-755",
+      "repository/src/paranoia_local/staged_protocol.py:719-766"
+    ],
+    "finding_id": null
+  },
+  "durable_result": {
+    "seeded_class_status": "closed",
+    "lineage_state_sha256": "2f5ab42b179ccdf6cc09fdf07d95461e04e045993a5b44879135103f859b170d",
+    "phase": "correction",
+    "phase_reason": "the acceptance review independently opened a test-coverage class"
+  },
+  "usage": {
+    "attempt_count": 5,
+    "input_tokens": 4837709,
+    "cached_input_tokens": 4177408,
+    "output_tokens": 26480,
+    "reasoning_output_tokens": 13107,
+    "observable_elapsed_seconds_approx": 202
+  },
+  "production_diff": {
+    "additions": 50,
+    "deletions": 2,
+    "largest_diff_module": {"path": "src/paranoia_local/staged_protocol.py", "added_lines": 37},
+    "largest_changed_module": {"path": "src/paranoia_local/handlers.py", "lines": 2827}
+  },
+  "limitations": [
+    "The real provider emitted a valid one-row consolidation; it did not exercise consolidation validation retry.",
+    "The full provider audit is represented by its hash and bounded semantic projection, not committed verbatim.",
+    "The separately retained cross-layer test owns duplicate rejection, same-session correction, audit projection, and durable settlement."
+  ]
+}

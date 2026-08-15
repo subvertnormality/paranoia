@@ -530,6 +530,190 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert not handlers._cacheable_consolidation_error(caught.value)
 
 
+def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_path):
+    active = [{
+        "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",
+        "status": "open", "mechanized": False, "pattern": None,
+        "pathspec": None, "procedure": "inspect the class",
+    }]
+    finding_row = {
+        "id": "execution:F1", "severity": "MAJOR", "summary": "cross-lane defect",
+        "evidence": ["plan:1"], "remedy": "repair the defect",
+        "source_ids": ["execution:F1"],
+        "classification": {"kind": "existing_class", "class_id": "class-a"},
+    }
+    invalid = {
+        "role": "census", "governing_findings": [finding_row],
+        "debt_outcomes": [], "class_actions": [],
+        "class_outcomes": [
+            {
+                "class_id": "class-a", "verdict": "satisfied",
+                "evidence": ["plan:2"],
+            },
+            {
+                "class_id": "class-a", "verdict": "violated",
+                "evidence": ["plan:1"],
+                "basis": {"kind": "new_finding", "finding_id": "execution:F1"},
+            },
+        ],
+    }
+    corrected = json.loads(json.dumps(invalid))
+    corrected["governing_findings"][0]["classification"] = {
+        "kind": "one_off", "reason": "not the satisfied active class",
+    }
+    corrected["class_outcomes"] = corrected["class_outcomes"][:1]
+    corrected["class_outcomes"][0]["evidence"] = ["plan:1"]
+    retry_prompts = []
+
+    def parser(text):
+        value = sp.decode_decision(text, mode=cc.BRANCH_MODE, role="census")
+        try:
+            return sp.materialize_decision_value(
+                value, mode=cc.BRANCH_MODE, role="census",
+                source_ids=["execution:F1"],
+                source_severities={"execution:F1": "MAJOR"},
+                assessment_verdicts={"class-a": "satisfied"},
+                assessment_findings={"class-a": None},
+                assessment_evidence={"class-a": ["plan:1"]},
+                active_classes=active,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = wire(invalid)
+            return Review(text=text, session_ref="session", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "session"
+            retry_prompts.append(prompt)
+            text = wire(corrected)
+            return Review(text=text, session_ref="session", raw=text)
+
+    _, parsed, attempts = handlers._staged_call(
+        role="consolidation", engine=Engine(), prompt="consolidate", cwd=tmp_path,
+        model="m", effort="high", timeout=1200, on_progress=None, parser=parser,
+    )
+
+    assert parsed["class_assessments"] == [{
+        "class_id": "class-a", "verdict": "satisfied",
+        "evidence": ["plan:1"], "finding_id": None,
+    }]
+    assert [attempt.outcome for attempt in attempts] == [
+        "validation-invalid", "completed",
+    ]
+    guidance = retry_prompts[0]
+    assert "emit exactly one census projection preserving integrity verdict 'satisfied'" in guidance
+    assert "its integrity assessment verdict is 'satisfied', so reclassify this finding" in guidance
+    assert "/class_outcomes/0/evidence: must exactly preserve integrity-lane evidence" in guidance
+
+
+def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    lineage_id = "active-class-census-retry"
+    lineage = cc.Lineage(lineage_id, mode=cc.BRANCH_MODE)
+    class_id = cc.apply_register(
+        lineage,
+        cc.Register(new_classes=(cc.NewClass(
+            "class outcomes preserve integrity evidence", "MAJOR",
+            procedure="inspect consolidation",
+        ),)),
+        round_no=0,
+    )[0]
+    cc.save_lineage(cc.default_state_root(), lineage)
+    anchor = "repository/README.md:1"
+    invalid = {
+        "role": "census",
+        "governing_findings": [{
+            "id": "behaviour:F1", "severity": "OUT-OF-SCOPE",
+            "summary": "separate advisory", "evidence": [anchor],
+            "remedy": "retain as context", "source_ids": ["behaviour:F1"],
+            "classification": {"kind": "existing_class", "class_id": class_id},
+        }],
+        "debt_outcomes": [], "class_actions": [],
+        "class_outcomes": [
+            {"class_id": class_id, "verdict": "satisfied", "evidence": [anchor]},
+            {
+                "class_id": class_id, "verdict": "violated", "evidence": [anchor],
+                "basis": {"kind": "new_finding", "finding_id": "behaviour:F1"},
+            },
+        ],
+    }
+    corrected = json.loads(json.dumps(invalid))
+    corrected["governing_findings"][0]["classification"] = {
+        "kind": "one_off", "reason": "separate from the satisfied class",
+    }
+    corrected["class_outcomes"] = corrected["class_outcomes"][:1]
+    retry_prompts = []
+
+    def run(self, prompt, *args, **kwargs):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            findings = []
+            assessments = []
+            if lane_name == "behaviour":
+                findings = [{
+                    "id": "F1", "severity": "OUT-OF-SCOPE",
+                    "summary": "separate advisory", "evidence": [anchor],
+                    "remedy": "retain as context",
+                }]
+            if lane_name == "integrity":
+                assessments = [{
+                    "class_id": class_id, "verdict": "satisfied",
+                    "evidence": [anchor], "finding_id": None,
+                }]
+            value = payload(lane(lane_name, findings=findings, assessments=assessments))
+            for coverage_row in value["coverage"]:
+                coverage_row["evidence"] = [anchor]
+            text = wire(value)
+        else:
+            text = wire(invalid)
+        return Review(text=text, session_ref="active-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "active-session"
+        retry_prompts.append(prompt)
+        text = wire(corrected)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_branch(
+        {
+            "repo_path": str(repo_with_branch), "base_ref": "main",
+            "head_ref": "feature", "lineage": lineage_id, "round": 1,
+            "stakes": "trusted local tool",
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda: "ACTIVE",
+    )
+
+    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert "emit exactly one census projection" in retry_prompts[0]
+    audit = json.loads(
+        next((tmp_path / "logs").glob("ACTIVE-critique_branch-*.json")).read_text()
+    )
+    assert [row["role"] for row in audit["attempt_ledger"]][-2:] == [
+        "consolidation", "consolidation-validation-retry",
+    ]
+    assert audit["staged_settlement"]["class_assessments"] == [{
+        "class_id": class_id, "verdict": "satisfied",
+        "evidence": [anchor], "finding_id": None,
+    }]
+    settled = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
+    )
+    assert settled.classes[class_id].status == cc.CLOSED
+    assert settled.review_state["phase"] == "clear"
+
+
 def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
     invalid = payload(settlement())
     invalid.update(

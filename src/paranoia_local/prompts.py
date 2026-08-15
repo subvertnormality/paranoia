@@ -357,8 +357,12 @@ complete reusable definition and explicit class severity; or existing_class nami
 class. One source may fan out only to distinct existing-class findings for distinct violated
 assessments that cited it. Consolidate all occurrences of one existing class into one finding.
 
-Preserve every integrity verdict in class_outcomes. A violation uses new_finding and names the
-governing finding following its cited lane source; satisfaction has no basis. Return one
+Treat class_outcomes as an exact projection of the integrity manifest: emit exactly one row per
+active class with the same verdict and evidence. A violation uses new_finding and names the one
+governing finding that includes its cited integrity source; satisfaction has no basis and must not
+gain a second outcome from another lane. A cross-lane finding may classify as existing_class only
+when that class's integrity assessment is violated and its cited source is included; otherwise
+classify the finding as one_off or new_class. Return one
 debt_outcome for every supplied open debt: open needs current evidence and a concrete remaining
 condition; closed needs current evidence. Do not invent debt or IDs. Use class_actions only for an
 independent lifecycle/severity decision. Closed mechanized violation requires replace with a

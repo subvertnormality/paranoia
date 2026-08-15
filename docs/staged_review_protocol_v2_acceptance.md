@@ -90,6 +90,31 @@ The final durable state is phase `clear`, three historical debts all `closed`, a
 `closed`. The rejected delimiter round did not increment durable rounds or apply either attempted
 payload.
 
+### Duplicate class-outcome correction acceptance (2026-08-15)
+
+A controlled signed-in Codex branch census reviewed implementation commit `6bdae17770f31c56e62be3f9f5fb3d687e47e309`
+with active class `89308d49` seeded through the canonical class engine. The integrity lane assessed
+that class `satisfied` with three repository evidence anchors. Consolidation emitted exactly one
+outcome for the class with the identical verdict and ordered evidence, and durable settlement closed
+the seeded class. This establishes the real provider's one-row behavior at this commit; it does not
+claim that every future provider response will follow the prompt.
+
+The bounded retained projection is
+[`duplicate_class_outcome_acceptance_2026-08-15.json`](duplicate_class_outcome_acceptance_2026-08-15.json).
+The full local audit SHA-256 was `54e6dfb1b75d1e15c62f285ab1c26a82fc8389b34a42f7d3a9ef298d76221169`;
+the consolidation response SHA-256 was `90b95f63feb27c703a769952af8e0db8c915b89abdd47f91ac93fbaf6c1551f0`.
+The run made five model attempts—three lanes, one execution-lane validation retry, and
+consolidation—and used 4,837,709 input tokens (4,177,408 cached), 26,480 output tokens, and 13,107
+reasoning tokens. Observable provider wall time across the command yields was approximately 202
+seconds.
+
+At the reviewed implementation commit the production diff was 50 additions and 2 deletions across
+`handlers.py`, `prompts.py`, and `staged_protocol.py`. The largest production diff was 37 added lines
+in `staged_protocol.py`; the largest changed production module was `handlers.py` at 2,827 lines.
+The real run did not force a consolidation retry. A production-handler test now supplies a seeded
+active class and valid branch anchors, sends a duplicate/overriding consolidation response, repairs
+it on the actual same-session retry, and asserts the exact audited and durable class assessment.
+
 ## Real Claude primary lifecycle
 
 The same disposable repository and contradictory/corrected plan pair then exercised the complete
