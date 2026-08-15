@@ -582,6 +582,7 @@ def materialize_decision_value(
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
     assessment_findings: dict[str, str | None] | None = None,
+    assessment_evidence: dict[str, Sequence[str]] | None = None,
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
@@ -755,6 +756,14 @@ def materialize_decision_value(
         ):
             issues.append(
                 f"{outcome_pointer}/verdict: must preserve integrity-lane verdict"
+            )
+        expected_evidence = (assessment_evidence or {}).get(cid)
+        if role == "census" and expected_evidence is not None and (
+            outcome["evidence"] != list(expected_evidence)
+        ):
+            issues.append(
+                f"{outcome_pointer}/evidence: must exactly preserve "
+                "integrity-lane evidence"
             )
         target: str | None = None
         if outcome["verdict"] == "violated":
@@ -968,6 +977,7 @@ def materialize_decision(
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
     assessment_findings: dict[str, str | None] | None = None,
+    assessment_evidence: dict[str, Sequence[str]] | None = None,
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
@@ -978,5 +988,6 @@ def materialize_decision(
         source_severities=source_severities,
         assessment_verdicts=assessment_verdicts,
         assessment_findings=assessment_findings,
+        assessment_evidence=assessment_evidence,
         active_classes=active_classes, durable_debt=durable_debt,
     )

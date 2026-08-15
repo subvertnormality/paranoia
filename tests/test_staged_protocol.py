@@ -799,6 +799,24 @@ def test_census_duplicate_outcome_names_integrity_projection_repair():
     ) in message
 
 
+def test_census_outcome_must_preserve_integrity_evidence_exactly():
+    value = decision("census", class_outcomes=[{
+        "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:2"],
+    }])
+
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"/class_outcomes/0/evidence: must exactly preserve integrity-lane evidence",
+    ):
+        materialize(
+            value,
+            assessment_verdicts={"class-a": "satisfied"},
+            assessment_findings={"class-a": None},
+            assessment_evidence={"class-a": ["plan:1"]},
+            active_classes=[active_class()],
+        )
+
+
 def test_consolidation_prompt_forbids_cross_lane_duplicate_class_outcomes():
     contract = " ".join(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.split())
     assert "exact projection of the integrity manifest" in contract

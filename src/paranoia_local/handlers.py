@@ -561,6 +561,7 @@ def _staged_structural_review(
         source_severities: dict[str, str] | None = None,
         assessment_verdicts: dict[str, str] | None = None,
         assessment_findings: dict[str, str | None] | None = None,
+        assessment_evidence: dict[str, list[str]] | None = None,
         known_debt: list[str] | None = None, role: str,
     ) -> dict[str, Any]:
         del assessment_ids, known_debt
@@ -576,6 +577,7 @@ def _staged_structural_review(
                 source_ids=source_ids, source_severities=source_severities,
                 assessment_verdicts=assessment_verdicts,
                 assessment_findings=assessment_findings,
+                assessment_evidence=assessment_evidence,
                 active_classes=active_classes,
                 durable_debt=state.get("debt", []),
             )
@@ -722,6 +724,10 @@ def _staged_structural_review(
         assessment_findings = {
             a["class_id"]: a["finding_id"] for m in manifests for a in m["class_assessments"]
         }
+        assessment_evidence = {
+            a["class_id"]: list(a["evidence"])
+            for m in manifests for a in m["class_assessments"]
+        }
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
@@ -746,6 +752,7 @@ def _staged_structural_review(
                     assessment_ids=assessment_ids,
                     assessment_verdicts=assessment_verdicts,
                     assessment_findings=assessment_findings,
+                    assessment_evidence=assessment_evidence,
                     known_debt=[
                         d["id"] for d in state.get("debt", []) if d.get("status") == "open"
                     ],

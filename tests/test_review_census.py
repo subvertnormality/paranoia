@@ -548,7 +548,7 @@ def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_p
         "class_outcomes": [
             {
                 "class_id": "class-a", "verdict": "satisfied",
-                "evidence": ["plan:1"],
+                "evidence": ["plan:2"],
             },
             {
                 "class_id": "class-a", "verdict": "violated",
@@ -562,6 +562,7 @@ def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_p
         "kind": "one_off", "reason": "not the satisfied active class",
     }
     corrected["class_outcomes"] = corrected["class_outcomes"][:1]
+    corrected["class_outcomes"][0]["evidence"] = ["plan:1"]
     retry_prompts = []
 
     def parser(text):
@@ -573,6 +574,7 @@ def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_p
                 source_severities={"execution:F1": "MAJOR"},
                 assessment_verdicts={"class-a": "satisfied"},
                 assessment_findings={"class-a": None},
+                assessment_evidence={"class-a": ["plan:1"]},
                 active_classes=active,
             )
         except sp.ProtocolError as exc:
@@ -606,6 +608,7 @@ def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_p
     guidance = retry_prompts[0]
     assert "emit exactly one census projection preserving integrity verdict 'satisfied'" in guidance
     assert "its integrity assessment verdict is 'satisfied', so reclassify this finding" in guidance
+    assert "/class_outcomes/0/evidence: must exactly preserve integrity-lane evidence" in guidance
 
 
 def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
