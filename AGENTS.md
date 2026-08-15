@@ -41,10 +41,11 @@ its source disposition to fan out to one distinct governing finding per affected
 force the reviewer to split or paraphrase the source finding merely to satisfy settlement shape.
 Every target of a repeated source must be an existing-class finding backed by its own distinct
 violated assessment citing that source; repetition must not manufacture one-off or new-class debt.
-During census consolidation, class outcomes are an exact one-row projection of the integrity lane.
-A finding from another lane may bind an existing class only when the violated integrity assessment
-cites a source consolidated into that finding; never append a second outcome or override a satisfied
-integrity assessment merely because another lane found a conceptually related defect.
+During census consolidation, do not ask the model to repeat class outcomes. Derive one outcome from
+each validated integrity assessment, copying its verdict and ordered evidence exactly. For a
+violation, require exactly one governing finding that includes the cited integrity source and
+classifies to that class; a finding may not target a satisfied class. Correction and final retain
+model-owned class outcomes because they have no prior lane judgement to project.
 Derive the deterministic close transition when an open, unmechanized class is assessed satisfied;
 do not discard a healthy census because the model omitted that redundant lifecycle record.
 After consolidation-only failure, reuse a complete validated lane census only under exact bindings
