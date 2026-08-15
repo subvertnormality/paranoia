@@ -1,6 +1,6 @@
 # Derive census class outcomes from the integrity manifest
 
-Status: proposed design for PLAN review.
+Status: revision 2 after broad PLAN census.
 
 ## Decision
 
@@ -72,22 +72,57 @@ The response-size bound may remain unchanged; reducing it is not part of this co
 6. Feed the derived outcomes through the existing debt, assessment, class-action, canonical-engine,
    anchor, and atomic-settlement path.
 
+### Diagnostic provenance
+
+No census diagnostic may point at the removed `/class_outcomes` field. Before consolidation, lane
+validation receives the bounded active-class metadata rather than IDs alone and rejects a satisfied
+assessment for an unproven mechanized class at that lane's
+`/class_assessments/<index>/verdict`; the existing same-session lane retry can repair it. This is the
+only outcome/class-state combination that no consolidation action can make legal: an unproven
+mechanized class is owned by its server sweep, not model closure.
+
+During consolidation, zero or multiple cited-source/class matches point to `/governing_findings` and
+name the exact source and class. An authored incompatible lifecycle operation points to its exact
+`/class_actions/<index>`. A closed violated class with no required reopen/replace points to the
+existing `/class_actions` array and names the required operation. Open class-bound debt that lacks a
+violated derived assessment continues to point to its authored `/debt_outcomes/<index>` row.
+Server-derived close records use `/class_actions` as canonical-engine provenance; the model may
+override the redundant derivation only with an independently legal action already admitted by the
+current contract.
+
+Tests mechanically resolve the JSON Pointer prefix of every independently detectable census issue
+against the response for the phase that receives that retry. Lane issues resolve against the lane
+response; consolidation issues resolve against the consolidation response.
+
 The materialized durable V1-shaped settlement remains unchanged: it still contains one explicit
 `class_assessments` row and assessment disposition for every active census class. Debt IDs, class
 IDs, source fan-out, advisory debt, close derivation, and trailers do not change.
 
 ## Historical and cache behavior
 
-Existing durable lineage state contains materialized class assessments/debt, not raw census
-decisions, so no migration is required. A cached validated lane census remains valid because lanes
-and their exact prompts are unchanged; retrying consolidation uses the new prompt and schema and
-derives outcomes from the cached integrity manifest.
+Existing durable lineage state contains debt, phase, and resulting class state, not raw census
+decisions or materialized assessment rows, so no migration is required. Exact materialized
+`class_assessments` remain in the audit's `staged_settlement`.
+
+Lane prompts change because integrity validation now receives and explains bounded class-state
+metadata. That exact prompt binding invalidates pre-cutover caches. An impossible satisfied/open-
+mechanized assessment is rejected in the lane's own same-session retry before a manifest can become
+cacheable. After all lanes validate, every remaining derived-outcome failure is repairable solely by
+governing-finding classification/source mapping or `class_actions`, so a terminal consolidation
+validation rejection may retain the existing exact-bound lane cache. Tests cover both cache
+invalidation across the prompt cutover and same-input recovery from a consolidation-only rejection
+without rerunning valid lanes.
 
 The retained Protocol-v2 provider acceptance predates this schema cutover. Preserve it as historical
 evidence rather than rewriting its claimed bytes. Its executable test must validate the old census
 probe against a frozen **test-only** old census schema representation, while correction/final probes
 continue to bind current schemas. Add a new real-provider acceptance artifact for the new census
 schema. No historical compatibility parser enters production.
+
+The linked `staged_review_protocol_v2_plan.md` is a historical shipped design: mark its census
+example and class-outcome bullet superseded by this amendment and link here. Update README's protocol
+description and design-document index to state that census outcomes are derived while correction and
+final remain model-owned.
 
 ## Implementation surface
 
@@ -100,6 +135,9 @@ schema. No historical compatibility parser enters production.
   the one semantic classification obligation.
 - Tests, README, AGENTS, and bounded acceptance artifacts: update the public contract and prove the
   cutover without changing correction/final documentation.
+- `scripts/run_staged_protocol_mutation_checks.py`: add owned mutants for cited-source/class
+  cardinality, exact manifest-evidence projection, and derived assessment completeness; retain the
+  existing differential corpus and require this independent gate before PR.
 
 No change is required to `review_census.settle_state`, class persistence, provider engines, retry
 count, timeout, cache storage, evidence anchors, claim verification, arbitration, or branch/plan
@@ -127,11 +165,15 @@ same-session schema retry; a corrected response without it must settle. Another 
 lanes created before consolidation rejection and proves the new derivation settles without rerunning
 lanes.
 
-Before PR, run the full suite and signed-in Codex census with both a satisfied and a violated active
-class if the controlled fixture can establish both without inventing product defects; otherwise
-limit the real claim to the observed class outcomes and let deterministic tests own the other case.
-Retain schema/response/audit hashes, model-call count, real elapsed time, production diff size, and
-largest changed modules. Then run same-vendor Codex CODE convergence under the same frozen stakes.
+Run the historical differential plus expanded mutation release gate independently of pytest.
+Before PR, exercise the exact new provider census schema through both supported transports: pinned
+Codex structured output and Claude's object-valued `structured_output`. For each, retain the exact
+provider schema and response hashes and locally decode/materialize the response with server-owned
+assessment inputs. Run a signed-in Codex primary census with active classes; use both a satisfied and
+a violated class only if the controlled fixture can establish them without inventing product
+defects, otherwise limit the live lifecycle claim to what it observes and let deterministic tests
+own the other case. Retain audit hashes, model-call count, real elapsed time, production diff size,
+and largest changed modules. Then run same-vendor Codex CODE convergence under the same frozen stakes.
 
 ## Non-goals
 
