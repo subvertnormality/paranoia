@@ -275,3 +275,31 @@ helper change, and dependency declaration already described above.
 The model-facing top-level settlement relationships fall from seven mirrored tables to four
 semantic tables. There is no new persistence layer, model phase, provider call, trust boundary, or
 durable V1 fallback. Cache protocol version is 2; durable lineage format remains version 1.
+
+## Deterministic census-outcome amendment (2026-08-15)
+
+The amendment in
+[`derive_census_class_outcomes_plan.md`](derive_census_class_outcomes_plan.md) removes model-authored
+`class_outcomes` from the census role only. The server now copies each validated integrity
+assessment's verdict and ordered evidence and, for a violation, requires exactly one governing
+finding that both contains the cited integrity source and classifies to that active class.
+Correction and final schemas, materialization, branch lifecycle, evidence anchors, durable state,
+and provider call count are unchanged.
+
+The combined focused protocol/handler suite passed 135 tests, including an unchanged-input
+cross-invocation case proving a satisfied assessment for an unproven mechanized class exhausts its
+lane retry, persists no census cache, and causes the next invocation to execute fresh lanes. The
+ordinary suite passed **1,048 tests in 201.58 seconds**. The historical differential passed all
+eight V1/V2 role/shape groups, and the expanded release gate killed all **15** owned mutations:
+the original nine plus census schema exclusion, lane/class-state compatibility, governing-match
+cardinality, exact verdict projection, exact ordered-evidence projection, and assessment
+completeness.
+
+[`derive_census_class_outcomes_acceptance_2026-08-15.json`](derive_census_class_outcomes_acceptance_2026-08-15.json)
+retains the exact current provider schema, schema hash, exact response objects and hashes,
+server-owned materialization inputs, and replayed class assessments/records for both supported
+transports. Codex CLI 0.144.6 with `gpt-5.6-sol`/high returned the valid response in 18.994 seconds.
+Claude Code 2.1.197 with Sonnet/high returned the same response as an object in
+`structured_output` in 9.371 seconds at $0.217897. Both calls had web disabled. The executable test
+regenerates and compares the exact schema, validates and hashes each retained response, and replays
+each through the current local decoder and materializer with the recorded inputs.

@@ -290,9 +290,14 @@ def decision_schema(mode: str, role: str) -> dict[str, Any]:
             maximum=MAX_CENSUS_FINDINGS if role == "census" else MAX_LANE_FINDINGS,
         ),
         "debt_outcomes": _array(_debt_outcome(), maximum=500),
-        "class_outcomes": _array(_class_outcome(), maximum=MAX_ACTIVE_CLASSES),
-        "class_actions": _array(_class_action(mode), maximum=MAX_ACTIVE_CLASSES),
     }
+    if role != "census":
+        properties["class_outcomes"] = _array(
+            _class_outcome(), maximum=MAX_ACTIVE_CLASSES,
+        )
+    properties["class_actions"] = _array(
+        _class_action(mode), maximum=MAX_ACTIVE_CLASSES,
+    )
     if role == "final":
         properties["coverage"] = _array(
             _coverage(), maximum=len(CHECKLIST), minimum=len(CHECKLIST),
@@ -442,7 +447,8 @@ def _validate_coverage(
 
 
 def parse_lane(text: str, *, mode: str, lane: str,
-               class_ids: Sequence[str] = ()) -> dict[str, Any]:
+               class_ids: Sequence[str] = (),
+               active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
     value = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
     issues: list[str] = []
     findings = _unique(value["findings"], "id", "findings", issues)
@@ -450,7 +456,12 @@ def parse_lane(text: str, *, mode: str, lane: str,
     assessments = _unique(
         value["class_assessments"], "class_id", "class_assessments", issues,
     )
-    expected = set(class_ids) if lane == "integrity" else set()
+    classes = {row["class_id"]: row for row in active_classes}
+    if len(classes) != len(active_classes):
+        issues.append("/class_assessments: active class metadata has duplicate class_id")
+    expected = (
+        set(classes) if active_classes else set(class_ids)
+    ) if lane == "integrity" else set()
     if set(assessments) != expected:
         issues.append(
             "/class_assessments: must assess every required active class exactly once"
@@ -463,6 +474,16 @@ def parse_lane(text: str, *, mode: str, lane: str,
         if row["verdict"] == "violated" and row["finding_id"] not in findings:
             issues.append(
                 f"{assessment_pointers[cid]}/finding_id: must name a lane finding"
+            )
+        cls = classes.get(cid)
+        if (
+            row["verdict"] == "satisfied" and cls is not None
+            and cls.get("mechanized") is True
+            and cls.get("status") in cc.UNPROVEN_STATUSES
+        ):
+            issues.append(
+                f"{assessment_pointers[cid]}/verdict: satisfied cannot close an "
+                "unproven mechanized class"
             )
     _raise_semantic_issues(issues)
     return value
@@ -516,7 +537,7 @@ def _rekey_finding_collisions(
     rewritten = deepcopy(value)
     for finding in rewritten["governing_findings"]:
         finding["id"] = renamed.get(finding["id"], finding["id"])
-    for outcome in rewritten["class_outcomes"]:
+    for outcome in rewritten.get("class_outcomes", []):
         basis = outcome.get("basis")
         if basis and basis["kind"] == "new_finding":
             basis["finding_id"] = renamed.get(
@@ -592,7 +613,7 @@ def materialize_decision_value(
     by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
         _validate_coverage(value["coverage"], by_finding, issues)
-    for outcome_index, outcome in enumerate(value["class_outcomes"]):
+    for outcome_index, outcome in enumerate(value.get("class_outcomes", [])):
         basis = outcome.get("basis")
         if (
             basis and basis["kind"] == "new_finding"
@@ -712,63 +733,80 @@ def materialize_decision_value(
         for row in value["debt_outcomes"]
     ]
 
-    outcome_pointers = {
-        row["class_id"]: f"/class_outcomes/{index}"
-        for index, row in reversed(list(enumerate(value["class_outcomes"])))
-    }
-    seen_outcomes: set[str] = set()
-    for outcome_index, outcome in enumerate(value["class_outcomes"]):
-        cid = outcome["class_id"]
-        if cid in seen_outcomes and role == "census":
-            expected_verdict = (assessment_verdicts or {}).get(cid)
+    if role == "census":
+        outcomes: dict[str, dict[str, Any]] = {}
+        outcome_pointers: dict[str, str] = {}
+        for cid, verdict in (assessment_verdicts or {}).items():
+            evidence = list((assessment_evidence or {}).get(cid, ()))
+            outcome: dict[str, Any] = {
+                "class_id": cid, "verdict": verdict, "evidence": evidence,
+            }
+            if verdict == "violated":
+                cited = (assessment_findings or {}).get(cid)
+                matches = [
+                    finding_id for finding_id in governing_by_source.get(cited or "", [])
+                    if finding_class.get(finding_id) == cid
+                ]
+                if len(matches) != 1:
+                    issues.append(
+                        f"/governing_findings: violated class {cid!r} requires exactly "
+                        f"one governing finding for cited source {cited!r}; got {matches}"
+                    )
+                if len(matches) == 1:
+                    outcome["basis"] = {
+                        "kind": "new_finding", "finding_id": matches[0],
+                    }
+                    outcome_pointers[cid] = next(
+                        f"/governing_findings/{index}"
+                        for index, finding in enumerate(findings)
+                        if finding["id"] == matches[0]
+                    )
+            outcomes[cid] = outcome
+        expected_classes = set(assessment_verdicts or {})
+        if set(outcomes) != expected_classes:
             issues.append(
-                f"/class_outcomes/{outcome_index}: duplicate class outcome for {cid!r}; "
-                "emit exactly one census projection preserving integrity verdict "
-                f"{expected_verdict!r}"
+                f"/governing_findings: derived assessments must cover exactly "
+                f"{sorted(expected_classes)}; got {sorted(outcomes)}"
             )
-        seen_outcomes.add(cid)
-    outcomes = _unique(
-        value["class_outcomes"], "class_id", "class_outcomes", issues,
-    )
-    expected_classes = (
-        set(assessment_verdicts or {}) if role == "census"
-        else set(classes) if role == "final"
-        else {
-            cid for debt in open_debt.values() for cid in debt.get("class_ids", [])
-            if cid in classes
-        } | set(existing_findings)
-    )
-    if set(outcomes) != expected_classes:
-        issues.append(
-            f"/class_outcomes: expected exactly {sorted(expected_classes)}, "
-            f"got {sorted(outcomes)}"
+    else:
+        outcome_pointers = {
+            row["class_id"]: f"/class_outcomes/{index}"
+            for index, row in reversed(list(enumerate(value["class_outcomes"])))
+        }
+        outcomes = _unique(
+            value["class_outcomes"], "class_id", "class_outcomes", issues,
         )
+        expected_model_classes = (
+            set(classes) if role == "final"
+            else {
+                cid for debt in open_debt.values() for cid in debt.get("class_ids", [])
+                if cid in classes
+            } | set(existing_findings)
+        )
+        if set(outcomes) != expected_model_classes:
+            issues.append(
+                f"/class_outcomes: expected exactly {sorted(expected_model_classes)}, "
+                f"got {sorted(outcomes)}"
+            )
 
     assessment_rows: list[dict[str, Any]] = []
     materialized_assessments: list[dict[str, Any]] = []
     violated: set[str] = set()
     target_by_class: dict[str, str | None] = {}
     for cid, outcome in outcomes.items():
-        outcome_pointer = outcome_pointers[cid]
-        expected_verdict = (assessment_verdicts or {}).get(cid)
-        if role == "census" and expected_verdict is not None and (
-            outcome["verdict"] != expected_verdict
-        ):
-            issues.append(
-                f"{outcome_pointer}/verdict: must preserve integrity-lane verdict"
-            )
-        expected_evidence = (assessment_evidence or {}).get(cid)
-        if role == "census" and expected_evidence is not None and (
-            outcome["evidence"] != list(expected_evidence)
-        ):
-            issues.append(
-                f"{outcome_pointer}/evidence: must exactly preserve "
-                "integrity-lane evidence"
-            )
+        outcome_pointer = outcome_pointers.get(cid, "/class_actions")
         target: str | None = None
         if outcome["verdict"] == "violated":
             violated.add(cid)
-            basis = outcome["basis"]
+            basis = outcome.get("basis")
+            if basis is None:
+                target_by_class[cid] = None
+                assessment_rows.append({"assessment_id": cid, "governing_id": None})
+                materialized_assessments.append({
+                    "class_id": cid, "verdict": outcome["verdict"],
+                    "evidence": list(outcome["evidence"]), "finding_id": None,
+                })
+                continue
             if basis["kind"] == "new_finding":
                 target = basis["finding_id"]
                 finding = by_finding.get(target)
@@ -776,17 +814,7 @@ def materialize_decision_value(
                     issues.append(
                         f"{outcome_pointer}/basis: finding must classify to this class"
                     )
-                if role == "census" and finding is not None:
-                    cited = (assessment_findings or {}).get(cid)
-                    if cited not in finding["source_ids"]:
-                        issues.append(
-                            f"{outcome_pointer}/basis: must follow cited lane finding {cited!r}"
-                        )
             else:
-                if role == "census":
-                    issues.append(
-                        f"{outcome_pointer}/basis: census violations require a new finding"
-                    )
                 debt_id = basis["debt_id"]
                 debt = open_debt.get(debt_id)
                 if debt is None or cid not in debt.get("class_ids", []):
@@ -886,7 +914,7 @@ def materialize_decision_value(
             )
 
     for cid, outcome in outcomes.items():
-        outcome_pointer = outcome_pointers[cid]
+        outcome_pointer = outcome_pointers.get(cid, "/class_actions")
         cls = classes.get(cid)
         if cls is None:
             continue

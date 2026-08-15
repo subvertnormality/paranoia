@@ -1,0 +1,550 @@
+{
+  "acceptance_kind": "derived-census-class-outcomes-provider-acceptance",
+  "date": "2026-08-15",
+  "probes": [
+    {
+      "cli_version": "codex-cli 0.144.6",
+      "effort": "high",
+      "engine": "codex",
+      "materialized_class_assessments": [
+        {
+          "class_id": "class-a",
+          "evidence": [
+            "plan:1"
+          ],
+          "finding_id": null,
+          "verdict": "satisfied"
+        }
+      ],
+      "materialized_class_records": [
+        {
+          "class_id": "class-a",
+          "op": "close"
+        }
+      ],
+      "model": "gpt-5.6-sol",
+      "raw_envelope_sha256": "7e9998f0a7d278eba31dc0b3a36e1e59c01c8c7925851ded4a9d8dd6159c5be7",
+      "response": {
+        "class_actions": [],
+        "debt_outcomes": [],
+        "governing_findings": [],
+        "role": "census"
+      },
+      "response_sha256": "bb4530d8c200888893c21c5d058f902dfb42e0bf19d364d1d66606afabb6c16d",
+      "structured_output_object": true,
+      "usage": {
+        "cached_input_tokens": 23296,
+        "input_tokens": 66720,
+        "output_tokens": 338,
+        "reasoning_output_tokens": 111
+      },
+      "wall_seconds": 18.994,
+      "web_search": false
+    },
+    {
+      "cli_version": "2.1.197 (Claude Code)",
+      "duration_ms": 8071,
+      "effort": "high",
+      "engine": "claude",
+      "materialized_class_assessments": [
+        {
+          "class_id": "class-a",
+          "evidence": [
+            "plan:1"
+          ],
+          "finding_id": null,
+          "verdict": "satisfied"
+        }
+      ],
+      "materialized_class_records": [
+        {
+          "class_id": "class-a",
+          "op": "close"
+        }
+      ],
+      "model": "sonnet",
+      "raw_envelope_sha256": "0cf63a26c70522f04c9ae79a17542625dfec22a71415384651cf8f3fc1e6fe8f",
+      "response": {
+        "class_actions": [],
+        "debt_outcomes": [],
+        "governing_findings": [],
+        "role": "census"
+      },
+      "response_sha256": "bb4530d8c200888893c21c5d058f902dfb42e0bf19d364d1d66606afabb6c16d",
+      "structured_output_object": true,
+      "usage": {
+        "cache_creation_input_tokens": 33026,
+        "cost_usd": 0.217897,
+        "input_tokens": 2570,
+        "output_tokens": 761,
+        "web_fetch_requests": 0,
+        "web_search_requests": 0
+      },
+      "wall_seconds": 9.371,
+      "web_search": false
+    }
+  ],
+  "schema": {
+    "additionalProperties": false,
+    "properties": {
+      "class_actions": {
+        "items": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "class_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "close",
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "class_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "class_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "reopen",
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "class_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "class_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "reclassify",
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "severity": {
+                  "enum": [
+                    "FATAL",
+                    "BLOCKER",
+                    "MAJOR",
+                    "MINOR",
+                    "OUT-OF-SCOPE"
+                  ],
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "class_id",
+                "severity"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "class_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "definition": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "invariant": {
+                      "maxLength": 1000,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "procedure": {
+                      "maxLength": 2000,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "severity": {
+                      "enum": [
+                        "FATAL",
+                        "BLOCKER",
+                        "MAJOR",
+                        "MINOR",
+                        "OUT-OF-SCOPE"
+                      ],
+                      "maxLength": 32,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invariant",
+                    "severity",
+                    "procedure"
+                  ],
+                  "type": "object"
+                },
+                "kind": {
+                  "const": "replace",
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "class_id",
+                "definition"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "maxItems": 100,
+        "minItems": 0,
+        "type": "array"
+      },
+      "debt_outcomes": {
+        "items": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "debt_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "status": {
+                  "const": "closed",
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "debt_id",
+                "status",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "debt_id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "reason": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "status": {
+                  "const": "open",
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "debt_id",
+                "status",
+                "evidence",
+                "reason"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "maxItems": 500,
+        "minItems": 0,
+        "type": "array"
+      },
+      "governing_findings": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "classification": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "one_off",
+                      "maxLength": 32,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "reason": {
+                      "maxLength": 2000,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "reason"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "definition": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "invariant": {
+                          "maxLength": 1000,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        },
+                        "procedure": {
+                          "maxLength": 2000,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        },
+                        "severity": {
+                          "enum": [
+                            "FATAL",
+                            "BLOCKER",
+                            "MAJOR",
+                            "MINOR",
+                            "OUT-OF-SCOPE"
+                          ],
+                          "maxLength": 32,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "invariant",
+                        "severity",
+                        "procedure"
+                      ],
+                      "type": "object"
+                    },
+                    "kind": {
+                      "const": "new_class",
+                      "maxLength": 32,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "definition"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "class_id": {
+                      "maxLength": 120,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "existing_class",
+                      "maxLength": 32,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "class_id"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "evidence": {
+              "items": {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
+            },
+            "id": {
+              "maxLength": 120,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+              "type": "string"
+            },
+            "remedy": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+              "type": "string"
+            },
+            "severity": {
+              "enum": [
+                "FATAL",
+                "BLOCKER",
+                "MAJOR",
+                "MINOR",
+                "OUT-OF-SCOPE"
+              ],
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+              "type": "string"
+            },
+            "source_ids": {
+              "items": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                "type": "string"
+              },
+              "maxItems": 300,
+              "minItems": 1,
+              "type": "array"
+            },
+            "summary": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "severity",
+            "summary",
+            "evidence",
+            "remedy",
+            "source_ids",
+            "classification"
+          ],
+          "type": "object"
+        },
+        "maxItems": 400,
+        "minItems": 0,
+        "type": "array"
+      },
+      "role": {
+        "const": "census",
+        "maxLength": 32,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+        "type": "string"
+      }
+    },
+    "required": [
+      "role",
+      "governing_findings",
+      "debt_outcomes",
+      "class_actions"
+    ],
+    "type": "object"
+  },
+  "schema_sha256": "a1b18a1aad9a3163ded4c80cac4cf96817c65eab5799e611906c6153ccee2f70",
+  "server_inputs": {
+    "active_classes": [
+      {
+        "class_id": "class-a",
+        "invariant": "the fixture invariant",
+        "mechanized": false,
+        "pathspec": null,
+        "pattern": null,
+        "procedure": "inspect the fixture",
+        "severity": "MAJOR",
+        "status": "open"
+      }
+    ],
+    "assessment_evidence": {
+      "class-a": [
+        "plan:1"
+      ]
+    },
+    "assessment_findings": {
+      "class-a": null
+    },
+    "assessment_verdicts": {
+      "class-a": "satisfied"
+    },
+    "durable_debt": [],
+    "source_ids": [],
+    "source_severities": {}
+  },
+  "version": 1
+}

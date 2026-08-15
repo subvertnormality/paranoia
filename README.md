@@ -144,8 +144,10 @@ broad, cold final regression before clearance. Every staged branch role retains 
 code-review investigation, packet-use, proportionality, and warranted-web-search profile; only its
 structured output contract changes. The staged roles use closed, role-specific provider schemas,
 then the server validates the complete bounded schema and semantic graph independently. The
-consolidator projects each integrity-lane class assessment exactly once; cross-lane findings cannot
-append a second outcome or override an integrity-lane satisfaction judgement. The pinned Codex
+server derives each census class outcome exactly once from the validated integrity-lane assessment;
+the consolidator supplies only the governing classification/source relationship needed for a
+violation. Cross-lane findings cannot append an outcome or override an integrity-lane satisfaction
+judgement. Correction and final class outcomes remain model-owned. The pinned Codex
 schema subset lacks `uniqueItems`, and Claude must not receive the draft-identifying
 `$schema` metadata. Those two non-semantic keywords are removed only from the provider projection;
 uniqueness remains mandatory in local validation, so duplicates can trigger the existing
@@ -220,8 +222,9 @@ invariant, several sites. Class closure makes the class itself a tracked object
 that survives the round.
 
 Tracked staged plan and branch reviews return provider-constrained semantic JSON. The model emits
-each source mapping, classification, debt outcome, class outcome, and independent class action once;
-the server validates the graph, allocates new debt IDs, derives the internal mirror rows, and applies
+each source mapping, classification, debt outcome, and independent class action once. Correction and
+final also emit their class outcomes; census outcomes are derived from the validated integrity
+manifest. The server validates the graph, allocates new debt IDs, derives the internal mirror rows, and applies
 class operations through the same durable class engine used by the legacy terminal register.
 Decision-level finding IDs are response-local references: if a cold response reuses a historical
 finding ID it was not shown, the server deterministically rekeys that fresh finding and all of its
@@ -1082,7 +1085,9 @@ Design documents for the two non-obvious subsystems live in
 staged model contract is specified in
 [`staged_review_protocol_v2_plan.md`](docs/staged_review_protocol_v2_plan.md), with
 implementation evidence in
-[`staged_review_protocol_v2_acceptance.md`](docs/staged_review_protocol_v2_acceptance.md).
+[`staged_review_protocol_v2_acceptance.md`](docs/staged_review_protocol_v2_acceptance.md). Its
+census-outcome amendment is specified in
+[`derive_census_class_outcomes_plan.md`](docs/derive_census_class_outcomes_plan.md).
 The latest real Codex verification evidence is recorded in
 [`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 
