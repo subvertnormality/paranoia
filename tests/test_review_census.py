@@ -1435,6 +1435,80 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert third_audit["staged_settlement"]["findings"][0]["id"] == "F1"
 
 
+def test_final_collision_audit_preserves_class_and_debt_lifecycle(
+    repo, tmp_path, monkeypatch,
+):
+    stakes = "trusted local tool"
+    state = rc.normalize_state({}, stakes=stakes, snapshot="prior")
+    state["phase"] = "final"
+    state["debt"] = [{
+        "id":"D7", "finding_id":"G1", "status":"closed", "severity":"MAJOR",
+        "summary":"historic occurrence", "evidence":["plan:1"],
+        "remedy":"historic remedy", "source_ids":[], "class_ids":["class-a"],
+        "first_round":1, "last_round":2,
+    }]
+    tracked = cc.TrackedClass(
+        class_id="class-a", invariant="the recurring invariant", severity="MAJOR",
+        first_round=1, status=cc.CLOSED, procedure="inspect the recurring path",
+    )
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            "final-collision-audit", mode=cc.PLAN_MODE,
+            classes={"class-a":tracked}, next_seq=2, rounds=2, review_state=state,
+        ),
+    )
+
+    final_finding = {
+        "id":"G1", "severity":"MAJOR", "summary":"fresh recurrence",
+        "evidence":["plan:1"], "remedy":"repair the recurrence",
+        "classification":{"kind":"existing_class", "class_id":"class-a"},
+    }
+    response = wire({
+        "role":"final", "governing_findings":[final_finding], "debt_outcomes":[],
+        "class_outcomes":[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G1"},
+        }],
+        "class_actions":[{"kind":"reopen", "class_id":"class-a"}],
+        "coverage":payload(lane(findings=[final_finding]))["coverage"],
+    })
+
+    def run(self, prompt, *args, **kwargs):
+        assert '"role": "final"' in prompt
+        return Review(text=response, session_ref="final-collision", raw=response)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    result = handlers.critique_plan({
+        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo),
+        "lineage":"final-collision-audit", "round":3,
+        "claim_verification":False, "stakes":stakes,
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda:"FC1")
+
+    assert "REOPEN class-a" in result
+    assert "STRUCTURAL-PHASE: correction" in result
+    audit = json.loads(next((tmp_path / "logs").glob("FC1-critique_plan-*.json")).read_text())
+    settlement = audit["staged_settlement"]
+    assert settlement["_finding_id_renames"] == {"G1":"F1"}
+    assert settlement["class_records"] == [{"op":"reopen", "class_id":"class-a"}]
+    assert settlement["findings"][0]["id"] == "F1"
+    assert settlement["debt"][0]["finding_id"] == "F1"
+
+    persisted = cc.load_lineage(
+        cc.default_state_root(), "final-collision-audit", stamp="FC2",
+        mode=cc.PLAN_MODE,
+    )
+    assert persisted.classes["class-a"].status == cc.OPEN
+    historic = next(row for row in persisted.review_state["debt"] if row["id"] == "D7")
+    fresh = next(row for row in persisted.review_state["debt"] if row["id"] != "D7")
+    assert (historic["finding_id"], historic["status"], historic["class_ids"]) == (
+        "G1", "closed", ["class-a"],
+    )
+    assert (fresh["finding_id"], fresh["status"], fresh["class_ids"]) == (
+        "F1", "open", ["class-a"],
+    )
+
+
 def test_branch_reuses_complete_census_after_settlement_rejection(
     repo_with_branch, tmp_path, monkeypatch,
 ):
