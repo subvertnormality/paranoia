@@ -1,5 +1,13 @@
 {
   "acceptance_kind": "derived-census-class-outcomes-provider-acceptance",
+  "authenticated_material": {
+    "path": "derive_census_class_outcomes_authenticated_material_2026-08-15.json",
+    "primary_audit_sha256": "d148bfd9fbf6bde6cb5a4d6cfeb7a60af640143b8e817f29f4c111baaea36d1e",
+    "provider_raw_envelope_sha256": {
+      "claude": "72dfc248e15b5c808c67330fea3dc83db033f9f865bfa21e69baec594e514cb1",
+      "codex": "f6de4cacdbe42d43ead36dcd961f91e24dd4a5d3abe7b306520249fa19788292"
+    }
+  },
   "date": "2026-08-15",
   "primary_census": {
     "audit_projection": {

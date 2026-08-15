@@ -1,3 +1,5 @@
+import base64
+import gzip
 import hashlib
 import json
 import re
@@ -8,6 +10,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from paranoia_local import class_closure as cc
+from paranoia_local import engines
 from paranoia_local import prompts
 from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
@@ -290,6 +293,61 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
                 probe["provider_envelope_projection_sha256"]
             )
         assert re.fullmatch(r"[0-9a-f]{64}", probe["raw_envelope_sha256"])
+
+
+def test_derived_census_authenticated_material_recomputes_every_digest():
+    acceptance = json.loads(
+        (ROOT / "docs/derive_census_class_outcomes_acceptance_2026-08-15.json").read_text()
+    )
+    material = json.loads(
+        (
+            ROOT
+            / "docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json"
+        ).read_text()
+    )
+    assert material["acceptance_kind"] == "derived-census-authenticated-material"
+
+    def exact_bytes(record):
+        raw = gzip.decompress(base64.b64decode(record["gzip_base64"], validate=True))
+        assert hashlib.sha256(raw).hexdigest() == record["sha256"]
+        return raw
+
+    audit_raw = exact_bytes(material["primary_audit"])
+    assert material["primary_audit"]["sha256"] == acceptance[
+        "authenticated_material"
+    ]["primary_audit_sha256"]
+    assert hashlib.sha256(audit_raw).hexdigest() == acceptance["primary_census"][
+        "audit_sha256"
+    ]
+    audit = json.loads(audit_raw)
+    projection = {
+        "base_id":audit["base_id"], "head_id":audit["head_id"],
+        "lineage":audit["lineage"], "round":audit["round"],
+        "attempts":[{
+            "role":row["role"], "outcome":row["outcome"],
+            "response_sha256":row["response_sha256"],
+        } for row in audit["attempt_ledger"]],
+        "class_assessments":audit["staged_settlement"]["class_assessments"],
+    }
+    assert projection == acceptance["primary_census"]["audit_projection"]
+
+    engine_by_name = {
+        "codex": engines.CodexEngine(), "claude": engines.ClaudeEngine(),
+    }
+    retained_responses = {
+        row["engine"]:row["response"] for row in acceptance["probes"]
+    }
+    for record in material["provider_probes"]:
+        raw = exact_bytes(record["raw_envelope"]).decode("utf-8")
+        assert record["raw_envelope"]["sha256"] == acceptance[
+            "authenticated_material"
+        ]["provider_raw_envelope_sha256"][record["engine"]]
+        review = engine_by_name[record["engine"]].parse_output(raw)
+        assert review.error is False
+        assert json.loads(review.text) == record["response"]
+        assert record["response"] == retained_responses[record["engine"]]
+        if record["engine"] == "claude":
+            assert json.loads(raw)["structured_output"] == record["response"]
 
 
 @pytest.mark.parametrize(

@@ -307,6 +307,13 @@ compares the exact schema, validates and hashes each retained response, verifies
 projection, and replays each through the current local decoder and materializer with the recorded
 inputs.
 
+[`derive_census_class_outcomes_authenticated_material_2026-08-15.json`](derive_census_class_outcomes_authenticated_material_2026-08-15.json)
+retains gzip-compressed exact bytes for the primary census audit and fresh raw Codex and Claude
+provider envelopes. The executable acceptance test decompresses each record, recomputes its SHA-256,
+reconstructs the bounded primary audit projection, parses both provider envelopes through the real
+engine parsers, and proves the resulting structured objects equal the retained schema-valid
+responses. The Claude check additionally reads `structured_output` directly from its exact envelope.
+
 The current signed-in primary acceptance used the real tracked branch handler at snapshot
 `f5950327303e9278829ca789b68577b5eb2b3be1` with active class `f7da2428`. Three Codex lanes plus
 consolidation completed in 208.165 seconds (four model calls). The persisted settlement assessed the
