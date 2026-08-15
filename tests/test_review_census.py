@@ -1368,10 +1368,16 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
             })
         else:
             assert '"role": "final"' in prompt
+            final_finding = {
+                "id":"G1", "severity":"OUT-OF-SCOPE",
+                "summary":"advisory final observation", "evidence":["plan:1"],
+                "remedy":"retain as context",
+                "classification":{"kind":"one_off", "reason":"final-only context"},
+            }
             text = wire({
-                "role":"final", "governing_findings":[], "debt_outcomes":[],
-                "class_outcomes":[], "class_actions":[],
-                "coverage": payload(lane())["coverage"],
+                "role":"final", "governing_findings":[final_finding],
+                "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
+                "coverage": payload(lane(findings=[final_finding]))["coverage"],
             })
         return Review(text=text, session_ref=f"s{len(calls)}", raw=text)
 
@@ -1425,6 +1431,8 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     third_audit = json.loads(next((tmp_path / "logs").glob("T3-critique_plan-*.json")).read_text())
     assert [row["role"] for row in second_audit["attempt_ledger"]] == ["correction"]
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
+    assert third_audit["staged_settlement"]["_finding_id_renames"] == {"G1":"F1"}
+    assert third_audit["staged_settlement"]["findings"][0]["id"] == "F1"
 
 
 def test_branch_reuses_complete_census_after_settlement_rejection(

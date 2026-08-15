@@ -591,6 +591,16 @@ def materialize_decision_value(
     by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
         _validate_coverage(value["coverage"], by_finding, issues)
+    for outcome_index, outcome in enumerate(value["class_outcomes"]):
+        basis = outcome.get("basis")
+        if (
+            basis and basis["kind"] == "new_finding"
+            and basis["finding_id"] not in by_finding
+        ):
+            issues.append(
+                f"/class_outcomes/{outcome_index}/basis/finding_id: "
+                "must name a governing finding"
+            )
     classes = {row["class_id"]: row for row in active_classes}
     if len(classes) != len(active_classes):
         issues.append("/active_classes: duplicate class_id")
