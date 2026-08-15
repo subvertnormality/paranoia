@@ -51,7 +51,7 @@ MUTATIONS = (
     ),
     (
         "outcome-completeness",
-        "if set(outcomes) != expected_classes:",
+        "if set(outcomes) != expected_model_classes:",
         "if False:",
         "test_class_and_debt_outcome_completeness_are_independent_controls",
     ),
@@ -84,6 +84,42 @@ MUTATIONS = (
         'if finding["severity"] in BLOCKING\n        or (',
         'if finding["severity"] in BLOCKING\n        and (',
         "test_census_existing_advisory_violation_still_mints_debt",
+    ),
+    (
+        "census-schema-exclusion",
+        'if role != "census":\n        properties["class_outcomes"]',
+        'if True:\n        properties["class_outcomes"]',
+        "test_census_schema_rejects_authored_class_outcomes",
+    ),
+    (
+        "mechanized-lane-compatibility",
+        'and cls.get("mechanized") is True',
+        "and False",
+        "test_integrity_lane_rejects_satisfied_unproven_mechanized_class",
+    ),
+    (
+        "census-governing-cardinality",
+        "if len(matches) != 1:",
+        "if False:",
+        "test_census_violated_class_requires_one_matching_governing_finding",
+    ),
+    (
+        "census-verdict-projection",
+        '"class_id": cid, "verdict": verdict, "evidence": evidence,',
+        '"class_id": cid, "verdict": "satisfied", "evidence": evidence,',
+        "test_census_derives_exact_verdict_evidence_and_basis",
+    ),
+    (
+        "census-evidence-projection",
+        '"class_id": cid, "verdict": verdict, "evidence": evidence,',
+        '"class_id": cid, "verdict": verdict, "evidence": list(reversed(evidence)),',
+        "test_census_derives_exact_verdict_evidence_and_basis",
+    ),
+    (
+        "integrity-assessment-completeness",
+        "if set(assessments) != expected:",
+        "if False:",
+        "test_integrity_lane_requires_every_active_class_assessment",
     ),
 )
 

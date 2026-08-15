@@ -76,6 +76,40 @@ def test_census_cache_requires_every_exact_binding():
     ) is None
 
 
+def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
+    lanes = rc.LANES[cc.PLAN_MODE]
+    active = [{
+        "class_id":"class-a", "invariant":"the invariant", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":True, "pattern":"BAD", "pathspec":"*.py",
+        "procedure":None,
+    }]
+    manifests = [payload(lane(name)) for name in lanes]
+    manifests[-1]["class_assessments"] = [{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }]
+    lane_prompts = {name:f"pre-cutover-{name}" for name in lanes}
+    binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=active, existing_debt=[], engine_name="codex", model="model",
+        effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
+    )
+    state = {"census_cache":{**binding, "manifests":manifests}}
+
+    def validate(text, lane_name):
+        try:
+            return sp.parse_lane(
+                text, mode=cc.PLAN_MODE, lane=lane_name,
+                active_classes=active if lane_name == "integrity" else (),
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    assert handlers._cached_census_manifests(
+        state, binding=binding, lanes=lanes, validate=validate,
+    ) is None
+
+
 def test_only_terminal_validation_rejection_can_cache_completed_lanes():
     def error(*outcomes):
         value = rc.CensusError("rejected")
@@ -139,7 +173,7 @@ def settlement(**overrides):
                 "kind":"one_off", "reason":"unique fixture site",
             },
         }],
-        "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": [],
     }
     value.update(overrides)
     return json.dumps(value)
@@ -530,48 +564,27 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert not handlers._cacheable_consolidation_error(caught.value)
 
 
-def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_path):
+def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     active = [{
         "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",
         "status": "open", "mechanized": False, "pattern": None,
         "pathspec": None, "procedure": "inspect the class",
     }]
-    finding_row = {
-        "id": "execution:F1", "severity": "MAJOR", "summary": "cross-lane defect",
-        "evidence": ["plan:1"], "remedy": "repair the defect",
-        "source_ids": ["execution:F1"],
-        "classification": {"kind": "existing_class", "class_id": "class-a"},
-    }
     invalid = {
-        "role": "census", "governing_findings": [finding_row],
+        "role": "census", "governing_findings": [],
         "debt_outcomes": [], "class_actions": [],
-        "class_outcomes": [
-            {
-                "class_id": "class-a", "verdict": "satisfied",
-                "evidence": ["plan:2"],
-            },
-            {
-                "class_id": "class-a", "verdict": "violated",
-                "evidence": ["plan:1"],
-                "basis": {"kind": "new_finding", "finding_id": "execution:F1"},
-            },
-        ],
+        "class_outcomes": [],
     }
     corrected = json.loads(json.dumps(invalid))
-    corrected["governing_findings"][0]["classification"] = {
-        "kind": "one_off", "reason": "not the satisfied active class",
-    }
-    corrected["class_outcomes"] = corrected["class_outcomes"][:1]
-    corrected["class_outcomes"][0]["evidence"] = ["plan:1"]
+    del corrected["class_outcomes"]
     retry_prompts = []
 
     def parser(text):
-        value = sp.decode_decision(text, mode=cc.BRANCH_MODE, role="census")
         try:
+            value = sp.decode_decision(text, mode=cc.BRANCH_MODE, role="census")
             return sp.materialize_decision_value(
                 value, mode=cc.BRANCH_MODE, role="census",
-                source_ids=["execution:F1"],
-                source_severities={"execution:F1": "MAJOR"},
+                source_ids=[], source_severities={},
                 assessment_verdicts={"class-a": "satisfied"},
                 assessment_findings={"class-a": None},
                 assessment_evidence={"class-a": ["plan:1"]},
@@ -606,9 +619,7 @@ def test_duplicate_class_outcome_retry_receives_actionable_semantic_repair(tmp_p
         "validation-invalid", "completed",
     ]
     guidance = retry_prompts[0]
-    assert "emit exactly one census projection preserving integrity verdict 'satisfied'" in guidance
-    assert "its integrity assessment verdict is 'satisfied', so reclassify this finding" in guidance
-    assert "/class_outcomes/0/evidence: must exactly preserve integrity-lane evidence" in guidance
+    assert "Additional properties are not allowed ('class_outcomes' was unexpected)" in guidance
 
 
 def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
@@ -635,19 +646,11 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
             "classification": {"kind": "existing_class", "class_id": class_id},
         }],
         "debt_outcomes": [], "class_actions": [],
-        "class_outcomes": [
-            {"class_id": class_id, "verdict": "satisfied", "evidence": [anchor]},
-            {
-                "class_id": class_id, "verdict": "violated", "evidence": [anchor],
-                "basis": {"kind": "new_finding", "finding_id": "behaviour:F1"},
-            },
-        ],
     }
     corrected = json.loads(json.dumps(invalid))
     corrected["governing_findings"][0]["classification"] = {
         "kind": "one_off", "reason": "separate from the satisfied class",
     }
-    corrected["class_outcomes"] = corrected["class_outcomes"][:1]
     retry_prompts = []
 
     def run(self, prompt, *args, **kwargs):
@@ -696,7 +699,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
     )
 
     assert "CONVERGENCE: NOT-BLOCKED" in result
-    assert "emit exactly one census projection" in retry_prompts[0]
+    assert "its integrity assessment verdict is 'satisfied', so reclassify" in retry_prompts[0]
     audit = json.loads(
         next((tmp_path / "logs").glob("ACTIVE-critique_branch-*.json")).read_text()
     )
@@ -1255,7 +1258,7 @@ def test_real_consolidation_path_accepts_150_independent_sources(tmp_path):
                         }
                         for index, source_id in enumerate(source_ids)
                     ],
-                    "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
+                    "debt_outcomes":[], "class_actions":[],
                 })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -1376,7 +1379,7 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
         else:
             text = wire({
                 "role":"census", "governing_findings":[], "debt_outcomes":[],
-                "class_outcomes":[], "class_actions":[],
+                "class_actions":[],
             })
         return Review(text=text, session_ref="s", raw=text)
 
@@ -1428,7 +1431,7 @@ def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
             else:
                 text = wire({
                     "role":"census", "governing_findings":[], "debt_outcomes":[],
-                    "class_outcomes":[], "class_actions":[],
+                    "class_actions":[],
                 })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -1540,7 +1543,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
                         "kind":"one_off", "reason":"unique plan edit",
                     },
                 }],
-                "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
+                "debt_outcomes":[], "class_actions":[],
             })
         elif '"role": "correction"' in prompt:
             text = wire({
@@ -1705,7 +1708,7 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
     def valid_settlement():
         return wire({
             "role":"census", "governing_findings":[], "debt_outcomes":[],
-            "class_outcomes":[], "class_actions":[],
+            "class_actions":[],
         })
 
     def run(self, prompt, *args, **kwargs):
@@ -1782,6 +1785,111 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
     assert [row["role"] for row in audit["attempt_ledger"]] == ["consolidation"]
 
 
+def test_impossible_integrity_manifest_is_not_cached_across_invocations(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    lineage_id = "noncacheable-mechanized-lane"
+    tracked = cc.TrackedClass(
+        class_id="class-a", invariant="hello must remain absent", severity="MAJOR",
+        first_round=1, status=cc.OPEN, pattern="hello", pathspec="app.py",
+    )
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=cc.BRANCH_MODE,
+            classes={tracked.class_id: tracked}, next_seq=2,
+        ),
+    )
+    anchor = "repository/README.md:1"
+    invalid_anchor = "repository/missing.py:999"
+    calls: list[str] = []
+    retry_guidance: list[str] = []
+    allow_valid = False
+
+    def lane_response(lane_name):
+        findings = []
+        assessments = []
+        if lane_name == "integrity":
+            if allow_valid:
+                findings = [{
+                    "id":"F1", "severity":"MAJOR", "summary":"BAD remains",
+                    "evidence":[anchor], "remedy":"remove BAD",
+                }]
+                assessments = [{
+                    "class_id":"class-a", "verdict":"violated",
+                    "evidence":[anchor], "finding_id":"F1",
+                }]
+            else:
+                assessments = [{
+                    "class_id":"class-a", "verdict":"satisfied",
+                    "evidence":[invalid_anchor], "finding_id":None,
+                }]
+        value = payload(lane(lane_name, findings=findings, assessments=assessments))
+        for row in value["coverage"]:
+            row["evidence"] = [anchor]
+        return wire(value)
+
+    def run(self, prompt, *args, **kwargs):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            calls.append(f"lane:{lane_name}")
+            text = lane_response(lane_name)
+            return Review(text=text, session_ref=f"lane-{lane_name}", raw=text)
+        calls.append("consolidation")
+        text = wire({
+            "role":"census", "governing_findings":[{
+                "id":"G1", "severity":"MAJOR", "summary":"BAD remains",
+                "evidence":[anchor], "remedy":"remove BAD",
+                "source_ids":["integrity:F1"],
+                "classification":{"kind":"existing_class", "class_id":"class-a"},
+            }],
+            "debt_outcomes":[], "class_actions":[],
+        })
+        return Review(text=text, session_ref="consolidation", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "lane-integrity"
+        calls.append("lane:integrity-retry")
+        retry_guidance.append(prompt)
+        text = lane_response("integrity")
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    args = {
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":lineage_id, "stakes":"trusted local tool",
+    }
+    first = handlers.critique_branch(
+        {**args, "round":1}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"NC1",
+    )
+    assert "STRUCTURAL-FAILURE: role=census-integrity-validation-retry" in first
+    assert "/class_assessments/0/verdict: satisfied cannot close" in retry_guidance[0]
+    assert (
+        f"/class_assessments/0/evidence/0: unresolvable repository anchor "
+        f"{invalid_anchor!r}"
+    ) in retry_guidance[0]
+    persisted = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="NC2", mode=cc.BRANCH_MODE,
+    )
+    assert "census_cache" not in persisted.review_state
+
+    allow_valid = True
+    second = handlers.critique_branch(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"NC2",
+    )
+    assert "STRUCTURAL-ERROR" not in second
+    assert calls.count("lane:behaviour") == 2
+    assert calls.count("lane:execution") == 2
+    assert calls.count("lane:integrity") == 2
+    assert calls.count("consolidation") == 1
+
+
 def test_branch_codex_runs_the_staged_census_path(
     repo_with_branch, tmp_path, monkeypatch,
 ):
@@ -1810,7 +1918,7 @@ def test_branch_codex_runs_the_staged_census_path(
             text = wire({
                 "role":"census", "governing_findings":[],
                 "debt_outcomes":debt_outcomes,
-                "class_outcomes":[], "class_actions":[],
+                "class_actions":[],
             })
         return Review(text=text, session_ref="branch-session", raw=text)
 
@@ -1891,7 +1999,7 @@ def test_tracked_branch_rejects_pathspec_magic_on_fresh_and_retry(
                 },
             },
         }],
-        "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": [],
     }
 
     def response(prompt):
@@ -1974,7 +2082,7 @@ def test_branch_settlement_persists_a_new_procedure_class(
                         },
                     },
                 }],
-                "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
+                "debt_outcomes":[], "class_actions":[],
             }
         text = wire(value)
         return Review(text=text, session_ref="branch-session", raw=text)

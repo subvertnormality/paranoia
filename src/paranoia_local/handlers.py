@@ -539,21 +539,30 @@ def _staged_structural_review(
 
     def validate_lane(text: str, lane: str) -> dict[str, Any]:
         try:
-            parsed = sp.parse_lane(
-                text, mode=mode, lane=lane,
-                class_ids=active_ids if lane == "integrity" else (),
-            )
+            parsed = sp.decode_lane(text, mode=mode, lane=lane)
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
+        issues: list[str] = []
+        try:
+            sp.validate_lane_value(
+                parsed, lane=lane,
+                active_classes=active_classes if lane == "integrity" else (),
+            )
+        except sp.ProtocolError as exc:
+            issues.extend(str(exc).splitlines())
         trusted_roots = None
         repository_alias = cwd / "repository"
         if mode == cc.PLAN_MODE and repository_alias.is_symlink():
             trusted_roots = {"repository": repository_alias.resolve(strict=True)}
         elif mode == cc.BRANCH_MODE:
             trusted_roots = {"repository": cwd.resolve(strict=True)}
-        rc.resolve_anchors(
-            parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
-        )
+        try:
+            rc.resolve_anchors(
+                parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
+            )
+        except rc.CensusError as exc:
+            issues.extend(str(exc).splitlines())
+        _raise_staged_validation_issues(issues)
         return parsed
 
     def validate_settlement(

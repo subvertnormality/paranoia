@@ -232,11 +232,16 @@ Consolidation and follow-up responses use these concepts:
 }
 ```
 
+> Historical census shape: the shipped amendment in
+> [`derive_census_class_outcomes_plan.md`](derive_census_class_outcomes_plan.md) removes
+> `class_outcomes` from census responses and derives them from the validated integrity manifest.
+> Correction and final retain this model-owned field.
+
 Role schemas add only what the role owns:
 
-- census findings require one or more `source_ids`; census class outcomes must exactly
-  preserve the validated integrity verdicts and explicitly bind each violation during
-  consolidation;
+- census findings require one or more `source_ids`; the current amended protocol derives census
+  class outcomes from validated integrity assessments and requires consolidation to bind each
+  violation through exactly one matching governing finding;
 - correction and final findings omit `source_ids`, because each is already a governing
   finding rather than a merge target;
 - correction returns one `class_outcome` for each affected class: the union of class IDs

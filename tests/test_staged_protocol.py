@@ -1,6 +1,9 @@
+import base64
+import gzip
 import hashlib
 import json
 import re
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
@@ -8,6 +11,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from paranoia_local import class_closure as cc
+from paranoia_local import engines
 from paranoia_local import prompts
 from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
@@ -63,9 +67,10 @@ def decision(role="census", **overrides):
         "role": role,
         "governing_findings": [],
         "debt_outcomes": [],
-        "class_outcomes": [],
         "class_actions": [],
     }
+    if role != "census":
+        value["class_outcomes"] = []
     if role == "final":
         value["coverage"] = coverage()
     value.update(overrides)
@@ -158,7 +163,17 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         ) == probe["response"]
     for probe in artifact["schema_probes"]:
         role = probe["role"]
-        schema = sp.provider_schema(sp.decision_schema(cc.PLAN_MODE, role))
+        schema = sp.decision_schema(cc.PLAN_MODE, role)
+        if role == "census":
+            # The retained artifact proves the shipped pre-cutover schema. Keep
+            # that representation test-only; production accepts only the current
+            # deterministic census contract.
+            schema = deepcopy(schema)
+            schema["properties"]["class_outcomes"] = sp._array(  # noqa: SLF001
+                sp._class_outcome(), maximum=sp.MAX_ACTIVE_CLASSES,  # noqa: SLF001
+            )
+            schema["required"].insert(3, "class_outcomes")
+        schema = sp.provider_schema(schema)
         assert hashlib.sha256(
             sp.canonical_schema(schema).encode("utf-8")
         ).hexdigest() == probe["schema_sha256"]
@@ -168,9 +183,15 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
             "response_sha256"
         ]
-        assert sp.materialize_decision(
-            rendered, mode=cc.PLAN_MODE, role=role,
-        )["role"] == role
+        if role == "census":
+            assert not list(Draft202012Validator(schema).iter_errors(probe["response"]))
+            assert sp.materialize_decision_value(
+                probe["response"], mode=cc.PLAN_MODE, role=role,
+            )["role"] == role
+        else:
+            assert sp.materialize_decision(
+                rendered, mode=cc.PLAN_MODE, role=role,
+            )["role"] == role
         assert re.fullmatch(r"[0-9a-f]{64}", probe["schema_sha256"])
         assert re.fullmatch(r"[0-9a-f]{64}", probe["response_sha256"])
     assert artifact["schema_probes"][1]["attempts"] == [
@@ -209,6 +230,154 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         for attempt in row["attempts"]:
             assert re.fullmatch(r"[0-9a-f]{64}", attempt["response_sha256"])
     assert re.fullmatch(r"[0-9a-f]{64}", lifecycle["final_state_sha256"])
+
+
+def test_derived_census_provider_acceptance_replays_exact_responses():
+    artifact = json.loads(
+        (ROOT / "docs/derive_census_class_outcomes_acceptance_2026-08-15.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "derived-census-class-outcomes-provider-acceptance"
+    )
+    schema = sp.provider_schema(sp.decision_schema(cc.PLAN_MODE, "census"))
+    assert artifact["schema"] == schema
+    assert hashlib.sha256(
+        sp.canonical_schema(schema).encode("utf-8")
+    ).hexdigest() == artifact["schema_sha256"]
+    primary = artifact["primary_census"]
+    primary_bytes = json.dumps(
+        primary["audit_projection"], ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"),
+    )
+    assert hashlib.sha256(primary_bytes.encode("utf-8")).hexdigest() == (
+        primary["audit_projection_sha256"]
+    )
+    assert primary["model_call_count"] == len(
+        primary["audit_projection"]["attempts"]
+    ) == 4
+    assert primary["audit_projection"]["class_assessments"][0]["verdict"] == (
+        "satisfied"
+    )
+    assert re.fullmatch(r"[0-9a-f]{64}", primary["audit_sha256"])
+    base = primary["audit_projection"]["base_id"]
+    head = primary["audit_projection"]["head_id"]
+    diff = subprocess.run(
+        ["git", "diff", "--numstat", base, head, "--", "src/paranoia_local"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    changed = [
+        (int(added), int(deleted), path)
+        for row in diff for added, deleted, path in [row.split("\t")]
+    ]
+    assert primary["production_diff"] == {
+        "added_lines":sum(row[0] for row in changed),
+        "deleted_lines":sum(row[1] for row in changed),
+        "net_lines":sum(row[0] - row[1] for row in changed),
+    }
+    largest_changed = max(changed, key=lambda row: row[0] + row[1])
+    assert primary["largest_changed_production_module"] == {
+        "added_lines":largest_changed[0], "deleted_lines":largest_changed[1],
+        "path":largest_changed[2],
+    }
+    module_paths = [row[2] for row in changed]
+    module_sizes = {
+        path:len(subprocess.run(
+            ["git", "show", f"{head}:{path}"], cwd=ROOT, check=True,
+            capture_output=True, text=True,
+        ).stdout.splitlines())
+        for path in module_paths
+    }
+    largest_module = max(module_sizes.items(), key=lambda row: row[1])
+    assert primary["largest_production_module"] == {
+        "path":largest_module[0], "lines":largest_module[1],
+    }
+    server_inputs = artifact["server_inputs"]
+    assert [probe["engine"] for probe in artifact["probes"]] == ["codex", "claude"]
+    for probe in artifact["probes"]:
+        response = probe["response"]
+        assert not list(Draft202012Validator(schema).iter_errors(response))
+        rendered = json.dumps(
+            response, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        )
+        assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == (
+            probe["response_sha256"]
+        )
+        decoded = sp.decode_decision(rendered, mode=cc.PLAN_MODE, role="census")
+        materialized = sp.materialize_decision_value(
+            decoded, mode=cc.PLAN_MODE, role="census", **server_inputs,
+        )
+        assert materialized["class_assessments"] == (
+            probe["materialized_class_assessments"]
+        )
+        assert materialized["class_records"] == probe["materialized_class_records"]
+
+
+def test_derived_census_authenticated_material_recomputes_every_digest():
+    acceptance = json.loads(
+        (ROOT / "docs/derive_census_class_outcomes_acceptance_2026-08-15.json").read_text()
+    )
+    material = json.loads(
+        (
+            ROOT
+            / "docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json"
+        ).read_text()
+    )
+    assert material["acceptance_kind"] == "derived-census-authenticated-material"
+
+    def exact_bytes(record):
+        raw = gzip.decompress(base64.b64decode(record["gzip_base64"], validate=True))
+        assert hashlib.sha256(raw).hexdigest() == record["sha256"]
+        return raw
+
+    audit_raw = exact_bytes(material["primary_audit"])
+    assert material["primary_audit"]["sha256"] == acceptance[
+        "authenticated_material"
+    ]["primary_audit_sha256"]
+    assert hashlib.sha256(audit_raw).hexdigest() == acceptance["primary_census"][
+        "audit_sha256"
+    ]
+    audit = json.loads(audit_raw)
+    projection = {
+        "base_id":audit["base_id"], "head_id":audit["head_id"],
+        "lineage":audit["lineage"], "round":audit["round"],
+        "attempts":[{
+            "role":row["role"], "outcome":row["outcome"],
+            "response_sha256":row["response_sha256"],
+        } for row in audit["attempt_ledger"]],
+        "class_assessments":audit["staged_settlement"]["class_assessments"],
+    }
+    assert projection == acceptance["primary_census"]["audit_projection"]
+
+    disposition_raw = exact_bytes(material["reviewer_disposition"])
+    assert material["reviewer_disposition"]["sha256"] == acceptance[
+        "authenticated_material"
+    ]["reviewer_disposition_sha256"]
+    disposition = json.loads(disposition_raw)
+    assert material["reviewer_disposition"]["disposition"] == "CONCEDE"
+    assert material["reviewer_disposition"]["session_ref"] == (
+        "01a00731-98a7-78d2-8a92-d551a15b09e2"
+    )
+    assert disposition["tool"] == "rebut"
+    assert disposition["text"].startswith("CONCEDE.")
+    assert "disputed class should close" in disposition["text"]
+
+    engine_by_name = {
+        "codex": engines.CodexEngine(), "claude": engines.ClaudeEngine(),
+    }
+    retained_responses = {
+        row["engine"]:row["response"] for row in acceptance["probes"]
+    }
+    for record in material["provider_probes"]:
+        raw = exact_bytes(record["raw_envelope"]).decode("utf-8")
+        assert record["raw_envelope"]["sha256"] == acceptance[
+            "authenticated_material"
+        ]["provider_raw_envelope_sha256"][record["engine"]]
+        review = engine_by_name[record["engine"]].parse_output(raw)
+        assert review.error is False
+        assert json.loads(review.text) == record["response"]
+        assert record["response"] == retained_responses[record["engine"]]
+        if record["engine"] == "claude":
+            assert json.loads(raw)["structured_output"] == record["response"]
 
 
 @pytest.mark.parametrize(
@@ -405,16 +574,13 @@ def test_census_existing_advisory_violation_still_mints_debt():
             severity="OUT-OF-SCOPE", source_ids=["integrity:F1"],
             classification={"kind": "existing_class", "class_id": "class-a"},
         )],
-        class_outcomes=[{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
-            "basis": {"kind": "new_finding", "finding_id": "G1"},
-        }],
     )
     parsed = materialize(
         value, source_ids=["integrity:F1"],
         source_severities={"integrity:F1": "OUT-OF-SCOPE"},
         assessment_verdicts={"class-a": "violated"},
         assessment_findings={"class-a": "integrity:F1"},
+        assessment_evidence={"class-a": ["plan:1"]},
         active_classes=[cls],
     )
     assert parsed["debt"] == [{
@@ -740,76 +906,96 @@ def test_source_fanout_requires_distinct_cited_existing_classes():
         )
         for index, cls in enumerate(classes, 1)
     ]
-    outcomes = [
-        {
-            "class_id": cls["class_id"], "verdict": "violated", "evidence": ["plan:1"],
-            "basis": {"kind": "new_finding", "finding_id": f"G{index}"},
-        }
-        for index, cls in enumerate(classes, 1)
-    ]
     parsed = materialize(
-        decision("census", governing_findings=findings, class_outcomes=outcomes),
+        decision("census", governing_findings=findings),
         source_ids=["integrity:F1"], source_severities={"integrity:F1": "MAJOR"},
         assessment_verdicts={cls["class_id"]: "violated" for cls in classes},
         assessment_findings={cls["class_id"]: "integrity:F1" for cls in classes},
+        assessment_evidence={cls["class_id"]: ["plan:1"] for cls in classes},
         active_classes=classes,
     )
     assert len(parsed["debt"]) == 2
 
 
-def test_census_duplicate_outcome_names_integrity_projection_repair():
-    value = decision(
-        "census",
-        governing_findings=[finding(
-            fid="execution:F1", source_ids=["execution:F1"],
-            classification={"kind": "existing_class", "class_id": "class-a"},
-        )],
-        class_outcomes=[
-            {
-                "class_id": "class-a", "verdict": "satisfied",
-                "evidence": ["plan:1"],
-            },
-            {
-                "class_id": "class-a", "verdict": "violated",
-                "evidence": ["plan:2"],
-                "basis": {"kind": "new_finding", "finding_id": "execution:F1"},
-            },
-        ],
+def test_census_schema_rejects_authored_class_outcomes():
+    value = decision("census")
+    value["class_outcomes"] = []
+    issues = list(
+        Draft202012Validator(sp.decision_schema("plan", "census")).iter_errors(value)
     )
+    assert len(issues) == 1
+    assert "Additional properties" in issues[0].message
 
-    with pytest.raises(sp.ProtocolError) as caught:
+
+def test_census_derives_exact_verdict_evidence_and_basis():
+    value = decision("census", governing_findings=[finding(
+        source_ids=["integrity:F1"],
+        classification={"kind": "existing_class", "class_id": "class-a"},
+    )])
+    parsed = materialize(
+        value, source_ids=["integrity:F1"],
+        source_severities={"integrity:F1": "MAJOR"},
+        assessment_verdicts={"class-a": "violated"},
+        assessment_findings={"class-a": "integrity:F1"},
+        assessment_evidence={"class-a": ["plan:2", "plan:1"]},
+        active_classes=[active_class()],
+    )
+    assert parsed["class_assessments"] == [{
+        "class_id": "class-a", "verdict": "violated",
+        "evidence": ["plan:2", "plan:1"], "finding_id": "G1",
+    }]
+
+
+def test_census_derives_satisfied_assessment_and_close():
+    parsed = materialize(
+        decision("census"),
+        assessment_verdicts={"class-a": "satisfied"},
+        assessment_findings={"class-a": None},
+        assessment_evidence={"class-a": ["plan:2", "plan:1"]},
+        active_classes=[active_class()],
+    )
+    assert parsed["class_assessments"] == [{
+        "class_id": "class-a", "verdict": "satisfied",
+        "evidence": ["plan:2", "plan:1"], "finding_id": None,
+    }]
+    assert parsed["class_records"] == [{"op": "close", "class_id": "class-a"}]
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_census_violated_class_requires_one_matching_governing_finding(count):
+    findings = [
+        finding(
+            fid=f"G{index}", source_ids=["integrity:F1"],
+            classification={"kind": "existing_class", "class_id": "class-a"},
+        )
+        for index in range(count)
+    ]
+    if count == 0:
+        findings = [finding(source_ids=["integrity:F1"])]
+    with pytest.raises(
+        sp.ProtocolError,
+        match=rf"/governing_findings: violated class 'class-a' requires exactly one .* got",
+    ):
         materialize(
-            value,
-            source_ids=["execution:F1"],
-            source_severities={"execution:F1": "MAJOR"},
-            assessment_verdicts={"class-a": "satisfied"},
-            assessment_findings={"class-a": None},
+            decision("census", governing_findings=findings),
+            source_ids=["integrity:F1"],
+            source_severities={"integrity:F1": "MAJOR"},
+            assessment_verdicts={"class-a": "violated"},
+            assessment_findings={"class-a": "integrity:F1"},
+            assessment_evidence={"class-a": ["plan:1"]},
             active_classes=[active_class()],
         )
 
-    message = str(caught.value)
-    assert (
-        "/governing_findings/0/classification/class_id: cannot target active class "
-        "'class-a'; its integrity assessment verdict is 'satisfied', so reclassify "
-        "this finding"
-    ) in message
-    assert (
-        "/class_outcomes/1: duplicate class outcome for 'class-a'; emit exactly one "
-        "census projection preserving integrity verdict 'satisfied'"
-    ) in message
 
-
-def test_census_outcome_must_preserve_integrity_evidence_exactly():
-    value = decision("census", class_outcomes=[{
-        "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:2"],
-    }])
-
-    with pytest.raises(
-        sp.ProtocolError,
-        match=r"/class_outcomes/0/evidence: must exactly preserve integrity-lane evidence",
-    ):
+def test_census_finding_cannot_target_satisfied_class():
+    with pytest.raises(sp.ProtocolError, match="its integrity assessment verdict is 'satisfied'"):
         materialize(
-            value,
+            decision("census", governing_findings=[finding(
+                source_ids=["execution:F1"],
+                classification={"kind": "existing_class", "class_id": "class-a"},
+            )]),
+            source_ids=["execution:F1"],
+            source_severities={"execution:F1": "MAJOR"},
             assessment_verdicts={"class-a": "satisfied"},
             assessment_findings={"class-a": None},
             assessment_evidence={"class-a": ["plan:1"]},
@@ -817,10 +1003,65 @@ def test_census_outcome_must_preserve_integrity_evidence_exactly():
         )
 
 
-def test_consolidation_prompt_forbids_cross_lane_duplicate_class_outcomes():
+def test_census_collision_rekey_does_not_depend_on_authored_outcome():
+    parsed = materialize(
+        decision(
+            "census",
+            governing_findings=[finding(
+                fid="old-finding", source_ids=["integrity:F1"],
+                classification={"kind": "existing_class", "class_id": "class-a"},
+            )],
+            debt_outcomes=[{
+                "debt_id":"D7", "status":"open", "evidence":["plan:1"],
+                "reason":"the historical occurrence remains reachable",
+            }],
+        ),
+        source_ids=["integrity:F1"],
+        source_severities={"integrity:F1": "MAJOR"},
+        assessment_verdicts={"class-a": "violated"},
+        assessment_findings={"class-a": "integrity:F1"},
+        assessment_evidence={"class-a": ["plan:1"]},
+        active_classes=[active_class()],
+        durable_debt=[durable_debt()],
+    )
+    assert parsed["_finding_id_renames"] == {"old-finding": "F1"}
+    assert parsed["class_assessments"][0]["finding_id"] == "F1"
+
+
+@pytest.mark.parametrize("mechanized", [False, True])
+def test_census_closed_violation_points_missing_action_to_collection(mechanized):
+    kwargs = {
+        "source_ids":["integrity:F1"],
+        "source_severities":{"integrity:F1":"MAJOR"},
+        "assessment_verdicts":{"class-a":"violated"},
+        "assessment_findings":{"class-a":"integrity:F1"},
+        "assessment_evidence":{"class-a":["plan:1"]},
+        "active_classes":[active_class(status=cc.CLOSED, mechanized=mechanized)],
+    }
+    value = decision("census", governing_findings=[finding(
+        source_ids=["integrity:F1"],
+        classification={"kind":"existing_class", "class_id":"class-a"},
+    )])
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(value, **kwargs)
+    assert any(
+        line.startswith("/class_actions: closed violated class requires")
+        for line in str(caught.value).splitlines()
+    )
+
+    value["class_actions"] = [{"kind":"close", "class_id":"class-a"}]
+    with pytest.raises(sp.ProtocolError) as caught:
+        materialize(value, **kwargs)
+    assert any(
+        line.startswith("/class_actions/0: closed violated class requires")
+        for line in str(caught.value).splitlines()
+    )
+
+
+def test_consolidation_prompt_delegates_census_projection_to_server():
     contract = " ".join(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.split())
-    assert "exact projection of the integrity manifest" in contract
-    assert "must not gain a second outcome from another lane" in contract
+    assert "server derives census class outcomes exactly" in contract
+    assert "Do not repeat them" in contract
 
 
 def test_final_coverage_binds_every_new_finding():
@@ -1080,6 +1321,38 @@ def test_duplicate_assessment_diagnostics_bind_the_retained_first_row():
     ]
 
 
+def test_integrity_lane_rejects_satisfied_unproven_mechanized_class():
+    value = lane_value("integrity", assessments=[{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }])
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"/class_assessments/0/verdict: satisfied cannot close an unproven mechanized class",
+    ):
+        sp.parse_lane(
+            json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+            active_classes=[active_class(mechanized=True)],
+        )
+
+    assert sp.parse_lane(
+        json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+        active_classes=[active_class(status=cc.CLOSED, mechanized=True)],
+    ) == value
+
+
+def test_integrity_lane_requires_every_active_class_assessment():
+    with pytest.raises(
+        sp.ProtocolError,
+        match="must assess every required active class exactly once",
+    ):
+        sp.parse_lane(
+            json.dumps(lane_value("integrity")),
+            mode=cc.PLAN_MODE, lane="integrity",
+            active_classes=[active_class()],
+        )
+
+
 def test_class_and_debt_outcome_completeness_are_independent_controls():
     with pytest.raises(sp.ProtocolError, match="class_outcomes: expected exactly"):
         materialize(
@@ -1274,13 +1547,7 @@ def test_frozen_historical_v1_census_projection_is_preserved():
             },
         ),
     ]
-    raw = decision(
-        "census", governing_findings=values,
-        class_outcomes=[{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
-            "basis": {"kind": "new_finding", "finding_id": "G2"},
-        }],
-    )
+    raw = decision("census", governing_findings=values)
     parsed = materialize(
         raw,
         source_ids=["domain:F1", "integrity:F2", "execution:F3"],
@@ -1290,6 +1557,7 @@ def test_frozen_historical_v1_census_projection_is_preserved():
         },
         assessment_verdicts={"class-a": "violated"},
         assessment_findings={"class-a": "integrity:F2"},
+        assessment_evidence={"class-a": ["plan:1"]},
         active_classes=classes,
     )
     expected_debt = [
@@ -1556,20 +1824,13 @@ def test_historical_v1_v2_census_fanout_shape_is_equivalent():
             classification={"kind":"existing_class", "class_id":"class-b"},
         ),
     ]
-    outcomes = [
-        {
-            "class_id":row["classification"]["class_id"],
-            "verdict":"violated", "evidence":["plan:1"],
-            "basis":{"kind":"new_finding", "finding_id":row["id"]},
-        }
-        for row in values
-    ]
     parsed = materialize(
-        decision("census", governing_findings=values, class_outcomes=outcomes),
+        decision("census", governing_findings=values),
         source_ids=["integrity:F1"],
         source_severities={"integrity:F1":"MINOR"},
-        assessment_verdicts={item["class_id"]:"violated" for item in outcomes},
-        assessment_findings={item["class_id"]:"integrity:F1" for item in outcomes},
+        assessment_verdicts={item["class_id"]:"violated" for item in classes},
+        assessment_findings={item["class_id"]:"integrity:F1" for item in classes},
+        assessment_evidence={item["class_id"]:["plan:1"] for item in classes},
         active_classes=classes,
     )
     legacy = {
@@ -1623,8 +1884,8 @@ def test_historical_v1_v2_census_fanout_shape_is_equivalent():
     }
     legacy = historical_v1_reference(
         legacy, role="census", source_ids=["integrity:F1"],
-        assessment_verdicts={item["class_id"]:"violated" for item in outcomes},
-        assessment_findings={item["class_id"]:"integrity:F1" for item in outcomes},
+        assessment_verdicts={item["class_id"]:"violated" for item in classes},
+        assessment_findings={item["class_id"]:"integrity:F1" for item in classes},
         active=classes,
     )
     assert durable_projection(
