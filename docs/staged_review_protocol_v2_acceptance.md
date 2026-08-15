@@ -1,11 +1,12 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **CODE round-12 held finding repaired; correction and cold-final convergence pending**
+Status: **Protocol v2 shipped. The deterministic census-outcome amendment remains subject to its
+external CODE-lineage correction and cold-final gate.**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
 that structured output improves reviewer judgement, that every provider version supports the
-schemas, or that the subsequent code review has converged.
+schemas, or that a subsequent code review has converged merely because this report exists.
 
 ## Frozen operating model
 
@@ -310,6 +311,10 @@ provider envelopes. The executable acceptance test decompresses each record, rec
 reconstructs the bounded primary audit projection, parses both provider envelopes through the real
 engine parsers, and proves the resulting structured objects equal the retained schema-valid
 responses. The Claude check additionally reads `structured_output` directly from its exact envelope.
+It also retains the exact same-vendor reviewer disposition for the circular demand that the reviewed
+commit contain its own future cold-final record. That reviewer answered `CONCEDE`; the executable
+test authenticates the disposition and session. This does not replace the external correction and
+cold-final release gate, and the report makes no self-attesting convergence claim.
 
 The current signed-in primary acceptance used the real tracked branch handler at snapshot
 `f5950327303e9278829ca789b68577b5eb2b3be1` with active class `f7da2428`. Three Codex lanes plus

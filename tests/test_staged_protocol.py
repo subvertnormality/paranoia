@@ -348,6 +348,19 @@ def test_derived_census_authenticated_material_recomputes_every_digest():
     }
     assert projection == acceptance["primary_census"]["audit_projection"]
 
+    disposition_raw = exact_bytes(material["reviewer_disposition"])
+    assert material["reviewer_disposition"]["sha256"] == acceptance[
+        "authenticated_material"
+    ]["reviewer_disposition_sha256"]
+    disposition = json.loads(disposition_raw)
+    assert material["reviewer_disposition"]["disposition"] == "CONCEDE"
+    assert material["reviewer_disposition"]["session_ref"] == (
+        "01a00731-98a7-78d2-8a92-d551a15b09e2"
+    )
+    assert disposition["tool"] == "rebut"
+    assert disposition["text"].startswith("CONCEDE.")
+    assert "disputed class should close" in disposition["text"]
+
     engine_by_name = {
         "codex": engines.CodexEngine(), "claude": engines.ClaudeEngine(),
     }

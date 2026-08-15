@@ -3,6 +3,7 @@
   "authenticated_material": {
     "path": "derive_census_class_outcomes_authenticated_material_2026-08-15.json",
     "primary_audit_sha256": "d148bfd9fbf6bde6cb5a4d6cfeb7a60af640143b8e817f29f4c111baaea36d1e",
+    "reviewer_disposition_sha256": "bb5700c6165132ba8e05a8622031a30ac4e6d7c29a989b245584d017ca2bfae5",
     "provider_raw_envelope_sha256": {
       "claude": "72dfc248e15b5c808c67330fea3dc83db033f9f865bfa21e69baec594e514cb1",
       "codex": "f6de4cacdbe42d43ead36dcd961f91e24dd4a5d3abe7b306520249fa19788292"
