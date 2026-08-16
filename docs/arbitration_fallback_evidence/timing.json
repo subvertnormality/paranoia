@@ -1,13 +1,7 @@
 {
-  "started_utc": "2026-08-16T19:42:22.821001Z",
-  "finished_utc": "2026-08-16T19:45:24.880736Z",
-  "monotonic_elapsed_seconds": 182.059733,
+  "audit_sha256": "d14f3caa6296de82962e88898a16212b19208ab19b0c8ad44d83876cef5f425b",
   "exit_status": 0,
-  "audit_sha256": "4a249d281511c706c30ebde148be67af985d46c36075d8520bd6d0367ec64066",
-  "external_calls": {
-    "attester": 1,
-    "codex_decider": 1,
-    "claude_decider": 1
-  },
-  "cleaner_source": "deterministic-reported-candidate"
+  "finished_utc": "2026-08-16T20:46:24.904669Z",
+  "monotonic_elapsed_seconds": 143.240264,
+  "started_utc": "2026-08-16T20:44:01.663795Z"
 }

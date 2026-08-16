@@ -25,6 +25,7 @@ SOURCES = frozenset({
     "src/paranoia_local/evidence.py",
     "src/paranoia_local/prompts.py",
     "src/paranoia_local/server.py",
+    "scripts/run_arbitration_fallback_acceptance.py",
     "scripts/validate_arbitration_fallback_acceptance.py",
     "tests/test_arbitrate_handler.py",
     "tests/test_arbitration_fallback_acceptance.py",
@@ -33,11 +34,12 @@ SOURCES = frozenset({
 SCOPE = {
     "proves": [
         "a reported destructive cleaner candidate was retained as rejected audit data",
+        "the current ordinary Claude cleaner completed the six-line attestation path with real deciders",
         "a signed-in Codex attester authorized the complete canonical originals",
         "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
         "the transient snapshot was the exact tree of the recorded durable source commit",
         "the recorded replies parse to the stored votes whose resolved decisive citations recompute the terminal result",
-        "the recorded run route used a deterministic cleaner candidate and three signed-in external calls",
+        "attempt-ledger provenance proves the ordinary and deterministic-fallback execution routes",
     ],
     "does_not_prove": [
         "that the current Claude cleaner will reproduce the historical destructive rewrite probabilistically",
@@ -45,22 +47,6 @@ SCOPE = {
         "provider service identity beyond the recorded local CLI versions and configured model names",
     ],
 }
-
-ROUTE = {
-    "cleaner": {
-        "source": "deterministic-reported-candidate",
-        "external": False,
-        "audit_lifecycle": "provider-completed",
-        "audit_lifecycle_note": (
-            "the production harness labels completion of its injected agent callable; "
-            "the separately recorded route identifies this callable as deterministic"
-        ),
-    },
-    "attester": {"source": "signed-in-codex", "external": True, "calls": 1},
-    "codex_decider": {"source": "signed-in-codex", "external": True, "calls": 1},
-    "claude_decider": {"source": "signed-in-claude", "external": True, "calls": 1},
-}
-
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -93,7 +79,35 @@ def _text_digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
-def _attempt_bound(record: dict, *, prompt: str, reply: str, rejection: str | None) -> bool:
+def _external_execution(engine: str, model: str) -> dict[str, str | None]:
+    implementation = engines.get_engine(engine)
+    return {
+        "engine": engine, "model": model, "route": "external-cli",
+        "binary": implementation.binary, "cli_version": None,
+    }
+
+
+def _execution_bound(actual: object, expected: dict[str, str | None]) -> bool:
+    if not isinstance(actual, dict) or set(actual) != set(expected):
+        return False
+    if any(actual.get(key) != value for key, value in expected.items() if key != "cli_version"):
+        return False
+    if expected["route"] != "external-cli":
+        return actual.get("cli_version") is None
+    value = actual.get("cli_version")
+    if not isinstance(value, str) or re.fullmatch(r"\d+\.\d+\.\d+", value) is None:
+        return False
+    minimum = (
+        engines.MIN_CODEX_VERSION if expected["engine"] == "codex"
+        else engines.MIN_CLAUDE_VERSION
+    )
+    return tuple(int(part) for part in value.split(".")) >= minimum
+
+
+def _attempt_bound(
+    record: dict, *, prompt: str, reply: str, rejection: str | None,
+    execution: dict[str, str | None],
+) -> bool:
     return (
         record.get("status") == "provider-completed"
         and record.get("admitted") is True
@@ -103,19 +117,24 @@ def _attempt_bound(record: dict, *, prompt: str, reply: str, rejection: str | No
         and record.get("reply_sha256") == _text_digest(reply)
         and record.get("reply") == reply
         and record.get("rejection") == rejection
+        and _execution_bound(record.get("execution"), execution)
     )
 
 
 def _effective_packet(audit: dict) -> ah.Packet:
     raw = audit["raw_input"]
+    cleaned = audit["cleaned"]
+    original = audit.get("cleaning") == "original-attested"
     return ah.Packet(
-        decision=raw["decision"], stakes=raw["stakes"], context=raw["context"],
-        hints=list(raw["files"]), statements=dict(raw["options"]),
-        cleaning="original-attested", attestation=audit["attestation"],
+        decision=raw["decision"] if original else cleaned["decision"],
+        stakes=raw["stakes"], context=raw["context"] if original else cleaned["context"],
+        hints=list(raw["files"] if original else cleaned["hints"]),
+        statements=dict(raw["options"] if original else cleaned["statements"]),
+        cleaning=audit["cleaning"], attestation=audit["attestation"],
     )
 
 
-def _cleaning_and_attestation_bound(audit: dict) -> bool:
+def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
     raw, cleaned = audit["raw_input"], audit["cleaned"]
     phase_attempts = audit.get("phase_attempts", [])
     if [row.get("role") for row in phase_attempts] != ["cleaner", "attester"]:
@@ -131,6 +150,15 @@ def _cleaning_and_attestation_bound(audit: dict) -> bool:
     cleaner_reply = cleaner.get("reply")
     if not isinstance(cleaner_reply, str) or not _attempt_bound(
         cleaner, prompt=cleaner_prompt, reply=cleaner_reply, rejection=None,
+        execution=(
+            ah._execution_identity(
+                engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
+                route="deterministic-cleaner",
+            )
+            if fallback else _external_execution(
+                engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
+            )
+        ),
     ):
         return False
     try:
@@ -165,12 +193,14 @@ def _cleaning_and_attestation_bound(audit: dict) -> bool:
     except (KeyError, arb.ArbitrationError):
         return False
     if (
-        attestation.ok or not attestation.original_neutrality_pass
+        (fallback and attestation.ok)
+        or (not fallback and not attestation.ok)
+        or not attestation.original_neutrality_pass
         or attestation.stakes_advocacy is not None
         or attestation.context_advocacy is not None
     ):
         return False
-    expected_rejection = (
+    expected_rejection = None if attestation.ok else (
         f"fidelity changed: {attestation.changed}; detail: {attestation.fidelity_detail}; "
         f"neutrality: {'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}"
     )
@@ -182,6 +212,7 @@ def _cleaning_and_attestation_bound(audit: dict) -> bool:
     return _attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=expected_rejection,
+        execution=_external_execution(engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL),
     )
 
 
@@ -217,6 +248,10 @@ def _decider_transcripts(audit: dict) -> list[arb.Vote] | None:
                 {**attempt, "reply": attempt.get("raw"),
                  "reply_sha256": _text_digest(attempt.get("raw", ""))},
                 prompt=prompt, reply=reply, rejection=None,
+                execution=_external_execution(
+                    engine,
+                    engines.get_engine(engine).default_model,
+                ),
             )
         ):
             return None
@@ -281,7 +316,7 @@ def _snapshot_and_outcome_bound(repo: Path, artifact: dict, audit: dict, votes: 
 def _timing_bound(record: dict, audit_sha256: str) -> bool:
     if set(record) != {
         "started_utc", "finished_utc", "monotonic_elapsed_seconds", "exit_status",
-        "audit_sha256", "external_calls", "cleaner_source",
+        "audit_sha256",
     }:
         return False
     try:
@@ -295,70 +330,73 @@ def _timing_bound(record: dict, audit_sha256: str) -> bool:
         and abs((finished - started).total_seconds() - elapsed) <= 1.0
         and record["exit_status"] == 0
         and record["audit_sha256"] == audit_sha256
-        and record["external_calls"] == {"attester": 1, "codex_decider": 1, "claude_decider": 1}
-        and record["cleaner_source"] == "deterministic-reported-candidate"
     )
+
+
+def _validate_run(
+    *, repo: Path, artifact: dict, audit_meta: dict, timing_meta: dict,
+    fallback: bool,
+) -> None:
+    if set(audit_meta) != {"path", "sha256", "snapshot", "cleaning", "result"}:
+        raise ValueError("acceptance audit metadata schema mismatch")
+    audit_path = _evidence_path(repo, audit_meta["path"])
+    if _sha256(audit_path) != audit_meta["sha256"]:
+        raise ValueError("acceptance audit digest mismatch")
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    expected_cleaning = "original-attested" if fallback else "attested"
+    if not (
+        audit_meta["cleaning"] == audit.get("cleaning") == expected_cleaning
+        and audit_meta["snapshot"] == audit.get("snapshot")
+        and audit_meta["result"] == audit.get("outcome") == "CONVERGED"
+        and _cleaned_digest_bound(audit.get("cleaned", {}))
+        and (not fallback or audit["cleaned"]["statements"] != audit["raw_input"]["options"])
+        and _cleaning_and_attestation_bound(audit, fallback=fallback)
+    ):
+        raise ValueError("acceptance audit does not prove its exact delivery route")
+    votes = _decider_transcripts(audit)
+    if votes is None or not _snapshot_and_outcome_bound(repo, artifact, audit, votes):
+        raise ValueError("acceptance audit does not replay to its terminal result")
+    if set(timing_meta) != {"path", "sha256"}:
+        raise ValueError("acceptance timing metadata schema mismatch")
+    timing_path = _evidence_path(repo, timing_meta["path"])
+    if _sha256(timing_path) != timing_meta["sha256"]:
+        raise ValueError("acceptance timing digest mismatch")
+    if not _timing_bound(json.loads(timing_path.read_text()), audit_meta["sha256"]):
+        raise ValueError("acceptance timing record mismatch")
 
 
 def validate(artifact_path: Path, repo: Path) -> None:
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     if set(artifact) != {
-        "acceptance_kind", "acceptance_scope", "audit", "timing", "providers",
-        "route", "snapshot_binding", "source_sha256", "tests",
+        "acceptance_kind", "acceptance_scope", "audits", "timings",
+        "snapshot_binding", "source_sha256", "tests",
     }:
         raise ValueError("fallback acceptance top-level schema mismatch")
     if artifact["acceptance_kind"] != "arbitration-original-fallback-v2":
         raise ValueError("unsupported fallback acceptance kind")
     if artifact["acceptance_scope"] != SCOPE:
         raise ValueError("fallback acceptance claim scope mismatch")
-    if artifact["route"] != ROUTE:
-        raise ValueError("fallback acceptance route mismatch")
     if set(artifact["source_sha256"]) != SOURCES:
         raise ValueError("fallback acceptance source set mismatch")
     for relative, digest in artifact["source_sha256"].items():
         if not _is_sha256(digest) or _sha256(repo / relative) != digest:
             raise ValueError(f"fallback acceptance source hash mismatch: {relative}")
 
-    audit_meta = artifact["audit"]
-    if set(audit_meta) != {"path", "sha256", "snapshot", "cleaning", "result"}:
-        raise ValueError("fallback audit metadata schema mismatch")
-    audit_path = _evidence_path(repo, audit_meta["path"])
-    if _sha256(audit_path) != audit_meta["sha256"]:
-        raise ValueError("fallback audit digest mismatch")
-    audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    if not (
-        audit_meta["cleaning"] == audit.get("cleaning") == "original-attested"
-        and audit_meta["snapshot"] == audit.get("snapshot")
-        and audit_meta["result"] == audit.get("outcome")
-        and _cleaned_digest_bound(audit.get("cleaned", {}))
-        and audit["cleaned"]["statements"] != audit["raw_input"]["options"]
-        and _cleaning_and_attestation_bound(audit)
-    ):
-        raise ValueError("fallback audit does not prove exact original delivery")
-    votes = _decider_transcripts(audit)
-    if votes is None or not _snapshot_and_outcome_bound(repo, artifact, audit, votes):
-        raise ValueError("fallback audit does not replay to its terminal result")
-
-    timing_meta = artifact["timing"]
-    if set(timing_meta) != {"path", "sha256"}:
-        raise ValueError("fallback timing metadata schema mismatch")
-    timing_path = _evidence_path(repo, timing_meta["path"])
-    if _sha256(timing_path) != timing_meta["sha256"]:
-        raise ValueError("fallback timing digest mismatch")
-    if not _timing_bound(json.loads(timing_path.read_text()), audit_meta["sha256"]):
-        raise ValueError("fallback timing record mismatch")
-
-    providers = artifact["providers"]
-    if set(providers) != {"codex_cli", "claude_cli", "attester_model", "decider_models"}:
-        raise ValueError("fallback provider metadata schema mismatch")
-    if not all(isinstance(value, str) and value for value in (providers["codex_cli"], providers["claude_cli"])):
-        raise ValueError("fallback provider versions are missing")
-    if providers["attester_model"] != engines.ATTESTER_MODEL or providers["decider_models"] != {
-        "codex": engines.CodexEngine().default_model,
-        "claude": engines.ClaudeEngine().default_model,
+    if set(artifact["audits"]) != {"ordinary", "fallback"} or set(artifact["timings"]) != {
+        "ordinary", "fallback",
     }:
-        raise ValueError("fallback configured provider models mismatch")
-    if artifact["tests"] != {"full_suite": "1086 passed", "exit_status": 0}:
+        raise ValueError("acceptance run set mismatch")
+    _validate_run(
+        repo=repo, artifact=artifact, audit_meta=artifact["audits"]["ordinary"],
+        timing_meta=artifact["timings"]["ordinary"], fallback=False,
+    )
+    _validate_run(
+        repo=repo, artifact=artifact, audit_meta=artifact["audits"]["fallback"],
+        timing_meta=artifact["timings"]["fallback"], fallback=True,
+    )
+    if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
+        raise ValueError("acceptance runs did not share one source snapshot")
+    if artifact["tests"] != {"full_suite": "1096 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 

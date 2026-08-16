@@ -3,11 +3,12 @@
   "acceptance_scope": {
     "proves": [
       "a reported destructive cleaner candidate was retained as rejected audit data",
+      "the current ordinary Claude cleaner completed the six-line attestation path with real deciders",
       "a signed-in Codex attester authorized the complete canonical originals",
       "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
       "the transient snapshot was the exact tree of the recorded durable source commit",
       "the recorded replies parse to the stored votes whose resolved decisive citations recompute the terminal result",
-      "the recorded run route used a deterministic cleaner candidate and three signed-in external calls"
+      "attempt-ledger provenance proves the ordinary and deterministic-fallback execution routes"
     ],
     "does_not_prove": [
       "that the current Claude cleaner will reproduce the historical destructive rewrite probabilistically",
@@ -15,68 +16,52 @@
       "provider service identity beyond the recorded local CLI versions and configured model names"
     ]
   },
-  "audit": {
-    "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
-    "sha256": "4a249d281511c706c30ebde148be67af985d46c36075d8520bd6d0367ec64066",
-    "snapshot": "0b8dae8d79968b7f963bb1de831b706c2dff8a9e",
-    "cleaning": "original-attested",
-    "result": "CONVERGED"
-  },
-  "timing": {
-    "path": "docs/arbitration_fallback_evidence/timing.json",
-    "sha256": "16b5015aee8af845653e4e6a18f3487f7871afa1dca9db98b51b678a51e5f6ab"
-  },
-  "providers": {
-    "codex_cli": "codex-cli 0.144.6",
-    "claude_cli": "2.1.197 (Claude Code)",
-    "attester_model": "gpt-5.6-sol",
-    "decider_models": {
-      "codex": "gpt-5.6-sol",
-      "claude": "claude-fable-5"
+  "audits": {
+    "ordinary": {
+      "path": "docs/arbitration_fallback_evidence/ordinary-audit.json",
+      "sha256": "ea12a3fd410ab6e9ae155a48b76ac39ef8f6d10ceec30cec810109f93e6eac09",
+      "snapshot": "4c5381885ef16ee2d2a8a136aef9e8c347ed9f75",
+      "cleaning": "attested",
+      "result": "CONVERGED"
+    },
+    "fallback": {
+      "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
+      "sha256": "d14f3caa6296de82962e88898a16212b19208ab19b0c8ad44d83876cef5f425b",
+      "snapshot": "4c5381885ef16ee2d2a8a136aef9e8c347ed9f75",
+      "cleaning": "original-attested",
+      "result": "CONVERGED"
     }
   },
-  "route": {
-    "cleaner": {
-      "source": "deterministic-reported-candidate",
-      "external": false,
-      "audit_lifecycle": "provider-completed",
-      "audit_lifecycle_note": "the production harness labels completion of its injected agent callable; the separately recorded route identifies this callable as deterministic"
+  "timings": {
+    "ordinary": {
+      "path": "docs/arbitration_fallback_evidence/ordinary-timing.json",
+      "sha256": "8e828ddfd8ba72573ba4543a87d232dd9020a13a44195d298eae889dc9a3550c"
     },
-    "attester": {
-      "source": "signed-in-codex",
-      "external": true,
-      "calls": 1
-    },
-    "codex_decider": {
-      "source": "signed-in-codex",
-      "external": true,
-      "calls": 1
-    },
-    "claude_decider": {
-      "source": "signed-in-claude",
-      "external": true,
-      "calls": 1
+    "fallback": {
+      "path": "docs/arbitration_fallback_evidence/timing.json",
+      "sha256": "206b7948b094f44ab25fbf2368a3b6f7058494d90ec7561293a2c17deddd5dae"
     }
   },
   "snapshot_binding": {
     "commit_object": "docs/arbitration_fallback_evidence/snapshot-commit.txt",
-    "sha256": "6575d5ed84921ee00b0a2bef1761604ad7cc6598050176f3fe75ddd06af44154",
-    "source_commit": "730c131fc6b1f1058517c7267734bc4c381070ba",
-    "tree": "3687203761498d9c2016fab8e1bf415d3a66a797"
+    "sha256": "a85aade32c1ee800b73fdb3fb6803494fac2083fe49cb24217b15ec498eb15fb",
+    "source_commit": "8b65c1517f6355000e920c9ee67b0f1c2ef98387",
+    "tree": "aae02b71734c16d807095ec7ff9f48e9efde72ea"
   },
   "source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "5e3c20ce4b6b1a2f638dcee862ad5e541edfb34d66d4d37b7b404f705b98e5ab",
-    "src/paranoia_local/arbitration.py": "d9ab0cbf572bfe57a4c2ab2f3c2a823a8472e9c478881338312d2cc85ff37e92",
+    "src/paranoia_local/arbitrate_handler.py": "f944973f5ccf53f35afc10e5c104b4938630c131adb72e5a27a176a1b56e2966",
+    "src/paranoia_local/arbitration.py": "f666eee57490d5c7cdc55a97b399ae6e39d00029376574adcba8db7dcf5d22a9",
     "src/paranoia_local/engines.py": "13210732e9e059bdf71135c1ecb8742345aac1d0a1fad3b9200ea0de129638b2",
     "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
     "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
-    "src/paranoia_local/server.py": "8e70799fe2d008e2c2b0cc12e2d5721e814889ee9af23c468448335bb4264047",
-    "scripts/validate_arbitration_fallback_acceptance.py": "2f5257958de99d9e44705bf0d298d61cfa56305d79e06544ead3785e4274488f",
-    "tests/test_arbitrate_handler.py": "fb8819457aa4138064480d7f433e8781058dd9783220765d0af417b6528b14ac",
-    "tests/test_arbitration_fallback_acceptance.py": "160de0869cc0f5676a1cae1def9025fcba75bcd4c9622d87bcf2a25d61d8a9d2"
+    "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac",
+    "scripts/run_arbitration_fallback_acceptance.py": "38d8cffe93c62fb145235f756f71334f1491149c35f0e6b07e20f902a82dc9d5",
+    "scripts/validate_arbitration_fallback_acceptance.py": "9ff19468f7b8a5427c60e55da3d535f67e8901cb9c5ecc011b95e860b83e494a",
+    "tests/test_arbitrate_handler.py": "0629f14a859557f31eaf41bffede1804d40339a586582029f1534b7bc92e8c1b",
+    "tests/test_arbitration_fallback_acceptance.py": "83385b88d2cded2de4f2c59c9ad8827344a670d8c116bac54186771f493d56ea"
   },
   "tests": {
-    "full_suite": "1086 passed",
+    "full_suite": "1096 passed",
     "exit_status": 0
   }
 }
