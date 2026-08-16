@@ -279,6 +279,10 @@ names every changed field, binds exact original and cleaned substrings to that f
 classifies the semantic delta with the closed change enum, and repeats that classification in the
 deterministic `<field>: <change>` reason label. Do not use a free-text heuristic as a semantic gate. Keep valid
 `raw_input.options` as the same ID-to-statement mapping on every success and failure path.
+When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
+the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
+never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and
+an advocating original packet must still be faithfully neutralized or fail.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid
