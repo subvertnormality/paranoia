@@ -84,9 +84,18 @@ persistence failure states that a settlement was computed but durable persistenc
 confirmed. Both state that no durable structural verdict is available and show only the applicable
 bounded diagnostic. Do not emit `What works — Nothing notable` or any success-review section.
 
-Add a deterministic trailer line summarizing staged attempt count and validation-retry count on
-both success and failure paths. The audit ledger remains authoritative; the trailer is an operator
-summary derived from it.
+Add this deterministic trailer line on both success and failure paths:
+
+`STAGED-ATTEMPTS: total=<N> validation-retries=<N> validation-invalid=<N> execution-failed=<N>`
+
+`validation-retries` counts roles ending `-validation-retry`; `validation-invalid` counts attempt
+rows with that outcome; `execution-failed` counts all other non-completed outcomes. The audit ledger
+remains authoritative; the trailer is an operator summary derived from it.
+
+When implementation lands, update the public output reference in README: retain the five-section
+shape only for completed reviews, add a separate `STAGED REVIEW FAILED` example with the lifecycle-
+accurate durable-verdict wording, and document the exact `STAGED-ATTEMPTS` line above. Do not publish
+planned behavior as current before the implementation and tests are committed.
 
 ## Verification
 
@@ -104,6 +113,8 @@ summary derived from it.
   remain exact, and oversized provider detail cannot escape the bounded rendered/persisted message.
 - Rendering tests prove pre-settlement and post-settlement persistence failures are accurate and
   cannot be mistaken for completed reviews; attempt counts match the ledger on success and failure.
+- Documentation checks prove README separates completed five-section reviews from staged terminal
+  failure and documents the exact attempt-summary syntax and count definitions.
 - Run focused staged-protocol/review-census/handler tests, then the full suite and one primary staged
   capability end to end before the PR.
 
