@@ -19,15 +19,15 @@
   "audits": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-audit.json",
-      "sha256": "4d7a6f667b0b4d31ce7dfbbd7755efb8b88f2421ab73bbec5d4e8b00a0eb41f9",
-      "snapshot": "3fd56c3c270e06ab0be54ac4ec396e76839e73fa",
+      "sha256": "8385cf24644c9d830b80b29f90f88c252ae94e89bd53657b59a3588ef67b6834",
+      "snapshot": "28590a6c7e64df4658c9d83ce450f51eca090818",
       "cleaning": "attested",
       "result": "CONVERGED"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
-      "sha256": "9585921355816660d1f1c767098b10e9fe2090e39c766b9fb9b406a5ef4b5f88",
-      "snapshot": "3fd56c3c270e06ab0be54ac4ec396e76839e73fa",
+      "sha256": "a4fab2bc130edf27ec4c5e4375ec89bc31155f4724994de69a7efe602d7290ea",
+      "snapshot": "28590a6c7e64df4658c9d83ce450f51eca090818",
       "cleaning": "original-attested",
       "result": "CONVERGED"
     }
@@ -35,33 +35,33 @@
   "timings": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-timing.json",
-      "sha256": "61a091bc6031ae382eee7bef36e497a520513a59107252c039a0ec4c87448365"
+      "sha256": "be6c7fc67f61d4af9571b870944ac2131873fab6f769955cc183b1b5740b6c89"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/timing.json",
-      "sha256": "1ffe345f8007f36feabec06a034adde763521cd9f41758d043e0a319f4c75718"
+      "sha256": "172ad68b233cc85923e2fae3850b62581cea9200550b6f7e3234cff4c5b3d64a"
     }
   },
   "snapshot_binding": {
     "commit_object": "docs/arbitration_fallback_evidence/snapshot-commit.txt",
-    "sha256": "68e30f541e83cdace2f10c9df8469567fcd9d7d342c36fcd614adbe0b02b1ed3",
-    "source_commit": "aba705895e7234e3208b3331f1722cf40d3ae9d0",
-    "tree": "d2d9d53df6244f12323676b0e4028298f64fb2a9"
+    "sha256": "05d5268f9e56be36fd6ab934065869aa6fa2c465924d56e225fcb344f04a7189",
+    "source_commit": "d66cf4d3891498df1f5d56e6abcf39783389001f",
+    "tree": "e29915171e725b7f5de2822d412e31013737f86f"
   },
   "source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "d9fec881b6386d243f0340cd2ca2e1a1ee4e3dcd7c77c3fa69473fea40478cef",
-    "src/paranoia_local/arbitration.py": "f666eee57490d5c7cdc55a97b399ae6e39d00029376574adcba8db7dcf5d22a9",
+    "src/paranoia_local/arbitrate_handler.py": "d7876e00dcf476c1929d5a0d1bb64251be15147cac3315faee0b4f3619fe4660",
+    "src/paranoia_local/arbitration.py": "38a62a095ffa4bfb1889959f4ec5962650a7e8c3920ffe9252f1d2ec653f8dfb",
     "src/paranoia_local/engines.py": "13210732e9e059bdf71135c1ecb8742345aac1d0a1fad3b9200ea0de129638b2",
     "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
     "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
     "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac",
     "scripts/run_arbitration_fallback_acceptance.py": "3855364403dade913193357e4cd2bfd9a931a3083e553a90efee712ee2fe4a4e",
-    "scripts/validate_arbitration_fallback_acceptance.py": "aff381f00744105a3ba46348c9cb2c6df4d0a4c87d92d896aead2d8c3e6893cc",
-    "tests/test_arbitrate_handler.py": "401124d0ec54d91f6e4ba3053952547ce843de352e368d3301f6973c327472d4",
+    "scripts/validate_arbitration_fallback_acceptance.py": "f154f2cdcb376108333af87f8b499d3758582bcf4e1afadaa584b7abdc293e0a",
+    "tests/test_arbitrate_handler.py": "0f7e8d05e07a99190067a3a7e7808bb26217e4d7e51a4a8407f7f2716fecf074",
     "tests/test_arbitration_fallback_acceptance.py": "45cfc4673fbb134cc186409c33bde5428a55656c52d872972fc03ee73a9b4e5d"
   },
   "tests": {
-    "full_suite": "1102 passed",
+    "full_suite": "1103 passed",
     "exit_status": 0
   }
 }
