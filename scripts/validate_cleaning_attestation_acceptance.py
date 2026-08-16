@@ -11,6 +11,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Mapping
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from paranoia_local import arbitrate_handler as production_arbitrate  # noqa: E402
@@ -35,6 +36,69 @@ CLEANING_SOURCES = frozenset({
     "src/paranoia_local/prompts.py",
     "src/paranoia_local/server.py",
 })
+
+# Immutable contract used by the cleaning-attestation-v1 evidence. This must not
+# follow the live prompt: v1 attesters were asked for five verdict lines and made
+# no ORIGINAL-NEUTRALITY judgement.
+V1_ATTEST_INSTRUCTIONS = """You are a TEXT AUDITOR. Another model has rewritten a decision packet to remove bias. Your job is to check its work. You are NOT asked which option is better, you have no repository access, and you must not express a preference — a verdict on the merits would defeat the purpose of this check.
+
+You are given, field by field, the ORIGINAL text and the CLEANED text. Judge two things:
+
+1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.
+2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option, through wording, emphasis, asymmetric detail, or what it leaves out? If so, say which option and quote the words that do it.
+
+Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is.
+
+Output EXACTLY these five lines, nothing before or after. The FIDELITY line must
+name EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —
+fields absent from it were never supplied and are not yours to judge:
+
+FIDELITY: <one "<field> PRESERVED" or "<field> CHANGED" per field, semicolon-separated>
+FIDELITY-DETAIL: NONE
+FIDELITY-DETAIL: <one JSON object keyed by every CHANGED field and no others; each value is {"original":"<exact non-empty ORIGINAL passage>","cleaned":"<exact non-empty CLEANED passage>","change":"<added|removed|narrowed|widened|altered-qualification>","reason":"<field>: <repeat the exact change token>"}>
+NEUTRALITY: PASS
+NEUTRALITY: FAIL <which option the packet favours, and the words that do it>
+STAKES-ADVOCACY: NONE
+CONTEXT-ADVOCACY: NONE
+
+Emit ONE FIDELITY-DETAIL line and ONE of the two NEUTRALITY lines. FIDELITY-DETAIL
+reason is a deterministic label, exactly "<field>: <change>". The closed change token
+plus the two exact passages is the semantic explanation; do not add free-form reason prose.
+must be NONE only when no field is CHANGED. The JSON must stay on that one line;
+passages must be exact substrings of the named field. Use STAKES-ADVOCACY: PRESENT <the
+advocating words> when stakes steers the decision. Use CONTEXT-ADVOCACY: PRESENT
+<the advocating words> when unchanged context steers the decision; emit NONE when
+no context was supplied or it does not steer."""
+
+
+class V1Attestation:
+    def __init__(
+        self,
+        *,
+        fidelity: dict[str, str],
+        fidelity_detail: str,
+        neutrality_pass: bool,
+        neutrality_note: str,
+        stakes_advocacy: str | None,
+        context_advocacy: str | None,
+    ) -> None:
+        self.fidelity = fidelity
+        self.fidelity_detail = fidelity_detail
+        self.neutrality_pass = neutrality_pass
+        self.neutrality_note = neutrality_note
+        self.stakes_advocacy = stakes_advocacy
+        self.context_advocacy = context_advocacy
+
+    @property
+    def changed(self) -> list[str]:
+        return sorted(key for key, value in self.fidelity.items() if value == "CHANGED")
+
+    @property
+    def ok(self) -> bool:
+        return (
+            self.neutrality_pass and not self.changed
+            and self.stakes_advocacy is None and self.context_advocacy is None
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -599,17 +663,124 @@ def _phase_diagnostics_bound(audit: dict, *, accepted: bool = True) -> bool:
 
 def _parse_attestation_record(
     reply: str, expected: dict[str, tuple[str, str]],
-) -> production_arbitrate.Attestation:
-    """Validate immutable v1 evidence without pretending it made the v2 judgement.
+) -> V1Attestation:
+    """Parse exactly the five judgements made by the immutable v1 contract."""
+    lines = [line.strip() for line in (reply or "").splitlines()]
+    prefixes = (
+        "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:",
+        "STAKES-ADVOCACY:", "CONTEXT-ADVOCACY:",
+    )
+    if len(lines) != 5 or any(not line for line in lines):
+        raise production_arbitrate.ArbitrationError(
+            "v1 attestation must contain exactly five non-empty verdict lines"
+        )
+    if any(not line.upper().startswith(prefix) for line, prefix in zip(lines, prefixes)):
+        raise production_arbitrate.ArbitrationError(
+            f"v1 attestation verdict lines must be ordered {prefixes}"
+        )
 
-    Five-line records predate ORIGINAL-NEUTRALITY. Inserting a parser-only PASS lets
-    the current closed parser validate their original five claims; callers of this
-    helper must never use the synthetic field to authorize original fallback.
-    """
-    lines = reply.splitlines()
-    if len(lines) == 5:
-        lines.insert(3, "ORIGINAL-NEUTRALITY: PASS")
-    return production_arbitrate.parse_attestation("\n".join(lines), expected)
+    fidelity: dict[str, str] = {}
+    for part in lines[0][len("FIDELITY:"):].split(";"):
+        field, _, verdict = part.strip().rpartition(" ")
+        field, verdict = field.strip(), verdict.strip().upper()
+        if not field or verdict not in {"PRESERVED", "CHANGED"}:
+            raise production_arbitrate.ArbitrationError("invalid v1 FIDELITY verdict")
+        if field in fidelity:
+            raise production_arbitrate.ArbitrationError(
+                f"v1 attestation reported {field!r} twice"
+            )
+        fidelity[field] = verdict
+    if set(fidelity) != set(expected):
+        raise production_arbitrate.ArbitrationError(
+            "v1 attestation fields do not exactly match the supplied fields"
+        )
+
+    detail = lines[1][len("FIDELITY-DETAIL:"):].strip()
+    if not detail:
+        raise production_arbitrate.ArbitrationError("v1 FIDELITY-DETAIL is empty")
+    changed = sorted(field for field, verdict in fidelity.items() if verdict == "CHANGED")
+    if not changed and detail.upper() != "NONE":
+        raise production_arbitrate.ArbitrationError(
+            "v1 FIDELITY-DETAIL must be NONE when no field is CHANGED"
+        )
+    if changed:
+        if detail.upper() == "NONE":
+            raise production_arbitrate.ArbitrationError(
+                "changed v1 fidelity requires a specific FIDELITY-DETAIL"
+            )
+        try:
+            parsed_detail = json.loads(detail, object_pairs_hook=_unique_v1_object)
+        except json.JSONDecodeError as exc:
+            raise production_arbitrate.ArbitrationError(
+                f"v1 FIDELITY-DETAIL must be one JSON object: {exc}"
+            ) from exc
+        if not isinstance(parsed_detail, dict) or set(parsed_detail) != set(changed):
+            raise production_arbitrate.ArbitrationError(
+                "v1 FIDELITY-DETAIL fields must exactly equal CHANGED fields"
+            )
+        required = {"original", "cleaned", "change", "reason"}
+        changes = {"added", "removed", "narrowed", "widened", "altered-qualification"}
+        for field in changed:
+            item = parsed_detail[field]
+            if not isinstance(item, dict) or set(item) != required:
+                raise production_arbitrate.ArbitrationError(
+                    f"v1 FIDELITY-DETAIL {field!r} has the wrong shape"
+                )
+            if any(not isinstance(item[key], str) or not item[key].strip() for key in required):
+                raise production_arbitrate.ArbitrationError(
+                    f"v1 FIDELITY-DETAIL {field!r} values must be non-empty strings"
+                )
+            if item["change"] not in changes:
+                raise production_arbitrate.ArbitrationError("invalid v1 fidelity change token")
+            original, cleaned = expected[field]
+            if item["original"] not in original or item["cleaned"] not in cleaned:
+                raise production_arbitrate.ArbitrationError(
+                    f"v1 FIDELITY-DETAIL {field!r} passages are not field substrings"
+                )
+            if item["original"] == item["cleaned"]:
+                raise production_arbitrate.ArbitrationError(
+                    f"v1 FIDELITY-DETAIL {field!r} passages do not demonstrate a change"
+                )
+            if item["reason"].strip() != f"{field}: {item['change']}":
+                raise production_arbitrate.ArbitrationError(
+                    f"v1 FIDELITY-DETAIL {field!r} reason is not deterministic"
+                )
+
+    neutrality_body = lines[2][len("NEUTRALITY:"):].strip()
+    if neutrality_body.upper() == "PASS":
+        neutrality, neutrality_note = True, ""
+    elif neutrality_body.upper().startswith("FAIL") and neutrality_body[4:].strip():
+        neutrality, neutrality_note = False, neutrality_body[4:].strip()
+    else:
+        raise production_arbitrate.ArbitrationError("invalid v1 NEUTRALITY verdict")
+
+    def advocacy(line: str, prefix: str) -> str | None:
+        body = line[len(prefix):].strip()
+        if body.upper() == "NONE":
+            return None
+        if body.upper().startswith("PRESENT") and body[7:].strip():
+            return body[7:].strip()
+        raise production_arbitrate.ArbitrationError(f"invalid v1 {prefix} verdict")
+
+    return V1Attestation(
+        fidelity=fidelity,
+        fidelity_detail=detail,
+        neutrality_pass=neutrality,
+        neutrality_note=neutrality_note,
+        stakes_advocacy=advocacy(lines[3], "STAKES-ADVOCACY:"),
+        context_advocacy=advocacy(lines[4], "CONTEXT-ADVOCACY:"),
+    )
+
+
+def _unique_v1_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise production_arbitrate.ArbitrationError(
+                f"v1 FIDELITY-DETAIL contains duplicate key {key!r}"
+            )
+        result[key] = value
+    return result
 
 
 def _cleaner_fields(reply: str) -> dict[str, str]:
@@ -659,6 +830,39 @@ def _cleaned_packet_bound(audit: dict) -> bool:
     return set(audit.get("cleaned", {})) == set(expected) and audit["cleaned"] == expected
 
 
+def _v1_render_hints(hints: list[dict]) -> str:
+    return "\n".join(f"- {hint['path']}: {hint.get('reason', '')}" for hint in hints) or "None."
+
+
+def _v1_attest_body(
+    decision: str,
+    stakes: str,
+    context: str,
+    original_hints: list[dict],
+    cleaned_hints: list[dict],
+    originals: Mapping[str, str],
+    parsed: Mapping[str, Any],
+) -> str:
+    """Exact body grammar used by cleaning-attestation-v1."""
+    pairs = [f"[decision]\nORIGINAL: {decision}\nCLEANED:  {parsed['decision']}"]
+    if original_hints:
+        pairs.append(
+            f"[hints]\nORIGINAL: {_v1_render_hints(original_hints)}\n"
+            f"CLEANED:  {_v1_render_hints(cleaned_hints)}"
+        )
+    for option_id, original in originals.items():
+        pairs.append(
+            f"[{option_id}]\nORIGINAL: {original}\n"
+            f"CLEANED:  {parsed['statements'][option_id]}"
+        )
+    return (
+        "=== FIELD BY FIELD ===\n" + "\n\n".join(pairs)
+        + "\n\n=== STAKES (NOT cleaned — judge only whether it advocates) ===\n" + stakes
+        + "\n\n=== CONTEXT (NOT cleaned — judge only whether it advocates) ===\n"
+        + (context or "None.")
+    )
+
+
 def _phase_prompts_bound(audit: dict) -> bool:
     raw = audit["raw_input"]
     originals = raw["options"]
@@ -683,12 +887,12 @@ def _phase_prompts_bound(audit: dict) -> bool:
             )
             parsed["context"] = raw["context"]
             cleaned_hints = production_arbitrate._merge_hints(hints, parsed["hints"])
-            attester_body = production_arbitrate._attest_body(
+            attester_body = _v1_attest_body(
                 raw["decision"], raw["stakes"], raw["context"], hints,
                 cleaned_hints, originals, parsed,
             )
             attester_prompt = production_prompts.compose(
-                production_prompts.ATTEST_INSTRUCTIONS, attester_body,
+                V1_ATTEST_INSTRUCTIONS, attester_body,
             )
             if not _prompt_record_bound(attester, attester_prompt):
                 return False
