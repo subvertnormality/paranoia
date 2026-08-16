@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import run_arbitration_fallback_acceptance as runner
 from scripts import validate_arbitration_fallback_acceptance as validator
 
 
@@ -18,6 +19,35 @@ def _audit(kind: str = "fallback") -> dict:
 
 def test_checked_in_original_fallback_acceptance_is_valid():
     validator.validate(ARTIFACT, ROOT)
+
+
+@pytest.mark.parametrize(
+    ("fallback", "outcome", "cleaning"),
+    [
+        (False, "CONVERGED", "original-attested"),
+        (False, "UNRESOLVED", "attested"),
+        (True, "CONVERGED", "attested"),
+        (True, "BLOCKED", "original-attested"),
+    ],
+)
+def test_acceptance_runner_rejects_every_non_contract_terminal_route(
+    fallback: bool, outcome: str, cleaning: str,
+):
+    with pytest.raises(RuntimeError, match="did not reach its required route"):
+        runner._require_route(
+            {"outcome": outcome, "cleaning": cleaning}, fallback=fallback,
+        )
+
+
+@pytest.mark.parametrize(
+    ("fallback", "cleaning"), [(False, "attested"), (True, "original-attested")],
+)
+def test_acceptance_runner_accepts_only_the_validator_routes(
+    fallback: bool, cleaning: str,
+):
+    runner._require_route(
+        {"outcome": "CONVERGED", "cleaning": cleaning}, fallback=fallback,
+    )
 
 
 @pytest.mark.parametrize(

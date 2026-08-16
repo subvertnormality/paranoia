@@ -102,6 +102,16 @@ def _audit_path(report: str) -> Path:
     return Path(match.group(1))
 
 
+def _require_route(audit: dict[str, Any], *, fallback: bool) -> None:
+    expected_cleaning = "original-attested" if fallback else "attested"
+    if audit.get("outcome") != "CONVERGED" or audit.get("cleaning") != expected_cleaning:
+        raise RuntimeError(
+            "acceptance run did not reach its required route: "
+            f"expected CONVERGED/{expected_cleaning}, got "
+            f"{audit.get('outcome')}/{audit.get('cleaning')}"
+        )
+
+
 def _run(repo: Path, log_dir: Path, *, fallback: bool) -> tuple[Path, dict[str, Any]]:
     started_utc = datetime.now(timezone.utc)
     started = time.monotonic()
@@ -117,12 +127,7 @@ def _run(repo: Path, log_dir: Path, *, fallback: bool) -> tuple[Path, dict[str, 
     elapsed = time.monotonic() - started
     audit_path = _audit_path(report)
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
-    expected = "original-attested" if fallback else {"attested", "original-attested"}
-    if audit.get("outcome") == "FAILED" or (
-        audit.get("cleaning") != expected if isinstance(expected, str)
-        else audit.get("cleaning") not in expected
-    ):
-        raise RuntimeError(f"acceptance run did not reach its required route:\n{report}")
+    _require_route(audit, fallback=fallback)
     timing = {
         "started_utc": started_utc.isoformat().replace("+00:00", "Z"),
         "finished_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

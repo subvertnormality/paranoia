@@ -55,13 +55,13 @@
     "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
     "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
     "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac",
-    "scripts/run_arbitration_fallback_acceptance.py": "38d8cffe93c62fb145235f756f71334f1491149c35f0e6b07e20f902a82dc9d5",
-    "scripts/validate_arbitration_fallback_acceptance.py": "9ff19468f7b8a5427c60e55da3d535f67e8901cb9c5ecc011b95e860b83e494a",
+    "scripts/run_arbitration_fallback_acceptance.py": "3855364403dade913193357e4cd2bfd9a931a3083e553a90efee712ee2fe4a4e",
+    "scripts/validate_arbitration_fallback_acceptance.py": "aff381f00744105a3ba46348c9cb2c6df4d0a4c87d92d896aead2d8c3e6893cc",
     "tests/test_arbitrate_handler.py": "401124d0ec54d91f6e4ba3053952547ce843de352e368d3301f6973c327472d4",
-    "tests/test_arbitration_fallback_acceptance.py": "83385b88d2cded2de4f2c59c9ad8827344a670d8c116bac54186771f493d56ea"
+    "tests/test_arbitration_fallback_acceptance.py": "45cfc4673fbb134cc186409c33bde5428a55656c52d872972fc03ee73a9b4e5d"
   },
   "tests": {
-    "full_suite": "1096 passed",
+    "full_suite": "1102 passed",
     "exit_status": 0
   }
 }
