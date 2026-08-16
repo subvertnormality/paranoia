@@ -749,8 +749,8 @@ def _parse_attestation_record(
     neutrality_body = lines[2][len("NEUTRALITY:"):].strip()
     if neutrality_body.upper() == "PASS":
         neutrality, neutrality_note = True, ""
-    elif neutrality_body.upper().startswith("FAIL") and neutrality_body[4:].strip():
-        neutrality, neutrality_note = False, neutrality_body[4:].strip()
+    elif (failure_note := _v1_verdict_note(neutrality_body, "FAIL")) is not None:
+        neutrality, neutrality_note = False, failure_note
     else:
         raise production_arbitrate.ArbitrationError("invalid v1 NEUTRALITY verdict")
 
@@ -758,8 +758,8 @@ def _parse_attestation_record(
         body = line[len(prefix):].strip()
         if body.upper() == "NONE":
             return None
-        if body.upper().startswith("PRESENT") and body[7:].strip():
-            return body[7:].strip()
+        if (present_note := _v1_verdict_note(body, "PRESENT")) is not None:
+            return present_note
         raise production_arbitrate.ArbitrationError(f"invalid v1 {prefix} verdict")
 
     return V1Attestation(
@@ -770,6 +770,13 @@ def _parse_attestation_record(
         stakes_advocacy=advocacy(lines[3], "STAKES-ADVOCACY:"),
         context_advocacy=advocacy(lines[4], "CONTEXT-ADVOCACY:"),
     )
+
+
+def _v1_verdict_note(body: str, keyword: str) -> str | None:
+    parts = body.split(maxsplit=1)
+    if len(parts) == 2 and parts[0].upper() == keyword and parts[1].strip():
+        return parts[1].strip()
+    return None
 
 
 def _unique_v1_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

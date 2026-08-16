@@ -530,6 +530,31 @@ def test_phase_diagnostics_bind_neutrality_only_rejection(tmp_path: Path):
     assert validator._phase_diagnostics_bound(audit, accepted=False)
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "NEUTRALITY: FAILURE biased words",
+        "STAKES-ADVOCACY: PRESENTLY biased words",
+        "CONTEXT-ADVOCACY: PRESENTATION biased words",
+    ],
+)
+def test_v1_attestation_requires_complete_verdict_tokens(line: str):
+    rows = [
+        "FIDELITY: decision PRESERVED",
+        "FIDELITY-DETAIL: NONE",
+        "NEUTRALITY: PASS",
+        "STAKES-ADVOCACY: NONE",
+        "CONTEXT-ADVOCACY: NONE",
+    ]
+    prefix = line.split(":", 1)[0] + ":"
+    index = next(i for i, row in enumerate(rows) if row.startswith(prefix))
+    rows[index] = line
+    with pytest.raises(validator.production_arbitrate.ArbitrationError):
+        validator._parse_attestation_record(
+            "\n".join(rows), {"decision": ("original", "cleaned")},
+        )
+
+
 def test_phase_diagnostics_reject_identical_passages(tmp_path: Path):
     artifact, repo = cleaning_fixture(tmp_path)
     data = json.loads(artifact.read_text())

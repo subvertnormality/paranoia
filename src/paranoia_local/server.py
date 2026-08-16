@@ -345,7 +345,16 @@ TOOLS: list[Tool] = [
                     "maxItems": 32,
                     "items": {
                         "type": "object",
-                        "properties": {"path": {"type": "string"}, "reason": {"type": "string", "maxLength": 1200}},
+                        "properties": {
+                            "path": {"type": "string"},
+                            "reason": {
+                                "type": "string",
+                                "description": (
+                                    "Optional prose; surrounding whitespace is removed and the "
+                                    "canonical value is limited to 1200 characters by runtime validation."
+                                ),
+                            },
+                        },
                         "required": ["path"],
                     },
                     "description": "Starting-point hints. Each must be a repo-relative path present in the snapshot. Both deciders see the same list, so a one-sided hint list biases both.",

@@ -969,6 +969,19 @@ def test_hint_aggregate_uses_exact_canonical_downstream_bytes():
         arb.preflight_framing(decision="d", context="", hints=hints, options=options)
 
 
+def test_hint_reason_limit_applies_after_surrounding_whitespace_is_removed():
+    options = (Option("A", "a"), Option("B", "b"))
+    arb.preflight_framing(
+        decision="d", context="", options=options,
+        hints=[{"path": "p", "reason": " \t" + "r" * arb.MAX_HINT_REASON_CHARS + "\n "}],
+    )
+    with pytest.raises(arb.ArbitrationError, match="reason"):
+        arb.preflight_framing(
+            decision="d", context="", options=options,
+            hints=[{"path": "p", "reason": " " + "r" * (arb.MAX_HINT_REASON_CHARS + 1) + " "}],
+        )
+
+
 def test_option_objects_reject_unknown_keys():
     """Issue #8 fix 8: a stray "x" key was silently accepted and ignored."""
     with pytest.raises(arb.ArbitrationError) as exc:

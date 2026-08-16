@@ -638,6 +638,14 @@ class Attestation:
         )
 
 
+def _verdict_note(body: str, keyword: str) -> str | None:
+    """Return a diagnostic only when keyword is the complete first token."""
+    parts = body.split(maxsplit=1)
+    if len(parts) == 2 and parts[0].upper() == keyword and parts[1].strip():
+        return parts[1].strip()
+    return None
+
+
 def parse_attestation(
     text: str,
     expected: Mapping[str, tuple[str, str]],
@@ -718,9 +726,9 @@ def parse_attestation(
             # bias to both deciders.
             if body.upper() == "PASS":
                 neutrality = True
-            elif body.upper().startswith("FAIL") and body[len("FAIL"):].strip():
+            elif (failure_note := _verdict_note(body, "FAIL")) is not None:
                 neutrality = False
-                note = body[len("FAIL"):].strip()
+                note = failure_note
             else:
                 raise ArbitrationError(
                     f"NEUTRALITY must be exactly PASS, or FAIL with a note, got {body!r}"
@@ -764,8 +772,8 @@ def parse_attestation(
             # Same reasoning: "NONE despite recommending A" is not NONE.
             if body.upper() == "NONE":
                 stakes = None
-            elif body.upper().startswith("PRESENT") and body[len("PRESENT"):].strip():
-                stakes = body[len("PRESENT"):].strip()
+            elif (present_note := _verdict_note(body, "PRESENT")) is not None:
+                stakes = present_note
             else:
                 raise ArbitrationError(
                     "STAKES-ADVOCACY must be exactly NONE, or PRESENT with the "
@@ -778,8 +786,8 @@ def parse_attestation(
             body = line[len("CONTEXT-ADVOCACY:"):].strip()
             if body.upper() == "NONE":
                 context_advocacy = None
-            elif body.upper().startswith("PRESENT") and body[len("PRESENT"):].strip():
-                context_advocacy = body[len("PRESENT"):].strip()
+            elif (present_note := _verdict_note(body, "PRESENT")) is not None:
+                context_advocacy = present_note
             else:
                 raise ArbitrationError(
                     "CONTEXT-ADVOCACY must be exactly NONE, or PRESENT with the "

@@ -2908,7 +2908,9 @@ def test_refs_moving_after_snapshot_is_provenance_only(repo: Path, tmp_path: Pat
         "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE despite recommending A\n",
         # FAIL with no note says nothing
         "NEUTRALITY: FAIL\nSTAKES-ADVOCACY: NONE\n",
+        "NEUTRALITY: FAILURE biased words\nSTAKES-ADVOCACY: NONE\n",
         "NEUTRALITY: maybe\nSTAKES-ADVOCACY: NONE\n",
+        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: PRESENTLY biased words\n",
     ],
 )
 def test_qualified_attestation_verdicts_are_not_accepted(repo: Path, tmp_path: Path, verdicts: str):
