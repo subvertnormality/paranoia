@@ -359,7 +359,10 @@ def _validate_cleaning_acceptance(artifact: dict, repo: Path) -> None:
         ),
         "original reason": original["reason"] == original_summary["reason"],
         "original diagnostics": _phase_diagnostics_bound(
-            original, accepted=original["cleaning"].startswith("attested")
+            original, accepted=(
+                original["cleaning"].startswith("attested")
+                or original["cleaning"] == "original-attested"
+            )
         ),
         "original prompt bindings": _phase_prompts_bound(original),
         "original derived outcome": original_outcome_bound,
@@ -565,9 +568,7 @@ def _phase_diagnostics_bound(audit: dict, *, accepted: bool = True) -> bool:
         if set(expected_pairs) != set(original_fields):
             return False
         try:
-            attestation = production_arbitrate.parse_attestation(
-                row.get("reply", ""), expected_pairs,
-            )
+            attestation = _parse_attestation_record(row.get("reply", ""), expected_pairs)
         except production_arbitrate.ArbitrationError:
             return False
         changed = set(attestation.changed)
@@ -597,6 +598,21 @@ def _phase_diagnostics_bound(audit: dict, *, accepted: bool = True) -> bool:
     if accepted is (attesters[-1].get("rejection") is not None):
         return False
     return True
+
+
+def _parse_attestation_record(
+    reply: str, expected: dict[str, tuple[str, str]],
+) -> production_arbitrate.Attestation:
+    """Validate immutable v1 evidence without pretending it made the v2 judgement.
+
+    Five-line records predate ORIGINAL-NEUTRALITY. Inserting a parser-only PASS lets
+    the current closed parser validate their original five claims; callers of this
+    helper must never use the synthetic field to authorize original fallback.
+    """
+    lines = reply.splitlines()
+    if len(lines) == 5:
+        lines.insert(3, "ORIGINAL-NEUTRALITY: PASS")
+    return production_arbitrate.parse_attestation("\n".join(lines), expected)
 
 
 def _cleaner_fields(reply: str) -> dict[str, str]:

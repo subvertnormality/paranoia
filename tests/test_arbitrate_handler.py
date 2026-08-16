@@ -110,6 +110,7 @@ ATTEST_OK = (
     "opt-float PRESERVED; opt-decimal PRESERVED\n"
     "FIDELITY-DETAIL: NONE\n"
     "NEUTRALITY: PASS\n"
+    "ORIGINAL-NEUTRALITY: PASS\n"
     "STAKES-ADVOCACY: NONE\n"
     "CONTEXT-ADVOCACY: NONE\n"
 )
@@ -121,6 +122,7 @@ ATTEST_OK_WITH_HINTS = (
     "opt-float PRESERVED; opt-decimal PRESERVED\n"
     "FIDELITY-DETAIL: NONE\n"
     "NEUTRALITY: PASS\n"
+    "ORIGINAL-NEUTRALITY: PASS\n"
     "STAKES-ADVOCACY: NONE\n"
     "CONTEXT-ADVOCACY: NONE\n"
 )
@@ -1707,7 +1709,7 @@ def test_cleaner_refusal_short_circuits(repo: Path, tmp_path: Path):
     assert all(c["cwd"] is None for c in agent.calls)
 
 
-def test_unequal_cleaned_options_are_retried_then_fail(repo: Path, tmp_path: Path):
+def test_unequal_cleaned_options_fall_back_to_attested_originals(repo: Path, tmp_path: Path):
     agent = Agent(
         lambda e, r: "opt-float",
         cleaner=cleaner_reply({
@@ -1716,10 +1718,85 @@ def test_unequal_cleaned_options_are_retried_then_fail(repo: Path, tmp_path: Pat
         }),
     )
     report = run(repo, agent, tmp_path)
-    # Same behaviour, sharper claim: the caller's framing was equalized, so the skew
-    # is the cleaner's doing.
-    assert "less equalized" in report
-    assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 2
+    assert trailer_field(report, "CLEANING") == "original-attested"
+    assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 1
+    decider_bodies = [c["body"] for c in agent.calls if c["cwd"] is not None]
+    assert decider_bodies and all("Store the threshold as a float." in body for body in decider_bodies)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["statements"]["opt-float"] == "Float."
+
+
+def test_original_fallback_is_atomic_across_decision_options_and_hints(
+    repo: Path, tmp_path: Path,
+):
+    cleaned = (
+        "=== DECISION ===\nChoose a storage type.\n\n"
+        "=== OPTIONS ===\n"
+        "opt-float: Store an approximate value.\n"
+        "opt-decimal: Store an exact value.\n\n"
+        "=== CONTEXT ===\nNone.\n\n"
+        "=== HINTS ===\n- app.py: preferred implementation\n"
+    )
+    fields = {
+        "decision": ("Choose the numeric type", "Choose a storage type"),
+        "hints": ("the threshold is written here", "preferred implementation"),
+        "opt-float": ("threshold as a float", "approximate value"),
+        "opt-decimal": ("threshold as a Decimal", "exact value"),
+    }
+    detail = {
+        field: {
+            "original": original, "cleaned": changed,
+            "change": "altered-qualification", "reason": f"{field}: altered-qualification",
+        }
+        for field, (original, changed) in fields.items()
+    }
+    attestation = (
+        "FIDELITY: decision CHANGED; hints CHANGED; opt-float CHANGED; opt-decimal CHANGED\n"
+        f"FIDELITY-DETAIL: {json.dumps(detail, separators=(',', ':'))}\n"
+        "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    agent = Agent(lambda e, r: "opt-float", cleaner=cleaned, attest=attestation)
+    report = run(
+        repo, agent, tmp_path,
+        files=[{"path": "app.py", "reason": "the threshold is written here"}],
+    )
+
+    assert trailer_field(report, "CLEANING") == "original-attested"
+    bodies = [call["body"] for call in agent.calls if call["cwd"] is not None]
+    assert bodies
+    for body in bodies:
+        assert BASE["decision"] in body
+        assert "Store the threshold as a float." in body
+        assert "Store the threshold as a Decimal." in body
+        assert "the threshold is written here" in body
+        assert "Choose a storage type" not in body
+        assert "preferred implementation" not in body
+
+
+def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: Path):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Use a Decimal, which is exact and avoids representation error entirely.",
+    })
+    failed = ATTEST_OK.replace(
+        "ORIGINAL-NEUTRALITY: PASS",
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}',
+    )
+
+    class Sequenced(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.attestations = [failed, ATTEST_OK]
+
+        def __call__(self, **kwargs):
+            if "TEXT AUDITOR" in kwargs["instructions"]:
+                self.attest = self.attestations.pop(0)
+            return super().__call__(**kwargs)
+
+    report = run(repo, Sequenced(), tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "original packet is not neutral enough for fallback" in report
 
 
 def test_attestation_failure_retries_once_then_fails(repo: Path, tmp_path: Path):
@@ -1758,7 +1835,8 @@ def test_fidelity_rejection_names_exact_passages_and_reason(repo: Path, tmp_path
         "opt-decimal": "Store the threshold as a Decimal.",
     }), attest=(
         "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
-        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL "
+        '{"field":"opt-float","passage":"Store the threshold as a float"}\n'
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path)
@@ -1774,7 +1852,7 @@ def test_changed_fidelity_without_detail_is_unusable_not_empty_changed(
 ):
     agent = Agent(lambda e, r: "opt-float", attest=(
         "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
-        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path)
@@ -1789,7 +1867,7 @@ def test_changed_fidelity_detail_must_identify_both_passages_and_reason(
     agent = Agent(lambda e, r: "opt-float", attest=(
         "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
         'FIDELITY-DETAIL: {"opt-float":{"reason":"wording differs"}}\n'
-        "NEUTRALITY: PASS\n"
+        "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path)
@@ -1804,7 +1882,8 @@ def test_changed_fidelity_detail_rejects_duplicate_json_keys():
         '"change":"narrowed","reason":"first: narrowed"},'
         '"first":{"original":"alpha","cleaned":"invented",'
         '"change":"widened","reason":"first: widened"}}\n'
-        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
+        "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
     )
     with pytest.raises(ah.ArbitrationError, match="duplicate key 'first'"):
         ah.parse_attestation(reply, {"first": ("alpha original", "beta cleaned")})
@@ -1816,14 +1895,43 @@ def test_attestation_rejects_split_or_reordered_verdict_lines():
         "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
     )
-    with pytest.raises(ah.ArbitrationError, match="exactly five"):
+    with pytest.raises(ah.ArbitrationError, match="must be ordered"):
         ah.parse_attestation(split, {"first": ("a", "a"), "second": ("b", "b")})
     reordered = (
         "FIDELITY: first PRESERVED\nNEUTRALITY: PASS\nFIDELITY-DETAIL: NONE\n"
+        "ORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"
     )
     with pytest.raises(ah.ArbitrationError, match="must be ordered"):
         ah.parse_attestation(reordered, {"first": ("a", "a")})
+
+
+@pytest.mark.parametrize(("verdict", "message"), [
+    (
+        'FAIL {"field":"unknown","passage":"alpha"}',
+        "unknown field",
+    ),
+    (
+        'FAIL {"field":"first","passage":"not present"}',
+        "passage is not in original field",
+    ),
+    (
+        'FAIL {"field":"first","field":"first","passage":"alpha"}',
+        "duplicate key",
+    ),
+    (
+        'FAIL {"field":"first","passage":"alpha","reason":"bias"}',
+        "exactly field and passage",
+    ),
+])
+def test_original_neutrality_failure_is_exactly_field_bound(verdict: str, message: str):
+    reply = (
+        "FIDELITY: first PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        f"ORIGINAL-NEUTRALITY: {verdict}\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    with pytest.raises(ah.ArbitrationError, match=message):
+        ah.parse_attestation(reply, {"first": ("alpha original", "alpha cleaned")})
 
 
 @pytest.mark.parametrize(("detail", "message"), [
@@ -1871,7 +1979,8 @@ def test_changed_fidelity_diagnostics_are_bound_per_field(detail, message):
     reply = (
         "FIDELITY: first CHANGED; second CHANGED\n"
         f"FIDELITY-DETAIL: {json.dumps(detail, separators=(',', ':'))}\n"
-        "NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+        "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     )
     with pytest.raises(ah.ArbitrationError, match=message):
         ah.parse_attestation(reply, {
@@ -1904,7 +2013,8 @@ def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
 ):
     agent = Agent(lambda e, r: "opt-float", attest=(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
-        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\n"
         "CONTEXT-ADVOCACY: PRESENT 'obviously choose binary floating point'\n"
     ))
     report = run(repo, agent, tmp_path, context="Obviously choose binary floating point.")
@@ -1919,7 +2029,8 @@ def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
         lambda e, r: "opt-float",
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
-                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
@@ -2221,7 +2332,10 @@ def test_cleaned_hint_reason_reaches_the_deciders_not_the_original(repo: Path):
 
 def test_attester_sees_the_real_original_hints(repo: Path, tmp_path: Path):
     """An auditor shown "(paths and reasons as given)" cannot compare anything."""
-    agent = Agent(lambda e, r: "opt-float")
+    agent = Agent(lambda e, r: "opt-float", cleaner=(
+        cleaner_reply({o["id"]: o["statement"] for o in OPTIONS})
+        .replace("=== HINTS ===\nNone.", "=== HINTS ===\n- app.py: MARKER-ORIGINAL-REASON")
+    ), attest=ATTEST_OK_WITH_HINTS)
     run(repo, agent, tmp_path, files=[{"path": "app.py", "reason": "MARKER-ORIGINAL-REASON"}])
     attest_body = next(c["body"] for c in agent.calls if "TEXT AUDITOR" in c["instructions"])
     assert "MARKER-ORIGINAL-REASON" in attest_body
@@ -2628,7 +2742,8 @@ def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: 
         lambda e, r: "opt-float",
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
-                "NEUTRALITY: PASS\nSTAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
@@ -2703,7 +2818,8 @@ def test_attestation_does_not_cover_fields_the_caller_never_supplied(repo: Path,
     the caller had no control over."""
     agent = Agent(lambda e, r: "opt-float", attest=(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
-        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\n"
         "CONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path)
@@ -2767,10 +2883,11 @@ def test_the_cleaner_may_compress_narration_without_tripping_the_floor(repo: Pat
         cleaner=(
             "=== DECISION ===\nd\n\n"
             f"=== OPTIONS ===\nA: {'a' * 90}\nB: {'b' * 120}\n\n"
+            "=== CONTEXT ===\nNone.\n\n"
             "=== HINTS ===\nNone.\n"
         ),
             attest=("FIDELITY: decision PRESERVED; A PRESERVED; B PRESERVED\n"
-                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
                     "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path,
@@ -2778,19 +2895,21 @@ def test_the_cleaner_may_compress_narration_without_tripping_the_floor(repo: Pat
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
 
 
-def test_the_cleaner_may_not_worsen_the_length_asymmetry(repo: Path, tmp_path: Path):
-    """The gate that survives: equalized input must not come back skewed."""
+def test_length_asymmetry_disqualifies_cleaned_but_allows_original_fallback(
+    repo: Path, tmp_path: Path,
+):
     agent = Agent(
         lambda e, r: "opt-float",
         cleaner=(
             "=== DECISION ===\nd\n\n"
             f"=== OPTIONS ===\nopt-float: {'a' * 40}\nopt-decimal: {'b' * 600}\n\n"
+            "=== CONTEXT ===\nNone.\n\n"
             "=== HINTS ===\nNone.\n"
         ),
     )
     report = run(repo, agent, tmp_path)
-    assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "equaliz" in report.lower()
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert trailer_field(report, "CLEANING") == "original-attested"
 
 
 def test_a_held_vote_that_was_never_substantiated_must_still_ground(repo: Path, tmp_path: Path):
@@ -2833,6 +2952,7 @@ def test_a_caller_context_that_reads_None_is_not_swallowed(repo: Path, tmp_path:
     ), attest=(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; "
         "opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+        "ORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
     ))
     report = run(repo, agent, tmp_path, context="None.")
@@ -2899,8 +3019,7 @@ def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):
     assert "not equalized" in report
 
 
-def test_a_cleaner_that_omits_context_cannot_change_it(repo: Path, tmp_path: Path):
-    """Context is caller-owned and restored verbatim regardless of cleaner output."""
+def test_a_cleaner_that_omits_context_is_structurally_rejected(repo: Path, tmp_path: Path):
     agent = Agent(lambda e, r: "opt-float", cleaner=(
         "=== DECISION ===\nd\n\n"
         "=== OPTIONS ===\nopt-float: Store the threshold as a float.\n"
@@ -2908,9 +3027,8 @@ def test_a_cleaner_that_omits_context_cannot_change_it(repo: Path, tmp_path: Pat
         "=== HINTS ===\nNone.\n"
     ))
     report = run(repo, agent, tmp_path, context="None.")
-    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
-    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
-    assert record["cleaned"]["context"] == "None."
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "no === CONTEXT === block" in report
 
 
 def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, tmp_path: Path):
@@ -2936,7 +3054,7 @@ def test_the_attester_template_names_exactly_the_fields_it_is_given(repo: Path, 
                 ]
                 self.attest = (
                     "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
-                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
                     "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
                 )
             return super().__call__(**kw)
@@ -2960,7 +3078,7 @@ def test_attester_checks_verbatim_context_advocacy_and_hint_fidelity(repo: Path,
                 ]
                 self.attest = (
                     "FIDELITY: " + "; ".join(f"{f} PRESERVED" for f in fields) + "\n"
-                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\n"
+                    "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
                     "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
                 )
             if "NEUTRALIZER" in kw["instructions"]:

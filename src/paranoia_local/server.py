@@ -305,12 +305,10 @@ TOOLS: list[Tool] = [
             "novel evidence to carry. Each malformed decider reply gets one bounded full-reply "
             "correction; execution failures are not retried. All phases remain inside the "
             "whole-call deadline. "
-            "SHAPE THE INPUT LIKE THIS: put every shared fact and the FULL specification of "
-            "whatever only one option adopts into `context`, prefaced as 'the rules under "
-            "consideration, if adopted'; leave each option statement to say only how much of it "
-            "is adopted and what follows. Options then describe scope-of-adoption rather than "
-            "one describing mechanism and the other its absence, so they equalize naturally "
-            "(~800 chars each is typical). Framing bounds are checked before anything is spent."
+            "SHAPE THE INPUT LIKE THIS: put only facts and specification shared by every "
+            "option in `context`. Keep each option's distinct mechanism, scope, and "
+            "consequences in that option's own concise statement, using parallel structure "
+            "and comparable detail. Framing bounds are checked before anything is spent."
         ),
         inputSchema={
             "type": "object",
@@ -321,6 +319,7 @@ TOOLS: list[Tool] = [
                 },
                 "decision": {
                     "type": "string",
+                    "maxLength": 2500,
                     "description": "What is being decided, and the properties that bear on it — NOT the evidence for it, which belongs in `context` (max 2500 chars). State it neutrally; your own recommendation will be stripped, and including it only wastes a cleaning round.",
                 },
                 "options": {
@@ -331,19 +330,20 @@ TOOLS: list[Tool] = [
                         "type": "object",
                         "properties": {
                             "id": {"type": "string", "description": "Stable id — the vocabulary of the record. Never shown to a decider."},
-                            "statement": {"type": "string", "description": "What this option is (max 1200 chars, and no option may be more than 2x the length of the shortest — asymmetric detail is an argument regardless of wording). Say only what this option adopts and what follows; hoist the shared mechanism into `context`. Self-contained: never reference another option by id, since the two deciders see different orders."},
+                            "statement": {"type": "string", "maxLength": 1200, "description": "What this option is (max 1200 chars, and no option may be more than 2x the length of the shortest — asymmetric detail is an argument regardless of wording). Include this option's distinct mechanism, scope, and consequences concisely and in parallel with the others. Self-contained: never reference another option by id, since the two deciders see different orders."},
                         },
                         "required": ["id", "statement"],
                     },
                     "description": "2-4 mutually exclusive options, each with a caller-stable id. Array order is irrelevant — canonical order is derived by sorting ids.",
                 },
-                "stakes": _STAKES_REQUIRED,
-                "context": {"type": "string", "description": "Background the deciders need, and the designated home for detail: shared facts and the full specification of whatever only one option adopts (max 20000 chars). Preserved byte-for-byte rather than cleaned; the cross-vendor attester independently rejects context that advocates for an option.",},
+                "stakes": {**_STAKES_REQUIRED, "maxLength": 20000},
+                "context": {"type": "string", "maxLength": 20000, "description": "Background shared by every option: common facts and common specification only. Option-specific mechanisms and consequences stay in their option statements. Preserved byte-for-byte rather than cleaned; the cross-vendor attester independently rejects context that advocates for an option.",},
                 "files": {
                     "type": "array",
+                    "maxItems": 32,
                     "items": {
                         "type": "object",
-                        "properties": {"path": {"type": "string"}, "reason": {"type": "string"}},
+                        "properties": {"path": {"type": "string"}, "reason": {"type": "string", "maxLength": 1200}},
                         "required": ["path"],
                     },
                     "description": "Starting-point hints. Each must be a repo-relative path present in the snapshot. Both deciders see the same list, so a one-sided hint list biases both.",

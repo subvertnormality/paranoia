@@ -117,19 +117,20 @@ class Packet:
     context: str
     hints: list[dict]
     statements: dict[str, str]  # caller id -> statement shown to deciders
-    cleaning: str  # attested | attested-after-retry | skipped
+    cleaning: str  # attested | attested-after-retry | original-attested | skipped
     attestation: str
     research_packets: tuple[research_core.Packet, ...] = ()
     research_text: str = "[]"
     research_enabled: bool = False
+    # On original fallback the deciders use the fields above, while this retains
+    # the rejected cleaner candidate under the audit's existing `cleaned` key.
+    cleaner_candidate: dict[str, Any] | None = None
 
 
 def _cleaned_packet_record(packet: Packet) -> dict[str, Any]:
-    fields = {
-        "decision": packet.decision,
-        "context": packet.context,
-        "hints": list(packet.hints),
-        "statements": dict(packet.statements),
+    fields = dict(packet.cleaner_candidate) if packet.cleaner_candidate is not None else {
+        "decision": packet.decision, "context": packet.context,
+        "hints": list(packet.hints), "statements": dict(packet.statements),
     }
     encoded = json.dumps(
         fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
@@ -470,6 +471,8 @@ def parse_cleaned_packet(
 
     blocks: dict[str, list[str]] = {}
     allowed_blocks = {"DECISION", "OPTIONS", "CONTEXT", "HINTS"}
+    expected_order = ("DECISION", "OPTIONS", "CONTEXT", "HINTS")
+    seen_order: list[str] = []
     current: str | None = None
     for line in stripped.splitlines():
         m = _BLOCK_RE.match(line.strip())
@@ -480,12 +483,23 @@ def parse_cleaned_packet(
             if current in blocks:
                 raise ArbitrationError(f"cleaner output repeats === {current} === block")
             blocks[current] = []
+            seen_order.append(current)
             continue
         if current:
             blocks[current].append(line)
-    for required in ("DECISION", "OPTIONS"):
+        elif line.strip():
+            raise ArbitrationError("cleaner output has text before its first declared block")
+    for required in ("DECISION", "OPTIONS", "CONTEXT", "HINTS"):
         if required not in blocks:
             raise ArbitrationError(f"cleaner output has no === {required} === block")
+    if tuple(seen_order) != expected_order:
+        raise ArbitrationError(
+            f"cleaner blocks must be ordered {expected_order}, got {tuple(seen_order)}"
+        )
+
+    cleaned_decision = "\n".join(blocks["DECISION"]).strip()
+    if not cleaned_decision:
+        raise ArbitrationError("cleaner emitted an empty decision")
 
     statements: dict[str, str] = {}
     for line in blocks["OPTIONS"]:
@@ -493,7 +507,7 @@ def parse_cleaned_packet(
             continue
         oid, sep, statement = line.partition(":")
         if not sep:
-            continue
+            raise ArbitrationError(f"cleaner emitted malformed option row {line!r}")
         oid, statement = oid.strip(), statement.strip()
         if oid in statements:
             raise ArbitrationError(f"cleaner emitted option {oid!r} twice")
@@ -509,9 +523,9 @@ def parse_cleaned_packet(
         raise ArbitrationError(f"cleaner emitted empty statement(s) for {empty}")
 
     return {
-        "decision": "\n".join(blocks["DECISION"]).strip(),
-        "context": _cleaned_context(blocks.get("CONTEXT", []), caller_gave_context),
-        "hints": parse_cleaned_hints(blocks.get("HINTS", [])),
+        "decision": cleaned_decision,
+        "context": _cleaned_context(blocks["CONTEXT"], caller_gave_context),
+        "hints": parse_cleaned_hints(blocks["HINTS"]),
         "statements": statements,
     }
 
@@ -548,6 +562,8 @@ def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
         path, _, reason = line.partition(":")
         path = path.strip()
         if path:
+            if path in out:
+                raise ArbitrationError(f"cleaner emitted hint path {path!r} twice")
             out[path] = reason.strip()
     return out
 
@@ -603,6 +619,8 @@ class Attestation:
     fidelity_diagnostics: dict[str, dict[str, str]]
     neutrality_pass: bool
     neutrality_note: str
+    original_neutrality_pass: bool
+    original_neutrality_diagnostic: dict[str, str] | None
     stakes_advocacy: str | None
     context_advocacy: str | None
     raw: str
@@ -625,7 +643,7 @@ def parse_attestation(
 ) -> Attestation:
     """Strict: every expected field exactly once, each `PRESERVED` or `CHANGED`,
     one detailed fidelity explanation, and exactly one neutrality, stakes-advocacy,
-    and context-advocacy verdict.
+    original-neutrality, stakes-advocacy, and context-advocacy verdict.
 
     A lenient parser made an *incomplete* attestation look like a passing one:
     `FIDELITY: decision PRESERVED` alone, or a value of `UNKNOWN`, would satisfy
@@ -638,6 +656,8 @@ def parse_attestation(
     fidelity_diagnostics: dict[str, dict[str, str]] = {}
     neutrality: bool | None = None
     note = ""
+    original_neutrality: bool | None = None
+    original_diagnostic: dict[str, str] | None = None
     stakes: str | None = None
     stakes_seen = False
     context_advocacy: str | None = None
@@ -645,10 +665,11 @@ def parse_attestation(
     lines = [raw.strip() for raw in (text or "").splitlines()]
     expected_prefixes = (
         "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:",
+        "ORIGINAL-NEUTRALITY:",
         "STAKES-ADVOCACY:", "CONTEXT-ADVOCACY:",
     )
-    if len(lines) != 5 or any(not line for line in lines):
-        raise ArbitrationError("attestation must contain exactly five non-empty verdict lines")
+    if len(lines) != 6 or any(not line for line in lines):
+        raise ArbitrationError("attestation must contain exactly six non-empty verdict lines")
     for line, expected_prefix in zip(lines, expected_prefixes):
         upper = line.upper()
         if not upper.startswith(expected_prefix):
@@ -657,14 +678,14 @@ def parse_attestation(
                 f"expected {expected_prefix}, got {line!r}"
             )
         if not upper.startswith((
-            "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:",
+            "FIDELITY:", "FIDELITY-DETAIL:", "NEUTRALITY:", "ORIGINAL-NEUTRALITY:",
             "STAKES-ADVOCACY:", "CONTEXT-ADVOCACY:",
         )):
             # No commentary. `NEUTRALITY: PASS` followed by "The cleaned wording still
             # favors option A." was otherwise accepted as clean, and the biased packet
             # went to both deciders stamped `attested`.
             raise ArbitrationError(
-                f"attestation contains text outside its five verdict lines: {line!r}"
+                f"attestation contains text outside its six verdict lines: {line!r}"
             )
         if upper.startswith("FIDELITY-DETAIL:"):
             if fidelity_detail is not None:
@@ -702,6 +723,37 @@ def parse_attestation(
             else:
                 raise ArbitrationError(
                     f"NEUTRALITY must be exactly PASS, or FAIL with a note, got {body!r}"
+                )
+        elif upper.startswith("ORIGINAL-NEUTRALITY:"):
+            body = line[len("ORIGINAL-NEUTRALITY:"):].strip()
+            if body.upper() == "PASS":
+                original_neutrality = True
+            elif body.startswith("FAIL "):
+                try:
+                    value = json.loads(body[5:], object_pairs_hook=_unique_json_object)
+                except (json.JSONDecodeError, ArbitrationError) as exc:
+                    raise ArbitrationError(
+                        f"ORIGINAL-NEUTRALITY FAIL must contain one JSON object: {exc}"
+                    ) from exc
+                if not isinstance(value, dict) or set(value) != {"field", "passage"}:
+                    raise ArbitrationError(
+                        "ORIGINAL-NEUTRALITY FAIL must contain exactly field and passage"
+                    )
+                field, passage = value["field"], value["passage"]
+                if not isinstance(field, str) or field not in expected:
+                    raise ArbitrationError(
+                        f"ORIGINAL-NEUTRALITY names unknown field {field!r}"
+                    )
+                if not isinstance(passage, str) or not passage or passage not in expected[field][0]:
+                    raise ArbitrationError(
+                        f"ORIGINAL-NEUTRALITY passage is not in original field {field!r}"
+                    )
+                original_neutrality = False
+                original_diagnostic = {"field": field, "passage": passage}
+            else:
+                raise ArbitrationError(
+                    "ORIGINAL-NEUTRALITY must be exactly PASS or FAIL followed by "
+                    "a field-bound JSON object"
                 )
         elif upper.startswith("STAKES-ADVOCACY:"):
             if stakes_seen:
@@ -741,6 +793,8 @@ def parse_attestation(
         raise ArbitrationError(f"attestation covered unknown field(s): {', '.join(unexpected)}")
     if neutrality is None:
         raise ArbitrationError("attestation has no NEUTRALITY verdict")
+    if original_neutrality is None:
+        raise ArbitrationError("attestation has no ORIGINAL-NEUTRALITY verdict")
     if not stakes_seen:
         raise ArbitrationError("attestation has no STAKES-ADVOCACY verdict")
     if not context_seen:
@@ -807,7 +861,8 @@ def parse_attestation(
             fidelity_diagnostics[field] = dict(item)
     return Attestation(
         fidelity, fidelity_detail, fidelity_diagnostics,
-        neutrality, note, stakes, context_advocacy,
+        neutrality, note, original_neutrality, original_diagnostic,
+        stakes, context_advocacy,
         (text or "").strip(),
     )
 
@@ -1156,7 +1211,8 @@ def _arbitrate(
     # production invocations died after two Opus attempts each on exactly these
     # measurements (issue #8, fix 5).
     arb.preflight_framing(
-        decision=decision, context=context, options=canonical, cleaned=do_clean
+        decision=decision, context=context, options=canonical, cleaned=do_clean,
+        stakes=stakes, hints=raw_hints,
     )
 
     _preflight(deciders)
@@ -2212,6 +2268,7 @@ def _clean_and_attest(
     # caller-owned and receives its own advocacy verdict instead of fidelity scoring.
     complaint = ""
     last_error: str | None = None
+    original_neutrality_failed = False
     phase_attempts = established.setdefault("phase_attempts", []) if established is not None else []
     # One retry only, and deliberately: a longer loop would hill-climb the framing
     # against the attester until it passed, which is optimization, not attestation.
@@ -2220,6 +2277,7 @@ def _clean_and_attest(
         if established is not None:
             established["packet"].cleaning = "cleaning"
         cleaner_body = _clean_body(decision, stakes, context, hints, originals, complaint)
+        _check_cleaning_role_body("cleaner", cleaner_body)
         cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
         cleaner_record = {
             "role": "cleaner", "attempt": attempt + 1,
@@ -2252,6 +2310,16 @@ def _clean_and_attest(
             cleaned_raw.encode("utf-8", "surrogatepass")
         ).hexdigest()
         cleaner_record["rejection"] = None
+        if len(cleaned_raw) > arb.MAX_CLEANER_REPLY_CHARS:
+            last_error = (
+                f"cleaner reply is {len(cleaned_raw)} chars "
+                f"(max {arb.MAX_CLEANER_REPLY_CHARS})"
+            )
+            cleaner_record["rejection"] = last_error
+            if established is not None:
+                established["packet"].cleaning = "cleaner-rejected"
+            complaint = f"Your previous attempt was rejected: {last_error}\nReturn only the four blocks."
+            continue
         try:
             parsed = parse_cleaned_packet(
                 cleaned_raw, list(originals), caller_gave_context=bool(context)
@@ -2260,17 +2328,13 @@ def _clean_and_attest(
             # copy is non-authoritative: always restore the exact caller string so a
             # rewrite, omission, or whitespace normalization cannot reach deciders.
             parsed["context"] = context
-            check_length_bands(parsed["statements"], originals)
+            expected_hint_paths = {hint["path"] for hint in hints}
+            if set(parsed["hints"]) != expected_hint_paths:
+                raise ArbitrationError(
+                    "cleaner changed the hint path set: "
+                    f"expected {sorted(expected_hint_paths)}, got {sorted(parsed['hints'])}"
+                )
             cleaned_hints = _merge_hints(hints, parsed["hints"])
-            arb.reject_reserved_tokens(
-                {
-                    "decision": parsed["decision"],
-                    "context": parsed["context"],
-                    **{f"statement[{k}]": v for k, v in parsed["statements"].items()},
-                    **{f"hint[{h['path']}]": h["reason"] for h in cleaned_hints},
-                },
-                list(originals),
-            )
         except ArbitrationError as exc:
             last_error = str(exc)
             cleaner_record["rejection"] = last_error
@@ -2278,6 +2342,14 @@ def _clean_and_attest(
                 established["packet"].cleaning = "cleaner-rejected"
             complaint = f"Your previous attempt was rejected: {exc}\nFix exactly that."
             continue
+
+        candidate_ineligibility = _cleaned_candidate_ineligibility(
+            parsed=parsed, cleaned_hints=cleaned_hints, originals=originals,
+        )
+        candidate_record = {
+            "decision": parsed["decision"], "context": parsed["context"],
+            "hints": list(cleaned_hints), "statements": dict(parsed["statements"]),
+        }
 
         if established is not None:
             established["packet"] = Packet(
@@ -2300,6 +2372,7 @@ def _clean_and_attest(
         attester_body = _attest_body(
             decision, stakes, context, hints, cleaned_hints, originals, parsed,
         )
+        _check_cleaning_role_body("attester", attester_body)
         attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
         attester_record = {
             "role": "attester", "attempt": attempt + 1,
@@ -2359,7 +2432,7 @@ def _clean_and_attest(
                 "the context text advocates for an option, and context is preserved "
                 f"verbatim — fix it and re-run: {attestation.context_advocacy}"
             )
-        if attestation.ok:
+        if attestation.ok and not candidate_ineligibility:
             return (
                 Packet(
                     decision=parsed["decision"], stakes=stakes, context=parsed["context"],
@@ -2374,12 +2447,61 @@ def _clean_and_attest(
             f"{attestation.fidelity_detail}; neutrality: "
             f"{'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}"
         )
+        if candidate_ineligibility:
+            last_error += "; cleaned candidate ineligible: " + "; ".join(candidate_ineligibility)
+        if not attestation.original_neutrality_pass:
+            original_neutrality_failed = True
+        if attestation.original_neutrality_pass and not original_neutrality_failed:
+            attester_record["rejection"] = last_error
+            fallback = Packet(
+                decision=decision, stakes=stakes, context=context,
+                hints=list(hints), statements=dict(originals),
+                cleaning="original-attested", attestation=attestation.raw,
+                cleaner_candidate=candidate_record,
+            )
+            if established is not None:
+                established["packet"] = fallback
+            return fallback, "original-attested"
+        if original_neutrality_failed:
+            last_error += "; original packet is not neutral enough for fallback"
         attester_record["rejection"] = last_error
         if established is not None:
             established["packet"].cleaning = "attestation-rejected"
         complaint = f"An independent auditor rejected your previous attempt: {last_error}\nFix exactly that."
 
     raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
+
+
+def _check_cleaning_role_body(role: str, body: str) -> None:
+    if len(body) > arb.MAX_CLEANING_ROLE_BODY_CHARS:
+        raise ArbitrationError(
+            f"{role} body is {len(body)} chars "
+            f"(max {arb.MAX_CLEANING_ROLE_BODY_CHARS})"
+        )
+
+
+def _cleaned_candidate_ineligibility(
+    *, parsed: Mapping[str, Any], cleaned_hints: Sequence[Mapping[str, str]],
+    originals: Mapping[str, str],
+) -> list[str]:
+    """Return failures that disqualify only the rewrite, not the originals."""
+    issues: list[str] = []
+    try:
+        check_length_bands(parsed["statements"], originals)
+    except ArbitrationError as exc:
+        issues.append(str(exc))
+    try:
+        arb.reject_reserved_tokens(
+            {
+                "decision": parsed["decision"],
+                **{f"statement[{k}]": v for k, v in parsed["statements"].items()},
+                **{f"hint[{h['path']}]": h["reason"] for h in cleaned_hints},
+            },
+            list(originals),
+        )
+    except ArbitrationError as exc:
+        issues.append(str(exc))
+    return issues
 
 
 def _clean_body(

@@ -152,22 +152,29 @@ def validate_options(raw: object) -> tuple[Option, ...]:
 # only scope-of-adoption — landed at ~800 chars and passed first time.
 MAX_OPTION_CHARS = 1200
 MAX_DECISION_CHARS = 2500
-# `context` is the designated home for detail, and it is not per-option, so its
-# length cannot be a vote between the options. It gets a far looser bound.
+# `context` carries shared detail, and it is not per-option, so its length cannot
+# be a vote between the options. It gets a far looser bound.
 MAX_CONTEXT_CHARS = 20000
+MAX_STAKES_CHARS = 20000
+MAX_HINTS = 32
+MAX_HINT_REASON_CHARS = 1200
+MAX_HINTS_CHARS = 20000
+# Includes the fixed instructions, caller framing, any bounded correction, and the
+# cleaner candidate. This is an admission bound, not a model quality budget.
+MAX_CLEANING_ROLE_BODY_CHARS = 160000
+MAX_CLEANER_REPLY_CHARS = 50000
 OPTION_RATIO_MAX = 2.0
 
 _HOIST_REMEDY = (
-    "Hoist the shared mechanism into `context` — including the full specification "
-    "of what only one option adopts — and leave each option statement to say only "
-    "which of it is adopted, and what follows. Options then describe "
-    "scope-of-adoption rather than one describing mechanism and the other its "
-    "absence, and they equalize naturally."
+    "Put only facts and specification shared by every option in `context`. Keep "
+    "each option's distinct mechanism, scope, and consequences in that option's "
+    "own concise statement, using parallel structure and comparable detail."
 )
 
 
 def preflight_framing(
-    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True
+    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True,
+    stakes: str = "", hints: Sequence[Mapping[str, object]] = (),
 ) -> None:
     """Reject framing defects visible in the caller's own input, before spending a
     cleaner call on them.
@@ -216,6 +223,25 @@ def preflight_framing(
     if len(context) > MAX_CONTEXT_CHARS:
         raise ArbitrationError(
             f"context is {len(context)} chars (max {MAX_CONTEXT_CHARS})"
+        )
+    if len(stakes) > MAX_STAKES_CHARS:
+        raise ArbitrationError(
+            f"stakes is {len(stakes)} chars (max {MAX_STAKES_CHARS})"
+        )
+    if len(hints) > MAX_HINTS:
+        raise ArbitrationError(f"file hints number {len(hints)} (max {MAX_HINTS})")
+    hint_chars = 0
+    for index, hint in enumerate(hints):
+        reason = str(hint.get("reason", ""))
+        if len(reason) > MAX_HINT_REASON_CHARS:
+            raise ArbitrationError(
+                f"file hint {index} reason is {len(reason)} chars "
+                f"(max {MAX_HINT_REASON_CHARS})"
+            )
+        hint_chars += len(str(hint.get("path", ""))) + len(reason)
+    if hint_chars > MAX_HINTS_CHARS:
+        raise ArbitrationError(
+            f"file hints render to {hint_chars} chars (max {MAX_HINTS_CHARS})"
         )
 
 

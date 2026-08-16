@@ -899,17 +899,15 @@ def test_preflight_rejects_an_over_long_decision():
     assert "decision" in str(exc.value) and str(arb.MAX_DECISION_CHARS) in str(exc.value)
 
 
-def test_preflight_accepts_the_hoisted_shape_that_worked_in_the_field():
-    """The shape the field report converged on: shared mechanism in context, each
-    option stating only scope-of-adoption. ~780 vs ~810 chars."""
+def test_preflight_accepts_parallel_options_with_only_shared_context():
     arb.preflight_framing(
         decision="How far should the fix go?" * 3,
-        context="The rules under consideration, if adopted: " + "spec. " * 800,
+        context="Facts shared by every option: " + "spec. " * 800,
         options=(Option("A_only", "x" * 780), Option("B_plus", "y" * 810)),
     )
 
 
-def test_preflight_allows_a_long_context_because_it_is_the_hoist_target():
+def test_preflight_allows_bounded_shared_context():
     arb.preflight_framing(
         decision="d", context="c" * (arb.MAX_CONTEXT_CHARS - 1),
         options=(Option("A", "x" * 100), Option("B", "y" * 100)),
@@ -920,6 +918,20 @@ def test_preflight_allows_a_long_context_because_it_is_the_hoist_target():
             options=(Option("A", "x" * 100), Option("B", "y" * 100)),
         )
     assert "context" in str(exc.value)
+
+
+@pytest.mark.parametrize(("kwargs", "message"), [
+    ({"stakes": "s" * (arb.MAX_STAKES_CHARS + 1)}, "stakes"),
+    ({"hints": [{"path": f"p{i}"} for i in range(arb.MAX_HINTS + 1)]}, "file hints number"),
+    ({"hints": [{"path": "p", "reason": "r" * (arb.MAX_HINT_REASON_CHARS + 1)}]}, "reason"),
+])
+def test_preflight_bounds_all_cleaning_framing(kwargs, message):
+    with pytest.raises(arb.ArbitrationError, match=message):
+        arb.preflight_framing(
+            decision="d", context="",
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+            **kwargs,
+        )
 
 
 def test_option_objects_reject_unknown_keys():
