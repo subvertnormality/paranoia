@@ -19,15 +19,15 @@
   "audits": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-audit.json",
-      "sha256": "ea12a3fd410ab6e9ae155a48b76ac39ef8f6d10ceec30cec810109f93e6eac09",
-      "snapshot": "4c5381885ef16ee2d2a8a136aef9e8c347ed9f75",
+      "sha256": "4d7a6f667b0b4d31ce7dfbbd7755efb8b88f2421ab73bbec5d4e8b00a0eb41f9",
+      "snapshot": "3fd56c3c270e06ab0be54ac4ec396e76839e73fa",
       "cleaning": "attested",
       "result": "CONVERGED"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
-      "sha256": "d14f3caa6296de82962e88898a16212b19208ab19b0c8ad44d83876cef5f425b",
-      "snapshot": "4c5381885ef16ee2d2a8a136aef9e8c347ed9f75",
+      "sha256": "9585921355816660d1f1c767098b10e9fe2090e39c766b9fb9b406a5ef4b5f88",
+      "snapshot": "3fd56c3c270e06ab0be54ac4ec396e76839e73fa",
       "cleaning": "original-attested",
       "result": "CONVERGED"
     }
@@ -35,21 +35,21 @@
   "timings": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-timing.json",
-      "sha256": "8e828ddfd8ba72573ba4543a87d232dd9020a13a44195d298eae889dc9a3550c"
+      "sha256": "61a091bc6031ae382eee7bef36e497a520513a59107252c039a0ec4c87448365"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/timing.json",
-      "sha256": "206b7948b094f44ab25fbf2368a3b6f7058494d90ec7561293a2c17deddd5dae"
+      "sha256": "1ffe345f8007f36feabec06a034adde763521cd9f41758d043e0a319f4c75718"
     }
   },
   "snapshot_binding": {
     "commit_object": "docs/arbitration_fallback_evidence/snapshot-commit.txt",
-    "sha256": "a85aade32c1ee800b73fdb3fb6803494fac2083fe49cb24217b15ec498eb15fb",
-    "source_commit": "8b65c1517f6355000e920c9ee67b0f1c2ef98387",
-    "tree": "aae02b71734c16d807095ec7ff9f48e9efde72ea"
+    "sha256": "68e30f541e83cdace2f10c9df8469567fcd9d7d342c36fcd614adbe0b02b1ed3",
+    "source_commit": "aba705895e7234e3208b3331f1722cf40d3ae9d0",
+    "tree": "d2d9d53df6244f12323676b0e4028298f64fb2a9"
   },
   "source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "f944973f5ccf53f35afc10e5c104b4938630c131adb72e5a27a176a1b56e2966",
+    "src/paranoia_local/arbitrate_handler.py": "d9fec881b6386d243f0340cd2ca2e1a1ee4e3dcd7c77c3fa69473fea40478cef",
     "src/paranoia_local/arbitration.py": "f666eee57490d5c7cdc55a97b399ae6e39d00029376574adcba8db7dcf5d22a9",
     "src/paranoia_local/engines.py": "13210732e9e059bdf71135c1ecb8742345aac1d0a1fad3b9200ea0de129638b2",
     "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
@@ -57,7 +57,7 @@
     "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac",
     "scripts/run_arbitration_fallback_acceptance.py": "38d8cffe93c62fb145235f756f71334f1491149c35f0e6b07e20f902a82dc9d5",
     "scripts/validate_arbitration_fallback_acceptance.py": "9ff19468f7b8a5427c60e55da3d535f67e8901cb9c5ecc011b95e860b83e494a",
-    "tests/test_arbitrate_handler.py": "0629f14a859557f31eaf41bffede1804d40339a586582029f1534b7bc92e8c1b",
+    "tests/test_arbitrate_handler.py": "401124d0ec54d91f6e4ba3053952547ce843de352e368d3301f6973c327472d4",
     "tests/test_arbitration_fallback_acceptance.py": "83385b88d2cded2de4f2c59c9ad8827344a670d8c116bac54186771f493d56ea"
   },
   "tests": {
