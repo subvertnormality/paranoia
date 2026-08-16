@@ -532,6 +532,9 @@ def test_whole_run_deadline_refuses_a_phase_that_cannot_fit(
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     assert record["phase_attempts"][0]["status"] == "admission-refused"
     assert record["phase_attempts"][0]["invoked"] is False
+    assert record["phase_attempts"][0]["execution"] == ah._execution_identity(
+        eng.CLEANER_ENGINE, eng.CLEANER_MODEL,
+    )
 
 
 def test_cleaner_execution_exception_keeps_pending_attempt_binding(
@@ -2277,7 +2280,10 @@ def test_run_agent_preserves_all_engine_failure_channels(monkeypatch, tmp_path: 
 def test_run_agent_marks_engine_setup_failure_before_provider_invocation(
     monkeypatch, tmp_path: Path,
 ):
-    lifecycle = {"status": "admitted", "admitted": True, "invoked": False}
+    lifecycle = {
+        "status": "admitted", "admitted": True, "invoked": False,
+        "execution": ah._execution_identity("codex", "m"),
+    }
     monkeypatch.setattr(
         ah.eng, "get_engine", lambda *a, **k: (_ for _ in ()).throw(
             RuntimeError("engine setup unavailable")
@@ -2293,6 +2299,7 @@ def test_run_agent_marks_engine_setup_failure_before_provider_invocation(
 
     assert lifecycle == {
         "status": "setup-failed", "admitted": True, "invoked": False,
+        "execution": ah._execution_identity("codex", "m"),
     }
 
 

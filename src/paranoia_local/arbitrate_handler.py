@@ -1148,13 +1148,6 @@ def _arbitrate(
 
     def budgeted_agent(**kwargs: Any) -> str:
         lifecycle = kwargs.pop("_attempt_lifecycle", None)
-        engine_name = str(kwargs.get("engine_name", ""))
-        model = str(kwargs.get("model", ""))
-        if lifecycle is not None:
-            lifecycle["execution"] = _execution_identity(
-                engine_name, model,
-                route="external-cli" if agent is _run_agent else "injected-agent",
-            )
         cap = int(kwargs.get("timeout", 0))
         if time.monotonic() + cap + TEARDOWN_RESERVE_SEC > deadline:
             if lifecycle is not None:
@@ -1165,7 +1158,13 @@ def _arbitrate(
         if lifecycle is not None:
             lifecycle.update(status="admitted", admitted=True, invoked=False)
         if lifecycle is not None and agent is not _run_agent:
-            lifecycle.update(status="provider-invoked", invoked=True)
+            lifecycle.update(
+                status="provider-invoked", invoked=True,
+                execution=_execution_identity(
+                    str(kwargs.get("engine_name", "")), str(kwargs.get("model", "")),
+                    route="injected-agent",
+                ),
+            )
         try:
             pass_lifecycle = agent is _run_agent or bool(
                 getattr(agent, "_paranoia_accepts_lifecycle", False)
