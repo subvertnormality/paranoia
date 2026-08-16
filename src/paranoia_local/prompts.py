@@ -200,7 +200,7 @@ You are given, field by field, the ORIGINAL text and the CLEANED text. Judge thr
 1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.
 2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option, through wording, emphasis, asymmetric detail, or what it leaves out? If so, say which option and quote the words that do it.
 3. ORIGINAL NEUTRALITY — independently judge whether the complete ORIGINAL decision,
-options, and hint reasons are neutral enough to show to both deciders without cleaning.
+options, and hints (every path and reason) are neutral enough to show to both deciders without cleaning.
 If not, name one exact original field and quote an exact non-empty passage from it.
 
 Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is.

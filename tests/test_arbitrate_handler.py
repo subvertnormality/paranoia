@@ -1799,6 +1799,33 @@ def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: 
     assert "original packet is not neutral enough for fallback" in report
 
 
+def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
+    repo: Path, tmp_path: Path,
+):
+    (repo / "prefer_float.py").write_text("VALUE = 1\n")
+    commit_all(repo, "add deliberately steering hint path")
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Use a Decimal, which is exact and avoids representation error entirely.",
+    }).replace(
+        "=== HINTS ===\nNone.",
+        "=== HINTS ===\n- prefer_float.py: implementation entry point",
+    )
+    attestation = ATTEST_OK_WITH_HINTS.replace(
+        "ORIGINAL-NEUTRALITY: PASS",
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"hints","passage":"prefer_float.py"}',
+    )
+    agent = Agent(lambda e, r: "opt-float", cleaner=cleaner, attest=attestation)
+    report = run(
+        repo, agent, tmp_path,
+        files=[{"path": "prefer_float.py", "reason": "implementation entry point"}],
+    )
+
+    assert "original packet is not neutral enough for fallback" in report
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "every path and reason" in prompts.ATTEST_INSTRUCTIONS
+
+
 def test_attestation_failure_retries_once_then_fails(repo: Path, tmp_path: Path):
     """One retry only: a longer loop would hill-climb the framing against the
     attester until it passed, which is optimization, not attestation."""
@@ -2006,6 +2033,12 @@ def test_phase_reply_bound_retains_complete_normal_protocol_and_marks_overflow()
     bounded = ah._bounded_phase_reply(overflow)
     assert len(bounded) == ah.MAX_PHASE_REPLY_CHARS
     assert "[bounded phase output]" in bounded
+
+
+def test_cleaning_limit_applies_to_the_fully_composed_prompt():
+    ah._check_cleaning_prompt("cleaner", "x" * arb.MAX_CLEANING_PROMPT_CHARS)
+    with pytest.raises(ah.ArbitrationError, match="cleaner prompt"):
+        ah._check_cleaning_prompt("cleaner", "x" * (arb.MAX_CLEANING_PROMPT_CHARS + 1))
 
 
 def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(

@@ -684,7 +684,8 @@ field's actual pair, and identical passages cannot demonstrate a change. A prefi
 `NEUTRALITY: PASS but the wording favors option A` as a clean bill of health and
 stamped a biased packet `attested` — sending that same bias to both deciders.
 
-`ORIGINAL-NEUTRALITY` is independent of cleaned fidelity and neutrality. Its FAIL
+`ORIGINAL-NEUTRALITY` is independent of cleaned fidelity and neutrality and covers
+complete hints, including every path and reason. Its FAIL
 form is a closed two-key JSON object bound to an exact original field and passage.
 When the cleaned candidate is complete and bounded but cannot be used, PASS permits
 one atomic fallback to the canonical original decision, option mapping, and validated

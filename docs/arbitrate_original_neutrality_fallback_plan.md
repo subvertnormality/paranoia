@@ -58,8 +58,8 @@ model call would increase cost without changing authority.
    Persist the raw attestation unchanged.
 3. Bound the complete original framing before the first cleaner call: retain the decision, option,
    and context limits; add maximum stakes length, hint count, per-reason length, aggregate
-   rendered-hint length, and one aggregate rendered cleaner/attester-body limit covering fixed
-   instructions, every caller/server field, and bounded correction diagnostics. The exact constants
+   rendered-hint length, and one aggregate fully composed cleaner/attester-prompt limit covering fixed
+   instructions, task separator, every caller/server field, and bounded correction diagnostics. The exact constants
    belong beside the existing framing bounds and are repeated in the tool schema.
    After parsing a cleaner candidate, require all four blocks, the exact 1:1 option-id set, non-empty
    decision/statements, and a bounded absolute candidate size before attestation. Those are structural

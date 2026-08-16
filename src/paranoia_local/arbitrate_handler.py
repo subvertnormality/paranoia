@@ -2277,8 +2277,8 @@ def _clean_and_attest(
         if established is not None:
             established["packet"].cleaning = "cleaning"
         cleaner_body = _clean_body(decision, stakes, context, hints, originals, complaint)
-        _check_cleaning_role_body("cleaner", cleaner_body)
         cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
+        _check_cleaning_prompt("cleaner", cleaner_prompt)
         cleaner_record = {
             "role": "cleaner", "attempt": attempt + 1,
             "status": "prepared", "admitted": False, "invoked": False,
@@ -2372,8 +2372,8 @@ def _clean_and_attest(
         attester_body = _attest_body(
             decision, stakes, context, hints, cleaned_hints, originals, parsed,
         )
-        _check_cleaning_role_body("attester", attester_body)
         attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
+        _check_cleaning_prompt("attester", attester_prompt)
         attester_record = {
             "role": "attester", "attempt": attempt + 1,
             "status": "prepared", "admitted": False, "invoked": False,
@@ -2472,11 +2472,11 @@ def _clean_and_attest(
     raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
 
 
-def _check_cleaning_role_body(role: str, body: str) -> None:
-    if len(body) > arb.MAX_CLEANING_ROLE_BODY_CHARS:
+def _check_cleaning_prompt(role: str, prompt: str) -> None:
+    if len(prompt) > arb.MAX_CLEANING_PROMPT_CHARS:
         raise ArbitrationError(
-            f"{role} body is {len(body)} chars "
-            f"(max {arb.MAX_CLEANING_ROLE_BODY_CHARS})"
+            f"{role} prompt is {len(prompt)} chars "
+            f"(max {arb.MAX_CLEANING_PROMPT_CHARS})"
         )
 
 

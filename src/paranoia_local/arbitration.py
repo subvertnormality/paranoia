@@ -161,7 +161,7 @@ MAX_HINT_REASON_CHARS = 1200
 MAX_HINTS_CHARS = 20000
 # Includes the fixed instructions, caller framing, any bounded correction, and the
 # cleaner candidate. This is an admission bound, not a model quality budget.
-MAX_CLEANING_ROLE_BODY_CHARS = 160000
+MAX_CLEANING_PROMPT_CHARS = 180000
 MAX_CLEANER_REPLY_CHARS = 50000
 OPTION_RATIO_MAX = 2.0
 
@@ -230,7 +230,7 @@ def preflight_framing(
         )
     if len(hints) > MAX_HINTS:
         raise ArbitrationError(f"file hints number {len(hints)} (max {MAX_HINTS})")
-    hint_chars = 0
+    rendered_hints: list[str] = []
     for index, hint in enumerate(hints):
         reason = str(hint.get("reason", ""))
         if len(reason) > MAX_HINT_REASON_CHARS:
@@ -238,7 +238,8 @@ def preflight_framing(
                 f"file hint {index} reason is {len(reason)} chars "
                 f"(max {MAX_HINT_REASON_CHARS})"
             )
-        hint_chars += len(str(hint.get("path", ""))) + len(reason)
+        rendered_hints.append(f"- {hint.get('path', '')}: {reason}")
+    hint_chars = len("\n".join(rendered_hints) or "None.")
     if hint_chars > MAX_HINTS_CHARS:
         raise ArbitrationError(
             f"file hints render to {hint_chars} chars (max {MAX_HINTS_CHARS})"

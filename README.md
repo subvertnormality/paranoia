@@ -739,7 +739,7 @@ the other CLI.
 | `stakes` | 20000 chars |
 | file hints | 32; 1200 chars per reason; 20000 rendered chars aggregate |
 | cleaner reply | 50000 chars |
-| cleaner or attester body | 160000 chars |
+| complete cleaner or attester prompt | 180000 chars |
 
 The shape that passes these naturally: put only facts and specification shared by
 every option in `context`. Keep each option's distinct mechanism, scope, and

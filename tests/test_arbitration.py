@@ -934,6 +934,19 @@ def test_preflight_bounds_all_cleaning_framing(kwargs, message):
         )
 
 
+def test_hint_aggregate_counts_the_exact_rendered_bullets_and_separators():
+    hints = [
+        {"path": f"path-{index}.py", "reason": "r" * 1165}
+        for index in range(17)
+    ]
+    assert sum(len(hint["path"]) + len(hint["reason"]) for hint in hints) < arb.MAX_HINTS_CHARS
+    with pytest.raises(arb.ArbitrationError, match="render to"):
+        arb.preflight_framing(
+            decision="d", context="", hints=hints,
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+        )
+
+
 def test_option_objects_reject_unknown_keys():
     """Issue #8 fix 8: a stray "x" key was silently accepted and ignored."""
     with pytest.raises(arb.ArbitrationError) as exc:

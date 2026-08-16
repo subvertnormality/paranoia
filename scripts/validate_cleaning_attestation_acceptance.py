@@ -359,10 +359,7 @@ def _validate_cleaning_acceptance(artifact: dict, repo: Path) -> None:
         ),
         "original reason": original["reason"] == original_summary["reason"],
         "original diagnostics": _phase_diagnostics_bound(
-            original, accepted=(
-                original["cleaning"].startswith("attested")
-                or original["cleaning"] == "original-attested"
-            )
+            original, accepted=original["cleaning"].startswith("attested")
         ),
         "original prompt bindings": _phase_prompts_bound(original),
         "original derived outcome": original_outcome_bound,
