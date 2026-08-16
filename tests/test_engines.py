@@ -92,6 +92,35 @@ def test_cli_version_is_compared_numerically(monkeypatch) -> None:
     assert engines._cli_version("claude") == (2, 10, 3)
 
 
+@pytest.mark.parametrize(
+    "reported",
+    ["claude 2.1.197-alpha.1", "codex-cli 0.144.6-beta"],
+)
+def test_cli_version_rejects_prereleases(monkeypatch, reported) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout=reported, stderr="",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="does not support prerelease"):
+        engines._cli_version("provider")
+
+
+def test_cli_version_accepts_build_metadata(monkeypatch) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout="claude 2.1.197+native.4", stderr="",
+        ),
+    )
+
+    assert engines._cli_version("claude") == (2, 1, 197)
+
+
 def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:
     review = engines.CodexEngine().parse_output(
         '{"type":"thread.started","thread_id":"recovered"}\n'

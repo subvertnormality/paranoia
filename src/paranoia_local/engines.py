@@ -594,10 +594,19 @@ def _cli_version(binary: str) -> tuple[int, int, int]:
     result = subprocess.run([binary, "--version"], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"cannot run {binary} --version: {result.stderr.strip()}")
-    match = re.search(r"(\d+)\.(\d+)\.(\d+)", result.stdout)
+    match = re.search(
+        r"(?<![\d.])(\d+)\.(\d+)\.(\d+)([-+][0-9A-Za-z.-]+)?",
+        result.stdout,
+    )
     if not match:
         raise RuntimeError(f"cannot parse {binary} version from {result.stdout.strip()!r}")
-    return tuple(int(part) for part in match.groups())
+    qualifier = match.group(4) or ""
+    if qualifier.startswith("-"):
+        raise RuntimeError(
+            f"{binary} evidence mode does not support prerelease CLI versions; "
+            f"found {match.group(0)}"
+        )
+    return tuple(int(part) for part in match.groups()[:3])
 
 
 def require_evidence_profile(engine: Engine) -> str:

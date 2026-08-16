@@ -34,9 +34,9 @@ structured critique.
 **1. Prerequisites**
 
 - Python 3.11+ and `git` on `PATH`
-- The reviewing agent's CLI, installed and signed in on a subscription:
-  [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
-  [Claude Code](https://code.claude.com) (`claude`)
+- The reviewing agent's stable CLI, installed and signed in on a subscription:
+  [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144.6) **or**
+  [Claude Code](https://code.claude.com) (`claude`, ≥ 2.1.197)
 - `arbitrate` needs **both** CLIs; the four review tools need only the other one
 
 **2. Install**
