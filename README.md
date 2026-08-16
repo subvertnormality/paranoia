@@ -709,6 +709,10 @@ Claude evidence roles use matching
 availability and permission allowlists on fresh and resumed calls; denial of a tool required by
 the active role is a visible provider-capability failure, never an empty-search success. Binding
 and text roles use explicit empty allowlists. Only server-captured packets can affect substantiation.
+Evidence roles require Codex CLI 0.144.6 or later and Claude Code 2.1.197 or later. Newer versions
+are accepted; compatibility is then checked by the real call, so unsupported flags or tools,
+permission denial, missing structured output, and malformed provider envelopes remain visible
+blocking failures.
 The signed-in end-to-end record, including exact versions, packet digest, source references,
 plan-claim closure, repository-only closure, and defects found by the first real runs, is
 [`docs/evidence_capture_acceptance_2026-08-10.json`](docs/evidence_capture_acceptance_2026-08-10.json).

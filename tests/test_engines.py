@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,52 @@ class TestFactory:
     def test_default_models(self) -> None:
         assert "gpt-5.6" in engines.get_engine("codex").default_model
         assert "fable" in engines.get_engine("claude").default_model
+
+
+@pytest.mark.parametrize(
+    ("engine", "version", "rendered"),
+    [
+        (engines.CodexEngine(), (0, 144, 6), "0.144.6"),
+        (engines.CodexEngine(), (0, 145, 0), "0.145.0"),
+        (engines.ClaudeEngine(), (2, 1, 197), "2.1.197"),
+        (engines.ClaudeEngine(), (2, 1, 220), "2.1.220"),
+        (engines.ClaudeEngine(), (3, 0, 0), "3.0.0"),
+    ],
+)
+def test_evidence_profile_accepts_minimum_and_later_versions(
+    monkeypatch, engine, version, rendered,
+) -> None:
+    monkeypatch.setattr(engines, "_cli_version", lambda binary: version)
+
+    assert engines.require_evidence_profile(engine) == rendered
+
+
+@pytest.mark.parametrize(
+    ("engine", "version", "minimum"),
+    [
+        (engines.CodexEngine(), (0, 144, 5), "0.144.6"),
+        (engines.ClaudeEngine(), (2, 1, 196), "2.1.197"),
+    ],
+)
+def test_evidence_profile_rejects_only_versions_below_minimum(
+    monkeypatch, engine, version, minimum,
+) -> None:
+    monkeypatch.setattr(engines, "_cli_version", lambda binary: version)
+
+    with pytest.raises(RuntimeError, match=rf">= {re.escape(minimum)}"):
+        engines.require_evidence_profile(engine)
+
+
+def test_cli_version_is_compared_numerically(monkeypatch) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout="Claude Code 2.10.3\n", stderr="",
+        ),
+    )
+
+    assert engines._cli_version("claude") == (2, 10, 3)
 
 
 def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:

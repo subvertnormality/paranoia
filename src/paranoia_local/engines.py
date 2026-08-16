@@ -35,8 +35,8 @@ ROLE_REPOSITORY = "evidence-repository"
 ROLE_TEXT = "evidence-text"
 EVIDENCE_ROLES = frozenset({ROLE_DISCOVERY, ROLE_BINDING, ROLE_REPOSITORY, ROLE_TEXT})
 
-SUPPORTED_CODEX_VERSION = "0.144.6"
-SUPPORTED_CLAUDE_VERSION = "2.1.197"
+MIN_CODEX_VERSION = (0, 144, 6)
+MIN_CLAUDE_VERSION = (2, 1, 197)
 
 CODEX_EXTERNAL_FEATURES = (
     "apps", "browser_use", "browser_use_external", "browser_use_full_cdp_access",
@@ -590,27 +590,29 @@ def all_engines() -> tuple[Engine, ...]:
     return tuple(cls() for cls in _ENGINES.values())
 
 
-def _cli_version(binary: str) -> str:
+def _cli_version(binary: str) -> tuple[int, int, int]:
     result = subprocess.run([binary, "--version"], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"cannot run {binary} --version: {result.stderr.strip()}")
-    match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", result.stdout)
     if not match:
         raise RuntimeError(f"cannot parse {binary} version from {result.stdout.strip()!r}")
-    return match.group(1)
+    return tuple(int(part) for part in match.groups())
 
 
 def require_evidence_profile(engine: Engine) -> str:
-    expected = {
-        "codex": SUPPORTED_CODEX_VERSION,
-        "claude": SUPPORTED_CLAUDE_VERSION,
+    minimum = {
+        "codex": MIN_CODEX_VERSION,
+        "claude": MIN_CLAUDE_VERSION,
     }.get(engine.name)
-    if expected is None:
+    if minimum is None:
         raise RuntimeError(f"no evidence profile for engine {engine.name!r}")
     actual = _cli_version(engine.binary)
-    if actual != expected:
+    if actual < minimum:
+        minimum_text = ".".join(str(part) for part in minimum)
+        actual_text = ".".join(str(part) for part in actual)
         raise RuntimeError(
-            f"{engine.name} evidence mode supports CLI {expected}; found {actual}. "
-            "Install the supported version or add and accept a new explicit profile."
+            f"{engine.name} evidence mode requires CLI >= {minimum_text}; "
+            f"found {actual_text}. Install a supported version."
         )
-    return actual
+    return ".".join(str(part) for part in actual)
