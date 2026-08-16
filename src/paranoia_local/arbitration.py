@@ -233,21 +233,32 @@ def preflight_framing(
         )
     if len(hints) > MAX_HINTS:
         raise ArbitrationError(f"file hints number {len(hints)} (max {MAX_HINTS})")
-    rendered_hints: list[str] = []
+    canonical_hints: list[dict[str, str]] = []
     for index, hint in enumerate(hints):
-        path = str(hint.get("path", "")).strip()
+        # Paths are repository identities and remain byte-for-byte as supplied;
+        # validate_hints later proves literal tree membership. Reasons are semantic
+        # prose and validate_hints strips them before any downstream prompt.
+        path = str(hint.get("path", ""))
         reason = str(hint.get("reason", "")).strip()
         if len(reason) > MAX_HINT_REASON_CHARS:
             raise ArbitrationError(
                 f"file hint {index} reason is {len(reason)} chars "
                 f"(max {MAX_HINT_REASON_CHARS})"
             )
-        rendered_hints.append(f"- {path}" + (f" ({reason})" if reason else ""))
-    hint_chars = len("\n".join(rendered_hints) or "None.")
+        canonical_hints.append({"path": path, "reason": reason})
+    hint_chars = len(render_hints(canonical_hints))
     if hint_chars > MAX_HINTS_CHARS:
         raise ArbitrationError(
             f"file hints render to {hint_chars} chars (max {MAX_HINTS_CHARS})"
         )
+
+
+def render_hints(hints: Sequence[Mapping[str, str]]) -> str:
+    """Canonical hint bytes authorized by the attester and delivered to deciders."""
+    return "\n".join(
+        f"- {hint['path']}" + (f" ({hint['reason']})" if hint.get("reason") else "")
+        for hint in hints
+    ) or "None."
 
 
 def canonical_order(options: Iterable[Option]) -> tuple[Option, ...]:

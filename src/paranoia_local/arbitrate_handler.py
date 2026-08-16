@@ -2589,10 +2589,7 @@ def _merge_hints(originals: Sequence[dict], cleaned: Mapping[str, str]) -> list[
 
 def _render_hints(hints: Sequence[Mapping[str, str]]) -> str:
     """Exact hint block delivered to deciders and judged by the attester."""
-    return "\n".join(
-        f"- {hint['path']}" + (f" ({hint['reason']})" if hint.get("reason") else "")
-        for hint in hints
-    ) or "None."
+    return arb.render_hints(hints)
 
 
 def _render_cleaner_hints(hints: Sequence[Mapping[str, str]]) -> str:

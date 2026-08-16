@@ -947,18 +947,22 @@ def test_hint_aggregate_counts_the_exact_rendered_bullets_and_separators():
         )
 
 
-def test_hint_aggregate_uses_the_canonical_stripped_downstream_bytes():
+def test_hint_aggregate_uses_exact_canonical_downstream_bytes():
     hints = [
         {"path": f"path-{index}.py", "reason": "r" * 1165}
         for index in range(16)
     ]
-    prefix = "\n".join(f"- {h['path']} ({h['reason']})" for h in hints)
-    last_path = "path-16.py"
+    prefix = arb.render_hints(hints)
+    last_path = "  path-16.py  "
     remaining = arb.MAX_HINTS_CHARS - len(prefix) - 1 - len(f"- {last_path} ()")
     assert 0 < remaining <= arb.MAX_HINT_REASON_CHARS
-    hints.append({"path": f"  {last_path}  ", "reason": "  " + "r" * remaining + "  "})
+    hints.append({"path": last_path, "reason": "  " + "r" * remaining + "  "})
     options = (Option("A", "x" * 100), Option("B", "y" * 100))
 
+    canonical = [
+        {"path": hint["path"], "reason": hint["reason"].strip()} for hint in hints
+    ]
+    assert len(arb.render_hints(canonical)) == arb.MAX_HINTS_CHARS
     arb.preflight_framing(decision="d", context="", hints=hints, options=options)
     hints[-1]["reason"] += "x"
     with pytest.raises(arb.ArbitrationError, match="render to"):
