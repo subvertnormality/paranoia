@@ -1,0 +1,44 @@
+{
+  "acceptance_kind": "minimum-provider-cli-version-compatibility",
+  "date": "2026-08-16",
+  "model_call_count": 2,
+  "operating_model": "One trusted local operator and OS; provider output is untrusted data; correctness and reachable compatibility failures only.",
+  "probes": [
+    {
+      "cli": "claude",
+      "elapsed_seconds_observed": 1.3,
+      "effort": "high",
+      "minimum_version": "2.1.197",
+      "model": "sonnet",
+      "profile": "evidence-text",
+      "response": {"status": "compatible"},
+      "returncode": 0,
+      "session_ref": "79c1396e-6f7d-43a5-ba26-49fee8d063f7",
+      "tested_version": "2.1.233"
+    },
+    {
+      "cli": "codex",
+      "elapsed_seconds_observed": 4.1,
+      "effort": "high",
+      "minimum_version": "0.144.6",
+      "model": "gpt-5.6-sol",
+      "profile": "evidence-text",
+      "response": {"status": "compatible"},
+      "returncode": 0,
+      "session_ref": "01a00ba8-e2f6-7a02-877c-68b71518342a",
+      "tested_version": "0.147.0"
+    }
+  ],
+  "schema": {
+    "additionalProperties": false,
+    "properties": {"status": {"enum": ["compatible"], "type": "string"}},
+    "required": ["status"],
+    "type": "object"
+  },
+  "sources": {
+    "claude_cli_reference": "https://code.claude.com/docs/en/cli-reference",
+    "claude_package": "https://www.npmjs.com/package/@anthropic-ai/claude-code",
+    "codex_package": "https://www.npmjs.com/package/@openai/codex"
+  },
+  "version": 1
+}

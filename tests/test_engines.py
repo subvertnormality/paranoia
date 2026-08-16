@@ -121,6 +121,27 @@ def test_cli_version_accepts_build_metadata(monkeypatch) -> None:
     assert engines._cli_version("claude") == (2, 1, 197)
 
 
+def test_minimum_provider_cli_acceptance_binds_later_real_versions() -> None:
+    artifact = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "docs/minimum_provider_cli_acceptance_2026-08-16.json"
+        ).read_text()
+    )
+    assert artifact["model_call_count"] == 2
+    minimums = {
+        "codex": engines.MIN_CODEX_VERSION,
+        "claude": engines.MIN_CLAUDE_VERSION,
+    }
+    assert {probe["cli"] for probe in artifact["probes"]} == set(minimums)
+    for probe in artifact["probes"]:
+        parse = lambda value: tuple(int(part) for part in value.split("."))
+        assert parse(probe["minimum_version"]) == minimums[probe["cli"]]
+        assert parse(probe["tested_version"]) > minimums[probe["cli"]]
+        assert probe["returncode"] == 0
+        assert probe["response"] == {"status": "compatible"}
+
+
 def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:
     review = engines.CodexEngine().parse_output(
         '{"type":"thread.started","thread_id":"recovered"}\n'
