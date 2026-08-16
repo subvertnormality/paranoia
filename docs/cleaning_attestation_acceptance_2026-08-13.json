@@ -14,15 +14,15 @@
   },
   "delivery_metrics": {
     "diff_base": "f4fe2cda09eea1542cc89a6075999f53dfd770c5",
-    "production_diff": {"files": 3, "lines_added": 281, "lines_removed": 56, "net_lines": 225},
+    "production_diff": {"files": 3, "lines_added": 304, "lines_removed": 62, "net_lines": 242},
     "all_changed_files_diff": {
-      "files": 26,
-      "lines_added": 2574,
-      "lines_removed": 168,
-      "net_lines": 2406
+      "files": 27,
+      "lines_added": 2680,
+      "lines_removed": 174,
+      "net_lines": 2506
     },
     "largest_production_modules": [
-      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2983},
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2991},
       {"path": "src/paranoia_local/handlers.py", "lines": 2836},
       {"path": "src/paranoia_local/plan_claims.py", "lines": 1417},
       {"path": "src/paranoia_local/arbitration.py", "lines": 1032},
@@ -85,9 +85,9 @@
     "audit_sha256": "dcec2610bbe833bec0fb1cee94159330eda642339b452df435d5f0ac41b7a3f0"
   },
   "production_source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "bffc71b9ed24feb55ce7380d38ae33560012bbd5404d64407a96f9ffb0fea5c2",
+    "src/paranoia_local/arbitrate_handler.py": "e29b98d3a1e8f29982943c327dc4166656a0ea54f95eda2ef556aa0499763bd0",
     "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
-    "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac"
+    "src/paranoia_local/server.py": "acf67a80eeb57c49d68a27baaa49e62034bb5b15ff4da1428176bdbe0732ecf7"
   },
   "timing_record": {
     "path": "docs/cleaning_attestation_timing_2026-08-13.json",
@@ -102,19 +102,19 @@
       "positive": {"path": "docs/cleaning_attestation_evidence/run_positive_acceptance.py", "sha256": "5edc04d747be66b999570de2d882a207efe3e394b3cfef47ceb09dfc0263bd4f"},
       "fixture": {"path": "docs/cleaning_attestation_evidence/acceptance_fixture.py", "sha256": "9917a230fdc787c4acadfbc65266e83511ce3361b58cab40bd9c46bb59612cc8"},
       "tests": {"path": "scripts/run_cleaning_acceptance_checks.py", "sha256": "b82fe7811b16b50cd74198fa8116052113b8152a347378be675f21437f4f85a7"},
-      "validator": {"path": "scripts/validate_cleaning_attestation_acceptance.py", "sha256": "72a0da3ad5b87cb457487e7ee3378769780e21661f81a22c52dac577dd7fdf63"}
+      "validator": {"path": "scripts/validate_cleaning_attestation_acceptance.py", "sha256": "c49f8e306b76a318ac92b717cfde434a09918f2e5257cb7b745be5bea33c87fa"}
     }
   },
   "tests": {
-    "focused_result": "266 passed in 45.30s",
+    "focused_result": "271 passed in 36.83s",
     "focused_log": "docs/cleaning_attestation_evidence/focused-tests.log",
-    "focused_log_sha256": "a2fb62d1b8438c8c272ffe743253b90ddc2f1564cfebed894a473cf307d9c93c",
+    "focused_log_sha256": "3bbdd9af3cbb2d22a8442334c89e39558c33d55e9e91ff5d206747af00d41646",
     "focused_exit_status": 0,
-    "full_result": "1104 passed in 231.21s (0:03:51)",
+    "full_result": "1111 passed in 202.13s (0:03:22)",
     "full_log": "docs/cleaning_attestation_evidence/full-tests.log",
-    "full_log_sha256": "d60ebc5c9b13426e1a378d9c1c5a770c2ada453cad27db642fdc315fd6863e85",
+    "full_log_sha256": "910b975460bfd6a55b040e58647375276ed552ba7ea62efed5efee21d538f0b3",
     "full_exit_status": 0,
     "runner_manifest": "docs/cleaning_attestation_evidence/test-runner-manifest.json",
-    "runner_manifest_sha256": "28d42fc427288e9449c86a49181e22c60acb55c0ef3b83c6cb55573582b15a02"
+    "runner_manifest_sha256": "1ac5eebafdfabcf17b26ca949ff473b1d675f18009c4d1a36633ba34b3ce884a"
   }
 }
