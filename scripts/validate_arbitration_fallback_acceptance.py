@@ -12,12 +12,17 @@ from pathlib import Path
 
 from paranoia_local import arbitrate_handler as ah
 from paranoia_local import arbitration as arb
+from paranoia_local import evidence
 from paranoia_local import engines
+from paranoia_local import inert_git
+from paranoia_local import prompts
 
 
 SOURCES = frozenset({
     "src/paranoia_local/arbitrate_handler.py",
     "src/paranoia_local/arbitration.py",
+    "src/paranoia_local/engines.py",
+    "src/paranoia_local/evidence.py",
     "src/paranoia_local/prompts.py",
     "src/paranoia_local/server.py",
     "scripts/validate_arbitration_fallback_acceptance.py",
@@ -30,13 +35,30 @@ SCOPE = {
         "a reported destructive cleaner candidate was retained as rejected audit data",
         "a signed-in Codex attester authorized the complete canonical originals",
         "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
-        "the recorded run reached an ordinary terminal arbitration result with CLEANING original-attested",
+        "the transient snapshot was the exact tree of the recorded durable source commit",
+        "the recorded replies parse to the stored votes whose resolved decisive citations recompute the terminal result",
+        "the recorded run route used a deterministic cleaner candidate and three signed-in external calls",
     ],
     "does_not_prove": [
         "that the current Claude cleaner will reproduce the historical destructive rewrite probabilistically",
         "that either decider's resolved citation semantically entails its constraint",
         "provider service identity beyond the recorded local CLI versions and configured model names",
     ],
+}
+
+ROUTE = {
+    "cleaner": {
+        "source": "deterministic-reported-candidate",
+        "external": False,
+        "audit_lifecycle": "provider-completed",
+        "audit_lifecycle_note": (
+            "the production harness labels completion of its injected agent callable; "
+            "the separately recorded route identifies this callable as deterministic"
+        ),
+    },
+    "attester": {"source": "signed-in-codex", "external": True, "calls": 1},
+    "codex_decider": {"source": "signed-in-codex", "external": True, "calls": 1},
+    "claude_decider": {"source": "signed-in-claude", "external": True, "calls": 1},
 }
 
 
@@ -67,6 +89,23 @@ def _cleaned_digest_bound(cleaned: dict) -> bool:
     ).hexdigest()
 
 
+def _text_digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def _attempt_bound(record: dict, *, prompt: str, reply: str, rejection: str | None) -> bool:
+    return (
+        record.get("status") == "provider-completed"
+        and record.get("admitted") is True
+        and record.get("invoked") is True
+        and record.get("prompt_sha256") == _text_digest(prompt)
+        and record.get("prompt_excerpt") == ah._bounded_research_text(prompt)
+        and record.get("reply_sha256") == _text_digest(reply)
+        and record.get("reply") == reply
+        and record.get("rejection") == rejection
+    )
+
+
 def _effective_packet(audit: dict) -> ah.Packet:
     raw = audit["raw_input"]
     return ah.Packet(
@@ -76,8 +115,40 @@ def _effective_packet(audit: dict) -> ah.Packet:
     )
 
 
-def _attestation_bound(audit: dict) -> bool:
+def _cleaning_and_attestation_bound(audit: dict) -> bool:
     raw, cleaned = audit["raw_input"], audit["cleaned"]
+    phase_attempts = audit.get("phase_attempts", [])
+    if [row.get("role") for row in phase_attempts] != ["cleaner", "attester"]:
+        return False
+    cleaner, attester_record = phase_attempts
+    if cleaner.get("attempt") != 1 or attester_record.get("attempt") != 1:
+        return False
+    cleaner_body = ah._clean_body(
+        raw["decision"], raw["stakes"], raw["context"], raw["files"],
+        raw["options"], "",
+    )
+    cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
+    cleaner_reply = cleaner.get("reply")
+    if not isinstance(cleaner_reply, str) or not _attempt_bound(
+        cleaner, prompt=cleaner_prompt, reply=cleaner_reply, rejection=None,
+    ):
+        return False
+    try:
+        parsed = ah.parse_cleaned_packet(
+            cleaner_reply, list(raw["options"]),
+            caller_gave_context=bool(raw["context"]),
+        )
+    except arb.ArbitrationError:
+        return False
+    parsed["context"] = raw["context"]
+    if set(parsed["hints"]) != {hint["path"] for hint in raw["files"]}:
+        return False
+    cleaned_hints = ah._merge_hints(raw["files"], parsed["hints"])
+    if {
+        "decision": parsed["decision"], "context": parsed["context"],
+        "hints": cleaned_hints, "statements": parsed["statements"],
+    } != {key: cleaned[key] for key in ("decision", "context", "hints", "statements")}:
+        return False
     expected = {
         "decision": (raw["decision"], cleaned["decision"]),
         **{
@@ -99,24 +170,30 @@ def _attestation_bound(audit: dict) -> bool:
         or attestation.context_advocacy is not None
     ):
         return False
-    attesters = [row for row in audit["phase_attempts"] if row.get("role") == "attester"]
-    if len(attesters) != 1 or attesters[0].get("reply") != audit["attestation"]:
-        return False
     expected_rejection = (
         f"fidelity changed: {attestation.changed}; detail: {attestation.fidelity_detail}; "
         f"neutrality: {'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}"
     )
-    return attesters[0].get("rejection") == expected_rejection
+    attester_body = ah._attest_body(
+        raw["decision"], raw["stakes"], raw["context"], raw["files"],
+        cleaned_hints, raw["options"], parsed,
+    )
+    attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
+    return _attempt_bound(
+        attester_record, prompt=attester_prompt, reply=audit["attestation"],
+        rejection=expected_rejection,
+    )
 
 
-def _decider_prompts_bound(audit: dict) -> bool:
+def _decider_transcripts(audit: dict) -> list[arb.Vote] | None:
     if len(audit.get("rounds", [])) != 1 or set(audit["rounds"][0]) != {"codex", "claude"}:
-        return False
+        return None
     packet = _effective_packet(audit)
+    votes: list[arb.Vote] = []
     for engine, cast in audit["rounds"][0].items():
         mapping = audit.get("label_maps", {}).get(engine)
         if not isinstance(mapping, dict) or set(mapping.values()) != set(packet.statements):
-            return False
+            return None
         presentation = arb.Presentation(
             engine=engine,
             items=tuple((label, packet.statements[option_id]) for label, option_id in mapping.items()),
@@ -127,10 +204,78 @@ def _decider_prompts_bound(audit: dict) -> bool:
         expected_body = ah.render_decider_body(packet, presentation)
         attempts = cast.get("attempts", [])
         if len(attempts) != 1 or attempts[0].get("body") != expected_body:
-            return False
-        if cast.get("prompt") != expected_body:
-            return False
-    return True
+            return None
+        reply = cast.get("reply")
+        prompt = prompts.compose(prompts.ARBITRATE_INSTRUCTIONS, expected_body)
+        attempt = attempts[0]
+        if (
+            cast.get("prompt") != expected_body
+            or not isinstance(reply, str)
+            or attempt.get("raw") != reply
+            or attempt.get("failure") is not None
+            or not _attempt_bound(
+                {**attempt, "reply": attempt.get("raw"),
+                 "reply_sha256": _text_digest(attempt.get("raw", ""))},
+                prompt=prompt, reply=reply, rejection=None,
+            )
+        ):
+            return None
+        try:
+            vote = arb.parse_verdict(reply, presentation)
+        except arb.ArbitrationError:
+            return None
+        if ah._vote_record(vote) != {
+            key: cast[key] for key in (
+                "label", "selected", "severity", "risk", "authority", "new_option",
+                "constraint", "decisive", "citations",
+            )
+        }:
+            return None
+        votes.append(vote)
+    return votes
+
+
+def _snapshot_and_outcome_bound(repo: Path, artifact: dict, audit: dict, votes: list[arb.Vote]) -> bool:
+    meta = artifact.get("snapshot_binding", {})
+    if set(meta) != {"commit_object", "sha256", "source_commit", "tree"}:
+        return False
+    object_path = _evidence_path(repo, meta["commit_object"])
+    content = object_path.read_bytes()
+    if _sha256(object_path) != meta["sha256"]:
+        return False
+    object_id = hashlib.sha1(
+        b"commit " + str(len(content)).encode("ascii") + b"\0" + content
+    ).hexdigest()
+    lines = content.decode("utf-8").splitlines()
+    if (
+        object_id != audit.get("snapshot")
+        or lines[:2] != [f"tree {meta['tree']}", f"parent {meta['source_commit']}"]
+    ):
+        return False
+    source_commit = inert_git.text(
+        repo, ["rev-parse", "--verify", f"{meta['source_commit']}^{{commit}}"],
+    ).strip()
+    source_tree = inert_git.text(repo, ["rev-parse", f"{source_commit}^{{tree}}"] ).strip()
+    if source_commit != meta["source_commit"] or source_tree != meta["tree"]:
+        return False
+    resolver = evidence.LinkResolver(repo, source_commit)
+
+    def resolve(citation: arb.Citation) -> arb.Region | None:
+        got = evidence.resolve_citation(
+            repo, citation, snapshot=source_commit, links=resolver,
+            context=arb.CONTEXT_LINES,
+        )
+        return got[0] if got else None
+
+    substantiated = arb.substantiation(votes, resolve=resolve)
+    if substantiated != {"codex": True, "claude": True}:
+        return False
+    outcome = arb.compute_outcome(votes, substantiated=substantiated)
+    return (
+        outcome.outcome == audit.get("outcome")
+        and outcome.selected == audit.get("selected")
+        and outcome.reason == audit.get("reason")
+    )
 
 
 def _timing_bound(record: dict, audit_sha256: str) -> bool:
@@ -159,13 +304,15 @@ def validate(artifact_path: Path, repo: Path) -> None:
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     if set(artifact) != {
         "acceptance_kind", "acceptance_scope", "audit", "timing", "providers",
-        "source_sha256", "tests",
+        "route", "snapshot_binding", "source_sha256", "tests",
     }:
         raise ValueError("fallback acceptance top-level schema mismatch")
     if artifact["acceptance_kind"] != "arbitration-original-fallback-v2":
         raise ValueError("unsupported fallback acceptance kind")
     if artifact["acceptance_scope"] != SCOPE:
         raise ValueError("fallback acceptance claim scope mismatch")
+    if artifact["route"] != ROUTE:
+        raise ValueError("fallback acceptance route mismatch")
     if set(artifact["source_sha256"]) != SOURCES:
         raise ValueError("fallback acceptance source set mismatch")
     for relative, digest in artifact["source_sha256"].items():
@@ -185,10 +332,12 @@ def validate(artifact_path: Path, repo: Path) -> None:
         and audit_meta["result"] == audit.get("outcome")
         and _cleaned_digest_bound(audit.get("cleaned", {}))
         and audit["cleaned"]["statements"] != audit["raw_input"]["options"]
-        and _attestation_bound(audit)
-        and _decider_prompts_bound(audit)
+        and _cleaning_and_attestation_bound(audit)
     ):
         raise ValueError("fallback audit does not prove exact original delivery")
+    votes = _decider_transcripts(audit)
+    if votes is None or not _snapshot_and_outcome_bound(repo, artifact, audit, votes):
+        raise ValueError("fallback audit does not replay to its terminal result")
 
     timing_meta = artifact["timing"]
     if set(timing_meta) != {"path", "sha256"}:
@@ -209,7 +358,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
         "claude": engines.ClaudeEngine().default_model,
     }:
         raise ValueError("fallback configured provider models mismatch")
-    if artifact["tests"] != {"full_suite": "1083 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1086 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 
