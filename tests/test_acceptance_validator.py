@@ -44,12 +44,12 @@ def _bind_phase_prompts(audit: dict) -> None:
         )
         parsed["context"] = raw["context"]
         hints = validator.production_arbitrate._merge_hints(raw["files"], parsed["hints"])
-        attester_body = validator.production_arbitrate._attest_body(
+        attester_body = validator._v1_attest_body(
             raw["decision"], raw["stakes"], raw["context"], raw["files"],
             hints, raw["options"], parsed,
         )
         attester_prompt = validator.production_prompts.compose(
-            validator.production_prompts.ATTEST_INSTRUCTIONS, attester_body,
+            validator.V1_ATTEST_INSTRUCTIONS, attester_body,
         )
         attester["prompt_sha256"] = hashlib.sha256(attester_prompt.encode()).hexdigest()
         attester["prompt_excerpt"] = validator.production_arbitrate._bounded_research_text(attester_prompt)
@@ -530,6 +530,31 @@ def test_phase_diagnostics_bind_neutrality_only_rejection(tmp_path: Path):
     assert validator._phase_diagnostics_bound(audit, accepted=False)
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "NEUTRALITY: FAILURE biased words",
+        "STAKES-ADVOCACY: PRESENTLY biased words",
+        "CONTEXT-ADVOCACY: PRESENTATION biased words",
+    ],
+)
+def test_v1_attestation_requires_complete_verdict_tokens(line: str):
+    rows = [
+        "FIDELITY: decision PRESERVED",
+        "FIDELITY-DETAIL: NONE",
+        "NEUTRALITY: PASS",
+        "STAKES-ADVOCACY: NONE",
+        "CONTEXT-ADVOCACY: NONE",
+    ]
+    prefix = line.split(":", 1)[0] + ":"
+    index = next(i for i, row in enumerate(rows) if row.startswith(prefix))
+    rows[index] = line
+    with pytest.raises(validator.production_arbitrate.ArbitrationError):
+        validator._parse_attestation_record(
+            "\n".join(rows), {"decision": ("original", "cleaned")},
+        )
+
+
 def test_phase_diagnostics_reject_identical_passages(tmp_path: Path):
     artifact, repo = cleaning_fixture(tmp_path)
     data = json.loads(artifact.read_text())
@@ -576,6 +601,7 @@ def test_cleaning_acceptance_rejects_inconsistent_timing_boundaries(tmp_path: Pa
     ("phase_schema", "positive diagnostics"),
     ("reply_digest", "positive diagnostics"),
     ("prompt_binding", "positive prompt bindings"),
+    ("v2_prompt_v1_reply", "positive prompt bindings"),
     ("attestation_order", "positive diagnostics"),
     ("derived_outcome", "positive derived outcome"),
     ("decider_lifecycle", "positive derived outcome"),
@@ -627,7 +653,10 @@ def test_cleaning_acceptance_rejects_each_claim_family(
         next(row for row in audit["phase_attempts"] if row["role"] == "attester")["rejection"] = "generic"
         audit_path.write_text(json.dumps(audit))
         data["original_report_input"]["audit_sha256"] = _sha(audit_path)
-    elif mutation in {"phase_schema", "reply_digest", "prompt_binding", "attestation_order"}:
+    elif mutation in {
+        "phase_schema", "reply_digest", "prompt_binding", "v2_prompt_v1_reply",
+        "attestation_order",
+    }:
         audit_path = repo / data["positive_long_context"]["audit"]
         audit = json.loads(audit_path.read_text())
         if mutation == "phase_schema":
@@ -639,6 +668,27 @@ def test_cleaning_acceptance_rejects_each_claim_family(
             audit["phase_attempts"][0]["prompt_sha256"] = hashlib.sha256(
                 b"invented prompt"
             ).hexdigest()
+        elif mutation == "v2_prompt_v1_reply":
+            raw = audit["raw_input"]
+            cleaner = audit["phase_attempts"][0]
+            attester = audit["phase_attempts"][1]
+            parsed = validator.production_arbitrate.parse_cleaned_packet(
+                cleaner["reply"], list(raw["options"]),
+                caller_gave_context=bool(raw["context"]),
+            )
+            parsed["context"] = raw["context"]
+            hints = validator.production_arbitrate._merge_hints(raw["files"], parsed["hints"])
+            body = validator.production_arbitrate._attest_body(
+                raw["decision"], raw["stakes"], raw["context"], raw["files"],
+                hints, raw["options"], parsed,
+            )
+            prompt = validator.production_prompts.compose(
+                validator.production_prompts.ATTEST_INSTRUCTIONS, body,
+            )
+            attester["prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
+            attester["prompt_excerpt"] = validator.production_arbitrate._bounded_research_text(
+                prompt
+            )
         else:
             attester = audit["phase_attempts"][-1]
             lines = attester["reply"].splitlines()

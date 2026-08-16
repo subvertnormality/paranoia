@@ -60,6 +60,12 @@ class TestToolListing:
         assert "attester independently rejects" in description
         assert "Neutralized" not in description
 
+    def test_arbitrate_schema_defers_normalized_hint_reason_limit_to_runtime(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "arbitrate")
+        reason = tool.inputSchema["properties"]["files"]["items"]["properties"]["reason"]
+        assert "maxLength" not in reason
+        assert "surrounding whitespace is removed" in reason["description"]
+
     def test_critique_branch_requires_repo_path(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
         assert "repo_path" in tool.inputSchema["required"]

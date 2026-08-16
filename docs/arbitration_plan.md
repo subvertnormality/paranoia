@@ -666,11 +666,12 @@ cleaner-owned field; its unchanged bytes receive a separate advocacy verdict.
 FIDELITY: decision PRESERVED|CHANGED; hints PRESERVED|CHANGED; <caller-id> PRESERVED|CHANGED; …
 FIDELITY-DETAIL: NONE | {"<field>":{"original":"<exact passage>","cleaned":"<exact passage>","change":"<added|removed|narrowed|widened|altered-qualification>","reason":"<field>: <exact change token>"}, …}
 NEUTRALITY: PASS | FAIL <which option the packet favours, and the words that do it>
+ORIGINAL-NEUTRALITY: PASS | FAIL {"field":"<decision|hints|caller-id>","passage":"<exact original substring>"}
 STAKES-ADVOCACY: NONE | PRESENT <the advocating words>
 CONTEXT-ADVOCACY: NONE | PRESENT <the advocating words>
 ```
 
-The attestation must contain **only** its five verdict lines, each once: a
+The attestation must contain **only** its six verdict lines, each once: a
 contradicting sentence beside `NEUTRALITY: PASS` would otherwise be ignored and the
 packet stamped `attested`. Verdicts are matched **exactly**: `PASS` and `NONE` must be the whole value, and
 `FAIL`/`PRESENT` must carry a note. `FIDELITY-DETAIL` must be `NONE` exactly when
@@ -682,6 +683,15 @@ enforceable semantic explanation; no free-text heuristic gates it. Both passages
 field's actual pair, and identical passages cannot demonstrate a change. A prefix match accepted
 `NEUTRALITY: PASS but the wording favors option A` as a clean bill of health and
 stamped a biased packet `attested` — sending that same bias to both deciders.
+
+`ORIGINAL-NEUTRALITY` is independent of cleaned fidelity and neutrality and covers
+complete hints, including every path and reason. Its FAIL
+form is a closed two-key JSON object bound to an exact original field and passage.
+When the cleaned candidate is complete and bounded but cannot be used, PASS permits
+one atomic fallback to the canonical original decision, option mapping, and validated
+hints. Context and stakes remain byte-identical and keep their independent advocacy
+gates. A prior valid FAIL latches across the one retry; later PASS cannot hill-climb
+the originals into eligibility. Cleaned success remains preferred.
 
 Any well-formed `CHANGED` or `FAIL` → one cleaner retry with the attester's exact complaint;
 a second failure ends the run `FAILED` with complaint and packet returned.
@@ -885,7 +895,7 @@ ARBITRATION: CONVERGED | BLOCKED | REFRAME_REQUIRED | UNRESOLVED | FAILED
 SELECTED: <caller-stable-id> | none
 ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: claude) | human-owner (flagged by: both)
 AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not
-CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | skipped
+CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped
 SNAPSHOT: <commit-id> | none
 REFS-MOVED: no | yes | unavailable
 ORDER-SEED: <seed>

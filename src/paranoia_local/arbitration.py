@@ -152,22 +152,32 @@ def validate_options(raw: object) -> tuple[Option, ...]:
 # only scope-of-adoption — landed at ~800 chars and passed first time.
 MAX_OPTION_CHARS = 1200
 MAX_DECISION_CHARS = 2500
-# `context` is the designated home for detail, and it is not per-option, so its
-# length cannot be a vote between the options. It gets a far looser bound.
+# `context` carries shared detail, and it is not per-option, so its length cannot
+# be a vote between the options. It gets a far looser bound.
 MAX_CONTEXT_CHARS = 20000
+MAX_STAKES_CHARS = 20000
+MAX_HINTS = 32
+MAX_HINT_REASON_CHARS = 1200
+MAX_HINTS_CHARS = 20000
+# Includes the fixed instructions, caller framing, any bounded correction, and the
+# cleaner candidate. This is an admission bound, not a model quality budget.
+MAX_CLEANING_PROMPT_CHARS = 180000
+# Initial and one bounded correction decider prompt, including the fixed instruction
+# block and every rendered packet field. This is an admission bound, not a quality budget.
+MAX_DECIDER_PROMPT_CHARS = 240000
+MAX_CLEANER_REPLY_CHARS = 50000
 OPTION_RATIO_MAX = 2.0
 
 _HOIST_REMEDY = (
-    "Hoist the shared mechanism into `context` — including the full specification "
-    "of what only one option adopts — and leave each option statement to say only "
-    "which of it is adopted, and what follows. Options then describe "
-    "scope-of-adoption rather than one describing mechanism and the other its "
-    "absence, and they equalize naturally."
+    "Put only facts and specification shared by every option in `context`. Keep "
+    "each option's distinct mechanism, scope, and consequences in that option's "
+    "own concise statement, using parallel structure and comparable detail."
 )
 
 
 def preflight_framing(
-    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True
+    *, decision: str, context: str, options: Sequence[Option], cleaned: bool = True,
+    stakes: str = "", hints: Sequence[Mapping[str, object]] = (),
 ) -> None:
     """Reject framing defects visible in the caller's own input, before spending a
     cleaner call on them.
@@ -217,6 +227,38 @@ def preflight_framing(
         raise ArbitrationError(
             f"context is {len(context)} chars (max {MAX_CONTEXT_CHARS})"
         )
+    if len(stakes) > MAX_STAKES_CHARS:
+        raise ArbitrationError(
+            f"stakes is {len(stakes)} chars (max {MAX_STAKES_CHARS})"
+        )
+    if len(hints) > MAX_HINTS:
+        raise ArbitrationError(f"file hints number {len(hints)} (max {MAX_HINTS})")
+    canonical_hints: list[dict[str, str]] = []
+    for index, hint in enumerate(hints):
+        # Paths are repository identities and remain byte-for-byte as supplied;
+        # validate_hints later proves literal tree membership. Reasons are semantic
+        # prose and validate_hints strips them before any downstream prompt.
+        path = str(hint.get("path", ""))
+        reason = str(hint.get("reason", "")).strip()
+        if len(reason) > MAX_HINT_REASON_CHARS:
+            raise ArbitrationError(
+                f"file hint {index} reason is {len(reason)} chars "
+                f"(max {MAX_HINT_REASON_CHARS})"
+            )
+        canonical_hints.append({"path": path, "reason": reason})
+    hint_chars = len(render_hints(canonical_hints))
+    if hint_chars > MAX_HINTS_CHARS:
+        raise ArbitrationError(
+            f"file hints render to {hint_chars} chars (max {MAX_HINTS_CHARS})"
+        )
+
+
+def render_hints(hints: Sequence[Mapping[str, str]]) -> str:
+    """Canonical hint bytes authorized by the attester and delivered to deciders."""
+    return "\n".join(
+        f"- {hint['path']}" + (f" ({hint['reason']})" if hint.get("reason") else "")
+        for hint in hints
+    ) or "None."
 
 
 def canonical_order(options: Iterable[Option]) -> tuple[Option, ...]:

@@ -195,14 +195,17 @@ INSUFFICIENT: <the specific reason>"""
 
 ATTEST_INSTRUCTIONS = """You are a TEXT AUDITOR. Another model has rewritten a decision packet to remove bias. Your job is to check its work. You are NOT asked which option is better, you have no repository access, and you must not express a preference — a verdict on the merits would defeat the purpose of this check.
 
-You are given, field by field, the ORIGINAL text and the CLEANED text. Judge two things:
+You are given, field by field, the ORIGINAL text and the CLEANED text. Judge three things:
 
 1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.
 2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option, through wording, emphasis, asymmetric detail, or what it leaves out? If so, say which option and quote the words that do it.
+3. ORIGINAL NEUTRALITY — independently judge whether the complete ORIGINAL decision,
+options, and hints (every path and reason) are neutral enough to show to both deciders without cleaning.
+If not, name one exact original field and quote an exact non-empty passage from it.
 
 Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is.
 
-Output EXACTLY these five lines, nothing before or after. The FIDELITY line must
+Output EXACTLY these six lines, nothing before or after. The FIDELITY line must
 name EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —
 fields absent from it were never supplied and are not yours to judge:
 
@@ -211,10 +214,15 @@ FIDELITY-DETAIL: NONE
 FIDELITY-DETAIL: <one JSON object keyed by every CHANGED field and no others; each value is {"original":"<exact non-empty ORIGINAL passage>","cleaned":"<exact non-empty CLEANED passage>","change":"<added|removed|narrowed|widened|altered-qualification>","reason":"<field>: <repeat the exact change token>"}>
 NEUTRALITY: PASS
 NEUTRALITY: FAIL <which option the packet favours, and the words that do it>
+ORIGINAL-NEUTRALITY: PASS
+ORIGINAL-NEUTRALITY: FAIL {"field":"<decision|hints|known option id>","passage":"<exact non-empty original substring>"}
 STAKES-ADVOCACY: NONE
 CONTEXT-ADVOCACY: NONE
 
-Emit ONE FIDELITY-DETAIL line and ONE of the two NEUTRALITY lines. FIDELITY-DETAIL
+Emit ONE FIDELITY-DETAIL line, ONE of the two NEUTRALITY lines, and ONE of the two
+ORIGINAL-NEUTRALITY lines. ORIGINAL-NEUTRALITY FAIL JSON has exactly the two shown
+keys; the field must be present below and passage must occur verbatim in its ORIGINAL.
+FIDELITY-DETAIL
 reason is a deterministic label, exactly "<field>: <change>". The closed change token
 plus the two exact passages is the semantic explanation; do not add free-form reason prose.
 must be NONE only when no field is CHANGED. The JSON must stay on that one line;

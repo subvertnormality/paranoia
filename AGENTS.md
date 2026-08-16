@@ -272,6 +272,11 @@ counts and retry diagnostics remain exact.
 Apply the same before-invocation ledger rule to cleaner and attester calls. Mark research running
 only after deadline admission, and keep established packet digest computation total on
 model-controlled Unicode so the failure serializer cannot throw.
+Cleaner, attester, and decider attempt rows must carry the requested engine/model and a closed
+execution route. External routes retain executable and compatible CLI version; injected and
+deterministic routes must not claim either. Derive acceptance call routes from those rows, not
+artifact prose. Append the prepared row before any local composed-prompt bound can reject it;
+retain local rejection distinctly with no admission or invocation.
 Treat arbitration context as caller-owned shared specification/data: preserve its exact bytes,
 ignore any cleaner rewrite or omission, and gate its advocacy independently rather than asking the
 cleaner to alter it. A changed fidelity verdict is actionable only when a per-field structured entry
@@ -279,6 +284,10 @@ names every changed field, binds exact original and cleaned substrings to that f
 classifies the semantic delta with the closed change enum, and repeats that classification in the
 deterministic `<field>: <change>` reason label. Do not use a free-text heuristic as a semantic gate. Keep valid
 `raw_input.options` as the same ID-to-statement mapping on every success and failure path.
+When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
+the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
+never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and
+an advocating original packet must still be faithfully neutralized or fail.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid

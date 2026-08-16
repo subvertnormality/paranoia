@@ -899,17 +899,15 @@ def test_preflight_rejects_an_over_long_decision():
     assert "decision" in str(exc.value) and str(arb.MAX_DECISION_CHARS) in str(exc.value)
 
 
-def test_preflight_accepts_the_hoisted_shape_that_worked_in_the_field():
-    """The shape the field report converged on: shared mechanism in context, each
-    option stating only scope-of-adoption. ~780 vs ~810 chars."""
+def test_preflight_accepts_parallel_options_with_only_shared_context():
     arb.preflight_framing(
         decision="How far should the fix go?" * 3,
-        context="The rules under consideration, if adopted: " + "spec. " * 800,
+        context="Facts shared by every option: " + "spec. " * 800,
         options=(Option("A_only", "x" * 780), Option("B_plus", "y" * 810)),
     )
 
 
-def test_preflight_allows_a_long_context_because_it_is_the_hoist_target():
+def test_preflight_allows_bounded_shared_context():
     arb.preflight_framing(
         decision="d", context="c" * (arb.MAX_CONTEXT_CHARS - 1),
         options=(Option("A", "x" * 100), Option("B", "y" * 100)),
@@ -920,6 +918,68 @@ def test_preflight_allows_a_long_context_because_it_is_the_hoist_target():
             options=(Option("A", "x" * 100), Option("B", "y" * 100)),
         )
     assert "context" in str(exc.value)
+
+
+@pytest.mark.parametrize(("kwargs", "message"), [
+    ({"stakes": "s" * (arb.MAX_STAKES_CHARS + 1)}, "stakes"),
+    ({"hints": [{"path": f"p{i}"} for i in range(arb.MAX_HINTS + 1)]}, "file hints number"),
+    ({"hints": [{"path": "p", "reason": "r" * (arb.MAX_HINT_REASON_CHARS + 1)}]}, "reason"),
+])
+def test_preflight_bounds_all_cleaning_framing(kwargs, message):
+    with pytest.raises(arb.ArbitrationError, match=message):
+        arb.preflight_framing(
+            decision="d", context="",
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+            **kwargs,
+        )
+
+
+def test_hint_aggregate_counts_the_exact_rendered_bullets_and_separators():
+    hints = [
+        {"path": f"path-{index}.py", "reason": "r" * 1165}
+        for index in range(17)
+    ]
+    assert sum(len(hint["path"]) + len(hint["reason"]) for hint in hints) < arb.MAX_HINTS_CHARS
+    with pytest.raises(arb.ArbitrationError, match="render to"):
+        arb.preflight_framing(
+            decision="d", context="", hints=hints,
+            options=(Option("A", "x" * 100), Option("B", "y" * 100)),
+        )
+
+
+def test_hint_aggregate_uses_exact_canonical_downstream_bytes():
+    hints = [
+        {"path": f"path-{index}.py", "reason": "r" * 1165}
+        for index in range(16)
+    ]
+    prefix = arb.render_hints(hints)
+    last_path = "  path-16.py  "
+    remaining = arb.MAX_HINTS_CHARS - len(prefix) - 1 - len(f"- {last_path} ()")
+    assert 0 < remaining <= arb.MAX_HINT_REASON_CHARS
+    hints.append({"path": last_path, "reason": "  " + "r" * remaining + "  "})
+    options = (Option("A", "x" * 100), Option("B", "y" * 100))
+
+    canonical = [
+        {"path": hint["path"], "reason": hint["reason"].strip()} for hint in hints
+    ]
+    assert len(arb.render_hints(canonical)) == arb.MAX_HINTS_CHARS
+    arb.preflight_framing(decision="d", context="", hints=hints, options=options)
+    hints[-1]["reason"] += "x"
+    with pytest.raises(arb.ArbitrationError, match="render to"):
+        arb.preflight_framing(decision="d", context="", hints=hints, options=options)
+
+
+def test_hint_reason_limit_applies_after_surrounding_whitespace_is_removed():
+    options = (Option("A", "a"), Option("B", "b"))
+    arb.preflight_framing(
+        decision="d", context="", options=options,
+        hints=[{"path": "p", "reason": " \t" + "r" * arb.MAX_HINT_REASON_CHARS + "\n "}],
+    )
+    with pytest.raises(arb.ArbitrationError, match="reason"):
+        arb.preflight_framing(
+            decision="d", context="", options=options,
+            hints=[{"path": "p", "reason": " " + "r" * (arb.MAX_HINT_REASON_CHARS + 1) + " "}],
+        )
 
 
 def test_option_objects_reject_unknown_keys():

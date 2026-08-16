@@ -669,7 +669,11 @@ What it does, in order:
    `stakes` and caller `context` are passed through verbatim, never rewritten.
    Stakes are server-owned read-only cleaner input and are not part of the cleaner's
    output schema; undeclared cleaner output blocks are rejected.
-   The attester separately rejects advocacy in either caller-owned field.
+   The attester separately rejects advocacy in either caller-owned field. It also
+   judges the complete canonical originals for neutrality. If a complete bounded
+   cleaner candidate is unusable but those originals pass, the server atomically
+   sends the original decision, options, and validated hints to both deciders and
+   reports `CLEANING: original-attested`; it never mixes original and cleaned fields.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
@@ -690,9 +694,9 @@ What it does, in order:
 | `repo_path` | string | **required** | Repository context to pin; decisive evidence may be a repository citation or captured source packet |
 | `decision` | string | **required** | What is being decided (max 2500 chars) — not the evidence for it |
 | `options` | array | **required** | 2–4 mutually exclusive `{id, statement}`. Array order is irrelevant; canonical order is derived by sorting ids |
-| `stakes` | string | **required** | Pass `"unstated"` to accept a fixed default reading |
-| `context` | string | — | Shared facts and the full specification of whatever only one option adopts (max 20000 chars) |
-| `files` | array | `[]` | `{path, reason?}` starting points. Both deciders see the same list |
+| `stakes` | string | **required** | Max 20000 chars; pass `"unstated"` to accept a fixed default reading |
+| `context` | string | — | Facts and specification shared by every option (max 20000 chars) |
+| `files` | array | `[]` | Up to 32 `{path, reason?}` starting points; each reason max 1200 chars. Both deciders see the same list |
 | `subject` | string | — | Short label for the paste-ready record block |
 | `clean` | boolean | `true` | Run the cleaner and its cross-vendor attestation |
 | `models` | object | — | `{codex?, claude?}` per-vendor overrides |
@@ -732,11 +736,16 @@ the other CLI.
 | longest ÷ shortest option | 2.0 |
 | `decision` | 2500 chars |
 | `context` | 20000 chars |
+| `stakes` | 20000 chars |
+| file hints | 32; 1200 chars per stripped reason; 20000 chars in the canonical `- path (reason)` downstream rendering |
+| cleaner reply | 50000 chars |
+| complete cleaner or attester prompt | 180000 chars |
+| complete initial or correction decider prompt | 240000 chars |
 
-The shape that passes these naturally: put every shared fact, and the full
-specification of whatever only one option adopts, into `context` — prefaced as
-"the rules under consideration, if adopted". Leave each option statement to say
-only how much of it is adopted and what follows. ~800 chars each is typical.
+The shape that passes these naturally: put only facts and specification shared by
+every option in `context`. Keep each option's distinct mechanism, scope, and
+consequences in its own concise statement, using parallel structure and comparable
+detail.
 
 **Behaviour worth knowing before you rely on it:**
 
@@ -795,7 +804,14 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
 - **Attempt state distinguishes preparation from spend.** Cleaner, attester,
   research, and decider records expose whether a prompt was prepared, admitted,
   invoked, completed, refused by the deadline, or blocked during inert-workspace
-  setup. Call counts include only attempts that crossed the provider boundary.
+  setup. Cleaner, attester, and decider attempts also record the requested engine
+  and model plus a closed execution route: `external-cli`, `injected-agent`,
+  `deterministic-cleaner`, or `not-invoked`. External routes retain the executable
+  and compatible CLI version; non-external routes retain neither. Call counts are
+  derived from these rows, not from separately asserted acceptance metadata.
+  A locally oversized composed prompt is retained as `local-rejected` with an exact
+  prompt binding and `admitted:false` / `invoked:false`. Cleaner/attester prompts
+  are capped at 180,000 characters and initial/correction decider prompts at 240,000.
 - **Cleaned packet audits are complete.** Success and late-failure records retain
   cleaned decision, context, hints, and statements plus one digest of that exact
   normalized packet. Cleaner and attester reply copies retain complete normal
@@ -807,6 +823,21 @@ only how much of it is adopted and what follows. ~800 chars each is typical.
   closed enum, and use the exact `<field>: <change>` reason label. The enum and bound
   passages are the enforceable explanation; free-form semantic heuristics are not used. Valid option arrays are
   audited as the same ID-to-statement mapping on success and every failure path.
+  `original-attested` means the attester rejected or mechanically disqualified the
+  cleaner candidate but explicitly passed the complete originals for neutrality;
+  the audit retains that rejected candidate while decider prompts record the exact
+  canonical originals actually used. The separately versioned
+  [`original-attested` acceptance](docs/arbitration_fallback_acceptance_2026-08-16.json)
+  binds that route to a reported destructive candidate, a signed-in Codex attester,
+  both signed-in decider prompts, attempt-derived provider versions and call routes,
+  elapsed time, and current source hashes. The source-hashed acceptance runner also
+  retains a separate ordinary signed-in Claude-cleaner compatibility run. Its fallback
+  cleaner candidate is deterministic, so it does not claim
+  that the current Claude cleaner will probabilistically reproduce the historical
+  rewrite. Regenerate both records with
+  `python scripts/run_arbitration_fallback_acceptance.py /absolute/repo/path`.
+  The older cleaning-attestation v1 artifact remains historical evidence for
+  the five-line protocol and is validated without inventing a v2 neutrality judgement.
   Signed-in reproductions are recorded in
   [`docs/cleaning_attestation_acceptance_2026-08-13.json`](docs/cleaning_attestation_acceptance_2026-08-13.json).
   They prove that exact caller context and normalized options reached both deciders and
