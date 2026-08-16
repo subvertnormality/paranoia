@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,119 @@ class TestFactory:
     def test_default_models(self) -> None:
         assert "gpt-5.6" in engines.get_engine("codex").default_model
         assert "fable" in engines.get_engine("claude").default_model
+
+
+@pytest.mark.parametrize(
+    ("engine", "version", "rendered"),
+    [
+        (engines.CodexEngine(), (0, 144, 6), "0.144.6"),
+        (engines.CodexEngine(), (0, 145, 0), "0.145.0"),
+        (engines.ClaudeEngine(), (2, 1, 197), "2.1.197"),
+        (engines.ClaudeEngine(), (2, 1, 220), "2.1.220"),
+        (engines.ClaudeEngine(), (3, 0, 0), "3.0.0"),
+    ],
+)
+def test_evidence_profile_accepts_minimum_and_later_versions(
+    monkeypatch, engine, version, rendered,
+) -> None:
+    monkeypatch.setattr(engines, "_cli_version", lambda binary: version)
+
+    assert engines.require_evidence_profile(engine) == rendered
+
+
+@pytest.mark.parametrize(
+    ("engine", "version", "minimum"),
+    [
+        (engines.CodexEngine(), (0, 144, 5), "0.144.6"),
+        (engines.ClaudeEngine(), (2, 1, 196), "2.1.197"),
+    ],
+)
+def test_evidence_profile_rejects_only_versions_below_minimum(
+    monkeypatch, engine, version, minimum,
+) -> None:
+    monkeypatch.setattr(engines, "_cli_version", lambda binary: version)
+
+    with pytest.raises(RuntimeError, match=rf">= {re.escape(minimum)}"):
+        engines.require_evidence_profile(engine)
+
+
+def test_cli_version_is_compared_numerically(monkeypatch) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout="Claude Code 2.10.3\n", stderr="",
+        ),
+    )
+
+    assert engines._cli_version("claude") == (2, 10, 3)
+
+
+@pytest.mark.parametrize(
+    "reported",
+    [
+        "claude 2.1.197-alpha.1",
+        "codex-cli 0.144.6-beta",
+        "codex-cli 0.145.0-alpha.1",
+    ],
+)
+def test_cli_version_rejects_prereleases(monkeypatch, reported) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout=reported, stderr="",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="does not support prerelease"):
+        engines._cli_version("provider")
+
+
+def test_cli_version_accepts_build_metadata(monkeypatch) -> None:
+    monkeypatch.setattr(
+        engines.subprocess,
+        "run",
+        lambda *args, **kwargs: RunResult(
+            returncode=0, stdout="claude 2.1.197+native.4", stderr="",
+        ),
+    )
+
+    assert engines._cli_version("claude") == (2, 1, 197)
+
+
+def test_minimum_provider_cli_acceptance_binds_later_real_versions() -> None:
+    artifact = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "docs/minimum_provider_cli_acceptance_2026-08-16.json"
+        ).read_text()
+    )
+    assert artifact["model_call_count"] == 11
+    minimums = {
+        "codex": engines.MIN_CODEX_VERSION,
+        "claude": engines.MIN_CLAUDE_VERSION,
+    }
+    assert {probe["cli"] for probe in artifact["probes"]} == set(minimums)
+    for probe in artifact["probes"]:
+        parse = lambda value: tuple(int(part) for part in value.split("."))
+        assert parse(probe["minimum_version"]) == minimums[probe["cli"]]
+        assert parse(probe["tested_version"]) > minimums[probe["cli"]]
+        assert probe["returncode"] == 0
+        assert probe["response"] == {"status": "compatible"}
+    lifecycles = {row["cli"]: row for row in artifact["primary_lifecycles"]}
+    assert set(lifecycles) == set(minimums)
+    assert lifecycles["claude"]["claim_counts"] == {
+        "refuted": 0, "supported": 1, "unverified": 0,
+    }
+    assert lifecycles["codex"]["claim_counts"] == {
+        "refuted": 0, "supported": 1, "unverified": 1,
+    }
+    assert all(row["engine_returncode"] == 0 for row in lifecycles.values())
+    assert sum(
+        row["claim_model_calls"] + row["structural_model_calls"]
+        for row in lifecycles.values()
+    ) + artifact["structured_probe_model_calls"] == artifact["model_call_count"]
 
 
 def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:

@@ -34,9 +34,9 @@ structured critique.
 **1. Prerequisites**
 
 - Python 3.11+ and `git` on `PATH`
-- The reviewing agent's CLI, installed and signed in on a subscription:
-  [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144) **or**
-  [Claude Code](https://code.claude.com) (`claude`)
+- The reviewing agent's stable CLI, installed and signed in on a subscription:
+  [Codex CLI](https://developers.openai.com/codex) (`codex`, ≥ 0.144.6) **or**
+  [Claude Code](https://code.claude.com) (`claude`, ≥ 2.1.197)
 - `arbitrate` needs **both** CLIs; the four review tools need only the other one
 
 **2. Install**
@@ -709,6 +709,13 @@ Claude evidence roles use matching
 availability and permission allowlists on fresh and resumed calls; denial of a tool required by
 the active role is a visible provider-capability failure, never an empty-search success. Binding
 and text roles use explicit empty allowlists. Only server-captured packets can affect substantiation.
+Evidence roles require Codex CLI 0.144.6 or later and Claude Code 2.1.197 or later. Newer versions
+are accepted; compatibility is then checked by the real call, so unsupported flags or tools,
+permission denial, missing structured output, and malformed provider envelopes remain visible
+blocking failures.
+Signed-in structured probes and complete verified-plan lifecycles on later Claude and Codex
+releases are recorded in
+[`docs/minimum_provider_cli_acceptance_2026-08-16.json`](docs/minimum_provider_cli_acceptance_2026-08-16.json).
 The signed-in end-to-end record, including exact versions, packet digest, source references,
 plan-claim closure, repository-only closure, and defects found by the first real runs, is
 [`docs/evidence_capture_acceptance_2026-08-10.json`](docs/evidence_capture_acceptance_2026-08-10.json).
