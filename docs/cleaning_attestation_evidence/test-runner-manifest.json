@@ -9,12 +9,12 @@
       "tests/test_acceptance_validator.py"
     ],
     "exit_status": 0,
-    "finished_utc": "2026-08-13T13:38:49.991419Z",
+    "finished_utc": "2026-08-16T22:21:47.921023Z",
     "log": "docs/cleaning_attestation_evidence/focused-tests.log",
-    "log_sha256": "9312cf70c3e0e82ca4c189207d1ea9ca07da0fb07ab5b7ba9e12dc21911c39e4",
-    "monotonic_elapsed_seconds": 66.963,
-    "started_utc": "2026-08-13T13:37:43.028173Z",
-    "terminal": "249 passed in 66.48s (0:01:06)"
+    "log_sha256": "a2fb62d1b8438c8c272ffe743253b90ddc2f1564cfebed894a473cf307d9c93c",
+    "monotonic_elapsed_seconds": 45.692,
+    "started_utc": "2026-08-16T22:21:02.229558Z",
+    "terminal": "266 passed in 45.30s"
   },
   "full": {
     "command": [
@@ -24,11 +24,11 @@
       "-q"
     ],
     "exit_status": 0,
-    "finished_utc": "2026-08-13T13:40:31.827480Z",
+    "finished_utc": "2026-08-16T22:25:39.635686Z",
     "log": "docs/cleaning_attestation_evidence/full-tests.log",
-    "log_sha256": "ccd558037e475f06044dec253ad5cf6df0816962643578532276cb893d9dadb4",
-    "monotonic_elapsed_seconds": 101.836,
-    "started_utc": "2026-08-13T13:38:49.991897Z",
-    "terminal": "947 passed in 101.06s (0:01:41)"
+    "log_sha256": "d60ebc5c9b13426e1a378d9c1c5a770c2ada453cad27db642fdc315fd6863e85",
+    "monotonic_elapsed_seconds": 231.715,
+    "started_utc": "2026-08-16T22:21:47.921375Z",
+    "terminal": "1104 passed in 231.21s (0:03:51)"
   }
 }

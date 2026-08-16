@@ -13,21 +13,21 @@
     ]
   },
   "delivery_metrics": {
-    "diff_base": "8c77b9d6ba2120aad13d13a19b92fe42f7dbc607",
-    "production_diff": {"files": 3, "lines_added": 233, "lines_removed": 55, "net_lines": 178},
+    "diff_base": "f4fe2cda09eea1542cc89a6075999f53dfd770c5",
+    "production_diff": {"files": 3, "lines_added": 281, "lines_removed": 56, "net_lines": 225},
     "all_changed_files_diff": {
-      "files": 28,
-      "lines_added": 5393,
-      "lines_removed": 186,
-      "net_lines": 5207
+      "files": 26,
+      "lines_added": 2574,
+      "lines_removed": 168,
+      "net_lines": 2406
     },
     "largest_production_modules": [
-      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2768},
-      {"path": "src/paranoia_local/handlers.py", "lines": 2707},
+      {"path": "src/paranoia_local/arbitrate_handler.py", "lines": 2983},
+      {"path": "src/paranoia_local/handlers.py", "lines": 2836},
       {"path": "src/paranoia_local/plan_claims.py", "lines": 1417},
-      {"path": "src/paranoia_local/class_closure.py", "lines": 1021},
-      {"path": "src/paranoia_local/arbitration.py", "lines": 990},
-      {"path": "src/paranoia_local/review_census.py", "lines": 901}
+      {"path": "src/paranoia_local/arbitration.py", "lines": 1032},
+      {"path": "src/paranoia_local/staged_protocol.py", "lines": 1032},
+      {"path": "src/paranoia_local/class_closure.py", "lines": 1021}
     ],
     "model_calls": {
       "positive": {"cleaner": 1, "attester": 1, "codex_decider": 1, "claude_decider": 1, "total": 4},
@@ -85,9 +85,9 @@
     "audit_sha256": "dcec2610bbe833bec0fb1cee94159330eda642339b452df435d5f0ac41b7a3f0"
   },
   "production_source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "5115af1a4319a303d95f5acdf14ed940efdefe83ce54d811fd572c2ebbfc09ff",
-    "src/paranoia_local/prompts.py": "f7ee13b35b50545ebf691c9178f9b3f5d92f0bf6f53f07ef2553480e3c2cdff9",
-    "src/paranoia_local/server.py": "cf76ef9fa6c9fa0089226362b7cec9880a386afe50b07c4cbf601543cd822083"
+    "src/paranoia_local/arbitrate_handler.py": "bffc71b9ed24feb55ce7380d38ae33560012bbd5404d64407a96f9ffb0fea5c2",
+    "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
+    "src/paranoia_local/server.py": "9d2f511c171955e007505e74921baeb1a2ab349d1ff3911a3897fdd7261fb6ac"
   },
   "timing_record": {
     "path": "docs/cleaning_attestation_timing_2026-08-13.json",
@@ -102,19 +102,19 @@
       "positive": {"path": "docs/cleaning_attestation_evidence/run_positive_acceptance.py", "sha256": "5edc04d747be66b999570de2d882a207efe3e394b3cfef47ceb09dfc0263bd4f"},
       "fixture": {"path": "docs/cleaning_attestation_evidence/acceptance_fixture.py", "sha256": "9917a230fdc787c4acadfbc65266e83511ce3361b58cab40bd9c46bb59612cc8"},
       "tests": {"path": "scripts/run_cleaning_acceptance_checks.py", "sha256": "b82fe7811b16b50cd74198fa8116052113b8152a347378be675f21437f4f85a7"},
-      "validator": {"path": "scripts/validate_cleaning_attestation_acceptance.py", "sha256": "b9c108449544270e4e86b4090bdbbc6db0e1c6b74ad7d223a9b8eebe3ebad5dc"}
+      "validator": {"path": "scripts/validate_cleaning_attestation_acceptance.py", "sha256": "72a0da3ad5b87cb457487e7ee3378769780e21661f81a22c52dac577dd7fdf63"}
     }
   },
   "tests": {
-    "focused_result": "249 passed in 66.48s (0:01:06)",
+    "focused_result": "266 passed in 45.30s",
     "focused_log": "docs/cleaning_attestation_evidence/focused-tests.log",
-    "focused_log_sha256": "9312cf70c3e0e82ca4c189207d1ea9ca07da0fb07ab5b7ba9e12dc21911c39e4",
+    "focused_log_sha256": "a2fb62d1b8438c8c272ffe743253b90ddc2f1564cfebed894a473cf307d9c93c",
     "focused_exit_status": 0,
-    "full_result": "947 passed in 101.06s (0:01:41)",
+    "full_result": "1104 passed in 231.21s (0:03:51)",
     "full_log": "docs/cleaning_attestation_evidence/full-tests.log",
-    "full_log_sha256": "ccd558037e475f06044dec253ad5cf6df0816962643578532276cb893d9dadb4",
+    "full_log_sha256": "d60ebc5c9b13426e1a378d9c1c5a770c2ada453cad27db642fdc315fd6863e85",
     "full_exit_status": 0,
     "runner_manifest": "docs/cleaning_attestation_evidence/test-runner-manifest.json",
-    "runner_manifest_sha256": "fad0855f8d9c40810c17c0e492b9482b0ff1866296fd7ec90a76ec4988030b71"
+    "runner_manifest_sha256": "28d42fc427288e9449c86a49181e22c60acb55c0ef3b83c6cb55573582b15a02"
   }
 }
