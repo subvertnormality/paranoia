@@ -396,7 +396,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     )
     if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
         raise ValueError("acceptance runs did not share one source snapshot")
-    if artifact["tests"] != {"full_suite": "1103 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1111 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 
