@@ -162,6 +162,13 @@ pointers so the single validation retry can repair more than the first defect. W
 semantic text, lane replies above 240,000 characters, and decision replies above 1,000,000
 characters fail before settlement or JSON decoding. The separate composed-prompt circuit breaker
 remains 5,000,000 characters.
+The server derives lifecycle mirrors when the model has already supplied the governing semantic
+judgement: an evidenced satisfied open unmechanized class closes, and an evidenced violated closed
+unmechanized class reopens. A bare action never manufactures an outcome or evidence, and mechanized
+violations still require an explicit replacement predicate. Every locally rejected staged attempt
+and rejected-payload audit row retains its own bounded pointer-addressed validation issue. Terminal
+staged failure uses a failure-only body, while a trailer summary reports total staged attempts and
+validation retries from the authoritative attempt ledger.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,

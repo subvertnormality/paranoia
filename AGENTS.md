@@ -92,6 +92,13 @@ review/class state while retaining required failure diagnostics. Prove historica
 materialization equivalence, and do not ship a permissive alias normalizer, partial settlement,
 durable dual protocol, extra model call, or new persistence mechanism. A structured-output
 capability failure blocks the cutover rather than falling back to unconstrained prose.
+Derive the reopen lifecycle record when an evidenced violated outcome targets a closed unmechanized
+class; never infer a violation, evidence, or basis from a bare reopen action, and continue to require
+an explicit replacement for a closed mechanized violation. Bind every validation-invalid staged
+attempt and rejected-payload record to that attempt's own bounded executable validation issue,
+retaining its JSON Pointer lines; execution failures keep their distinct engine channels. Render
+terminal staged failure in a failure-only body and summarize attempt/retry counts from the ledger,
+never with a clean-review section.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement
