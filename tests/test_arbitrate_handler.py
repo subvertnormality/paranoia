@@ -1784,8 +1784,8 @@ def test_changed_hint_path_candidate_can_only_fall_back_to_originals(
         "=== HINTS ===\nNone.",
         "=== HINTS ===\n- substituted.py: substituted path",
     )
-    original_hint = "- app.py: the threshold is written here"
-    cleaned_hint = "- substituted.py: substituted path"
+    original_hint = "- app.py (the threshold is written here)"
+    cleaned_hint = "- substituted.py (substituted path)"
     detail = json.dumps({
         "hints": {
             "original": original_hint,
@@ -2515,9 +2515,17 @@ def test_attester_sees_the_real_original_hints(repo: Path, tmp_path: Path):
         cleaner_reply({o["id"]: o["statement"] for o in OPTIONS})
         .replace("=== HINTS ===\nNone.", "=== HINTS ===\n- app.py: MARKER-ORIGINAL-REASON")
     ), attest=ATTEST_OK_WITH_HINTS)
-    run(repo, agent, tmp_path, files=[{"path": "app.py", "reason": "MARKER-ORIGINAL-REASON"}])
+    report = run(
+        repo, agent, tmp_path,
+        files=[{"path": "app.py", "reason": "MARKER-ORIGINAL-REASON"}],
+    )
     attest_body = next(c["body"] for c in agent.calls if "TEXT AUDITOR" in c["instructions"])
-    assert "MARKER-ORIGINAL-REASON" in attest_body
+    delivered = "- app.py (MARKER-ORIGINAL-REASON)"
+    assert f"ORIGINAL: {delivered}" in attest_body
+    assert f"CLEANED:  {delivered}" in attest_body
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    for cast in record["rounds"][0].values():
+        assert delivered in cast["prompt"]
     assert "(paths and reasons as given)" not in attest_body
 
 

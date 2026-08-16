@@ -737,9 +737,10 @@ the other CLI.
 | `decision` | 2500 chars |
 | `context` | 20000 chars |
 | `stakes` | 20000 chars |
-| file hints | 32; 1200 chars per reason; 20000 rendered chars aggregate |
+| file hints | 32; 1200 chars per stripped reason; 20000 chars in the canonical `- path (reason)` downstream rendering |
 | cleaner reply | 50000 chars |
 | complete cleaner or attester prompt | 180000 chars |
+| complete initial or correction decider prompt | 240000 chars |
 
 The shape that passes these naturally: put only facts and specification shared by
 every option in `context`. Keep each option's distinct mechanism, scope, and

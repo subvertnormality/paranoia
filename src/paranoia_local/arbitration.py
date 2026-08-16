@@ -235,13 +235,14 @@ def preflight_framing(
         raise ArbitrationError(f"file hints number {len(hints)} (max {MAX_HINTS})")
     rendered_hints: list[str] = []
     for index, hint in enumerate(hints):
-        reason = str(hint.get("reason", ""))
+        path = str(hint.get("path", "")).strip()
+        reason = str(hint.get("reason", "")).strip()
         if len(reason) > MAX_HINT_REASON_CHARS:
             raise ArbitrationError(
                 f"file hint {index} reason is {len(reason)} chars "
                 f"(max {MAX_HINT_REASON_CHARS})"
             )
-        rendered_hints.append(f"- {hint.get('path', '')}: {reason}")
+        rendered_hints.append(f"- {path}" + (f" ({reason})" if reason else ""))
     hint_chars = len("\n".join(rendered_hints) or "None.")
     if hint_chars > MAX_HINTS_CHARS:
         raise ArbitrationError(

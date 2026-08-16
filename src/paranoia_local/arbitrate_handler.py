@@ -901,14 +901,10 @@ def render_decider_body(
     options_block = "\n".join(f"{label}: {statement}" for label, statement in presentation.items)
     parts.append("=== OPTIONS (choose exactly one; copy its label verbatim) ===\n" + options_block)
     if packet.hints:
-        hints = "\n".join(
-            f"- {h['path']}" + (f" ({h['reason']})" if h.get("reason") else "")
-            for h in packet.hints
-        )
         parts.append(
             "=== FILES SUGGESTED AS STARTING POINTS ===\n"
             "Non-exhaustive. Establish relevance yourself and read whatever else bears on this.\n"
-            + hints
+            + _render_hints(packet.hints)
         )
     if packet.research_packets:
         parts.append(
@@ -2574,7 +2570,7 @@ def _clean_body(
     parts.append("=== CONTEXT (COPY VERBATIM) ===\n" + (context or "None."))
     parts.append(
         "=== HINTS (neutralize the reasons, keep the paths EXACTLY) ===\n"
-        + _render_hints(hints)
+        + _render_cleaner_hints(hints)
     )
     parts.append(
         "=== STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return) ===\n"
@@ -2592,7 +2588,18 @@ def _merge_hints(originals: Sequence[dict], cleaned: Mapping[str, str]) -> list[
 
 
 def _render_hints(hints: Sequence[Mapping[str, str]]) -> str:
-    return "\n".join(f"- {h['path']}: {h.get('reason', '')}" for h in hints) or "None."
+    """Exact hint block delivered to deciders and judged by the attester."""
+    return "\n".join(
+        f"- {hint['path']}" + (f" ({hint['reason']})" if hint.get("reason") else "")
+        for hint in hints
+    ) or "None."
+
+
+def _render_cleaner_hints(hints: Sequence[Mapping[str, str]]) -> str:
+    """Cleaner input/output grammar; never used as the downstream authorization bytes."""
+    return "\n".join(
+        f"- {hint['path']}: {hint.get('reason', '')}" for hint in hints
+    ) or "None."
 
 
 def _attest_body(
