@@ -139,14 +139,15 @@ model call would increase cost without changing authority.
 
 ## Primary acceptance
 
-Run the real signed-in cleaner/attester path on a small pinned fixture whose two options contain a
-shared factual paragraph and different factual consequences, using the reported reproduction shape
-that repeatedly caused compression. Acceptance is valid only when the signed-in providers exercise
-the fallback and the resulting status is exactly `original-attested`, the persisted cleaned candidate
-remains visibly unusable, both persisted decider prompts contain the canonical original facts, and an
-ordinary arbitration outcome is produced. The deterministic injected-agent integration test forces
-the same route independently of provider variability. Record provider/model versions, call count,
-elapsed time, cleaning status, and audit digest.
+Run the fully signed-in cleaner/attester path on a small pinned duplicated-preamble fixture to establish
+current six-line provider compatibility. Because cleaner failure is probabilistic, separately inject the
+reported destructive candidate and require the signed-in Codex attester plus both signed-in deciders to
+exercise the fallback. Acceptance is valid only when the resulting status is exactly `original-attested`,
+the persisted cleaned candidate remains visibly unusable, both persisted decider prompts contain the
+canonical original facts, and an ordinary arbitration outcome is produced. Check in a separately
+versioned v2 artifact that records provider/model versions, external call count, elapsed time, cleaning
+status, audit/source digests, and the explicit exclusion that it does not prove cleaner recurrence. The
+deterministic injected-agent integration test forces the same route without provider variability.
 
 Then run Codex CODE convergence against the implementation under the frozen operating model. Accepted
 findings receive one coherent correction and focused rerun; recurring architectural objections stop

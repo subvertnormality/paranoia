@@ -1,0 +1,49 @@
+{
+  "acceptance_kind": "arbitration-original-fallback-v2",
+  "acceptance_scope": {
+    "proves": [
+      "a reported destructive cleaner candidate was retained as rejected audit data",
+      "a signed-in Codex attester authorized the complete canonical originals",
+      "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
+      "the recorded run reached an ordinary terminal arbitration result with CLEANING original-attested"
+    ],
+    "does_not_prove": [
+      "that the current Claude cleaner will reproduce the historical destructive rewrite probabilistically",
+      "that either decider's resolved citation semantically entails its constraint",
+      "provider service identity beyond the recorded local CLI versions and configured model names"
+    ]
+  },
+  "audit": {
+    "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
+    "sha256": "4a249d281511c706c30ebde148be67af985d46c36075d8520bd6d0367ec64066",
+    "snapshot": "0b8dae8d79968b7f963bb1de831b706c2dff8a9e",
+    "cleaning": "original-attested",
+    "result": "CONVERGED"
+  },
+  "timing": {
+    "path": "docs/arbitration_fallback_evidence/timing.json",
+    "sha256": "16b5015aee8af845653e4e6a18f3487f7871afa1dca9db98b51b678a51e5f6ab"
+  },
+  "providers": {
+    "codex_cli": "codex-cli 0.144.6",
+    "claude_cli": "2.1.197 (Claude Code)",
+    "attester_model": "gpt-5.6-sol",
+    "decider_models": {
+      "codex": "gpt-5.6-sol",
+      "claude": "claude-fable-5"
+    }
+  },
+  "source_sha256": {
+    "src/paranoia_local/arbitrate_handler.py": "5e3c20ce4b6b1a2f638dcee862ad5e541edfb34d66d4d37b7b404f705b98e5ab",
+    "src/paranoia_local/arbitration.py": "d9ab0cbf572bfe57a4c2ab2f3c2a823a8472e9c478881338312d2cc85ff37e92",
+    "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
+    "src/paranoia_local/server.py": "8e70799fe2d008e2c2b0cc12e2d5721e814889ee9af23c468448335bb4264047",
+    "scripts/validate_arbitration_fallback_acceptance.py": "3ced905171510feba22579f4eea7202d256f9e80f89641f57a03423cd0934e9a",
+    "tests/test_arbitrate_handler.py": "fb8819457aa4138064480d7f433e8781058dd9783220765d0af417b6528b14ac",
+    "tests/test_arbitration_fallback_acceptance.py": "f0dd110df058d1053e0f80171900142c64a2c7fe0734b8832ca6ee8ed7162108"
+  },
+  "tests": {
+    "full_suite": "1083 passed",
+    "exit_status": 0
+  }
+}

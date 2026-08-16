@@ -209,7 +209,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
         "claude": engines.ClaudeEngine().default_model,
     }:
         raise ValueError("fallback configured provider models mismatch")
-    if artifact["tests"] != {"full_suite": "1077 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1083 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 

@@ -818,7 +818,14 @@ detail.
   `original-attested` means the attester rejected or mechanically disqualified the
   cleaner candidate but explicitly passed the complete originals for neutrality;
   the audit retains that rejected candidate while decider prompts record the exact
-  canonical originals actually used.
+  canonical originals actually used. The separately versioned
+  [`original-attested` acceptance](docs/arbitration_fallback_acceptance_2026-08-16.json)
+  binds that route to a reported destructive candidate, a signed-in Codex attester,
+  both signed-in decider prompts, provider versions, call counts, elapsed time, and
+  current source hashes. Its cleaner candidate is deterministic, so it does not claim
+  that the current Claude cleaner will probabilistically reproduce the historical
+  rewrite. The older cleaning-attestation v1 artifact remains historical evidence for
+  the five-line protocol and is validated without inventing a v2 neutrality judgement.
   Signed-in reproductions are recorded in
   [`docs/cleaning_attestation_acceptance_2026-08-13.json`](docs/cleaning_attestation_acceptance_2026-08-13.json).
   They prove that exact caller context and normalized options reached both deciders and
