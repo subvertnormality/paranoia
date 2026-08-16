@@ -1,8 +1,36 @@
 {
   "acceptance_kind": "minimum-provider-cli-version-compatibility",
   "date": "2026-08-16",
-  "model_call_count": 2,
+  "model_call_count": 11,
   "operating_model": "One trusted local operator and OS; provider output is untrusted data; correctness and reachable compatibility failures only.",
+  "primary_lifecycles": [
+    {
+      "audit_sha256": "a9b9d862d0661aecf823e2241730148e7f97b5b065aaf65954a6ac98940eaad2",
+      "claim_counts": {"refuted": 0, "supported": 1, "unverified": 0},
+      "claim_duration_ms": 32013,
+      "claim_model_calls": 4,
+      "cli": "claude",
+      "elapsed_seconds_observed": 100.49,
+      "engine_error": false,
+      "engine_returncode": 0,
+      "outcome": "claim closure succeeded",
+      "structural_model_calls": 1,
+      "tested_version": "2.1.233"
+    },
+    {
+      "audit_sha256": "dcebd6e2e95e0c75e39b58984f57ee77a2292a16dd45e063ef3f80b705fb21b7",
+      "claim_counts": {"refuted": 0, "supported": 1, "unverified": 1},
+      "claim_duration_ms": 92257,
+      "claim_model_calls": 3,
+      "cli": "codex",
+      "elapsed_seconds_observed": 230.94,
+      "engine_error": false,
+      "engine_returncode": 0,
+      "outcome": "visible fail-closed capture limit after complete claim lifecycle",
+      "structural_model_calls": 1,
+      "tested_version": "0.147.0"
+    }
+  ],
   "probes": [
     {
       "cli": "claude",
@@ -40,5 +68,6 @@
     "claude_package": "https://www.npmjs.com/package/@anthropic-ai/claude-code",
     "codex_package": "https://www.npmjs.com/package/@openai/codex"
   },
+  "structured_probe_model_calls": 2,
   "version": 1
 }

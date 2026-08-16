@@ -94,7 +94,11 @@ def test_cli_version_is_compared_numerically(monkeypatch) -> None:
 
 @pytest.mark.parametrize(
     "reported",
-    ["claude 2.1.197-alpha.1", "codex-cli 0.144.6-beta"],
+    [
+        "claude 2.1.197-alpha.1",
+        "codex-cli 0.144.6-beta",
+        "codex-cli 0.145.0-alpha.1",
+    ],
 )
 def test_cli_version_rejects_prereleases(monkeypatch, reported) -> None:
     monkeypatch.setattr(
@@ -128,7 +132,7 @@ def test_minimum_provider_cli_acceptance_binds_later_real_versions() -> None:
             / "docs/minimum_provider_cli_acceptance_2026-08-16.json"
         ).read_text()
     )
-    assert artifact["model_call_count"] == 2
+    assert artifact["model_call_count"] == 11
     minimums = {
         "codex": engines.MIN_CODEX_VERSION,
         "claude": engines.MIN_CLAUDE_VERSION,
@@ -140,6 +144,19 @@ def test_minimum_provider_cli_acceptance_binds_later_real_versions() -> None:
         assert parse(probe["tested_version"]) > minimums[probe["cli"]]
         assert probe["returncode"] == 0
         assert probe["response"] == {"status": "compatible"}
+    lifecycles = {row["cli"]: row for row in artifact["primary_lifecycles"]}
+    assert set(lifecycles) == set(minimums)
+    assert lifecycles["claude"]["claim_counts"] == {
+        "refuted": 0, "supported": 1, "unverified": 0,
+    }
+    assert lifecycles["codex"]["claim_counts"] == {
+        "refuted": 0, "supported": 1, "unverified": 1,
+    }
+    assert all(row["engine_returncode"] == 0 for row in lifecycles.values())
+    assert sum(
+        row["claim_model_calls"] + row["structural_model_calls"]
+        for row in lifecycles.values()
+    ) + artifact["structured_probe_model_calls"] == artifact["model_call_count"]
 
 
 def test_codex_recovered_stream_error_does_not_discard_completed_turn() -> None:
