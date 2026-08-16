@@ -272,6 +272,11 @@ counts and retry diagnostics remain exact.
 Apply the same before-invocation ledger rule to cleaner and attester calls. Mark research running
 only after deadline admission, and keep established packet digest computation total on
 model-controlled Unicode so the failure serializer cannot throw.
+Cleaner, attester, and decider attempt rows must carry the requested engine/model and a closed
+execution route. External routes retain executable and compatible CLI version; injected and
+deterministic routes must not claim either. Derive acceptance call routes from those rows, not
+artifact prose. Append the prepared row before any local composed-prompt bound can reject it;
+retain local rejection distinctly with no admission or invocation.
 Treat arbitration context as caller-owned shared specification/data: preserve its exact bytes,
 ignore any cleaner rewrite or omission, and gate its advocacy independently rather than asking the
 cleaner to alter it. A changed fidelity verdict is actionable only when a per-field structured entry

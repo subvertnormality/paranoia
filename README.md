@@ -803,7 +803,14 @@ detail.
 - **Attempt state distinguishes preparation from spend.** Cleaner, attester,
   research, and decider records expose whether a prompt was prepared, admitted,
   invoked, completed, refused by the deadline, or blocked during inert-workspace
-  setup. Call counts include only attempts that crossed the provider boundary.
+  setup. Cleaner, attester, and decider attempts also record the requested engine
+  and model plus a closed execution route: `external-cli`, `injected-agent`,
+  `deterministic-cleaner`, or `not-invoked`. External routes retain the executable
+  and compatible CLI version; non-external routes retain neither. Call counts are
+  derived from these rows, not from separately asserted acceptance metadata.
+  A locally oversized composed prompt is retained as `local-rejected` with an exact
+  prompt binding and `admitted:false` / `invoked:false`. Cleaner/attester prompts
+  are capped at 180,000 characters and initial/correction decider prompts at 240,000.
 - **Cleaned packet audits are complete.** Success and late-failure records retain
   cleaned decision, context, hints, and statements plus one digest of that exact
   normalized packet. Cleaner and attester reply copies retain complete normal
@@ -821,10 +828,14 @@ detail.
   canonical originals actually used. The separately versioned
   [`original-attested` acceptance](docs/arbitration_fallback_acceptance_2026-08-16.json)
   binds that route to a reported destructive candidate, a signed-in Codex attester,
-  both signed-in decider prompts, provider versions, call counts, elapsed time, and
-  current source hashes. Its cleaner candidate is deterministic, so it does not claim
+  both signed-in decider prompts, attempt-derived provider versions and call routes,
+  elapsed time, and current source hashes. The source-hashed acceptance runner also
+  retains a separate ordinary signed-in Claude-cleaner compatibility run. Its fallback
+  cleaner candidate is deterministic, so it does not claim
   that the current Claude cleaner will probabilistically reproduce the historical
-  rewrite. The older cleaning-attestation v1 artifact remains historical evidence for
+  rewrite. Regenerate both records with
+  `python scripts/run_arbitration_fallback_acceptance.py /absolute/repo/path`.
+  The older cleaning-attestation v1 artifact remains historical evidence for
   the five-line protocol and is validated without inventing a v2 neutrality judgement.
   Signed-in reproductions are recorded in
   [`docs/cleaning_attestation_acceptance_2026-08-13.json`](docs/cleaning_attestation_acceptance_2026-08-13.json).

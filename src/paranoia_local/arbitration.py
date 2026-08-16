@@ -162,6 +162,9 @@ MAX_HINTS_CHARS = 20000
 # Includes the fixed instructions, caller framing, any bounded correction, and the
 # cleaner candidate. This is an admission bound, not a model quality budget.
 MAX_CLEANING_PROMPT_CHARS = 180000
+# Initial and one bounded correction decider prompt, including the fixed instruction
+# block and every rendered packet field. This is an admission bound, not a quality budget.
+MAX_DECIDER_PROMPT_CHARS = 240000
 MAX_CLEANER_REPLY_CHARS = 50000
 OPTION_RATIO_MAX = 2.0
 

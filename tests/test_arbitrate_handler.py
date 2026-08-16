@@ -1774,6 +1774,59 @@ def test_original_fallback_is_atomic_across_decision_options_and_hints(
         assert "preferred implementation" not in body
 
 
+def test_changed_hint_path_candidate_can_only_fall_back_to_originals(
+    repo: Path, tmp_path: Path,
+):
+    cleaned = cleaner_reply({o["id"]: o["statement"] for o in OPTIONS}).replace(
+        "=== HINTS ===\nNone.",
+        "=== HINTS ===\n- substituted.py: substituted path",
+    )
+    original_hint = "- app.py: the threshold is written here"
+    cleaned_hint = "- substituted.py: substituted path"
+    detail = json.dumps({
+        "hints": {
+            "original": original_hint,
+            "cleaned": cleaned_hint,
+            "change": "altered-qualification",
+            "reason": "hints: altered-qualification",
+        }
+    }, separators=(",", ":"))
+    attestation = (
+        "FIDELITY: decision PRESERVED; hints CHANGED; opt-float PRESERVED; "
+        "opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\n"
+        "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    agent = Agent(lambda e, r: "opt-float", cleaner=cleaned, attest=attestation)
+    report = run(
+        repo, agent, tmp_path,
+        files=[{"path": "app.py", "reason": "the threshold is written here"}],
+    )
+
+    assert trailer_field(report, "CLEANING") == "original-attested"
+    bodies = [call["body"] for call in agent.calls if call["cwd"] is not None]
+    assert bodies and all("app.py (the threshold is written here)" in body for body in bodies)
+    assert all("substituted.py" not in body for body in bodies)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["cleaned"]["hints"] == [
+        {"path": "substituted.py", "reason": "substituted path"}
+    ]
+
+
+def test_caller_id_in_validated_hint_path_is_rejected_before_agents(
+    repo: Path, tmp_path: Path,
+):
+    (repo / "opt-float.py").write_text("VALUE = 1\n")
+    commit_all(repo, "add identifier-bearing hint")
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path, files=[{"path": "opt-float.py"}])
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "reserved token 'opt-float'" in report
+    assert not agent.calls
+
+
 def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: Path):
     cleaner = cleaner_reply({
         "opt-float": "Float.",
@@ -2041,6 +2094,67 @@ def test_cleaning_limit_applies_to_the_fully_composed_prompt():
         ah._check_cleaning_prompt("cleaner", "x" * (arb.MAX_CLEANING_PROMPT_CHARS + 1))
 
 
+def test_cleaner_prompt_local_rejection_is_durable_before_spend(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(arb, "MAX_CLEANING_PROMPT_CHARS", 1)
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path)
+
+    assert not agent.calls
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attempt = record["phase_attempts"][0]
+    assert attempt["role"] == "cleaner"
+    assert attempt["status"] == "local-rejected"
+    assert attempt["admitted"] is attempt["invoked"] is False
+    assert attempt["prompt_sha256"] and "cleaner prompt" in attempt["rejection"]
+
+
+def test_attester_prompt_local_rejection_is_durable_before_spend(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    originals = {o["id"]: o["statement"] for o in sorted(OPTIONS, key=lambda o: o["id"])}
+    cleaned_raw = cleaner_reply(originals)
+    parsed = ah.parse_cleaned_packet(cleaned_raw, list(originals), caller_gave_context=False)
+    cleaner_prompt = prompts.compose(
+        prompts.CLEANER_INSTRUCTIONS,
+        ah._clean_body(BASE["decision"], BASE["stakes"], "", [], originals, ""),
+    )
+    attester_prompt = prompts.compose(
+        prompts.ATTEST_INSTRUCTIONS,
+        ah._attest_body(BASE["decision"], BASE["stakes"], "", [], [], originals, parsed),
+    )
+    assert len(attester_prompt) > len(cleaner_prompt)
+    monkeypatch.setattr(arb, "MAX_CLEANING_PROMPT_CHARS", len(cleaner_prompt))
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path)
+
+    assert ["NEUTRALIZER" in call["instructions"] for call in agent.calls] == [True]
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attempt = record["phase_attempts"][-1]
+    assert attempt["role"] == "attester"
+    assert attempt["status"] == "local-rejected"
+    assert attempt["admitted"] is attempt["invoked"] is False
+    assert attempt["prompt_sha256"] and "attester prompt" in attempt["rejection"]
+
+
+def test_injected_attempts_record_execution_identity(repo: Path, tmp_path: Path):
+    report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attempts = record["phase_attempts"] + [
+        attempt
+        for cast in record["rounds"][0].values()
+        for attempt in cast["attempts"]
+    ]
+    assert attempts
+    for attempt in attempts:
+        assert attempt["execution"]["route"] == "injected-agent"
+        assert attempt["execution"]["engine"] in {"codex", "claude"}
+        assert attempt["execution"]["model"]
+        assert attempt["execution"]["binary"] is None
+        assert attempt["execution"]["cli_version"] is None
+
+
 def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
     repo: Path, tmp_path: Path,
 ):
@@ -2179,6 +2293,31 @@ def test_run_agent_marks_engine_setup_failure_before_provider_invocation(
 
     assert lifecycle == {
         "status": "setup-failed", "admitted": True, "invoked": False,
+    }
+
+
+def test_run_agent_records_external_cli_execution_identity(monkeypatch, tmp_path: Path):
+    class SuccessfulEngine:
+        binary = "codex"
+
+        def for_role(self, _role):
+            return self
+
+        def run(self, *args, **kwargs):
+            return eng.Review(text="ok", session_ref="s", raw="raw")
+
+    lifecycle = {"status": "admitted", "admitted": True, "invoked": False}
+    monkeypatch.setattr(ah.eng, "get_engine", lambda *a, **k: SuccessfulEngine())
+    monkeypatch.setattr(ah.eng, "require_evidence_profile", lambda engine: "0.144.6")
+
+    assert ah._run_agent(
+        engine_name="codex", model="gpt-5.6-sol", instructions="i", body="b",
+        cwd=tmp_path, effort="high", web_search=False, timeout=1,
+        text_only=False, _attempt_lifecycle=lifecycle,
+    ) == "ok"
+    assert lifecycle["execution"] == {
+        "engine": "codex", "model": "gpt-5.6-sol", "route": "external-cli",
+        "binary": "codex", "cli_version": "0.144.6",
     }
 
 
@@ -3042,6 +3181,67 @@ def test_clean_false_is_not_subject_to_cleaner_capacity_bounds(repo: Path, tmp_p
                  options=[{"id": "A", "statement": long_a}, {"id": "B", "statement": long_b}])
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
     assert trailer_field(report, "CLEANING") == "skipped"
+
+
+def test_initial_decider_prompt_local_rejection_is_recorded_without_call(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    monkeypatch.setattr(arb, "MAX_DECIDER_PROMPT_CHARS", 1)
+    agent = Agent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path, clean=False)
+
+    assert not agent.calls
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    failures = record["failed_round"]["deciders"]
+    assert set(failures) == {"codex", "claude"}
+    for failure in failures.values():
+        attempt = failure["attempts"][0]
+        assert attempt["status"] == "local-rejected"
+        assert attempt["admitted"] is attempt["invoked"] is False
+        assert attempt["prompt_sha256"] and "decider prompt" in attempt["rejection"]
+
+
+def test_correction_decider_prompt_local_rejection_retains_both_attempts(
+    repo: Path, tmp_path: Path, monkeypatch,
+):
+    statements = {o["id"]: o["statement"] for o in OPTIONS}
+    packet = ah.Packet(
+        decision=BASE["decision"], stakes=BASE["stakes"], context="", hints=[],
+        statements=statements, cleaning="skipped", attestation="skipped",
+    )
+    presentation = arb.Presentation(
+        engine="codex",
+        items=(("OPTION-0000000000000000", statements["opt-float"]),
+               ("OPTION-1111111111111111", statements["opt-decimal"])),
+        label_to_id={"OPTION-0000000000000000": "opt-float",
+                     "OPTION-1111111111111111": "opt-decimal"},
+        id_to_label={"opt-float": "OPTION-0000000000000000",
+                     "opt-decimal": "OPTION-1111111111111111"},
+        reversed_order=False,
+    )
+    initial = prompts.compose(
+        prompts.ARBITRATE_INSTRUCTIONS, ah.render_decider_body(packet, presentation),
+    )
+    monkeypatch.setattr(arb, "MAX_DECIDER_PROMPT_CHARS", len(initial))
+
+    class InvalidDeciderAgent(Agent):
+        def __call__(self, **kwargs):
+            if kwargs["cwd"] is not None:
+                self.calls.append(kwargs)
+                return "malformed"
+            return super().__call__(**kwargs)
+
+    agent = InvalidDeciderAgent(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path, clean=False)
+
+    assert len(agent.calls) == 2
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    for failure in record["failed_round"]["deciders"].values():
+        assert [item["status"] for item in failure["attempts"]] == [
+            "provider-completed", "local-rejected",
+        ]
+        assert failure["attempts"][1]["admitted"] is False
+        assert failure["attempts"][1]["invoked"] is False
 
 
 def test_clean_false_still_enforces_equalization(repo: Path, tmp_path: Path):

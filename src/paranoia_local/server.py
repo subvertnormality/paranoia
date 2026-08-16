@@ -308,7 +308,9 @@ TOOLS: list[Tool] = [
             "SHAPE THE INPUT LIKE THIS: put only facts and specification shared by every "
             "option in `context`. Keep each option's distinct mechanism, scope, and "
             "consequences in that option's own concise statement, using parallel structure "
-            "and comparable detail. Framing bounds are checked before anything is spent."
+            "and comparable detail. Framing bounds are checked before anything is spent; fully "
+            "composed cleaner/attester prompts are capped at 180,000 characters and initial or "
+            "correction decider prompts at 240,000."
         ),
         inputSchema={
             "type": "object",

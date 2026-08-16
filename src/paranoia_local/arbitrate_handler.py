@@ -70,6 +70,7 @@ class DeciderAttempt:
     status: str = "provider-completed"
     admitted: bool = True
     invoked: bool = True
+    execution: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -1147,6 +1148,13 @@ def _arbitrate(
 
     def budgeted_agent(**kwargs: Any) -> str:
         lifecycle = kwargs.pop("_attempt_lifecycle", None)
+        engine_name = str(kwargs.get("engine_name", ""))
+        model = str(kwargs.get("model", ""))
+        if lifecycle is not None:
+            lifecycle["execution"] = _execution_identity(
+                engine_name, model,
+                route="external-cli" if agent is _run_agent else "injected-agent",
+            )
         cap = int(kwargs.get("timeout", 0))
         if time.monotonic() + cap + TEARDOWN_RESERVE_SEC > deadline:
             if lifecycle is not None:
@@ -1159,10 +1167,10 @@ def _arbitrate(
         if lifecycle is not None and agent is not _run_agent:
             lifecycle.update(status="provider-invoked", invoked=True)
         try:
-            result = (
-                agent(**kwargs, _attempt_lifecycle=lifecycle)
-                if agent is _run_agent else agent(**kwargs)
+            pass_lifecycle = agent is _run_agent or bool(
+                getattr(agent, "_paranoia_accepts_lifecycle", False)
             )
+            result = agent(**kwargs, _attempt_lifecycle=lifecycle) if pass_lifecycle else agent(**kwargs)
         except Exception:
             if lifecycle is not None and lifecycle.get("invoked"):
                 lifecycle["status"] = "provider-failed"
@@ -1289,7 +1297,8 @@ def _arbitrate(
         "context": context,
         "stakes": stakes,
         **{f"statement[{o.id}]": o.statement for o in canonical},
-        **{f"hint[{h['path']}]": h.get("reason", "") for h in hints},
+        **{f"hint-path[{index}]": h["path"] for index, h in enumerate(hints)},
+        **{f"hint-reason[{index}]": h.get("reason", "") for index, h in enumerate(hints)},
     }
     arb.reject_reserved_tokens(visible, caller_ids)
 
@@ -2278,10 +2287,10 @@ def _clean_and_attest(
             established["packet"].cleaning = "cleaning"
         cleaner_body = _clean_body(decision, stakes, context, hints, originals, complaint)
         cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
-        _check_cleaning_prompt("cleaner", cleaner_prompt)
         cleaner_record = {
             "role": "cleaner", "attempt": attempt + 1,
             "status": "prepared", "admitted": False, "invoked": False,
+            "execution": _execution_identity(eng.CLEANER_ENGINE, cleaner_model),
             "prompt_sha256": hashlib.sha256(
                 cleaner_prompt.encode("utf-8", "surrogatepass")
             ).hexdigest(),
@@ -2289,6 +2298,14 @@ def _clean_and_attest(
             "reply": "", "reply_sha256": None, "rejection": "pending",
         }
         phase_attempts.append(cleaner_record)
+        prompt_rejection = _local_prompt_rejection(
+            "cleaner", cleaner_prompt, arb.MAX_CLEANING_PROMPT_CHARS,
+        )
+        if prompt_rejection:
+            cleaner_record.update(status="local-rejected", rejection=prompt_rejection)
+            if established is not None:
+                established["packet"].cleaning = "cleaner-rejected"
+            raise ArbitrationError(prompt_rejection)
         try:
             cleaned_raw = agent(
                 engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
@@ -2328,13 +2345,6 @@ def _clean_and_attest(
             # copy is non-authoritative: always restore the exact caller string so a
             # rewrite, omission, or whitespace normalization cannot reach deciders.
             parsed["context"] = context
-            expected_hint_paths = {hint["path"] for hint in hints}
-            if set(parsed["hints"]) != expected_hint_paths:
-                raise ArbitrationError(
-                    "cleaner changed the hint path set: "
-                    f"expected {sorted(expected_hint_paths)}, got {sorted(parsed['hints'])}"
-                )
-            cleaned_hints = _merge_hints(hints, parsed["hints"])
         except ArbitrationError as exc:
             last_error = str(exc)
             cleaner_record["rejection"] = last_error
@@ -2343,9 +2353,23 @@ def _clean_and_attest(
             complaint = f"Your previous attempt was rejected: {exc}\nFix exactly that."
             continue
 
+        expected_hint_paths = {hint["path"] for hint in hints}
+        actual_hint_paths = set(parsed["hints"])
+        path_mismatch = actual_hint_paths != expected_hint_paths
+        cleaned_hints = (
+            [{"path": path, "reason": reason} for path, reason in parsed["hints"].items()]
+            if path_mismatch else _merge_hints(hints, parsed["hints"])
+        )
+
         candidate_ineligibility = _cleaned_candidate_ineligibility(
             parsed=parsed, cleaned_hints=cleaned_hints, originals=originals,
         )
+        if path_mismatch:
+            candidate_ineligibility.insert(
+                0,
+                "cleaner changed the hint path set: "
+                f"expected {sorted(expected_hint_paths)}, got {sorted(actual_hint_paths)}",
+            )
         candidate_record = {
             "decision": parsed["decision"], "context": parsed["context"],
             "hints": list(cleaned_hints), "statements": dict(parsed["statements"]),
@@ -2373,10 +2397,10 @@ def _clean_and_attest(
             decision, stakes, context, hints, cleaned_hints, originals, parsed,
         )
         attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
-        _check_cleaning_prompt("attester", attester_prompt)
         attester_record = {
             "role": "attester", "attempt": attempt + 1,
             "status": "prepared", "admitted": False, "invoked": False,
+            "execution": _execution_identity(eng.ATTESTER_ENGINE, eng.ATTESTER_MODEL),
             "prompt_sha256": hashlib.sha256(
                 attester_prompt.encode("utf-8", "surrogatepass")
             ).hexdigest(),
@@ -2384,6 +2408,14 @@ def _clean_and_attest(
             "reply": "", "reply_sha256": None, "rejection": "pending",
         }
         phase_attempts.append(attester_record)
+        prompt_rejection = _local_prompt_rejection(
+            "attester", attester_prompt, arb.MAX_CLEANING_PROMPT_CHARS,
+        )
+        if prompt_rejection:
+            attester_record.update(status="local-rejected", rejection=prompt_rejection)
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
+            raise ArbitrationError(prompt_rejection)
         try:
             attested_raw = agent(
                 engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
@@ -2478,6 +2510,26 @@ def _check_cleaning_prompt(role: str, prompt: str) -> None:
             f"{role} prompt is {len(prompt)} chars "
             f"(max {arb.MAX_CLEANING_PROMPT_CHARS})"
         )
+
+
+def _execution_identity(
+    engine_name: str, model: str, *, route: str = "not-invoked",
+    binary: str | None = None, cli_version: str | None = None,
+) -> dict[str, str | None]:
+    """Closed execution identity attached to the attempt that owns the call."""
+    return {
+        "engine": engine_name,
+        "model": model,
+        "route": route,
+        "binary": binary,
+        "cli_version": cli_version,
+    }
+
+
+def _local_prompt_rejection(role: str, prompt: str, limit: int) -> str | None:
+    if len(prompt) <= limit:
+        return None
+    return f"{role} prompt is {len(prompt)} chars (max {limit})"
 
 
 def _cleaned_candidate_ineligibility(
@@ -2592,13 +2644,25 @@ def _fan_out(
 
     def one(engine: eng.Engine) -> Cast:
         presentation = by_name[engine.name]
+        model = models.get(engine.name) or engine.default_model
         body = render_decider_body(packet, presentation, tuple(carried.get(engine.name, ())))
         first_prompt = prompts.compose(prompts.ARBITRATE_INSTRUCTIONS, body)
         attempts: list[DeciderAttempt] = [DeciderAttempt(
             body, "", "pending",
             hashlib.sha256(first_prompt.encode("utf-8", "surrogatepass")).hexdigest(),
             _bounded_research_text(first_prompt), None, "prepared", False, False,
+            _execution_identity(engine.name, model),
         )]
+        prompt_rejection = _local_prompt_rejection(
+            f"{engine.name} decider", first_prompt, arb.MAX_DECIDER_PROMPT_CHARS,
+        )
+        if prompt_rejection:
+            attempts[-1] = DeciderAttempt(
+                body, "", prompt_rejection, attempts[-1].prompt_sha256,
+                attempts[-1].prompt_excerpt, None, "local-rejected", False, False,
+                attempts[-1].execution,
+            )
+            raise DeciderAttemptFailure(prompt_rejection, attempts)
         try:
             workspace_manager = inert_tree.evidence_workspace(repo, snapshot)
             workspace = workspace_manager.__enter__()
@@ -2608,6 +2672,7 @@ def _fan_out(
                 current.body, "", f"workspace setup failure: {exc}",
                 current.prompt_sha256, current.prompt_excerpt, None,
                 "setup-failed", False, False,
+                current.execution,
             )
             raise DeciderAttemptFailure(
                 f"workspace setup failed before provider invocation: "
@@ -2622,6 +2687,7 @@ def _fan_out(
                     current.body, "", f"workspace setup failure: {exc}",
                     current.prompt_sha256, current.prompt_excerpt, None,
                     "setup-failed", False, False,
+                    current.execution,
                 )
                 raise DeciderAttemptFailure(
                     f"workspace setup failed before provider invocation: "
@@ -2634,11 +2700,12 @@ def _fan_out(
                     "status": current.status,
                     "admitted": current.admitted,
                     "invoked": current.invoked,
+                    "execution": current.execution,
                 }
                 try:
                     text = agent(
                         engine_name=engine.name,
-                        model=models.get(engine.name) or engine.default_model,
+                        model=model,
                         instructions=prompts.ARBITRATE_INSTRUCTIONS,
                         body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
                         timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
@@ -2651,6 +2718,7 @@ def _fan_out(
                         current.prompt_sha256, current.prompt_excerpt,
                         dict(failure_record) if failure_record is not None else None,
                         lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                        lifecycle.get("execution"),
                     )
                     if attempt:
                         raise DeciderAttemptFailure(
@@ -2667,6 +2735,7 @@ def _fan_out(
                         attempt_body, text, str(exc),
                         current.prompt_sha256, current.prompt_excerpt, None,
                         lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                        lifecycle.get("execution"),
                     )
                     if attempt == 1:
                         raise DeciderAttemptFailure(
@@ -2688,12 +2757,26 @@ def _fan_out(
                         ).hexdigest(),
                         _bounded_research_text(next_prompt), None,
                         "prepared", False, False,
+                        _execution_identity(engine.name, model),
                     ))
+                    prompt_rejection = _local_prompt_rejection(
+                        f"{engine.name} decider", next_prompt,
+                        arb.MAX_DECIDER_PROMPT_CHARS,
+                    )
+                    if prompt_rejection:
+                        pending = attempts[-1]
+                        attempts[-1] = DeciderAttempt(
+                            pending.body, "", prompt_rejection,
+                            pending.prompt_sha256, pending.prompt_excerpt, None,
+                            "local-rejected", False, False, pending.execution,
+                        )
+                        raise DeciderAttemptFailure(prompt_rejection, attempts)
                     continue
                 attempts[-1] = DeciderAttempt(
                     attempt_body, text, None,
                     current.prompt_sha256, current.prompt_excerpt, None,
                     lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                    lifecycle.get("execution"),
                 )
                 return Cast(
                     vote=vote, body=attempt_body, raw=text, attempts=tuple(attempts),
@@ -2748,6 +2831,13 @@ def _run_agent(
         engine = eng.get_engine(engine_name, text_only=text_only)
         if hasattr(engine, "for_role"):
             engine = engine.for_role(role)
+        cli_version = eng.require_evidence_profile(engine)
+        binary = getattr(engine, "binary", engine_name)
+        if lifecycle is not None:
+            lifecycle["execution"] = _execution_identity(
+                engine_name, model, route="external-cli",
+                binary=binary, cli_version=cli_version,
+            )
         # text_only roles get a fresh EMPTY directory: for Claude the empty allowlist is
         # the boundary; for Codex, whose read-only sandbox paranoia cannot narrow, an
         # empty cwd plus instruction is a bound, not a boundary.
