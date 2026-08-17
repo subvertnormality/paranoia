@@ -243,14 +243,11 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     }
     assert set(artifact["run"]) == {
         "base_id", "head_id", "round", "model_call_count", "returncode",
-        "session_ref", "call_elapsed_seconds", "elapsed_seconds",
+        "session_ref",
     }
     assert artifact["run"]["model_call_count"] == 1
     assert artifact["run"]["returncode"] == 0
     assert artifact["run"]["round"] == 3
-    assert 0 < artifact["run"]["call_elapsed_seconds"] <= artifact["run"][
-        "elapsed_seconds"
-    ]
 
     def unpack(name):
         record = artifact[name]
@@ -285,6 +282,11 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     assert ledger[0]["response_sha256"] == artifact["response_sha256"]
     assert ledger[0]["returncode"] is None
     assert ledger[0]["validation_issue"] is None
+    assert artifact["timing"]["attempt_sequence"] == ledger[0]["sequence"]
+    assert artifact["timing"]["session_ref"] == ledger[0]["session_ref"]
+    assert 0 < artifact["timing"]["call_elapsed_seconds"] <= artifact["timing"][
+        "handler_elapsed_seconds"
+    ]
 
     persisted = unpack("persisted_lineage")
     prior_state = dict(persisted["review_state"])
@@ -317,16 +319,22 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     assert rows == artifact["production_diff"]["files"]
     assert sum(row["added"] for row in rows) == artifact["production_diff"]["total_added"]
     assert sum(row["deleted"] for row in rows) == artifact["production_diff"]["total_deleted"]
-    assert artifact["changed_production_module_lines"] == sorted(
-        ({
-            "path":row["path"],
-            "lines":len(subprocess.run(
-                ["git", "show", f"{head_id}:{row['path']}"], cwd=ROOT,
-                capture_output=True, text=True, check=True,
-            ).stdout.splitlines()),
-        } for row in rows),
+    production_paths = [
+        path for path in subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", head_id, "--", "src"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout.splitlines() if path.endswith(".py")
+    ]
+    largest = sorted(({
+        "path":path,
+        "lines":len(subprocess.run(
+            ["git", "show", f"{head_id}:{path}"], cwd=ROOT,
+            capture_output=True, text=True, check=True,
+        ).stdout.splitlines()),
+    } for path in production_paths),
         key=lambda row:(-row["lines"], row["path"]),
-    )
+    )[:5]
+    assert artifact["largest_production_module_lines"] == largest
 
 
 def test_duplicate_wire_citations_reach_canonical_aggregate_validation():

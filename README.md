@@ -176,9 +176,10 @@ the production handler, settlement, or persistence seam.
 The separate [production-handler acceptance](docs/evidence_citation_shape_handler_acceptance_2026-08-17.json)
 records one signed-in staged correction call through `critique_branch`, including its exact schema
 and response, standard attempt ledger, canonical settlement, persisted lineage, real timing and
-call count, production diff totals, and changed-module sizes. Its replay test reconstructs the
-settlement and durable review state; the record does not claim future provider compliance or
-semantic correctness of the review findings.
+call count, production diff totals, and largest production-module sizes. Its replay test reconstructs the
+settlement and durable review state and recomputes the largest modules from the recorded head's
+complete production tree. The record does not claim future provider compliance, exact composed
+prompt bytes, or semantic correctness of the review findings.
 For an evidenced violation of a closed unmechanized class, the server derives the redundant
 `reopen` lifecycle record. A model-owned non-downgrading reclassification is applied before that
 derived lifecycle transition; an explicit replacement remains model-owned, and a closed
