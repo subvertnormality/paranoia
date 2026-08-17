@@ -31,8 +31,9 @@ Replace every model-facing staged evidence item with one closed object:
 {"anchor":"repository/path.py:12-18","rationale":"The guarded write occurs after validation."}
 ```
 
-Both fields are required and bounded. `anchor` retains the exact current plan/repository pattern;
-`rationale` is non-empty, single-line explanatory text. Multiple citations require multiple array
+Both fields are required and bounded. `anchor` retains the exact current 512-character
+plan/repository pattern; `rationale` is non-empty, single-line explanatory text capped at 500
+characters. Multiple citations require multiple array
 items. The prompts explicitly forbid prose in `anchor` and joined citations. The local role schema
 and provider projection use this same wire shape; legacy strings, extra keys, empty rationale, and
 prose-contaminated anchors reject with their exact JSON Pointer.
@@ -40,9 +41,16 @@ prose-contaminated anchors reject with their exact JSON Pointer.
 ### 2. Canonicalize only after closed wire validation
 
 After a complete response passes the wire schema, project each citation object to its exact
-`anchor` string. Validate that projection against a separate closed canonical role schema before
-semantic validation. This second pass preserves anchor uniqueness after rationale is removed and
-prevents two objects with the same anchor but different prose from bypassing duplicate checks.
+`anchor` string. Evaluate that projection against a separate closed canonical role schema. This
+second pass preserves anchor uniqueness after rationale is removed and prevents two objects with
+the same anchor but different prose from bypassing duplicate checks.
+
+Wire-schema failure still rejects before projection because there is no safe complete object to
+inspect. After wire success, canonical-schema issues do not reject early: the handler accumulates
+them with all independently safe semantic-graph, anchor-resolution, and canonical class-engine
+issues into the existing bounded pointer-addressed diagnostic before the one retry. Projection
+returns the canonical object plus issues rather than throwing on the first duplicate. Standalone
+decoder helpers raise the same bounded canonical issues when no outer aggregation context exists.
 
 All existing semantic graph checks, `resolve_anchors`, class/debt materialization, and durable
 settlement continue to receive string arrays. Rationale is non-authoritative generation context;
@@ -60,6 +68,31 @@ Consolidation receives canonical source manifests but emits citation objects for
 evidence field in its own response. Census outcomes derived from integrity assessments continue to
 copy canonical ordered anchor strings exactly.
 
+### 4. Preserve historical acceptance without production compatibility
+
+Copy the exact pre-cutover provider schemas exercised by every dated Protocol v2 response into a
+complete test-only legacy fixture. Historical response bytes, schema/response hashes, sessions,
+costs, and lifecycle records remain unchanged and replay only against those frozen schemas. The
+production decoder rejects legacy strings; do not add an alias or compatibility branch.
+
+Record a new dated live-provider acceptance artifact containing the citation-object provider schema
+and hash, exact successful response and hash, canonical projected manifest/settlement, provider
+identity/settings, attempt count, elapsed time, and production diff/module sizes. The artifact must
+prove a rationale-bearing citation crosses the real structured-output boundary and materializes to
+the exact string anchor.
+
+### 5. Keep bounds and release gates executable
+
+The 500-character rationale bound and existing response caps remain cumulative circuit breakers.
+Add a budget test with 200 rationale-bearing citations showing the encoded packet fits the
+240,000-character lane cap; the 1,000,000-character decision cap remains looser. Oversized replies
+still reject before JSON decode.
+
+Extend `scripts/run_staged_protocol_mutation_checks.py` with owned mutants for closed citation
+objects, exact (not trimmed/split) anchor projection, post-projection duplicate rejection,
+canonical cache validation, and cache-version invalidation. Each mutant names a focused test and
+the mandatory mutation command runs before merge.
+
 ## Verification
 
 - Schema tests cover every role and every evidence-bearing row with concrete citation objects.
@@ -69,10 +102,17 @@ copy canonical ordered anchor strings exactly.
   settlement shape and preserve ordered anchor identity.
 - Cache tests prove canonical manifests revalidate, pre-cutover cache is invalidated, and provider
   wire objects are not persisted as cached manifests.
+- One composite retry test combines a duplicate projected anchor, semantic graph defect, bad anchor,
+  and invalid class action and proves all independently detectable pointers appear together.
 - Prompt tests prove every staged role tells the model where rationale belongs and forbids joining.
 - Existing out-of-range, traversal, prefix, symlink, and plan-line checks remain unchanged.
+- Historical acceptance tests replay immutable old responses only through complete frozen test-only
+  schemas; production rejects them. A new dated live-provider artifact proves the new cutover.
+- The bounded Protocol v2 mutation gate kills every new projection/cache/schema mutant.
+- README is changed from planned status to the shipped wire-object/canonical-string/cache-version
+  behavior while dated historical documents remain labeled historical.
 - Run focused protocol/census/handler tests, the full suite, and one real staged CODE capability
-  before merge.
+  plus `scripts/run_staged_protocol_mutation_checks.py` before merge.
 
 ## Acceptance
 
