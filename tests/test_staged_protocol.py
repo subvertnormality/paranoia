@@ -375,6 +375,22 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     prompt_bytes = captured["prompt"].encode("utf-8", "surrogatepass")
     assert len(captured["prompt"]) == prompt_replay["chars"]
     assert hashlib.sha256(prompt_bytes).hexdigest() == prompt_replay["sha256"]
+    durable_path = (
+        state_root / "lineages" / "evidence-citation-shape-code-20260817.json"
+    )
+    assert json.loads(durable_path.read_text()) == unpack("persisted_lineage")
+    audit_paths = list((tmp_path / "prompt-logs").glob("*.json"))
+    assert len(audit_paths) == 1
+    audit = json.loads(audit_paths[0].read_text())
+    assert audit["staged_settlement"] == settlement
+    assert len(audit["attempt_ledger"]) == 1
+    assert {
+        key:audit["attempt_ledger"][0][key]
+        for key in ("role", "sequence", "outcome", "session_ref", "response_sha256")
+    } == {
+        key:ledger[0][key]
+        for key in ("role", "sequence", "outcome", "session_ref", "response_sha256")
+    }
 
     persisted = unpack("persisted_lineage")
     prior_state = dict(persisted["review_state"])
