@@ -231,6 +231,78 @@ def test_live_provider_citation_probe_is_bound_and_replays():
     )
 
 
+def test_live_handler_citation_acceptance_replays_settlement_and_state():
+    artifact = json.loads(
+        (ROOT / "docs/evidence_citation_shape_handler_acceptance_2026-08-17.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == "staged-evidence-citation-handler-lifecycle"
+    assert artifact["version"] == 1
+    assert artifact["run"]["model_call_count"] == 1
+    assert artifact["run"]["returncode"] == 0
+
+    def unpack(name):
+        record = artifact[name]
+        text = gzip.decompress(base64.b64decode(record["gzip_base64"])).decode()
+        assert hashlib.sha256(text.encode()).hexdigest() == record["sha256"]
+        return json.loads(text)
+
+    schema = unpack("schema")
+    assert schema == sp.provider_schema(
+        sp.decision_schema(cc.BRANCH_MODE, "correction")
+    )
+    response = artifact["response"]
+    assert hashlib.sha256(response.encode()).hexdigest() == artifact["response_sha256"]
+    decoded = sp.decode_decision(
+        response, mode=cc.BRANCH_MODE, role="correction",
+    )
+    rc.resolve_anchors(
+        decoded, root=ROOT, trusted_roots={"repository":ROOT},
+    )
+    preconditions = unpack("preconditions")
+    settlement = sp.materialize_decision_value(
+        decoded, mode=cc.BRANCH_MODE, role="correction",
+        **preconditions,
+    )
+    assert settlement == unpack("settlement")
+
+    ledger = unpack("attempt_ledger")
+    assert len(ledger) == artifact["run"]["model_call_count"]
+    assert ledger[0]["role"] == "correction"
+    assert ledger[0]["outcome"] == "completed"
+    assert ledger[0]["session_ref"] == artifact["run"]["session_ref"]
+    assert ledger[0]["response_sha256"] == artifact["response_sha256"]
+
+    persisted = unpack("persisted_lineage")
+    prior_state = dict(persisted["review_state"])
+    prior_state.update(
+        phase="correction", debt=preconditions["durable_debt"], last_round=1,
+    )
+    replayed = rc.settle_state(
+        prior_state, settlement, phase="correction",
+        snapshot=persisted["review_state"]["snapshot_digest"], round_no=3,
+    )
+    for debt in replayed["debt"]:
+        assert not debt.get("class_record_indexes")
+        debt.pop("class_record_indexes", None)
+    assert replayed == persisted["review_state"]
+
+    rows = []
+    for line in subprocess.run(
+        ["git", "diff", "--numstat", "main...HEAD", "--", "src"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.splitlines():
+        added, deleted, path = line.split("\t")
+        rows.append({"path":path, "added":int(added), "deleted":int(deleted)})
+    assert rows == artifact["production_diff"]["files"]
+    assert sum(row["added"] for row in rows) == artifact["production_diff"]["total_added"]
+    assert sum(row["deleted"] for row in rows) == artifact["production_diff"]["total_deleted"]
+    assert artifact["changed_production_module_lines"] == sorted(
+        ({"path":row["path"], "lines":len((ROOT / row["path"]).read_text().splitlines())}
+         for row in rows),
+        key=lambda row:(-row["lines"], row["path"]),
+    )
+
+
 def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
     value = wire_value(lane_value())
     value["coverage"][0]["evidence"] = [

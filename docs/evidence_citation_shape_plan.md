@@ -124,7 +124,11 @@ the mandatory mutation command runs before merge.
   `evidence_citation_shape_acceptance_2026-08-17.json` provider-probe artifact binds one live Codex
   call's exact prompt, schema, raw reply, canonical projection, and successful production anchor
   resolution. It does not claim the production handler/settlement/persistence seam, future provider
-  compliance, or semantic entailment; a separate handler acceptance record is required before merge.
+  compliance, or semantic entailment. The separate
+  `evidence_citation_shape_handler_acceptance_2026-08-17.json` record binds one production staged
+  correction call, exact schema and response, attempt ledger, canonical settlement, persisted
+  lineage, elapsed time, call count, production diff, and changed-module sizes. Its test replays the
+  materializer and durable state transition.
 - Every evidence-bearing wire shape accepts a 500-character rationale and rejects 501 characters.
   Valid lane and decision packets with 200 maximum-length rationales remain below their respective
   240,000- and 1,000,000-character raw-response caps.
