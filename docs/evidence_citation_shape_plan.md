@@ -130,6 +130,9 @@ the mandatory mutation command runs before merge.
   lineage, elapsed time, call count, production diff, and the largest modules in the recorded
   production tree. Its test replays the materializer and durable state transition. Exact composed
   prompt bytes are outside this artifact's claim; standard audit prompt provenance remains bounded.
+  A separate hashed invocation envelope integrity-binds the recorded provider and timing
+  observations to the production attempt sequence, session, response digest, return code, and call
+  count; it does not independently attest provider service identity or wall-clock truth.
 - Every evidence-bearing wire shape accepts a 500-character rationale and rejects 501 characters.
   Valid lane and decision packets with 200 maximum-length rationales remain below their respective
   240,000- and 1,000,000-character raw-response caps.

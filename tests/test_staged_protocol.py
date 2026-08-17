@@ -307,6 +307,16 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     assert ledger[0]["response_sha256"] == artifact["response_sha256"]
     assert ledger[0]["returncode"] is None
     assert ledger[0]["validation_issue"] is None
+    invocation = unpack("invocation_provenance")
+    assert invocation == {
+        "attempt_sequence":ledger[0]["sequence"],
+        "model_call_count":len(ledger),
+        "provider":artifact["provider"],
+        "response_sha256":ledger[0]["response_sha256"],
+        "returncode":artifact["run"]["returncode"],
+        "session_ref":ledger[0]["session_ref"],
+        "timing":artifact["timing"],
+    }
     assert artifact["timing"]["attempt_sequence"] == ledger[0]["sequence"]
     assert artifact["timing"]["session_ref"] == ledger[0]["session_ref"]
     assert 0 < artifact["timing"]["call_elapsed_seconds"] <= artifact["timing"][

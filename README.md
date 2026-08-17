@@ -179,7 +179,9 @@ and response, standard attempt ledger, canonical settlement, persisted lineage, 
 call count, production diff totals, and largest production-module sizes. Its replay test reconstructs the
 settlement and durable review state and recomputes the largest modules from the recorded head's
 complete production tree. The record does not claim future provider compliance, exact composed
-prompt bytes, or semantic correctness of the review findings.
+prompt bytes, independently attested wall-clock/service identity, or semantic correctness of the
+review findings. A hashed invocation envelope binds the recorded provider and timing observations
+to the production attempt's sequence, session, response digest, return code, and call count.
 For an evidenced violation of a closed unmechanized class, the server derives the redundant
 `reopen` lifecycle record. A model-owned non-downgrading reclassification is applied before that
 derived lifecycle transition; an explicit replacement remains model-owned, and a closed
