@@ -427,7 +427,9 @@ def _settle_staged_failure(
             trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
         return review, trailer, [a.json() for a in getattr(error, "attempts", [])]
     closure._settled = True
-    closure.register_status = f"staged rejected: {error}"
+    closure.register_status = (
+        f"staged rejected: {rc.trailer_diagnostic(error)}"
+    )
     attempts = [a.json() for a in getattr(error, "attempts", [])]
     review = Review(
         text=rc.render_error_review(
