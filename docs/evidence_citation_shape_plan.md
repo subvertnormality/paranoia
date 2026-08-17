@@ -38,6 +38,10 @@ items. The prompts explicitly forbid prose in `anchor` and joined citations. The
 and provider projection use this same wire shape; legacy strings, extra keys, empty rationale, and
 prose-contaminated anchors reject with their exact JSON Pointer.
 
+The wire evidence array deliberately omits `uniqueItems`: two identical citation objects must
+survive structural decoding so duplicate-anchor failure can be aggregated with later safe checks.
+Uniqueness is load-bearing only for the projected canonical anchor array.
+
 ### 2. Canonicalize only after closed wire validation
 
 After a complete response passes the wire schema, project each citation object to its exact
