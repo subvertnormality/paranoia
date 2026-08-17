@@ -887,6 +887,7 @@ def materialize_decision_value(
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
     )
+    derived_actions: list[tuple[dict[str, Any], str]] = []
     for cid, action in actions.items():
         action_pointer = action_pointers[cid]
         if cid not in classes:
@@ -932,22 +933,36 @@ def materialize_decision_value(
                 issues.append(
                     f"{outcome_pointer}: mechanized open class cannot be model-closed"
                 )
-            if action is None:
-                actions[cid] = {"kind": "close", "class_id": cid}
-            elif action["kind"] not in {"close", "reclassify", "replace"}:
+            if action is None or action["kind"] == "reclassify":
+                derived_actions.append((
+                    {"kind": "close", "class_id": cid}, outcome_pointer,
+                ))
+            elif action["kind"] not in {"close", "replace"}:
                 issues.append(
                     f"{action_pointers.get(cid, outcome_pointer)}: "
                     "open satisfied class must close"
                 )
         if outcome["verdict"] == "violated" and cls["status"] == cc.CLOSED:
-            allowed = {"replace"} if cls["mechanized"] else {"reopen", "replace"}
-            if action is None or action["kind"] not in allowed:
+            if cls["mechanized"]:
+                allowed = {"replace"}
+            else:
+                allowed = {"reopen", "reclassify", "replace"}
+                if action is None or action["kind"] == "reclassify":
+                    derived_actions.append((
+                        {"kind": "reopen", "class_id": cid}, outcome_pointer,
+                    ))
+            if cls["mechanized"] and (action is None or action["kind"] not in allowed):
                 repair_pointer = (
                     "/class_actions" if action is None else action_pointers[cid]
                 )
                 issues.append(
                     f"{repair_pointer}: "
                     f"closed violated class requires {sorted(allowed)}"
+                )
+            elif not cls["mechanized"] and action is not None and action["kind"] not in allowed:
+                issues.append(
+                    f"{action_pointers[cid]}: closed violated class requires "
+                    "reopen, reclassify with derived reopen, or replace"
                 )
 
     _raise_semantic_issues(issues)
@@ -959,6 +974,9 @@ def materialize_decision_value(
                 action["class_id"], outcome_pointers.get(action["class_id"], "/class_actions"),
             )
         )
+    for action, pointer in derived_actions:
+        class_records.extend(class_records_from_actions([action]))
+        class_record_pointers.append(pointer)
 
     debt_bearing = [
         finding for finding in findings

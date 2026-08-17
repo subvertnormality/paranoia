@@ -336,7 +336,9 @@ class TestFailurePaths:
         finally:
             d.chmod(0o700)
         assert "STATE-UNAVAILABLE" in out and "CONVERGENCE: BLOCKED" in out
-        assert "Nothing notable" in out, "the paid review text must survive"
+        assert "# STAGED REVIEW FAILED" in out
+        assert "No durable structural verdict is available" in out
+        assert "Nothing notable" not in out
 
     def test_an_unremovable_latch_does_not_destroy_the_review(
         self, repo: Path, tmp_path: Path

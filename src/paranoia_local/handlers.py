@@ -106,7 +106,10 @@ def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
         else "provider" if review.returncode == 0
         else "execution"
     )
-    detail = review.failure_detail or review.text or review.raw or "engine failure"
+    detail = rc.bounded_diagnostic(
+        review.failure_detail or review.text or review.raw or "engine failure",
+        rc.MAX_ENGINE_FAILURE_MESSAGE_CHARS,
+    )
     error = rc.CensusError(detail)
     error.stage_role = role  # type: ignore[attr-defined]
     error.failure_kind = kind  # type: ignore[attr-defined]
@@ -121,7 +124,7 @@ def _staged_call(
     next_sequence: Callable[[], int] | None = None,
     web_search: bool = False,
     response_schema: dict[str, Any] | None = None,
-) -> tuple[Review, dict[str, Any], list[rc.Attempt]]:
+) -> tuple[Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]]]:
     """One schema-constrained staged call plus one same-session correction."""
     sequence = next_sequence() if next_sequence else None
     review = engine.run(
@@ -134,15 +137,19 @@ def _staged_call(
         error.attempts = attempts  # type: ignore[attr-defined]
         raise error
     try:
-        return review, parser(review.text), attempts
+        return review, parser(review.text), attempts, []
     except rc.CensusError as first:
+        first_issue = rc.bounded_diagnostic(str(first), sp.MAX_ISSUE_CHARS)
         rejected = [rc.rejected_payload(
             role, review.text, sequence=attempts[-1].sequence,
+            validation_issue=first_issue,
         )]
-        attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
+        attempts[-1] = replace(
+            attempts[-1], outcome="validation-invalid", validation_issue=first_issue,
+        )
         if not review.session_ref:
             error = rc.CensusError(
-                f"{role} validation invalid and has no resumable session: {first}"
+                f"{role} validation invalid and has no resumable session: {first_issue}"
             )
             error.stage_role = role  # type: ignore[attr-defined]
             error.failure_kind = "validation"  # type: ignore[attr-defined]
@@ -152,7 +159,7 @@ def _staged_call(
         retry_sequence = next_sequence() if next_sequence else None
         retry = engine.resume(
             review.session_ref,
-            "Your staged JSON was rejected: " + str(first) +
+            "Your staged JSON was rejected: " + first_issue +
             "\nFix every reported violation in the complete object, not only the first one. "
             "Return the complete schema-conforming JSON object.",
             cwd, model, effort, web_search,
@@ -173,17 +180,22 @@ def _staged_call(
         try:
             parsed = parser(retry.text)
         except rc.CensusError as second:
+            second_issue = rc.bounded_diagnostic(str(second), sp.MAX_ISSUE_CHARS)
             rejected.append(rc.rejected_payload(
                 f"{role}-validation-retry", retry.text,
                 sequence=attempts[-1].sequence,
+                validation_issue=second_issue,
             ))
-            attempts[-1] = replace(attempts[-1], outcome="validation-invalid")
+            attempts[-1] = replace(
+                attempts[-1], outcome="validation-invalid",
+                validation_issue=second_issue,
+            )
             second.stage_role = f"{role}-validation-retry"  # type: ignore[attr-defined]
             second.failure_kind = "validation"  # type: ignore[attr-defined]
             second.attempts = attempts  # type: ignore[attr-defined]
             second.rejected_payloads = rejected  # type: ignore[attr-defined]
             raise
-        return retry, parsed, attempts
+        return retry, parsed, attempts, rejected
 
 
 def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
@@ -408,13 +420,16 @@ def _settle_staged_failure(
         trailer = (
             "CLASS-REGISTER: staged rejected; failure state persistence unavailable\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+            f"{rc.attempt_trailer(getattr(error, 'attempts', []))}\n"
             "CONVERGENCE: BLOCKED — staged failure state may not have persisted."
         )
         if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
             trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
         return review, trailer, [a.json() for a in getattr(error, "attempts", [])]
     closure._settled = True
-    closure.register_status = f"staged rejected: {error}"
+    closure.register_status = (
+        f"staged rejected: {rc.trailer_diagnostic(error)}"
+    )
     attempts = [a.json() for a in getattr(error, "attempts", [])]
     review = Review(
         text=rc.render_error_review(
@@ -425,6 +440,7 @@ def _settle_staged_failure(
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(state),
+        rc.attempt_trailer(attempts),
     ))
     if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
         trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
@@ -445,6 +461,7 @@ def _state_unavailable_review(
     trailer = (
         "CLASS-REGISTER: staged state unavailable\n"
         f"CLASS-CLOSURE: STATE-UNAVAILABLE — {reason}\n"
+        f"{rc.attempt_trailer([])}\n"
         "CONVERGENCE: BLOCKED — lineage state could not be used this round."
     )
     if (
@@ -528,6 +545,7 @@ def _staged_structural_review(
         # integrity lane, not an empty targeted correction that can never settle it.
         state["phase"] = phase = "census"
     attempts: list[rc.Attempt] = []
+    rejected_payloads: list[dict[str, Any]] = []
     sequence_lock = Lock()
     sequence_value = 0
 
@@ -651,14 +669,16 @@ def _staged_structural_review(
             lane_prompts=lane_prompts,
         )
 
-        def run_lane(lane: str) -> tuple[str, Review, dict[str, Any], list[rc.Attempt]]:
+        def run_lane(
+            lane: str,
+        ) -> tuple[str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]]]:
             prompt = lane_prompts[lane]
             if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
                 raise _staged_error(
                     f"staged lane prompt is {len(prompt)} characters",
                     role=f"census-{lane}", kind="validation",
                 )
-            result, parsed, lane_attempts = _staged_call(
+            result, parsed, lane_attempts, lane_rejected = _staged_call(
                 role=f"census-{lane}", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CENSUS_LANE_TIMEOUT_SEC,
                 on_progress=on_progress,
@@ -674,7 +694,7 @@ def _staged_structural_review(
             for assessment in parsed["class_assessments"]:
                 if assessment["finding_id"] is not None:
                     assessment["finding_id"] = renamed[assessment["finding_id"]]
-            return lane, result, parsed, lane_attempts
+            return lane, result, parsed, lane_attempts, lane_rejected
 
         manifests = _cached_census_manifests(
             state, binding=cache_binding, lanes=lanes, validate=validate_lane,
@@ -697,14 +717,20 @@ def _staged_structural_review(
                     a for _, error in lane_errors for a in getattr(error, "attempts", [])
                 )
                 all_attempts.sort(key=lambda item: item.sequence or 0)
-                rejected_payloads = [
+                failed_rejected = [
                     (lanes.index(lane_name), position, payload)
                     for lane_name, error in lane_errors
                     for position, payload in enumerate(
                         getattr(error, "rejected_payloads", [])
                     )
                 ]
-                rejected_payloads.sort(key=lambda row: (
+                successful_rejected = [
+                    (lanes.index(row[0]), position, payload)
+                    for row in lane_rows
+                    for position, payload in enumerate(row[4])
+                ]
+                failed_rejected.extend(successful_rejected)
+                failed_rejected.sort(key=lambda row: (
                     row[2].get("sequence") is None,
                     row[2].get("sequence") or 0,
                     row[0], row[1],
@@ -712,14 +738,15 @@ def _staged_structural_review(
                 first_error = lane_errors[0][1]
                 first_error.attempts = all_attempts  # type: ignore[attr-defined]
                 first_error.rejected_payloads = [  # type: ignore[attr-defined]
-                    payload for _, _, payload in rejected_payloads
+                    payload for _, _, payload in failed_rejected
                 ]
                 first_error.manifests = [  # type: ignore[attr-defined]
                     row[2] for row in lane_rows
                 ]
                 raise first_error
-            for _, _, _, lane_attempts in lane_rows:
+            for _, _, _, lane_attempts, lane_rejected in lane_rows:
                 attempts.extend(lane_attempts)
+                rejected_payloads.extend(lane_rejected)
             manifests = [row[2] for row in lane_rows]
         elif on_progress is not None:
             on_progress("reusing validated census lanes after settlement rejection")
@@ -749,7 +776,7 @@ def _staged_structural_review(
                     f"consolidation prompt is {len(prompt)} characters",
                     role="consolidation", kind="validation",
                 )
-            review, settlement, call_attempts = _staged_call(
+            review, settlement, call_attempts, call_rejected = _staged_call(
                 role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
                 model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
                 on_progress=on_progress,
@@ -773,6 +800,13 @@ def _staged_structural_review(
             error.attempts = [  # type: ignore[attr-defined]
                 *attempts, *getattr(error, "attempts", []),
             ]
+            combined_rejected = [
+                *rejected_payloads, *getattr(error, "rejected_payloads", []),
+            ]
+            combined_rejected.sort(key=lambda row: (
+                row.get("sequence") is None, row.get("sequence") or 0,
+            ))
+            error.rejected_payloads = combined_rejected  # type: ignore[attr-defined]
             error.manifests = manifests  # type: ignore[attr-defined]
             if cacheable:
                 error.census_cache = {  # type: ignore[attr-defined]
@@ -780,6 +814,7 @@ def _staged_structural_review(
                 }
             raise
         attempts.extend(call_attempts)
+        rejected_payloads.extend(call_rejected)
     else:
         role = "final" if phase == "final" else "correction"
         open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
@@ -796,7 +831,7 @@ def _staged_structural_review(
                 f"{role} prompt is {len(prompt)} characters",
                 role=role, kind="validation",
             )
-        review, settlement, call_attempts = _staged_call(
+        review, settlement, call_attempts, call_rejected = _staged_call(
             role=role, engine=engine, prompt=prompt, cwd=cwd, model=model, effort=effort,
             timeout=STAGED_FOLLOWUP_TIMEOUT_SEC, on_progress=on_progress,
             next_sequence=next_sequence,
@@ -809,6 +844,7 @@ def _staged_structural_review(
             ),
         )
         attempts.extend(call_attempts)
+        rejected_payloads.extend(call_rejected)
 
     draft = cc.copy_lineage(lineage)
     register = rc.register_from_records(
@@ -860,6 +896,10 @@ def _staged_structural_review(
     register_status = rc.register_status(
         settlement["class_records"], minted_by_record, phase=phase,
     )
+    rejected_payloads.sort(key=lambda row: (
+        row.get("sequence") is None, row.get("sequence") or 0,
+    ))
+    closure.rejected_payloads = deepcopy(rejected_payloads)
     try:
         cc.save_lineage(closure.state_root, lineage)
     except cc.StateUnavailable as exc:
@@ -867,12 +907,15 @@ def _staged_structural_review(
         closure.staged_settlement = settlement
         message = f"lineage state unavailable after staged settlement: {exc}"
         failed = Review(
-            text=rc.render_error_review(f"[paranoia-local error] {message}"),
+            text=rc.render_error_review(
+                f"[paranoia-local error] {message}", settlement_computed=True,
+            ),
             session_ref=review.session_ref, raw=message, returncode=2, error=True,
         )
         trailer = (
             f"CLASS-REGISTER: {register_status}; persistence unavailable\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+            f"{rc.attempt_trailer(attempts)}\n"
             "CONVERGENCE: BLOCKED — this staged settlement may not have persisted."
         )
         if mode == cc.PLAN_MODE and closure.claims_enabled:
@@ -888,6 +931,7 @@ def _staged_structural_review(
             include_verdict=False,
         ),
         rc.trailer(state),
+        rc.attempt_trailer(attempts),
     ))
     if mode == cc.PLAN_MODE and closure.claims_enabled:
         trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"

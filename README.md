@@ -162,6 +162,11 @@ pointers so the single validation retry can repair more than the first defect. W
 semantic text, lane replies above 240,000 characters, and decision replies above 1,000,000
 characters fail before settlement or JSON decoding. The separate composed-prompt circuit breaker
 remains 5,000,000 characters.
+For an evidenced violation of a closed unmechanized class, the server derives the redundant
+`reopen` lifecycle record. A model-owned non-downgrading reclassification is applied before that
+derived lifecycle transition; an explicit replacement remains model-owned, and a closed
+mechanized class still requires a replacement with its predicate and pathspec. A bare reopen never
+manufactures a violated assessment.
 If all three census lanes validate but consolidation is rejected, their manifests are persisted
 with the lineage and the next invocation reruns consolidation only. Reuse requires an exact match
 on mode, structural snapshot, complete review body and open debt, frozen stakes, active-class state,
@@ -243,7 +248,8 @@ split: every target of a repeated source must be an existing-class finding backe
 violated assessment citing that source. One-off or new-class targets, duplicate source-to-governing
 pairs, and omitted sources still reject the settlement.
 An open, unmechanized active class assessed `satisfied` closes deterministically; the model does not
-need to repeat that derived action. Mechanized classes retain
+need to repeat that derived action. A closed, unmechanized class assessed `violated` likewise
+reopens deterministically. Mechanized classes retain
 their separate mechanical closure rule. Rejections after parsing are recorded as
 `validation-invalid`, which covers both envelope/schema and semantic lifecycle failures.
 Only terminal consolidation validation populates `validation_debt`; lane/follow-up validation and
@@ -253,9 +259,12 @@ older census cache and cannot authorize reuse. Engine outcomes retain `timeout`,
 `provider`, or `execution` rather than being flattened into an exit-code label; a failed validation
 retry and its attempt-ledger event use the same `*-validation-retry` role.
 Terminal validation debt retains that same structured role, kind, and message in lineage state and
-the convergence trailer. Terminal staged validation rejection also persists each rejected extracted
-model reply as a bounded head-and-tail excerpt plus its full SHA-256 in lineage state and the audit
-log's top-level `rejected_payloads`; provider-envelope excerpts in `attempt_ledger` remain separate.
+the convergence trailer. Every staged validation rejection records its bounded executable
+`validation_issue` on that exact attempt and corresponding rejected-payload row. Rejected extracted
+model replies are retained as a bounded head-and-tail excerpt plus their full SHA-256 in terminal
+lineage state and the audit log's top-level `rejected_payloads`; a rejected first response remains
+in the audit when its retry succeeds. Provider-envelope excerpts in `attempt_ledger` remain
+separate.
 Validation retry guidance includes the bounded server validation issue with a JSON Pointer, while
 the provider schema remains the structural source of truth. The server does not normalize aliases,
 fences, markers, partial objects, unresolved anchors, or missing semantic decisions.
@@ -875,10 +884,10 @@ Accepted by the four review tools:
 
 ### Review output
 
-Every review returns exactly five headings, in this order. One-shot reviews populate their natural
-categories; tracked staged plan and branch reviews put governing findings in `What doesn't work`,
-bounded remedies in `Improvements`, and write `Nothing notable.` in categories the settlement does
-not represent.
+Every completed review returns exactly five headings, in this order. One-shot reviews populate
+their natural categories; tracked staged plan and branch reviews put governing findings in `What
+doesn't work`, bounded remedies in `Improvements`, and write `Nothing notable.` in categories the
+settlement does not represent.
 
 | Section | Contains |
 |---|---|
@@ -902,6 +911,23 @@ next to its severity tag.
 
 The footer carries the `session_ref` for [`rebut`](#rebut).
 
+A terminal staged failure is deliberately not shaped like a successful review:
+
+```
+# STAGED REVIEW FAILED
+
+The staged structural review did not complete settlement. No durable structural verdict is available.
+
+## Diagnostic
+
+[paranoia-local error] ...
+```
+
+If settlement was computed but its durable write could not be confirmed, the lifecycle sentence
+says exactly that instead. The diagnostic is bounded and indented as inert code, and the result
+never emits `Nothing notable.` `STRUCTURAL-ERROR` encodes line breaks and controls as JSON string
+content on one trailer line, so retained provider text cannot create a heading or convergence row.
+
 ### Tracked convergence trailer
 
 Appended below a staged tracked plan or branch review:
@@ -912,6 +938,7 @@ CLASS-CLOSURE: 1 open, 0 closed
   19ef00ab repeated state transitions preserve their owner (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)
 STRUCTURAL-PHASE: correction
 STRUCTURAL-DEBT: 2 blocking open
+STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0
 CONVERGENCE: BLOCKED — staged structural debt remains open.
 ```
 
@@ -921,6 +948,7 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 | `CLASS-CLOSURE` | Open/closed reusable-class counts plus blocking class detail |
 | `STRUCTURAL-PHASE: census\|correction\|final\|clear` | The next broad/targeted gate; `final` requires one fresh cold regression |
 | `STRUCTURAL-DEBT: N blocking open` | Concrete governing findings still requiring correction |
+| `STAGED-ATTEMPTS: total=N validation-retries=N validation-invalid=N execution-failed=N` | Exact call shape derived from the ledger: retry-role count, locally invalid response count, and all other non-completed attempts |
 | `CONVERGENCE: NOT-BLOCKED` | Structural debt/classes and, for plans, external claims are clear |
 | `CONVERGENCE: BLOCKED` | The named phase, debt, class, claim, format, or state condition still blocks |
 | `STRUCTURAL-ERROR` / `STRUCTURAL-PENDING` | A bounded format/deadline path did not produce a settled review |

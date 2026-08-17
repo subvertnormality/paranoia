@@ -521,16 +521,18 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
     """
     draft = copy_lineage(lineage)
     minted: list[str] = []
-    seen_sources: set[str] = set()
+    seen_sources: dict[str, str] = {}
     for t in register.transitions:
         if t.class_id in seen_sources:
-            # Two state changes against one class in a register have no defined order, and
-            # two SUPERSEDE ... WITH-* records would mint two live replacements for one
-            # retired class — quietly breaking the net-zero guarantee at the cap.
-            raise RegisterError(
-                f"more than one transition against class {t.class_id} in a single register"
-            )
-        seen_sources.add(t.class_id)
+            # Protocol v2 defines one narrow composite: a model-owned severity
+            # change followed by the server-derived lifecycle transition.  All
+            # other repeated targets remain ambiguous and are rejected atomically.
+            previous = seen_sources[t.class_id]
+            if previous != "RECLASSIFY" or t.kind not in {"CLOSED", "REOPEN"}:
+                raise RegisterError(
+                    f"more than one transition against class {t.class_id} in a single register"
+                )
+        seen_sources[t.class_id] = t.kind
         _apply_transition(draft, t, round_no=round_no, minted=minted)
     for nc in register.new_classes:
         if len(draft.active()) >= MAX_ACTIVE_CLASSES:
