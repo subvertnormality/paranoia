@@ -924,7 +924,9 @@ The staged structural review did not complete settlement. No durable structural 
 ```
 
 If settlement was computed but its durable write could not be confirmed, the lifecycle sentence
-says exactly that instead. The diagnostic is bounded and the result never emits `Nothing notable.`
+says exactly that instead. The diagnostic is bounded and indented as inert code, and the result
+never emits `Nothing notable.` `STRUCTURAL-ERROR` encodes line breaks and controls as JSON string
+content on one trailer line, so retained provider text cannot create a heading or convergence row.
 
 ### Tracked convergence trailer
 

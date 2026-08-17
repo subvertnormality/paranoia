@@ -7,6 +7,7 @@ tracked class received one coherent, durable disposition before state can clear.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
@@ -65,6 +66,18 @@ def bounded_diagnostic(text: str, cap: int) -> str:
     return text[:half] + marker + text[-(cap - len(marker) - half):]
 
 
+def rendered_diagnostic(text: str) -> str:
+    """Render untrusted diagnostics as an inert indented Markdown code block."""
+    bounded = bounded_diagnostic(text, sp.MAX_ISSUE_CHARS)
+    lines = bounded.splitlines() or [""]
+    return "\n".join(f"    {line}" for line in lines)
+
+
+def trailer_diagnostic(text: Any) -> str:
+    """Encode a diagnostic as JSON string content on exactly one trailer line."""
+    return json.dumps(str(text), ensure_ascii=True)[1:-1]
+
+
 def rejected_payload(
     role: str, text: str, *, sequence: int | None = None,
     validation_issue: str | None = None,
@@ -97,7 +110,7 @@ def rejected_payload(
 
 
 def render_error_review(message: str, *, settlement_computed: bool = False) -> str:
-    safe = bounded_diagnostic(str(message), sp.MAX_ISSUE_CHARS)
+    safe = rendered_diagnostic(str(message))
     lifecycle = (
         "A structural settlement was computed, but durable persistence could not be confirmed."
         if settlement_computed else "The staged structural review did not complete settlement."
@@ -300,22 +313,22 @@ def trailer(state: dict[str, Any]) -> str:
             role = failure.get("role", "unknown")
             kind = failure.get("kind", "unknown")
             message = failure.get("message", "staged review failed")
-            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-ERROR: {trailer_diagnostic(message)}")
             lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
             lines.append(f"CONVERGENCE: BLOCKED — staged {kind} failure did not settle.")
         else:
             # Version-1 state written before structured failure metadata.
-            lines.append(f"STRUCTURAL-ERROR: {failure}")
+            lines.append(f"STRUCTURAL-ERROR: {trailer_diagnostic(failure)}")
             lines.append("CONVERGENCE: BLOCKED — staged failure did not settle.")
     elif validation_debt:
         if isinstance(validation_debt, dict):
             role = validation_debt.get("role", "consolidation-validation-retry")
             kind = validation_debt.get("kind", "validation")
             message = validation_debt.get("message", "settlement validation rejected")
-            lines.append(f"STRUCTURAL-ERROR: {message}")
+            lines.append(f"STRUCTURAL-ERROR: {trailer_diagnostic(message)}")
             lines.append(f"STRUCTURAL-FAILURE: role={role} kind={kind}")
         else:
-            lines.append(f"STRUCTURAL-ERROR: {validation_debt}")
+            lines.append(f"STRUCTURAL-ERROR: {trailer_diagnostic(validation_debt)}")
         lines.append("CONVERGENCE: BLOCKED — staged validation debt remains open.")
     elif state.get("unbound_class_ids"):
         lines.append("CONVERGENCE: BLOCKED — class closure remains open.")
