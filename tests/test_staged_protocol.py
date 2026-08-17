@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 
 from paranoia_local import class_closure as cc
 from paranoia_local import engines
+from paranoia_local import handlers
 from paranoia_local import prompts
 from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
@@ -322,6 +323,58 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     assert 0 < artifact["timing"]["call_elapsed_seconds"] <= artifact["timing"][
         "handler_elapsed_seconds"
     ]
+
+    prompt_replay = artifact["prompt_replay"]
+    tracked = {
+        row["class_id"]:cc.TrackedClass(
+            class_id=row["class_id"], invariant=row["invariant"],
+            severity=row["severity"], first_round=row["first_round"],
+            status=row["status"], procedure=row["procedure"],
+        ) for row in unpack("persisted_lineage")["classes"]
+    }
+    prompt_state = dict(unpack("persisted_lineage")["review_state"])
+    prompt_state.update(
+        phase="correction", debt=preconditions["durable_debt"], last_round=1,
+        snapshot_digest=prompt_replay["prior_snapshot_digest"],
+    )
+    prior_debt = prompt_state["debt"][0]
+    prompt_state["debt"] = [{
+        "id":prior_debt["id"], "finding_id":prior_debt["finding_id"],
+        "status":prior_debt["status"], "severity":prior_debt["severity"],
+        "summary":prior_debt["summary"],
+        "evidence":prompt_replay["prior_debt_evidence"],
+        "remedy":prior_debt["remedy"], "source_ids":prior_debt["source_ids"],
+        "class_ids":prior_debt["class_ids"], "first_round":1, "last_round":1,
+    }]
+    state_root = tmp_path / "prompt-state"
+    cc.save_lineage(state_root, cc.Lineage(
+        lineage_id="evidence-citation-shape-code-20260817",
+        mode=cc.BRANCH_MODE, rounds=2, next_seq=3, classes=tracked,
+        review_state=prompt_state,
+    ))
+    captured = {}
+    engine = engines.CodexEngine()
+
+    def capture(prompt, *args, response_schema=None, **kwargs):
+        captured["prompt"] = prompt
+        return engines.Review(
+            text=response, raw=response, returncode=0,
+            session_ref=artifact["run"]["session_ref"],
+        )
+
+    engine.run = capture
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
+        handlers.critique_branch({
+            "repo_path":str(ROOT), "base_ref":"main", "head_ref":head_id,
+            "lineage":"evidence-citation-shape-code-20260817", "round":3,
+            "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
+            "converge":True, "class_closure":True,
+            "stakes":unpack("persisted_lineage")["review_state"]["stakes"],
+        }, engine=engine, log_dir=tmp_path / "prompt-logs")
+    prompt_bytes = captured["prompt"].encode("utf-8", "surrogatepass")
+    assert len(captured["prompt"]) == prompt_replay["chars"]
+    assert hashlib.sha256(prompt_bytes).hexdigest() == prompt_replay["sha256"]
 
     persisted = unpack("persisted_lineage")
     prior_state = dict(persisted["review_state"])

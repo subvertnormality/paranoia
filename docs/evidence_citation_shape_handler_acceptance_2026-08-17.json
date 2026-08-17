@@ -8,6 +8,18 @@
     "gzip_base64": "H4sIAAAAAAACA51QQW6EMAz8SuUzICchIfAZFBIHkNiEJrCttNq/N6za2556seTxeDyeB5jjoNt+jJk+TwqWYGAV3KKjbbRmKyWe4XiBe4r31VGC4QF2W8c7pbzGAAPYQv+uC/aBDWvbRkEF5H1MZRGWdV6uPsxroD8y/N4o/bwftWxUneNW0C+aihWT7AKDN1umZwWJ8h5DpjEvhktVdoSzkk9CM47eS9XaXhmpJmmR0HKFkzSKLLNao9XU98Ig0xO2U+eVM9rDJXqcKVxmYMAKMuXrmTGRL/rIDBYpXuvOmrrzUtQajaondCiUYAI9FY1jva1hvvJ4m+IrP9rMnsmViY3BZRg0azrRVrCY4DZKbwi8UT3/l6Xn8wftVfKq0QEAAA==",
     "sha256": "3eb1c6ecaa969f8ace6169f6fdbb58a5e73f38804f945fe8d646bf8713cfd4e3"
   },
+  "prompt_replay": {
+    "chars": 410642,
+    "sha256": "489301dab5a62ee717240c488da944d3634360441ec2841f6fa046a5911bfeec",
+    "prior_snapshot_digest": "a02523bed9108fd174f9bb535878d171ee4feeedc34a89ff35d4ffe1fbe2b3ac",
+    "prior_debt_evidence": [
+      "repository/AGENTS.md:31-32",
+      "repository/AGENTS.md:312-320",
+      "repository/docs/evidence_citation_shape_plan.md:88-92",
+      "repository/docs/evidence_citation_shape_acceptance_2026-08-17.json:1-46",
+      "repository/tests/test_staged_protocol.py:208-231"
+    ]
+  },
   "largest_production_module_lines": [
     {"lines": 2991, "path": "src/paranoia_local/arbitrate_handler.py"},
     {"lines": 2902, "path": "src/paranoia_local/handlers.py"},
