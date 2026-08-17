@@ -43,11 +43,15 @@ def test_census_cache_requires_every_exact_binding():
         active_classes=[], existing_debt=[], engine_name="codex", model="model",
         effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
     )
+    assert binding["version"] == 3
     state = {"census_cache":{**binding, "manifests":manifests}}
 
     def validate(text, lane_name):
         try:
-            return sp.parse_lane(text, mode=cc.PLAN_MODE, lane=lane_name)
+            value = sp.decode_canonical_lane(
+                text, mode=cc.PLAN_MODE, lane=lane_name,
+            )
+            return sp.validate_lane_value(value, lane=lane_name)
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
 
@@ -142,6 +146,29 @@ def assert_five_headings(text):
     assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
 
 
+def wire_value(value):
+    value = json.loads(json.dumps(value))
+
+    def visit(node):
+        if isinstance(node, dict):
+            for key, child in node.items():
+                if key == "evidence":
+                    node[key] = [
+                        item if isinstance(item, dict) else {
+                            "anchor":item, "rationale":"fixture evidence",
+                        }
+                        for item in child
+                    ]
+                else:
+                    visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(value)
+    return value
+
+
 def lane(lane="domain", findings=None, assessments=None):
     findings = findings or []
     coverage = [
@@ -152,7 +179,7 @@ def lane(lane="domain", findings=None, assessments=None):
         coverage[0].update(
             status="finding", finding_ids=[item["id"] for item in findings],
         )
-    return json.dumps({
+    return wire({
         "lane": lane,
         "coverage": coverage,
         "findings": findings, "class_assessments": assessments or [],
@@ -176,23 +203,20 @@ def settlement(**overrides):
         "debt_outcomes": [], "class_actions": [],
     }
     value.update(overrides)
-    return json.dumps(value)
+    return wire(value)
 
 
 def payload(text):
-    return json.loads(text)
+    return sp.project_citations(json.loads(text))
 
 
 def wire(value):
-    return json.dumps(value)
+    return json.dumps(wire_value(value))
 
 
 def parse_decision(text, *, role="census"):
     try:
-        return sp.decode(
-            text, sp.decision_schema(cc.PLAN_MODE, role),
-            max_chars=sp.MAX_DECISION_RESPONSE_CHARS,
-        )
+        return sp.decode_decision(text, mode=cc.PLAN_MODE, role=role)
     except sp.ProtocolError as exc:
         raise rc.CensusError(str(exc)) from exc
 
@@ -323,7 +347,9 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
         "governing_findings":[
             {
                 "id":"G1", "severity":"MAJOR", "summary":"new defect",
-                "evidence":["repository/missing.py:1"], "remedy":"repair it",
+                "evidence":[
+                    "repository/missing.py:1", "repository/missing.py:1",
+                ], "remedy":"repair it",
                 "classification":{"kind":"one_off", "reason":"one site"},
             },
             {
@@ -376,6 +402,8 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
         )
     message = str(caught.value)
     assert "/debt_outcomes: must update every supplied open debt" in message
+    assert "/governing_findings/0/evidence:" in message
+    assert "has non-unique elements" in message
     assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
     assert "/: invalid combined class actions for 'class-0'" in message
     assert "/: invalid combined new-class set" in message

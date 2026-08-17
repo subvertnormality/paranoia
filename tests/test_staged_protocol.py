@@ -20,6 +20,45 @@ from paranoia_local import staged_protocol as sp
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def wire_value(value):
+    value = deepcopy(value)
+
+    def visit(node):
+        if isinstance(node, dict):
+            for key, child in node.items():
+                if key == "evidence":
+                    node[key] = [
+                        item if isinstance(item, dict) else {
+                            "anchor":item, "rationale":"fixture evidence",
+                        }
+                        for item in child
+                    ]
+                else:
+                    visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(value)
+    return value
+
+
+def wire(value):
+    return json.dumps(wire_value(value))
+
+
+def has_legacy_string_evidence(value):
+    if isinstance(value, dict):
+        return any(
+            key == "evidence" and any(isinstance(item, str) for item in child)
+            or has_legacy_string_evidence(child)
+            for key, child in value.items()
+        )
+    if isinstance(value, list):
+        return any(has_legacy_string_evidence(child) for child in value)
+    return False
+
+
 def coverage(*finding_ids: str, anchor: str = "plan:1"):
     rows = [
         {
@@ -125,9 +164,118 @@ def durable_debt(
 
 def materialize(value, **kwargs):
     return sp.materialize_decision(
-        json.dumps(value), mode=kwargs.pop("mode", cc.PLAN_MODE),
+        wire(value), mode=kwargs.pop("mode", cc.PLAN_MODE),
         role=value["role"], **kwargs,
     )
+
+
+def test_wire_citations_are_closed_and_project_exactly_to_canonical_anchors():
+    value = wire_value(lane_value())
+    value["coverage"][0]["evidence"] = [{
+        "anchor": "plan:1-2", "rationale": "the two lines establish the claim",
+    }]
+    decoded = sp.decode_lane(
+        json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
+    )
+    assert decoded["coverage"][0]["evidence"] == ["plan:1-2"]
+
+    for citation in (
+        "plan:1",
+        {"anchor":"plan:1 because it proves the claim", "rationale":"why"},
+        {"anchor":"plan:1, repository/a.py:2", "rationale":"why"},
+        {"anchor":"plan:1", "rationale":"why", "comment":"extra"},
+    ):
+        invalid = wire_value(lane_value())
+        invalid["coverage"][0]["evidence"] = [citation]
+        with pytest.raises(sp.ProtocolError):
+            sp.decode_lane(
+                json.dumps(invalid), mode=cc.PLAN_MODE, lane="domain",
+            )
+
+
+def test_model_citation_instructions_name_closed_shape_and_mode_anchors():
+    plan = sp.citation_instructions(cc.PLAN_MODE)
+    branch = sp.citation_instructions(cc.BRANCH_MODE)
+    for text in (plan, branch):
+        assert "exactly a closed" in text
+        assert '"anchor"' in text and '"rationale"' in text
+        assert "bare citation" in text
+        assert "never join citations" in text
+    assert "plan:<line-or-range>" in plan
+    assert "plan:<line-or-range>" not in branch
+
+
+def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
+    value = wire_value(lane_value())
+    value["coverage"][0]["evidence"] = [
+        {"anchor":"plan:1", "rationale":"first reason"},
+        {"anchor":"plan:1", "rationale":"different reason"},
+    ]
+    decoded, issues = sp.decode_lane_with_issues(
+        json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
+    )
+    assert decoded["coverage"][0]["evidence"] == ["plan:1", "plan:1"]
+    assert len(issues) == 1
+    assert issues[0].startswith("/coverage/0/evidence:")
+    assert "has non-unique elements" in issues[0]
+
+
+@pytest.mark.parametrize("length, valid", [(500, True), (501, False)])
+def test_citation_rationale_bound_applies_to_every_evidence_shape(length, valid):
+    rationale = "r" * length
+    lane_finding = finding()
+    lane_finding.pop("classification")
+    lane = wire_value(lane_value(findings=[lane_finding]))
+    lane["coverage"][0]["evidence"][0]["rationale"] = rationale
+    lane["findings"][0]["evidence"][0]["rationale"] = rationale
+
+    census_finding = finding(source_ids=["domain:G1"])
+    census = wire_value(decision("census", governing_findings=[census_finding]))
+    census["governing_findings"][0]["evidence"][0]["rationale"] = rationale
+
+    correction = wire_value(decision(
+        "correction",
+        debt_outcomes=[{
+            "debt_id":"D1", "status":"open", "reason":"still open",
+            "evidence":["plan:1"],
+        }],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated",
+            "basis":{"kind":"new_finding", "finding_id":"G1"},
+            "evidence":["plan:1"],
+        }],
+    ))
+    correction["debt_outcomes"][0]["evidence"][0]["rationale"] = rationale
+    correction["class_outcomes"][0]["evidence"][0]["rationale"] = rationale
+
+    final = wire_value(decision("final"))
+    final["coverage"][0]["evidence"][0]["rationale"] = rationale
+
+    cases = [
+        (lane, sp.lane_schema(cc.PLAN_MODE, "domain")),
+        (census, sp.decision_schema(cc.PLAN_MODE, "census")),
+        (correction, sp.decision_schema(cc.PLAN_MODE, "correction")),
+        (final, sp.decision_schema(cc.PLAN_MODE, "final")),
+    ]
+    assert all(Draft202012Validator(schema).is_valid(value) for value, schema in cases) is valid
+
+
+def test_two_hundred_maximum_rationales_fit_the_lane_response_cap():
+    findings = [finding("G1"), finding("G2")]
+    for row in findings:
+        row.pop("classification")
+    value = wire_value(lane_value(findings=findings))
+    citations = [
+        {"anchor":f"plan:{index}", "rationale":"r" * sp.MAX_RATIONALE_CHARS}
+        for index in range(1, 101)
+    ]
+    for row in value["findings"]:
+        row["evidence"] = deepcopy(citations)
+    text = json.dumps(value, separators=(",", ":"))
+    assert len(text) < sp.MAX_LANE_RESPONSE_CHARS
+    assert Draft202012Validator(
+        sp.lane_schema(cc.PLAN_MODE, "domain")
+    ).is_valid(value)
 
 
 def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle():
@@ -148,7 +296,9 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         },
     }
     for probe in artifact["lane_probes"]:
-        schema = sp.provider_schema(sp.lane_schema(probe["mode"], probe["lane"]))
+        schema = sp.provider_schema(sp.lane_schema(
+            probe["mode"], probe["lane"], canonical=True,
+        ))
         assert hashlib.sha256(
             sp.canonical_schema(schema).encode("utf-8")
         ).hexdigest() == probe["schema_sha256"]
@@ -158,19 +308,27 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
             "response_sha256"
         ]
-        assert sp.parse_lane(
-            rendered, mode=probe["mode"], lane=probe["lane"],
+        legacy = sp.decode(
+            rendered,
+            sp.lane_schema(probe["mode"], probe["lane"], canonical=True),
+            max_chars=sp.MAX_LANE_RESPONSE_CHARS,
+        )
+        assert sp.validate_lane_value(
+            legacy, lane=probe["lane"],
         ) == probe["response"]
+        with pytest.raises(sp.ProtocolError):
+            sp.decode_lane(rendered, mode=probe["mode"], lane=probe["lane"])
     for probe in artifact["schema_probes"]:
         role = probe["role"]
-        schema = sp.decision_schema(cc.PLAN_MODE, role)
+        schema = sp.decision_schema(cc.PLAN_MODE, role, canonical=True)
         if role == "census":
             # The retained artifact proves the shipped pre-cutover schema. Keep
             # that representation test-only; production accepts only the current
             # deterministic census contract.
             schema = deepcopy(schema)
             schema["properties"]["class_outcomes"] = sp._array(  # noqa: SLF001
-                sp._class_outcome(), maximum=sp.MAX_ACTIVE_CLASSES,  # noqa: SLF001
+                sp._class_outcome(canonical=True),  # noqa: SLF001
+                maximum=sp.MAX_ACTIVE_CLASSES,
             )
             schema["required"].insert(3, "class_outcomes")
         schema = sp.provider_schema(schema)
@@ -183,15 +341,13 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
         assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
             "response_sha256"
         ]
-        if role == "census":
-            assert not list(Draft202012Validator(schema).iter_errors(probe["response"]))
-            assert sp.materialize_decision_value(
-                probe["response"], mode=cc.PLAN_MODE, role=role,
-            )["role"] == role
-        else:
-            assert sp.materialize_decision(
-                rendered, mode=cc.PLAN_MODE, role=role,
-            )["role"] == role
+        assert not list(Draft202012Validator(schema).iter_errors(probe["response"]))
+        assert sp.materialize_decision_value(
+            probe["response"], mode=cc.PLAN_MODE, role=role,
+        )["role"] == role
+        if has_legacy_string_evidence(probe["response"]):
+            with pytest.raises(sp.ProtocolError):
+                sp.decode_decision(rendered, mode=cc.PLAN_MODE, role=role)
         assert re.fullmatch(r"[0-9a-f]{64}", probe["schema_sha256"])
         assert re.fullmatch(r"[0-9a-f]{64}", probe["response_sha256"])
     assert artifact["schema_probes"][1]["attempts"] == [
@@ -239,7 +395,7 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
     assert artifact["acceptance_kind"] == (
         "derived-census-class-outcomes-provider-acceptance"
     )
-    schema = sp.provider_schema(sp.decision_schema(cc.PLAN_MODE, "census"))
+    schema = artifact["schema"]
     assert artifact["schema"] == schema
     assert hashlib.sha256(
         sp.canonical_schema(schema).encode("utf-8")
@@ -302,7 +458,9 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
         assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == (
             probe["response_sha256"]
         )
-        decoded = sp.decode_decision(rendered, mode=cc.PLAN_MODE, role="census")
+        decoded = sp.decode(
+            rendered, schema, max_chars=sp.MAX_DECISION_RESPONSE_CHARS,
+        )
         materialized = sp.materialize_decision_value(
             decoded, mode=cc.PLAN_MODE, role="census", **server_inputs,
         )
@@ -310,6 +468,9 @@ def test_derived_census_provider_acceptance_replays_exact_responses():
             probe["materialized_class_assessments"]
         )
         assert materialized["class_records"] == probe["materialized_class_records"]
+        if has_legacy_string_evidence(response):
+            with pytest.raises(sp.ProtocolError):
+                sp.decode_decision(rendered, mode=cc.PLAN_MODE, role="census")
 
 
 def test_derived_census_authenticated_material_recomputes_every_digest():
@@ -417,7 +578,7 @@ def test_every_role_schema_is_closed_and_draft_valid():
 
 def test_role_schemas_reject_cross_role_payloads():
     for role in ("census", "correction", "final"):
-        raw = decision(role)
+        raw = wire_value(decision(role))
         for other in ("census", "correction", "final"):
             issues = list(Draft202012Validator(sp.decision_schema("plan", other)).iter_errors(raw))
             assert bool(issues) is (role != other)
@@ -463,7 +624,7 @@ def test_semantic_strings_require_non_whitespace(mutate):
     }])
     mutate(value)
     with pytest.raises(sp.ProtocolError, match="does not match"):
-        sp.parse_lane(json.dumps(value), mode="plan", lane="domain")
+        sp.parse_lane(wire(value), mode="plan", lane="domain")
 
 
 def test_role_specific_response_caps_fail_before_json_decode():
@@ -519,8 +680,10 @@ def test_decision_semantic_strings_require_non_whitespace(field):
     ],
 )
 def test_provider_schema_constrains_each_evidence_item_to_one_anchor(anchor, valid):
-    value = lane_value()
-    value["coverage"][0]["evidence"] = [anchor]
+    value = wire_value(lane_value())
+    value["coverage"][0]["evidence"] = [{
+        "anchor":anchor, "rationale":"why this supports the row",
+    }]
     issues = list(Draft202012Validator(sp.lane_schema("plan", "domain")).iter_errors(value))
     assert (not issues) is valid
 
@@ -529,7 +692,7 @@ def test_lane_dynamic_completeness_and_binding():
     value = lane_value()
     value["coverage"].pop()
     with pytest.raises(sp.ProtocolError, match="/coverage"):
-        sp.parse_lane(json.dumps(value), mode="plan", lane="domain")
+        sp.parse_lane(wire(value), mode="plan", lane="domain")
 
     value = lane_value(findings=[{
         "id": "F1", "severity": "MAJOR", "summary": "broken",
@@ -537,7 +700,7 @@ def test_lane_dynamic_completeness_and_binding():
     }])
     value["coverage"][0].update(status="covered", finding_ids=[])
     with pytest.raises(sp.ProtocolError, match="bound to coverage"):
-        sp.parse_lane(json.dumps(value), mode="plan", lane="domain")
+        sp.parse_lane(wire(value), mode="plan", lane="domain")
 
 
 def test_census_materializes_one_off_and_canonical_debt_id():
@@ -1253,7 +1416,7 @@ def test_census_schema_represents_full_three_lane_aggregate_and_fanout():
         )
         for index in range(sp.MAX_ACTIVE_CLASSES)
     )
-    value = decision("census", governing_findings=findings)
+    value = wire_value(decision("census", governing_findings=findings))
     assert not list(
         Draft202012Validator(sp.decision_schema("branch", "census")).iter_errors(value)
     )
@@ -1327,7 +1490,7 @@ def test_unpaired_surrogates_are_rejected_at_the_model_owned_pointer(surrogate):
         match=r"/coverage/0/summary: string contains an unpaired surrogate",
     ):
         sp.parse_lane(
-            json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
+            wire(value), mode=cc.PLAN_MODE, lane="domain",
         )
 
 
@@ -1355,7 +1518,7 @@ def test_duplicate_assessment_diagnostics_bind_the_retained_first_row():
     )
     with pytest.raises(sp.ProtocolError) as caught:
         sp.parse_lane(
-            json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+            wire(value), mode=cc.PLAN_MODE, lane="integrity",
             class_ids=["class-a"],
         )
     assert str(caught.value).splitlines() == [
@@ -1374,12 +1537,12 @@ def test_integrity_lane_rejects_satisfied_unproven_mechanized_class():
         match=r"/class_assessments/0/verdict: satisfied cannot close an unproven mechanized class",
     ):
         sp.parse_lane(
-            json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+            wire(value), mode=cc.PLAN_MODE, lane="integrity",
             active_classes=[active_class(mechanized=True)],
         )
 
     assert sp.parse_lane(
-        json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+        wire(value), mode=cc.PLAN_MODE, lane="integrity",
         active_classes=[active_class(status=cc.CLOSED, mechanized=True)],
     ) == value
 
@@ -1390,7 +1553,7 @@ def test_integrity_lane_requires_every_active_class_assessment():
         match="must assess every required active class exactly once",
     ):
         sp.parse_lane(
-            json.dumps(lane_value("integrity")),
+            wire(lane_value("integrity")),
             mode=cc.PLAN_MODE, lane="integrity",
             active_classes=[active_class()],
         )

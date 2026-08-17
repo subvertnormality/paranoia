@@ -1,6 +1,9 @@
-# Evidence citation shape plan
+# Evidence citation shape design
 
 ## Status and scope
+
+Implemented on the issue #38 branch. This document records the converged design and its bounded
+acceptance claims.
 
 Issue #38 is current under Protocol v2: model responses still append rationale prose or join
 multiple citations inside an `evidence` string, and both the initial response and its bounded retry

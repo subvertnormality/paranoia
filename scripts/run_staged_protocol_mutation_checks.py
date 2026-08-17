@@ -69,14 +69,14 @@ MUTATIONS = (
     ),
     (
         "standalone-action",
-        '{"close", "reclassify", "replace"}',
-        '{"close"}',
+        'elif action["kind"] not in {"close", "replace"}:',
+        'elif action["kind"] not in {"close"}:',
         "test_satisfied_open_class_preserves_compatible_standalone_action",
     ),
     (
         "derived-close",
-        "if action is None:\n                actions[cid] = {\"kind\": \"close\", \"class_id\": cid}",
-        "if False:\n                actions[cid] = {\"kind\": \"close\", \"class_id\": cid}",
+        'if action is None or action["kind"] == "reclassify":\n                derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,',
+        'if False:\n                derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,',
         "test_satisfied_open_unmechanized_class_derives_close",
     ),
     (
@@ -123,6 +123,39 @@ MUTATIONS = (
     ),
 )
 
+CROSS_MODULE_MUTATIONS = (
+    (
+        SOURCE, TEST, "citation-closed-wire-shape",
+        '"rationale": _string(MAX_RATIONALE_CHARS),',
+        '"rationale": {},',
+        "test_citation_rationale_bound_applies_to_every_evidence_shape",
+    ),
+    (
+        SOURCE, TEST, "citation-exact-projection",
+        'node[key] = [citation["anchor"] for citation in child]',
+        'node[key] = [citation["rationale"] for citation in child]',
+        "test_wire_citations_are_closed_and_project_exactly_to_canonical_anchors",
+    ),
+    (
+        SOURCE, TEST, "canonical-citation-uniqueness",
+        'maximum=100, minimum=1, unique=canonical,',
+        'maximum=100, minimum=1, unique=False,',
+        "test_duplicate_wire_citations_reach_canonical_aggregate_validation",
+    ),
+    (
+        SOURCE, "tests/test_review_census.py", "canonical-cache-shape",
+        'text, lane_schema(mode, lane, canonical=True),',
+        'text, lane_schema(mode, lane),',
+        "test_census_cache_requires_every_exact_binding",
+    ),
+    (
+        ROOT / "src" / "paranoia_local" / "review_census.py",
+        "tests/test_review_census.py", "citation-cache-version",
+        "CENSUS_CACHE_VERSION = 3", "CENSUS_CACHE_VERSION = 2",
+        "test_census_cache_requires_every_exact_binding",
+    ),
+)
+
 
 def main() -> int:
     differential = subprocess.run(
@@ -141,16 +174,20 @@ def main() -> int:
         f"Historical V1/V2 differential gate passed for "
         f"{len(DIFFERENTIAL_TESTS)} role/shape groups."
     )
-    original = SOURCE.read_text(encoding="utf-8")
+    mutations = [
+        (SOURCE, TEST, name, before, after, test_name)
+        for name, before, after, test_name in MUTATIONS
+    ] + list(CROSS_MODULE_MUTATIONS)
     failures: list[str] = []
-    for name, before, after, test_name in MUTATIONS:
+    for source, test, name, before, after, test_name in mutations:
+        original = source.read_text(encoding="utf-8")
         if original.count(before) != 1:
             failures.append(f"{name}: source target count is {original.count(before)}, expected 1")
             continue
         with TemporaryDirectory(prefix=f"paranoia-mutant-{name}-") as directory:
             package_root = Path(directory)
             shutil.copytree(ROOT / "src" / "paranoia_local", package_root / "paranoia_local")
-            target = package_root / "paranoia_local" / "staged_protocol.py"
+            target = package_root / "paranoia_local" / source.name
             target.write_text(original.replace(before, after), encoding="utf-8")
             env = dict(os.environ)
             env["PYTHONPATH"] = os.pathsep.join((
@@ -159,7 +196,7 @@ def main() -> int:
             completed = subprocess.run(
                 [
                     sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
-                    f"{ROOT / TEST}::{test_name}",
+                    f"{ROOT / test}::{test_name}",
                 ],
                 cwd=ROOT, env=env, capture_output=True, text=True, check=False,
             )
@@ -170,7 +207,7 @@ def main() -> int:
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
-    print(f"All {len(MUTATIONS)} owned Protocol v2 mutants were killed.")
+    print(f"All {len(mutations)} owned Protocol v2 mutants were killed.")
     return 0
 
 
