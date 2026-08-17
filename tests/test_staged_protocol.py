@@ -205,11 +205,11 @@ def test_model_citation_instructions_name_closed_shape_and_mode_anchors():
     assert "plan:<line-or-range>" not in branch
 
 
-def test_live_provider_citation_acceptance_is_bound_and_replays():
+def test_live_provider_citation_probe_is_bound_and_replays():
     artifact = json.loads(
         (ROOT / "docs/evidence_citation_shape_acceptance_2026-08-17.json").read_text()
     )
-    assert artifact["acceptance_kind"] == "staged-evidence-citation-live-provider"
+    assert artifact["acceptance_kind"] == "staged-evidence-citation-provider-probe"
     assert artifact["version"] == 1
     assert artifact["call_count"] == 1
     assert hashlib.sha256(artifact["prompt"].encode()).hexdigest() == artifact[
@@ -301,6 +301,25 @@ def test_two_hundred_maximum_rationales_fit_the_lane_response_cap():
     assert len(text) < sp.MAX_LANE_RESPONSE_CHARS
     assert Draft202012Validator(
         sp.lane_schema(cc.PLAN_MODE, "domain")
+    ).is_valid(value)
+
+
+def test_two_hundred_maximum_rationales_fit_the_decision_response_cap():
+    findings = [
+        finding("G1", source_ids=["domain:F1"]),
+        finding("G2", source_ids=["execution:F2"]),
+    ]
+    value = wire_value(decision("census", governing_findings=findings))
+    citations = [
+        {"anchor":f"plan:{index}", "rationale":"r" * sp.MAX_RATIONALE_CHARS}
+        for index in range(1, 101)
+    ]
+    for row in value["governing_findings"]:
+        row["evidence"] = deepcopy(citations)
+    text = json.dumps(value, separators=(",", ":"))
+    assert len(text) < sp.MAX_DECISION_RESPONSE_CHARS
+    assert Draft202012Validator(
+        sp.decision_schema(cc.PLAN_MODE, "census")
     ).is_valid(value)
 
 

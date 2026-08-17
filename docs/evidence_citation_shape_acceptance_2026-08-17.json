@@ -1,5 +1,5 @@
 {
-  "acceptance_kind": "staged-evidence-citation-live-provider",
+  "acceptance_kind": "staged-evidence-citation-provider-probe",
   "call_count": 1,
   "canonical_projection": {
     "class_assessments": [],
@@ -32,12 +32,13 @@
   "schema_sha256": "5f1e3ad433bc7e0cf5b44d7ca097dc2666a8c4f13d6f1e5ba10385bbe5f9a5f5",
   "scope": {
     "does_not_prove": [
+      "the production staged handler, canonical settlement, or durable lineage persistence",
       "that every future provider response follows the schema without the existing bounded retry",
       "semantic entailment beyond successful resolution of the cited repository line",
       "provider service identity beyond the recorded local CLI version and configured model name"
     ],
     "proves": [
-      "one signed-in Codex structured-output call accepted the closed citation-object wire schema",
+      "one signed-in Codex structured-output probe accepted the closed citation-object wire schema",
       "the production decoder projected each returned citation to the exact canonical anchor",
       "the production resolver resolved every projected anchor against the reviewed checkout"
     ]

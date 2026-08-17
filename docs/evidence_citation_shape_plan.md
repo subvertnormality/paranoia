@@ -121,9 +121,10 @@ the mandatory mutation command runs before merge.
 - Historical acceptance tests replay stored old response values when they exist, bind their hashes
   to the explicit canonical/legacy schema mode, and keep hash/projection-only records explicitly
   hash-only. Production rejects all legacy strings. The dated
-  `evidence_citation_shape_acceptance_2026-08-17.json` artifact binds one live Codex call's exact
-  prompt, schema, raw reply, canonical projection, and successful production anchor resolution; it
-  does not claim future provider compliance or semantic entailment.
+  `evidence_citation_shape_acceptance_2026-08-17.json` provider-probe artifact binds one live Codex
+  call's exact prompt, schema, raw reply, canonical projection, and successful production anchor
+  resolution. It does not claim the production handler/settlement/persistence seam, future provider
+  compliance, or semantic entailment; a separate handler acceptance record is required before merge.
 - Every evidence-bearing wire shape accepts a 500-character rationale and rejects 501 characters.
   Valid lane and decision packets with 200 maximum-length rationales remain below their respective
   240,000- and 1,000,000-character raw-response caps.
