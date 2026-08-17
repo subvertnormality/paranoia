@@ -237,8 +237,20 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     )
     assert artifact["acceptance_kind"] == "staged-evidence-citation-handler-lifecycle"
     assert artifact["version"] == 1
+    assert artifact["provider"] == {
+        "engine":"codex", "cli_version":"codex-cli 0.144.6",
+        "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
+    }
+    assert set(artifact["run"]) == {
+        "base_id", "head_id", "round", "model_call_count", "returncode",
+        "session_ref", "call_elapsed_seconds", "elapsed_seconds",
+    }
     assert artifact["run"]["model_call_count"] == 1
     assert artifact["run"]["returncode"] == 0
+    assert artifact["run"]["round"] == 3
+    assert 0 < artifact["run"]["call_elapsed_seconds"] <= artifact["run"][
+        "elapsed_seconds"
+    ]
 
     def unpack(name):
         record = artifact[name]
@@ -271,6 +283,8 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     assert ledger[0]["outcome"] == "completed"
     assert ledger[0]["session_ref"] == artifact["run"]["session_ref"]
     assert ledger[0]["response_sha256"] == artifact["response_sha256"]
+    assert ledger[0]["returncode"] is None
+    assert ledger[0]["validation_issue"] is None
 
     persisted = unpack("persisted_lineage")
     prior_state = dict(persisted["review_state"])
@@ -286,9 +300,16 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
         debt.pop("class_record_indexes", None)
     assert replayed == persisted["review_state"]
 
+    base_id = artifact["run"]["base_id"]
+    head_id = artifact["run"]["head_id"]
+    for commit in (base_id, head_id):
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=ROOT, capture_output=True, check=True,
+        )
     rows = []
     for line in subprocess.run(
-        ["git", "diff", "--numstat", "main...HEAD", "--", "src"],
+        ["git", "diff", "--numstat", f"{base_id}...{head_id}", "--", "src"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout.splitlines():
         added, deleted, path = line.split("\t")
@@ -297,8 +318,13 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     assert sum(row["added"] for row in rows) == artifact["production_diff"]["total_added"]
     assert sum(row["deleted"] for row in rows) == artifact["production_diff"]["total_deleted"]
     assert artifact["changed_production_module_lines"] == sorted(
-        ({"path":row["path"], "lines":len((ROOT / row["path"]).read_text().splitlines())}
-         for row in rows),
+        ({
+            "path":row["path"],
+            "lines":len(subprocess.run(
+                ["git", "show", f"{head_id}:{row['path']}"], cwd=ROOT,
+                capture_output=True, text=True, check=True,
+            ).stdout.splitlines()),
+        } for row in rows),
         key=lambda row:(-row["lines"], row["path"]),
     )
 
