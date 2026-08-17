@@ -231,7 +231,7 @@ def test_live_provider_citation_probe_is_bound_and_replays():
     )
 
 
-def test_live_handler_citation_acceptance_replays_settlement_and_state():
+def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path):
     artifact = json.loads(
         (ROOT / "docs/evidence_citation_shape_handler_acceptance_2026-08-17.json").read_text()
     )
@@ -264,8 +264,33 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     decoded = sp.decode_decision(
         response, mode=cc.BRANCH_MODE, role="correction",
     )
+    head_id = artifact["run"]["head_id"]
+    snapshot_root = tmp_path / "repository"
+    snapshot_root.mkdir()
+    anchors = []
+
+    def collect(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "evidence":
+                    anchors.extend(value)
+                else:
+                    collect(value)
+        elif isinstance(node, list):
+            for value in node:
+                collect(value)
+
+    collect(decoded)
+    paths = {anchor.rpartition(":")[0].removeprefix("repository/") for anchor in anchors}
+    for relative in paths:
+        target = snapshot_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(subprocess.run(
+            ["git", "show", f"{head_id}:{relative}"], cwd=ROOT,
+            capture_output=True, check=True,
+        ).stdout)
     rc.resolve_anchors(
-        decoded, root=ROOT, trusted_roots={"repository":ROOT},
+        decoded, root=tmp_path, trusted_roots={"repository":snapshot_root},
     )
     preconditions = unpack("preconditions")
     settlement = sp.materialize_decision_value(
@@ -303,7 +328,6 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state():
     assert replayed == persisted["review_state"]
 
     base_id = artifact["run"]["base_id"]
-    head_id = artifact["run"]["head_id"]
     for commit in (base_id, head_id):
         subprocess.run(
             ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
