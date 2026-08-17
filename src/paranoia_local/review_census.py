@@ -19,6 +19,7 @@ MAX_CLASS_CONTEXT_CHARS = 64_000
 MAX_STAGED_PROMPT_CHARS = 5_000_000
 MAX_CONSOLIDATION_PROMPT_CHARS = 1_000_000
 MAX_REJECTED_PAYLOAD_CHARS = 12_000
+MAX_ENGINE_FAILURE_MESSAGE_CHARS = 4_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
 CENSUS_CACHE_VERSION = 2
 
@@ -45,6 +46,7 @@ class Attempt:
     failure_detail_excerpt: str | None = None
     stderr_sha256: str | None = None
     stderr_excerpt: str | None = None
+    validation_issue: str | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)
@@ -54,8 +56,18 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
 
 
+def bounded_diagnostic(text: str, cap: int) -> str:
+    """Bound diagnostic text while preserving both the governing head and tail."""
+    if len(text) <= cap:
+        return text
+    marker = "\n… [bounded diagnostic] …\n"
+    half = (cap - len(marker)) // 2
+    return text[:half] + marker + text[-(cap - len(marker) - half):]
+
+
 def rejected_payload(
     role: str, text: str, *, sequence: int | None = None,
+    validation_issue: str | None = None,
 ) -> dict[str, Any]:
     """Bound one rejected extracted reply; hash every string JSON can decode."""
     if len(text) <= MAX_REJECTED_PAYLOAD_CHARS:
@@ -67,7 +79,7 @@ def rejected_payload(
             + "\n… [bounded rejected staged output] …\n"
             + text[-half:]
         )
-    return {
+    row = {
         "role":role, "sequence":sequence,
         # Engine JSON extraction can legally produce unpaired surrogates.  This
         # diagnostic digest is deliberately separate from structural digest(),
@@ -77,17 +89,37 @@ def rejected_payload(
         ).hexdigest(),
         "excerpt":excerpt,
     }
+    if validation_issue is not None:
+        row["validation_issue"] = bounded_diagnostic(
+            validation_issue, sp.MAX_ISSUE_CHARS,
+        )
+    return row
 
 
-def render_error_review(message: str) -> str:
-    safe = str(message).replace("\r", " ").replace("\n", " ")
-    return "\n\n".join((
-        "## What works\n\nNothing notable.",
-        f"## What doesn't work\n\n{safe}",
-        "## Risks\n\nNothing notable.",
-        "## Gaps\n\nNothing notable.",
-        "## Improvements\n\nNothing notable.",
-    ))
+def render_error_review(message: str, *, settlement_computed: bool = False) -> str:
+    safe = bounded_diagnostic(str(message), sp.MAX_ISSUE_CHARS)
+    lifecycle = (
+        "A structural settlement was computed, but durable persistence could not be confirmed."
+        if settlement_computed else "The staged structural review did not complete settlement."
+    )
+    return (
+        "# STAGED REVIEW FAILED\n\n"
+        f"{lifecycle} No durable structural verdict is available.\n\n"
+        "## Diagnostic\n\n" + safe
+    )
+
+
+def attempt_trailer(attempts: Sequence[Attempt] | Sequence[dict[str, Any]]) -> str:
+    rows = [row.json() if isinstance(row, Attempt) else row for row in attempts]
+    retries = sum(str(row.get("role", "")).endswith("-validation-retry") for row in rows)
+    invalid = sum(row.get("outcome") == "validation-invalid" for row in rows)
+    execution_failed = sum(
+        row.get("outcome") not in {"completed", "validation-invalid"} for row in rows
+    )
+    return (
+        f"STAGED-ATTEMPTS: total={len(rows)} validation-retries={retries} "
+        f"validation-invalid={invalid} execution-failed={execution_failed}"
+    )
 
 
 def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:

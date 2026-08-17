@@ -764,6 +764,7 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
     assert state["debt"][0]["status"] == "closed"
     if action["kind"] == "reclassify":
         assert lineage.classes["class-a"].severity == "BLOCKER"
+        assert lineage.classes["class-a"].status == cc.CLOSED
         assert minted == []
     else:
         assert lineage.classes["class-a"].status == cc.SUPERSEDED
@@ -824,7 +825,7 @@ def test_class_action_cannot_downgrade(kind):
         materialize(value, active_classes=[active_class()])
 
 
-def test_closed_violated_class_requires_reopen_or_replace():
+def test_closed_violated_class_derives_reopen_and_preserves_explicit_reopen(tmp_path):
     value = decision(
         "final", coverage=coverage("G1"),
         governing_findings=[finding(classification={
@@ -835,11 +836,49 @@ def test_closed_violated_class_requires_reopen_or_replace():
             "basis": {"kind": "new_finding", "finding_id": "G1"},
         }],
     )
-    with pytest.raises(sp.ProtocolError, match="closed violated class"):
-        materialize(value, active_classes=[active_class(status=cc.CLOSED)])
+    parsed = materialize(value, active_classes=[active_class(status=cc.CLOSED)])
+    assert parsed["class_records"] == [{"op": "reopen", "class_id": "class-a"}]
+    lineage = lineage_with_active(active_class(status=cc.CLOSED))
+    cc.apply_register(
+        lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
+        round_no=2,
+    )
+    cc.save_lineage(tmp_path, lineage)
+    durable = cc.load_lineage(
+        tmp_path, lineage.lineage_id, stamp="after", mode=cc.BRANCH_MODE,
+    )
+    assert durable.classes["class-a"].status == cc.OPEN
     value["class_actions"] = [{"kind": "reopen", "class_id": "class-a"}]
     parsed = materialize(value, active_classes=[active_class(status=cc.CLOSED)])
     assert parsed["class_records"] == [{"op": "reopen", "class_id": "class-a"}]
+
+
+def test_closed_violated_reclassify_precedes_derived_reopen():
+    value = decision(
+        "final", coverage=coverage("G1"),
+        governing_findings=[finding(classification={
+            "kind": "existing_class", "class_id": "class-a",
+        })],
+        class_outcomes=[{
+            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "basis": {"kind": "new_finding", "finding_id": "G1"},
+        }],
+        class_actions=[{
+            "kind": "reclassify", "class_id": "class-a", "severity": "BLOCKER",
+        }],
+    )
+    parsed = materialize(value, active_classes=[active_class(status=cc.CLOSED)])
+    assert parsed["class_records"] == [
+        {"op": "reclassify", "class_id": "class-a", "severity": "BLOCKER"},
+        {"op": "reopen", "class_id": "class-a"},
+    ]
+    lineage = lineage_with_active(active_class(status=cc.CLOSED))
+    cc.apply_register(
+        lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
+        round_no=2,
+    )
+    assert lineage.classes["class-a"].severity == "BLOCKER"
+    assert lineage.classes["class-a"].status == cc.OPEN
 
 
 def test_closed_mechanized_class_cannot_be_replaced_by_manual_procedure():
@@ -1029,7 +1068,7 @@ def test_census_collision_rekey_does_not_depend_on_authored_outcome():
 
 
 @pytest.mark.parametrize("mechanized", [False, True])
-def test_census_closed_violation_points_missing_action_to_collection(mechanized):
+def test_census_closed_violation_derives_only_unmechanized_reopen(mechanized):
     kwargs = {
         "source_ids":["integrity:F1"],
         "source_severities":{"integrity:F1":"MAJOR"},
@@ -1042,12 +1081,16 @@ def test_census_closed_violation_points_missing_action_to_collection(mechanized)
         source_ids=["integrity:F1"],
         classification={"kind":"existing_class", "class_id":"class-a"},
     )])
-    with pytest.raises(sp.ProtocolError) as caught:
-        materialize(value, **kwargs)
-    assert any(
-        line.startswith("/class_actions: closed violated class requires")
-        for line in str(caught.value).splitlines()
-    )
+    if mechanized:
+        with pytest.raises(sp.ProtocolError) as caught:
+            materialize(value, **kwargs)
+        assert any(
+            line.startswith("/class_actions: closed violated class requires")
+            for line in str(caught.value).splitlines()
+        )
+    else:
+        parsed = materialize(value, **kwargs)
+        assert parsed["class_records"] == [{"op":"reopen", "class_id":"class-a"}]
 
     value["class_actions"] = [{"kind":"close", "class_id":"class-a"}]
     with pytest.raises(sp.ProtocolError) as caught:

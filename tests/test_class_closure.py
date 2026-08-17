@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -250,6 +251,23 @@ class TestIdentityAndTransitions:
                 cc.Transition("SUPERSEDE", cid, pattern="Z", pathspec="."),
             )), round_no=2)
         assert len(lin.active()) == 1, "a rejected register applies none of its records"
+
+    @pytest.mark.parametrize(("start", "lifecycle", "expected"), [
+        (cc.OPEN, "CLOSED", cc.CLOSED),
+        (cc.CLOSED, "REOPEN", cc.OPEN),
+    ])
+    def test_reclassify_then_derived_lifecycle_is_the_only_composite(
+        self, start, lifecycle, expected,
+    ) -> None:
+        lin = lineage_with(("a", cc.MAJOR, None))
+        cid = lin.active()[0].class_id
+        lin.classes[cid] = replace(lin.classes[cid], status=start)
+        cc.apply_register(lin, cc.Register(transitions=(
+            cc.Transition("RECLASSIFY", cid, severity=cc.BLOCKER),
+            cc.Transition(lifecycle, cid),
+        )), round_no=2)
+        assert lin.classes[cid].severity == cc.BLOCKER
+        assert lin.classes[cid].status == expected
 
     def test_transition_naming_an_unknown_id_is_rejected(self) -> None:
         with pytest.raises(cc.RegisterError, match="unknown class id"):
