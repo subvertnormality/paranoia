@@ -70,10 +70,13 @@ copy canonical ordered anchor strings exactly.
 
 ### 4. Preserve historical acceptance without production compatibility
 
-Copy the exact pre-cutover provider schemas exercised by every dated Protocol v2 response into a
-complete test-only legacy fixture. Historical response bytes, schema/response hashes, sessions,
-costs, and lifecycle records remain unchanged and replay only against those frozen schemas. The
-production decoder rejects legacy strings; do not add an alias or compatibility branch.
+Inventory the dated Protocol v2 acceptance artifacts before cutover. Where an artifact retains an
+exact provider response, copy the complete exercised pre-cutover provider schema into a test-only
+legacy fixture and replay those exact bytes against it. Where an artifact retains only hashes or a
+bounded audit projection, preserve and recompute that authenticated material under an explicit
+immutable hash-only historical contract; do not claim or fabricate response replay. Historical
+bytes, hashes, sessions, costs, and lifecycle records remain unchanged. The production decoder
+rejects legacy strings; do not add an alias or compatibility branch.
 
 Record a new dated live-provider acceptance artifact containing the citation-object provider schema
 and hash, exact successful response and hash, canonical projected manifest/settlement, provider
@@ -96,18 +99,25 @@ the mandatory mutation command runs before merge.
 ## Verification
 
 - Schema tests cover every role and every evidence-bearing row with concrete citation objects.
-- Cross-role tests prove trailing prose, joined anchors, legacy strings, extra fields, empty
-  rationale, and duplicate anchors reject before resolution, while exact single/range anchors pass.
+- Cross-role tests prove trailing prose, joined anchors, legacy strings, extra fields, and empty
+  rationale fail wire validation, while exact single/range anchors pass. Projected duplicate-anchor
+  issues are recorded without short-circuiting later safe semantic, resolver, or class checks.
 - Materialization tests prove successful wire replies produce the historical durable string-only
   settlement shape and preserve ordered anchor identity.
 - Cache tests prove canonical manifests revalidate, pre-cutover cache is invalidated, and provider
   wire objects are not persisted as cached manifests.
-- One composite retry test combines a duplicate projected anchor, semantic graph defect, bad anchor,
-  and invalid class action and proves all independently detectable pointers appear together.
+- One composite retry test combines both identical citation objects and same-anchor/different-
+  rationale objects with a semantic graph defect, bad anchor, and invalid class action, and proves
+  all independently detectable pointers appear together before settlement rejects.
 - Prompt tests prove every staged role tells the model where rationale belongs and forbids joining.
 - Existing out-of-range, traversal, prefix, symlink, and plan-line checks remain unchanged.
-- Historical acceptance tests replay immutable old responses only through complete frozen test-only
-  schemas; production rejects them. A new dated live-provider artifact proves the new cutover.
+- Historical acceptance tests replay immutable old responses only when exact bytes exist and only
+  through complete frozen test-only schemas. Hash/projection-only records use explicitly named
+  immutable hash-only tests. Production rejects all legacy strings. A new dated live-provider
+  artifact proves the new cutover.
+- Every evidence-bearing wire shape accepts a 500-character rationale and rejects 501 characters.
+  Valid lane and decision packets with 200 maximum-length rationales remain below their respective
+  240,000- and 1,000,000-character raw-response caps.
 - The bounded Protocol v2 mutation gate kills every new projection/cache/schema mutant.
 - README is changed from planned status to the shipped wire-object/canonical-string/cache-version
   behavior while dated historical documents remain labeled historical.
