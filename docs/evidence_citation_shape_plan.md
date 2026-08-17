@@ -118,10 +118,12 @@ the mandatory mutation command runs before merge.
   all independently detectable pointers appear together before settlement rejects.
 - Prompt tests prove every staged role tells the model where rationale belongs and forbids joining.
 - Existing out-of-range, traversal, prefix, symlink, and plan-line checks remain unchanged.
-- Historical acceptance tests replay immutable old responses only when exact bytes exist and only
-  through complete frozen test-only schemas. Hash/projection-only records use explicitly named
-  immutable hash-only tests. Production rejects all legacy strings. A new dated live-provider
-  artifact proves the new cutover.
+- Historical acceptance tests replay stored old response values when they exist, bind their hashes
+  to the explicit canonical/legacy schema mode, and keep hash/projection-only records explicitly
+  hash-only. Production rejects all legacy strings. The dated
+  `evidence_citation_shape_acceptance_2026-08-17.json` artifact binds one live Codex call's exact
+  prompt, schema, raw reply, canonical projection, and successful production anchor resolution; it
+  does not claim future provider compliance or semantic entailment.
 - Every evidence-bearing wire shape accepts a 500-character rationale and rejects 501 characters.
   Valid lane and decision packets with 200 maximum-length rationales remain below their respective
   240,000- and 1,000,000-character raw-response caps.

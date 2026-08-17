@@ -205,6 +205,32 @@ def test_model_citation_instructions_name_closed_shape_and_mode_anchors():
     assert "plan:<line-or-range>" not in branch
 
 
+def test_live_provider_citation_acceptance_is_bound_and_replays():
+    artifact = json.loads(
+        (ROOT / "docs/evidence_citation_shape_acceptance_2026-08-17.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == "staged-evidence-citation-live-provider"
+    assert artifact["version"] == 1
+    assert artifact["call_count"] == 1
+    assert hashlib.sha256(artifact["prompt"].encode()).hexdigest() == artifact[
+        "prompt_sha256"
+    ]
+    schema = sp.provider_schema(sp.lane_schema(cc.BRANCH_MODE, "behaviour"))
+    assert hashlib.sha256(sp.canonical_schema(schema).encode()).hexdigest() == artifact[
+        "schema_sha256"
+    ]
+    assert hashlib.sha256(artifact["raw_reply"].encode()).hexdigest() == artifact[
+        "raw_reply_sha256"
+    ]
+    parsed = sp.parse_lane(
+        artifact["raw_reply"], mode=cc.BRANCH_MODE, lane="behaviour",
+    )
+    assert parsed == artifact["canonical_projection"]
+    rc.resolve_anchors(
+        parsed, root=ROOT, trusted_roots={"repository":ROOT},
+    )
+
+
 def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
     value = wire_value(lane_value())
     value["coverage"][0]["evidence"] = [

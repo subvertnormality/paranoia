@@ -169,6 +169,9 @@ resolution. Legacy strings, prose in an anchor, joined citations, extra fields, 
 projected anchors reject through the existing bounded validation retry. Cached lane manifests
 remain canonical string data under cache schema version 3. See
 `docs/evidence_citation_shape_plan.md` for the design and acceptance boundaries.
+The dated [live Codex acceptance artifact](docs/evidence_citation_shape_acceptance_2026-08-17.json)
+binds the exact provider schema, prompt, raw citation-object response, canonical projection, and
+successful production anchor resolution for one call; it does not claim future provider compliance.
 For an evidenced violation of a closed unmechanized class, the server derives the redundant
 `reopen` lifecycle record. A model-owned non-downgrading reclassification is applied before that
 derived lifecycle transition; an explicit replacement remains model-owned, and a closed
