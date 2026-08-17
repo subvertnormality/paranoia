@@ -354,6 +354,14 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     ))
     captured = {}
     engine = engines.CodexEngine()
+    replay_repo = tmp_path / ROOT.name
+    subprocess.run(
+        [
+            "git", "clone", "--shared", "--no-checkout", "--branch", "main",
+            str(ROOT), str(replay_repo),
+        ],
+        capture_output=True, check=True,
+    )
 
     def capture(prompt, *args, response_schema=None, **kwargs):
         captured["prompt"] = prompt
@@ -366,7 +374,7 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
         handlers.critique_branch({
-            "repo_path":str(ROOT), "base_ref":"main", "head_ref":head_id,
+            "repo_path":str(replay_repo), "base_ref":"main", "head_ref":head_id,
             "lineage":"evidence-citation-shape-code-20260817", "round":3,
             "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
             "converge":True, "class_closure":True,
