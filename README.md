@@ -162,6 +162,11 @@ pointers so the single validation retry can repair more than the first defect. W
 semantic text, lane replies above 240,000 characters, and decision replies above 1,000,000
 characters fail before settlement or JSON decoding. The separate composed-prompt circuit breaker
 remains 5,000,000 characters.
+Issue #38's evidence-citation cutover is planned in
+`docs/evidence_citation_shape_plan.md`: model-facing staged citations gain separate exact `anchor`
+and explanatory `rationale` fields, then validate into the existing string-only settlement
+contract. Until implementation lands, evidence remains a bare anchor string and trailing prose is
+rejected rather than stripped.
 For an evidenced violation of a closed unmechanized class, the server derives the redundant
 `reopen` lifecycle record. A model-owned non-downgrading reclassification is applied before that
 derived lifecycle transition; an explicit replacement remains model-owned, and a closed

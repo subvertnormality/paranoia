@@ -105,6 +105,13 @@ not escape those bounds through the rendered/persisted error message. Render ter
 in a failure-only body that accurately distinguishes pre-settlement failure from an unconfirmed
 post-settlement persistence result, and summarize attempt/retry counts from the ledger, never with a
 clean-review section.
+Model-owned staged evidence uses a closed `{anchor, rationale}` citation object. Validate that wire
+shape before projecting the exact anchor into the existing string-only semantic/cache/settlement
+contract; validate the canonical projection again so duplicate anchors cannot hide behind different
+rationales. Never trim or extract a leading anchor from prose, split joined citations, accept legacy
+strings, or relax traversal, range, prefix, snapshot, and symlink resolution. Cached lane manifests
+are canonical data and use an explicit canonical validator plus a cache-version cutover, not the
+fresh wire decoder.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement
