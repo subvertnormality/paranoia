@@ -1,0 +1,47 @@
+{
+  "acceptance_kind": "staged-evidence-citation-provider-probe",
+  "call_count": 1,
+  "canonical_projection": {
+    "class_assessments": [],
+    "coverage": [
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "artifact-complete", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "repository-premises", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "transformations", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "consumers", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "failure-recovery", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "tests-acceptance", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "docs-operations", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "consistency", "status": "covered", "summary": "checked"},
+      {"evidence": ["repository/README.md:1"], "finding_ids": [], "id": "proportionality", "status": "covered", "summary": "checked"}
+    ],
+    "findings": [],
+    "lane": "behaviour"
+  },
+  "elapsed_seconds": 14.826,
+  "prompt_sha256": "2b65afc503dee3095809c618645e0bb6234d7bc5f8545d0182e91d31cc641831",
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "model": "gpt-5.6-sol",
+    "web_search": false
+  },
+  "prompt": "Return the behaviour-lane JSON object required by the supplied schema. Use every checklist id exactly once, status covered, summary 'checked', finding_ids [], no findings, and no class assessments. For every evidence array use exactly one citation with anchor repository/README.md:1 and a short rationale. Every evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.",
+  "raw_reply": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"repository-premises\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"transformations\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"consumers\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"failure-recovery\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"tests-acceptance\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"docs-operations\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"consistency\",\"status\":\"covered\",\"summary\":\"checked\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1\",\"rationale\":\"These lines support this row.\"}],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"checked\"}],\"findings\":[],\"lane\":\"behaviour\"}",
+  "raw_reply_sha256": "750e88c3354ae0e470c7bb9b40c8e711a4b887af326f00a41b020ed1be4198c7",
+  "schema_sha256": "5f1e3ad433bc7e0cf5b44d7ca097dc2666a8c4f13d6f1e5ba10385bbe5f9a5f5",
+  "scope": {
+    "does_not_prove": [
+      "the production staged handler, canonical settlement, or durable lineage persistence",
+      "that every future provider response follows the schema without the existing bounded retry",
+      "semantic entailment beyond successful resolution of the cited repository line",
+      "provider service identity beyond the recorded local CLI version and configured model name"
+    ],
+    "proves": [
+      "one signed-in Codex structured-output probe accepted the closed citation-object wire schema",
+      "the production decoder projected each returned citation to the exact canonical anchor",
+      "the production resolver resolved every projected anchor against the reviewed checkout"
+    ]
+  },
+  "version": 1
+}

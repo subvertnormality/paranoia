@@ -30,6 +30,7 @@ LANES = {
 BLOCKING = frozenset({cc.FATAL, cc.BLOCKER, cc.MAJOR})
 MAX_SUMMARY_CHARS = 2_000
 MAX_ANCHOR_CHARS = 512
+MAX_RATIONALE_CHARS = 500
 MAX_ISSUES = 24
 MAX_ISSUE_CHARS = 8_000
 MAX_LANE_FINDINGS = 100
@@ -45,6 +46,25 @@ MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
 MAX_LANE_RESPONSE_CHARS = 240_000
 MAX_DECISION_RESPONSE_CHARS = 1_000_000
 MAX_CONSOLIDATION_CONTEXT_CHARS = 200_000
+
+
+def citation_instructions(mode: str) -> str:
+    """Return the shared model-facing evidence object contract."""
+    if mode == cc.PLAN_MODE:
+        alternatives = (
+            '`plan:<line-or-range>` or `repository/<path>:<line-or-range>`'
+        )
+    elif mode == cc.BRANCH_MODE:
+        alternatives = '`repository/<path>:<line-or-range>`'
+    else:
+        raise ValueError(f"invalid staged mode {mode!r}")
+    return (
+        "Every evidence array item is exactly a closed "
+        '`{"anchor":"<citation>","rationale":"why these lines support this row"}` '
+        f"object, where `<citation>` is {alternatives}. Put only the bare citation "
+        "in `anchor`; put all explanation in `rationale`; and use one object per "
+        "citation, never join citations."
+    )
 
 
 class ProtocolError(ValueError):
@@ -118,26 +138,39 @@ def _pathspec() -> dict[str, Any]:
     return value
 
 
-def _evidence() -> dict[str, Any]:
-    return _array(_anchor(), maximum=100, minimum=1, unique=True)
+def _citation() -> dict[str, Any]:
+    return _object({
+        "anchor": _anchor(),
+        "rationale": _string(MAX_RATIONALE_CHARS),
+    })
 
 
-def _coverage() -> dict[str, Any]:
+def _evidence(*, canonical: bool = False) -> dict[str, Any]:
+    # Wire uniqueness is intentionally deferred: identical objects must reach
+    # canonical validation so duplicate anchors can join the aggregate retry
+    # diagnostic. Canonical anchor strings remain unique and load-bearing.
+    return _array(
+        _anchor() if canonical else _citation(),
+        maximum=100, minimum=1, unique=canonical,
+    )
+
+
+def _coverage(*, canonical: bool = False) -> dict[str, Any]:
     return _object({
         "id": _string(80, enum=CHECKLIST),
         "status": _string(32, enum=("covered", "finding", "not_applicable")),
         "summary": _string(MAX_SUMMARY_CHARS),
-        "evidence": _evidence(),
+        "evidence": _evidence(canonical=canonical),
         "finding_ids": _array(_string(120), maximum=100, unique=True),
     })
 
 
-def _finding(*, mode: str, census: bool) -> dict[str, Any]:
+def _finding(*, mode: str, census: bool, canonical: bool = False) -> dict[str, Any]:
     properties = {
         "id": _string(120),
         "severity": _string(32, enum=cc.SEVERITIES),
         "summary": _string(MAX_SUMMARY_CHARS),
-        "evidence": _evidence(),
+        "evidence": _evidence(canonical=canonical),
         "remedy": _string(MAX_SUMMARY_CHARS),
     }
     if census:
@@ -148,12 +181,12 @@ def _finding(*, mode: str, census: bool) -> dict[str, Any]:
     return _object(properties)
 
 
-def _lane_finding() -> dict[str, Any]:
+def _lane_finding(*, canonical: bool = False) -> dict[str, Any]:
     return _object({
         "id": _string(120),
         "severity": _string(32, enum=cc.SEVERITIES),
         "summary": _string(MAX_SUMMARY_CHARS),
-        "evidence": _evidence(),
+        "evidence": _evidence(canonical=canonical),
         "remedy": _string(MAX_SUMMARY_CHARS),
     })
 
@@ -189,24 +222,24 @@ def _classification(mode: str = cc.PLAN_MODE) -> dict[str, Any]:
     ]}
 
 
-def _lane_assessment() -> dict[str, Any]:
+def _lane_assessment(*, canonical: bool = False) -> dict[str, Any]:
     return {"anyOf": [
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
             "finding_id": {"type": "null"},
         }),
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
             "finding_id": _string(120),
         }),
     ]}
 
 
-def _class_outcome() -> dict[str, Any]:
+def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
     basis = {"anyOf": [
         _object({
             "kind": _string(32, const="new_finding"),
@@ -221,28 +254,28 @@ def _class_outcome() -> dict[str, Any]:
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
         }),
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
             "basis": basis,
         }),
     ]}
 
 
-def _debt_outcome() -> dict[str, Any]:
+def _debt_outcome(*, canonical: bool = False) -> dict[str, Any]:
     return {"anyOf": [
         _object({
             "debt_id": _string(120),
             "status": _string(16, const="closed"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
         }),
         _object({
             "debt_id": _string(120),
             "status": _string(16, const="open"),
-            "evidence": _evidence(),
+            "evidence": _evidence(canonical=canonical),
             "reason": _string(MAX_SUMMARY_CHARS),
         }),
     ]}
@@ -267,18 +300,27 @@ def _class_action(mode: str) -> dict[str, Any]:
     ]}
 
 
-def lane_schema(mode: str, lane: str) -> dict[str, Any]:
+def lane_schema(mode: str, lane: str, *, canonical: bool = False) -> dict[str, Any]:
     if lane not in LANES.get(mode, ()):
         raise ValueError(f"invalid staged lane {lane!r} for {mode!r}")
     return _root(_object({
         "lane": _string(32, const=lane),
-        "coverage": _array(_coverage(), maximum=len(CHECKLIST), minimum=len(CHECKLIST)),
-        "findings": _array(_lane_finding(), maximum=MAX_LANE_FINDINGS),
-        "class_assessments": _array(_lane_assessment(), maximum=MAX_ACTIVE_CLASSES),
+        "coverage": _array(
+            _coverage(canonical=canonical),
+            maximum=len(CHECKLIST), minimum=len(CHECKLIST),
+        ),
+        "findings": _array(
+            _lane_finding(canonical=canonical), maximum=MAX_LANE_FINDINGS,
+        ),
+        "class_assessments": _array(
+            _lane_assessment(canonical=canonical), maximum=MAX_ACTIVE_CLASSES,
+        ),
     }))
 
 
-def decision_schema(mode: str, role: str) -> dict[str, Any]:
+def decision_schema(
+    mode: str, role: str, *, canonical: bool = False,
+) -> dict[str, Any]:
     if mode not in LANES:
         raise ValueError(f"invalid staged mode {mode!r}")
     if role not in {"census", "correction", "final"}:
@@ -286,21 +328,24 @@ def decision_schema(mode: str, role: str) -> dict[str, Any]:
     properties = {
         "role": _string(32, const=role),
         "governing_findings": _array(
-            _finding(mode=mode, census=role == "census"),
+            _finding(mode=mode, census=role == "census", canonical=canonical),
             maximum=MAX_CENSUS_FINDINGS if role == "census" else MAX_LANE_FINDINGS,
         ),
-        "debt_outcomes": _array(_debt_outcome(), maximum=500),
+        "debt_outcomes": _array(
+            _debt_outcome(canonical=canonical), maximum=500,
+        ),
     }
     if role != "census":
         properties["class_outcomes"] = _array(
-            _class_outcome(), maximum=MAX_ACTIVE_CLASSES,
+            _class_outcome(canonical=canonical), maximum=MAX_ACTIVE_CLASSES,
         )
     properties["class_actions"] = _array(
         _class_action(mode), maximum=MAX_ACTIVE_CLASSES,
     )
     if role == "final":
         properties["coverage"] = _array(
-            _coverage(), maximum=len(CHECKLIST), minimum=len(CHECKLIST),
+            _coverage(canonical=canonical),
+            maximum=len(CHECKLIST), minimum=len(CHECKLIST),
         )
     return _root(_object(properties))
 
@@ -446,9 +491,49 @@ def _validate_coverage(
         issues.extend(found)
 
 
+def project_citations(value: dict[str, Any]) -> dict[str, Any]:
+    """Project a wire-valid response to exact canonical anchor strings."""
+    projected = deepcopy(value)
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, child in node.items():
+                if key == "evidence":
+                    node[key] = [citation["anchor"] for citation in child]
+                else:
+                    visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(projected)
+    return projected
+
+
+def decode_lane_with_issues(
+    text: str, *, mode: str, lane: str,
+) -> tuple[dict[str, Any], list[str]]:
+    """Decode the closed wire shape and retain canonical issues for fan-in."""
+    wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    canonical = project_citations(wire)
+    return canonical, _schema_issues(
+        canonical, lane_schema(mode, lane, canonical=True),
+    )
+
+
 def decode_lane(text: str, *, mode: str, lane: str) -> dict[str, Any]:
     """Decode a lane response before independent semantic/anchor validation."""
-    return decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    value, issues = decode_lane_with_issues(text, mode=mode, lane=lane)
+    _raise_semantic_issues(issues)
+    return value
+
+
+def decode_canonical_lane(text: str, *, mode: str, lane: str) -> dict[str, Any]:
+    """Validate a server-owned canonical lane manifest, never a provider reply."""
+    return decode(
+        text, lane_schema(mode, lane, canonical=True),
+        max_chars=MAX_LANE_RESPONSE_CHARS,
+    )
 
 
 def validate_lane_value(value: dict[str, Any], *, lane: str,
@@ -503,11 +588,24 @@ def parse_lane(text: str, *, mode: str, lane: str,
     )
 
 
-def decode_decision(text: str, *, mode: str, role: str) -> dict[str, Any]:
-    """Decode and structurally validate a decision before semantic layers run."""
-    return decode(
+def decode_decision_with_issues(
+    text: str, *, mode: str, role: str,
+) -> tuple[dict[str, Any], list[str]]:
+    """Decode the decision wire shape and retain canonical issues for fan-in."""
+    wire = decode(
         text, decision_schema(mode, role), max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
+    canonical = project_citations(wire)
+    return canonical, _schema_issues(
+        canonical, decision_schema(mode, role, canonical=True),
+    )
+
+
+def decode_decision(text: str, *, mode: str, role: str) -> dict[str, Any]:
+    """Decode and structurally validate a decision before semantic layers run."""
+    value, issues = decode_decision_with_issues(text, mode=mode, role=role)
+    _raise_semantic_issues(issues)
+    return value
 
 
 def _rank(severity: str) -> int:

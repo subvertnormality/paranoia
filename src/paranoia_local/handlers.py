@@ -229,7 +229,10 @@ def _staged_class_context(blocks: list[str]) -> str:
 def _staged_lane_prompt(
     *, mode: str, lane: str, active_classes: list[dict[str, Any]], body: str,
 ) -> str:
-    instructions = prompts.staged_census_instructions(mode, lane)
+    instructions = (
+        f"{prompts.staged_census_instructions(mode, lane)}\n"
+        f"{sp.citation_instructions(mode)}"
+    )
     lane_body = (
         f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(sp.CHECKLIST)}\n"
         "ACTIVE CLASSES: "
@@ -555,12 +558,19 @@ def _staged_structural_review(
             sequence_value += 1
             return sequence_value
 
-    def validate_lane(text: str, lane: str) -> dict[str, Any]:
+    def validate_lane(
+        text: str, lane: str, *, canonical: bool = False,
+    ) -> dict[str, Any]:
         try:
-            parsed = sp.decode_lane(text, mode=mode, lane=lane)
+            if canonical:
+                parsed = sp.decode_canonical_lane(text, mode=mode, lane=lane)
+                issues: list[str] = []
+            else:
+                parsed, issues = sp.decode_lane_with_issues(
+                    text, mode=mode, lane=lane,
+                )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
-        issues: list[str] = []
         try:
             sp.validate_lane_value(
                 parsed, lane=lane,
@@ -593,10 +603,11 @@ def _staged_structural_review(
     ) -> dict[str, Any]:
         del assessment_ids, known_debt
         try:
-            value = sp.decode_decision(text, mode=mode, role=role)
+            value, issues = sp.decode_decision_with_issues(
+                text, mode=mode, role=role,
+            )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
-        issues: list[str] = []
         parsed: dict[str, Any] | None = None
         try:
             parsed = sp.materialize_decision_value(
@@ -697,7 +708,10 @@ def _staged_structural_review(
             return lane, result, parsed, lane_attempts, lane_rejected
 
         manifests = _cached_census_manifests(
-            state, binding=cache_binding, lanes=lanes, validate=validate_lane,
+            state, binding=cache_binding, lanes=lanes,
+            validate=lambda text, lane: validate_lane(
+                text, lane, canonical=True,
+            ),
         )
         if manifests is None:
             lane_rows = []
@@ -770,7 +784,11 @@ def _staged_structural_review(
             "existing_debt": existing_debt,
         }, ensure_ascii=False, separators=(",", ":"))
         try:
-            prompt = prompts.compose(prompts.STAGED_CONSOLIDATION_INSTRUCTIONS, consolidation_body)
+            prompt = prompts.compose(
+                f"{prompts.STAGED_CONSOLIDATION_INSTRUCTIONS}\n"
+                f"{sp.citation_instructions(mode)}",
+                consolidation_body,
+            )
             if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
                 raise _staged_error(
                     f"consolidation prompt is {len(prompt)} characters",
@@ -825,7 +843,11 @@ def _staged_structural_review(
             "checklist": list(sp.CHECKLIST) if role == "final" else [],
             "artifact": body,
         }, ensure_ascii=False)
-        prompt = prompts.compose(prompts.staged_followup_instructions(mode), stage_body)
+        prompt = prompts.compose(
+            f"{prompts.staged_followup_instructions(mode)}\n"
+            f"{sp.citation_instructions(mode)}",
+            stage_body,
+        )
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
             raise _staged_error(
                 f"{role} prompt is {len(prompt)} characters",
