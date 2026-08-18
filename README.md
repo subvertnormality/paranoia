@@ -364,6 +364,15 @@ passages. A separate cold, tool-free attester must accept both publisher authori
 entailment before a packet can close a claim. Claude `WebFetch` is never enabled or trusted in
 this path. There is no `PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search
 adapter.
+Capture keeps a 5,000,000-byte response circuit breaker but admits complete Trafilatura output
+through 100,000 characters, so ordinary long reference pages are not discarded at the former
+40,000-character threshold. Repeated identical captures are rendered once per binding prompt or
+batch and referenced by final URL plus content/text digests; distinct pages still obey the
+existing serialized aggregate ceilings. Requests use explicit HTML/text accept headers and
+identity transfer encoding. An HTTP 403 receives one same-URL browser-compatible retry inside
+the original deadline and redirect/public-address policy. A persistent 403 remains fail-closed
+with its final URL, status, bounded error, and retry fact visible in durable provenance; the
+server never uses cookies, browser automation, mirrors, snippets, or provider-fetched text.
 Redirect destinations govern URL eligibility, UGC/self-source classification, packet identity,
 and the persisted source URL; a benign discovery URL cannot launder an ineligible destination.
 Persisted claim provenance includes the captured-text digest and cold authority/entailment

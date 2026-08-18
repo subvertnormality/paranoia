@@ -53,6 +53,28 @@ def test_binding_requires_exact_captured_passage():
         ar.parse_binding(bad, claims, captures)
 
 
+def test_binding_input_compacts_repeated_large_capture():
+    value = json.loads(discovery().split("\n", 1)[1])
+    second = json.loads(json.dumps(value["claims"][0]))
+    second["proposition"] = "The API waits before retrying."
+    value["claims"].append(second)
+    claims = ar.parse_discovery(ar.DISCOVERY_MARKER + "\n" + json.dumps(value))
+    text = "x" * 70_000
+    captures = [
+        es.Capture(
+            claim.candidate, claim.candidate.url, 200, "text/html",
+            "a" * 64, "b" * 64, text,
+        )
+        for claim in claims
+    ]
+    rendered = json.loads(ar.binding_input(claims, captures))
+    assert rendered[0]["capture"]["capture_ref"] is None
+    assert rendered[1]["capture"]["capture_ref"] == 0
+    assert rendered[1]["capture"]["line_numbered_text"] == ""
+    assert rendered[0]["capture"]["line_numbered_text"].endswith(text)
+    assert "earlier claim_index" in rendered[1]["capture"]["capture_ref_semantics"]
+
+
 def test_packet_union_is_deterministic_and_governing():
     claims = ar.parse_discovery(discovery())
     captures = [captured(claims[0])]

@@ -20,6 +20,30 @@ from paranoia_local.engines import Review
 PLAN = "# Rollout\n\nPython 3.11 was released in October 2022.\n"
 
 
+def test_large_page_capture_acceptance_record() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/large_page_capture_acceptance_2026-08-18.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == "large-page-plan-claim-capture"
+    assert artifact["runtime"]["model_calls"] == [
+        "evidence-discovery", "evidence-binding", "evidence-text",
+    ]
+    assert artifact["runtime"]["validation_retries"] == 0
+    assert artifact["direct_capture"]["extracted_characters"] == 70_378
+    assert artifact["direct_capture"]["former_limit"] < 70_378
+    assert artifact["direct_capture"]["current_limit"] >= 70_378
+    assert artifact["verified_plan"]["verdict"] == "supported"
+    assert artifact["verified_plan"]["blocked"] is False
+    assert len(artifact["verified_plan"]["evidence"]) == 2
+    assert all(
+        row["publisher_authority"] and row["passage_entailment"]
+        for row in artifact["verified_plan"]["evidence"]
+    )
+    for relative, expected in artifact["source_sha256"].items():
+        assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
+
+
 def test_minimal_claim_validation_acceptance_record() -> None:
     root = Path(__file__).resolve().parents[1]
     artifact = json.loads(
@@ -1617,8 +1641,13 @@ def test_plan_binding_batches_large_ordinary_inventory(tmp_path: Path) -> None:
                 "x" * external_sources.MAX_EXTRACTED_CHARS,
             )
         batches = adapter._binding_batches(audit, captures)
-        assert len(batches) == 2
+        assert len(batches) == 1
         assert sum(map(len, batches)) == 11
+        assert batches[0][0]["capture"]["capture_ref"] is None
+        assert batches[0][1]["capture"]["capture_ref"] == {
+            "claim_index": 0, "evidence_index": 0,
+        }
+        assert batches[0][1]["capture"]["line_numbered_text"] == ""
     finally:
         adapter.close()
 
@@ -1668,7 +1697,8 @@ def test_plan_binding_aggregate_batch_ceiling_raises_before_model_calls(
             item["authority_basis"], item["relation"],
         )
         captures[(claim_index, 0)] = external_sources.Capture(
-            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            candidate, f"{candidate.url}?claim={claim_index}", 200, "text/html",
+            f"{claim_index:064x}", "b" * 64,
             "x" * external_sources.MAX_EXTRACTED_CHARS,
         )
     try:
@@ -2252,3 +2282,42 @@ def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:
         assert bound.claims[0]["evidence"][0]["source_kind"] == "ugc"
     finally:
         adapter.close()
+
+
+def test_persistent_403_provenance_survives_claim_state_reload(tmp_path: Path) -> None:
+    audit = pc.parse_audit(_audit(_claim()), PLAN)
+    item = audit.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, "https://www.python.org/forbidden", 403, "text/html",
+        None, None, None,
+        "HTTP Error 403: Forbidden; browser-compatible retry attempted", True,
+    )
+    binding = (
+        handlers.PLAN_BINDING_MARKER
+        + '\n{"bindings":[{"claim_index":0,"evidence_index":0,"usable":false,'
+        '"location":null,"passage":null}]}'
+    )
+    engine = _RoleScript({"evidence-binding": [binding]})
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    adapter.binding_engine = engine.for_role("evidence-binding")
+    try:
+        bound, _ = adapter._bind_indexed(
+            "session", audit, {(0, 0): capture}, "m", "high", {"timeout": 300},
+        )
+    finally:
+        adapter.close()
+    state = pc.reconcile(
+        {}, bound, lineage_id="persistent-403", round_no=1, plan_text=PLAN,
+    )
+    reloaded = pc.normalize_state(json.loads(json.dumps(state)))
+    evidence = next(iter(reloaded["claims"].values()))["evidence"][0]
+    assert evidence["url"] == "https://www.python.org/forbidden"
+    assert evidence["location"] == "Server capture unavailable"
+    assert "HTTP Error 403" in evidence["quote"]
+    assert "browser-compatible retry attempted" in evidence["quote"]

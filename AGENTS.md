@@ -181,6 +181,14 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   other real capability failures block visibly.
   Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
   digests plus cold authority/entailment decisions before support may freeze.
+  Keep the 5,000,000-byte raw response circuit breaker and admit complete extracted text through
+  100,000 characters. Deduplicate identical final-URL/content/text captures only within one
+  binding prompt or batch, using an earlier-row reference bound to all three values. Count actual
+  numbered, metadata-bearing, JSON-escaped representations against aggregate binding budgets.
+  Retry HTTP 403 at most once with a browser-compatible user agent, a fresh redirect counter, and
+  the original absolute deadline and public-address/final-URL policy. A persistent 403 remains
+  unusable and retains final URL, numeric status, bounded error, and retry fact; never add cookies,
+  browser automation, access-control bypass, third-party mirrors, snippets, or provider bodies.
   Validate retained inventory before capture; attest replacement wording as its own exact
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.

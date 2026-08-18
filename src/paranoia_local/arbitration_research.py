@@ -142,7 +142,13 @@ def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.C
     if len(claims) != len(captures):
         raise ResearchError("capture count does not match discovery count")
     rows: list[dict[str, object]] = []
+    seen_captures: dict[tuple[str | None, str | None, str | None], int] = {}
     for index, (claim, capture) in enumerate(zip(claims, captures, strict=True)):
+        identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
+        referenceable = capture.usable and all(identity)
+        capture_ref = seen_captures.get(identity) if referenceable else None
+        if referenceable and capture_ref is None:
+            seen_captures[identity] = index
         rows.append({
             "claim_index": index,
             "proposition": claim.proposition,
@@ -162,7 +168,16 @@ def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.C
                 "content_sha256": capture.content_sha256,
                 "text_sha256": capture.text_sha256,
                 "error": capture.error,
-                "line_numbered_text": sources.numbered_text(capture.text or ""),
+                "fallback_attempted": capture.fallback_attempted,
+                "capture_ref": capture_ref,
+                "capture_ref_semantics": (
+                    "non-null names an earlier claim_index in this input with identical "
+                    "final URL and content/text digests; use that row's line-numbered text"
+                ),
+                "line_numbered_text": (
+                    "" if capture_ref is not None
+                    else sources.numbered_text(capture.text or "")
+                ),
             },
         })
     rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))

@@ -59,9 +59,17 @@ an empty, verified register.
    bounded correction therefore repairs omissions while discovery search is still available;
    only the corrected complete inventory proceeds to capture.
 3. The server downloads each candidate directly under bounded HTTP(S), redirect, response-size,
-   and extracted-text limits, then extracts main text with Trafilatura. The same reviewer session
+   and extracted-text limits, then extracts main text with Trafilatura. Responses remain capped at
+   5,000,000 bytes; complete extracted text through 100,000 characters is admitted. Repeated
+   captures with the same final URL and content/text digests appear once per serialized binding
+   prompt or batch and later rows reference that exact capture. The same reviewer session
    is resumed with web and repository access disabled and may bind exact passages only from those
    captures. Search snippets, provider summaries, and provider-fetched page bodies never count.
+   The initial attributable request carries explicit accept/language/identity-encoding headers.
+   Only HTTP 403 receives one browser-compatible same-URL retry, using a fresh five-redirect
+   handler but the same absolute deadline and public-address/final-URL checks. Persistent 403
+   remains unusable and retains its final URL, numeric status, bounded error, and retry fact; no
+   authentication, cookies, headless browser, CAPTCHA/paywall bypass, or mirror is attempted.
 4. A fresh tool-free attester receives only each atomic proposition, declared publisher and
    authority basis, capture metadata, relation, location, and exact passage. A source governs
    only when the attester independently accepts publisher authority and passage entailment. A
@@ -93,7 +101,9 @@ limits let a large real plan complete useful research without making either a ca
 an individual model call unbounded.
 Captured sources are downloaded with up to 16 workers under the same monotonic deadline and
 per-source wall-clock bounds, then bound in deterministic indexed batches in the same corrected
-discovery session. One oversized source, a sixth batch, an expired capture, or a failed batch
+discovery session. Exact 5,000,000-byte and 100,000-character boundaries are admitted; the first
+unit above either is rejected. Serialized numbering, metadata, and JSON escaping count against
+the existing 400,000-character binding limit. One oversized source, a sixth batch, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
 
 The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
@@ -255,3 +265,14 @@ The server-capture migration is separately recorded in
 It records a fresh two-vendor external arbitration, two fresh Codex plan claims closed only after
 server capture and cold attestation, and an explicit repository-only arbitration. It also records
 the timeout and Claude inert-root defects those real runs exposed before the successful reruns.
+
+The long-page follow-up is recorded in
+[`large_page_capture_acceptance_2026-08-18.json`](large_page_capture_acceptance_2026-08-18.json).
+A signed-in Codex run discovered the official Python decimal reference, captured all 70,378
+extracted characters, compacted two identical capture payloads in the binding batch, bound two
+exact passages with browsing disabled, and obtained independent positive authority/entailment
+attestations. It completed in 53.384 seconds with three model calls and no validation retry.
+The production diff is 173 additions and 43 deletions across `external_sources.py`,
+`arbitration_research.py`, and `handlers.py`. At acceptance time the three largest production
+Python modules were `handlers.py` (137,306 bytes; 2,947 lines), `arbitrate_handler.py` (127,166
+bytes; 2,991 lines), and `plan_claims.py` (62,865 bytes; 1,422 lines).

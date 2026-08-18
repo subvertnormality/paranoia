@@ -2125,41 +2125,69 @@ class _CapturedClaimEngine:
         batches: list[list[dict[str, Any]]] = []
         current: list[dict[str, Any]] = []
         current_chars = 2
+        seen_captures: dict[
+            tuple[str | None, str | None, str | None], tuple[int, int]
+        ] = {}
         for (claim_index, evidence_index), capture in captures.items():
             claim = discovery.claims[claim_index]
             item = claim["evidence"][evidence_index]
-            row = {
-                "claim_index": claim_index,
-                "evidence_index": evidence_index,
-                "proposition": claim["proposition"],
-                "candidate": {
-                    key: item[key] for key in (
-                        "url", "title", "publisher", "source_kind",
-                        "authority_basis", "relation",
-                    )
-                },
-                "capture": {
-                    "usable": capture.usable,
-                    "final_url": capture.final_url,
-                    "status": capture.status,
-                    "content_type": capture.content_type,
-                    "content_sha256": capture.content_sha256,
-                    "text_sha256": capture.text_sha256,
-                    "error": capture.error,
-                    "line_numbered_text": external_sources.numbered_text(capture.text or ""),
-                },
-            }
+            identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
+            referenceable = capture.usable and all(identity)
+
+            def make_row(capture_ref: tuple[int, int] | None) -> dict[str, Any]:
+                return {
+                    "claim_index": claim_index,
+                    "evidence_index": evidence_index,
+                    "proposition": claim["proposition"],
+                    "candidate": {
+                        key: item[key] for key in (
+                            "url", "title", "publisher", "source_kind",
+                            "authority_basis", "relation",
+                        )
+                    },
+                    "capture": {
+                        "usable": capture.usable,
+                        "final_url": capture.final_url,
+                        "status": capture.status,
+                        "content_type": capture.content_type,
+                        "content_sha256": capture.content_sha256,
+                        "text_sha256": capture.text_sha256,
+                        "error": capture.error,
+                        "fallback_attempted": capture.fallback_attempted,
+                        "capture_ref": (
+                            None if capture_ref is None else {
+                                "claim_index": capture_ref[0],
+                                "evidence_index": capture_ref[1],
+                            }
+                        ),
+                        "line_numbered_text": (
+                            "" if capture_ref is not None else
+                            external_sources.numbered_text(capture.text or "")
+                        ),
+                    },
+                }
+
+            capture_ref = seen_captures.get(identity) if referenceable else None
+            row = make_row(capture_ref)
             row_chars = len(json.dumps(row, ensure_ascii=False, separators=(",", ":"))) + 1
-            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
-                raise pc.AuditError(
-                    "one captured source exceeds the plan binding batch budget"
-                )
             if current and current_chars + row_chars > MAX_PLAN_BINDING_BATCH_CHARS:
                 batches.append(current)
                 current = []
                 current_chars = 2
+                seen_captures = {}
+                capture_ref = None
+                row = make_row(capture_ref)
+                row_chars = len(
+                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+                ) + 1
+            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
+                raise pc.AuditError(
+                    "one captured source exceeds the plan binding batch budget"
+                )
             current.append(row)
             current_chars += row_chars
+            if referenceable and capture_ref is None:
+                seen_captures[identity] = (claim_index, evidence_index)
         if current:
             batches.append(current)
         if len(batches) > MAX_PLAN_BINDING_BATCHES:
@@ -2186,6 +2214,8 @@ class _CapturedClaimEngine:
             instruction = (
                 "Bind every indexed candidate below using only its server capture. Return "
                 "exactly one row per (claim_index,evidence_index); preserve both indices. "
+                "A capture_ref points to an earlier row in this batch with identical final "
+                "URL and content/text digests; use that earlier row's line-numbered text. "
                 "Copy a precise location and exact passage only when usable, otherwise use "
                 "nulls. Do not return claims or source metadata.\n\n"
                 f"{PLAN_BINDING_MARKER}\n"
