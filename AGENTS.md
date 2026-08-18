@@ -258,6 +258,9 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
+- When discovery and its single correction both fail local claim-payload validation, preserve the
+  ordered bounded validator reasons and exact initial/correction raw exchange; do not describe a
+  successful provider process as a reviewer execution failure.
 - The reviewer remains read-only. The calling coding agent autonomously validates packets,
   edits the plan before round 2, increments the round, and reruns. No human is required for
   ordinary convergence, and unchanged-input reviewer churn is not correction.

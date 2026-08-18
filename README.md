@@ -1012,6 +1012,10 @@ CONVERGENCE: BLOCKED — external claim closure remains open.
 `CLAIM-AUDIT-DEBT` includes the validator reason, SHA-256, and a bounded rejected
 output excerpt. Malformed model JSON, a failed audit/retry, unsupported authority,
 or missing entailment blocks; it never becomes an empty successful register.
+If discovery and its single correction are both rejected locally, the debt reports the
+ordered initial and correction validator reasons and hashes the exact two provider envelopes
+joined by the discovery-correction separator. A successful provider process is not labeled as
+`reviewer failed (exit 0)` solely because its payload was invalid.
 
 ### `arbitrate` outcomes
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -934,6 +935,54 @@ def _repo(tmp_path: Path) -> Path:
 
 
 class TestHandlerFlow:
+    def test_exhausted_discovery_validation_preserves_both_reasons_and_raw(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        initial = _audit(_claim()) + "\nunexpected source list"
+        correction = _audit(_claim(
+            anchor="This corrected anchor is absent.",
+            proposition="This corrected anchor is absent.",
+        ))
+        engine = _RoleScript({"evidence-discovery": [initial, correction]})
+        monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+        state, status = handlers._verify_plan_claims(
+            PLAN, pc.empty_state(), lineage_id="validation-diagnostic", round_no=1,
+            stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+            model="m", effort="high", plan_repo_path=None, on_progress=None,
+        )
+
+        debt = state["debt"]
+        expected_raw = (
+            "evidence-discovery\n--- discovery correction ---\nevidence-discovery"
+        )
+        assert status == "validation-invalid"
+        assert "initial: unexpected text after claim audit JSON" in debt["reason"]
+        assert "correction: claim 0: anchor is not a verbatim substring" in debt["reason"]
+        assert "reviewer failed" not in debt["reason"]
+        assert debt["returncode"] == 0
+        assert debt["raw_sha256"] == hashlib.sha256(expected_raw.encode()).hexdigest()
+        assert debt["rejected_excerpt"] == expected_raw
+
+    def test_returncode_zero_provider_error_keeps_execution_wording(
+        self, tmp_path: Path,
+    ) -> None:
+        failure = Review(
+            "provider rejected request", "session", "provider envelope",
+            returncode=0, error=True, failure_detail="in-band provider error",
+        )
+
+        state, status = handlers._verify_plan_claims(
+            PLAN, pc.empty_state(), lineage_id="provider-error", round_no=1,
+            stakes="trusted local tool", engine=ScriptedEngine(failure),
+            repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+            on_progress=None,
+        )
+
+        assert status == "failed"
+        assert state["debt"]["reason"] == "claim-audit reviewer failed (exit 0)"
+        assert state["debt"]["failure_detail"] == "in-band provider error"
+
     @pytest.mark.parametrize(("returncode", "diagnostic"), [
         (124, "timed out after 3600s"),
         (127, "executable not found: codex"),

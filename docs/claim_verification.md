@@ -225,6 +225,11 @@ Canonical durable state remained blocked with zero applied claims and retained d
 exact rejected-response hash, so the valid sibling row could not be misbound or partially applied.
 The run used two signed-in calls plus the controlled attestation boundary and 38.555 seconds.
 
+When discovery and its one same-session correction both fail local payload validation, the claim
+debt preserves the bounded reasons in initial/correction order. Its rejected raw identity is the
+initial provider envelope, the literal discovery-correction separator, and the corrected provider
+envelope in that order. Provider return code zero remains distinct from a reviewer execution error.
+
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an
