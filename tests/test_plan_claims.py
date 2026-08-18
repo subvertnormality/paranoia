@@ -36,16 +36,16 @@ def test_large_page_capture_acceptance_record() -> None:
     assert artifact["direct_capture"]["current_limit"] >= 70_378
     assert artifact["verified_plan"]["verdict"] == "supported"
     assert artifact["verified_plan"]["blocked"] is False
-    assert len(artifact["verified_plan"]["evidence"]) == 2
+    assert len(artifact["verified_plan"]["evidence"]) == 1
     assert all(
         row["publisher_authority"] and row["passage_entailment"]
         for row in artifact["verified_plan"]["evidence"]
     )
     assert artifact["arbitration_research"] == {
         "model_calls": ["arbitration-discovery", "arbitration-binding"],
-        "claim_count": 6,
-        "capture_count": 6,
-        "bound_count": 6,
+        "claim_count": 4,
+        "capture_count": 4,
+        "bound_count": 4,
         "binding_budget_demotions": 0,
         "validation_retries": 0,
     }

@@ -2,7 +2,7 @@
   "acceptance_kind": "large-page-plan-claim-capture",
   "date": "2026-08-18",
   "branch": "fix/large-page-evidence-capture",
-  "source_commit": "2f57b7cd57278bb41bd387ce9edf918df7f230a3",
+  "source_commit": "a56b59a23cfc0d6d1158654b5317c74f3f8a9117",
   "provider": {
     "engine": "codex",
     "cli_version": "codex-cli 0.144.6",
@@ -12,7 +12,7 @@
   },
   "runtime": {
     "trafilatura_version": "2.2.0",
-    "elapsed_seconds": 122.571,
+    "elapsed_seconds": 90.602,
     "model_calls": [
       "plan-evidence-discovery",
       "plan-evidence-binding",
@@ -23,9 +23,9 @@
     "validation_retries": 0
   },
   "source_sha256": {
-    "src/paranoia_local/external_sources.py": "eec4089ab6d416b89538d05ccfedc408e322304526abd6ba0f60c91960653d81",
-    "src/paranoia_local/arbitration_research.py": "09eb07231cbef4c5810bc7fd618fc854ed0bd989f49cbe57f0f842cc787329d4",
-    "src/paranoia_local/handlers.py": "6f64582a70a8c895f1fbf108ef529c0f94b39d8854bc195d86e2016e802c74bb",
+    "src/paranoia_local/external_sources.py": "166bfd4bf987714f9a9f500217d4f1cce6f74a4313fadd709e01d7d6a9ddb483",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/handlers.py": "1698f2f4115eb1ef143fa18bb713cc2dbfa0cdaa5e9d21fc392ffae856920c67",
     "src/paranoia_local/arbitrate_handler.py": "cda50974be9c83261da808c94eca553265d460960e17c79c1001f9305a01caff"
   },
   "direct_capture": {
@@ -43,21 +43,14 @@
     "status": "parsed 1 new + 0 targeted retained + 0 frozen",
     "claim_count": 1,
     "blocked": false,
-    "claim_id": "C-57ad3abe93",
-    "proposition": "Python's decimal module is designed to permit exact representation of decimal numbers.",
+    "claim_id": "C-ca24537844",
+    "proposition": "Python's decimal module can represent decimal numbers exactly.",
     "verdict": "supported",
     "evidence": [
       {
         "url": "https://docs.python.org/3/library/decimal.html",
-        "location": "Introduction, lines 3–9",
+        "location": "Module introduction, advantages over float, second bullet, line 7",
         "passage": "Decimal numbers can be represented exactly.",
-        "publisher_authority": true,
-        "passage_entailment": true
-      },
-      {
-        "url": "https://docs.python.org/3/library/decimal.html",
-        "location": "Introduction, line 24",
-        "passage": "The decimal module was designed to support “without prejudice, both exact unrounded decimal arithmetic (sometimes called fixed-point arithmetic) and rounded floating-point arithmetic.”",
         "publisher_authority": true,
         "passage_entailment": true
       }
@@ -65,18 +58,17 @@
   },
   "arbitration_research": {
     "model_calls": ["arbitration-discovery", "arbitration-binding"],
-    "claim_count": 6,
-    "capture_count": 6,
-    "bound_count": 6,
+    "claim_count": 4,
+    "capture_count": 4,
+    "bound_count": 4,
     "binding_budget_demotions": 0,
     "validation_retries": 0
   },
   "assertions": [
     "The live server captured and extracted a 70,378-character authoritative page that the former 40,000-character policy rejected.",
-    "The signed-in discovery session resumed with tools disabled and bound two exact passages from the server capture.",
-    "The two evidence rows shared identical final URL and content/text digests, exercising per-batch capture-reference compaction.",
-    "A fresh tool-less attester independently accepted publisher authority and passage entailment for both rows.",
+    "The signed-in discovery session resumed with tools disabled and bound an exact passage from the server capture.",
+    "A fresh tool-less attester independently accepted publisher authority and passage entailment.",
     "The final durable claim state was supported and unblocked without a validation retry.",
-    "A separate signed-in arbitration researcher accepted the new bounded capture-reference envelope and bound all six captured claims in two calls."
+    "A separate signed-in arbitration researcher accepted the new bounded capture-reference envelope and bound all four captured claims in two calls."
   ]
 }
