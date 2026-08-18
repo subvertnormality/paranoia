@@ -20,6 +20,34 @@ from paranoia_local.engines import Review
 PLAN = "# Rollout\n\nPython 3.11 was released in October 2022.\n"
 
 
+def test_minimal_claim_validation_acceptance_record() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/minimal_claim_validation_acceptance_2026-08-18.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == "minimal-claim-validation-diagnostics-v1"
+    assert artifact["model_call_count"] == 2
+    calls = artifact["provider_calls"]
+    assert [call["role"] for call in calls] == [
+        "evidence-discovery", "evidence-discovery",
+    ]
+    assert all(call["returncode"] == 0 and not call["error"] for call in calls)
+    assert calls[0]["session_ref"] == calls[1]["session_ref"]
+    debt = artifact["debt"]
+    assert "initial: unexpected text after claim audit JSON" in debt["reason"]
+    assert "correction: unexpected text after claim audit JSON" in debt["reason"]
+    assert "reviewer failed" not in debt["reason"]
+    assert debt["raw_sha256"] == artifact["expected_rejected_exchange_sha256"]
+    assert artifact["caller_claim_audit_debt"] is True
+    assert artifact["caller_convergence_blocked"] is True
+    assert "CONVERGENCE: BLOCKED" in artifact["result_excerpt"]
+    source = subprocess.run(
+        ["git", "show", f'{artifact["source_commit"]}:src/paranoia_local/handlers.py'],
+        cwd=root, capture_output=True, text=True, check=True,
+    ).stdout
+    assert "class _ValidationReview" in source
+
+
 def _source(
     *,
     url: str = "https://www.python.org/downloads/release/python-3110/",
