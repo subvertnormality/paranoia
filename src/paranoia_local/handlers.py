@@ -2181,9 +2181,21 @@ class _CapturedClaimEngine:
                     json.dumps(row, ensure_ascii=False, separators=(",", ":"))
                 ) + 1
             if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
-                raise pc.AuditError(
-                    "one captured source exceeds the plan binding batch budget"
+                capture = replace(
+                    capture, text=None,
+                    error=external_sources.BINDING_BUDGET_ERROR,
                 )
+                captures[(claim_index, evidence_index)] = capture
+                referenceable = False
+                capture_ref = None
+                row = make_row(None)
+                row_chars = len(
+                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+                ) + 1
+                if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
+                    raise pc.AuditError(
+                        "one capture's non-text metadata exceeds the plan binding batch budget"
+                    )
             current.append(row)
             current_chars += row_chars
             if referenceable and capture_ref is None:

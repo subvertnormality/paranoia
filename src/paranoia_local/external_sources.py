@@ -48,6 +48,10 @@ BROWSER_USER_AGENT = (
     "Chrome/127.0.0.0 Safari/537.36"
 )
 MAX_CAPTURE_ERROR_CHARS = 1200
+BINDING_BUDGET_ERROR = (
+    "capture excluded from binding input because its serialized captured text exceeds "
+    "the available binding budget"
+)
 
 
 class SourceError(ValueError):

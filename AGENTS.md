@@ -188,6 +188,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   When distinct arbitration captures exceed its single prompt budget, deterministically demote
   the largest capture groups to bounded server-owned binding-budget failures until it fits;
   preserve the remaining research and do not add a model call.
+  Apply the same per-source failure to a plan capture whose numbered and JSON-escaped row alone
+  exceeds one binding batch; never let one admitted page abort unrelated plan evidence.
   Retry HTTP 403 at most once with a browser-compatible user agent, a fresh redirect counter, and
   the original absolute deadline and public-address/final-URL policy. A persistent 403 remains
   unusable and retains final URL, numeric status, bounded error, and retry fact; never add cookies,

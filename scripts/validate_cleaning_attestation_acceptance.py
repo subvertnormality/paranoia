@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from paranoia_local import arbitrate_handler as production_arbitrate  # noqa: E402
 from paranoia_local import arbitration as production_protocol  # noqa: E402
 from paranoia_local import evidence as production_evidence  # noqa: E402
+from paranoia_local import inert_git  # noqa: E402
 from paranoia_local import prompts as production_prompts  # noqa: E402
 
 PRODUCTION_SOURCES = frozenset({
@@ -150,11 +151,19 @@ def _exact_numeric_schema(artifact: dict) -> None:
             raise ValueError(f"{prefix} test exit status schema mismatch")
 
 
-def _validate_hashes(hashes: dict[str, str], expected: frozenset[str], repo: Path) -> None:
+def _validate_hashes(
+    hashes: dict[str, str], expected: frozenset[str], repo: Path, source_commit: str,
+) -> None:
     if set(hashes) != expected:
         raise ValueError("production_source_sha256 does not name the complete source set")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise ValueError("production source_commit is invalid")
     for relative, expected_hash in hashes.items():
-        if _sha256(repo / relative) != expected_hash:
+        blob = inert_git.invoke(repo, ["show", f"{source_commit}:{relative}"])
+        if (
+            blob.returncode != 0
+            or hashlib.sha256(blob.stdout).hexdigest() != expected_hash
+        ):
             raise ValueError(f"production hash mismatch: {relative}")
 
 
@@ -296,7 +305,7 @@ def _derived_outcome_bound(audit: dict, fixture_repo: Path) -> bool:
 def _validate_cleaning_acceptance(artifact: dict, repo: Path) -> None:
     expected_top = {
         "acceptance_kind", "acceptance_scope", "delivery_metrics", "positive_long_context",
-        "original_report_input", "production_source_sha256",
+        "original_report_input", "production_source_sha256", "source_commit",
         "timing_record", "tests",
     }
     if set(artifact) != expected_top:
@@ -341,7 +350,10 @@ def _validate_cleaning_acceptance(artifact: dict, repo: Path) -> None:
     }:
         raise ValueError("test record schema is incomplete or contains unverified fields")
     _exact_numeric_schema(artifact)
-    _validate_hashes(artifact["production_source_sha256"], CLEANING_SOURCES, repo)
+    _validate_hashes(
+        artifact["production_source_sha256"], CLEANING_SOURCES, repo,
+        artifact["source_commit"],
+    )
     audits: dict[str, dict] = {}
     for name in ("positive_long_context", "original_report_input"):
         summary = artifact[name]

@@ -370,7 +370,9 @@ through 100,000 characters, so ordinary long reference pages are not discarded a
 batch and referenced by final URL plus content/text digests; distinct pages still obey the
 existing serialized aggregate ceilings. Arbitration deterministically marks the largest distinct
 captures unusable until its single binding prompt fits, so one large-source group fails closed
-without aborting all research. Requests use explicit HTML/text accept headers and identity content
+without aborting all research. Plan binding likewise marks an individual capture unusable when
+line numbering or JSON escaping makes its row exceed one batch; other captures continue.
+Requests use explicit HTML/text accept headers and identity content
 encoding (`Accept-Encoding: identity`). An HTTP 403 receives one same-URL browser-compatible retry inside
 the original deadline and redirect/public-address policy. A persistent 403 remains fail-closed
 with its final URL, status, bounded error, and retry fact visible in durable provenance; the

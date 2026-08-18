@@ -110,6 +110,9 @@ the existing 400,000-character binding limit. Arbitration degrades the largest d
 groups per-source when its aggregate would overflow; the plan path retains its five deterministic
 batches. One oversized source, a sixth plan batch, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
+If numbering or JSON escaping makes one plan capture row exceed a batch by itself, only that
+capture becomes unusable with the bounded server-owned binding-budget reason; it cannot abort
+unrelated claim captures.
 
 The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
 reserve within the documented 7,200-second MCP client timeout. After evidence state is persisted,

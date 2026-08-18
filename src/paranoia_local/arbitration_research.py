@@ -142,10 +142,7 @@ CAPTURE_REF_SEMANTICS = (
     "A non-null capture_ref names an earlier claim_index in rows with identical final URL "
     "and content/text digests; use that row's line-numbered text."
 )
-BINDING_BUDGET_ERROR = (
-    "capture excluded from binding input because distinct captured pages exceed the "
-    f"{MAX_BINDING_INPUT_CHARS}-character aggregate binding budget"
-)
+BINDING_BUDGET_ERROR = sources.BINDING_BUDGET_ERROR
 
 
 def _render_binding_input(

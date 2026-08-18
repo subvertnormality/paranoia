@@ -1702,6 +1702,32 @@ def test_plan_binding_capture_references_never_cross_batch_boundary(tmp_path: Pa
     assert batches[1][2]["capture"]["line_numbered_text"] == ""
 
 
+def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: Path) -> None:
+    audit = pc.parse_audit(_audit(_claim()), PLAN)
+    item = audit.claims[0]["evidence"][0]
+    candidate = external_sources.CandidateSource(
+        item["url"], item["title"], item["publisher"], item["source_kind"],
+        item["authority_basis"], item["relation"],
+    )
+    captures = {(0, 0): external_sources.Capture(
+        candidate, candidate.url, 200, "text/plain", "a" * 64, "b" * 64,
+        "\n" * external_sources.MAX_EXTRACTED_CHARS,
+    )}
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    try:
+        batches = adapter._binding_batches(audit, captures)
+    finally:
+        adapter.close()
+    assert len(batches) == 1
+    assert len(batches[0]) == 1
+    assert not captures[(0, 0)].usable
+    assert captures[(0, 0)].error == external_sources.BINDING_BUDGET_ERROR
+    assert batches[0][0]["capture"]["usable"] is False
+    assert batches[0][0]["capture"]["line_numbered_text"] == ""
+
+
 def test_plan_capture_aggregate_ceiling_blocks_before_network(
     tmp_path: Path, monkeypatch,
 ) -> None:
