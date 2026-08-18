@@ -396,6 +396,10 @@ def cleaning_fixture(tmp_path: Path) -> tuple[Path, Path]:
         ["git", "-c", "commit.gpgsign=false", "commit", "--amend", "--no-edit", "-q"],
         cwd=repo, check=True,
     )
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
     diff_rows = subprocess.run(
         ["git", "diff", "--numstat", f"{base}..HEAD"], cwd=repo, check=True,
         capture_output=True, text=True,
@@ -410,6 +414,7 @@ def cleaning_fixture(tmp_path: Path) -> tuple[Path, Path]:
     artifact = tmp_path / "cleaning-acceptance.json"
     artifact.write_text(json.dumps({
         "acceptance_kind": "cleaning-attestation-v1",
+        "source_commit": source_commit,
         "acceptance_scope": {
             "proves": [
                 "caller context and normalized options reached both deciders in the recorded runs",

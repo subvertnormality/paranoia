@@ -1,0 +1,74 @@
+{
+  "acceptance_kind": "large-page-plan-claim-capture",
+  "date": "2026-08-18",
+  "branch": "fix/large-page-evidence-capture",
+  "source_commit": "c25a1ab6c6f1a66705dba3ac7bcd0ff81ed5498b",
+  "provider": {
+    "engine": "codex",
+    "cli_version": "codex-cli 0.144.6",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "web_search": true
+  },
+  "runtime": {
+    "trafilatura_version": "2.2.0",
+    "elapsed_seconds": 79.361,
+    "model_calls": [
+      "plan-evidence-discovery",
+      "plan-evidence-binding",
+      "plan-evidence-text",
+      "arbitration-discovery",
+      "arbitration-binding"
+    ],
+    "validation_retries": 0
+  },
+  "source_sha256": {
+    "src/paranoia_local/external_sources.py": "166bfd4bf987714f9a9f500217d4f1cce6f74a4313fadd709e01d7d6a9ddb483",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/handlers.py": "afb37aa4110617e65c44dd32fff6bc8d279ac9a908853cc3c489a1e118473faf",
+    "src/paranoia_local/arbitrate_handler.py": "cda50974be9c83261da808c94eca553265d460960e17c79c1001f9305a01caff"
+  },
+  "direct_capture": {
+    "url": "https://docs.python.org/3/library/decimal.html",
+    "status": 200,
+    "content_type": "text/html",
+    "content_sha256": "55fc6cbb881fee55c002bdc642cb7c1cbcaad6c0c74574417d0e6d2f328db104",
+    "text_sha256": "0cbe258434bc4ae6167a8b2f6f32db6776e2aa660b48d0de60e1c8166603b62d",
+    "extracted_characters": 70378,
+    "former_limit": 40000,
+    "current_limit": 100000,
+    "fallback_attempted": false
+  },
+  "verified_plan": {
+    "status": "parsed 1 new + 0 targeted retained + 0 frozen",
+    "claim_count": 1,
+    "blocked": false,
+    "claim_id": "C-aaf8826076",
+    "proposition": "Python's decimal module supports exact representation of decimal numbers.",
+    "verdict": "supported",
+    "evidence": [
+      {
+        "url": "https://docs.python.org/3/library/decimal.html",
+        "location": "Introduction, second bullet under advantages over the float datatype, lines 3–9",
+        "passage": "Decimal numbers can be represented exactly.",
+        "publisher_authority": true,
+        "passage_entailment": true
+      }
+    ]
+  },
+  "arbitration_research": {
+    "model_calls": ["arbitration-discovery", "arbitration-binding"],
+    "claim_count": 5,
+    "capture_count": 5,
+    "bound_count": 5,
+    "binding_budget_demotions": 0,
+    "validation_retries": 0
+  },
+  "assertions": [
+    "The live server captured and extracted a 70,378-character authoritative page that the former 40,000-character policy rejected.",
+    "The signed-in discovery session resumed with tools disabled and bound an exact passage from the server capture.",
+    "A fresh tool-less attester independently accepted publisher authority and passage entailment.",
+    "The final durable claim state was supported and unblocked without a validation retry.",
+    "A separate signed-in arbitration researcher accepted the new bounded capture-reference envelope and bound all five captured claims in two calls."
+  ]
+}

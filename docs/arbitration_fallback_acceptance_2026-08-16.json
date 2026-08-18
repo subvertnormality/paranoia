@@ -1,5 +1,6 @@
 {
   "acceptance_kind": "arbitration-original-fallback-v2",
+  "source_commit": "321c1d20849934a5a7eec2139441f0bc25ca701c",
   "acceptance_scope": {
     "proves": [
       "a reported destructive cleaner candidate was retained as rejected audit data",

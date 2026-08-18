@@ -305,13 +305,17 @@ Budgets are corruption/pathology guards, not sampling targets. Each researcher m
 12 unique normalized propositions and one candidate record per proposition; duplicate normalized
 propositions within one producer are rejected. Bound fields are: proposition 1,200 characters,
 URL 2,048, title 400, publisher 200, authority basis 600, location 400, and exact passage 1,200.
-Each captured document is at most 40,000 extracted characters and each producer's binding input is
-at most 400,000 rendered characters. The deterministic two-producer union may contain at most 24
+Each captured document is at most 100,000 extracted characters and each producer's binding input is
+at most 400,000 rendered characters after line numbering, metadata, and JSON escaping. Identical
+final-URL/content/text captures render once and later rows reference the first. When distinct
+captures would overflow the aggregate, the server deterministically marks the largest capture
+groups unusable with a binding-budget reason until the prompt fits; it does not abort otherwise
+usable research or add another model call. The deterministic two-producer union may contain at most 24
 propositions, two records per normalized proposition, and 200,000 rendered packet characters.
 The maximum accepted field payload plus fixed rendering overhead is below that union limit.
-Exceeding a producer, field, capture, binding-input, or union budget fails visibly rather than
-truncating evidence and calling the result complete. These limits compose without assuming that
-independently worded claims deduplicate.
+Exceeding a producer, field, capture, or union budget fails visibly rather than truncating evidence
+and calling the result complete. Binding-input overflow is localized into visible per-source
+unusable capture state. These limits do not assume independently worded claims deduplicate.
 
 The shared engine diagnostic contract also applies to captured plan-claim binding: durable debt
 stores provider stdout, structured failure detail, and process stderr as separate hashed, bounded

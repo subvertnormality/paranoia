@@ -31,11 +31,27 @@ UGC_HOSTS = (
 )
 
 MAX_RESPONSE_BYTES = 5_000_000
-MAX_EXTRACTED_CHARS = 40_000
+MAX_EXTRACTED_CHARS = 100_000
 CONNECT_TIMEOUT_SEC = 20
 READ_TIMEOUT_SEC = 40
 MAX_REDIRECTS = 5
 READ_CHUNK_BYTES = 64 * 1024
+BASE_REQUEST_HEADERS = {
+    "User-Agent": "paranoia-local/0.1 evidence-capture",
+    "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+    "Accept-Language": "en-US,en;q=0.8",
+    "Accept-Encoding": "identity",
+}
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/127.0.0.0 Safari/537.36"
+)
+MAX_CAPTURE_ERROR_CHARS = 1200
+BINDING_BUDGET_ERROR = (
+    "capture excluded from binding input because its serialized captured text exceeds "
+    "the available binding budget"
+)
 
 
 class SourceError(ValueError):
@@ -70,6 +86,7 @@ class Capture:
     text_sha256: str | None
     text: str | None
     error: str | None = None
+    fallback_attempted: bool = False
 
     @property
     def usable(self) -> bool:
@@ -213,6 +230,39 @@ def _read_body(response: object, *, deadline: float, clock: Callable[[], float])
     return bytes(body)
 
 
+def _bounded_error(value: object) -> str:
+    text = " ".join(str(value).split()) or type(value).__name__
+    if len(text) <= MAX_CAPTURE_ERROR_CHARS:
+        return text
+    return text[: MAX_CAPTURE_ERROR_CHARS - 1] + "…"
+
+
+def _http_error_capture(
+    candidate: CandidateSource,
+    error: urllib.error.HTTPError,
+    *,
+    fallback_attempted: bool,
+    detail: str | None = None,
+) -> Capture:
+    final_url: str | None = None
+    try:
+        proposed = error.geturl()
+        _validate_public_url(proposed)
+        final_url = proposed
+    except (SourceError, OSError, ValueError) as exc:
+        detail = f"HTTP {error.code}; rejected final URL: {_bounded_error(exc)}"
+    content_type = None
+    if error.headers is not None:
+        content_type = error.headers.get_content_type().lower()
+    message = detail or _bounded_error(error)
+    if fallback_attempted and error.code == 403:
+        message = f"{message}; browser-compatible retry attempted"
+    return Capture(
+        candidate, final_url, int(error.code), content_type, None, None, None,
+        _bounded_error(message), fallback_attempted,
+    )
+
+
 def capture(
     candidate: CandidateSource,
     *,
@@ -221,6 +271,7 @@ def capture(
     clock: Callable[[], float] = time.monotonic,
 ) -> Capture:
     candidate = normalize_candidate(candidate)
+    fallback_attempted = False
     try:
         started = clock()
         capture_deadline = started + CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC
@@ -232,21 +283,47 @@ def capture(
         remaining = capture_deadline - clock()
         if remaining <= 0:
             raise SourceError("source capture deadline expired before request")
-        request = urllib.request.Request(
-            candidate.url,
-            headers={"User-Agent": "paranoia-local/0.1 evidence-capture"},
-        )
-        if opener is None:
-            handler = _SafeRedirect()
-            built_opener = urllib.request.build_opener(handler)
+        response = None
+        first_403: urllib.error.HTTPError | None = None
+        for browser_compatible in (False, True):
+            remaining = capture_deadline - clock()
+            if remaining <= 0:
+                if browser_compatible and first_403 is not None:
+                    return _http_error_capture(
+                        candidate, first_403, fallback_attempted=False,
+                        detail=(
+                            "HTTP 403; browser-compatible retry not attempted because the "
+                            "source capture deadline expired"
+                        ),
+                    )
+                raise SourceError("source capture deadline expired before request")
+            headers = dict(BASE_REQUEST_HEADERS)
+            if browser_compatible:
+                headers["User-Agent"] = BROWSER_USER_AGENT
+                fallback_attempted = True
+            request = urllib.request.Request(candidate.url, headers=headers)
+            if opener is None:
+                handler = _SafeRedirect()
+                built_opener = urllib.request.build_opener(handler)
 
-            def open_call(req: urllib.request.Request, timeout: float):
-                return built_opener.open(req, timeout=timeout)
-        else:
-            open_call = opener
-        with open_call(
-            request, min(CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC, remaining),
-        ) as response:  # type: ignore[attr-defined]
+                def open_call(req: urllib.request.Request, timeout: float):
+                    return built_opener.open(req, timeout=timeout)
+            else:
+                open_call = opener
+            try:
+                response = open_call(
+                    request, min(CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC, remaining),
+                )
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code == 403 and not browser_compatible:
+                    first_403 = exc
+                    continue
+                return _http_error_capture(
+                    candidate, exc, fallback_attempted=fallback_attempted,
+                )
+        assert response is not None
+        with response:  # type: ignore[attr-defined]
             final_url = response.geturl()
             _validate_public_url(final_url)
             status = int(getattr(response, "status", 200))
@@ -265,9 +342,13 @@ def capture(
             content_sha256=hashlib.sha256(body).hexdigest(),
             text_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
             text=text,
+            fallback_attempted=fallback_attempted,
         )
     except (SourceError, urllib.error.URLError, OSError, ValueError) as exc:
-        return Capture(candidate, None, None, None, None, None, None, str(exc))
+        return Capture(
+            candidate, None, None, None, None, None, None, _bounded_error(exc),
+            fallback_attempted,
+        )
 
 
 def capture_all(

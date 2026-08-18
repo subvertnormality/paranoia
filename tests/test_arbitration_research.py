@@ -53,6 +53,60 @@ def test_binding_requires_exact_captured_passage():
         ar.parse_binding(bad, claims, captures)
 
 
+def test_binding_input_compacts_repeated_large_capture():
+    value = json.loads(discovery().split("\n", 1)[1])
+    second = json.loads(json.dumps(value["claims"][0]))
+    second["proposition"] = "The API waits before retrying."
+    value["claims"].append(second)
+    claims = ar.parse_discovery(ar.DISCOVERY_MARKER + "\n" + json.dumps(value))
+    text = "x" * 70_000
+    captures = [
+        es.Capture(
+            claim.candidate, claim.candidate.url, 200, "text/html",
+            "a" * 64, "b" * 64, text,
+        )
+        for claim in claims
+    ]
+    rendered = json.loads(ar.binding_input(claims, captures))
+    rows = rendered["rows"]
+    assert rows[0]["capture"]["capture_ref"] is None
+    assert rows[1]["capture"]["capture_ref"] == 0
+    assert rows[1]["capture"]["line_numbered_text"] == ""
+    assert rows[0]["capture"]["line_numbered_text"].endswith(text)
+    assert "earlier claim_index" in rendered["capture_ref_semantics"]
+
+
+def test_distinct_large_captures_degrade_per_source_to_fit_binding_budget():
+    value = json.loads(discovery().split("\n", 1)[1])
+    template = value["claims"][0]
+    value["claims"] = []
+    for index in range(5):
+        item = json.loads(json.dumps(template))
+        item["proposition"] = f"The API behavior {index} is documented."
+        item["candidate"]["url"] = f"https://docs.example.com/api/{index}"
+        value["claims"].append(item)
+    claims = ar.parse_discovery(ar.DISCOVERY_MARKER + "\n" + json.dumps(value))
+    captures = tuple(
+        es.Capture(
+            claim.candidate, claim.candidate.url, 200, "text/html",
+            f"{index:064x}", f"{index + 10:064x}", "x" * 100_000,
+        )
+        for index, claim in enumerate(claims)
+    )
+    rendered, effective = ar.bounded_binding_input(claims, captures)
+    assert len(rendered) <= ar.MAX_BINDING_INPUT_CHARS
+    assert any(not capture.usable for capture in effective)
+    assert any(capture.usable for capture in effective)
+    assert all(
+        capture.error == ar.BINDING_BUDGET_ERROR
+        for capture in effective if not capture.usable
+    )
+    rows = json.loads(rendered)["rows"]
+    assert [row["capture"]["usable"] for row in rows] == [
+        capture.usable for capture in effective
+    ]
+
+
 def test_packet_union_is_deterministic_and_governing():
     claims = ar.parse_discovery(discovery())
     captures = [captured(claims[0])]

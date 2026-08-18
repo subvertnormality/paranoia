@@ -369,7 +369,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     if set(artifact) != {
         "acceptance_kind", "acceptance_scope", "audits", "timings",
-        "snapshot_binding", "source_sha256", "tests",
+        "snapshot_binding", "source_commit", "source_sha256", "tests",
     }:
         raise ValueError("fallback acceptance top-level schema mismatch")
     if artifact["acceptance_kind"] != "arbitration-original-fallback-v2":
@@ -378,8 +378,16 @@ def validate(artifact_path: Path, repo: Path) -> None:
         raise ValueError("fallback acceptance claim scope mismatch")
     if set(artifact["source_sha256"]) != SOURCES:
         raise ValueError("fallback acceptance source set mismatch")
+    source_commit = artifact.get("source_commit")
+    if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise ValueError("fallback acceptance source commit is invalid")
     for relative, digest in artifact["source_sha256"].items():
-        if not _is_sha256(digest) or _sha256(repo / relative) != digest:
+        blob = inert_git.invoke(repo, ["show", f"{source_commit}:{relative}"])
+        if (
+            not _is_sha256(digest)
+            or blob.returncode != 0
+            or hashlib.sha256(blob.stdout).hexdigest() != digest
+        ):
             raise ValueError(f"fallback acceptance source hash mismatch: {relative}")
 
     if set(artifact["audits"]) != {"ordinary", "fallback"} or set(artifact["timings"]) != {
