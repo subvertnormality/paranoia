@@ -2170,6 +2170,18 @@ class _CapturedClaimEngine:
             capture_ref = seen_captures.get(identity) if referenceable else None
             row = make_row(capture_ref)
             row_chars = len(json.dumps(row, ensure_ascii=False, separators=(",", ":"))) + 1
+            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
+                capture = replace(
+                    capture, text=None,
+                    error=external_sources.BINDING_BUDGET_ERROR,
+                )
+                captures[(claim_index, evidence_index)] = capture
+                referenceable = False
+                capture_ref = None
+                row = make_row(None)
+                row_chars = len(
+                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+                ) + 1
             if current and current_chars + row_chars > MAX_PLAN_BINDING_BATCH_CHARS:
                 batches.append(current)
                 current = []

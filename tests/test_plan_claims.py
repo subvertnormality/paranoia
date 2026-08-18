@@ -1728,6 +1728,40 @@ def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: 
     assert batches[0][0]["capture"]["line_numbered_text"] == ""
 
 
+def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
+    tmp_path: Path,
+) -> None:
+    lines = [f"External behavior {index} is guaranteed." for index in range(4)]
+    plan = "# Plan\n\n" + "\n".join(lines)
+    audit = pc.parse_audit(_audit(*[
+        _claim(anchor=line, proposition=line) for line in lines
+    ]), plan)
+    captures = {}
+    for claim_index, claim in enumerate(audit.claims):
+        item = claim["evidence"][0]
+        candidate = external_sources.CandidateSource(
+            item["url"], item["title"], item["publisher"], item["source_kind"],
+            item["authority_basis"], item["relation"],
+        )
+        captures[(claim_index, 0)] = external_sources.Capture(
+            candidate, f"{candidate.url}?page={claim_index}", 200, "text/plain",
+            f"{claim_index:064x}", f"{claim_index + 10:064x}",
+            ("x" * external_sources.MAX_EXTRACTED_CHARS)
+            if claim_index < 3 else ("\n" * external_sources.MAX_EXTRACTED_CHARS),
+        )
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    try:
+        batches = adapter._binding_batches(audit, captures)
+    finally:
+        adapter.close()
+    assert len(batches) == 1
+    assert len(batches[0]) == 4
+    assert batches[0][-1]["capture"]["usable"] is False
+    assert captures[(3, 0)].error == external_sources.BINDING_BUDGET_ERROR
+
+
 def test_plan_capture_aggregate_ceiling_blocks_before_network(
     tmp_path: Path, monkeypatch,
 ) -> None:
