@@ -368,8 +368,10 @@ Capture keeps a 5,000,000-byte response circuit breaker but admits complete Traf
 through 100,000 characters, so ordinary long reference pages are not discarded at the former
 40,000-character threshold. Repeated identical captures are rendered once per binding prompt or
 batch and referenced by final URL plus content/text digests; distinct pages still obey the
-existing serialized aggregate ceilings. Requests use explicit HTML/text accept headers and
-identity transfer encoding. An HTTP 403 receives one same-URL browser-compatible retry inside
+existing serialized aggregate ceilings. Arbitration deterministically marks the largest distinct
+captures unusable until its single binding prompt fits, so one large-source group fails closed
+without aborting all research. Requests use explicit HTML/text accept headers and identity content
+encoding (`Accept-Encoding: identity`). An HTTP 403 receives one same-URL browser-compatible retry inside
 the original deadline and redirect/public-address policy. A persistent 403 remains fail-closed
 with its final URL, status, bounded error, and retry fact visible in durable provenance; the
 server never uses cookies, browser automation, mirrors, snippets, or provider-fetched text.

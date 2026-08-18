@@ -185,6 +185,9 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   100,000 characters. Deduplicate identical final-URL/content/text captures only within one
   binding prompt or batch, using an earlier-row reference bound to all three values. Count actual
   numbered, metadata-bearing, JSON-escaped representations against aggregate binding budgets.
+  When distinct arbitration captures exceed its single prompt budget, deterministically demote
+  the largest capture groups to bounded server-owned binding-budget failures until it fits;
+  preserve the remaining research and do not add a model call.
   Retry HTTP 403 at most once with a browser-compatible user agent, a fresh redirect counter, and
   the original absolute deadline and public-address/final-URL policy. A persistent 403 remains
   unusable and retains final URL, numeric status, bounded error, and retry fact; never add cookies,

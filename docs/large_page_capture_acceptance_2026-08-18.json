@@ -2,6 +2,7 @@
   "acceptance_kind": "large-page-plan-claim-capture",
   "date": "2026-08-18",
   "branch": "fix/large-page-evidence-capture",
+  "source_commit": "fe8fa8c5ed404e5186e203ef91fa350066d69e86",
   "provider": {
     "engine": "codex",
     "cli_version": "codex-cli 0.144.6",

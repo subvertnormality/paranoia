@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable, Sequence
 
 from . import external_sources as sources
@@ -138,7 +138,19 @@ def parse_discovery(text: str, *, forbidden: Iterable[str] = ()) -> tuple[Discov
     return tuple(claims)
 
 
-def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture]) -> str:
+CAPTURE_REF_SEMANTICS = (
+    "A non-null capture_ref names an earlier claim_index in rows with identical final URL "
+    "and content/text digests; use that row's line-numbered text."
+)
+BINDING_BUDGET_ERROR = (
+    "capture excluded from binding input because distinct captured pages exceed the "
+    f"{MAX_BINDING_INPUT_CHARS}-character aggregate binding budget"
+)
+
+
+def _render_binding_input(
+    claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
+) -> str:
     if len(claims) != len(captures):
         raise ResearchError("capture count does not match discovery count")
     rows: list[dict[str, object]] = []
@@ -170,19 +182,54 @@ def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.C
                 "error": capture.error,
                 "fallback_attempted": capture.fallback_attempted,
                 "capture_ref": capture_ref,
-                "capture_ref_semantics": (
-                    "non-null names an earlier claim_index in this input with identical "
-                    "final URL and content/text digests; use that row's line-numbered text"
-                ),
                 "line_numbered_text": (
                     "" if capture_ref is not None
                     else sources.numbered_text(capture.text or "")
                 ),
             },
         })
-    rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
-    if len(rendered) > MAX_BINDING_INPUT_CHARS:
-        raise ResearchError(f"binding input exceeds {MAX_BINDING_INPUT_CHARS} characters")
+    return json.dumps(
+        {"capture_ref_semantics": CAPTURE_REF_SEMANTICS, "rows": rows},
+        ensure_ascii=False, separators=(",", ":"),
+    )
+
+
+def bounded_binding_input(
+    claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
+) -> tuple[str, tuple[sources.Capture, ...]]:
+    """Fit arbitration binding input by failing only the largest distinct captures closed."""
+    effective = list(captures)
+    while True:
+        rendered = _render_binding_input(claims, effective)
+        if len(rendered) <= MAX_BINDING_INPUT_CHARS:
+            return rendered, tuple(effective)
+        groups: dict[
+            tuple[str | None, str | None, str | None], list[int]
+        ] = {}
+        for index, capture in enumerate(effective):
+            identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
+            if capture.usable and all(identity):
+                groups.setdefault(identity, []).append(index)
+        if not groups:
+            raise ResearchError(
+                f"binding input exceeds {MAX_BINDING_INPUT_CHARS} characters even with "
+                "every captured page unusable"
+            )
+        _identity, indices = max(
+            groups.items(),
+            key=lambda item: (
+                len(sources.numbered_text(effective[item[1][0]].text or "")),
+                tuple(-index for index in item[1]),
+            ),
+        )
+        for index in indices:
+            effective[index] = replace(
+                effective[index], text=None, error=BINDING_BUDGET_ERROR,
+            )
+
+
+def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture]) -> str:
+    rendered, _ = bounded_binding_input(claims, captures)
     return rendered
 
 

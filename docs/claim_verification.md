@@ -62,7 +62,10 @@ an empty, verified register.
    and extracted-text limits, then extracts main text with Trafilatura. Responses remain capped at
    5,000,000 bytes; complete extracted text through 100,000 characters is admitted. Repeated
    captures with the same final URL and content/text digests appear once per serialized binding
-   prompt or batch and later rows reference that exact capture. The same reviewer session
+   prompt or batch and later rows reference that exact capture. If distinct arbitration captures
+   exceed its single 400,000-character binding prompt, the largest capture groups are
+   deterministically made unusable with a server-owned binding-budget reason until the prompt
+   fits; other research continues. The same reviewer session
    is resumed with web and repository access disabled and may bind exact passages only from those
    captures. Search snippets, provider summaries, and provider-fetched page bodies never count.
    The initial attributable request carries explicit accept/language/identity-encoding headers.
@@ -103,7 +106,9 @@ Captured sources are downloaded with up to 16 workers under the same monotonic d
 per-source wall-clock bounds, then bound in deterministic indexed batches in the same corrected
 discovery session. Exact 5,000,000-byte and 100,000-character boundaries are admitted; the first
 unit above either is rejected. Serialized numbering, metadata, and JSON escaping count against
-the existing 400,000-character binding limit. One oversized source, a sixth batch, an expired capture, or a failed batch
+the existing 400,000-character binding limit. Arbitration degrades the largest distinct capture
+groups per-source when its aggregate would overflow; the plan path retains its five deterministic
+batches. One oversized source, a sixth plan batch, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
 
 The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown

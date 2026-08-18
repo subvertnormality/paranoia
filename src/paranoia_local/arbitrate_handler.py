@@ -2081,7 +2081,7 @@ def _research_one(
                 rejected=rejected, claims=claims, captures=completed_captures,
             ) from exc
         try:
-            rendered = research_core.binding_input(claims, captures)
+            rendered, captures = research_core.bounded_binding_input(claims, captures)
         except Exception as exc:
             raise _research_failure(
                 engine=engine, model=model, phase="binding-input", kind="validation",

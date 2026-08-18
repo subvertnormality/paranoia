@@ -40,8 +40,13 @@ def test_large_page_capture_acceptance_record() -> None:
         row["publisher_authority"] and row["passage_entailment"]
         for row in artifact["verified_plan"]["evidence"]
     )
+    source_commit = artifact["source_commit"]
     for relative, expected in artifact["source_sha256"].items():
-        assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
+        content = subprocess.run(
+            ["git", "show", f"{source_commit}:{relative}"], cwd=root,
+            capture_output=True, check=True,
+        ).stdout
+        assert hashlib.sha256(content).hexdigest() == expected
 
 
 def test_minimal_claim_validation_acceptance_record() -> None:
@@ -1650,6 +1655,42 @@ def test_plan_binding_batches_large_ordinary_inventory(tmp_path: Path) -> None:
         assert batches[0][1]["capture"]["line_numbered_text"] == ""
     finally:
         adapter.close()
+
+
+def test_plan_binding_capture_references_never_cross_batch_boundary(tmp_path: Path) -> None:
+    lines = [f"External behavior {index} is guaranteed." for index in range(6)]
+    plan = "# Plan\n\n" + "\n".join(lines)
+    audit = pc.parse_audit(_audit(*[
+        _claim(anchor=line, proposition=line) for line in lines
+    ]), plan)
+    identities = [0, 1, 2, 3, 0, 0]
+    captures = {}
+    for claim_index, (claim, identity) in enumerate(zip(audit.claims, identities)):
+        item = claim["evidence"][0]
+        candidate = external_sources.CandidateSource(
+            item["url"], item["title"], item["publisher"], item["source_kind"],
+            item["authority_basis"], item["relation"],
+        )
+        captures[(claim_index, 0)] = external_sources.Capture(
+            candidate, f"{candidate.url}?page={identity}", 200, "text/html",
+            f"{identity:064x}", f"{identity + 10:064x}",
+            "x" * external_sources.MAX_EXTRACTED_CHARS,
+        )
+    adapter = handlers._CapturedClaimEngine(
+        _RoleScript({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+    )
+    try:
+        batches = adapter._binding_batches(audit, captures)
+    finally:
+        adapter.close()
+    assert len(batches) == 2
+    assert [row["claim_index"] for row in batches[1]] == [3, 4, 5]
+    assert batches[1][1]["capture"]["capture_ref"] is None
+    assert batches[1][1]["capture"]["line_numbered_text"]
+    assert batches[1][2]["capture"]["capture_ref"] == {
+        "claim_index": 4, "evidence_index": 0,
+    }
+    assert batches[1][2]["capture"]["line_numbered_text"] == ""
 
 
 def test_plan_capture_aggregate_ceiling_blocks_before_network(

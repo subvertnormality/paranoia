@@ -314,14 +314,6 @@ def capture(
             except urllib.error.HTTPError as exc:
                 if exc.code == 403 and not browser_compatible:
                     first_403 = exc
-                    if clock() >= capture_deadline:
-                        return _http_error_capture(
-                            candidate, exc, fallback_attempted=False,
-                            detail=(
-                                "HTTP 403; browser-compatible retry not attempted because "
-                                "the source capture deadline expired"
-                            ),
-                        )
                     continue
                 return _http_error_capture(
                     candidate, exc, fallback_attempted=fallback_attempted,
