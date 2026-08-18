@@ -43,9 +43,9 @@ def test_large_page_capture_acceptance_record() -> None:
     )
     assert artifact["arbitration_research"] == {
         "model_calls": ["arbitration-discovery", "arbitration-binding"],
-        "claim_count": 4,
-        "capture_count": 4,
-        "bound_count": 4,
+        "claim_count": 5,
+        "capture_count": 5,
+        "bound_count": 5,
         "binding_budget_demotions": 0,
         "validation_retries": 0,
     }
