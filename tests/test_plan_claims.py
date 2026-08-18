@@ -27,7 +27,8 @@ def test_large_page_capture_acceptance_record() -> None:
     )
     assert artifact["acceptance_kind"] == "large-page-plan-claim-capture"
     assert artifact["runtime"]["model_calls"] == [
-        "evidence-discovery", "evidence-binding", "evidence-text",
+        "plan-evidence-discovery", "plan-evidence-binding", "plan-evidence-text",
+        "arbitration-discovery", "arbitration-binding",
     ]
     assert artifact["runtime"]["validation_retries"] == 0
     assert artifact["direct_capture"]["extracted_characters"] == 70_378
@@ -40,6 +41,14 @@ def test_large_page_capture_acceptance_record() -> None:
         row["publisher_authority"] and row["passage_entailment"]
         for row in artifact["verified_plan"]["evidence"]
     )
+    assert artifact["arbitration_research"] == {
+        "model_calls": ["arbitration-discovery", "arbitration-binding"],
+        "claim_count": 6,
+        "capture_count": 6,
+        "bound_count": 6,
+        "binding_budget_demotions": 0,
+        "validation_retries": 0,
+    }
     source_commit = artifact["source_commit"]
     for relative, expected in artifact["source_sha256"].items():
         content = subprocess.run(

@@ -276,8 +276,10 @@ The long-page follow-up is recorded in
 A signed-in Codex run discovered the official Python decimal reference, captured all 70,378
 extracted characters, compacted two identical capture payloads in the binding batch, bound two
 exact passages with browsing disabled, and obtained independent positive authority/entailment
-attestations. It completed in 53.384 seconds with three model calls and no validation retry.
-The production diff is 173 additions and 43 deletions across `external_sources.py`,
-`arbitration_research.py`, and `handlers.py`. At acceptance time the three largest production
-Python modules were `handlers.py` (137,306 bytes; 2,947 lines), `arbitrate_handler.py` (127,166
+attestations. A separate signed-in arbitration researcher then discovered six sources and bound
+all six through the bounded capture-reference envelope. Both paths completed in 122.571 seconds
+with five model calls and no validation retry.
+The production diff is 218 additions and 49 deletions across `external_sources.py`,
+`arbitration_research.py`, `handlers.py`, and `arbitrate_handler.py`. At acceptance time the three largest production
+Python modules were `handlers.py` (137,306 bytes; 2,947 lines), `arbitrate_handler.py` (127,184
 bytes; 2,991 lines), and `plan_claims.py` (62,865 bytes; 1,422 lines).
