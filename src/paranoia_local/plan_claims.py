@@ -79,6 +79,11 @@ class AuditError(ValueError):
         }
 
 
+def bounded_diagnostic(text: str) -> str:
+    """Bound one model-controlled diagnostic using the canonical head/tail excerpt."""
+    return _excerpt(text)
+
+
 @dataclass(frozen=True)
 class Audit:
     claims: tuple[dict[str, Any], ...]

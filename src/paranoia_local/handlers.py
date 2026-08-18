@@ -18,7 +18,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
@@ -60,6 +60,13 @@ class _OmittedBinding:
 
 
 _OMITTED_BINDING = _OmittedBinding()
+
+
+@dataclass(frozen=True)
+class _ValidationReview(Review):
+    """A successful provider response rejected by local claim validation."""
+
+    validation_detail: str = ""
 
 
 def _attempt(
@@ -1776,15 +1783,18 @@ def _verify_plan_claims(
     if captured_engine is None and attempt_ledger is not None:
         attempt_ledger.append(_attempt("claim-audit", engine, review).json())
     if review.error:
+        validation_invalid = isinstance(review, _ValidationReview)
         error = pc.AuditError(
-            f"claim-audit reviewer failed (exit {review.returncode})",
+            review.validation_detail if validation_invalid else (
+                f"claim-audit reviewer failed (exit {review.returncode})"
+            ),
             review.raw,
             failure_detail=review.failure_detail or "", stderr=review.stderr or "",
             returncode=review.returncode,
         )
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
-        ), "failed"
+        ), "validation-invalid" if validation_invalid else "failed"
     allow_missing = bool(captured_engine and captured_engine.allow_missing)
     try:
         audit = pc.parse_audit(
@@ -1960,11 +1970,16 @@ class _CapturedClaimEngine:
                         plan_repo_path=self.plan_repo_path, allow_missing=True,
                     )
                 except pc.AuditError:
-                    return Review(
+                    detail = pc.bounded_diagnostic(
+                        f"initial: {error.reason}\ncorrection: {second.reason}"
+                    )
+                    return _ValidationReview(
                         text=f"[paranoia-local error] discovery audit invalid: {second}",
                         session_ref=corrected.session_ref,
                         raw="\n--- discovery correction ---\n".join(raw_parts),
-                        error=True,
+                        returncode=corrected.returncode, error=True,
+                        failure_detail=corrected.failure_detail,
+                        stderr=corrected.stderr, validation_detail=detail,
                     )
                 self.allow_missing = True
             session_ref = corrected.session_ref

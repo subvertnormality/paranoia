@@ -1,0 +1,66 @@
+{
+  "acceptance_kind": "minimal-claim-validation-diagnostics-v1",
+  "source_commit": "af93499dcb986f72bf456ec6c89c9949ec87b313",
+  "provider": {
+    "engine": "codex",
+    "cli_version": "codex-cli 0.144.6",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "web_search": true
+  },
+  "controlled_boundary": "Append fixed trailing text only to each successful discovery Review.text; preserve provider envelope, session, return code, usage, and execution.",
+  "elapsed_seconds": 157.974,
+  "model_call_count": 2,
+  "provider_calls": [
+    {
+      "role": "evidence-discovery",
+      "returncode": 0,
+      "error": false,
+      "session_ref": "01a0163c-c57d-7952-8838-dc58cdb1b465",
+      "original_text_sha256": "cac2995cf200f6fceae9439ae67c387c2c16b1b6818ce7e4c8e8a081f2f01800",
+      "exposed_text_sha256": "18d189b8c1b2fb0f21358f07e76389c8be885d1a7757e63f632967f17b46e53a",
+      "raw_sha256": "55a8f5f72ab406af49ea47e8db29eaf4368ca2cabf8d551f19f03b504685ac5a",
+      "controlled_text_mutation": true,
+      "usage": {
+        "input_tokens": 29242,
+        "cached_input_tokens": 5632,
+        "output_tokens": 440,
+        "reasoning_output_tokens": 133
+      }
+    },
+    {
+      "role": "evidence-discovery",
+      "returncode": 0,
+      "error": false,
+      "session_ref": "01a0163c-c57d-7952-8838-dc58cdb1b465",
+      "original_text_sha256": "09318c07078e6acd94dc0fcb9336f4edb21f2f1d9454b124b0b5b4b052c31c32",
+      "exposed_text_sha256": "b116360e483d5f592d95636f5a2ef10b99daf9d16dda5eb9856be7be49258f1e",
+      "raw_sha256": "0cfa3a6c8cf536f157b5fe3e71f06965836be86c8879ee30f58e3e817e84a529",
+      "controlled_text_mutation": true,
+      "usage": {
+        "input_tokens": 68630,
+        "cached_input_tokens": 38912,
+        "output_tokens": 1113,
+        "reasoning_output_tokens": 500
+      }
+    }
+  ],
+  "debt": {
+    "round": 1,
+    "reason": "initial: unexpected text after claim audit JSON\ncorrection: unexpected text after claim audit JSON",
+    "returncode": 0,
+    "raw_sha256": "03b81d174c95f1ad413fce349d8f3602612d40d5a049a777d48f449b5b922f0a",
+    "rejected_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0163c-c57d-7952-8838-dc58cdb1b465\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-a673d473-1f54-4294-8ed1-47df0046af77\",\"query\":\"\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-a673d473-1f54-4294-8ed1-47df0046af77\",\"query\":\"site:python.org Python 3.11.0 released October 24 2022\",\"action\":{\"type\":\"search\",\"query\":\"site:python.org Python 3.11.0 released October 24 2022\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"proposition\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"supported\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://www.python.org/downloads/release/python-3110/\\\",\\\"title\\\":\\\"Python Release Python 3.11.0\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The Python Software Foundation operates Python.org and publishes the official Python release record.\\\",\\\"location\\\":\\\"Python 3.11.0 release page, immediately below the page title\\\",\\\"quote\\\":\\\"Release date: Oct. 24, 2022\\\",\\\"relation\\\":\\\"supports_claim\\\"}],\\\"replacement\\\":null,\\\"rationale\\\":\\\"The official Python 3.11.0 release record states the exact asserted release date.\\\"}],\\\"coverage\\\":{\\\"sections_scanned\\\":1,\\\"omitted_nonfacts\\\":1,\\\"prior_assessments\\\":[],\\\"prior_dispositions\\\":[],\\\"notes\\\":\\\"Scanned the Acceptance heading and its sole sentence; retained the one load-bearing external fact.\\\"}}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":29242,\"cached_input_tokens\":5632,\"output_tokens\":440,\"reasoning_output_tokens\":133}}\n\n--- discovery correction ---\n{\"type\":\"thread.started\",\"thread_id\":\"01a0163c-c57d-7952-8838-dc58cdb1b465\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-6a397a4a-433b-4d35-97c2-fae88b2dfb33\",\"query\":\"\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-6a397a4a-433b-4d35-97c2-fae88b2dfb33\",\"query\":\"https://www.python.org/downloads/release/python-3110/\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"proposition\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"supported\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://www.python.org/downloads/release/python-3110/\\\",\\\"title\\\":\\\"Python Release Python 3.11.0\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The Python Software Foundation publishes Python's official release records on Python.org.\\\",\\\"location\\\":\\\"Python 3.11.0 release page, lines 21\u201329, directly below the title\\\",\\\"quote\\\":\\\"Release date: Oct. 24, 2022\\\",\\\"relation\\\":\\\"supports_claim\\\"}],\\\"replacement\\\":null,\\\"rationale\\\":\\\"The official Python 3.11.0 release record gives the exact asserted release date.\\\"}],\\\"coverage\\\":{\\\"sections_scanned\\\":1,\\\"omitted_nonfacts\\\":1,\\\"prior_assessments\\\":[],\\\"prior_dispositions\\\":[],\\\"notes\\\":\\\"Scanned the Acceptance heading and its sole sentence; retained the one eligible external fact.\\\"}}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":68630,\"cached_input_tokens\":38912,\"output_tokens\":1113,\"reasoning_output_tokens\":500}}\n",
+    "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "failure_detail": "",
+    "stderr_sha256": "e953025cf64f6d52918495ee714518fccf622f0b2794fabf6d95ff6bf8639108",
+    "stderr": "2026-08-18T18:58:23.770318Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-18T18:58:33.801013Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n"
+  },
+  "audit_sha256": "85bbf4c50690b0cc9b447917fefa7533640add7a567e3b19c00b2ccf095e5a32",
+  "result_sha256": "f2c9b335f0e216ba8c2c434a33d9aad1fdefed5f30945116290b36b4368fc21a",
+  "caller_claim_audit_debt": true,
+  "caller_convergence_blocked": true,
+  "result_excerpt": "f0a)\nREJECTED-AUDIT-EXCERPT:\n{\"type\":\"thread.started\",\"thread_id\":\"01a0163c-c57d-7952-8838-dc58cdb1b465\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-a673d473-1f54-4294-8ed1-47df0046af77\",\"query\":\"\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-a673d473-1f54-4294-8ed1-47df0046af77\",\"query\":\"site:python.org Python 3.11.0 released October 24 2022\",\"action\":{\"type\":\"search\",\"query\":\"site:python.org Python 3.11.0 released October 24 2022\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"proposition\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"supported\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://www.python.org/downloads/release/python-3110/\\\",\\\"title\\\":\\\"Python Release Python 3.11.0\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The Python Software Foundation operates Python.org and publishes the official Python release record.\\\",\\\"location\\\":\\\"Python 3.11.0 release page, immediately below the page title\\\",\\\"quote\\\":\\\"Release date: Oct. 24, 2022\\\",\\\"relation\\\":\\\"supports_claim\\\"}],\\\"replacement\\\":null,\\\"rationale\\\":\\\"The official Python 3.11.0 release record states the exact asserted release date.\\\"}],\\\"coverage\\\":{\\\"sections_scanned\\\":1,\\\"omitted_nonfacts\\\":1,\\\"prior_assessments\\\":[],\\\"prior_dispositions\\\":[],\\\"notes\\\":\\\"Scanned the Acceptance heading and its sole sentence; retained the one load-bearing external fact.\\\"}}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":29242,\"cached_input_tokens\":5632,\"output_tokens\":440,\"reasoning_output_tokens\":133}}\n\n--- discovery correction ---\n{\"type\":\"thread.started\",\"thread_id\":\"01a0163c-c57d-7952-8838-dc58cdb1b465\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-6a397a4a-433b-4d35-97c2-fae88b2dfb33\",\"query\":\"\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-6a397a4a-433b-4d35-97c2-fae88b2dfb33\",\"query\":\"https://www.python.org/downloads/release/python-3110/\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"proposition\\\":\\\"Python 3.11.0 was released on October 24, 2022.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"supported\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://www.python.org/downloads/release/python-3110/\\\",\\\"title\\\":\\\"Python Release Python 3.11.0\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The Python Software Foundation publishes Python's official release records on Python.org.\\\",\\\"location\\\":\\\"Python 3.11.0 release page, lines 21\u201329, directly below the title\\\",\\\"quote\\\":\\\"Release date: Oct. 24, 2022\\\",\\\"relation\\\":\\\"supports_claim\\\"}],\\\"replacement\\\":null,\\\"rationale\\\":\\\"The official Python 3.11.0 release record gives the exact asserted release date.\\\"}],\\\"coverage\\\":{\\\"sections_scanned\\\":1,\\\"omitted_nonfacts\\\":1,\\\"prior_assessments\\\":[],\\\"prior_dispositions\\\":[],\\\"notes\\\":\\\"Scanned the Acceptance heading and its sole sentence; retained the one eligible external fact.\\\"}}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":68630,\"cached_input_tokens\":38912,\"output_tokens\":1113,\"reasoning_output_tokens\":500}}\n\nLINEAGE: minimal-claim-validation-acceptance (rounds recorded: 1)\nCLASS-REGISTER: NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nCLASS-CONVERGENCE: NOT-BLOCKED \u2014 no blocking class is unclosed; advisory classes may remain open. Reviewer findings still govern.\nCONVERGENCE: BLOCKED \u2014 external claim closure remain open.",
+  "rejected_exchange_composition": "initial provider raw + literal \\n--- discovery correction ---\\n + corrected provider raw",
+  "expected_rejected_exchange_sha256": "03b81d174c95f1ad413fce349d8f3602612d40d5a049a777d48f449b5b922f0a"
+}

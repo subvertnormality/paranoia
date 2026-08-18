@@ -225,6 +225,21 @@ Canonical durable state remained blocked with zero applied claims and retained d
 exact rejected-response hash, so the valid sibling row could not be misbound or partially applied.
 The run used two signed-in calls plus the controlled attestation boundary and 38.555 seconds.
 
+When discovery and its one same-session correction both fail local payload validation, the claim
+debt preserves the bounded reasons in initial/correction order. Its rejected raw identity is the
+initial provider envelope, the literal discovery-correction separator, and the corrected provider
+envelope in that order. Provider return code zero remains distinct from a reviewer execution error.
+The controlled signed-in acceptance record is
+[`minimal_claim_validation_acceptance_2026-08-18.json`](minimal_claim_validation_acceptance_2026-08-18.json).
+It is bound to behavior commit `af93499`, Codex CLI 0.144.6, `gpt-5.6-sol`, high effort, and web
+search enabled. Two same-session discovery calls both exited zero; controlled post-extraction text
+made both payloads invalid while preserving their real provider envelopes. The production handler
+persisted both ordered reasons, caller-visible blocking debt, and the exact aggregate raw SHA-256 in
+157.974 seconds. The behavior diff against `main` is 25 additions and five deletions across
+`handlers.py` and `plan_claims.py`; the three largest Python production modules are `handlers.py`
+(135,711 bytes; 2,917 lines), `arbitrate_handler.py` (127,166 bytes; 2,991 lines), and
+`plan_claims.py` (62,865 bytes; 1,422 lines).
+
 The current Codex acceptance record is
 [`external_claim_acceptance_2026-08-09.json`](external_claim_acceptance_2026-08-09.json).
 It covers a known false internet-only claim, an external fact, an RFC design principle, an
