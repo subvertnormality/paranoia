@@ -141,8 +141,26 @@ MUTATIONS = (
     ),
     (
         "keyed-action-diagnostic-pointer",
-        'keyed_action_pointers = wire_pointers.get("class_actions", {})',
-        'keyed_action_pointers = {}',
+        'action_pointers = _class_row_pointers(value, "class_actions")\n    actions = _unique(',
+        'action_pointers = {\n        row["class_id"]: f"/class_actions/{index}"\n        for index, row in enumerate(value["class_actions"])\n    }\n    actions = _unique(',
+        "test_keyed_decision_semantic_issue_retains_late_wire_key_pointer",
+    ),
+    (
+        "canonical-keyed-diagnostic-pointer",
+        "issues = _remap_class_schema_issues(canonical, issues)",
+        "issues = issues",
+        "test_keyed_decision_canonical_issue_retains_wire_key_pointer",
+    ),
+    (
+        "null-action-slot-pointer",
+        '_class_slot_pointer(value, "class_actions", cid)\n                    if action is None',
+        '"/class_actions"\n                    if action is None',
+        "test_census_closed_violation_derives_only_unmechanized_reopen",
+    ),
+    (
+        "fallback-action-pointer",
+        'action_pointers[action["class_id"]] for action in value["class_actions"]',
+        'f"/class_actions/{index}" for index, action in enumerate(value["class_actions"])',
         "test_keyed_decision_semantic_issue_retains_late_wire_key_pointer",
     ),
     (

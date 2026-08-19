@@ -721,6 +721,57 @@ def _wire_class_pointers(value: dict[str, Any]) -> dict[str, dict[str, str]]:
     return result
 
 
+def _class_row_pointers(
+    value: dict[str, Any], label: str,
+) -> dict[str, str]:
+    """Return provider keyed pointers, falling back only for canonical callers."""
+    keyed = value.get("_wire_class_pointers", {}).get(label, {})
+    return {
+        row["class_id"]: keyed.get(row["class_id"], f"/{label}/{index}")
+        for index, row in reversed(list(enumerate(value.get(label, []))))
+    }
+
+
+def _class_slot_pointer(value: dict[str, Any], label: str, class_id: str) -> str:
+    """Locate a required keyed slot even when its canonical projection is absent."""
+    keyed = value.get("_wire_class_pointers", {}).get(label, {})
+    return keyed.get(class_id, f"/{label}")
+
+
+def _remap_class_schema_issues(
+    value: dict[str, Any], issues: Sequence[str],
+) -> list[str]:
+    """Translate canonical array-row issues back to fresh provider wire keys."""
+    replacements: list[tuple[str, str]] = []
+    for label in ("class_outcomes", "class_actions"):
+        keyed = value.get("_wire_class_pointers", {}).get(label, {})
+        for index, row in enumerate(value.get(label, [])):
+            pointer = keyed.get(row["class_id"])
+            if pointer is not None:
+                replacements.append((f"/{label}/{index}", pointer))
+    remapped: list[str] = []
+    for issue in issues:
+        for canonical, wire in replacements:
+            if issue == canonical or issue.startswith((canonical + "/", canonical + ":")):
+                issue = wire + issue[len(canonical):]
+                break
+        remapped.append(issue)
+    return remapped
+
+
+def _canonical_class_projection_issues(value: dict[str, Any]) -> list[str]:
+    """Name lossy wire-to-canonical citation collisions at their keyed slot."""
+    pointers = _class_row_pointers(value, "class_outcomes")
+    issues: list[str] = []
+    for row in value.get("class_outcomes", []):
+        evidence = row.get("evidence", [])
+        if len(evidence) != len(set(evidence)):
+            issues.append(
+                f"{pointers[row['class_id']]}/evidence: projected anchors must be unique"
+            )
+    return issues
+
+
 def decode_lane_with_issues(
     text: str, *, mode: str, lane: str,
 ) -> tuple[dict[str, Any], list[str]]:
@@ -826,6 +877,8 @@ def decode_decision_with_issues(
         ),
     )
     canonical["_wire_class_pointers"] = wire_pointers
+    issues = _remap_class_schema_issues(canonical, issues)
+    issues.extend(_canonical_class_projection_issues(canonical))
     return canonical, issues
 
 
@@ -939,8 +992,9 @@ def class_record_candidates(
             f"/governing_findings/{index}/classification/definition"
         )
     records.extend(class_records_from_actions(value["class_actions"]))
+    action_pointers = _class_row_pointers(value, "class_actions")
     pointers.extend(
-        f"/class_actions/{index}" for index in range(len(value["class_actions"]))
+        action_pointers[action["class_id"]] for action in value["class_actions"]
     )
     return records, pointers
 
@@ -960,14 +1014,15 @@ def materialize_decision_value(
     by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
         _validate_coverage(value["coverage"], by_finding, issues)
-    for outcome_index, outcome in enumerate(value.get("class_outcomes", [])):
+    early_outcome_pointers = _class_row_pointers(value, "class_outcomes")
+    for outcome in value.get("class_outcomes", []):
         basis = outcome.get("basis")
         if (
             basis and basis["kind"] == "new_finding"
             and basis["finding_id"] not in by_finding
         ):
             issues.append(
-                f"/class_outcomes/{outcome_index}/basis/finding_id: "
+                f"{early_outcome_pointers[outcome['class_id']]}/basis/finding_id: "
                 "must name a governing finding"
             )
     classes = {row["class_id"]: row for row in active_classes}
@@ -1110,14 +1165,7 @@ def materialize_decision_value(
                     )
             outcomes[cid] = outcome
     else:
-        wire_pointers = value.get("_wire_class_pointers", {})
-        keyed_outcome_pointers = wire_pointers.get("class_outcomes", {})
-        outcome_pointers = {
-            row["class_id"]: keyed_outcome_pointers.get(
-                row["class_id"], f"/class_outcomes/{index}",
-            )
-            for index, row in reversed(list(enumerate(value["class_outcomes"])))
-        }
+        outcome_pointers = _class_row_pointers(value, "class_outcomes")
         outcomes = _unique(
             value["class_outcomes"], "class_id", "class_outcomes", issues,
         )
@@ -1257,14 +1305,7 @@ def materialize_decision_value(
                 f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
 
-    wire_pointers = value.get("_wire_class_pointers", {})
-    keyed_action_pointers = wire_pointers.get("class_actions", {})
-    action_pointers = {
-        row["class_id"]: keyed_action_pointers.get(
-            row["class_id"], f"/class_actions/{index}",
-        )
-        for index, row in reversed(list(enumerate(value["class_actions"])))
-    }
+    action_pointers = _class_row_pointers(value, "class_actions")
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
     )
@@ -1334,7 +1375,8 @@ def materialize_decision_value(
                     ))
             if cls["mechanized"] and (action is None or action["kind"] not in allowed):
                 repair_pointer = (
-                    "/class_actions" if action is None else action_pointers[cid]
+                    _class_slot_pointer(value, "class_actions", cid)
+                    if action is None else action_pointers[cid]
                 )
                 issues.append(
                     f"{repair_pointer}: "

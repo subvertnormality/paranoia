@@ -502,6 +502,71 @@ def test_handler_retry_names_late_keyed_action_for_debt_bound_outcome(tmp_path):
     )
 
 
+def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
+    active = [{
+        "class_id":"class-a", "invariant":"invariant a", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":"inspect it",
+    }]
+    coverage = [
+        {
+            "id":item, "status":"covered", "summary":"checked",
+            "evidence":["plan:1"], "finding_ids":[],
+        }
+        for item in sp.CHECKLIST
+    ]
+    base = {
+        "role":"final", "governing_findings":[], "debt_outcomes":[],
+        "class_outcomes":{
+            "class-a":{"verdict":"satisfied", "evidence":["plan:1"]},
+        },
+        "class_actions":{"class-a":None}, "coverage":coverage,
+    }
+    invalid_value = wire_value(base)
+    invalid_value["class_outcomes"]["class-a"]["evidence"] = [
+        {"anchor":"plan:1", "rationale":"first reason"},
+        {"anchor":"plan:1", "rationale":"different reason"},
+    ]
+    invalid = json.dumps(invalid_value)
+    corrected = wire(base)
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/class_outcomes/class-a/evidence:" in prompt
+            return Review(text=corrected, session_ref="s", raw=corrected)
+
+    def parser(text):
+        try:
+            value, issues = sp.decode_decision_with_issues(
+                text, mode=cc.PLAN_MODE, role="final", active_classes=active,
+            )
+            parsed = sp.materialize_decision_value(
+                value, mode=cc.PLAN_MODE, role="final", active_classes=active,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+        if issues:
+            raise rc.CensusError("\n".join(issues))
+        return parsed
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="final", engine=Engine(), prompt="review it", cwd=tmp_path,
+        model="m", effort="high", timeout=10, parser=parser,
+    )
+    assert parsed["class_records"] == [{"op":"close", "class_id":"class-a"}]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+    assert (
+        "/class_outcomes/class-a/evidence: projected anchors must be unique"
+        in rejected[0]["validation_issue"]
+    )
+
+
 def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state.update(phase="correction", debt=[{

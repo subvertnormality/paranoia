@@ -351,6 +351,23 @@ def test_keyed_decision_semantic_issue_retains_late_wire_key_pointer():
         ],
         class_actions=[{"class_id":"class-b", "kind":"reopen"}],
     )
+    encoded = wire_value(value)
+    encoded["class_actions"]["class-a"] = None
+    decoded = sp.decode_decision(
+        json.dumps(encoded), mode=cc.PLAN_MODE, role="correction",
+        active_classes=classes, durable_debt=debt,
+    )
+    records, pointers = sp.class_record_candidates(decoded)
+    assert records == [{"op":"reopen", "class_id":"class-b"}]
+    assert pointers == ["/class_actions/class-b"]
+    with pytest.raises(
+        rc.CensusError,
+        match=r"^/class_actions/class-b: invalid class operation:",
+    ):
+        handlers._validate_materialized_class_records(
+            {"class_records":records, "_class_record_pointers":pointers},
+            mode=cc.PLAN_MODE, lineage=cc.Lineage("missing-class"), round_no=1,
+        )
     with pytest.raises(
         sp.ProtocolError,
         match=r"^/class_actions/class-b: reopen requires closed class$",
@@ -582,6 +599,33 @@ def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
     assert len(issues) == 1
     assert issues[0].startswith("/coverage/0/evidence:")
     assert "has non-unique elements" in issues[0]
+
+
+def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
+    active = [active_class()]
+    value = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1", "plan:1"],
+        }],
+    ))
+    value["class_outcomes"]["class-a"]["evidence"] = [
+        {"anchor":"plan:1", "rationale":"first reason"},
+        {"anchor":"plan:1", "rationale":"different reason"},
+    ]
+    value["class_actions"] = {"class-a":None}
+    _, issues = sp.decode_decision_with_issues(
+        json.dumps(value), mode=cc.PLAN_MODE, role="final",
+        active_classes=active,
+    )
+    assert any(
+        issue == (
+            "/class_outcomes/class-a/evidence: projected anchors must be unique"
+        )
+        for issue in issues
+    )
+    assert all(issue.startswith("/class_outcomes/class-a") for issue in issues)
 
 
 @pytest.mark.parametrize("length, valid", [(500, True), (501, False)])
@@ -1648,7 +1692,9 @@ def test_census_closed_violation_derives_only_unmechanized_reopen(mechanized):
         with pytest.raises(sp.ProtocolError) as caught:
             materialize(value, **kwargs)
         assert any(
-            line.startswith("/class_actions: closed violated class requires")
+            line.startswith(
+                "/class_actions/class-a: closed violated class requires"
+            )
             for line in str(caught.value).splitlines()
         )
     else:
@@ -1776,7 +1822,10 @@ def test_rekey_cannot_legalize_an_originally_unknown_class_basis():
 
     with pytest.raises(
         sp.ProtocolError,
-        match=r"/class_outcomes/0/basis/finding_id: must name a governing finding",
+        match=(
+            r"/class_outcomes/class-a/basis/finding_id: "
+            r"must name a governing finding"
+        ),
     ):
         materialize(
             value,

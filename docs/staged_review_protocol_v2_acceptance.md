@@ -114,10 +114,10 @@ Elapsed handler time was 219.059 seconds with one model call and no validation r
 replay regenerates the exact schema, hashes and decodes the retained response, resolves anchors from
 the recorded commit, replays canonical class transition, and checks durable and rendered outcomes.
 
-The final pre-convergence production diff from `main` is 404 additions and 56
-deletions across five existing modules: `staged_protocol.py` +330/-37, `engines.py` +44/-7,
+The final pre-convergence production diff from `main` is 456 additions and 66
+deletions across five existing modules: `staged_protocol.py` +382/-47, `engines.py` +44/-7,
 `handlers.py` +16/-5, `prompts.py` +13/-6, and `review_census.py` +1/-1. The largest changed
-production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,441 lines. The retained
+production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,483 lines. The retained
 provider and handler acceptance totals 17 successful model calls and 603.127 seconds of observable
 wall time. This excludes failed diagnostic/capability attempts and CODE-review calls rather than
 misstating them as successful release evidence.
@@ -125,9 +125,11 @@ misstating them as successful release evidence.
 Fresh keyed locations are also retained through canonical materialization solely for retry
 diagnostics. Semantic and canonical class-engine failures therefore name the provider-repairable
 key (for example `/class_actions/<class-id>`) rather than an array index that never appeared in the
-provider response. The private pointer map is not persisted or included in settlement state.
-The worktree-bound full suite passed **1,165 tests in 59.79 seconds**. The historical differential
-passed all eight role/shape groups and the bounded mutation gate killed all **28** owned mutants,
+provider response. This includes canonical projection collisions, invalid finding bases, fallback
+class-engine candidates, and required null action slots. The private pointer map is not persisted
+or included in settlement state.
+The worktree-bound full suite passed **1,167 tests in 60.82 seconds**. The historical differential
+passed all eight role/shape groups and the bounded mutation gate killed all **31** owned mutants,
 including keyed diagnostic-pointer preservation.
 
 ## Real Codex primary lifecycle
