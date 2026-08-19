@@ -287,9 +287,10 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
     assert with_assessment["properties"]["class_id"]["enum"] == ["mechanized"]
 
 
-def test_exact_empty_active_set_cannot_target_an_existing_class():
+@pytest.mark.parametrize("role", ["census", "correction", "final"])
+def test_exact_empty_active_set_cannot_target_an_existing_class(role):
     schema = sp.decision_schema(
-        cc.BRANCH_MODE, "census", active_classes=[], outcome_class_ids=[],
+        cc.BRANCH_MODE, role, active_classes=[], outcome_class_ids=[],
     )
     classification = schema["properties"]["governing_findings"]["items"][
         "properties"

@@ -2247,7 +2247,7 @@ def test_branch_settlement_persists_a_new_procedure_class(
     assert lineage.review_state["debt"][0]["class_ids"] == [classes[0].class_id]
 
 
-def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_path):
+def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
     (tmp_path / "a.py").write_text("broken\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
@@ -2300,7 +2300,7 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
                 "class_actions":[{
                     "kind":"replace", "class_id":"abc", "definition":{
                         "invariant":"new invariant", "severity":"MAJOR",
-                        "procedure":"inspect new behavior",
+                        "pattern":"BROKEN", "pathspec":"src/*.py",
                     },
                 }],
                 "coverage":coverage,
@@ -2321,6 +2321,8 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
     )
     successor = lineage.classes["abc"].superseded_by
     assert successor
+    assert lineage.classes[successor].mechanized
+    assert lineage.classes[successor].pattern == "BROKEN"
     current = next(d for d in lineage.review_state["debt"] if d["id"] == "D1")
     assert current["class_ids"] == [successor]
     historic = next(d for d in lineage.review_state["debt"] if d["id"] == "historic")
@@ -2482,3 +2484,74 @@ def test_correction_assessment_anchor_retries_before_durable_settlement(tmp_path
         row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh"
     )
     assert fresh["class_ids"] == ["abc"]
+
+
+def test_exact_empty_active_set_retries_unknown_existing_target_atomically(tmp_path):
+    (tmp_path / "a.py").write_text("reachable\n", encoding="utf-8")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "correction"
+    state["debt"] = [{
+        "id":"D0", "finding_id":"old", "status":"open", "severity":"MAJOR",
+        "summary":"old one-off", "evidence":["repository/a.py:1"],
+        "remedy":"close it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }]
+    lineage = cc.Lineage(
+        "empty-active-retry", mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    def response(classification):
+        return wire({
+            "role":"correction", "governing_findings":[{
+                "id":"fresh", "severity":"MAJOR", "summary":"observation",
+                "evidence":["repository/a.py:1"], "remedy":"record it",
+                "classification":classification,
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D0", "status":"closed",
+                "evidence":["repository/a.py:1"],
+            }],
+            "class_outcomes":[], "class_actions":{},
+        })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = response({"kind":"existing_class", "class_id":"invented"})
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert lineage.review_state["debt"][0]["status"] == "open"
+            assert "/governing_findings/0/classification" in prompt
+            text = response({"kind":"one_off", "reason":"one isolated observation"})
+            return Review(text=text, session_ref=session_ref, raw=text)
+
+    closure = Closure()
+    _, _, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None,
+    )
+    assert [row["outcome"] for row in attempts] == ["validation-invalid", "completed"]
+    assert not lineage.classes
+    assert lineage.review_state["debt"][0]["status"] == "closed"
+    fresh = next(row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh")
+    assert fresh["class_ids"] == []
