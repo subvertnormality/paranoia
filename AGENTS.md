@@ -112,6 +112,15 @@ rationales. Never trim or extract a leading anchor from prose, split joined cita
 strings, or relax traversal, range, prefix, snapshot, and symlink resolution. Cached lane manifests
 are canonical data and use an explicit canonical validator plus a cache-version cutover, not the
 fresh wire decoder.
+Represent fresh model-owned class outcomes and independent class actions as closed objects keyed by
+the exact server-supplied class IDs, rejecting duplicate JSON keys before schema validation. Project
+those maps deterministically into the existing canonical arrays; do not deduplicate an invalid
+array, accept a legacy wire shape, or partially settle a register. Final owns one outcome per active
+class; correction owns outcomes only for classes already bound to supplied open debt and derives a
+new existing-class violation from that finding's evidence and basis. Census continues to derive
+outcomes from validated integrity assessments. Specialize each action value schema to the target
+class so mechanized classes cannot express close/reopen, while canonical semantic validation and
+the class-engine dry-run remain authoritative for state/outcome compatibility.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement
