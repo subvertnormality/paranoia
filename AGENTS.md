@@ -126,6 +126,10 @@ schema to the target class so mechanized classes cannot express close/reopen, wh
 semantic validation and the class-engine dry-run remain authoritative for state/outcome
 compatibility. Capability-gate the exact compact minimum and maximum generated schemas on fresh and
 resumed Codex and Claude routes; unsupported schema dialect or transport size blocks the cutover.
+When a correction fresh finding targets a debt-bound class, require that class's authored violated
+outcome to use `new_finding` basis naming the exact finding; `carried_debt` is legal only when no
+fresh existing-class finding targets that class. Preserve independently authored finding evidence,
+assessment evidence, every debt outcome, assessment disposition, and audit binding.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement

@@ -89,12 +89,15 @@ other. Exactly one finding per existing class remains mandatory.
 
 When a class is already debt-bound, its authored outcome remains the sole class assessment and may
 carry evidence different from the new finding. The classification omits `assessment_evidence`; its
-authored outcome must be violated and bind consistently to the finding or carried debt. The server
-never overwrites a contradictory satisfaction judgment. Generate per-class existing-class
+authored outcome must be violated with `new_finding` basis naming that exact fresh finding. A
+`carried_debt` basis is legal only when no fresh existing-class finding targets the class; it names
+one representative open debt while every debt outcome remains independently authored. Satisfaction
+has no basis and is legal only when no fresh finding targets the class. The server never overwrites
+a contradictory satisfaction or carried-debt judgment. Generate per-class existing-class
 classification branches so the provider schema requires or forbids the assessment member according
-to that target. Final retains model-owned outcomes for every class because absence of a finding is
-itself part of the cold judgment. Census continues to derive outcomes from validated integrity
-assessments.
+to that target, then enforce the dynamic fresh-finding/basis binding locally. Final retains
+model-owned outcomes for every class because absence of a finding is itself part of the cold
+judgment. Census continues to derive outcomes from validated integrity assessments.
 
 This preserves new unrelated findings in a targeted correction without opening the outcome map to
 every active class. The finding is the one semantic judgment; the outcome is its deterministic
@@ -153,9 +156,12 @@ ledger.
   historical legal V2 materialization through an explicit semantic bijection.
 - Correction tests prove a new existing-class finding derives one violated outcome from its
   independent assessment evidence; finding and assessment evidence may differ without either being
-  substituted. Debt-bound satisfaction remains authored; overlap requires consistency;
-  duplicate/multiple findings for one class reject; and no finding or action can manufacture
-  satisfaction.
+  substituted. For a debt-bound overlap, the authored assessment uses `new_finding` naming the exact
+  fresh finding; `carried_debt` is accepted only without a fresh class finding. Positive and negative
+  fixtures compare exact assessment dispositions, materialized assessments, fresh debt, debt
+  updates, and audit projection. Debt-bound satisfaction remains authored only without a fresh
+  finding; duplicate/multiple findings for one class reject; and no finding or action can
+  manufacture satisfaction.
 - Cross-layer plan and branch tests carry keyed decisions through anchor validation, canonical
   class dry-run, atomic settlement, durable lineage state, rejected-payload diagnostics, and audit.
 - Regression fixtures reproduce issue #42's repeated transition, mechanized `CLOSED`/`REOPEN`, and
