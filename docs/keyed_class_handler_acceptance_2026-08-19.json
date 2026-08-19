@@ -1,0 +1,995 @@
+{
+  "acceptance_kind": "keyed-staged-class-decision-handler-lifecycle",
+  "after_lineage": {
+    "classes": [
+      {
+        "class_id": "acceptance-class",
+        "detail": null,
+        "first_round": 0,
+        "invariant": "A keyed staged protocol cutover has replayable production-handler acceptance binding the exact provider schema and response through anchor validation, canonical dry-run, atomic settlement, durable lineage, audit attempts, and rendered verdict.",
+        "matches": [],
+        "pathspec": null,
+        "pattern": null,
+        "procedure": "replay the complete retained handler artifact",
+        "severity": "MAJOR",
+        "status": "open",
+        "superseded_by": null
+      }
+    ],
+    "next_seq": 1,
+    "review_state": {
+      "debt": [
+        {
+          "class_ids": [
+            "acceptance-class"
+          ],
+          "evidence": [
+            "repository/scripts/run_keyed_handler_acceptance.py:18-19",
+            "repository/scripts/run_keyed_handler_acceptance.py:175-179",
+            "repository/README.md:1202-1205"
+          ],
+          "finding_id": "historical-acceptance-gap",
+          "first_round": 0,
+          "id": "D1",
+          "last_round": 1,
+          "reason": "The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.",
+          "remedy": "Run and retain the production keyed handler lifecycle.",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "open",
+          "summary": "The keyed protocol lacks a retained production-handler lifecycle."
+        }
+      ],
+      "last_round": 1,
+      "phase": "correction",
+      "snapshot_digest": "1b2913593df2178b043f9804607c108d03ffb10cd898e73acb95480333cbbd3d",
+      "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
+      "stakes_digest": "0107c32da199a5ce80a57e51f2e51c5d7863b549fd4c61ed8ab5cbf1fba19bc2",
+      "version": 1
+    },
+    "rounds": 1
+  },
+  "attempt_ledger": [
+    {
+      "duration_ms": null,
+      "engine": "codex",
+      "failure_detail_excerpt": null,
+      "failure_detail_sha256": null,
+      "outcome": "completed",
+      "raw_excerpt": null,
+      "raw_sha256": null,
+      "response_excerpt": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner declares the retained production-handler artifact required by this class, but that artifact is absent from the reviewed tree.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:95-127\",\"rationale\":\"The runner would exercise the production handler and verify settlement, derived lifecycle, durable lineage, and rendered verdict; executable code alone is not replayable retained evidence that these checks completed.\"},{\"anchor\":\"repository/docs/staged_review_protocol_v2_acceptance.md:3-9\",\"rationale\":\"The acceptance report says the keyed amendment is still undergoing CODE convergence and explicitly disclaims convergence merely because the report exists.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner names docs/keyed_class_handler_acceptance_2026-08-19.json as its required retained output, which is absent from the reviewed snapshot.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:175-179\",\"rationale\":\"The handler artifact is written only after the live lifecycle and all acceptance checks complete; no resulting artifact was retained.\"},{\"anchor\":\"repository/README.md:1202-1205\",\"rationale\":\"The public issue #42 evidence links only the provider-capability record, not a production-handler lifecycle artifact.\"}],\"reason\":\"The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "response_sha256": "3f2f37f707dafb5cca0affee35bba838a477e444925c7deadb6bc1860ef12465",
+      "returncode": null,
+      "role": "correction",
+      "sequence": 1,
+      "session_ref": "01a019f8-681c-7903-92ac-916cef0ea474",
+      "stderr_excerpt": null,
+      "stderr_sha256": null,
+      "usage": {
+        "cached_input_tokens": 1369856,
+        "input_tokens": 1553424,
+        "output_tokens": 6790,
+        "reasoning_output_tokens": 4069
+      },
+      "validation_issue": null
+    }
+  ],
+  "base_id": "259c26d5471f4513cd7e5b8db0d56d423161c869",
+  "before_state": {
+    "debt": [
+      {
+        "class_ids": [
+          "acceptance-class"
+        ],
+        "evidence": [
+          "repository/README.md:1"
+        ],
+        "finding_id": "historical-acceptance-gap",
+        "first_round": 0,
+        "id": "D1",
+        "last_round": 0,
+        "remedy": "Run and retain the production keyed handler lifecycle.",
+        "severity": "MAJOR",
+        "source_ids": [],
+        "status": "open",
+        "summary": "The keyed protocol lacks a retained production-handler lifecycle."
+      }
+    ],
+    "phase": "correction",
+    "snapshot_digest": "seed",
+    "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
+    "stakes_digest": "0107c32da199a5ce80a57e51f2e51c5d7863b549fd4c61ed8ab5cbf1fba19bc2",
+    "version": 1
+  },
+  "calls": [
+    {
+      "prompt_sha256": "b51579c54ef7676fb4a816bd8fb81a8e2478fb465cf7c3908c5bce0573e08cb4",
+      "raw_sha256": "7b7d9f1c97e339f284b5f6fb0c554138da766dd9afd3505c495930e92425ae06",
+      "response_sha256": "3f2f37f707dafb5cca0affee35bba838a477e444925c7deadb6bc1860ef12465",
+      "response_text": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner declares the retained production-handler artifact required by this class, but that artifact is absent from the reviewed tree.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:95-127\",\"rationale\":\"The runner would exercise the production handler and verify settlement, derived lifecycle, durable lineage, and rendered verdict; executable code alone is not replayable retained evidence that these checks completed.\"},{\"anchor\":\"repository/docs/staged_review_protocol_v2_acceptance.md:3-9\",\"rationale\":\"The acceptance report says the keyed amendment is still undergoing CODE convergence and explicitly disclaims convergence merely because the report exists.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner names docs/keyed_class_handler_acceptance_2026-08-19.json as its required retained output, which is absent from the reviewed snapshot.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:175-179\",\"rationale\":\"The handler artifact is written only after the live lifecycle and all acceptance checks complete; no resulting artifact was retained.\"},{\"anchor\":\"repository/README.md:1202-1205\",\"rationale\":\"The public issue #42 evidence links only the provider-capability record, not a production-handler lifecycle artifact.\"}],\"reason\":\"The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "route": "fresh",
+      "schema": {
+        "$defs": {
+          "class_outcome": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "evidence": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "anchor": {
+                          "maxLength": 512,
+                          "minLength": 1,
+                          "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                          "type": "string"
+                        },
+                        "rationale": {
+                          "maxLength": 500,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "anchor",
+                        "rationale"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "verdict": {
+                    "const": "satisfied",
+                    "maxLength": 32,
+                    "minLength": 1,
+                    "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "evidence"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "basis": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "finding_id": {
+                            "maxLength": 120,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "new_finding",
+                            "maxLength": 32,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "finding_id"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "debt_id": {
+                            "maxLength": 120,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "carried_debt",
+                            "maxLength": 32,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "debt_id"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "evidence": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "anchor": {
+                          "maxLength": 512,
+                          "minLength": 1,
+                          "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                          "type": "string"
+                        },
+                        "rationale": {
+                          "maxLength": 500,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "anchor",
+                        "rationale"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "verdict": {
+                    "const": "violated",
+                    "maxLength": 32,
+                    "minLength": 1,
+                    "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "evidence",
+                  "basis"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "manual_class_action": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "close",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "reopen",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "reclassify",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      },
+                      "severity": {
+                        "enum": [
+                          "FATAL",
+                          "BLOCKER",
+                          "MAJOR",
+                          "MINOR",
+                          "OUT-OF-SCOPE"
+                        ],
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "severity"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "definition": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "invariant": {
+                                "maxLength": 1000,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              },
+                              "procedure": {
+                                "maxLength": 2000,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              },
+                              "severity": {
+                                "enum": [
+                                  "FATAL",
+                                  "BLOCKER",
+                                  "MAJOR",
+                                  "MINOR",
+                                  "OUT-OF-SCOPE"
+                                ],
+                                "maxLength": 32,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "invariant",
+                              "severity",
+                              "procedure"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "invariant": {
+                                "maxLength": 1000,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              },
+                              "pathspec": {
+                                "maxLength": 1000,
+                                "minLength": 1,
+                                "pattern": "^[^:\\r\\n][^\\r\\n]*$",
+                                "type": "string"
+                              },
+                              "pattern": {
+                                "maxLength": 2000,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              },
+                              "severity": {
+                                "enum": [
+                                  "FATAL",
+                                  "BLOCKER",
+                                  "MAJOR",
+                                  "MINOR",
+                                  "OUT-OF-SCOPE"
+                                ],
+                                "maxLength": 32,
+                                "minLength": 1,
+                                "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "invariant",
+                              "severity",
+                              "pattern",
+                              "pathspec"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "const": "replace",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "definition"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              }
+            ]
+          },
+          "mechanized_class_action": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "reclassify",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      },
+                      "severity": {
+                        "enum": [
+                          "FATAL",
+                          "BLOCKER",
+                          "MAJOR",
+                          "MINOR",
+                          "OUT-OF-SCOPE"
+                        ],
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "severity"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "definition": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "invariant": {
+                            "maxLength": 1000,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          },
+                          "pathspec": {
+                            "maxLength": 1000,
+                            "minLength": 1,
+                            "pattern": "^[^:\\r\\n][^\\r\\n]*$",
+                            "type": "string"
+                          },
+                          "pattern": {
+                            "maxLength": 2000,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          },
+                          "severity": {
+                            "enum": [
+                              "FATAL",
+                              "BLOCKER",
+                              "MAJOR",
+                              "MINOR",
+                              "OUT-OF-SCOPE"
+                            ],
+                            "maxLength": 32,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "invariant",
+                          "severity",
+                          "pattern",
+                          "pathspec"
+                        ],
+                        "type": "object"
+                      },
+                      "kind": {
+                        "const": "replace",
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "definition"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "class_actions": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance-class": {
+                "$ref": "#/$defs/manual_class_action"
+              }
+            },
+            "required": [
+              "acceptance-class"
+            ],
+            "type": "object"
+          },
+          "class_outcomes": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance-class": {
+                "$ref": "#/$defs/class_outcome"
+              }
+            },
+            "required": [
+              "acceptance-class"
+            ],
+            "type": "object"
+          },
+          "debt_outcomes": {
+            "items": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "debt_id": {
+                      "maxLength": 120,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "anchor": {
+                            "maxLength": 512,
+                            "minLength": 1,
+                            "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                            "type": "string"
+                          },
+                          "rationale": {
+                            "maxLength": 500,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "anchor",
+                          "rationale"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 100,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "status": {
+                      "const": "closed",
+                      "maxLength": 16,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "debt_id",
+                    "status",
+                    "evidence"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "debt_id": {
+                      "maxLength": 120,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "anchor": {
+                            "maxLength": 512,
+                            "minLength": 1,
+                            "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                            "type": "string"
+                          },
+                          "rationale": {
+                            "maxLength": 500,
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "anchor",
+                          "rationale"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 100,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "reason": {
+                      "maxLength": 2000,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    },
+                    "status": {
+                      "const": "open",
+                      "maxLength": 16,
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "debt_id",
+                    "status",
+                    "evidence",
+                    "reason"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "maxItems": 500,
+            "minItems": 0,
+            "type": "array"
+          },
+          "governing_findings": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "classification": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "one_off",
+                          "maxLength": 32,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        },
+                        "reason": {
+                          "maxLength": 2000,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "reason"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "definition": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "invariant": {
+                                  "maxLength": 1000,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                },
+                                "procedure": {
+                                  "maxLength": 2000,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                },
+                                "severity": {
+                                  "enum": [
+                                    "FATAL",
+                                    "BLOCKER",
+                                    "MAJOR",
+                                    "MINOR",
+                                    "OUT-OF-SCOPE"
+                                  ],
+                                  "maxLength": 32,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "invariant",
+                                "severity",
+                                "procedure"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "invariant": {
+                                  "maxLength": 1000,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                },
+                                "pathspec": {
+                                  "maxLength": 1000,
+                                  "minLength": 1,
+                                  "pattern": "^[^:\\r\\n][^\\r\\n]*$",
+                                  "type": "string"
+                                },
+                                "pattern": {
+                                  "maxLength": 2000,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                },
+                                "severity": {
+                                  "enum": [
+                                    "FATAL",
+                                    "BLOCKER",
+                                    "MAJOR",
+                                    "MINOR",
+                                    "OUT-OF-SCOPE"
+                                  ],
+                                  "maxLength": 32,
+                                  "minLength": 1,
+                                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "invariant",
+                                "severity",
+                                "pattern",
+                                "pathspec"
+                              ],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "kind": {
+                          "const": "new_class",
+                          "maxLength": 32,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "definition"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "class_id": {
+                          "enum": [
+                            "acceptance-class"
+                          ],
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "existing_class",
+                          "maxLength": 32,
+                          "minLength": 1,
+                          "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "class_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "evidence": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "anchor": {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "maxLength": 500,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "anchor",
+                      "rationale"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 100,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "id": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "remedy": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "severity": {
+                  "enum": [
+                    "FATAL",
+                    "BLOCKER",
+                    "MAJOR",
+                    "MINOR",
+                    "OUT-OF-SCOPE"
+                  ],
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                },
+                "summary": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "severity",
+                "summary",
+                "evidence",
+                "remedy",
+                "classification"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 0,
+            "type": "array"
+          },
+          "role": {
+            "const": "correction",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "governing_findings",
+          "debt_outcomes",
+          "class_outcomes",
+          "class_actions"
+        ],
+        "type": "object"
+      },
+      "schema_sha256": "5e044b4c342cc5b9c02b483f6bbdbcb713a92a9e6c87082bc258ce33e79f6635",
+      "session_ref": "01a019f8-681c-7903-92ac-916cef0ea474",
+      "usage": {
+        "cached_input_tokens": 1369856,
+        "input_tokens": 1553424,
+        "output_tokens": 6790,
+        "reasoning_output_tokens": 4069
+      }
+    }
+  ],
+  "date": "2026-08-19",
+  "elapsed_seconds": 219.059,
+  "head_id": "feb012133ac48b30ecafe677ecff412402807b59",
+  "lineage_id": "keyed-class-handler-acceptance-20260819",
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "model": "gpt-5.6-sol",
+    "web_search": false
+  },
+  "result_sha256": "451283bb7601a4ac4f276c35adbc70317294666213ebef3da24aaf47a897b50c",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The keyed protocol lacks a retained production-handler lifecycle. — remains open: The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed. [classes: acceptance-class] (repository/scripts/run_keyed_handler_acceptance.py:18-19, repository/scripts/run_keyed_handler_acceptance.py:175-179, repository/README.md:1202-1205)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run and retain the production keyed handler lifecycle.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a019f8-681c-7903-92ac-916cef0ea474` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 1)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class A keyed staged protocol cutover has replayable production-handler acceptance binding the exact provider schema and response through anchor validation, canonical dry-run, atomic settlement, durable lineage, audit attempts, and rendered verdict. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "settlement": {
+    "_class_record_pointers": [
+      "/class_outcomes/0"
+    ],
+    "_finding_class_refs": {},
+    "assessment_dispositions": [
+      {
+        "assessment_id": "acceptance-class",
+        "governing_id": "historical-acceptance-gap"
+      }
+    ],
+    "class_assessments": [
+      {
+        "class_id": "acceptance-class",
+        "evidence": [
+          "repository/scripts/run_keyed_handler_acceptance.py:18-19",
+          "repository/scripts/run_keyed_handler_acceptance.py:95-127",
+          "repository/docs/staged_review_protocol_v2_acceptance.md:3-9"
+        ],
+        "finding_id": "historical-acceptance-gap",
+        "verdict": "violated"
+      }
+    ],
+    "class_dispositions": [],
+    "class_records": [
+      {
+        "class_id": "acceptance-class",
+        "op": "reopen"
+      }
+    ],
+    "debt": [],
+    "debt_updates": [
+      {
+        "evidence": [
+          "repository/scripts/run_keyed_handler_acceptance.py:18-19",
+          "repository/scripts/run_keyed_handler_acceptance.py:175-179",
+          "repository/README.md:1202-1205"
+        ],
+        "id": "D1",
+        "reason": "The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.",
+        "status": "open"
+      }
+    ],
+    "findings": [],
+    "role": "correction",
+    "source_dispositions": []
+  },
+  "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
+  "version": 1
+}

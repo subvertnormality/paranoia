@@ -1203,6 +1203,8 @@ The issue #42 class-register amendment is specified in
 [`keyed_class_decision_plan.md`](docs/keyed_class_decision_plan.md), with exact fresh/resumed
 Codex and Claude capability evidence in
 [`keyed_class_decision_provider_acceptance_2026-08-19.json`](docs/keyed_class_decision_provider_acceptance_2026-08-19.json).
+Its signed-in production-handler lifecycle and executable replay are retained in
+[`keyed_class_handler_acceptance_2026-08-19.json`](docs/keyed_class_handler_acceptance_2026-08-19.json).
 The latest real Codex verification evidence is recorded in
 [`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 

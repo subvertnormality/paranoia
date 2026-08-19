@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -157,6 +158,87 @@ def test_only_terminal_validation_rejection_can_cache_completed_lanes():
 
 def assert_five_headings(text):
     assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
+
+
+def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
+    artifact = json.loads(
+        (Path(__file__).resolve().parents[1]
+         / "docs/keyed_class_handler_acceptance_2026-08-19.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "keyed-staged-class-decision-handler-lifecycle"
+    )
+    assert artifact["version"] == 1
+    assert artifact["provider"]["engine"] == "codex"
+    assert len(artifact["calls"]) == len(artifact["attempt_ledger"]) == 1
+    call = artifact["calls"][0]
+    schema_text = sp.canonical_schema(call["schema"])
+    assert hashlib.sha256(schema_text.encode()).hexdigest() == call["schema_sha256"]
+    response = call["response_text"]
+    assert hashlib.sha256(response.encode()).hexdigest() == call["response_sha256"]
+    assert artifact["attempt_ledger"][0]["response_sha256"] == call["response_sha256"]
+
+    after_class = artifact["after_lineage"]["classes"][0]
+    active = [{
+        "class_id":after_class["class_id"], "invariant":after_class["invariant"],
+        "severity":after_class["severity"], "status":cc.CLOSED,
+        "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":after_class["procedure"],
+    }]
+    debt = artifact["before_state"]["debt"]
+    expected_schema = sp.provider_schema(sp.decision_schema(
+        cc.BRANCH_MODE, "correction", active_classes=active,
+        outcome_class_ids=sp.expected_outcome_class_ids(
+            "correction", active_classes=active, durable_debt=debt,
+        ),
+    ))
+    assert call["schema"] == expected_schema
+    decoded = sp.decode_decision(
+        response, mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=debt,
+    )
+    settlement = sp.materialize_decision_value(
+        decoded, mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=debt,
+    )
+    assert settlement == artifact["settlement"]
+
+    snapshot = tmp_path / "repository"
+    snapshot.mkdir()
+    anchors = [anchor for _, anchor in rc._walk_evidence(decoded)]  # noqa: SLF001
+    for relative in {
+        anchor.rpartition(":")[0].removeprefix("repository/") for anchor in anchors
+    }:
+        target = snapshot / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(subprocess.run(
+            ["git", "show", f"{artifact['head_id']}:{relative}"],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True, check=True,
+        ).stdout)
+    rc.resolve_anchors(
+        decoded, root=tmp_path, trusted_roots={"repository":snapshot},
+    )
+
+    tracked = cc.TrackedClass(
+        active[0]["class_id"], active[0]["invariant"], active[0]["severity"],
+        0, cc.CLOSED, procedure=active[0]["procedure"],
+    )
+    replay_lineage = cc.Lineage(
+        "handler-replay", classes={tracked.class_id:tracked}, next_seq=1,
+        mode=cc.BRANCH_MODE,
+    )
+    cc.apply_register(
+        replay_lineage,
+        rc.register_from_records(settlement["class_records"], mechanized=None),
+        round_no=1,
+    )
+    assert replay_lineage.classes[tracked.class_id].status == cc.OPEN
+    assert artifact["after_lineage"]["classes"][0]["status"] == cc.OPEN
+    assert artifact["after_lineage"]["review_state"]["debt"][0]["status"] == "open"
+    result = artifact["result_text"]
+    assert hashlib.sha256(result.encode()).hexdigest() == artifact["result_sha256"]
+    assert "STRUCTURAL-PHASE: correction" in result
+    assert "CONVERGENCE: BLOCKED" in result
 
 
 def wire_value(value):

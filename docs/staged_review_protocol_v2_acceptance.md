@@ -100,6 +100,25 @@ production decoder and semantic materializer. The maximum-final schema was 24,19
 retained call time totaled 354.248 seconds. The older hashes above describe the pre-amendment array
 wire schema and remain historical evidence only.
 
+The separate signed-in
+[`keyed_class_handler_acceptance_2026-08-19.json`](keyed_class_handler_acceptance_2026-08-19.json)
+drives commit `feb0121` through the production `critique_branch` correction handler with one closed,
+debt-bound active class. Codex session `01a019f8-681c-7903-92ac-916cef0ea474` returned one exact keyed
+response; schema SHA-256 is `5e044b4c…f6635` and response SHA-256 is `3f2f37f7…2465`. Anchor
+validation and canonical materialization derived `reopen`; atomic settlement persisted that class
+open with its original open debt binding, and the rendered result remained correctly blocked.
+Elapsed handler time was 219.059 seconds with one model call and no validation retry. The executable
+replay regenerates the exact schema, hashes and decodes the retained response, resolves anchors from
+the recorded commit, replays canonical class transition, and checks durable and rendered outcomes.
+
+At handler-acceptance commit `feb0121`, the production diff from `main` is 372 additions and 53
+deletions across five existing modules: `staged_protocol.py` +298/-34, `engines.py` +44/-7,
+`handlers.py` +16/-5, `prompts.py` +13/-6, and `review_census.py` +1/-1. The largest changed
+production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,412 lines. The retained
+provider and handler acceptance totals 13 successful model calls and 573.307 seconds of observable
+wall time. This excludes failed diagnostic/capability attempts and CODE-review calls rather than
+misstating them as successful release evidence.
+
 ## Real Codex primary lifecycle
 
 The disposable repository contained one pure Python function, its README contract, and one test.

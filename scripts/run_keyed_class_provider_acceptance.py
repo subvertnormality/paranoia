@@ -304,10 +304,10 @@ def repair_claude_maximum() -> int:
     return 0
 
 
-def add_populated_correction() -> int:
-    """Add the exact debt-bound/non-debt correction shape without rerunning other probes."""
+def add_correction_shape(shape: str) -> int:
+    """Add one exact correction shape without rerunning retained probes."""
     artifact = json.loads(OUTPUT.read_text(encoding="utf-8"))
-    fixture = next(row for row in fixtures() if row["shape"] == "populated-correction")
+    fixture = next(row for row in fixtures() if row["shape"] == shape)
     classes = fixture["classes"]
     durable_debt = fixture["durable_debt"]
     outcome_ids = sp.expected_outcome_class_ids(
@@ -342,7 +342,7 @@ def add_populated_correction() -> int:
             )
             if review.error:
                 raise RuntimeError(
-                    f"{provider['engine']} populated-correction {route}: "
+                    f"{provider['engine']} {shape} {route}: "
                     f"{review.failure_detail or review.text}"
                 )
             decoded = sp.decode_decision(
@@ -363,7 +363,7 @@ def add_populated_correction() -> int:
                 "usage":review.usage, "response_text":review.text,
             })
         probe = {
-            "shape":"populated-correction", "role":"correction",
+            "shape":shape, "role":"correction",
             "active_class_count":len(classes),
             "active_classes":classes,
             "required_outcome_count":len(outcome_ids),
@@ -373,9 +373,9 @@ def add_populated_correction() -> int:
         }
         provider["probes"] = [
             row for row in provider["probes"]
-            if row["shape"] != "populated-correction"
+            if row["shape"] != shape
         ]
-        provider["probes"].insert(1, probe)
+        provider["probes"].insert(-1, probe)
         for row in provider["probes"]:
             row.setdefault("durable_debt", [])
             if "active_classes" not in row:
@@ -394,7 +394,7 @@ def add_populated_correction() -> int:
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    print(f"extended {OUTPUT} with populated correction on both providers")
+    print(f"extended {OUTPUT} with {shape} on both providers")
     return 0
 
 
@@ -406,5 +406,5 @@ if __name__ == "__main__":
     if args.repair_claude_maximum:
         sys.exit(repair_claude_maximum())
     if args.add_populated_correction:
-        sys.exit(add_populated_correction())
+        sys.exit(add_correction_shape("populated-correction"))
     sys.exit(main())
