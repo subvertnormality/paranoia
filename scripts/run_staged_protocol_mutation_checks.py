@@ -50,12 +50,6 @@ MUTATIONS = (
         "test_branch_schema_rejects_git_pathspec_magic_for_new_and_replacement_classes",
     ),
     (
-        "outcome-completeness",
-        "if set(outcomes) != expected_model_classes:",
-        "if False:",
-        "test_class_and_debt_outcome_completeness_are_independent_controls",
-    ),
-    (
         "debt-completeness",
         "if set(debt_outcomes) != set(open_debt):",
         "if False:",
@@ -87,8 +81,8 @@ MUTATIONS = (
     ),
     (
         "census-schema-exclusion",
-        'if role != "census":\n        properties["class_outcomes"]',
-        'if True:\n        properties["class_outcomes"]',
+        'if role != "census":\n        if canonical:',
+        'if True:\n        if canonical:',
         "test_census_schema_rejects_authored_class_outcomes",
     ),
     (
@@ -120,6 +114,36 @@ MUTATIONS = (
         "if set(assessments) != expected:",
         "if False:",
         "test_integrity_lane_requires_every_active_class_assessment",
+    ),
+    (
+        "duplicate-class-key-detection",
+        "if key in result:",
+        "if False:",
+        "test_duplicate_class_decision_keys_reject_before_projection",
+    ),
+    (
+        "keyed-outcome-completeness",
+        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n            )',
+        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n                required=(),\n            )',
+        "test_keyed_decision_schema_exposes_only_role_legal_class_decisions",
+    ),
+    (
+        "mechanized-action-specialization",
+        'if cls.get("mechanized", False)\n                        else "#/$defs/manual_class_action"',
+        'if False\n                        else "#/$defs/manual_class_action"',
+        "test_keyed_decision_schema_exposes_only_role_legal_class_decisions",
+    ),
+    (
+        "decision-encounter-order",
+        "for class_id, body in rows.items()",
+        "for class_id, body in sorted(rows.items())",
+        "test_keyed_decision_projection_preserves_encounter_order",
+    ),
+    (
+        "derived-correction-violation",
+        "if cid not in authored_classes:",
+        "if False:",
+        "test_correction_derives_non_debt_class_outcome_with_distinct_evidence",
     ),
 )
 

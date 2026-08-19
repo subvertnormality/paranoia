@@ -372,9 +372,10 @@ cross-lane finding may classify as existing_class only when that class's integri
 violated and its cited source is included; otherwise classify the finding as one_off or new_class.
 Return one
 debt_outcome for every supplied open debt: open needs current evidence and a concrete remaining
-condition; closed needs current evidence. Do not invent debt or IDs. Use class_actions only for an
-independent lifecycle/severity decision. Closed mechanized violation requires replace with a
-corrected violation-only predicate; reopen applies only to unmechanized classes."""
+condition; closed needs current evidence. Do not invent debt or IDs. class_actions is keyed by every
+active class: use null when no independent action is needed, otherwise one lifecycle/severity
+decision. Closed mechanized violation requires replace with a corrected violation-only predicate;
+reopen applies only to unmechanized classes."""
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
@@ -389,9 +390,15 @@ Every supplied open debt receives exactly one outcome; open needs current eviden
 remaining condition, closed needs current evidence. A violated class uses new_finding for a new
 occurrence, or carried_debt naming exactly one representative open debt; other historical debts
 remain independent outcomes. Satisfaction has no basis. Correction covers exactly affected
-classes; final covers every active class and all checklist rows. Use class_actions for independent
-close, reopen, non-downgrading reclassify, or replacement decisions. Open unmechanized satisfaction
-may omit its redundant close; the server derives it. Closed mechanized violation requires replace."""
+classes; final covers every active class and all checklist rows. class_outcomes and class_actions
+are keyed objects whose values never repeat class_id. Every active class has one action slot; use
+null or at most one independent close, reopen,
+non-downgrading reclassify, or replacement decision per action key. For a new existing-class finding
+whose class has no required outcome key, put its distinct class-assessment citations in
+classification.assessment_evidence; the server derives the violated outcome. A fresh finding for a
+required debt-bound class needs that authored violated outcome to use new_finding basis naming the
+fresh finding; carried_debt is only for no fresh occurrence. Open unmechanized satisfaction may omit
+its redundant close; the server derives it. Closed mechanized violation requires replace."""
 
 
 # ── class closure ─────────────────────────────────────────────────────────────

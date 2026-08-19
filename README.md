@@ -251,6 +251,14 @@ each source mapping, classification, debt outcome, and independent class action 
 final also emit their class outcomes; census outcomes are derived from the validated integrity
 manifest. The server validates the graph, allocates new debt IDs, derives the internal mirror rows, and applies
 class operations through the same durable class engine used by the legacy terminal register.
+At the fresh provider boundary, class outcomes and actions are closed objects keyed by the exact
+active class IDs. This makes duplicate transitions, unknown targets, extra correction outcomes, and
+`close`/`reopen` on a mechanized class inexpressible in an ordinary schema-valid response. Duplicate
+raw JSON keys reject before mapping conversion. The server then restores the existing canonical
+arrays in encounter order, preserving action order and durable successor identity. Correction asks
+for authored outcomes only for classes already bound to open debt; a fresh occurrence of another
+active class carries distinct `assessment_evidence` on its finding classification and deterministically
+derives the violated class outcome. Finding evidence and class-assessment evidence remain separate.
 Decision-level finding IDs are response-local references: if a cold response reuses a historical
 finding ID it was not shown, the server deterministically rekeys that fresh finding and all of its
 coverage/class references before materialization, retaining the rename in the audit settlement.
@@ -1191,6 +1199,10 @@ implementation evidence in
 [`staged_review_protocol_v2_acceptance.md`](docs/staged_review_protocol_v2_acceptance.md). Its
 census-outcome amendment is specified in
 [`derive_census_class_outcomes_plan.md`](docs/derive_census_class_outcomes_plan.md).
+The issue #42 class-register amendment is specified in
+[`keyed_class_decision_plan.md`](docs/keyed_class_decision_plan.md), with exact fresh/resumed
+Codex and Claude capability evidence in
+[`keyed_class_decision_provider_acceptance_2026-08-19.json`](docs/keyed_class_decision_provider_acceptance_2026-08-19.json).
 The latest real Codex verification evidence is recorded in
 [`docs/external_claim_acceptance_2026-08-09.json`](docs/external_claim_acceptance_2026-08-09.json).
 

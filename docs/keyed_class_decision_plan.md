@@ -43,8 +43,11 @@ The model-facing decision schema replaces these two arrays with closed objects:
 
 - `class_outcomes`: property names are the exact class IDs the role must judge; each value is the
   current outcome body without its redundant `class_id` member.
-- `class_actions`: property names are active class IDs; each optional value is one independent
-  action body without its redundant `class_id` member.
+- `class_actions`: property names are active class IDs; each required value is either `null` or one
+  independent action body without its redundant `class_id` member. The converged design originally
+  specified optional properties, but the exact Codex capability gate rejected that shape because
+  every declared property must be required. Required nullable slots preserve the same partial
+  function and closed target set without a fallback or semantic relaxation.
 
 The server generates these properties from the validated active-class snapshot and sets
 `additionalProperties: false`. Final requires every active-class outcome key. Correction requires
@@ -126,7 +129,7 @@ active action-key/action-kind table beside the role schema. The JSON Schema rema
 the prose is concise repair guidance.
 
 Provider projection may continue removing only the currently documented provider-subset omissions.
-Do not treat closed objects, sparse action maps, `$defs`/`$ref`, schema size, or command transport as
+Do not treat closed objects, nullable action-slot maps, `$defs`/`$ref`, schema size, or command transport as
 supported merely because local Draft 2020-12 validation accepts them. Before the cutover, run exact
 fresh and resumed structured-output probes through both retained interfaces—Codex CLI
 `--output-schema` and Claude CLI `--json-schema`—using the actual generated final and correction

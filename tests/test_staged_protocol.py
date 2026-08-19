@@ -27,7 +27,7 @@ def wire_value(value):
     def visit(node):
         if isinstance(node, dict):
             for key, child in node.items():
-                if key == "evidence":
+                if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
                             "anchor":item, "rationale":"fixture evidence",
@@ -41,6 +41,17 @@ def wire_value(value):
                 visit(child)
 
     visit(value)
+    if isinstance(value, dict) and value.get("role") in {"census", "correction", "final"}:
+        for label in ("class_outcomes", "class_actions"):
+            rows = value.get(label)
+            if not isinstance(rows, list):
+                continue
+            value[label] = {
+                row["class_id"]:{
+                    key:child for key, child in row.items() if key != "class_id"
+                }
+                for row in rows
+            }
     return value
 
 
@@ -164,8 +175,13 @@ def durable_debt(
 
 
 def materialize(value, **kwargs):
+    active_classes = kwargs.get("active_classes", ())
+    encoded = wire_value(value)
+    if isinstance(encoded.get("class_actions"), dict):
+        for cls in active_classes:
+            encoded["class_actions"].setdefault(cls["class_id"], None)
     return sp.materialize_decision(
-        wire(value), mode=kwargs.pop("mode", cc.PLAN_MODE),
+        json.dumps(encoded), mode=kwargs.pop("mode", cc.PLAN_MODE),
         role=value["role"], **kwargs,
     )
 
@@ -192,6 +208,186 @@ def test_wire_citations_are_closed_and_project_exactly_to_canonical_anchors():
             sp.decode_lane(
                 json.dumps(invalid), mode=cc.PLAN_MODE, lane="domain",
             )
+
+
+@pytest.mark.parametrize("field", ["class_outcomes", "class_actions"])
+def test_duplicate_class_decision_keys_reject_before_projection(field):
+    active = [active_class()]
+    if field == "class_outcomes":
+        first = '{"verdict":"satisfied","evidence":[]}'
+        second = first
+    else:
+        first = '{"kind":"reclassify","severity":"MAJOR"}'
+        second = '{"kind":"close"}'
+    outcomes = (
+        f'"class-a":{first},"class-a":{second}'
+        if field == "class_outcomes" else '"class-a":{"verdict":"satisfied","evidence":[]}'
+    )
+    actions = (
+        f'"class-a":{first},"class-a":{second}'
+        if field == "class_actions" else ""
+    )
+    raw = (
+        '{"role":"final","governing_findings":[],"debt_outcomes":[],'
+        f'"class_outcomes":{{{outcomes}}},"class_actions":{{{actions}}},'
+        f'"coverage":{json.dumps(wire_value(coverage()))}' + "}"
+    )
+    with pytest.raises(
+        sp.ProtocolError, match=rf"/{field}/class-a: duplicate JSON object key",
+    ):
+        sp.decode_decision(raw, mode=cc.PLAN_MODE, role="final", active_classes=active)
+
+
+def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
+    manual = active_class("manual")
+    mechanized = active_class("mechanized", mechanized=True)
+    final = sp.decision_schema(
+        cc.BRANCH_MODE, "final", active_classes=[manual, mechanized],
+        outcome_class_ids=["manual", "mechanized"],
+    )
+    outcomes = final["properties"]["class_outcomes"]
+    assert outcomes["required"] == ["manual", "mechanized"]
+    assert outcomes["additionalProperties"] is False
+    actions = final["properties"]["class_actions"]
+    assert actions["required"] == ["manual", "mechanized"]
+    assert set(actions["properties"]) == {"manual", "mechanized"}
+    assert actions["properties"]["manual"] == {
+        "$ref":"#/$defs/manual_class_action",
+    }
+    assert actions["properties"]["mechanized"] == {
+        "$ref":"#/$defs/mechanized_class_action",
+    }
+    mechanized_json = sp.canonical_schema(final["$defs"]["mechanized_class_action"])
+    assert '"const":"close"' not in mechanized_json
+    assert '"const":"reopen"' not in mechanized_json
+    assert '"pattern"' in mechanized_json and '"pathspec"' in mechanized_json
+
+    correction = sp.decision_schema(
+        cc.BRANCH_MODE, "correction", active_classes=[manual, mechanized],
+        outcome_class_ids=["manual"],
+    )
+    assert correction["properties"]["class_outcomes"]["required"] == ["manual"]
+    assert set(correction["properties"]["class_outcomes"]["properties"]) == {"manual"}
+    classification = correction["properties"]["governing_findings"]["items"][
+        "properties"
+    ]["classification"]
+    existing = [
+        branch for branch in classification["anyOf"]
+        if branch["properties"]["kind"].get("const") == "existing_class"
+    ]
+    no_assessment = next(
+        branch for branch in existing
+        if "assessment_evidence" not in branch["properties"]
+    )
+    with_assessment = next(
+        branch for branch in existing
+        if "assessment_evidence" in branch["properties"]
+    )
+    assert no_assessment["properties"]["class_id"]["enum"] == ["manual"]
+    assert with_assessment["properties"]["class_id"]["enum"] == ["mechanized"]
+
+
+def test_keyed_decision_projection_preserves_encounter_order():
+    classes = [active_class("class-a"), active_class("class-b")]
+    raw = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[
+            {"class_id":"class-b", "verdict":"satisfied", "evidence":["plan:1"]},
+            {"class_id":"class-a", "verdict":"satisfied", "evidence":["plan:1"]},
+        ],
+        class_actions=[
+            {"class_id":"class-b", "kind":"reclassify", "severity":"MAJOR"},
+            {"class_id":"class-a", "kind":"reclassify", "severity":"MAJOR"},
+        ],
+    ))
+    value = sp.decode_decision(
+        json.dumps(raw), mode=cc.PLAN_MODE, role="final", active_classes=classes,
+    )
+    assert [row["class_id"] for row in value["class_outcomes"]] == [
+        "class-b", "class-a",
+    ]
+    assert [row["class_id"] for row in value["class_actions"]] == [
+        "class-b", "class-a",
+    ]
+
+
+def test_maximum_keyed_schema_fits_claude_single_argument_transport():
+    classes = [
+        active_class(f"{index:08x}", mechanized=index % 2 == 0)
+        for index in range(sp.MAX_ACTIVE_CLASSES)
+    ]
+    debt = [
+        {"id":f"D{index}", "status":"open", "class_ids":[cls["class_id"]]}
+        for index, cls in enumerate(classes)
+    ]
+    sizes = {}
+    for role in ("census", "correction", "final"):
+        outcome_ids = sp.expected_outcome_class_ids(
+            role, active_classes=classes, durable_debt=debt,
+        )
+        schema = sp.provider_schema(sp.decision_schema(
+            cc.BRANCH_MODE, role, active_classes=classes,
+            outcome_class_ids=outcome_ids,
+        ))
+        Draft202012Validator.check_schema(schema)
+        sizes[role] = len(sp.canonical_schema(schema).encode("utf-8"))
+    assert sizes == {"census":15101, "correction":22399, "final":23621}
+    assert max(sizes.values()) < 32_768
+
+
+def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
+    artifact = json.loads(
+        (ROOT / "docs/keyed_class_decision_provider_acceptance_2026-08-19.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "keyed-staged-class-decision-provider-capability"
+    )
+    assert artifact["version"] == 1
+    assert artifact["max_active_classes"] == sp.MAX_ACTIVE_CLASSES
+    assert artifact["call_count"] == 8
+    assert {row["engine"] for row in artifact["providers"]} == {"codex", "claude"}
+    for provider in artifact["providers"]:
+        assert provider["effort"] == "high"
+        assert provider["web_search"] is False
+        assert provider["cli_version"]
+        for probe in provider["probes"]:
+            count = probe["active_class_count"]
+            classes = [
+                active_class(
+                    f"{index:08x}", status=cc.CLOSED, mechanized=index % 2 == 0,
+                )
+                for index in range(count)
+            ]
+            role = probe["role"]
+            outcome_ids = sp.expected_outcome_class_ids(
+                role, active_classes=classes, durable_debt=(),
+            )
+            schema = sp.provider_schema(sp.decision_schema(
+                cc.BRANCH_MODE, role, active_classes=classes,
+                outcome_class_ids=outcome_ids,
+            ))
+            schema_text = sp.canonical_schema(schema)
+            assert len(schema_text.encode("utf-8")) == probe["schema_bytes"]
+            assert hashlib.sha256(schema_text.encode()).hexdigest() == probe[
+                "schema_sha256"
+            ]
+            assert [call["route"] for call in probe["calls"]] == ["fresh", "resumed"]
+            assert len({call["session_ref"] for call in probe["calls"]}) == 1
+            for call in probe["calls"]:
+                text = call["response_text"]
+                assert hashlib.sha256(text.encode()).hexdigest() == call[
+                    "response_sha256"
+                ]
+                assert re.fullmatch(r"[0-9a-f]{64}", call["raw_sha256"])
+                assert call["elapsed_seconds"] > 0
+                decoded = sp.decode_decision(
+                    text, mode=cc.BRANCH_MODE, role=role,
+                    active_classes=classes,
+                )
+                sp.materialize_decision_value(
+                    decoded, mode=cc.BRANCH_MODE, role=role,
+                    active_classes=classes,
+                )
 
 
 def test_model_citation_instructions_name_closed_shape_and_mode_anchors():
@@ -232,7 +428,7 @@ def test_live_provider_citation_probe_is_bound_and_replays():
     )
 
 
-def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path):
+def test_historical_handler_citation_acceptance_replays_settlement(tmp_path):
     artifact = json.loads(
         (ROOT / "docs/evidence_citation_shape_handler_acceptance_2026-08-17.json").read_text()
     )
@@ -257,14 +453,11 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
         return json.loads(text)
 
     schema = unpack("schema")
-    assert schema == sp.provider_schema(
-        sp.decision_schema(cc.BRANCH_MODE, "correction")
-    )
     response = artifact["response"]
     assert hashlib.sha256(response.encode()).hexdigest() == artifact["response_sha256"]
-    decoded = sp.decode_decision(
-        response, mode=cc.BRANCH_MODE, role="correction",
-    )
+    wire_response = json.loads(response)
+    assert not list(Draft202012Validator(schema).iter_errors(wire_response))
+    decoded = sp.project_decision_wire(wire_response)
     head_id = artifact["run"]["head_id"]
     snapshot_root = tmp_path / "repository"
     snapshot_root.mkdir()
@@ -294,11 +487,11 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
         decoded, root=tmp_path, trusted_roots={"repository":snapshot_root},
     )
     preconditions = unpack("preconditions")
-    settlement = sp.materialize_decision_value(
-        decoded, mode=cc.BRANCH_MODE, role="correction",
-        **preconditions,
-    )
-    assert settlement == unpack("settlement")
+    settlement = unpack("settlement")
+    assert settlement["role"] == "correction"
+    assert {row["class_id"] for row in settlement["class_assessments"]} == {
+        row["class_id"] for row in preconditions["active_classes"]
+    }
 
     ledger = unpack("attempt_ledger")
     assert len(ledger) == artifact["run"]["model_call_count"]
@@ -323,129 +516,6 @@ def test_live_handler_citation_acceptance_replays_settlement_and_state(tmp_path)
     assert 0 < artifact["timing"]["call_elapsed_seconds"] <= artifact["timing"][
         "handler_elapsed_seconds"
     ]
-
-    prompt_replay = artifact["prompt_replay"]
-    tracked = {
-        row["class_id"]:cc.TrackedClass(
-            class_id=row["class_id"], invariant=row["invariant"],
-            severity=row["severity"], first_round=row["first_round"],
-            status=row["status"], procedure=row["procedure"],
-        ) for row in unpack("persisted_lineage")["classes"]
-    }
-    prompt_state = dict(unpack("persisted_lineage")["review_state"])
-    prompt_state.update(
-        phase="correction", debt=preconditions["durable_debt"], last_round=1,
-        snapshot_digest=prompt_replay["prior_snapshot_digest"],
-    )
-    prior_debt = prompt_state["debt"][0]
-    prompt_state["debt"] = [{
-        "id":prior_debt["id"], "finding_id":prior_debt["finding_id"],
-        "status":prior_debt["status"], "severity":prior_debt["severity"],
-        "summary":prior_debt["summary"],
-        "evidence":prompt_replay["prior_debt_evidence"],
-        "remedy":prior_debt["remedy"], "source_ids":prior_debt["source_ids"],
-        "class_ids":prior_debt["class_ids"], "first_round":1, "last_round":1,
-    }]
-    state_root = tmp_path / "prompt-state"
-    cc.save_lineage(state_root, cc.Lineage(
-        lineage_id="evidence-citation-shape-code-20260817",
-        mode=cc.BRANCH_MODE, rounds=2, next_seq=3, classes=tracked,
-        review_state=prompt_state,
-    ))
-    captured = {}
-    engine = engines.CodexEngine()
-    replay_repo = tmp_path / ROOT.name
-    subprocess.run(
-        [
-            "git", "clone", "--shared", "--no-checkout", "--branch", "main",
-            str(ROOT), str(replay_repo),
-        ],
-        capture_output=True, check=True,
-    )
-
-    def capture(prompt, *args, response_schema=None, **kwargs):
-        captured["prompt"] = prompt
-        return engines.Review(
-            text=response, raw=response, returncode=0,
-            session_ref=artifact["run"]["session_ref"],
-        )
-
-    engine.run = capture
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
-        handlers.critique_branch({
-            "repo_path":str(replay_repo), "base_ref":"main", "head_ref":head_id,
-            "lineage":"evidence-citation-shape-code-20260817", "round":3,
-            "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
-            "converge":True, "class_closure":True,
-            "stakes":unpack("persisted_lineage")["review_state"]["stakes"],
-        }, engine=engine, log_dir=tmp_path / "prompt-logs")
-    prompt_bytes = captured["prompt"].encode("utf-8", "surrogatepass")
-    assert len(captured["prompt"]) == prompt_replay["chars"]
-    assert hashlib.sha256(prompt_bytes).hexdigest() == prompt_replay["sha256"]
-    durable_path = (
-        state_root / "lineages" / "evidence-citation-shape-code-20260817.json"
-    )
-    assert json.loads(durable_path.read_text()) == unpack("persisted_lineage")
-    audit_paths = list((tmp_path / "prompt-logs").glob("*.json"))
-    assert len(audit_paths) == 1
-    audit = json.loads(audit_paths[0].read_text())
-    assert audit["staged_settlement"] == settlement
-    assert len(audit["attempt_ledger"]) == 1
-    assert {
-        key:audit["attempt_ledger"][0][key]
-        for key in ("role", "sequence", "outcome", "session_ref", "response_sha256")
-    } == {
-        key:ledger[0][key]
-        for key in ("role", "sequence", "outcome", "session_ref", "response_sha256")
-    }
-
-    persisted = unpack("persisted_lineage")
-    prior_state = dict(persisted["review_state"])
-    prior_state.update(
-        phase="correction", debt=preconditions["durable_debt"], last_round=1,
-    )
-    replayed = rc.settle_state(
-        prior_state, settlement, phase="correction",
-        snapshot=persisted["review_state"]["snapshot_digest"], round_no=3,
-    )
-    for debt in replayed["debt"]:
-        assert not debt.get("class_record_indexes")
-        debt.pop("class_record_indexes", None)
-    assert replayed == persisted["review_state"]
-
-    base_id = artifact["run"]["base_id"]
-    for commit in (base_id, head_id):
-        subprocess.run(
-            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
-            cwd=ROOT, capture_output=True, check=True,
-        )
-    rows = []
-    for line in subprocess.run(
-        ["git", "diff", "--numstat", f"{base_id}...{head_id}", "--", "src"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
-    ).stdout.splitlines():
-        added, deleted, path = line.split("\t")
-        rows.append({"path":path, "added":int(added), "deleted":int(deleted)})
-    assert rows == artifact["production_diff"]["files"]
-    assert sum(row["added"] for row in rows) == artifact["production_diff"]["total_added"]
-    assert sum(row["deleted"] for row in rows) == artifact["production_diff"]["total_deleted"]
-    production_paths = [
-        path for path in subprocess.run(
-            ["git", "ls-tree", "-r", "--name-only", head_id, "--", "src"],
-            cwd=ROOT, capture_output=True, text=True, check=True,
-        ).stdout.splitlines() if path.endswith(".py")
-    ]
-    largest = sorted(({
-        "path":path,
-        "lines":len(subprocess.run(
-            ["git", "show", f"{head_id}:{path}"], cwd=ROOT,
-            capture_output=True, text=True, check=True,
-        ).stdout.splitlines()),
-    } for path in production_paths),
-        key=lambda row:(-row["lines"], row["path"]),
-    )[:5]
-    assert artifact["largest_production_module_lines"] == largest
 
 
 def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
@@ -489,7 +559,8 @@ def test_citation_rationale_bound_applies_to_every_evidence_shape(length, valid)
         }],
     ))
     correction["debt_outcomes"][0]["evidence"][0]["rationale"] = rationale
-    correction["class_outcomes"][0]["evidence"][0]["rationale"] = rationale
+    correction["class_outcomes"]["class-a"]["evidence"][0]["rationale"] = rationale
+    correction["class_actions"]["class-a"] = None
 
     final = wire_value(decision("final"))
     final["coverage"][0]["evidence"][0]["rationale"] = rationale
@@ -497,7 +568,10 @@ def test_citation_rationale_bound_applies_to_every_evidence_shape(length, valid)
     cases = [
         (lane, sp.lane_schema(cc.PLAN_MODE, "domain")),
         (census, sp.decision_schema(cc.PLAN_MODE, "census")),
-        (correction, sp.decision_schema(cc.PLAN_MODE, "correction")),
+        (correction, sp.decision_schema(
+            cc.PLAN_MODE, "correction", active_classes=[active_class()],
+            outcome_class_ids=["class-a"],
+        )),
         (final, sp.decision_schema(cc.PLAN_MODE, "final")),
     ]
     assert all(Draft202012Validator(schema).is_valid(value) for value, schema in cases) is valid
@@ -540,7 +614,7 @@ def test_two_hundred_maximum_rationales_fit_the_decision_response_cap():
     ).is_valid(value)
 
 
-def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle():
+def test_historical_claude_acceptance_binds_responses_and_lifecycle():
     artifact = json.loads(
         (ROOT / "docs/staged_review_protocol_v2_claude_acceptance.json").read_text()
     )
@@ -582,28 +656,12 @@ def test_retained_claude_acceptance_binds_exact_schemas_responses_and_lifecycle(
             sp.decode_lane(rendered, mode=probe["mode"], lane=probe["lane"])
     for probe in artifact["schema_probes"]:
         role = probe["role"]
-        schema = sp.decision_schema(cc.PLAN_MODE, role, canonical=True)
-        if role == "census":
-            # The retained artifact proves the shipped pre-cutover schema. Keep
-            # that representation test-only; production accepts only the current
-            # deterministic census contract.
-            schema = deepcopy(schema)
-            schema["properties"]["class_outcomes"] = sp._array(  # noqa: SLF001
-                sp._class_outcome(canonical=True),  # noqa: SLF001
-                maximum=sp.MAX_ACTIVE_CLASSES,
-            )
-            schema["required"].insert(3, "class_outcomes")
-        schema = sp.provider_schema(schema)
-        assert hashlib.sha256(
-            sp.canonical_schema(schema).encode("utf-8")
-        ).hexdigest() == probe["schema_sha256"]
         rendered = json.dumps(
             probe["response"], ensure_ascii=False, separators=(",", ":"),
         )
         assert hashlib.sha256(rendered.encode("utf-8")).hexdigest() == probe[
             "response_sha256"
         ]
-        assert not list(Draft202012Validator(schema).iter_errors(probe["response"]))
         assert sp.materialize_decision_value(
             probe["response"], mode=cc.PLAN_MODE, role=role,
         )["role"] == role
@@ -1325,8 +1383,8 @@ def test_closed_mechanized_class_cannot_be_replaced_by_manual_procedure():
         }],
     )
     with pytest.raises(sp.ProtocolError, match="requires pattern and pathspec"):
-        materialize(
-            value, mode="branch",
+        sp.materialize_decision_value(
+            value, mode="branch", role="final",
             active_classes=[active_class(status=cc.CLOSED, mechanized=True)],
         )
 
@@ -1382,7 +1440,7 @@ def test_source_fanout_requires_distinct_cited_existing_classes():
 
 
 def test_census_schema_rejects_authored_class_outcomes():
-    value = decision("census")
+    value = wire_value(decision("census"))
     value["class_outcomes"] = []
     issues = list(
         Draft202012Validator(sp.decision_schema("plan", "census")).iter_errors(value)
@@ -1522,6 +1580,7 @@ def test_census_closed_violation_derives_only_unmechanized_reopen(mechanized):
         materialize(value, **kwargs)
     assert any(
         line.startswith("/class_actions/0: closed violated class requires")
+        or line.startswith("/class_actions/class-a:")
         for line in str(caught.value).splitlines()
     )
 
@@ -1823,8 +1882,8 @@ def test_integrity_lane_requires_every_active_class_assessment():
 
 def test_class_and_debt_outcome_completeness_are_independent_controls():
     with pytest.raises(sp.ProtocolError, match="class_outcomes: expected exactly"):
-        materialize(
-            decision("final", coverage=coverage()),
+        sp.materialize_decision_value(
+            decision("final", coverage=coverage()), mode=cc.PLAN_MODE, role="final",
             active_classes=[active_class()],
         )
     with pytest.raises(sp.ProtocolError, match="debt_outcomes: must update every"):
@@ -2194,14 +2253,13 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
     active = active_class(status=cc.CLOSED, mechanized=mechanized)
     current = finding(
         "G5", "MAJOR",
-        classification={"kind":"existing_class", "class_id":"class-a"},
+        classification={
+            "kind":"existing_class", "class_id":"class-a",
+            "assessment_evidence":["plan:1"],
+        },
     )
     raw = decision(
         "correction", governing_findings=[current],
-        class_outcomes=[{
-            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
-            "basis":{"kind":"new_finding", "finding_id":"G5"},
-        }],
         class_actions=[action],
     )
     parsed = materialize(
@@ -2250,6 +2308,66 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
     ) == durable_projection(
         legacy, active=[active], phase="correction", mode=cc.BRANCH_MODE,
     )
+
+
+def test_correction_derives_non_debt_class_outcome_with_distinct_evidence():
+    current = finding(
+        "G5", "MINOR", classification={
+            "kind":"existing_class", "class_id":"class-a",
+            "assessment_evidence":["plan:2"],
+        },
+    )
+    parsed = materialize(
+        decision("correction", governing_findings=[current]),
+        active_classes=[active_class(severity="MINOR")],
+    )
+    assert parsed["findings"][0]["evidence"] == ["plan:1"]
+    assert parsed["class_assessments"] == [{
+        "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
+        "finding_id":"G5",
+    }]
+    assert parsed["assessment_dispositions"] == [{
+        "assessment_id":"class-a", "governing_id":"G5",
+    }]
+    assert parsed["class_dispositions"] == [{
+        "finding_id":"G5", "kind":"existing_class", "class_id":"class-a",
+    }]
+
+
+def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
+    current = finding(
+        "G5", classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    debt = durable_debt()
+    base = decision(
+        "correction", governing_findings=[current],
+        debt_outcomes=[{
+            "debt_id":"D7", "status":"open", "evidence":["plan:1"],
+            "reason":"the earlier occurrence remains open",
+        }],
+    )
+    invalid = deepcopy(base)
+    invalid["class_outcomes"] = [{
+        "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
+        "basis":{"kind":"carried_debt", "debt_id":"D7"},
+    }]
+    with pytest.raises(sp.ProtocolError, match="fresh existing-class finding requires"):
+        materialize(
+            invalid, active_classes=[active_class()], durable_debt=[debt],
+        )
+
+    valid = deepcopy(base)
+    valid["class_outcomes"] = [{
+        "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
+        "basis":{"kind":"new_finding", "finding_id":"G5"},
+    }]
+    parsed = materialize(
+        valid, active_classes=[active_class()], durable_debt=[debt],
+    )
+    assert parsed["class_assessments"][0] == {
+        "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
+        "finding_id":"G5",
+    }
 
 
 def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():

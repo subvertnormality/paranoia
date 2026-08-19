@@ -152,7 +152,7 @@ def wire_value(value):
     def visit(node):
         if isinstance(node, dict):
             for key, child in node.items():
-                if key == "evidence":
+                if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
                             "anchor":item, "rationale":"fixture evidence",
@@ -166,6 +166,19 @@ def wire_value(value):
                 visit(child)
 
     visit(value)
+    if isinstance(value, dict) and value.get("role") in {
+        "census", "correction", "final",
+    }:
+        for label in ("class_outcomes", "class_actions"):
+            rows = value.get(label)
+            if not isinstance(rows, list):
+                continue
+            value[label] = {
+                row["class_id"]:{
+                    key:child for key, child in row.items() if key != "class_id"
+                }
+                for row in rows
+            }
     return value
 
 
@@ -374,15 +387,10 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
             },
         ],
         "debt_outcomes":[], "class_outcomes":[],
-        "class_actions":[
-            {"kind":"reclassify", "class_id":"class-0", "severity":"BLOCKER"},
-            {
-                "kind":"replace", "class_id":"class-0", "definition":{
-                    "invariant":"replacement invariant", "severity":"BLOCKER",
-                    "procedure":"inspect the replacement",
-                },
-            },
-        ],
+        "class_actions":{
+            **{f"class-{index}":None for index in range(cc.MAX_ACTIVE_CLASSES - 1)},
+            "class-0":{"kind":"reclassify", "severity":"BLOCKER"},
+        },
     })
 
     class Engine:
@@ -405,10 +413,8 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     assert "/governing_findings/0/evidence:" in message
     assert "has non-unique elements" in message
     assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
-    assert "/: invalid combined class actions for 'class-0'" in message
     assert "/: invalid combined new-class set" in message
     assert "100 non-superseded classes already tracked" in message
-    assert "/class_actions/1/class_id: duplicate value 'class-0'" in message
     assert caught.value.stage_role == "correction-validation-retry"
     assert [row.outcome for row in caught.value.attempts] == [
         "validation-invalid", "validation-invalid",
@@ -600,7 +606,7 @@ def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     }]
     invalid = {
         "role": "census", "governing_findings": [],
-        "debt_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": {},
         "class_outcomes": [],
     }
     corrected = json.loads(json.dumps(invalid))
@@ -675,7 +681,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
             "remedy": "retain as context", "source_ids": ["behaviour:F1"],
             "classification": {"kind": "existing_class", "class_id": class_id},
         }],
-        "debt_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": {class_id:None},
     }
     corrected = json.loads(json.dumps(invalid))
     corrected["governing_findings"][0]["classification"] = {
@@ -1969,7 +1975,7 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
                 "source_ids":["integrity:F1"],
                 "classification":{"kind":"existing_class", "class_id":"class-a"},
             }],
-            "debt_outcomes":[], "class_actions":[],
+            "debt_outcomes":[], "class_actions":{"class-a":None},
         })
         return Review(text=text, session_ref="consolidation", raw=text)
 
@@ -2359,7 +2365,7 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
                 "debt_outcomes":[{
                     "debt_id":"D0", "status":"closed", "evidence":["repository/a.py:1"],
                 }],
-                "class_outcomes":[], "class_actions":[],
+                "class_outcomes":[], "class_actions":{"abc":None},
             })
             return Review(text=text, session_ref="s", raw=text)
 

@@ -611,7 +611,8 @@ def _staged_structural_review(
         del assessment_ids, known_debt
         try:
             value, issues = sp.decode_decision_with_issues(
-                text, mode=mode, role=role,
+                text, mode=mode, role=role, active_classes=active_classes,
+                durable_debt=state.get("debt", []),
             )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
@@ -793,7 +794,8 @@ def _staged_structural_review(
         try:
             prompt = prompts.compose(
                 f"{prompts.STAGED_CONSOLIDATION_INSTRUCTIONS}\n"
-                f"{sp.citation_instructions(mode)}",
+                f"{sp.citation_instructions(mode)}\n"
+                f"{sp.class_decision_instructions('census', active_classes=active_classes)}",
                 consolidation_body,
             )
             if len(prompt) > rc.MAX_CONSOLIDATION_PROMPT_CHARS:
@@ -806,7 +808,9 @@ def _staged_structural_review(
                 model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
                 on_progress=on_progress,
                 web_search=web_search,
-                response_schema=sp.provider_schema(sp.decision_schema(mode, "census")),
+                response_schema=sp.provider_schema(sp.decision_schema(
+                    mode, "census", active_classes=active_classes,
+                )),
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
                     text, source_ids=source_ids, source_severities=source_severities,
@@ -844,6 +848,9 @@ def _staged_structural_review(
         role = "final" if phase == "final" else "correction"
         open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
         existing = [d["id"] for d in open_debt]
+        outcome_class_ids = sp.expected_outcome_class_ids(
+            role, active_classes=active_classes, durable_debt=open_debt,
+        )
         stage_body = json.dumps({
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
@@ -852,7 +859,8 @@ def _staged_structural_review(
         }, ensure_ascii=False)
         prompt = prompts.compose(
             f"{prompts.staged_followup_instructions(mode)}\n"
-            f"{sp.citation_instructions(mode)}",
+            f"{sp.citation_instructions(mode)}\n"
+            f"{sp.class_decision_instructions(role, active_classes=active_classes, outcome_class_ids=outcome_class_ids)}",
             stage_body,
         )
         if len(prompt) > rc.MAX_STAGED_PROMPT_CHARS:
@@ -865,7 +873,10 @@ def _staged_structural_review(
             timeout=STAGED_FOLLOWUP_TIMEOUT_SEC, on_progress=on_progress,
             next_sequence=next_sequence,
             web_search=web_search,
-            response_schema=sp.provider_schema(sp.decision_schema(mode, role)),
+            response_schema=sp.provider_schema(sp.decision_schema(
+                mode, role, active_classes=active_classes,
+                outcome_class_ids=outcome_class_ids,
+            )),
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
                 assessment_ids=active_ids if role == "final" else [],
