@@ -105,12 +105,14 @@ wire schema and remain historical evidence only.
 
 The separate signed-in
 [`keyed_class_handler_acceptance_2026-08-19.json`](keyed_class_handler_acceptance_2026-08-19.json)
-drives commit `feb0121` through the production `critique_branch` correction handler with one closed,
-debt-bound active class. Codex session `01a019f8-681c-7903-92ac-916cef0ea474` returned one exact keyed
-response; schema SHA-256 is `5e044b4c…f6635` and response SHA-256 is `3f2f37f7…2465`. Anchor
+drives commit `9ef782b` through the production `critique_branch` correction handler with one closed,
+debt-bound active class. Codex session `01a01a28-879a-7ab2-aede-d38271faeb70` returned one exact keyed
+response; schema SHA-256 is `5e044b4c…f6635` and response SHA-256 is `55bc5e4a…2e12`. Anchor
 validation and canonical materialization derived `reopen`; atomic settlement persisted that class
 open with its original open debt binding, and the rendered result remained correctly blocked.
-Elapsed handler time was 219.059 seconds with one model call and no validation retry. The executable
+The exact settlement retains `_class_record_pointers` as
+`["/class_outcomes/acceptance-class"]`. Elapsed handler time was 77.854 seconds with one model call
+and no validation retry. The executable
 replay regenerates the exact schema, hashes and decodes the retained response, resolves anchors from
 the recorded commit, replays canonical class transition, and checks durable and rendered outcomes.
 
@@ -118,7 +120,7 @@ The final pre-convergence production diff from `main` is 456 additions and 66
 deletions across five existing modules: `staged_protocol.py` +382/-47, `engines.py` +44/-7,
 `handlers.py` +16/-5, `prompts.py` +13/-6, and `review_census.py` +1/-1. The largest changed
 production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,483 lines. The retained
-provider and handler acceptance totals 17 successful model calls and 603.127 seconds of observable
+provider and handler acceptance totals 17 successful model calls and 461.922 seconds of observable
 wall time. This excludes failed diagnostic/capability attempts and CODE-review calls rather than
 misstating them as successful release evidence.
 

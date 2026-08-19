@@ -7,15 +7,17 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, review_census as rc
 
-
-ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "keyed_class_handler_acceptance_2026-08-19.json"
 LINEAGE = "keyed-class-handler-acceptance-20260819"
 STAKES = (
@@ -30,6 +32,14 @@ def digest(text: str) -> str:
 
 
 def main() -> int:
+    head_id = subprocess.run(
+        ["git", "rev-parse", "codex/fix-consolidation-registers^{commit}"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    base_id = subprocess.run(
+        ["git", "rev-parse", "main^{commit}"], cwd=ROOT,
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
     state_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-state-"))
     log_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-log-"))
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
@@ -38,17 +48,17 @@ def main() -> int:
     before["debt"] = [{
         "id":"D1", "finding_id":"historical-acceptance-gap", "status":"open",
         "severity":"MAJOR",
-        "summary":"The keyed protocol lacks a retained production-handler lifecycle.",
-        "evidence":["repository/README.md:1"],
-        "remedy":"Run and retain the production keyed handler lifecycle.",
+        "summary":"The retained handler lifecycle predates the current keyed diagnostic contract.",
+        "evidence":["repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949"],
+        "remedy":"Run and retain the current production handler with exact keyed pointers.",
         "source_ids":[], "class_ids":["acceptance-class"],
         "first_round":0, "last_round":0,
     }]
     tracked = cc.TrackedClass(
         "acceptance-class",
-        "A keyed staged protocol cutover has replayable production-handler acceptance binding "
-        "the exact provider schema and response through anchor validation, canonical dry-run, "
-        "atomic settlement, durable lineage, audit attempts, and rendered verdict.",
+        "The retained keyed handler acceptance is bound to current head " + head_id +
+        " and records _class_record_pointers as exactly "
+        "['/class_outcomes/acceptance-class'] without excluding that field from replay.",
         "MAJOR", 0, cc.CLOSED, procedure="replay the complete retained handler artifact",
     )
     cc.save_lineage(state_root, cc.Lineage(
@@ -90,7 +100,11 @@ def main() -> int:
         "stakes":STAKES,
         "project_summary":"Paranoia Local is a trusted-single-user local review MCP server.",
         "diff_intent":"Prove the keyed staged class-decision protocol through its production handler.",
-        "focus":"Assess only the seeded acceptance class and preserve exact evidence bindings.",
+        "focus":(
+            "Assess only the seeded acceptance class. The existing retained artifact predates "
+            "the named head and records a canonical array pointer, so preserve the open debt "
+            "and violated carried-debt binding with exact repository evidence."
+        ),
     }
     started = time.monotonic()
     result = handlers.critique_branch(args, engine=engine, log_dir=log_root)
@@ -125,14 +139,6 @@ def main() -> int:
         raise RuntimeError("durable debt binding changed unexpectedly")
     if "STRUCTURAL-PHASE: correction" not in result or "CONVERGENCE: BLOCKED" not in result:
         raise RuntimeError("rendered staged trailer is not the expected blocked correction")
-    head_id = subprocess.run(
-        ["git", "rev-parse", "codex/fix-consolidation-registers^{commit}"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
-    ).stdout.strip()
-    base_id = subprocess.run(
-        ["git", "rev-parse", "main^{commit}"], cwd=ROOT,
-        capture_output=True, text=True, check=True,
-    ).stdout.strip()
     artifact_calls = []
     for call in recorded_calls:
         review = call["review"]

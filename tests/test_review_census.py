@@ -201,16 +201,7 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
     )
-    assert settlement["_class_record_pointers"] == [
-        "/class_outcomes/acceptance-class",
-    ]
-    assert {
-        key:value for key, value in settlement.items()
-        if key != "_class_record_pointers"
-    } == {
-        key:value for key, value in artifact["settlement"].items()
-        if key != "_class_record_pointers"
-    }
+    assert settlement == artifact["settlement"]
 
     snapshot = tmp_path / "repository"
     snapshot.mkdir()

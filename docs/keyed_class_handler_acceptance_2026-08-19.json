@@ -6,7 +6,7 @@
         "class_id": "acceptance-class",
         "detail": null,
         "first_round": 0,
-        "invariant": "A keyed staged protocol cutover has replayable production-handler acceptance binding the exact provider schema and response through anchor validation, canonical dry-run, atomic settlement, durable lineage, audit attempts, and rendered verdict.",
+        "invariant": "The retained keyed handler acceptance is bound to current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay.",
         "matches": [],
         "pathspec": null,
         "pattern": null,
@@ -24,25 +24,25 @@
             "acceptance-class"
           ],
           "evidence": [
-            "repository/scripts/run_keyed_handler_acceptance.py:18-19",
-            "repository/scripts/run_keyed_handler_acceptance.py:175-179",
-            "repository/README.md:1202-1205"
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+            "repository/tests/test_review_census.py:204-213"
           ],
           "finding_id": "historical-acceptance-gap",
           "first_round": 0,
           "id": "D1",
           "last_round": 1,
-          "reason": "The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.",
-          "remedy": "Run and retain the production keyed handler lifecycle.",
+          "reason": "The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.",
+          "remedy": "Run and retain the current production handler with exact keyed pointers.",
           "severity": "MAJOR",
           "source_ids": [],
           "status": "open",
-          "summary": "The keyed protocol lacks a retained production-handler lifecycle."
+          "summary": "The retained handler lifecycle predates the current keyed diagnostic contract."
         }
       ],
       "last_round": 1,
       "phase": "correction",
-      "snapshot_digest": "1b2913593df2178b043f9804607c108d03ffb10cd898e73acb95480333cbbd3d",
+      "snapshot_digest": "1fc764d71ddc5624463b66524b924a1c5701f7f038393dd7446ed634d7e1fb77",
       "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
       "stakes_digest": "0107c32da199a5ce80a57e51f2e51c5d7863b549fd4c61ed8ab5cbf1fba19bc2",
       "version": 1
@@ -58,19 +58,19 @@
       "outcome": "completed",
       "raw_excerpt": null,
       "raw_sha256": null,
-      "response_excerpt": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner declares the retained production-handler artifact required by this class, but that artifact is absent from the reviewed tree.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:95-127\",\"rationale\":\"The runner would exercise the production handler and verify settlement, derived lifecycle, durable lineage, and rendered verdict; executable code alone is not replayable retained evidence that these checks completed.\"},{\"anchor\":\"repository/docs/staged_review_protocol_v2_acceptance.md:3-9\",\"rationale\":\"The acceptance report says the keyed amendment is still undergoing CODE convergence and explicitly disclaims convergence merely because the report exists.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner names docs/keyed_class_handler_acceptance_2026-08-19.json as its required retained output, which is absent from the reviewed snapshot.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:175-179\",\"rationale\":\"The handler artifact is written only after the live lifecycle and all acceptance checks complete; no resulting artifact was retained.\"},{\"anchor\":\"repository/README.md:1202-1205\",\"rationale\":\"The public issue #42 evidence links only the provider-capability record, not a production-handler lifecycle artifact.\"}],\"reason\":\"The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
-      "response_sha256": "3f2f37f707dafb5cca0affee35bba838a477e444925c7deadb6bc1860ef12465",
+      "response_excerpt": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained lifecycle is bound to feb012133ac48b30ecafe677ecff412402807b59, not the required current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement records /class_outcomes/0 rather than the required keyed pointer /class_outcomes/acceptance-class.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"Replay computes the correct keyed pointer but explicitly excludes _class_record_pointers when comparing the regenerated settlement with the retained artifact, so the stale pointer cannot fail acceptance.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained artifact still names an older head instead of the required current snapshot.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained artifact still contains the canonical array pointer that this acceptance debt requires replacing.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"The replay test masks the mismatch by omitting _class_record_pointers from its artifact comparison.\"}],\"reason\":\"The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "response_sha256": "55bc5e4a3fa6c8b258d2610ce82a451a0cfdf833a76a2be1aae3ec038d4d2e12",
       "returncode": null,
       "role": "correction",
       "sequence": 1,
-      "session_ref": "01a019f8-681c-7903-92ac-916cef0ea474",
+      "session_ref": "01a01a28-879a-7ab2-aede-d38271faeb70",
       "stderr_excerpt": null,
       "stderr_sha256": null,
       "usage": {
-        "cached_input_tokens": 1369856,
-        "input_tokens": 1553424,
-        "output_tokens": 6790,
-        "reasoning_output_tokens": 4069
+        "cached_input_tokens": 273920,
+        "input_tokens": 430005,
+        "output_tokens": 2806,
+        "reasoning_output_tokens": 1913
       },
       "validation_issue": null
     }
@@ -83,17 +83,17 @@
           "acceptance-class"
         ],
         "evidence": [
-          "repository/README.md:1"
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949"
         ],
         "finding_id": "historical-acceptance-gap",
         "first_round": 0,
         "id": "D1",
         "last_round": 0,
-        "remedy": "Run and retain the production keyed handler lifecycle.",
+        "remedy": "Run and retain the current production handler with exact keyed pointers.",
         "severity": "MAJOR",
         "source_ids": [],
         "status": "open",
-        "summary": "The keyed protocol lacks a retained production-handler lifecycle."
+        "summary": "The retained handler lifecycle predates the current keyed diagnostic contract."
       }
     ],
     "phase": "correction",
@@ -104,10 +104,10 @@
   },
   "calls": [
     {
-      "prompt_sha256": "b51579c54ef7676fb4a816bd8fb81a8e2478fb465cf7c3908c5bce0573e08cb4",
-      "raw_sha256": "7b7d9f1c97e339f284b5f6fb0c554138da766dd9afd3505c495930e92425ae06",
-      "response_sha256": "3f2f37f707dafb5cca0affee35bba838a477e444925c7deadb6bc1860ef12465",
-      "response_text": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner declares the retained production-handler artifact required by this class, but that artifact is absent from the reviewed tree.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:95-127\",\"rationale\":\"The runner would exercise the production handler and verify settlement, derived lifecycle, durable lineage, and rendered verdict; executable code alone is not replayable retained evidence that these checks completed.\"},{\"anchor\":\"repository/docs/staged_review_protocol_v2_acceptance.md:3-9\",\"rationale\":\"The acceptance report says the keyed amendment is still undergoing CODE convergence and explicitly disclaims convergence merely because the report exists.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:18-19\",\"rationale\":\"The runner names docs/keyed_class_handler_acceptance_2026-08-19.json as its required retained output, which is absent from the reviewed snapshot.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:175-179\",\"rationale\":\"The handler artifact is written only after the live lifecycle and all acceptance checks complete; no resulting artifact was retained.\"},{\"anchor\":\"repository/README.md:1202-1205\",\"rationale\":\"The public issue #42 evidence links only the provider-capability record, not a production-handler lifecycle artifact.\"}],\"reason\":\"The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "prompt_sha256": "bb0a04406c6332ee54063caf14048db1e0a7c8eba56089017f80817f0fbb1854",
+      "raw_sha256": "c3b1f1fcd6dae9c061f6410c2920ba22dcbea8fd1bed15d55c8cef2b1b978937",
+      "response_sha256": "55bc5e4a3fa6c8b258d2610ce82a451a0cfdf833a76a2be1aae3ec038d4d2e12",
+      "response_text": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained lifecycle is bound to feb012133ac48b30ecafe677ecff412402807b59, not the required current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement records /class_outcomes/0 rather than the required keyed pointer /class_outcomes/acceptance-class.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"Replay computes the correct keyed pointer but explicitly excludes _class_record_pointers when comparing the regenerated settlement with the retained artifact, so the stale pointer cannot fail acceptance.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained artifact still names an older head instead of the required current snapshot.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained artifact still contains the canonical array pointer that this acceptance debt requires replacing.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"The replay test masks the mismatch by omitting _class_record_pointers from its artifact comparison.\"}],\"reason\":\"The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
       "route": "fresh",
       "schema": {
         "$defs": {
@@ -921,18 +921,18 @@
         "type": "object"
       },
       "schema_sha256": "5e044b4c342cc5b9c02b483f6bbdbcb713a92a9e6c87082bc258ce33e79f6635",
-      "session_ref": "01a019f8-681c-7903-92ac-916cef0ea474",
+      "session_ref": "01a01a28-879a-7ab2-aede-d38271faeb70",
       "usage": {
-        "cached_input_tokens": 1369856,
-        "input_tokens": 1553424,
-        "output_tokens": 6790,
-        "reasoning_output_tokens": 4069
+        "cached_input_tokens": 273920,
+        "input_tokens": 430005,
+        "output_tokens": 2806,
+        "reasoning_output_tokens": 1913
       }
     }
   ],
   "date": "2026-08-19",
-  "elapsed_seconds": 219.059,
-  "head_id": "feb012133ac48b30ecafe677ecff412402807b59",
+  "elapsed_seconds": 77.854,
+  "head_id": "9ef782b163fa0c80914c75458dbb08133e7b9e5d",
   "lineage_id": "keyed-class-handler-acceptance-20260819",
   "provider": {
     "cli_version": "codex-cli 0.144.6",
@@ -941,11 +941,11 @@
     "model": "gpt-5.6-sol",
     "web_search": false
   },
-  "result_sha256": "451283bb7601a4ac4f276c35adbc70317294666213ebef3da24aaf47a897b50c",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The keyed protocol lacks a retained production-handler lifecycle. — remains open: The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed. [classes: acceptance-class] (repository/scripts/run_keyed_handler_acceptance.py:18-19, repository/scripts/run_keyed_handler_acceptance.py:175-179, repository/README.md:1202-1205)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run and retain the production keyed handler lifecycle.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a019f8-681c-7903-92ac-916cef0ea474` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 1)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class A keyed staged protocol cutover has replayable production-handler acceptance binding the exact provider schema and response through anchor validation, canonical dry-run, atomic settlement, durable lineage, audit attempts, and rendered verdict. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "result_sha256": "fb9462c5e5546371671ed97534b6284c290e75c3245b2f2d45b019692105421e",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The retained handler lifecycle predates the current keyed diagnostic contract. — remains open: The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion. [classes: acceptance-class] (repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949, repository/tests/test_review_census.py:204-213)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run and retain the current production handler with exact keyed pointers.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a01a28-879a-7ab2-aede-d38271faeb70` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 1)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class The retained keyed handler acceptance is bound to current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
   "settlement": {
     "_class_record_pointers": [
-      "/class_outcomes/0"
+      "/class_outcomes/acceptance-class"
     ],
     "_finding_class_refs": {},
     "assessment_dispositions": [
@@ -958,9 +958,9 @@
       {
         "class_id": "acceptance-class",
         "evidence": [
-          "repository/scripts/run_keyed_handler_acceptance.py:18-19",
-          "repository/scripts/run_keyed_handler_acceptance.py:95-127",
-          "repository/docs/staged_review_protocol_v2_acceptance.md:3-9"
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+          "repository/tests/test_review_census.py:204-213"
         ],
         "finding_id": "historical-acceptance-gap",
         "verdict": "violated"
@@ -977,12 +977,12 @@
     "debt_updates": [
       {
         "evidence": [
-          "repository/scripts/run_keyed_handler_acceptance.py:18-19",
-          "repository/scripts/run_keyed_handler_acceptance.py:175-179",
-          "repository/README.md:1202-1205"
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+          "repository/tests/test_review_census.py:204-213"
         ],
         "id": "D1",
-        "reason": "The production runner exists, but its declared handler-lifecycle output is absent. Closure requires running it successfully and retaining the generated artifact so its exact schema, response, anchor validation, settlement, lineage, attempt ledger, and rendered verdict can be replayed.",
+        "reason": "The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.",
         "status": "open"
       }
     ],
