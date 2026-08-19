@@ -134,6 +134,29 @@ The worktree-bound full suite passed **1,167 tests in 60.82 seconds**. The histo
 passed all eight role/shape groups and the bounded mutation gate killed all **31** owned mutants,
 including keyed diagnostic-pointer preservation.
 
+### Keyed amendment acceptance boundary
+
+The retained live evidence is deliberately compositional, not Cartesian. The provider matrix proves
+fresh and resumed structured transport for census, populated correction (including independent
+`assessment_evidence`), and final responses through the production decoder/materializer. The
+signed-in handler artifact proves the production `critique_branch` bridge through anchor
+resolution, canonical dry-run, settlement, persistence, audit, and rendering. Deterministic handler
+tests then drive the same production `_staged_call` used by that bridge through schema-valid
+semantic and canonical failures, the exact keyed retry prompt, rejected-attempt retention, resumed
+success, and final materialization. This acceptance does **not** claim that a signed-in model was
+induced to fail validation on command, or that every semantic payload shape was crossed with every
+provider/route/handler combination.
+
+That boundary is intentional. Asking a live model to emit a prescribed invalid response tests
+model obedience to an instruction to fail, not a distinct CLI/schema capability, and is not a
+repeatable release gate. Production class IDs are server-minted as the first eight hexadecimal
+characters of SHA-256, so a primary lifecycle cannot naturally create a class key containing `/` or
+`~`; doing so requires deliberately corrupted lineage state, which the frozen operating model
+excludes. RFC 6901 escaping remains total defensive behavior, while reachable production pointer
+bindings are covered using actual ID-shaped and named test-fixture keys. A future distinct call
+adapter or supported non-hex ID source would require new live evidence; semantic reuse alone does
+not.
+
 ## Real Codex primary lifecycle
 
 The disposable repository contained one pure Python function, its README contract, and one test.
