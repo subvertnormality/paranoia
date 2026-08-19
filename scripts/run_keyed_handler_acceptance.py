@@ -29,32 +29,6 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
-class RecordingCodex(engines.CodexEngine):
-    def __init__(self) -> None:
-        super().__init__()
-        self.calls: list[dict] = []
-
-    def run(self, prompt, *args, response_schema=None, **kwargs):
-        review = super().run(
-            prompt, *args, response_schema=response_schema, **kwargs,
-        )
-        self.calls.append({
-            "route":"fresh", "prompt":prompt, "schema":response_schema,
-            "review":review,
-        })
-        return review
-
-    def resume(self, session_ref, prompt, *args, response_schema=None, **kwargs):
-        review = super().resume(
-            session_ref, prompt, *args, response_schema=response_schema, **kwargs,
-        )
-        self.calls.append({
-            "route":"resumed", "prompt":prompt, "schema":response_schema,
-            "review":review,
-        })
-        return review
-
-
 def main() -> int:
     state_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-state-"))
     log_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-log-"))
@@ -81,7 +55,33 @@ def main() -> int:
         LINEAGE, rounds=0, next_seq=1, classes={tracked.class_id:tracked},
         mode=cc.BRANCH_MODE, review_state=before,
     ))
-    engine = RecordingCodex()
+    engine = engines.CodexEngine()
+    recorded_calls: list[dict] = []
+    original_run = engine.run
+    original_resume = engine.resume
+
+    def record_run(prompt, *args, response_schema=None, **kwargs):
+        review = original_run(
+            prompt, *args, response_schema=response_schema, **kwargs,
+        )
+        recorded_calls.append({
+            "route":"fresh", "prompt":prompt, "schema":response_schema,
+            "review":review,
+        })
+        return review
+
+    def record_resume(session_ref, prompt, *args, response_schema=None, **kwargs):
+        review = original_resume(
+            session_ref, prompt, *args, response_schema=response_schema, **kwargs,
+        )
+        recorded_calls.append({
+            "route":"resumed", "prompt":prompt, "schema":response_schema,
+            "review":review,
+        })
+        return review
+
+    engine.run = record_run  # type: ignore[method-assign]
+    engine.resume = record_resume  # type: ignore[method-assign]
     args = {
         "repo_path":str(ROOT), "base_ref":"main",
         "head_ref":"codex/fix-consolidation-registers", "lineage":LINEAGE,
@@ -95,13 +95,36 @@ def main() -> int:
     started = time.monotonic()
     result = handlers.critique_branch(args, engine=engine, log_dir=log_root)
     elapsed = time.monotonic() - started
-    if len(engine.calls) not in {1, 2}:
-        raise RuntimeError(f"expected one call plus optional validation retry, got {len(engine.calls)}")
-    if any(call["review"].error for call in engine.calls):
+    if len(recorded_calls) not in {1, 2}:
+        raise RuntimeError(
+            f"expected one call plus optional validation retry, got {len(recorded_calls)}"
+        )
+    if any(call["review"].error for call in recorded_calls):
         raise RuntimeError("provider execution failed")
     audit_path = next(log_root.glob("*.json"))
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
     lineage = cc.load_lineage(state_root, LINEAGE, stamp="ACCEPTANCE", mode=cc.BRANCH_MODE)
+    settlement = audit.get("staged_settlement")
+    if not isinstance(settlement, dict):
+        raise RuntimeError("production staged settlement is absent")
+    if settlement["class_assessments"] != [{
+        "class_id":"acceptance-class", "verdict":"violated",
+        "evidence":settlement["class_assessments"][0]["evidence"],
+        "finding_id":"historical-acceptance-gap",
+    }]:
+        raise RuntimeError("unexpected staged class assessment")
+    if settlement["class_records"] != [{
+        "op":"reopen", "class_id":"acceptance-class",
+    }]:
+        raise RuntimeError("expected the violated closed class to derive reopen")
+    current_class = lineage.classes["acceptance-class"]
+    if current_class.status != cc.OPEN:
+        raise RuntimeError("derived reopen did not persist")
+    current_debt = next(row for row in lineage.review_state["debt"] if row["id"] == "D1")
+    if current_debt["status"] != "open" or current_debt["class_ids"] != ["acceptance-class"]:
+        raise RuntimeError("durable debt binding changed unexpectedly")
+    if "STRUCTURAL-PHASE: correction" not in result or "CONVERGENCE: BLOCKED" not in result:
+        raise RuntimeError("rendered staged trailer is not the expected blocked correction")
     head_id = subprocess.run(
         ["git", "rev-parse", "codex/fix-consolidation-registers^{commit}"],
         cwd=ROOT, capture_output=True, text=True, check=True,
@@ -110,13 +133,13 @@ def main() -> int:
         ["git", "rev-parse", "main^{commit}"], cwd=ROOT,
         capture_output=True, text=True, check=True,
     ).stdout.strip()
-    calls = []
-    for call in engine.calls:
+    artifact_calls = []
+    for call in recorded_calls:
         review = call["review"]
         schema_text = json.dumps(
             call["schema"], ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         )
-        calls.append({
+        artifact_calls.append({
             "route":call["route"], "session_ref":review.session_ref,
             "prompt_sha256":digest(call["prompt"]), "schema":call["schema"],
             "schema_sha256":digest(schema_text), "response_text":review.text,
@@ -134,8 +157,8 @@ def main() -> int:
         },
         "base_id":base_id, "head_id":head_id, "lineage_id":LINEAGE,
         "stakes":STAKES, "elapsed_seconds":round(elapsed, 3),
-        "calls":calls, "before_state":before,
-        "settlement":audit["staged_settlement"],
+        "calls":artifact_calls, "before_state":before,
+        "settlement":settlement,
         "attempt_ledger":audit["attempt_ledger"],
         "after_lineage":{
             "rounds":lineage.rounds, "next_seq":lineage.next_seq,
@@ -144,11 +167,16 @@ def main() -> int:
         },
         "result_text":result, "result_sha256":digest(result),
     }
+    if (
+        audit["attempt_ledger"][-1]["response_sha256"]
+        != artifact_calls[-1]["response_sha256"]
+    ):
+        raise RuntimeError("audit attempt is not bound to the accepted response")
     OUTPUT.write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    print(f"wrote {OUTPUT} from {len(calls)} production handler call(s)")
+    print(f"wrote {OUTPUT} from {len(artifact_calls)} production handler call(s)")
     return 0
 
 
