@@ -1,7 +1,10 @@
 # Staged review Protocol v2 implementation acceptance
 
 Status: **Protocol v2 shipped. The keyed class-decision amendment for issue #42 passed its external
-provider capability gate and is undergoing its CODE-convergence gate.**
+provider, production-handler, test, and mutation gates. After the reviewer conceded two
+acceptance-matrix objections but later reopened them unchanged, the operator ended that churned
+convergence loop without expanding the frozen stakes to synthetic corrupted IDs or prescribed live
+provider failure.**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
