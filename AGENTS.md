@@ -114,13 +114,18 @@ are canonical data and use an explicit canonical validator plus a cache-version 
 fresh wire decoder.
 Represent fresh model-owned class outcomes and independent class actions as closed objects keyed by
 the exact server-supplied class IDs, rejecting duplicate JSON keys before schema validation. Project
-those maps deterministically into the existing canonical arrays; do not deduplicate an invalid
-array, accept a legacy wire shape, or partially settle a register. Final owns one outcome per active
-class; correction owns outcomes only for classes already bound to supplied open debt and derives a
-new existing-class violation from that finding's evidence and basis. Census continues to derive
-outcomes from validated integrity assessments. Specialize each action value schema to the target
-class so mechanized classes cannot express close/reopen, while canonical semantic validation and
-the class-engine dry-run remain authoritative for state/outcome compatibility.
+those maps in duplicate-checked encounter order into the existing canonical arrays; do not sort
+actions whose order determines successor identity, deduplicate an invalid array, accept a legacy
+wire shape, or partially settle a register. Detect nested duplicate keys in Claude's raw structured
+envelope before converting `structured_output` to a mapping, retaining its session and raw channel
+through the validation retry. Final owns one outcome per active class; correction owns outcomes
+only for classes already bound to supplied open debt and derives a new existing-class violation
+from a distinct role-specific assessment-evidence member, never from finding evidence. Census
+continues to derive outcomes from validated integrity assessments. Specialize each action value
+schema to the target class so mechanized classes cannot express close/reopen, while canonical
+semantic validation and the class-engine dry-run remain authoritative for state/outcome
+compatibility. Capability-gate the exact compact minimum and maximum generated schemas on fresh and
+resumed Codex and Claude routes; unsupported schema dialect or transport size blocks the cutover.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement

@@ -57,15 +57,21 @@ semantic choice but exclude operations that class can never take: mechanized cla
 literal pathspec. State-dependent and outcome-dependent compatibility remains a local semantic
 check because the outcome is in the same response.
 
-JSON object keys are parsed with duplicate-key detection before schema validation. A repeated
-class key therefore rejects rather than becoming last-value-wins. Unknown IDs, extra correction
-outcomes, legacy arrays, and a value-level `class_id` reject through the existing single bounded
-retry.
+JSON object keys are parsed into a pair-preserving representation with duplicate-key detection
+before conversion to ordinary mappings or schema validation. For Codex this applies to the extracted
+model JSON. For Claude, parse the provider envelope itself pair-preservingly, locate
+`structured_output`, and serialize that nested pair tree without collapsing duplicates; the staged
+decoder then reports the exact nested duplicate pointer while the envelope's session reference and
+raw stdout remain available. Fresh and resumed paths use the same extraction. A repeated class key
+therefore rejects rather than becoming last-value-wins. Unknown IDs, extra correction outcomes,
+legacy arrays, and a value-level `class_id` reject through the existing single bounded retry.
 
-After wire validation, project the maps in sorted class-ID order to the existing canonical arrays,
-restoring `class_id` on each row. Canonical schemas, settlement rows, class-engine records, durable
-state, cache data, and audit semantics remain unchanged. There is one fresh wire protocol, not a
-durable dual format or permissive alias layer.
+Retain object member order after duplicate-key validation. After wire validation, project the maps
+in exact encounter order to the existing canonical arrays, restoring `class_id` on each row. Member
+order is explicit protocol data because multiple legal replacement actions allocate successor IDs
+in action order; it is never sorted or reconstructed from an unordered mapping. Canonical schemas,
+settlement rows, class-engine records, durable state, cache data, and audit semantics remain
+unchanged. There is one fresh wire protocol, not a durable dual format or permissive alias layer.
 
 ### 2. Derive correction findings' violated outcomes
 
@@ -73,13 +79,22 @@ A correction may discover a new occurrence for an active class not already bound
 debt. Today the response repeats that judgment as both an `existing_class` governing finding and a
 `violated` class outcome. Remove the second expression.
 
-For correction only, every validated governing finding classified to an existing active class
-deterministically creates that class's violated outcome from the finding's canonical evidence and
-`new_finding` basis. Exactly one finding per existing class remains mandatory. If the class is also
-in the required debt-bound outcome map, its authored outcome must be violated and bind consistently;
-the server does not overwrite a contradictory satisfaction judgment. Final retains model-owned
-outcomes for every class because absence of a finding is itself part of the cold judgment. Census
-continues to derive outcomes from validated integrity assessments.
+For correction only, an `existing_class` classification gains a role-specific
+`assessment_evidence` citation member when its target is not already in the required debt-bound
+outcome map. Every validated governing finding classified to such an existing active class
+deterministically creates that class's violated outcome from `assessment_evidence` and the finding's
+`new_finding` basis. Finding evidence continues to own the finding and fresh debt; assessment
+evidence independently owns the class assessment. They may differ, and neither substitutes for the
+other. Exactly one finding per existing class remains mandatory.
+
+When a class is already debt-bound, its authored outcome remains the sole class assessment and may
+carry evidence different from the new finding. The classification omits `assessment_evidence`; its
+authored outcome must be violated and bind consistently to the finding or carried debt. The server
+never overwrites a contradictory satisfaction judgment. Generate per-class existing-class
+classification branches so the provider schema requires or forbids the assessment member according
+to that target. Final retains model-owned outcomes for every class because absence of a finding is
+itself part of the cold judgment. Census continues to derive outcomes from validated integrity
+assessments.
 
 This preserves new unrelated findings in a targeted correction without opening the outcome map to
 every active class. The finding is the one semantic judgment; the outcome is its deterministic
@@ -107,10 +122,23 @@ per required outcome class, at most one independent action value per active clas
 active action-key/action-kind table beside the role schema. The JSON Schema remains authoritative;
 the prose is concise repair guidance.
 
-Provider projection may continue removing only unsupported `uniqueItems` and draft metadata. The
-keyed shape relies on closed object properties already supported by both providers, not on an
-unsupported uniqueness keyword. Local duplicate-key, schema, semantic, anchor, and canonical
-class-engine failures continue into the same bounded pointer-addressed retry and audit ledger.
+Provider projection may continue removing only the currently documented provider-subset omissions.
+Do not treat closed objects, sparse action maps, `$defs`/`$ref`, schema size, or command transport as
+supported merely because local Draft 2020-12 validation accepts them. Before the cutover, run exact
+fresh and resumed structured-output probes through both retained interfaces—Codex CLI
+`--output-schema` and Claude CLI `--json-schema`—using the actual generated final and correction
+schemas with empty/minimal and populated maps. A failure blocks the cutover rather than selecting a
+different semantic protocol or unconstrained fallback.
+
+Keep the generated schema compact by sharing repeated outcome and action bodies through the smallest
+provider-compatible definition mechanism proven by those probes. Generate only the 100 explicit
+class properties admitted by `MAX_ACTIVE_CLASSES`, measure canonical schema bytes and the final CLI
+argument/file transport at that maximum, and assert both fit the observed provider and OS transport
+limits with documented headroom. If either interface rejects the compact dialect or maximum shape,
+narrow the supported active-class cap coherently in schema, validation, documentation, and tests;
+do not ship an unmeasured expanded schema. Local duplicate-key, schema, semantic, anchor, and
+canonical class-engine failures continue into the same bounded pointer-addressed retry and audit
+ledger.
 
 ## Verification
 
@@ -118,12 +146,16 @@ class-engine failures continue into the same bounded pointer-addressed retry and
   debt-bound keys; census has no model-owned outcome map; and unknown keys, legacy arrays, embedded
   `class_id`, and impossible mechanized lifecycle values reject.
 - Raw-JSON tests prove duplicate object keys reject before ordinary parsing for both outcome and
-  action maps, with a pointer-addressed retry diagnostic.
-- Projection tests prove maps become sorted canonical arrays and historical legal V2 materializes
-  identically through an explicit semantic bijection.
-- Correction tests prove a new existing-class finding derives one violated outcome; debt-bound
-  satisfaction remains authored; overlap requires consistency; duplicate/multiple findings for one
-  class reject; and no finding or action can manufacture satisfaction.
+  action maps, including Claude fresh/resumed envelopes, with a pointer-addressed retry diagnostic,
+  retained session reference, rejected extracted reply, and raw provider channel.
+- Projection tests prove maps preserve duplicate-checked encounter order. Reversed multi-replacement
+  fixtures reproduce exact successor IDs, supersession links, debt bindings, audit order, and
+  historical legal V2 materialization through an explicit semantic bijection.
+- Correction tests prove a new existing-class finding derives one violated outcome from its
+  independent assessment evidence; finding and assessment evidence may differ without either being
+  substituted. Debt-bound satisfaction remains authored; overlap requires consistency;
+  duplicate/multiple findings for one class reject; and no finding or action can manufacture
+  satisfaction.
 - Cross-layer plan and branch tests carry keyed decisions through anchor validation, canonical
   class dry-run, atomic settlement, durable lineage state, rejected-payload diagnostics, and audit.
 - Regression fixtures reproduce issue #42's repeated transition, mechanized `CLOSED`/`REOPEN`, and
@@ -131,16 +163,26 @@ class-engine failures continue into the same bounded pointer-addressed retry and
   failures.
 - Extend the bounded Protocol v2 mutation gate for duplicate-key detection, exact correction keys,
   action-kind specialization, projection order, and derived correction violation.
+- Record exact-schema fresh/resumed live acceptance for Codex and Claude at minimal and maximum
+  active-class shapes, including schema bytes, transport route, CLI version, response shape, call
+  count, and elapsed time. A capability failure blocks implementation acceptance.
 - Run focused staged protocol/review census tests, the complete suite, the mutation gate, and one
   real signed-in staged CODE lifecycle through the production handler before PR.
+- Update README and staged protocol documentation to describe keyed outcome/action objects, authored
+  debt-bound versus derived new-finding assessments, independent assessment evidence, duplicate-key
+  rejection, encounter-order preservation, and the unchanged canonical boundary.
 
 ## Acceptance
 
 - The fresh provider schema cannot express two actions for one class, an unknown class target, an
   extra correction outcome, or `close`/`reopen` for a mechanized class.
 - Correction asks each new existing-class violation judgment once and derives its binding outcome.
+- Finding evidence, class-assessment evidence, action encounter order, successor identity, and audit
+  order all remain independently faithful to every currently legal settlement.
 - Every historical legal semantic result remains representable and materializes to the same
   canonical settlement and class-engine transition.
+- Both retained provider interfaces accept the exact minimal and maximum generated schema on fresh
+  and resumed calls within documented schema/transport bounds; otherwise the cutover blocks.
 - Invalid JSON/schema/semantic output still rejects atomically; no row is deduplicated, repaired,
   ignored, or partially settled server-side.
 - The existing retry, diagnostics, response caps, evidence rules, persistence, and convergence
