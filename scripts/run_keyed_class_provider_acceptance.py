@@ -11,12 +11,13 @@ import sys
 import time
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
 from paranoia_local import class_closure as cc
 from paranoia_local import staged_protocol as sp
 from paranoia_local.engines import ClaudeEngine, CodexEngine
 
-
-ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "keyed_class_decision_provider_acceptance_2026-08-19.json"
 
 
@@ -92,6 +93,16 @@ def fixtures() -> list[dict]:
             for item in sp.CHECKLIST
         ],
     }
+    census_classes = [active_class(1), active_class(3)]
+    census = {
+        "role":"census", "governing_findings":[], "debt_outcomes":[],
+        "class_actions":{"00000001":None, "00000003":None},
+    }
+    census_kwargs = {
+        "assessment_verdicts":{"00000001":"satisfied", "00000003":"satisfied"},
+        "assessment_findings":{"00000001":None, "00000003":None},
+        "assessment_evidence":{"00000001":["plan:1"], "00000003":["plan:1"]},
+    }
     return [
         {"shape":"minimal-correction", "role":"correction",
          "classes":minimal_classes, "durable_debt":[], "response":minimal},
@@ -100,6 +111,9 @@ def fixtures() -> list[dict]:
          "response":populated},
         {"shape":"maximum-final", "role":"final",
          "classes":maximum_classes, "durable_debt":[], "response":maximum},
+        {"shape":"representative-census", "role":"census",
+         "classes":census_classes, "durable_debt":[], "response":census,
+         "materialize_kwargs":census_kwargs},
     ]
 
 
@@ -147,6 +161,11 @@ def main() -> int:
                     fixture["response"], ensure_ascii=False, separators=(",", ":"),
                 )
                 if fixture["shape"] == "populated-correction" else
+                "This is a structured-output transport probe. Return exactly this "
+                "census object: " + json.dumps(
+                    fixture["response"], ensure_ascii=False, separators=(",", ":"),
+                )
+                if fixture["shape"] == "representative-census" else
                 "This is a structured-output transport probe. Assess every class "
                 "satisfied using plan:1 evidence, use null for every action slot, and "
                 "mark each of these checklist IDs covered with no findings: "
@@ -180,6 +199,7 @@ def main() -> int:
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    **fixture.get("materialize_kwargs", {}),
                 )
                 session = review.session_ref
                 if not session:
@@ -197,6 +217,7 @@ def main() -> int:
                 "active_classes":classes,
                 "required_outcome_count":len(outcome_ids),
                 "durable_debt":durable_debt,
+                "materialize_kwargs":fixture.get("materialize_kwargs", {}),
                 "schema_bytes":len(schema_text.encode("utf-8")),
                 "schema_sha256":digest(schema_text),
                 "calls":calls,
@@ -304,23 +325,24 @@ def repair_claude_maximum() -> int:
     return 0
 
 
-def add_correction_shape(shape: str) -> int:
-    """Add one exact correction shape without rerunning retained probes."""
+def add_shape(shape: str) -> int:
+    """Add one exact role shape without rerunning retained probes."""
     artifact = json.loads(OUTPUT.read_text(encoding="utf-8"))
     fixture = next(row for row in fixtures() if row["shape"] == shape)
     classes = fixture["classes"]
     durable_debt = fixture["durable_debt"]
+    role = fixture["role"]
     outcome_ids = sp.expected_outcome_class_ids(
-        "correction", active_classes=classes, durable_debt=durable_debt,
+        role, active_classes=classes, durable_debt=durable_debt,
     )
     schema = sp.provider_schema(sp.decision_schema(
-        cc.BRANCH_MODE, "correction", active_classes=classes,
+        cc.BRANCH_MODE, role, active_classes=classes,
         outcome_class_ids=outcome_ids,
     ))
     schema_text = sp.canonical_schema(schema)
     prompt = (
-        "This is a structured-output transport probe. Return exactly this populated "
-        "correction object: " + json.dumps(
+        "This is a structured-output transport probe. Return exactly this "
+        f"{role} object: " + json.dumps(
             fixture["response"], ensure_ascii=False, separators=(",", ":"),
         )
     )
@@ -346,12 +368,13 @@ def add_correction_shape(shape: str) -> int:
                     f"{review.failure_detail or review.text}"
                 )
             decoded = sp.decode_decision(
-                review.text, mode=cc.BRANCH_MODE, role="correction",
+                review.text, mode=cc.BRANCH_MODE, role=role,
                 active_classes=classes, durable_debt=durable_debt,
             )
             sp.materialize_decision_value(
-                decoded, mode=cc.BRANCH_MODE, role="correction",
+                decoded, mode=cc.BRANCH_MODE, role=role,
                 active_classes=classes, durable_debt=durable_debt,
+                **fixture.get("materialize_kwargs", {}),
             )
             session = review.session_ref
             if not session:
@@ -363,11 +386,12 @@ def add_correction_shape(shape: str) -> int:
                 "usage":review.usage, "response_text":review.text,
             })
         probe = {
-            "shape":shape, "role":"correction",
+            "shape":shape, "role":role,
             "active_class_count":len(classes),
             "active_classes":classes,
             "required_outcome_count":len(outcome_ids),
             "durable_debt":durable_debt,
+            "materialize_kwargs":fixture.get("materialize_kwargs", {}),
             "schema_bytes":len(schema_text.encode("utf-8")),
             "schema_sha256":digest(schema_text), "calls":calls,
         }
@@ -402,9 +426,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--repair-claude-maximum", action="store_true")
     parser.add_argument("--add-populated-correction", action="store_true")
+    parser.add_argument("--add-representative-census", action="store_true")
     args = parser.parse_args()
     if args.repair_claude_maximum:
         sys.exit(repair_claude_maximum())
     if args.add_populated_correction:
-        sys.exit(add_correction_shape("populated-correction"))
+        sys.exit(add_shape("populated-correction"))
+    if args.add_representative_census:
+        sys.exit(add_shape("representative-census"))
     sys.exit(main())

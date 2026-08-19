@@ -329,6 +329,35 @@ def test_keyed_decision_projection_preserves_encounter_order():
     ]
 
 
+def test_keyed_decision_semantic_issue_retains_late_wire_key_pointer():
+    classes = [active_class("class-a"), active_class("class-b")]
+    debt = [
+        durable_debt("D1", cid="class-a"),
+        durable_debt("D2", cid="class-b", finding_id="other-finding"),
+    ]
+    value = decision(
+        "correction",
+        debt_outcomes=[
+            {"debt_id":"D1", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+            {"debt_id":"D2", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+        ],
+        class_outcomes=[
+            {"class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D1"}},
+            {"class_id":"class-b", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D2"}},
+        ],
+        class_actions=[{"class_id":"class-b", "kind":"reopen"}],
+    )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"^/class_actions/class-b: reopen requires closed class$",
+    ):
+        materialize(value, active_classes=classes, durable_debt=debt)
+
+
 def test_maximum_keyed_schema_fits_claude_single_argument_transport():
     classes = [
         active_class(f"{index:08x}", mechanized=index % 2 == 0)
@@ -362,7 +391,7 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
     )
     assert artifact["version"] == 1
     assert artifact["max_active_classes"] == sp.MAX_ACTIVE_CLASSES
-    assert artifact["call_count"] == 12
+    assert artifact["call_count"] == 16
     assert {row["engine"] for row in artifact["providers"]} == {"codex", "claude"}
     for provider in artifact["providers"]:
         assert provider["effort"] == "high"
@@ -401,7 +430,15 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    **probe.get("materialize_kwargs", {}),
                 )
+    assert {
+        probe["shape"]
+        for provider in artifact["providers"] for probe in provider["probes"]
+    } == {
+        "minimal-correction", "populated-correction", "maximum-final",
+        "representative-census",
+    }
 
 
 def test_model_citation_instructions_name_closed_shape_and_mode_anchors():

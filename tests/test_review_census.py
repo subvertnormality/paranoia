@@ -201,7 +201,16 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
     )
-    assert settlement == artifact["settlement"]
+    assert settlement["_class_record_pointers"] == [
+        "/class_outcomes/acceptance-class",
+    ]
+    assert {
+        key:value for key, value in settlement.items()
+        if key != "_class_record_pointers"
+    } == {
+        key:value for key, value in artifact["settlement"].items()
+        if key != "_class_record_pointers"
+    }
 
     snapshot = tmp_path / "repository"
     snapshot.mkdir()
@@ -421,6 +430,76 @@ def test_canonical_class_validation_reports_independent_action_pointers():
         "/class_actions/0: invalid class operation: CLOSED names unknown class id 'missing-a'",
         "/class_actions/1: invalid class operation: REOPEN names unknown class id 'missing-b'",
     ]
+
+
+def test_handler_retry_names_late_keyed_action_for_debt_bound_outcome(tmp_path):
+    classes = [
+        {
+            "class_id":cid, "invariant":f"invariant {cid}", "severity":"MAJOR",
+            "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+            "procedure":"inspect it",
+        }
+        for cid in ("class-a", "class-b")
+    ]
+    debt = [
+        {
+            "id":debt_id, "finding_id":finding_id, "status":"open",
+            "severity":"MAJOR", "summary":"still reachable", "evidence":["plan:1"],
+            "remedy":"repair it", "source_ids":[], "class_ids":[cid],
+            "first_round":1, "last_round":1,
+        }
+        for debt_id, finding_id, cid in (
+            ("D1", "old-a", "class-a"), ("D2", "old-b", "class-b"),
+        )
+    ]
+    base = {
+        "role":"correction", "governing_findings":[],
+        "debt_outcomes":[
+            {"debt_id":"D1", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+            {"debt_id":"D2", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+        ],
+        "class_outcomes":[
+            {"class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D1"}},
+            {"class_id":"class-b", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D2"}},
+        ],
+        "class_actions":{"class-a":None, "class-b":{"kind":"reopen"}},
+    }
+    invalid = wire(base)
+    corrected = wire({**base, "class_actions":{"class-a":None, "class-b":None}})
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/class_actions/class-b: reopen requires closed class" in prompt
+            return Review(text=corrected, session_ref="s", raw=corrected)
+
+    def parser(text):
+        try:
+            return sp.materialize_decision(
+                text, mode=cc.PLAN_MODE, role="correction",
+                active_classes=classes, durable_debt=debt,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="correction", engine=Engine(), prompt="correct it", cwd=tmp_path,
+        model="m", effort="high", timeout=10, parser=parser,
+    )
+    assert parsed["class_records"] == []
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+    assert rejected[0]["validation_issue"] == (
+        "/class_actions/class-b: reopen requires closed class"
+    )
 
 
 def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):

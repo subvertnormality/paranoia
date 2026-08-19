@@ -46,6 +46,9 @@ each validated integrity assessment, copying its verdict and ordered evidence ex
 violation, require exactly one governing finding that includes the cited integrity source and
 classifies to that class; a finding may not target a satisfied class. Correction and final retain
 model-owned class outcomes because they have no prior lane judgement to project.
+When fresh class decisions use keyed objects, retain those wire locations through semantic and
+canonical class-engine validation so the bounded retry names provider-repairable JSON Pointers;
+never expose canonical array indexes that were absent from the provider response.
 Derive the deterministic close transition when an open, unmechanized class is assessed satisfied;
 do not discard a healthy census because the model omitted that redundant lifecycle record.
 After consolidation-only failure, reuse a complete validated lane census only under exact bindings

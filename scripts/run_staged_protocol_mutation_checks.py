@@ -140,6 +140,12 @@ MUTATIONS = (
         "test_keyed_decision_projection_preserves_encounter_order",
     ),
     (
+        "keyed-action-diagnostic-pointer",
+        'keyed_action_pointers = wire_pointers.get("class_actions", {})',
+        'keyed_action_pointers = {}',
+        "test_keyed_decision_semantic_issue_retains_late_wire_key_pointer",
+    ),
+    (
         "derived-correction-violation",
         "if cid not in authored_classes:",
         "if False:",
@@ -201,12 +207,16 @@ CROSS_MODULE_MUTATIONS = (
 
 
 def main() -> int:
+    source_env = dict(os.environ)
+    source_env["PYTHONPATH"] = os.pathsep.join((
+        str(ROOT / "src"), str(ROOT), source_env.get("PYTHONPATH", ""),
+    ))
     differential = subprocess.run(
         [
             sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
             *(f"{ROOT / TEST}::{name}" for name in DIFFERENTIAL_TESTS),
         ],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT, env=source_env, capture_output=True, text=True, check=False,
     )
     if differential.returncode:
         print("Historical V1/V2 differential gate failed.", file=sys.stderr)

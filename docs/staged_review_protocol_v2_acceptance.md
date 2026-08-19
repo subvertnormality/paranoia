@@ -92,12 +92,15 @@ for census, 22,975 for correction, and 24,197 for final, all below a 32,768-byte
 well below Linux's per-argument limit used by Claude. Exact fresh/resumed Codex and Claude results
 are retained in
 [`keyed_class_decision_provider_acceptance_2026-08-19.json`](keyed_class_decision_provider_acceptance_2026-08-19.json).
-The bounded gate made twelve successful calls: minimal correction, a populated correction with one
-debt-bound and one newly affected active class, and maximum 100-class final, fresh and resumed, on
+The bounded gate made sixteen successful calls: minimal correction, a populated correction with one
+debt-bound and one newly affected active class, a representative two-class census, and maximum
+100-class final, fresh and resumed, on
 Codex CLI `0.144.6` with `gpt-5.6-sol` and Claude Code `2.1.197` with
 `sonnet`, all at high effort with web disabled. Each retained exact response replays through the
 production decoder and semantic materializer. The maximum-final schema was 24,197 bytes; the
-retained call time totaled 354.248 seconds. The older hashes above describe the pre-amendment array
+retained call time totaled 384.068 seconds. The census probe carries its authoritative assessment
+inputs into executable semantic replay, so every decision role is exercised rather than merely
+schema-generated. The older hashes above describe the pre-amendment array
 wire schema and remain historical evidence only.
 
 The separate signed-in
@@ -111,13 +114,21 @@ Elapsed handler time was 219.059 seconds with one model call and no validation r
 replay regenerates the exact schema, hashes and decodes the retained response, resolves anchors from
 the recorded commit, replays canonical class transition, and checks durable and rendered outcomes.
 
-At handler-acceptance commit `feb0121`, the production diff from `main` is 372 additions and 53
-deletions across five existing modules: `staged_protocol.py` +298/-34, `engines.py` +44/-7,
+The final pre-convergence production diff from `main` is 404 additions and 56
+deletions across five existing modules: `staged_protocol.py` +330/-37, `engines.py` +44/-7,
 `handlers.py` +16/-5, `prompts.py` +13/-6, and `review_census.py` +1/-1. The largest changed
-production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,412 lines. The retained
-provider and handler acceptance totals 13 successful model calls and 573.307 seconds of observable
+production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,441 lines. The retained
+provider and handler acceptance totals 17 successful model calls and 603.127 seconds of observable
 wall time. This excludes failed diagnostic/capability attempts and CODE-review calls rather than
 misstating them as successful release evidence.
+
+Fresh keyed locations are also retained through canonical materialization solely for retry
+diagnostics. Semantic and canonical class-engine failures therefore name the provider-repairable
+key (for example `/class_actions/<class-id>`) rather than an array index that never appeared in the
+provider response. The private pointer map is not persisted or included in settlement state.
+The worktree-bound full suite passed **1,165 tests in 59.79 seconds**. The historical differential
+passed all eight role/shape groups and the bounded mutation gate killed all **28** owned mutants,
+including keyed diagnostic-pointer preservation.
 
 ## Real Codex primary lifecycle
 

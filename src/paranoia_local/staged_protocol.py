@@ -703,6 +703,24 @@ def project_decision_wire(value: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
+def _pointer_token(value: str) -> str:
+    """Escape one object key for use as an RFC 6901 JSON Pointer token."""
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def _wire_class_pointers(value: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Retain provider-facing keyed locations across canonical projection."""
+    result: dict[str, dict[str, str]] = {}
+    for label in ("class_outcomes", "class_actions"):
+        rows = value.get(label)
+        if isinstance(rows, dict):
+            result[label] = {
+                class_id: f"/{label}/{_pointer_token(class_id)}"
+                for class_id in rows
+            }
+    return result
+
+
 def decode_lane_with_issues(
     text: str, *, mode: str, lane: str,
 ) -> tuple[dict[str, Any], list[str]]:
@@ -798,14 +816,17 @@ def decode_decision_with_issues(
         ),
         max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
+    wire_pointers = _wire_class_pointers(wire)
     canonical = project_decision_wire(wire)
-    return canonical, _schema_issues(
+    issues = _schema_issues(
         canonical,
         decision_schema(
             mode, role, canonical=True, active_classes=active_classes,
             outcome_class_ids=outcome_ids,
         ),
     )
+    canonical["_wire_class_pointers"] = wire_pointers
+    return canonical, issues
 
 
 def decode_decision(
@@ -1089,8 +1110,12 @@ def materialize_decision_value(
                     )
             outcomes[cid] = outcome
     else:
+        wire_pointers = value.get("_wire_class_pointers", {})
+        keyed_outcome_pointers = wire_pointers.get("class_outcomes", {})
         outcome_pointers = {
-            row["class_id"]: f"/class_outcomes/{index}"
+            row["class_id"]: keyed_outcome_pointers.get(
+                row["class_id"], f"/class_outcomes/{index}",
+            )
             for index, row in reversed(list(enumerate(value["class_outcomes"])))
         }
         outcomes = _unique(
@@ -1232,8 +1257,12 @@ def materialize_decision_value(
                 f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
 
+    wire_pointers = value.get("_wire_class_pointers", {})
+    keyed_action_pointers = wire_pointers.get("class_actions", {})
     action_pointers = {
-        row["class_id"]: f"/class_actions/{index}"
+        row["class_id"]: keyed_action_pointers.get(
+            row["class_id"], f"/class_actions/{index}",
+        )
         for index, row in reversed(list(enumerate(value["class_actions"])))
     }
     actions = _unique(

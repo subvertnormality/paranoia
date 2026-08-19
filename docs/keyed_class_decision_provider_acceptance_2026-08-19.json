@@ -1,8 +1,8 @@
 {
   "acceptance_kind": "keyed-staged-class-decision-provider-capability",
-  "call_count": 12,
+  "call_count": 16,
   "date": "2026-08-19",
-  "elapsed_seconds": 354.248,
+  "elapsed_seconds": 384.068,
   "max_active_classes": 100,
   "providers": [
     {
@@ -140,6 +140,85 @@
           "schema_bytes": 11004,
           "schema_sha256": "a39479d73c839ea17bbad29182da591d537e4c30e9a09d0ad95dcf53720c4a54",
           "shape": "populated-correction"
+        },
+        {
+          "active_class_count": 2,
+          "active_classes": [
+            {
+              "class_id": "00000001",
+              "invariant": "invariant 1",
+              "mechanized": false,
+              "pathspec": null,
+              "pattern": null,
+              "procedure": "inspect the affected path",
+              "severity": "MAJOR",
+              "status": "closed"
+            },
+            {
+              "class_id": "00000003",
+              "invariant": "invariant 3",
+              "mechanized": false,
+              "pathspec": null,
+              "pattern": null,
+              "procedure": "inspect the affected path",
+              "severity": "MAJOR",
+              "status": "closed"
+            }
+          ],
+          "calls": [
+            {
+              "elapsed_seconds": 8.426,
+              "raw_sha256": "a3e48eddf837abb3d3da143dbd94cc2a5243c6700abd082c02f7eb677aadcc7c",
+              "response_sha256": "eb71d0c51324e1d87701be6c8be3298371c3da0ac717942c7beed2f52d0e051b",
+              "response_text": "{\"class_actions\":{\"00000001\":null,\"00000003\":null},\"debt_outcomes\":[],\"governing_findings\":[],\"role\":\"census\"}",
+              "route": "fresh",
+              "session_ref": "01a01a12-2bf4-7e81-a51e-1513757564e9",
+              "usage": {
+                "cached_input_tokens": 0,
+                "input_tokens": 20352,
+                "output_tokens": 44,
+                "reasoning_output_tokens": 0
+              }
+            },
+            {
+              "elapsed_seconds": 8.418,
+              "raw_sha256": "bc7d4b0345a78328a0684c18bdabdaa0cac0871c1a27f6ca3735747cbfedc077",
+              "response_sha256": "eb71d0c51324e1d87701be6c8be3298371c3da0ac717942c7beed2f52d0e051b",
+              "response_text": "{\"class_actions\":{\"00000001\":null,\"00000003\":null},\"debt_outcomes\":[],\"governing_findings\":[],\"role\":\"census\"}",
+              "route": "resumed",
+              "session_ref": "01a01a12-2bf4-7e81-a51e-1513757564e9",
+              "usage": {
+                "cached_input_tokens": 20224,
+                "input_tokens": 40796,
+                "output_tokens": 88,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "durable_debt": [],
+          "materialize_kwargs": {
+            "assessment_evidence": {
+              "00000001": [
+                "plan:1"
+              ],
+              "00000003": [
+                "plan:1"
+              ]
+            },
+            "assessment_findings": {
+              "00000001": null,
+              "00000003": null
+            },
+            "assessment_verdicts": {
+              "00000001": "satisfied",
+              "00000003": "satisfied"
+            }
+          },
+          "required_outcome_count": 0,
+          "role": "census",
+          "schema_bytes": 8421,
+          "schema_sha256": "3dcc64ecf4fe2f6114f2a0d3599f807ad4ca12b7cd44e0126e23c322bb4d09fb",
+          "shape": "representative-census"
         },
         {
           "active_class_count": 100,
@@ -1428,6 +1507,139 @@
           "schema_bytes": 11004,
           "schema_sha256": "a39479d73c839ea17bbad29182da591d537e4c30e9a09d0ad95dcf53720c4a54",
           "shape": "populated-correction"
+        },
+        {
+          "active_class_count": 2,
+          "active_classes": [
+            {
+              "class_id": "00000001",
+              "invariant": "invariant 1",
+              "mechanized": false,
+              "pathspec": null,
+              "pattern": null,
+              "procedure": "inspect the affected path",
+              "severity": "MAJOR",
+              "status": "closed"
+            },
+            {
+              "class_id": "00000003",
+              "invariant": "invariant 3",
+              "mechanized": false,
+              "pathspec": null,
+              "pattern": null,
+              "procedure": "inspect the affected path",
+              "severity": "MAJOR",
+              "status": "closed"
+            }
+          ],
+          "calls": [
+            {
+              "elapsed_seconds": 6.195,
+              "raw_sha256": "fa776c2762382a8472422db896dfcc346d18e3ed4b0596a59563ca8988dedaf3",
+              "response_sha256": "078aac32500e403676a3fe33aea2c42e8ae7443e502bfac22360af7659a67251",
+              "response_text": "{\"role\":\"census\",\"governing_findings\":[],\"debt_outcomes\":[],\"class_actions\":{\"00000001\":null,\"00000003\":null}}",
+              "route": "fresh",
+              "session_ref": "265f496b-b8eb-41af-8e16-b15d56be1b13",
+              "usage": {
+                "cost_usd": 0.21997999999999998,
+                "tokens": {
+                  "cache_creation": {
+                    "ephemeral_1h_input_tokens": 34551,
+                    "ephemeral_5m_input_tokens": 0
+                  },
+                  "cache_creation_input_tokens": 34551,
+                  "cache_read_input_tokens": 0,
+                  "inference_geo": "not_available",
+                  "input_tokens": 2570,
+                  "iterations": [
+                    {
+                      "cache_creation": {
+                        "ephemeral_1h_input_tokens": 34551,
+                        "ephemeral_5m_input_tokens": 0
+                      },
+                      "cache_creation_input_tokens": 34551,
+                      "cache_read_input_tokens": 0,
+                      "input_tokens": 2570,
+                      "output_tokens": 290,
+                      "type": "message"
+                    }
+                  ],
+                  "output_tokens": 290,
+                  "server_tool_use": {
+                    "web_fetch_requests": 0,
+                    "web_search_requests": 0
+                  },
+                  "service_tier": "standard",
+                  "speed": "standard"
+                }
+              }
+            },
+            {
+              "elapsed_seconds": 7.454,
+              "raw_sha256": "e66d4b9606343b77dc285f04171266623986807b22779537e90ae758dfb3c42b",
+              "response_sha256": "078aac32500e403676a3fe33aea2c42e8ae7443e502bfac22360af7659a67251",
+              "response_text": "{\"role\":\"census\",\"governing_findings\":[],\"debt_outcomes\":[],\"class_actions\":{\"00000001\":null,\"00000003\":null}}",
+              "route": "resumed",
+              "session_ref": "265f496b-b8eb-41af-8e16-b15d56be1b13",
+              "usage": {
+                "cost_usd": 0.030765299999999995,
+                "tokens": {
+                  "cache_creation": {
+                    "ephemeral_1h_input_tokens": 2960,
+                    "ephemeral_5m_input_tokens": 0
+                  },
+                  "cache_creation_input_tokens": 2960,
+                  "cache_read_input_tokens": 34551,
+                  "inference_geo": "not_available",
+                  "input_tokens": 165,
+                  "iterations": [
+                    {
+                      "cache_creation": {
+                        "ephemeral_1h_input_tokens": 2960,
+                        "ephemeral_5m_input_tokens": 0
+                      },
+                      "cache_creation_input_tokens": 2960,
+                      "cache_read_input_tokens": 34551,
+                      "input_tokens": 165,
+                      "output_tokens": 143,
+                      "type": "message"
+                    }
+                  ],
+                  "output_tokens": 143,
+                  "server_tool_use": {
+                    "web_fetch_requests": 0,
+                    "web_search_requests": 0
+                  },
+                  "service_tier": "standard",
+                  "speed": "standard"
+                }
+              }
+            }
+          ],
+          "durable_debt": [],
+          "materialize_kwargs": {
+            "assessment_evidence": {
+              "00000001": [
+                "plan:1"
+              ],
+              "00000003": [
+                "plan:1"
+              ]
+            },
+            "assessment_findings": {
+              "00000001": null,
+              "00000003": null
+            },
+            "assessment_verdicts": {
+              "00000001": "satisfied",
+              "00000003": "satisfied"
+            }
+          },
+          "required_outcome_count": 0,
+          "role": "census",
+          "schema_bytes": 8421,
+          "schema_sha256": "3dcc64ecf4fe2f6114f2a0d3599f807ad4ca12b7cd44e0126e23c322bb4d09fb",
+          "shape": "representative-census"
         },
         {
           "active_class_count": 100,
