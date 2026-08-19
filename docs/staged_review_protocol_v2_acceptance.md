@@ -87,16 +87,17 @@ name that exact finding; `carried_debt` cannot mask a fresh occurrence. Finding 
 evidence are projected and retained independently.
 
 The maximum 100-active-class branch schemas use local `$defs`/`$ref` sharing and grouped class-ID
-enums without changing the closed contract. Their compact provider projections are 15,101 bytes
-for census, 22,399 for correction, and 23,621 for final, all below a 32,768-byte transport gate and
+enums without changing the closed contract. Their compact provider projections are 15,677 bytes
+for census, 22,975 for correction, and 24,197 for final, all below a 32,768-byte transport gate and
 well below Linux's per-argument limit used by Claude. Exact fresh/resumed Codex and Claude results
 are retained in
 [`keyed_class_decision_provider_acceptance_2026-08-19.json`](keyed_class_decision_provider_acceptance_2026-08-19.json).
-The bounded gate made eight successful calls: minimal correction and maximum 100-class final,
-fresh and resumed, on Codex CLI `0.144.6` with `gpt-5.6-sol` and Claude Code `2.1.197` with
+The bounded gate made twelve successful calls: minimal correction, a populated correction with one
+debt-bound and one newly affected active class, and maximum 100-class final, fresh and resumed, on
+Codex CLI `0.144.6` with `gpt-5.6-sol` and Claude Code `2.1.197` with
 `sonnet`, all at high effort with web disabled. Each retained exact response replays through the
-production decoder and semantic materializer. The maximum-final schema was 23,621 bytes; the
-retained call time totaled 345.265 seconds. The older hashes above describe the pre-amendment array
+production decoder and semantic materializer. The maximum-final schema was 24,197 bytes; the
+retained call time totaled 354.248 seconds. The older hashes above describe the pre-amendment array
 wire schema and remain historical evidence only.
 
 ## Real Codex primary lifecycle

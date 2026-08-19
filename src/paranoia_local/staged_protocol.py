@@ -191,7 +191,8 @@ def _coverage(*, canonical: bool = False) -> dict[str, Any]:
 
 
 def _finding(
-    *, mode: str, role: str, active_classes: Sequence[dict[str, Any]] = (),
+    *, mode: str, role: str,
+    active_classes: Sequence[dict[str, Any]] | None = None,
     outcome_class_ids: Sequence[str] = (), canonical: bool = False,
 ) -> dict[str, Any]:
     properties = {
@@ -238,7 +239,7 @@ def _definition(mode: str, *, mechanized: bool | None = None) -> dict[str, Any]:
 
 def _classification(
     mode: str = cc.PLAN_MODE, *, role: str | None = None,
-    active_classes: Sequence[dict[str, Any]] = (),
+    active_classes: Sequence[dict[str, Any]] | None = None,
     outcome_class_ids: Sequence[str] = (), canonical: bool = False,
 ) -> dict[str, Any]:
     alternatives = [
@@ -252,7 +253,7 @@ def _classification(
         }),
     ]
     outcome_ids = set(outcome_class_ids)
-    if active_classes:
+    if active_classes is not None:
         grouped: list[tuple[list[str], bool]] = []
         active_ids = [cls["class_id"] for cls in active_classes]
         if role == "correction":
@@ -381,7 +382,7 @@ def _class_action_body(mode: str, cls: dict[str, Any]) -> dict[str, Any]:
         _object({
             "kind": _string(32, const="replace"),
             "definition": _definition(
-                mode, mechanized=bool(cls.get("mechanized", False)),
+                mode, mechanized=True if cls.get("mechanized", False) else None,
             ),
         }),
     ])
@@ -408,7 +409,7 @@ def lane_schema(mode: str, lane: str, *, canonical: bool = False) -> dict[str, A
 
 def decision_schema(
     mode: str, role: str, *, canonical: bool = False,
-    active_classes: Sequence[dict[str, Any]] = (),
+    active_classes: Sequence[dict[str, Any]] | None = None,
     outcome_class_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     if mode not in LANES:
@@ -463,7 +464,7 @@ def decision_schema(
                         else "#/$defs/manual_class_action"
                     ),
                 }
-                for cls in active_classes
+                for cls in (active_classes or ())
             },
         )
     if role == "final":
@@ -782,12 +783,12 @@ def parse_lane(text: str, *, mode: str, lane: str,
 
 def decode_decision_with_issues(
     text: str, *, mode: str, role: str,
-    active_classes: Sequence[dict[str, Any]] = (),
+    active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the decision wire shape and retain canonical issues for fan-in."""
     outcome_ids = expected_outcome_class_ids(
-        role, active_classes=active_classes, durable_debt=durable_debt,
+        role, active_classes=active_classes or (), durable_debt=durable_debt,
     )
     wire = decode(
         text,
@@ -809,7 +810,7 @@ def decode_decision_with_issues(
 
 def decode_decision(
     text: str, *, mode: str, role: str,
-    active_classes: Sequence[dict[str, Any]] = (),
+    active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Decode and structurally validate a decision before semantic layers run."""

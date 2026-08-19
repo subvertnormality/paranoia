@@ -145,6 +145,18 @@ MUTATIONS = (
         "if False:",
         "test_correction_derives_non_debt_class_outcome_with_distinct_evidence",
     ),
+    (
+        "exact-empty-active-targets",
+        "if active_classes is not None:",
+        "if active_classes:",
+        "test_exact_empty_active_set_cannot_target_an_existing_class",
+    ),
+    (
+        "unmechanized-to-mechanized-replacement",
+        'mode, mechanized=True if cls.get("mechanized", False) else None,',
+        'mode, mechanized=bool(cls.get("mechanized", False)),',
+        "test_unmechanized_class_can_be_replaced_by_a_mechanized_successor",
+    ),
 )
 
 CROSS_MODULE_MUTATIONS = (
@@ -177,6 +189,13 @@ CROSS_MODULE_MUTATIONS = (
         "tests/test_review_census.py", "citation-cache-version",
         "CENSUS_CACHE_VERSION = 3", "CENSUS_CACHE_VERSION = 2",
         "test_census_cache_requires_every_exact_binding",
+    ),
+    (
+        ROOT / "src" / "paranoia_local" / "review_census.py",
+        "tests/test_review_census.py", "assessment-anchor-walk",
+        'if key in {"evidence", "assessment_evidence"} and isinstance(child, list):',
+        'if key == "evidence" and isinstance(child, list):',
+        "test_assessment_evidence_uses_the_shared_anchor_resolver",
     ),
 )
 

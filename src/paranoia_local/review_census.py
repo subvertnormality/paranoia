@@ -464,7 +464,7 @@ def _walk_evidence(value: Any, pointer: str = ""):
                 continue
             escaped = str(key).replace("~", "~0").replace("/", "~1")
             child_pointer = f"{pointer}/{escaped}"
-            if key == "evidence" and isinstance(child, list):
+            if key in {"evidence", "assessment_evidence"} and isinstance(child, list):
                 for index, anchor in enumerate(child):
                     yield f"{child_pointer}/{index}", anchor
             else:

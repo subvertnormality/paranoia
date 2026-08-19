@@ -46,6 +46,35 @@ def fixtures() -> list[dict]:
         "class_outcomes":{}, "class_actions":{"00000000":None},
     }
     maximum_classes = [active_class(index) for index in range(sp.MAX_ACTIVE_CLASSES)]
+    populated_classes = [active_class(1), active_class(3)]
+    populated_debt = [{
+        "id":"D1", "finding_id":"historic", "status":"open",
+        "severity":"MAJOR", "summary":"historic occurrence",
+        "evidence":["plan:1"], "remedy":"repair it", "source_ids":[],
+        "class_ids":["00000001"], "first_round":1, "last_round":1,
+    }]
+    populated = {
+        "role":"correction",
+        "governing_findings":[{
+            "id":"fresh", "severity":"MINOR", "summary":"new occurrence",
+            "evidence":[citation()], "remedy":"repair the occurrence",
+            "classification":{
+                "kind":"existing_class", "class_id":"00000003",
+                "assessment_evidence":[citation()],
+            },
+        }],
+        "debt_outcomes":[{
+            "debt_id":"D1", "status":"open", "evidence":[citation()],
+            "reason":"the historic occurrence remains reachable",
+        }],
+        "class_outcomes":{
+            "00000001":{
+                "verdict":"violated", "evidence":[citation()],
+                "basis":{"kind":"carried_debt", "debt_id":"D1"},
+            },
+        },
+        "class_actions":{"00000001":None, "00000003":None},
+    }
     maximum = {
         "role":"final", "governing_findings":[], "debt_outcomes":[],
         "class_outcomes":{
@@ -65,9 +94,12 @@ def fixtures() -> list[dict]:
     }
     return [
         {"shape":"minimal-correction", "role":"correction",
-         "classes":minimal_classes, "response":minimal},
+         "classes":minimal_classes, "durable_debt":[], "response":minimal},
+        {"shape":"populated-correction", "role":"correction",
+         "classes":populated_classes, "durable_debt":populated_debt,
+         "response":populated},
         {"shape":"maximum-final", "role":"final",
-         "classes":maximum_classes, "response":maximum},
+         "classes":maximum_classes, "durable_debt":[], "response":maximum},
     ]
 
 
@@ -95,9 +127,10 @@ def main() -> int:
         }
         for fixture in fixtures():
             classes = fixture["classes"]
+            durable_debt = fixture["durable_debt"]
             role = fixture["role"]
             outcome_ids = sp.expected_outcome_class_ids(
-                role, active_classes=classes, durable_debt=(),
+                role, active_classes=classes, durable_debt=durable_debt,
             )
             schema = sp.provider_schema(sp.decision_schema(
                 cc.BRANCH_MODE, role, active_classes=classes,
@@ -108,7 +141,12 @@ def main() -> int:
                 "This is a structured-output transport probe. Return a correction with "
                 "no findings, debt outcomes, or class outcomes, and a null action for "
                 "the sole class."
-                if role == "correction" else
+                if fixture["shape"] == "minimal-correction" else
+                "This is a structured-output transport probe. Return exactly this "
+                "populated correction object: " + json.dumps(
+                    fixture["response"], ensure_ascii=False, separators=(",", ":"),
+                )
+                if fixture["shape"] == "populated-correction" else
                 "This is a structured-output transport probe. Assess every class "
                 "satisfied using plan:1 evidence, use null for every action slot, and "
                 "mark each of these checklist IDs covered with no findings: "
@@ -137,11 +175,11 @@ def main() -> int:
                 json.loads(review.text)
                 decoded = sp.decode_decision(
                     review.text, mode=cc.BRANCH_MODE, role=role,
-                    active_classes=classes,
+                    active_classes=classes, durable_debt=durable_debt,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
-                    active_classes=classes,
+                    active_classes=classes, durable_debt=durable_debt,
                 )
                 session = review.session_ref
                 if not session:
@@ -156,7 +194,9 @@ def main() -> int:
             provider["probes"].append({
                 "shape":fixture["shape"], "role":role,
                 "active_class_count":len(classes),
+                "active_classes":classes,
                 "required_outcome_count":len(outcome_ids),
+                "durable_debt":durable_debt,
                 "schema_bytes":len(schema_text.encode("utf-8")),
                 "schema_sha256":digest(schema_text),
                 "calls":calls,
@@ -195,7 +235,7 @@ def repair_claude_maximum() -> int:
     probe = next(
         row for row in provider["probes"] if row["shape"] == "maximum-final"
     )
-    fixture = fixtures()[1]
+    fixture = next(row for row in fixtures() if row["shape"] == "maximum-final")
     classes = fixture["classes"]
     role = fixture["role"]
     outcome_ids = sp.expected_outcome_class_ids(
@@ -264,8 +304,107 @@ def repair_claude_maximum() -> int:
     return 0
 
 
+def add_populated_correction() -> int:
+    """Add the exact debt-bound/non-debt correction shape without rerunning other probes."""
+    artifact = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    fixture = next(row for row in fixtures() if row["shape"] == "populated-correction")
+    classes = fixture["classes"]
+    durable_debt = fixture["durable_debt"]
+    outcome_ids = sp.expected_outcome_class_ids(
+        "correction", active_classes=classes, durable_debt=durable_debt,
+    )
+    schema = sp.provider_schema(sp.decision_schema(
+        cc.BRANCH_MODE, "correction", active_classes=classes,
+        outcome_class_ids=outcome_ids,
+    ))
+    schema_text = sp.canonical_schema(schema)
+    prompt = (
+        "This is a structured-output transport probe. Return exactly this populated "
+        "correction object: " + json.dumps(
+            fixture["response"], ensure_ascii=False, separators=(",", ":"),
+        )
+    )
+    for provider in artifact["providers"]:
+        engine = CodexEngine() if provider["engine"] == "codex" else ClaudeEngine()
+        calls = []
+        session = None
+        for route in ("fresh", "resumed"):
+            started = time.monotonic()
+            review = (
+                engine.run(
+                    prompt, ROOT, provider["model"], "high", False, timeout=600,
+                    response_schema=schema,
+                )
+                if route == "fresh" else engine.resume(
+                    session, prompt, ROOT, provider["model"], "high", False,
+                    timeout=600, response_schema=schema,
+                )
+            )
+            if review.error:
+                raise RuntimeError(
+                    f"{provider['engine']} populated-correction {route}: "
+                    f"{review.failure_detail or review.text}"
+                )
+            decoded = sp.decode_decision(
+                review.text, mode=cc.BRANCH_MODE, role="correction",
+                active_classes=classes, durable_debt=durable_debt,
+            )
+            sp.materialize_decision_value(
+                decoded, mode=cc.BRANCH_MODE, role="correction",
+                active_classes=classes, durable_debt=durable_debt,
+            )
+            session = review.session_ref
+            if not session:
+                raise RuntimeError(f"{provider['engine']} {route}: missing session")
+            calls.append({
+                "route":route, "session_ref":session,
+                "elapsed_seconds":round(time.monotonic() - started, 3),
+                "response_sha256":digest(review.text), "raw_sha256":digest(review.raw),
+                "usage":review.usage, "response_text":review.text,
+            })
+        probe = {
+            "shape":"populated-correction", "role":"correction",
+            "active_class_count":len(classes),
+            "active_classes":classes,
+            "required_outcome_count":len(outcome_ids),
+            "durable_debt":durable_debt,
+            "schema_bytes":len(schema_text.encode("utf-8")),
+            "schema_sha256":digest(schema_text), "calls":calls,
+        }
+        provider["probes"] = [
+            row for row in provider["probes"]
+            if row["shape"] != "populated-correction"
+        ]
+        provider["probes"].insert(1, probe)
+        for row in provider["probes"]:
+            row.setdefault("durable_debt", [])
+            if "active_classes" not in row:
+                row["active_classes"] = (
+                    [active_class(0)] if row["shape"] == "minimal-correction"
+                    else [active_class(index) for index in range(sp.MAX_ACTIVE_CLASSES)]
+                )
+    artifact["call_count"] = sum(
+        len(row["calls"]) for item in artifact["providers"] for row in item["probes"]
+    )
+    artifact["elapsed_seconds"] = round(sum(
+        call["elapsed_seconds"] for item in artifact["providers"]
+        for row in item["probes"] for call in row["calls"]
+    ), 3)
+    OUTPUT.write_text(
+        json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(f"extended {OUTPUT} with populated correction on both providers")
+    return 0
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--repair-claude-maximum", action="store_true")
+    parser.add_argument("--add-populated-correction", action="store_true")
     args = parser.parse_args()
-    sys.exit(repair_claude_maximum() if args.repair_claude_maximum else main())
+    if args.repair_claude_maximum:
+        sys.exit(repair_claude_maximum())
+    if args.add_populated_correction:
+        sys.exit(add_populated_correction())
+    sys.exit(main())

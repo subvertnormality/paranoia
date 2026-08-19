@@ -80,6 +80,19 @@ def test_census_cache_requires_every_exact_binding():
     ) is None
 
 
+def test_assessment_evidence_uses_the_shared_anchor_resolver(tmp_path):
+    (tmp_path / "a.py").write_text("one\n", encoding="utf-8")
+    rc.resolve_anchors(
+        {"classification":{"assessment_evidence":["a.py:1"]}}, root=tmp_path,
+    )
+    with pytest.raises(
+        rc.CensusError, match=r"/classification/assessment_evidence/0: out-of-range",
+    ):
+        rc.resolve_anchors(
+            {"classification":{"assessment_evidence":["a.py:2"]}}, root=tmp_path,
+        )
+
+
 def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
     lanes = rc.LANES[cc.PLAN_MODE]
     active = [{
@@ -2385,3 +2398,87 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
     assert "STRUCTURAL-DEBT: 0 blocking open" in trailer
     assert "class closure remains open" in trailer
     assert "CONVERGENCE: BLOCKED" in trailer
+
+
+def test_correction_assessment_anchor_retries_before_durable_settlement(tmp_path):
+    (tmp_path / "a.py").write_text("reachable\n", encoding="utf-8")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "correction"
+    state["debt"] = [{
+        "id":"D0", "finding_id":"old", "status":"open", "severity":"MAJOR",
+        "summary":"older one-off", "evidence":["repository/a.py:1"],
+        "remedy":"close it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }]
+    tracked = cc.TrackedClass(
+        "abc", "the active invariant", "MAJOR", 1, cc.OPEN,
+        procedure="inspect the recurring path",
+    )
+    lineage = cc.Lineage(
+        "assessment-anchor-retry", classes={"abc":tracked}, next_seq=2,
+        mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    def response(assessment_anchor):
+        return wire({
+            "role":"correction",
+            "governing_findings":[{
+                "id":"fresh", "severity":"MAJOR", "summary":"new occurrence",
+                "evidence":["repository/a.py:1"], "remedy":"repair it",
+                "classification":{
+                    "kind":"existing_class", "class_id":"abc",
+                    "assessment_evidence":[assessment_anchor],
+                },
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D0", "status":"closed",
+                "evidence":["repository/a.py:1"],
+            }],
+            "class_outcomes":[], "class_actions":{"abc":None},
+        })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = response("repository/a.py:2")
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/governing_findings/0/classification/assessment_evidence/0" in prompt
+            text = response("repository/a.py:1")
+            return Review(text=text, session_ref="s", raw=text)
+
+    closure = Closure()
+    _, _, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None,
+    )
+    assert [row["outcome"] for row in attempts] == ["validation-invalid", "completed"]
+    assert closure.staged_settlement["class_assessments"] == [{
+        "class_id":"abc", "verdict":"violated",
+        "evidence":["repository/a.py:1"], "finding_id":"fresh",
+    }]
+    fresh = next(
+        row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh"
+    )
+    assert fresh["class_ids"] == ["abc"]

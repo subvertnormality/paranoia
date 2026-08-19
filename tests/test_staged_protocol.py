@@ -287,6 +287,23 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
     assert with_assessment["properties"]["class_id"]["enum"] == ["mechanized"]
 
 
+def test_exact_empty_active_set_cannot_target_an_existing_class():
+    schema = sp.decision_schema(
+        cc.BRANCH_MODE, "census", active_classes=[], outcome_class_ids=[],
+    )
+    classification = schema["properties"]["governing_findings"]["items"][
+        "properties"
+    ]["classification"]
+    kinds = {
+        branch["properties"]["kind"].get("const")
+        for branch in classification["anyOf"]
+    }
+    assert kinds == {"one_off", "new_class"}
+    unrestricted = sp.decision_schema(cc.BRANCH_MODE, "census")
+    rendered = sp.canonical_schema(unrestricted)
+    assert '"const":"existing_class"' in rendered
+
+
 def test_keyed_decision_projection_preserves_encounter_order():
     classes = [active_class("class-a"), active_class("class-b")]
     raw = wire_value(decision(
@@ -331,7 +348,7 @@ def test_maximum_keyed_schema_fits_claude_single_argument_transport():
         ))
         Draft202012Validator.check_schema(schema)
         sizes[role] = len(sp.canonical_schema(schema).encode("utf-8"))
-    assert sizes == {"census":15101, "correction":22399, "final":23621}
+    assert sizes == {"census":15677, "correction":22975, "final":24197}
     assert max(sizes.values()) < 32_768
 
 
@@ -344,23 +361,19 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
     )
     assert artifact["version"] == 1
     assert artifact["max_active_classes"] == sp.MAX_ACTIVE_CLASSES
-    assert artifact["call_count"] == 8
+    assert artifact["call_count"] == 12
     assert {row["engine"] for row in artifact["providers"]} == {"codex", "claude"}
     for provider in artifact["providers"]:
         assert provider["effort"] == "high"
         assert provider["web_search"] is False
         assert provider["cli_version"]
         for probe in provider["probes"]:
-            count = probe["active_class_count"]
-            classes = [
-                active_class(
-                    f"{index:08x}", status=cc.CLOSED, mechanized=index % 2 == 0,
-                )
-                for index in range(count)
-            ]
+            classes = probe["active_classes"]
+            assert len(classes) == probe["active_class_count"]
+            durable_debt = probe["durable_debt"]
             role = probe["role"]
             outcome_ids = sp.expected_outcome_class_ids(
-                role, active_classes=classes, durable_debt=(),
+                role, active_classes=classes, durable_debt=durable_debt,
             )
             schema = sp.provider_schema(sp.decision_schema(
                 cc.BRANCH_MODE, role, active_classes=classes,
@@ -382,11 +395,11 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
                 assert call["elapsed_seconds"] > 0
                 decoded = sp.decode_decision(
                     text, mode=cc.BRANCH_MODE, role=role,
-                    active_classes=classes,
+                    active_classes=classes, durable_debt=durable_debt,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
-                    active_classes=classes,
+                    active_classes=classes, durable_debt=durable_debt,
                 )
 
 
@@ -1419,6 +1432,35 @@ def test_closed_mechanized_replacement_runs_through_canonical_class_engine():
     assert (successor.pattern, successor.pathspec) == ("STILL_BAD", "src/*.py")
 
 
+def test_unmechanized_class_can_be_replaced_by_a_mechanized_successor():
+    cls = active_class(status=cc.CLOSED, mechanized=False)
+    value = decision(
+        "final", coverage=coverage("G1"),
+        governing_findings=[finding(classification={
+            "kind":"existing_class", "class_id":"class-a",
+        })],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G1"},
+        }],
+        class_actions=[{
+            "kind":"replace", "class_id":"class-a", "definition":{
+                "invariant":"machine-check the successor", "severity":"MAJOR",
+                "pattern":"BROKEN", "pathspec":"src/*.py",
+            },
+        }],
+    )
+    parsed = materialize(value, mode=cc.BRANCH_MODE, active_classes=[cls])
+    lineage = lineage_with_active(cls)
+    minted = cc.apply_register(
+        lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
+        round_no=2,
+    )
+    assert len(minted) == 1
+    assert lineage.classes[minted[0]].mechanized
+    assert lineage.classes["class-a"].superseded_by == minted[0]
+
+
 def test_source_fanout_requires_distinct_cited_existing_classes():
     classes = [active_class("class-a"), active_class("class-b")]
     findings = [
@@ -1778,8 +1820,9 @@ def test_semantic_validation_reports_all_independent_issues():
         ],
     )
     with pytest.raises(sp.ProtocolError) as caught:
-        materialize(
-            value, source_ids=["domain:F1"],
+        sp.materialize_decision_value(
+            value, mode=cc.PLAN_MODE, role="census",
+            source_ids=["domain:F1"],
             source_severities={"domain:F1": "MAJOR"},
         )
     message = str(caught.value)
