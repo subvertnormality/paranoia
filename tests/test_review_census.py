@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -80,6 +81,19 @@ def test_census_cache_requires_every_exact_binding():
     ) is None
 
 
+def test_assessment_evidence_uses_the_shared_anchor_resolver(tmp_path):
+    (tmp_path / "a.py").write_text("one\n", encoding="utf-8")
+    rc.resolve_anchors(
+        {"classification":{"assessment_evidence":["a.py:1"]}}, root=tmp_path,
+    )
+    with pytest.raises(
+        rc.CensusError, match=r"/classification/assessment_evidence/0: out-of-range",
+    ):
+        rc.resolve_anchors(
+            {"classification":{"assessment_evidence":["a.py:2"]}}, root=tmp_path,
+        )
+
+
 def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
     lanes = rc.LANES[cc.PLAN_MODE]
     active = [{
@@ -146,13 +160,94 @@ def assert_five_headings(text):
     assert [line for line in text.splitlines() if line.startswith("## ")] == list(HEADINGS)
 
 
+def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
+    artifact = json.loads(
+        (Path(__file__).resolve().parents[1]
+         / "docs/keyed_class_handler_acceptance_2026-08-19.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "keyed-staged-class-decision-handler-lifecycle"
+    )
+    assert artifact["version"] == 1
+    assert artifact["provider"]["engine"] == "codex"
+    assert len(artifact["calls"]) == len(artifact["attempt_ledger"]) == 1
+    call = artifact["calls"][0]
+    schema_text = sp.canonical_schema(call["schema"])
+    assert hashlib.sha256(schema_text.encode()).hexdigest() == call["schema_sha256"]
+    response = call["response_text"]
+    assert hashlib.sha256(response.encode()).hexdigest() == call["response_sha256"]
+    assert artifact["attempt_ledger"][0]["response_sha256"] == call["response_sha256"]
+
+    after_class = artifact["after_lineage"]["classes"][0]
+    active = [{
+        "class_id":after_class["class_id"], "invariant":after_class["invariant"],
+        "severity":after_class["severity"], "status":cc.CLOSED,
+        "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":after_class["procedure"],
+    }]
+    debt = artifact["before_state"]["debt"]
+    expected_schema = sp.provider_schema(sp.decision_schema(
+        cc.BRANCH_MODE, "correction", active_classes=active,
+        outcome_class_ids=sp.expected_outcome_class_ids(
+            "correction", active_classes=active, durable_debt=debt,
+        ),
+    ))
+    assert call["schema"] == expected_schema
+    decoded = sp.decode_decision(
+        response, mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=debt,
+    )
+    settlement = sp.materialize_decision_value(
+        decoded, mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=debt,
+    )
+    assert settlement == artifact["settlement"]
+
+    snapshot = tmp_path / "repository"
+    snapshot.mkdir()
+    anchors = [anchor for _, anchor in rc._walk_evidence(decoded)]  # noqa: SLF001
+    for relative in {
+        anchor.rpartition(":")[0].removeprefix("repository/") for anchor in anchors
+    }:
+        target = snapshot / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(subprocess.run(
+            ["git", "show", f"{artifact['head_id']}:{relative}"],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True, check=True,
+        ).stdout)
+    rc.resolve_anchors(
+        decoded, root=tmp_path, trusted_roots={"repository":snapshot},
+    )
+
+    tracked = cc.TrackedClass(
+        active[0]["class_id"], active[0]["invariant"], active[0]["severity"],
+        0, cc.CLOSED, procedure=active[0]["procedure"],
+    )
+    replay_lineage = cc.Lineage(
+        "handler-replay", classes={tracked.class_id:tracked}, next_seq=1,
+        mode=cc.BRANCH_MODE,
+    )
+    cc.apply_register(
+        replay_lineage,
+        rc.register_from_records(settlement["class_records"], mechanized=None),
+        round_no=1,
+    )
+    assert replay_lineage.classes[tracked.class_id].status == cc.OPEN
+    assert artifact["after_lineage"]["classes"][0]["status"] == cc.OPEN
+    assert artifact["after_lineage"]["review_state"]["debt"][0]["status"] == "open"
+    result = artifact["result_text"]
+    assert hashlib.sha256(result.encode()).hexdigest() == artifact["result_sha256"]
+    assert "STRUCTURAL-PHASE: correction" in result
+    assert "CONVERGENCE: BLOCKED" in result
+
+
 def wire_value(value):
     value = json.loads(json.dumps(value))
 
     def visit(node):
         if isinstance(node, dict):
             for key, child in node.items():
-                if key == "evidence":
+                if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
                             "anchor":item, "rationale":"fixture evidence",
@@ -166,6 +261,19 @@ def wire_value(value):
                 visit(child)
 
     visit(value)
+    if isinstance(value, dict) and value.get("role") in {
+        "census", "correction", "final",
+    }:
+        for label in ("class_outcomes", "class_actions"):
+            rows = value.get(label)
+            if not isinstance(rows, list):
+                continue
+            value[label] = {
+                row["class_id"]:{
+                    key:child for key, child in row.items() if key != "class_id"
+                }
+                for row in rows
+            }
     return value
 
 
@@ -315,6 +423,141 @@ def test_canonical_class_validation_reports_independent_action_pointers():
     ]
 
 
+def test_handler_retry_names_late_keyed_action_for_debt_bound_outcome(tmp_path):
+    classes = [
+        {
+            "class_id":cid, "invariant":f"invariant {cid}", "severity":"MAJOR",
+            "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+            "procedure":"inspect it",
+        }
+        for cid in ("class-a", "class-b")
+    ]
+    debt = [
+        {
+            "id":debt_id, "finding_id":finding_id, "status":"open",
+            "severity":"MAJOR", "summary":"still reachable", "evidence":["plan:1"],
+            "remedy":"repair it", "source_ids":[], "class_ids":[cid],
+            "first_round":1, "last_round":1,
+        }
+        for debt_id, finding_id, cid in (
+            ("D1", "old-a", "class-a"), ("D2", "old-b", "class-b"),
+        )
+    ]
+    base = {
+        "role":"correction", "governing_findings":[],
+        "debt_outcomes":[
+            {"debt_id":"D1", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+            {"debt_id":"D2", "status":"open", "evidence":["plan:1"],
+             "reason":"still reachable"},
+        ],
+        "class_outcomes":[
+            {"class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D1"}},
+            {"class_id":"class-b", "verdict":"violated", "evidence":["plan:1"],
+             "basis":{"kind":"carried_debt", "debt_id":"D2"}},
+        ],
+        "class_actions":{"class-a":None, "class-b":{"kind":"reopen"}},
+    }
+    invalid = wire(base)
+    corrected = wire({**base, "class_actions":{"class-a":None, "class-b":None}})
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/class_actions/class-b: reopen requires closed class" in prompt
+            return Review(text=corrected, session_ref="s", raw=corrected)
+
+    def parser(text):
+        try:
+            return sp.materialize_decision(
+                text, mode=cc.PLAN_MODE, role="correction",
+                active_classes=classes, durable_debt=debt,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="correction", engine=Engine(), prompt="correct it", cwd=tmp_path,
+        model="m", effort="high", timeout=10, parser=parser,
+    )
+    assert parsed["class_records"] == []
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+    assert rejected[0]["validation_issue"] == (
+        "/class_actions/class-b: reopen requires closed class"
+    )
+
+
+def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
+    active = [{
+        "class_id":"class-a", "invariant":"invariant a", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":"inspect it",
+    }]
+    coverage = [
+        {
+            "id":item, "status":"covered", "summary":"checked",
+            "evidence":["plan:1"], "finding_ids":[],
+        }
+        for item in sp.CHECKLIST
+    ]
+    base = {
+        "role":"final", "governing_findings":[], "debt_outcomes":[],
+        "class_outcomes":{
+            "class-a":{"verdict":"satisfied", "evidence":["plan:1"]},
+        },
+        "class_actions":{"class-a":None}, "coverage":coverage,
+    }
+    invalid_value = wire_value(base)
+    invalid_value["class_outcomes"]["class-a"]["evidence"] = [
+        {"anchor":"plan:1", "rationale":"first reason"},
+        {"anchor":"plan:1", "rationale":"different reason"},
+    ]
+    invalid = json.dumps(invalid_value)
+    corrected = wire(base)
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/class_outcomes/class-a/evidence:" in prompt
+            return Review(text=corrected, session_ref="s", raw=corrected)
+
+    def parser(text):
+        try:
+            value, issues = sp.decode_decision_with_issues(
+                text, mode=cc.PLAN_MODE, role="final", active_classes=active,
+            )
+            parsed = sp.materialize_decision_value(
+                value, mode=cc.PLAN_MODE, role="final", active_classes=active,
+            )
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+        if issues:
+            raise rc.CensusError("\n".join(issues))
+        return parsed
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="final", engine=Engine(), prompt="review it", cwd=tmp_path,
+        model="m", effort="high", timeout=10, parser=parser,
+    )
+    assert parsed["class_records"] == [{"op":"close", "class_id":"class-a"}]
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+    assert (
+        "/class_outcomes/class-a/evidence: projected anchors must be unique"
+        in rejected[0]["validation_issue"]
+    )
+
+
 def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state.update(phase="correction", debt=[{
@@ -374,15 +617,10 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
             },
         ],
         "debt_outcomes":[], "class_outcomes":[],
-        "class_actions":[
-            {"kind":"reclassify", "class_id":"class-0", "severity":"BLOCKER"},
-            {
-                "kind":"replace", "class_id":"class-0", "definition":{
-                    "invariant":"replacement invariant", "severity":"BLOCKER",
-                    "procedure":"inspect the replacement",
-                },
-            },
-        ],
+        "class_actions":{
+            **{f"class-{index}":None for index in range(cc.MAX_ACTIVE_CLASSES - 1)},
+            "class-0":{"kind":"reclassify", "severity":"BLOCKER"},
+        },
     })
 
     class Engine:
@@ -405,10 +643,8 @@ def test_one_retry_receives_semantic_anchor_and_class_engine_issues(tmp_path):
     assert "/governing_findings/0/evidence:" in message
     assert "has non-unique elements" in message
     assert "/governing_findings/0/evidence/0: unresolvable repository anchor" in message
-    assert "/: invalid combined class actions for 'class-0'" in message
     assert "/: invalid combined new-class set" in message
     assert "100 non-superseded classes already tracked" in message
-    assert "/class_actions/1/class_id: duplicate value 'class-0'" in message
     assert caught.value.stage_role == "correction-validation-retry"
     assert [row.outcome for row in caught.value.attempts] == [
         "validation-invalid", "validation-invalid",
@@ -600,7 +836,7 @@ def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     }]
     invalid = {
         "role": "census", "governing_findings": [],
-        "debt_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": {},
         "class_outcomes": [],
     }
     corrected = json.loads(json.dumps(invalid))
@@ -675,7 +911,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
             "remedy": "retain as context", "source_ids": ["behaviour:F1"],
             "classification": {"kind": "existing_class", "class_id": class_id},
         }],
-        "debt_outcomes": [], "class_actions": [],
+        "debt_outcomes": [], "class_actions": {class_id:None},
     }
     corrected = json.loads(json.dumps(invalid))
     corrected["governing_findings"][0]["classification"] = {
@@ -1969,7 +2205,7 @@ def test_impossible_integrity_manifest_is_not_cached_across_invocations(
                 "source_ids":["integrity:F1"],
                 "classification":{"kind":"existing_class", "class_id":"class-a"},
             }],
-            "debt_outcomes":[], "class_actions":[],
+            "debt_outcomes":[], "class_actions":{"class-a":None},
         })
         return Review(text=text, session_ref="consolidation", raw=text)
 
@@ -2228,7 +2464,7 @@ def test_branch_settlement_persists_a_new_procedure_class(
     assert lineage.review_state["debt"][0]["class_ids"] == [classes[0].class_id]
 
 
-def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_path):
+def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
     (tmp_path / "a.py").write_text("broken\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
@@ -2281,7 +2517,7 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
                 "class_actions":[{
                     "kind":"replace", "class_id":"abc", "definition":{
                         "invariant":"new invariant", "severity":"MAJOR",
-                        "procedure":"inspect new behavior",
+                        "pattern":"BROKEN", "pathspec":"src/*.py",
                     },
                 }],
                 "coverage":coverage,
@@ -2302,6 +2538,8 @@ def test_staged_replace_transfers_debt_to_successor_and_stays_in_correction(tmp_
     )
     successor = lineage.classes["abc"].superseded_by
     assert successor
+    assert lineage.classes[successor].mechanized
+    assert lineage.classes[successor].pattern == "BROKEN"
     current = next(d for d in lineage.review_state["debt"] if d["id"] == "D1")
     assert current["class_ids"] == [successor]
     historic = next(d for d in lineage.review_state["debt"] if d["id"] == "historic")
@@ -2359,7 +2597,7 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
                 "debt_outcomes":[{
                     "debt_id":"D0", "status":"closed", "evidence":["repository/a.py:1"],
                 }],
-                "class_outcomes":[], "class_actions":[],
+                "class_outcomes":[], "class_actions":{"abc":None},
             })
             return Review(text=text, session_ref="s", raw=text)
 
@@ -2379,3 +2617,158 @@ def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_
     assert "STRUCTURAL-DEBT: 0 blocking open" in trailer
     assert "class closure remains open" in trailer
     assert "CONVERGENCE: BLOCKED" in trailer
+
+
+def test_correction_assessment_anchor_retries_before_durable_settlement(tmp_path):
+    (tmp_path / "a.py").write_text("reachable\n", encoding="utf-8")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "correction"
+    state["debt"] = [{
+        "id":"D0", "finding_id":"old", "status":"open", "severity":"MAJOR",
+        "summary":"older one-off", "evidence":["repository/a.py:1"],
+        "remedy":"close it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }]
+    tracked = cc.TrackedClass(
+        "abc", "the active invariant", "MAJOR", 1, cc.OPEN,
+        procedure="inspect the recurring path",
+    )
+    lineage = cc.Lineage(
+        "assessment-anchor-retry", classes={"abc":tracked}, next_seq=2,
+        mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    def response(assessment_anchor):
+        return wire({
+            "role":"correction",
+            "governing_findings":[{
+                "id":"fresh", "severity":"MAJOR", "summary":"new occurrence",
+                "evidence":["repository/a.py:1"], "remedy":"repair it",
+                "classification":{
+                    "kind":"existing_class", "class_id":"abc",
+                    "assessment_evidence":[assessment_anchor],
+                },
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D0", "status":"closed",
+                "evidence":["repository/a.py:1"],
+            }],
+            "class_outcomes":[], "class_actions":{"abc":None},
+        })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = response("repository/a.py:2")
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "s"
+            assert "/governing_findings/0/classification/assessment_evidence/0" in prompt
+            text = response("repository/a.py:1")
+            return Review(text=text, session_ref="s", raw=text)
+
+    closure = Closure()
+    _, _, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None,
+    )
+    assert [row["outcome"] for row in attempts] == ["validation-invalid", "completed"]
+    assert closure.staged_settlement["class_assessments"] == [{
+        "class_id":"abc", "verdict":"violated",
+        "evidence":["repository/a.py:1"], "finding_id":"fresh",
+    }]
+    fresh = next(
+        row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh"
+    )
+    assert fresh["class_ids"] == ["abc"]
+
+
+def test_exact_empty_active_set_retries_unknown_existing_target_atomically(tmp_path):
+    (tmp_path / "a.py").write_text("reachable\n", encoding="utf-8")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "correction"
+    state["debt"] = [{
+        "id":"D0", "finding_id":"old", "status":"open", "severity":"MAJOR",
+        "summary":"old one-off", "evidence":["repository/a.py:1"],
+        "remedy":"close it", "source_ids":[], "class_ids":[],
+        "first_round":1, "last_round":1,
+    }]
+    lineage = cc.Lineage(
+        "empty-active-retry", mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    def response(classification):
+        return wire({
+            "role":"correction", "governing_findings":[{
+                "id":"fresh", "severity":"MAJOR", "summary":"observation",
+                "evidence":["repository/a.py:1"], "remedy":"record it",
+                "classification":classification,
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D0", "status":"closed",
+                "evidence":["repository/a.py:1"],
+            }],
+            "class_outcomes":[], "class_actions":{},
+        })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            text = response({"kind":"existing_class", "class_id":"invented"})
+            return Review(text=text, session_ref="s", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert lineage.review_state["debt"][0]["status"] == "open"
+            assert "/governing_findings/0/classification" in prompt
+            text = response({"kind":"one_off", "reason":"one isolated observation"})
+            return Review(text=text, session_ref=session_ref, raw=text)
+
+    closure = Closure()
+    _, _, attempts = handlers._staged_structural_review(
+        engine=Engine(), cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None,
+    )
+    assert [row["outcome"] for row in attempts] == ["validation-invalid", "completed"]
+    assert not lineage.classes
+    assert lineage.review_state["debt"][0]["status"] == "closed"
+    fresh = next(row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh")
+    assert fresh["class_ids"] == []

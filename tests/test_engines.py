@@ -547,6 +547,26 @@ class TestRunWithInjectedRunner:
             "claude did not return the requested structured_output object"
         )
 
+    def test_claude_preserves_nested_duplicate_keys_for_local_rejection(self) -> None:
+        review = engines.ClaudeEngine().parse_output(
+            '{"is_error":false,"session_id":"s","structured_output":'
+            '{"class_actions":{"class-a":{"kind":"close"},'
+            '"class-a":{"kind":"reopen"}}}}'
+        )
+        assert not review.error
+        assert review.session_ref == "s"
+        assert review.text.count('"class-a"') == 2
+
+    def test_claude_rejects_duplicate_structured_output_envelope_keys(self) -> None:
+        review = engines.ClaudeEngine().parse_output(
+            '{"is_error":false,"structured_output":{"answer":"first"},'
+            '"structured_output":{"answer":"second"}}'
+        )
+        assert review.error
+        assert review.failure_detail == (
+            "claude returned duplicate structured_output envelope keys"
+        )
+
 
 def test_every_claude_deny_rule_is_a_tool_the_cli_knows():
     """An unknown deny rule contaminates the engine's structured output.

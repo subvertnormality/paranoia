@@ -46,6 +46,9 @@ each validated integrity assessment, copying its verdict and ordered evidence ex
 violation, require exactly one governing finding that includes the cited integrity source and
 classifies to that class; a finding may not target a satisfied class. Correction and final retain
 model-owned class outcomes because they have no prior lane judgement to project.
+When fresh class decisions use keyed objects, retain those wire locations through semantic and
+canonical class-engine validation so the bounded retry names provider-repairable JSON Pointers;
+never expose canonical array indexes that were absent from the provider response.
 Derive the deterministic close transition when an open, unmechanized class is assessed satisfied;
 do not discard a healthy census because the model omitted that redundant lifecycle record.
 After consolidation-only failure, reuse a complete validated lane census only under exact bindings
@@ -112,6 +115,24 @@ rationales. Never trim or extract a leading anchor from prose, split joined cita
 strings, or relax traversal, range, prefix, snapshot, and symlink resolution. Cached lane manifests
 are canonical data and use an explicit canonical validator plus a cache-version cutover, not the
 fresh wire decoder.
+Represent fresh model-owned class outcomes and independent class actions as closed objects keyed by
+the exact server-supplied class IDs, rejecting duplicate JSON keys before schema validation. Project
+those maps in duplicate-checked encounter order into the existing canonical arrays; do not sort
+actions whose order determines successor identity, deduplicate an invalid array, accept a legacy
+wire shape, or partially settle a register. Detect nested duplicate keys in Claude's raw structured
+envelope before converting `structured_output` to a mapping, retaining its session and raw channel
+through the validation retry. Final owns one outcome per active class; correction owns outcomes
+only for classes already bound to supplied open debt and derives a new existing-class violation
+from a distinct role-specific assessment-evidence member, never from finding evidence. Census
+continues to derive outcomes from validated integrity assessments. Specialize each action value
+schema to the target class so mechanized classes cannot express close/reopen, while canonical
+semantic validation and the class-engine dry-run remain authoritative for state/outcome
+compatibility. Capability-gate the exact compact minimum and maximum generated schemas on fresh and
+resumed Codex and Claude routes; unsupported schema dialect or transport size blocks the cutover.
+When a correction fresh finding targets a debt-bound class, require that class's authored violated
+outcome to use `new_finding` basis naming the exact finding; `carried_debt` is legal only when no
+fresh existing-class finding targets that class. Preserve independently authored finding evidence,
+assessment evidence, every debt outcome, assessment disposition, and audit binding.
 Treat a requested Claude schema as unsatisfied unless the provider envelope contains an object in
 `structured_output`; a successful process plus result prose is not structured success. Branch
 class definitions must reject leading-colon Git pathspec magic, and a mechanized class replacement

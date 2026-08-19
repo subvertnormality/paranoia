@@ -67,6 +67,28 @@ def citation_instructions(mode: str) -> str:
     )
 
 
+def class_decision_instructions(
+    role: str, *, active_classes: Sequence[dict[str, Any]],
+    outcome_class_ids: Sequence[str] = (),
+) -> str:
+    """Render the exact keyed decision surface beside the executable schema."""
+    actions = {}
+    for cls in active_classes:
+        kinds = ["reclassify", "replace"]
+        if not cls.get("mechanized", False):
+            kinds[:0] = ["close", "reopen"]
+        actions[cls["class_id"]] = kinds
+    return (
+        "class_outcomes is a closed object keyed by exactly these required class IDs: "
+        f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
+        "class_actions is a closed object with one independent-action slot per active "
+        "class. Every listed key is required; use null when no "
+        "independent action is needed. Allowed non-null action kinds by active class are: "
+        f"{json.dumps(actions, ensure_ascii=False, separators=(',', ':'))}. "
+        "Never put class_id inside an outcome or action value."
+    )
+
+
 class ProtocolError(ValueError):
     """A structured staged response cannot be safely materialized."""
 
@@ -112,10 +134,13 @@ def _array(items: dict[str, Any], *, maximum: int, minimum: int = 0,
     return value
 
 
-def _object(properties: dict[str, Any]) -> dict[str, Any]:
+def _object(
+    properties: dict[str, Any], *, required: Sequence[str] | None = None,
+) -> dict[str, Any]:
     return {
         "type": "object", "additionalProperties": False,
-        "properties": properties, "required": list(properties),
+        "properties": properties,
+        "required": list(properties) if required is None else list(required),
     }
 
 
@@ -165,7 +190,11 @@ def _coverage(*, canonical: bool = False) -> dict[str, Any]:
     })
 
 
-def _finding(*, mode: str, census: bool, canonical: bool = False) -> dict[str, Any]:
+def _finding(
+    *, mode: str, role: str,
+    active_classes: Sequence[dict[str, Any]] | None = None,
+    outcome_class_ids: Sequence[str] = (), canonical: bool = False,
+) -> dict[str, Any]:
     properties = {
         "id": _string(120),
         "severity": _string(32, enum=cc.SEVERITIES),
@@ -173,11 +202,14 @@ def _finding(*, mode: str, census: bool, canonical: bool = False) -> dict[str, A
         "evidence": _evidence(canonical=canonical),
         "remedy": _string(MAX_SUMMARY_CHARS),
     }
-    if census:
+    if role == "census":
         properties["source_ids"] = _array(
             _string(240), maximum=MAX_CENSUS_SOURCES, minimum=1, unique=True,
         )
-    properties["classification"] = _classification(mode)
+    properties["classification"] = _classification(
+        mode, role=role, active_classes=active_classes,
+        outcome_class_ids=outcome_class_ids, canonical=canonical,
+    )
     return _object(properties)
 
 
@@ -191,22 +223,26 @@ def _lane_finding(*, canonical: bool = False) -> dict[str, Any]:
     })
 
 
-def _definition(mode: str) -> dict[str, Any]:
+def _definition(mode: str, *, mechanized: bool | None = None) -> dict[str, Any]:
     common = {
         "invariant": _string(1_000),
         "severity": _string(32, enum=cc.SEVERITIES),
     }
     procedure = _object({**common, "procedure": _string(2_000)})
-    if mode == cc.PLAN_MODE:
+    if mode == cc.PLAN_MODE or mechanized is False:
         return procedure
     pattern = _object({
         **common, "pattern": _string(2_000), "pathspec": _pathspec(),
     })
-    return {"anyOf": [procedure, pattern]}
+    return pattern if mechanized is True else {"anyOf": [procedure, pattern]}
 
 
-def _classification(mode: str = cc.PLAN_MODE) -> dict[str, Any]:
-    return {"anyOf": [
+def _classification(
+    mode: str = cc.PLAN_MODE, *, role: str | None = None,
+    active_classes: Sequence[dict[str, Any]] | None = None,
+    outcome_class_ids: Sequence[str] = (), canonical: bool = False,
+) -> dict[str, Any]:
+    alternatives = [
         _object({
             "kind": _string(32, const="one_off"),
             "reason": _string(MAX_SUMMARY_CHARS),
@@ -215,11 +251,34 @@ def _classification(mode: str = cc.PLAN_MODE) -> dict[str, Any]:
             "kind": _string(32, const="new_class"),
             "definition": _definition(mode),
         }),
-        _object({
+    ]
+    outcome_ids = set(outcome_class_ids)
+    if active_classes is not None:
+        grouped: list[tuple[list[str], bool]] = []
+        active_ids = [cls["class_id"] for cls in active_classes]
+        if role == "correction":
+            grouped.extend((
+                ([cid for cid in active_ids if cid in outcome_ids], False),
+                ([cid for cid in active_ids if cid not in outcome_ids], True),
+            ))
+        else:
+            grouped.append((active_ids, False))
+        for class_ids, needs_assessment in grouped:
+            if not class_ids:
+                continue
+            properties = {
+                "kind": _string(32, const="existing_class"),
+                "class_id": _string(120, enum=class_ids),
+            }
+            if needs_assessment:
+                properties["assessment_evidence"] = _evidence(canonical=canonical)
+            alternatives.append(_object(properties))
+    else:
+        alternatives.append(_object({
             "kind": _string(32, const="existing_class"),
             "class_id": _string(120),
-        }),
-    ]}
+        }))
+    return {"anyOf": alternatives}
 
 
 def _lane_assessment(*, canonical: bool = False) -> dict[str, Any]:
@@ -265,6 +324,14 @@ def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
     ]}
 
 
+def _class_outcome_body(*, canonical: bool = False) -> dict[str, Any]:
+    value = deepcopy(_class_outcome(canonical=canonical))
+    for alternative in value["anyOf"]:
+        alternative["properties"].pop("class_id")
+        alternative["required"].remove("class_id")
+    return value
+
+
 def _debt_outcome(*, canonical: bool = False) -> dict[str, Any]:
     return {"anyOf": [
         _object({
@@ -300,6 +367,28 @@ def _class_action(mode: str) -> dict[str, Any]:
     ]}
 
 
+def _class_action_body(mode: str, cls: dict[str, Any]) -> dict[str, Any]:
+    alternatives: list[dict[str, Any]] = []
+    if not cls.get("mechanized", False):
+        alternatives.extend([
+            _object({"kind": _string(32, const="close")}),
+            _object({"kind": _string(32, const="reopen")}),
+        ])
+    alternatives.extend([
+        _object({
+            "kind": _string(32, const="reclassify"),
+            "severity": _string(32, enum=cc.SEVERITIES),
+        }),
+        _object({
+            "kind": _string(32, const="replace"),
+            "definition": _definition(
+                mode, mechanized=True if cls.get("mechanized", False) else None,
+            ),
+        }),
+    ])
+    return {"anyOf": alternatives}
+
+
 def lane_schema(mode: str, lane: str, *, canonical: bool = False) -> dict[str, Any]:
     if lane not in LANES.get(mode, ()):
         raise ValueError(f"invalid staged lane {lane!r} for {mode!r}")
@@ -320,6 +409,8 @@ def lane_schema(mode: str, lane: str, *, canonical: bool = False) -> dict[str, A
 
 def decision_schema(
     mode: str, role: str, *, canonical: bool = False,
+    active_classes: Sequence[dict[str, Any]] | None = None,
+    outcome_class_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     if mode not in LANES:
         raise ValueError(f"invalid staged mode {mode!r}")
@@ -328,26 +419,63 @@ def decision_schema(
     properties = {
         "role": _string(32, const=role),
         "governing_findings": _array(
-            _finding(mode=mode, census=role == "census", canonical=canonical),
+            _finding(
+                mode=mode, role=role, active_classes=active_classes,
+                outcome_class_ids=outcome_class_ids, canonical=canonical,
+            ),
             maximum=MAX_CENSUS_FINDINGS if role == "census" else MAX_LANE_FINDINGS,
         ),
         "debt_outcomes": _array(
             _debt_outcome(canonical=canonical), maximum=500,
         ),
     }
+    definitions: dict[str, Any] = {}
     if role != "census":
-        properties["class_outcomes"] = _array(
-            _class_outcome(canonical=canonical), maximum=MAX_ACTIVE_CLASSES,
+        if canonical:
+            properties["class_outcomes"] = _array(
+                _class_outcome(canonical=True), maximum=MAX_ACTIVE_CLASSES,
+            )
+        else:
+            outcome_ids = list(outcome_class_ids)
+            definitions["class_outcome"] = _class_outcome_body()
+            properties["class_outcomes"] = _object(
+                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},
+            )
+    if canonical:
+        properties["class_actions"] = _array(
+            _class_action(mode), maximum=MAX_ACTIVE_CLASSES,
         )
-    properties["class_actions"] = _array(
-        _class_action(mode), maximum=MAX_ACTIVE_CLASSES,
-    )
+    else:
+        if active_classes:
+            definitions["manual_class_action"] = {"anyOf":[
+                {"type":"null"},
+                _class_action_body(mode, {"mechanized":False}),
+            ]}
+            definitions["mechanized_class_action"] = {"anyOf":[
+                {"type":"null"},
+                _class_action_body(mode, {"mechanized":True}),
+            ]}
+        properties["class_actions"] = _object(
+            {
+                cls["class_id"]:{
+                    "$ref":(
+                        "#/$defs/mechanized_class_action"
+                        if cls.get("mechanized", False)
+                        else "#/$defs/manual_class_action"
+                    ),
+                }
+                for cls in (active_classes or ())
+            },
+        )
     if role == "final":
         properties["coverage"] = _array(
             _coverage(canonical=canonical),
             maximum=len(CHECKLIST), minimum=len(CHECKLIST),
         )
-    return _root(_object(properties))
+    schema = _root(_object(properties))
+    if definitions:
+        schema["$defs"] = definitions
+    return schema
 
 
 def canonical_schema(schema: dict[str, Any]) -> str:
@@ -416,15 +544,46 @@ def _unicode_issues(value: Any, parts: tuple[Any, ...] = ()) -> list[str]:
     return issues
 
 
+class _ObjectPairs(list[tuple[str, Any]]):
+    """Distinguish JSON objects from arrays until duplicate keys are checked."""
+
+
+def _pairs_to_value(
+    value: Any, parts: tuple[Any, ...] = (),
+) -> tuple[Any, list[str]]:
+    issues: list[str] = []
+    if isinstance(value, _ObjectPairs):
+        result: dict[str, Any] = {}
+        for key, child in value:
+            if key in result:
+                issues.append(f"{_pointer((*parts, key))}: duplicate JSON object key")
+                continue
+            converted, child_issues = _pairs_to_value(child, (*parts, key))
+            result[key] = converted
+            issues.extend(child_issues)
+        return result, issues
+    if isinstance(value, list):
+        result_list: list[Any] = []
+        for index, child in enumerate(value):
+            converted, child_issues = _pairs_to_value(child, (*parts, index))
+            result_list.append(converted)
+            issues.extend(child_issues)
+        return result_list, issues
+    return value, issues
+
+
 def decode(text: str, schema: dict[str, Any], *, max_chars: int) -> dict[str, Any]:
     if len(text) > max_chars:
         raise ProtocolError(
             f"/: response is {len(text)} characters; maximum is {max_chars}"
         )
     try:
-        value = json.loads(text)
+        pairs = json.loads(text, object_pairs_hook=_ObjectPairs)
     except json.JSONDecodeError as exc:
         raise ProtocolError(f"/: invalid JSON at line {exc.lineno} column {exc.colno}") from exc
+    value, duplicate_issues = _pairs_to_value(pairs)
+    if duplicate_issues:
+        _raise_semantic_issues(duplicate_issues)
     issues = _schema_issues(value, schema) + _unicode_issues(value)
     if issues:
         ordered = sorted(dict.fromkeys(issues))
@@ -498,7 +657,7 @@ def project_citations(value: dict[str, Any]) -> dict[str, Any]:
     def visit(node: Any) -> None:
         if isinstance(node, dict):
             for key, child in node.items():
-                if key == "evidence":
+                if key in {"evidence", "assessment_evidence"}:
                     node[key] = [citation["anchor"] for citation in child]
                 else:
                     visit(child)
@@ -508,6 +667,109 @@ def project_citations(value: dict[str, Any]) -> dict[str, Any]:
 
     visit(projected)
     return projected
+
+
+def expected_outcome_class_ids(
+    role: str, *, active_classes: Sequence[dict[str, Any]] = (),
+    durable_debt: Sequence[dict[str, Any]] = (),
+) -> list[str]:
+    """Return model-owned outcome keys in stable active-class order."""
+    if role == "census":
+        return []
+    active_ids = [row["class_id"] for row in active_classes]
+    if role == "final":
+        return active_ids
+    bound = {
+        cid
+        for debt in durable_debt
+        if debt.get("status") == "open"
+        for cid in debt.get("class_ids", [])
+    }
+    return [cid for cid in active_ids if cid in bound]
+
+
+def project_decision_wire(value: dict[str, Any]) -> dict[str, Any]:
+    """Project keyed fresh decision maps to the canonical array representation."""
+    projected = project_citations(value)
+    for label in ("class_outcomes", "class_actions"):
+        rows = projected.get(label)
+        if not isinstance(rows, dict):
+            continue
+        projected[label] = [
+            {"class_id": class_id, **body}
+            for class_id, body in rows.items()
+            if body is not None
+        ]
+    return projected
+
+
+def _pointer_token(value: str) -> str:
+    """Escape one object key for use as an RFC 6901 JSON Pointer token."""
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def _wire_class_pointers(value: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Retain provider-facing keyed locations across canonical projection."""
+    result: dict[str, dict[str, str]] = {}
+    for label in ("class_outcomes", "class_actions"):
+        rows = value.get(label)
+        if isinstance(rows, dict):
+            result[label] = {
+                class_id: f"/{label}/{_pointer_token(class_id)}"
+                for class_id in rows
+            }
+    return result
+
+
+def _class_row_pointers(
+    value: dict[str, Any], label: str,
+) -> dict[str, str]:
+    """Return provider keyed pointers, falling back only for canonical callers."""
+    keyed = value.get("_wire_class_pointers", {}).get(label, {})
+    return {
+        row["class_id"]: keyed.get(row["class_id"], f"/{label}/{index}")
+        for index, row in reversed(list(enumerate(value.get(label, []))))
+    }
+
+
+def _class_slot_pointer(value: dict[str, Any], label: str, class_id: str) -> str:
+    """Locate a required keyed slot even when its canonical projection is absent."""
+    keyed = value.get("_wire_class_pointers", {}).get(label, {})
+    return keyed.get(class_id, f"/{label}")
+
+
+def _remap_class_schema_issues(
+    value: dict[str, Any], issues: Sequence[str],
+) -> list[str]:
+    """Translate canonical array-row issues back to fresh provider wire keys."""
+    replacements: list[tuple[str, str]] = []
+    for label in ("class_outcomes", "class_actions"):
+        keyed = value.get("_wire_class_pointers", {}).get(label, {})
+        for index, row in enumerate(value.get(label, [])):
+            pointer = keyed.get(row["class_id"])
+            if pointer is not None:
+                replacements.append((f"/{label}/{index}", pointer))
+    remapped: list[str] = []
+    for issue in issues:
+        for canonical, wire in replacements:
+            if issue == canonical or issue.startswith((canonical + "/", canonical + ":")):
+                issue = wire + issue[len(canonical):]
+                break
+        remapped.append(issue)
+    return remapped
+
+
+def _canonical_class_projection_issues(value: dict[str, Any]) -> list[str]:
+    """Name lossy wire-to-canonical citation collisions at their keyed slot."""
+    pointers = _class_row_pointers(value, "class_outcomes")
+    issues: list[str] = []
+    for row in value.get("class_outcomes", []):
+        evidence = row.get("evidence", [])
+        if len(evidence) != len(set(evidence)):
+            issues.append(
+                f"{pointers[row['class_id']]}/evidence: projected anchors must be unique"
+            )
+    return issues
 
 
 def decode_lane_with_issues(
@@ -590,20 +852,46 @@ def parse_lane(text: str, *, mode: str, lane: str,
 
 def decode_decision_with_issues(
     text: str, *, mode: str, role: str,
+    active_classes: Sequence[dict[str, Any]] | None = None,
+    durable_debt: Sequence[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the decision wire shape and retain canonical issues for fan-in."""
+    outcome_ids = expected_outcome_class_ids(
+        role, active_classes=active_classes or (), durable_debt=durable_debt,
+    )
     wire = decode(
-        text, decision_schema(mode, role), max_chars=MAX_DECISION_RESPONSE_CHARS,
+        text,
+        decision_schema(
+            mode, role, active_classes=active_classes,
+            outcome_class_ids=outcome_ids,
+        ),
+        max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
-    canonical = project_citations(wire)
-    return canonical, _schema_issues(
-        canonical, decision_schema(mode, role, canonical=True),
+    wire_pointers = _wire_class_pointers(wire)
+    canonical = project_decision_wire(wire)
+    issues = _schema_issues(
+        canonical,
+        decision_schema(
+            mode, role, canonical=True, active_classes=active_classes,
+            outcome_class_ids=outcome_ids,
+        ),
     )
+    canonical["_wire_class_pointers"] = wire_pointers
+    issues = _remap_class_schema_issues(canonical, issues)
+    issues.extend(_canonical_class_projection_issues(canonical))
+    return canonical, issues
 
 
-def decode_decision(text: str, *, mode: str, role: str) -> dict[str, Any]:
+def decode_decision(
+    text: str, *, mode: str, role: str,
+    active_classes: Sequence[dict[str, Any]] | None = None,
+    durable_debt: Sequence[dict[str, Any]] = (),
+) -> dict[str, Any]:
     """Decode and structurally validate a decision before semantic layers run."""
-    value, issues = decode_decision_with_issues(text, mode=mode, role=role)
+    value, issues = decode_decision_with_issues(
+        text, mode=mode, role=role, active_classes=active_classes,
+        durable_debt=durable_debt,
+    )
     _raise_semantic_issues(issues)
     return value
 
@@ -704,8 +992,9 @@ def class_record_candidates(
             f"/governing_findings/{index}/classification/definition"
         )
     records.extend(class_records_from_actions(value["class_actions"]))
+    action_pointers = _class_row_pointers(value, "class_actions")
     pointers.extend(
-        f"/class_actions/{index}" for index in range(len(value["class_actions"]))
+        action_pointers[action["class_id"]] for action in value["class_actions"]
     )
     return records, pointers
 
@@ -725,14 +1014,15 @@ def materialize_decision_value(
     by_finding = _unique(findings, "id", "governing_findings", issues)
     if role == "final":
         _validate_coverage(value["coverage"], by_finding, issues)
-    for outcome_index, outcome in enumerate(value.get("class_outcomes", [])):
+    early_outcome_pointers = _class_row_pointers(value, "class_outcomes")
+    for outcome in value.get("class_outcomes", []):
         basis = outcome.get("basis")
         if (
             basis and basis["kind"] == "new_finding"
             and basis["finding_id"] not in by_finding
         ):
             issues.append(
-                f"/class_outcomes/{outcome_index}/basis/finding_id: "
+                f"{early_outcome_pointers[outcome['class_id']]}/basis/finding_id: "
                 "must name a governing finding"
             )
     classes = {row["class_id"]: row for row in active_classes}
@@ -875,20 +1165,57 @@ def materialize_decision_value(
                     )
             outcomes[cid] = outcome
     else:
-        outcome_pointers = {
-            row["class_id"]: f"/class_outcomes/{index}"
-            for index, row in reversed(list(enumerate(value["class_outcomes"])))
-        }
+        outcome_pointers = _class_row_pointers(value, "class_outcomes")
         outcomes = _unique(
             value["class_outcomes"], "class_id", "class_outcomes", issues,
         )
-        expected_model_classes = (
+        authored_classes = (
             set(classes) if role == "final"
             else {
                 cid for debt in open_debt.values() for cid in debt.get("class_ids", [])
                 if cid in classes
-            } | set(existing_findings)
+            }
         )
+        if set(outcomes) != authored_classes:
+            issues.append(
+                f"/class_outcomes: expected exactly {sorted(authored_classes)}, "
+                f"got {sorted(outcomes)}"
+            )
+        if role == "correction":
+            finding_indexes = {
+                finding["id"]: index for index, finding in enumerate(findings)
+            }
+            for cid, finding_id in existing_findings.items():
+                finding_index = finding_indexes[finding_id]
+                classification = findings[finding_index]["classification"]
+                pointer = f"/governing_findings/{finding_index}/classification"
+                if cid not in authored_classes:
+                    evidence = classification.get("assessment_evidence")
+                    if not isinstance(evidence, list):
+                        issues.append(
+                            f"{pointer}/assessment_evidence: required for a new "
+                            "non-debt-bound class occurrence"
+                        )
+                        continue
+                    outcomes[cid] = {
+                        "class_id": cid, "verdict": "violated",
+                        "evidence": list(evidence),
+                        "basis": {"kind":"new_finding", "finding_id":finding_id},
+                    }
+                    outcome_pointers[cid] = pointer
+                    continue
+                outcome = outcomes.get(cid)
+                basis = outcome.get("basis") if outcome else None
+                if (
+                    outcome is None or outcome.get("verdict") != "violated"
+                    or basis != {"kind":"new_finding", "finding_id":finding_id}
+                ):
+                    issues.append(
+                        f"{outcome_pointers.get(cid, '/class_outcomes')}: a fresh "
+                        f"existing-class finding requires violated new_finding basis "
+                        f"naming {finding_id!r}"
+                    )
+        expected_model_classes = authored_classes | set(existing_findings)
         if set(outcomes) != expected_model_classes:
             issues.append(
                 f"/class_outcomes: expected exactly {sorted(expected_model_classes)}, "
@@ -978,10 +1305,7 @@ def materialize_decision_value(
                 f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
 
-    action_pointers = {
-        row["class_id"]: f"/class_actions/{index}"
-        for index, row in reversed(list(enumerate(value["class_actions"])))
-    }
+    action_pointers = _class_row_pointers(value, "class_actions")
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
     )
@@ -1051,7 +1375,8 @@ def materialize_decision_value(
                     ))
             if cls["mechanized"] and (action is None or action["kind"] not in allowed):
                 repair_pointer = (
-                    "/class_actions" if action is None else action_pointers[cid]
+                    _class_slot_pointer(value, "class_actions", cid)
+                    if action is None else action_pointers[cid]
                 )
                 issues.append(
                     f"{repair_pointer}: "
@@ -1106,11 +1431,18 @@ def materialize_decision_value(
         "debt_updates": debt_updates,
         "class_dispositions": [
             (
-                {"finding_id": finding["id"], **finding["classification"]}
-                if finding["classification"]["kind"] != "new_class"
-                else {
-                    "finding_id": finding["id"], "kind": "new_class",
+                {
+                    "finding_id": finding["id"], "kind":"new_class",
                     "record_index": int(str(finding_class[finding["id"]]).split(":", 1)[1]),
+                }
+                if finding["classification"]["kind"] == "new_class"
+                else {
+                    "finding_id":finding["id"],
+                    **{
+                        key:finding["classification"][key]
+                        for key in ("kind", "reason", "class_id")
+                        if key in finding["classification"]
+                    },
                 }
             )
             for finding in findings
@@ -1137,7 +1469,10 @@ def materialize_decision(
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Decode one semantic decision and project it to the durable V1 shape."""
-    value = decode_decision(text, mode=mode, role=role)
+    value = decode_decision(
+        text, mode=mode, role=role, active_classes=active_classes,
+        durable_debt=durable_debt,
+    )
     return materialize_decision_value(
         value, mode=mode, role=role, source_ids=source_ids,
         source_severities=source_severities,

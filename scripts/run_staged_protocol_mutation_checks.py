@@ -50,12 +50,6 @@ MUTATIONS = (
         "test_branch_schema_rejects_git_pathspec_magic_for_new_and_replacement_classes",
     ),
     (
-        "outcome-completeness",
-        "if set(outcomes) != expected_model_classes:",
-        "if False:",
-        "test_class_and_debt_outcome_completeness_are_independent_controls",
-    ),
-    (
         "debt-completeness",
         "if set(debt_outcomes) != set(open_debt):",
         "if False:",
@@ -87,8 +81,8 @@ MUTATIONS = (
     ),
     (
         "census-schema-exclusion",
-        'if role != "census":\n        properties["class_outcomes"]',
-        'if True:\n        properties["class_outcomes"]',
+        'if role != "census":\n        if canonical:',
+        'if True:\n        if canonical:',
         "test_census_schema_rejects_authored_class_outcomes",
     ),
     (
@@ -120,6 +114,72 @@ MUTATIONS = (
         "if set(assessments) != expected:",
         "if False:",
         "test_integrity_lane_requires_every_active_class_assessment",
+    ),
+    (
+        "duplicate-class-key-detection",
+        "if key in result:",
+        "if False:",
+        "test_duplicate_class_decision_keys_reject_before_projection",
+    ),
+    (
+        "keyed-outcome-completeness",
+        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n            )',
+        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n                required=(),\n            )',
+        "test_keyed_decision_schema_exposes_only_role_legal_class_decisions",
+    ),
+    (
+        "mechanized-action-specialization",
+        'if cls.get("mechanized", False)\n                        else "#/$defs/manual_class_action"',
+        'if False\n                        else "#/$defs/manual_class_action"',
+        "test_keyed_decision_schema_exposes_only_role_legal_class_decisions",
+    ),
+    (
+        "decision-encounter-order",
+        "for class_id, body in rows.items()",
+        "for class_id, body in sorted(rows.items())",
+        "test_keyed_decision_projection_preserves_encounter_order",
+    ),
+    (
+        "keyed-action-diagnostic-pointer",
+        'action_pointers = _class_row_pointers(value, "class_actions")\n    actions = _unique(',
+        'action_pointers = {\n        row["class_id"]: f"/class_actions/{index}"\n        for index, row in enumerate(value["class_actions"])\n    }\n    actions = _unique(',
+        "test_keyed_decision_semantic_issue_retains_late_wire_key_pointer",
+    ),
+    (
+        "canonical-keyed-diagnostic-pointer",
+        "issues = _remap_class_schema_issues(canonical, issues)",
+        "issues = issues",
+        "test_keyed_decision_canonical_issue_retains_wire_key_pointer",
+    ),
+    (
+        "null-action-slot-pointer",
+        '_class_slot_pointer(value, "class_actions", cid)\n                    if action is None',
+        '"/class_actions"\n                    if action is None',
+        "test_census_closed_violation_derives_only_unmechanized_reopen",
+    ),
+    (
+        "fallback-action-pointer",
+        'action_pointers[action["class_id"]] for action in value["class_actions"]',
+        'f"/class_actions/{index}" for index, action in enumerate(value["class_actions"])',
+        "test_keyed_decision_semantic_issue_retains_late_wire_key_pointer",
+    ),
+    (
+        "derived-correction-violation",
+        "if cid not in authored_classes:",
+        "if False:",
+        "test_correction_derives_non_debt_class_outcome_with_distinct_evidence",
+    ),
+    (
+        "exact-empty-active-targets",
+        "if active_classes is not None:",
+        "if active_classes:",
+        "test_exact_empty_active_set_cannot_target_an_existing_class",
+    ),
+    (
+        "unmechanized-to-mechanized-replacement",
+        'mode, mechanized=True if cls.get("mechanized", False) else None,',
+        'mode, mechanized=bool(cls.get("mechanized", False)),',
+        "test_unmechanized_class_can_be_replaced_by_a_mechanized_successor",
     ),
 )
 
@@ -154,16 +214,27 @@ CROSS_MODULE_MUTATIONS = (
         "CENSUS_CACHE_VERSION = 3", "CENSUS_CACHE_VERSION = 2",
         "test_census_cache_requires_every_exact_binding",
     ),
+    (
+        ROOT / "src" / "paranoia_local" / "review_census.py",
+        "tests/test_review_census.py", "assessment-anchor-walk",
+        'if key in {"evidence", "assessment_evidence"} and isinstance(child, list):',
+        'if key == "evidence" and isinstance(child, list):',
+        "test_assessment_evidence_uses_the_shared_anchor_resolver",
+    ),
 )
 
 
 def main() -> int:
+    source_env = dict(os.environ)
+    source_env["PYTHONPATH"] = os.pathsep.join((
+        str(ROOT / "src"), str(ROOT), source_env.get("PYTHONPATH", ""),
+    ))
     differential = subprocess.run(
         [
             sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
             *(f"{ROOT / TEST}::{name}" for name in DIFFERENTIAL_TESTS),
         ],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT, env=source_env, capture_output=True, text=True, check=False,
     )
     if differential.returncode:
         print("Historical V1/V2 differential gate failed.", file=sys.stderr)

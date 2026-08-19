@@ -47,6 +47,35 @@ CODEX_EXTERNAL_FEATURES = (
 )
 
 
+class _JsonObjectPairs(list[tuple[str, Any]]):
+    """Pair-preserving JSON object used while extracting Claude structured output."""
+
+
+def _pair_value(pairs: _JsonObjectPairs, key: str, default: Any = None) -> Any:
+    values = [value for candidate, value in pairs if candidate == key]
+    return values[-1] if values else default
+
+
+def _pairs_json(value: Any) -> str:
+    """Serialize a pair tree without collapsing nested duplicate object keys."""
+    if isinstance(value, _JsonObjectPairs):
+        return "{" + ",".join(
+            f"{json.dumps(key, ensure_ascii=False)}:{_pairs_json(child)}"
+            for key, child in value
+        ) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(_pairs_json(child) for child in value) + "]"
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _pairs_plain(value: Any) -> Any:
+    if isinstance(value, _JsonObjectPairs):
+        return {key:_pairs_plain(child) for key, child in value}
+    if isinstance(value, list):
+        return [_pairs_plain(child) for child in value]
+    return value
+
+
 @dataclass(frozen=True)
 class Review:
     """The reviewer's final message plus a token to resume the same session, and enough
@@ -517,21 +546,26 @@ class ClaudeEngine(Engine):
 
     def parse_output(self, stdout: str) -> Review:
         try:
-            data = json.loads(stdout)
+            pair_data = json.loads(stdout, object_pairs_hook=_JsonObjectPairs)
         except json.JSONDecodeError:
             return Review(text=stdout.strip(), session_ref=None, raw=stdout)
-        if not isinstance(data, dict):
+        if not isinstance(pair_data, _JsonObjectPairs):
             return Review(text=stdout.strip(), session_ref=None, raw=stdout)
+        data = _pairs_plain(pair_data)
+        structured_values = [
+            value for key, value in pair_data if key == "structured_output"
+        ]
         usage: dict | None = None
         tokens, cost = data.get("usage"), data.get("total_cost_usd")
         if tokens is not None or cost is not None:
             usage = {"tokens": tokens, "cost_usd": cost}
-        structured = data.get("structured_output")
+        structured = structured_values[-1] if structured_values else None
         text = (
-            json.dumps(structured, ensure_ascii=False, separators=(",", ":"))
-            if isinstance(structured, dict) else str(data.get("result", ""))
+            _pairs_json(structured)
+            if isinstance(structured, _JsonObjectPairs) else str(data.get("result", ""))
         )
-        is_error = bool(data.get("is_error", False))
+        duplicate_structured = len(structured_values) > 1
+        is_error = bool(data.get("is_error", False)) or duplicate_structured
         denied = {
             item.get("tool_name")
             for item in data.get("permission_denials", [])
@@ -550,7 +584,10 @@ class ClaudeEngine(Engine):
             error=is_error or permission_failure is not None,
             usage=usage,
             duration_ms=data.get("duration_ms"),
-            failure_detail=text if is_error else permission_failure,
+            failure_detail=(
+                "claude returned duplicate structured_output envelope keys"
+                if duplicate_structured else text if is_error else permission_failure
+            ),
         )
 
 

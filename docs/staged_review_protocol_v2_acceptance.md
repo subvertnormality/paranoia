@@ -1,7 +1,10 @@
 # Staged review Protocol v2 implementation acceptance
 
-Status: **Protocol v2 shipped. The deterministic census-outcome amendment remains subject to its
-external CODE-lineage correction and cold-final gate.**
+Status: **Protocol v2 shipped. The keyed class-decision amendment for issue #42 passed its external
+provider, production-handler, test, and mutation gates. After the reviewer conceded two
+acceptance-matrix objections but later reopened them unchanged, the operator ended that churned
+convergence loop without expanding the frozen stakes to synthetic corrupted IDs or prescribed live
+provider failure.**
 
 This report records the artifacts that exist for the implementation of
 [`staged_review_protocol_v2_plan.md`](staged_review_protocol_v2_plan.md). It does not claim
@@ -64,6 +67,98 @@ The retained lane probe binds provider-schema SHA-256
 SHA-256 `d683a2d0a1897d186c2b4076dc4c2ebfe25d5af9aab00e2bc53dfa6d83705a81`;
 the executable test regenerates `lane_schema("plan", "domain")`, re-hashes the compact response,
 and parses it through the production lane validator.
+
+## Keyed class-decision amendment (issue #42)
+
+Fresh decision replies no longer express `class_outcomes` or `class_actions` as arrays containing
+repeatable `class_id` fields. They are closed objects generated from the active-class snapshot.
+Final requires every active class outcome; correction requires exactly the classes already bound to
+open debt; census derives outcomes from the integrity manifest. Every active class has a required
+nullable action slot, where `null` means no independent action. A non-null slot admits exactly one
+action. A mechanized class's value schema excludes `close` and `reopen`
+and requires a mechanized replacement definition.
+
+The decoder retains JSON object pairs until duplicate keys have been rejected, including nested
+Claude `structured_output`, then projects the maps to the unchanged canonical arrays in encounter
+order. Canonical semantic validation, class-engine dry-run, atomic settlement, durable state, and
+the single corrective retry are unchanged. No invalid row is collapsed or partially settled.
+
+Correction findings for a non-debt-bound existing class carry independent
+`classification.assessment_evidence`; the server derives that one violated outcome with a
+`new_finding` basis. A fresh finding for a debt-bound class instead requires the authored outcome to
+name that exact finding; `carried_debt` cannot mask a fresh occurrence. Finding and assessment
+evidence are projected and retained independently.
+
+The maximum 100-active-class branch schemas use local `$defs`/`$ref` sharing and grouped class-ID
+enums without changing the closed contract. Their compact provider projections are 15,677 bytes
+for census, 22,975 for correction, and 24,197 for final, all below a 32,768-byte transport gate and
+well below Linux's per-argument limit used by Claude. Exact fresh/resumed Codex and Claude results
+are retained in
+[`keyed_class_decision_provider_acceptance_2026-08-19.json`](keyed_class_decision_provider_acceptance_2026-08-19.json).
+The bounded gate made sixteen successful calls: minimal correction, a populated correction with one
+debt-bound and one newly affected active class, a representative two-class census, and maximum
+100-class final, fresh and resumed, on
+Codex CLI `0.144.6` with `gpt-5.6-sol` and Claude Code `2.1.197` with
+`sonnet`, all at high effort with web disabled. Each retained exact response replays through the
+production decoder and semantic materializer. The maximum-final schema was 24,197 bytes; the
+retained call time totaled 384.068 seconds. The census probe carries its authoritative assessment
+inputs into executable semantic replay, so every decision role is exercised rather than merely
+schema-generated. The older hashes above describe the pre-amendment array
+wire schema and remain historical evidence only.
+
+The separate signed-in
+[`keyed_class_handler_acceptance_2026-08-19.json`](keyed_class_handler_acceptance_2026-08-19.json)
+drives commit `9ef782b` through the production `critique_branch` correction handler with one closed,
+debt-bound active class. Codex session `01a01a28-879a-7ab2-aede-d38271faeb70` returned one exact keyed
+response; schema SHA-256 is `5e044b4c…f6635` and response SHA-256 is `55bc5e4a…2e12`. Anchor
+validation and canonical materialization derived `reopen`; atomic settlement persisted that class
+open with its original open debt binding, and the rendered result remained correctly blocked.
+The exact settlement retains `_class_record_pointers` as
+`["/class_outcomes/acceptance-class"]`. Elapsed handler time was 77.854 seconds with one model call
+and no validation retry. The executable
+replay regenerates the exact schema, hashes and decodes the retained response, resolves anchors from
+the recorded commit, replays canonical class transition, and checks durable and rendered outcomes.
+
+The final pre-convergence production diff from `main` is 456 additions and 66
+deletions across five existing modules: `staged_protocol.py` +382/-47, `engines.py` +44/-7,
+`handlers.py` +16/-5, `prompts.py` +13/-6, and `review_census.py` +1/-1. The largest changed
+production module is `handlers.py` at 2,982 lines; `staged_protocol.py` is 1,483 lines. The retained
+provider and handler acceptance totals 17 successful model calls and 461.922 seconds of observable
+wall time. This excludes failed diagnostic/capability attempts and CODE-review calls rather than
+misstating them as successful release evidence.
+
+Fresh keyed locations are also retained through canonical materialization solely for retry
+diagnostics. Semantic and canonical class-engine failures therefore name the provider-repairable
+key (for example `/class_actions/<class-id>`) rather than an array index that never appeared in the
+provider response. This includes canonical projection collisions, invalid finding bases, fallback
+class-engine candidates, and required null action slots. The private pointer map is not persisted
+or included in settlement state.
+The worktree-bound full suite passed **1,167 tests in 60.82 seconds**. The historical differential
+passed all eight role/shape groups and the bounded mutation gate killed all **31** owned mutants,
+including keyed diagnostic-pointer preservation.
+
+### Keyed amendment acceptance boundary
+
+The retained live evidence is deliberately compositional, not Cartesian. The provider matrix proves
+fresh and resumed structured transport for census, populated correction (including independent
+`assessment_evidence`), and final responses through the production decoder/materializer. The
+signed-in handler artifact proves the production `critique_branch` bridge through anchor
+resolution, canonical dry-run, settlement, persistence, audit, and rendering. Deterministic handler
+tests then drive the same production `_staged_call` used by that bridge through schema-valid
+semantic and canonical failures, the exact keyed retry prompt, rejected-attempt retention, resumed
+success, and final materialization. This acceptance does **not** claim that a signed-in model was
+induced to fail validation on command, or that every semantic payload shape was crossed with every
+provider/route/handler combination.
+
+That boundary is intentional. Asking a live model to emit a prescribed invalid response tests
+model obedience to an instruction to fail, not a distinct CLI/schema capability, and is not a
+repeatable release gate. Production class IDs are server-minted as the first eight hexadecimal
+characters of SHA-256, so a primary lifecycle cannot naturally create a class key containing `/` or
+`~`; doing so requires deliberately corrupted lineage state, which the frozen operating model
+excludes. RFC 6901 escaping remains total defensive behavior, while reachable production pointer
+bindings are covered using actual ID-shaped and named test-fixture keys. A future distinct call
+adapter or supported non-hex ID source would require new live evidence; semantic reuse alone does
+not.
 
 ## Real Codex primary lifecycle
 
