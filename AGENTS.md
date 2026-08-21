@@ -203,14 +203,43 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   Treat the final redirect URL as governing UGC/self-source eligibility and persist capture
   digests plus cold authority/entailment decisions before support may freeze.
   Keep the 5,000,000-byte raw response circuit breaker and admit complete extracted text through
-  100,000 characters. Deduplicate identical final-URL/content/text captures only within one
+  1,000,000 characters. In plan verification, preserve complete-source context. Let a normalized,
+  structurally governing primary or authoritative capture that exceeds the ordinary 400,000-
+  character batch occupy one dedicated expanded packet only when the exact complete initial and
+  correction prompts fit 685,000 characters, recomputing eligibility from the final URL. Carry its
+  complete capture into the cold attestation prompt and enforce the same exact prompt bound there.
+  Before binding admission, reserve the maximum bounded validation diagnostic, location, passage,
+  correction template, and attestation envelope so later output cannot overflow unrelated evidence.
+  Pack cold attestation by exact initial-and-correction prompt size into at most five batches and
+  allow one same-session validation correction. Persist one closed server-owned capture-provenance
+  row per source outcome with explicit nullable response metadata, both digests, fallback fact, and
+  bounded error; retain it when an expanded packet cannot be bound or attested.
+  Bound the complete evidence phase to 22 model calls (the discovery + five binding + five
+  attestation topology and one reserved correction for every initial call) as a pathology guard,
+  not a quality target. Admit an initial call only when both its call-count and full latency reserve
+  fit the remaining monotonic deadline. Before the first model call, reserve the complete maximum
+  model/retry graph plus explicit non-model capture/processing time and scheduling slack.
+  Use the same pure prompt renderers for preflight and invocation and test the exact strings; do not
+  maintain parallel size estimates.
+  Packet and latency limits are circuit breakers, not
+  irretractable evidence-quality budgets. Deduplicate
+  identical final-URL/content/text captures only within one
   binding prompt or batch, using an earlier-row reference bound to all three values. Count actual
   numbered, metadata-bearing, JSON-escaped representations against aggregate binding budgets.
   When distinct arbitration captures exceed its single prompt budget, deterministically demote
   the largest capture groups to bounded server-owned binding-budget failures until it fits;
   preserve the remaining research and do not add a model call.
-  Apply the same per-source failure to a plan capture whose numbered and JSON-escaped row alone
-  exceeds one binding batch; never let one admitted page abort unrelated plan evidence.
+  Apply the same per-source failure when a row is ineligible for expansion or its complete expanded
+  prompt cannot fit; never silently truncate an admitted page or let it abort unrelated plan
+  evidence. Bound model-authored binding fields before downstream attestation, and bind replacement
+  evidence against the replacement proposition rather than the original proposition. Bypass model
+  binding for unavailable captures so omission cannot overwrite a known capture failure. A failed
+  dedicated expanded call is a diagnostic-retaining source-local failure; continue unrelated
+  batches and preserve its requested location, nullable effective HTTP(S) final URL, response
+  metadata, fallback fact, and capture digests. A non-web context location remains a valid
+  uncaptured provenance outcome and must not invalidate independently captured HTTP(S) evidence.
+  Partition unavailable captures before row construction, materialize their server-owned decision
+  directly, and never expose them to provider binding output.
   Retry HTTP 403 at most once with a browser-compatible user agent, a fresh redirect counter, and
   the original absolute deadline and public-address/final-URL policy. A persistent 403 remains
   unusable and retains final URL, numeric status, bounded error, and retry fact; never add cookies,
@@ -218,6 +247,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   Validate retained inventory before capture; attest replacement wording as its own exact
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.
+  Reject a sixth exact binding or cold-attestation batch globally before that role settles a
+  prefix; aggregate ceilings must never become cross-round pagination.
   Treat an omitted expected indexed binding row as unusable for that exact source and demote only
   the affected claim when it has no other qualifying evidence. Preserve omission as a distinct
   conservative outcome from an explicit `usable:false` row so durable provenance remains truthful.
@@ -229,6 +260,8 @@ sizes, and convergence phases to stop pathological work while allowing valid cal
   scalar or container alias may bind authority or entailment to another claim or evidence row.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
+  Enforce the reserved non-model capture/pre-binding interval as one aggregate monotonic deadline;
+  it may not consume time reserved for later model phases.
   Captured binding failure debt must retain raw provider stdout, structured failure detail, and
   process stderr as distinct hashed and bounded channels, including initial and correction calls.
 - The evidence register is mechanically external-only. Retain atomic, load-bearing external

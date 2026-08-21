@@ -26,6 +26,7 @@ AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
 MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
+MAX_ATTESTATION_REASON_CHARS = 1_000
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
 SCOPES = frozenset({"external"})
@@ -251,6 +252,7 @@ def frozen_supported_ids(
 
 def _captured_support(record: dict[str, Any]) -> bool:
     evidence = record.get("evidence", [])
+    provenance = record.get("capture_provenance", [])
     for row in record.get("capture_attestations", []):
         if not isinstance(row, dict):
             continue
@@ -258,11 +260,21 @@ def _captured_support(record: dict[str, Any]) -> bool:
         if type(index) is not int or not 0 <= index < len(evidence):
             continue
         item = evidence[index]
+        capture_row = next((
+            candidate for candidate in provenance
+            if isinstance(candidate, dict)
+            and candidate.get("evidence_index") == index
+        ), None)
         if (
             isinstance(item, dict)
+            and isinstance(capture_row, dict)
             and item.get("relation") == "supports_claim"
             and row.get("relation") == "supports_claim"
             and row.get("final_url") == item.get("url")
+            and capture_row.get("final_url") == item.get("url")
+            and isinstance(capture_row.get("requested_url"), str)
+            and capture_row.get("text_sha256") == row.get("text_sha256")
+            and capture_row.get("error") is None
             and row.get("publisher_authority") is True
             and row.get("passage_entailment") is True
         ):
@@ -286,6 +298,7 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
 def parse_audit(
     text: str, plan_text: str, *, allow_partial: bool = False,
     repo: Path | None = None, plan_repo_path: str | None = None,
+    require_capture_provenance: bool = False,
 ) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
     if text.count(AUDIT_MARKER) != 1:
@@ -327,6 +340,7 @@ def parse_audit(
         try:
             claim = _validate_claim(
                 item, plan_text, repo=repo, plan_repo_path=plan_repo_path,
+                require_capture_provenance=require_capture_provenance,
             )
         except ValueError as exc:
             reason = f"claim {index}: {exc}"
@@ -406,12 +420,14 @@ def _validate_assessments(raw: Any, text: str) -> tuple[dict[str, str], ...]:
 
 def _validate_claim(
     item: Any, plan_text: str, *, repo: Path | None = None,
-    plan_repo_path: str | None = None,
+    plan_repo_path: str | None = None, require_capture_provenance: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("must be an object")
     required = {"kind", "scope", "anchor", "proposition", "verdict", "evidence", "replacement"}
-    optional = {"prior_claim_id", "rationale", "capture_attestations"}
+    optional = {
+        "prior_claim_id", "rationale", "capture_attestations", "capture_provenance",
+    }
     unknown = set(item) - required - optional
     missing = required - set(item)
     if missing or unknown:
@@ -459,6 +475,13 @@ def _validate_claim(
     capture_attestations = _validate_capture_attestations(
         item.get("capture_attestations", []), checked,
     )
+    capture_provenance = _validate_capture_provenance(
+        item.get("capture_provenance", []), checked,
+    )
+    if require_capture_provenance and len(capture_provenance) != len(checked):
+        raise ValueError(
+            "capture_provenance must contain exactly one row per evidence item"
+        )
 
     qualifying = [
         e for e in checked
@@ -491,7 +514,79 @@ def _validate_claim(
         "proposition": proposition, "verdict": verdict, "evidence": checked,
         "replacement": replacement, "prior_claim_id": prior, "rationale": rationale,
         "capture_attestations": capture_attestations,
+        "capture_provenance": capture_provenance,
     }
+
+
+def _validate_capture_provenance(
+    value: Any, evidence: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or len(value) > len(evidence):
+        raise ValueError("capture_provenance must contain at most one row per evidence item")
+    fields = {
+        "evidence_index", "requested_url", "final_url", "status", "content_type",
+        "fallback_attempted", "content_sha256", "text_sha256", "error",
+    }
+    rows: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for row in value:
+        if not isinstance(row, dict) or set(row) != fields:
+            raise ValueError("capture_provenance fields are invalid")
+        index = row["evidence_index"]
+        if type(index) is not int or not 0 <= index < len(evidence) or index in seen:
+            raise ValueError("capture_provenance evidence_index is invalid or duplicated")
+        seen.add(index)
+        requested_url = _one_line(
+            row["requested_url"], "capture_provenance.requested_url",
+        )
+        final_url = row["final_url"]
+        if final_url is not None:
+            final_url = _one_line(final_url, "capture_provenance.final_url")
+            parsed = urlparse(final_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                raise ValueError(
+                    "capture_provenance final_url must be null or absolute HTTP(S)"
+                )
+            if final_url != evidence[index]["url"]:
+                raise ValueError("capture_provenance final_url differs from its evidence URL")
+        elif requested_url != evidence[index]["url"]:
+            raise ValueError(
+                "capture_provenance requested_url differs from uncaptured evidence URL"
+            )
+        status = row["status"]
+        if status is not None and (type(status) is not int or not 100 <= status <= 599):
+            raise ValueError("capture_provenance status must be null or an HTTP status integer")
+        if type(row["fallback_attempted"]) is not bool:
+            raise ValueError("capture_provenance fallback_attempted must be boolean")
+
+        def optional_line(field: str, maximum: int) -> str | None:
+            raw = row[field]
+            if raw is None:
+                return None
+            checked = _one_line(raw, f"capture_provenance.{field}")
+            if len(checked) > maximum:
+                raise ValueError(
+                    f"capture_provenance {field} exceeds {maximum} characters"
+                )
+            return checked
+
+        content_sha = optional_line("content_sha256", 64)
+        text_sha = optional_line("text_sha256", 64)
+        for field, digest in (("content_sha256", content_sha), ("text_sha256", text_sha)):
+            if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError(f"capture_provenance {field} must be null or lowercase SHA-256")
+        rows.append({
+            "evidence_index": index,
+            "requested_url": requested_url,
+            "final_url": final_url,
+            "status": status,
+            "content_type": optional_line("content_type", 500),
+            "fallback_attempted": row["fallback_attempted"],
+            "content_sha256": content_sha,
+            "text_sha256": text_sha,
+            "error": optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS),
+        })
+    return rows
 
 
 def _validate_capture_attestations(
@@ -504,10 +599,14 @@ def _validate_capture_attestations(
         "publisher_authority", "authority_reason", "passage_entailment",
         "entailment_reason",
     }
+    optional = {
+        "content_sha256", "status", "content_type", "fallback_attempted",
+        "capture_error",
+    }
     rows: list[dict[str, Any]] = []
     seen: set[int] = set()
     for row in value:
-        if not isinstance(row, dict) or set(row) != required:
+        if not isinstance(row, dict) or not required <= set(row) or set(row) - required - optional:
             raise ValueError("capture_attestation fields are invalid")
         index = row["evidence_index"]
         if type(index) is not int or not 0 <= index < len(evidence) or index in seen:
@@ -530,7 +629,7 @@ def _validate_capture_attestations(
         for field in ("publisher_authority", "passage_entailment"):
             if type(row[field]) is not bool:
                 raise ValueError(f"capture_attestation {field} must be boolean")
-        rows.append({
+        checked = {
             "evidence_index": index,
             "final_url": final_url,
             "text_sha256": text_sha256,
@@ -543,7 +642,38 @@ def _validate_capture_attestations(
             "entailment_reason": _one_line(
                 row["entailment_reason"], "capture_attestation.entailment_reason",
             ),
-        })
+        }
+        if len(checked["authority_reason"]) > MAX_ATTESTATION_REASON_CHARS or len(
+            checked["entailment_reason"]
+        ) > MAX_ATTESTATION_REASON_CHARS:
+            raise ValueError(
+                "capture_attestation reason exceeds "
+                f"{MAX_ATTESTATION_REASON_CHARS} characters"
+            )
+        if "content_sha256" in row:
+            content_sha256 = _one_line(
+                row["content_sha256"], "capture_attestation.content_sha256",
+            )
+            if not re.fullmatch(r"[0-9a-f]{64}", content_sha256):
+                raise ValueError("capture_attestation content_sha256 must be lowercase SHA-256")
+            checked["content_sha256"] = content_sha256
+        if "status" in row:
+            if type(row["status"]) is not int or not 100 <= row["status"] <= 599:
+                raise ValueError("capture_attestation status must be an HTTP status integer")
+            checked["status"] = row["status"]
+        if "content_type" in row:
+            checked["content_type"] = _one_line(
+                row["content_type"], "capture_attestation.content_type",
+            )
+        if "fallback_attempted" in row:
+            if type(row["fallback_attempted"]) is not bool:
+                raise ValueError("capture_attestation fallback_attempted must be boolean")
+            checked["fallback_attempted"] = row["fallback_attempted"]
+        if "capture_error" in row:
+            checked["capture_error"] = _one_line(
+                row["capture_error"], "capture_attestation.capture_error",
+            )
+        rows.append(checked)
     return rows
 
 

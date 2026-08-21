@@ -373,13 +373,17 @@ entailment before a packet can close a claim. Claude `WebFetch` is never enabled
 this path. There is no `PARANOIA_SEARCH_ENDPOINT`, API key, plugin, or caller-supplied search
 adapter.
 Capture keeps a 5,000,000-byte response circuit breaker but admits complete Trafilatura output
-through 100,000 characters, so ordinary long reference pages are not discarded at the former
-40,000-character threshold. Repeated identical captures are rendered once per binding prompt or
+through 1,000,000 characters. Plan binding keeps complete-source context: an otherwise governing
+primary or authoritative capture that exceeds the ordinary 400,000-character batch may occupy one
+dedicated expanded packet when the exact rendered prompt fits 685,000 characters. Its complete
+capture accompanies the selected passage in the cold attestation packet, which is checked against
+the same exact bound before binding admission, including maximum output and correction-envelope
+reserves. Repeated identical captures are rendered once per binding prompt or
 batch and referenced by final URL plus content/text digests; distinct pages still obey the
 existing serialized aggregate ceilings. Arbitration deterministically marks the largest distinct
 captures unusable until its single binding prompt fits, so one large-source group fails closed
-without aborting all research. Plan binding likewise marks an individual capture unusable when
-line numbering or JSON escaping makes its row exceed one batch; other captures continue.
+without aborting all research. Plan binding sizes complete initial and correction prompts from
+their actual numbered, metadata-bearing, JSON-escaped representation.
 Requests use explicit HTML/text accept headers and identity content
 encoding (`Accept-Encoding: identity`). An HTTP 403 receives one same-URL browser-compatible retry inside
 the original deadline and redirect/public-address policy. A persistent 403 remains fail-closed
@@ -388,7 +392,11 @@ server never uses cookies, browser automation, mirrors, snippets, or provider-fe
 Redirect destinations govern URL eligibility, UGC/self-source classification, packet identity,
 and the persisted source URL; a benign discovery URL cannot launder an ineligible destination.
 Persisted claim provenance includes the captured-text digest and cold authority/entailment
-decisions, so legacy unattested support is researched once before freezing.
+decisions, so legacy unattested support is researched once before freezing. A separate closed
+server-owned `capture_provenance` row retains the requested location, nullable effective HTTP(S)
+final URL, nullable response metadata, fallback fact, both digests, and bounded failure for every
+source outcome. Non-web repository/file/custom context therefore remains representable without
+pretending it was captured; model attestation cannot overwrite this provenance.
 
 The register is mechanically limited to load-bearing external propositions in three kinds:
 
@@ -507,9 +515,20 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase also has a 6,000-second monotonic deadline and nine model calls
-maximum. That fits discovery, five maximum-size binding batches, cold attestation, and one
-correction in both discovery and binding. The full verified plan call is bounded to 7,080 seconds.
+The complete evidence phase has a 6,960-second monotonic circuit breaker and 22 model calls
+maximum. That admits discovery, five maximum-size binding batches, five exact-size
+cold-attestation batches, and the promised one validation correction for every call. Before each
+first spend the server reserves the complete 22-call graph, 300 seconds for capture and bounded
+local processing, and 60 seconds of scheduling slack. Before each initial call it also reserves
+both call-count and two 300-second windows for its correction.
+The capture pool and exact pre-binding packing share that one enforced 300-second monotonic
+deadline; exhaustion blocks visibly before the first binding call rather than consuming time
+reserved for later model phases.
+These are pathology guards, not targets or reasons to shorten an admitted review. The full verified
+plan call remains bounded to 7,080 seconds.
+If exact packing would require a sixth binding or cold-attestation batch, the complete evidence
+phase fails globally before that role spends or settles any prefix. The limit cannot act as
+cross-round pagination for a partially supported inventory.
 Evidence state is persisted first. A staged census starts only when its full 4,320-second
 lane/consolidation/retry reserve still fits; correction and final use a 3,120-second reserve. If the
 reserve no longer fits, the result is visibly pending and the next round reuses frozen supported

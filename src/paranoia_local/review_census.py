@@ -48,6 +48,9 @@ class Attempt:
     stderr_sha256: str | None = None
     stderr_excerpt: str | None = None
     validation_issue: str | None = None
+    validation_pointer: str | None = None
+    rejected_reply_sha256: str | None = None
+    rejected_reply_excerpt: str | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)
