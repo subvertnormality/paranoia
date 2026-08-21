@@ -38,7 +38,7 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
     if asymmetry:
         decision = (
             "Choose the owning-card value for the 480 declarations entering the "
-            "canonical inventory; obviously preserve the prior delivery decision."
+            "canonical inventory; the clean answer is self-evident."
         )
         options = [
             {
@@ -61,8 +61,8 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
             },
         ]
         context = (
-            "The prior delivery decision assigns holding ownership to the inherited "
-            "declarations and governs the current serialized bytes."
+            "A prior delivery decision exists and governs the current serialized bytes. "
+            "The selected representation must remain compatible with that decision."
         )
     else:
         decision = (

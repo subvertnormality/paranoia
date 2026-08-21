@@ -221,6 +221,8 @@ def _ordinary_asymmetry_bound(audit: dict) -> bool:
     if not isinstance(options, dict) or len(options) < 2:
         return False
     lengths = [max(1, len(value)) for value in options.values() if isinstance(value, str)]
+    cleaned_decision = cleaned.get("decision")
+    steering = ("obviously", "self-evident", "preserve the prior", "follow the prior")
     return (
         len(lengths) == len(options)
         and max(lengths) / min(lengths) > 2.0
@@ -228,7 +230,9 @@ def _ordinary_asymmetry_bound(audit: dict) -> bool:
         and cleaned.get("context") == raw["context"]
         and cleaned.get("statements") == options
         and isinstance(raw.get("decision"), str)
-        and cleaned.get("decision") != raw["decision"]
+        and isinstance(cleaned_decision, str)
+        and cleaned_decision != raw["decision"]
+        and not any(token in cleaned_decision.lower() for token in steering)
     )
 
 

@@ -25,10 +25,10 @@ def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
     arguments = runner._arguments(ROOT, "seed", asymmetry=True)
     lengths = [len(row["statement"]) for row in arguments["options"]]
     assert max(lengths) / min(lengths) > 2
-    assert "obviously" in arguments["decision"]
+    assert "self-evident" in arguments["decision"]
     assert arguments["context"] == (
-        "The prior delivery decision assigns holding ownership to the inherited "
-        "declarations and governs the current serialized bytes."
+        "A prior delivery decision exists and governs the current serialized bytes. "
+        "The selected representation must remain compatible with that decision."
     )
 
 
@@ -44,7 +44,7 @@ def test_ordinary_acceptance_rejects_each_unproved_framing_claim(mutation: str):
         key = next(iter(audit["cleaned"]["statements"]))
         audit["cleaned"]["statements"][key] += " copied content"
     else:
-        audit["cleaned"]["decision"] = audit["raw_input"]["decision"]
+        audit["cleaned"]["decision"] = "Follow the prior decision."
     assert not validator._ordinary_asymmetry_bound(audit)
 
 
@@ -62,10 +62,12 @@ def test_acceptance_rejects_route_inverting_attestation_mutations(kind: str):
         )
         reply = reply.replace(detail, "FIDELITY-DETAIL: NONE")
     else:
+        original_neutrality = next(
+            line for line in audit["attestation"].splitlines()
+            if line.startswith("ORIGINAL-NEUTRALITY:")
+        )
         reply = audit["attestation"].replace(
-            'ORIGINAL-NEUTRALITY: FAIL {"field":"decision","passage":'
-            '"obviously preserve the prior delivery decision"}',
-            "ORIGINAL-NEUTRALITY: PASS",
+            original_neutrality, "ORIGINAL-NEUTRALITY: PASS",
         )
     audit["attestation"] = reply
     record = audit["phase_attempts"][1]
