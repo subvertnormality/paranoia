@@ -92,13 +92,15 @@ disagree for a reason other than the evidence.
 
 ### 2.1 The caller's own view leaks into the framing — closed
 
-Option 1 gets three sentences and option 3 gets four words; the framing says "the
-obvious approach"; the caller's recommendation rides along. §2 of the
+Loaded wording, a recommendation, rhetorical emphasis, or selective persuasive padding can expose
+the caller's preference. Unequal substantive length or detail alone is not bias: alternatives often
+need different amounts of text to preserve their own facts, constraints, caveats, qualifications,
+scope, and consequences. §2 of the
 adjudication doc: *"Do not include your own recommendation: it anchors both
 reviewers onto one answer and correlates their errors, destroying the
-independence the mechanism runs on."* Today that is enforced by the caller
-remembering it. Closed by the cleaner (§3.2), validated and cross-vendor attested
-field by field (§3.3). Raw framing reaches no decider.
+independence the mechanism runs on."* The cleaner removes those rhetorical vectors while preserving
+substantive asymmetry; cross-vendor attestation validates fidelity and neutrality field by field
+(§3.2–§3.3). Raw framing reaches no decider.
 
 ### 2.1a Framing bounds are checked before anything is spent
 
