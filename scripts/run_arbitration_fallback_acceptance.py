@@ -37,26 +37,23 @@ REPORTED_CANDIDATE = (
 def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, Any]:
     if asymmetry:
         decision = (
-            "Choose the owning-card value for the 480 declarations entering the "
-            "canonical inventory; the clean answer is self-evident."
+            "Choose how the cleaner should handle substantively asymmetric option "
+            "statements; the clean answer is self-evident."
         )
         options = [
             {
-                "id": "opt-causing-card",
-                "statement": (
-                    "Record the card that caused each declaration to enter the canonical "
-                    "inventory."
-                ),
+                "id": "opt-equalize",
+                "statement": "Rewrite both options to comparable length and detail.",
             },
             {
-                "id": "opt-holding-owner",
-                "statement": COMMON + (
-                    "The 480 inherited declarations retain the delivery-level holding owner. "
-                    "The card's own 62 authored definitions retain the card that caused their "
-                    "entry, so the two provenance groups remain distinguishable across the 542 "
-                    "definitions this change brings into or adds to the governed surface. The "
-                    "serialized value therefore records holding ownership for inherited bytes "
-                    "without rewriting authorship for newly introduced definitions."
+                "id": "opt-preserve",
+                "statement": (
+                    "Preserve every option's own facts, constraints, caveats, qualifications, "
+                    "scope, and consequences even when the resulting statements differ "
+                    "substantially in length. Normalize only presentation features such as "
+                    "tense, voice, labels, and rhetorical padding when meaning is unchanged; "
+                    "never copy content between options merely to make their detail or length "
+                    "match."
                 ),
             },
         ]
@@ -64,6 +61,10 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
             "A prior delivery decision exists and governs the current serialized bytes. "
             "The selected representation must remain compatible with that decision."
         )
+        files = [{
+            "path":"docs/arbitration_plan.md",
+            "reason":"defines the governing cleaner fidelity and neutrality contract",
+        }]
     else:
         decision = (
             "Choose the owning-card value for the 480 declarations entering the "
@@ -90,6 +91,10 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
             },
         ]
         context = ""
+        files = [{
+            "path":"docs/arbitrate_original_neutrality_fallback_plan.md",
+            "reason":"records the reported duplicated-preamble fidelity failure shape",
+        }]
     return {
         "repo_path": str(repo),
         "decision": decision,
@@ -102,10 +107,7 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
             "outside the supported environment."
         ),
         "context": context,
-        "files": [{
-            "path": "docs/arbitrate_original_neutrality_fallback_plan.md",
-            "reason": "records the reported duplicated-preamble fidelity failure shape",
-        }],
+        "files": files,
         "clean": True,
         "research": False,
         "web_search": False,
@@ -151,8 +153,8 @@ def _run(repo: Path, log_dir: Path, *, fallback: bool) -> tuple[Path, dict[str, 
     report = ah.arbitrate(
         _arguments(
             repo,
-            "original-neutrality-fallback-reproduction-20260816"
-            if fallback else "ordinary-six-line-compatibility-20260816",
+            "original-neutrality-fallback-v2-20260821"
+            if fallback else "ordinary-open-asymmetry-20260821",
             asymmetry=not fallback,
         ),
         log_dir=log_dir,

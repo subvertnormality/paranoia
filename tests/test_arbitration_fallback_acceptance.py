@@ -25,6 +25,9 @@ def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
     arguments = runner._arguments(ROOT, "seed", asymmetry=True)
     lengths = [len(row["statement"]) for row in arguments["options"]]
     assert max(lengths) / min(lengths) > 2
+    assert {row["id"] for row in arguments["options"]} == {
+        "opt-equalize", "opt-preserve",
+    }
     assert "self-evident" in arguments["decision"]
     assert arguments["context"] == (
         "A prior delivery decision exists and governs the current serialized bytes. "
