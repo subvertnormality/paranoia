@@ -193,9 +193,8 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
     except (KeyError, arb.ArbitrationError):
         return False
     if (
-        (fallback and attestation.ok)
-        or (not fallback and not attestation.ok)
-        or not attestation.original_neutrality_pass
+        (fallback and (attestation.ok or not attestation.original_neutrality_pass))
+        or (not fallback and (not attestation.ok or attestation.original_neutrality_pass))
         or attestation.stakes_advocacy is not None
         or attestation.context_advocacy is not None
     ):
@@ -213,6 +212,23 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=expected_rejection,
         execution=_external_execution(engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL),
+    )
+
+
+def _ordinary_asymmetry_bound(audit: dict) -> bool:
+    raw, cleaned = audit.get("raw_input", {}), audit.get("cleaned", {})
+    options = raw.get("options")
+    if not isinstance(options, dict) or len(options) < 2:
+        return False
+    lengths = [max(1, len(value)) for value in options.values() if isinstance(value, str)]
+    return (
+        len(lengths) == len(options)
+        and max(lengths) / min(lengths) > 2.0
+        and isinstance(raw.get("context"), str) and bool(raw["context"])
+        and cleaned.get("context") == raw["context"]
+        and cleaned.get("statements") == options
+        and isinstance(raw.get("decision"), str)
+        and cleaned.get("decision") != raw["decision"]
     )
 
 
@@ -351,6 +367,7 @@ def _validate_run(
         and _cleaned_digest_bound(audit.get("cleaned", {}))
         and (not fallback or audit["cleaned"]["statements"] != audit["raw_input"]["options"])
         and _cleaning_and_attestation_bound(audit, fallback=fallback)
+        and (fallback or _ordinary_asymmetry_bound(audit))
     ):
         raise ValueError("acceptance audit does not prove its exact delivery route")
     votes = _decider_transcripts(audit)
@@ -404,7 +421,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     )
     if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
         raise ValueError("acceptance runs did not share one source snapshot")
-    if artifact["tests"] != {"full_suite": "1111 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1199 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 

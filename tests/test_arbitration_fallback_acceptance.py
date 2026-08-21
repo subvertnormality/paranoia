@@ -32,6 +32,49 @@ def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
     )
 
 
+@pytest.mark.parametrize("mutation", ["asymmetry", "context", "options", "advocacy"])
+def test_ordinary_acceptance_rejects_each_unproved_framing_claim(mutation: str):
+    audit = copy.deepcopy(_audit("ordinary"))
+    assert validator._ordinary_asymmetry_bound(audit)
+    if mutation == "asymmetry":
+        audit["raw_input"]["options"] = {"one":"same", "two":"same"}
+    elif mutation == "context":
+        audit["cleaned"]["context"] = "changed context"
+    elif mutation == "options":
+        key = next(iter(audit["cleaned"]["statements"]))
+        audit["cleaned"]["statements"][key] += " copied content"
+    else:
+        audit["cleaned"]["decision"] = audit["raw_input"]["decision"]
+    assert not validator._ordinary_asymmetry_bound(audit)
+
+
+@pytest.mark.parametrize("kind", ["ordinary-original-neutral", "fallback-fidelity-pass"])
+def test_acceptance_rejects_route_inverting_attestation_mutations(kind: str):
+    fallback = kind.startswith("fallback")
+    audit = copy.deepcopy(_audit("fallback" if fallback else "ordinary"))
+    if fallback:
+        fidelity = audit["attestation"].splitlines()[0]
+        reply = audit["attestation"].replace(
+            fidelity, fidelity.replace(" CHANGED", " PRESERVED"),
+        )
+        detail = next(
+            line for line in reply.splitlines() if line.startswith("FIDELITY-DETAIL:")
+        )
+        reply = reply.replace(detail, "FIDELITY-DETAIL: NONE")
+    else:
+        reply = audit["attestation"].replace(
+            'ORIGINAL-NEUTRALITY: FAIL {"field":"decision","passage":'
+            '"obviously preserve the prior delivery decision"}',
+            "ORIGINAL-NEUTRALITY: PASS",
+        )
+    audit["attestation"] = reply
+    record = audit["phase_attempts"][1]
+    record["reply"] = reply
+    record["reply_sha256"] = validator._text_digest(reply)
+    record["rejection"] = None
+    assert not validator._cleaning_and_attestation_bound(audit, fallback=fallback)
+
+
 @pytest.mark.parametrize(
     ("fallback", "outcome", "cleaning"),
     [

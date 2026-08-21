@@ -103,15 +103,27 @@ def test_authoritative_capture_acceptance_record() -> None:
     assert measured["configured_ceiling"] == handlers.MAX_PLAN_EXPANDED_PROMPT_CHARS
     snapshot = artifact["reviewed_snapshot"]
     assert len(snapshot["base_commit"]) == 40
+    source_commit = snapshot["source_commit"]
     for relative, expected in snapshot["production_source_sha256"].items():
-        assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
+        recorded = subprocess.run(
+            ["git", "show", f"{source_commit}:{relative}"], cwd=root,
+            check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(recorded).hexdigest() == expected
+        if relative != "src/paranoia_local/handlers.py":
+            assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
+    allowed = snapshot["allowed_later_handlers_diff"]
+    handler_diff = subprocess.run(
+        ["git", "diff", "--no-ext-diff", source_commit, "--", "src/paranoia_local/handlers.py"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    ).stdout
+    assert hashlib.sha256(handler_diff).hexdigest() == allowed["sha256"]
+    assert "no claim-verification path" in allowed["scope"]
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
-    assert production_diff["largest_changed_module_lines_after"] == sum(
-        1 for _ in (root / production_diff["largest_changed_module"]).open(
-            encoding="utf-8"
-        )
-    )
+    assert production_diff["largest_changed_module_lines_after"] == 3415
+    current_lines = sum(1 for _ in (root / "src/paranoia_local/handlers.py").open())
+    assert current_lines == 3415 + allowed["additions"] - allowed["deletions"]
 
 
 def test_minimal_claim_validation_acceptance_record() -> None:

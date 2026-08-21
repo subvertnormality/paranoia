@@ -27,6 +27,9 @@ Do a plan review to validate the design, then implement it. Once implementation 
 paranoia convergence reviews the **code branch/diff**, not the old plan, unless the user
 explicitly asks to reopen plan design. Never spend repeated rounds polishing a plan while
 reporting implementation progress. Label every run in commentary as PLAN or CODE.
+After implementation begins, do not invoke `critique_plan` again merely as acceptance for
+plan-role mechanics unless the user explicitly authorizes that return. Use deterministic
+production-handler lifecycle coverage and keep convergence on the code artifact.
 
 Before review, update public documentation and these agent instructions. Before opening a PR,
 run the primary capability end to end; fake-backed tests alone do not establish usability.

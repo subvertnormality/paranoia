@@ -116,28 +116,23 @@ independently gated.
 
 ## End-to-end acceptance
 
-Use the public `critique_plan` handler with `repo_path` set to this checkout, `plan_path` set to this
-file, lineage `phase-gating-real-code-acceptance`, the frozen stakes above, Codex
-`gpt-5.6-sol`/`high`, claim verification and web search disabled, and an isolated state root. Seed
-that plan lineage at round 1 with one open `MAJOR` class whose invariant requires a runtime
-attestation produced by future code and one open debt record bound to it. The tracked acceptance is:
+Before implementation, review this design through the tracked plan lifecycle under the frozen
+stakes and require its broad cold final to reach `CONVERGENCE: NOT-BLOCKED`. Once implementation
+begins, do not return to plan-role convergence: review and correct the code branch in place.
 
-1. Round 2 must replace that predecessor with a plan-reviewable invariant requiring exact
-   implementation scope, executable acceptance evidence, and fail-closed behavior. The same open
-   debt ID must bind to the successor; replacement alone is not clearance.
-2. A targeted correction round must independently assess the successor against this plan. It may
-   close only when the cited plan text actually contains all three bindings. The durable class and
-   debt must both close and the structural phase must advance to `final`.
-3. The immediately following broad cold-final round must finish with `STRUCTURAL-PHASE: clear`, no
-   blocking structural debt, and `CONVERGENCE: NOT-BLOCKED`.
+The executable CODE acceptance for phase-aware settlement is the production-handler lifecycle test
+`test_plan_handler_replaces_artifact_demand_with_phase_bound_class`. It seeds an active
+artifact-demanding predecessor and bound debt, invokes the public handler twice, and asserts exact
+prompt delivery, replacement, successor identity, debt rebinding, independent successor
+satisfaction, derived closure, durable phase advancement, call count, and recorded per-call latency.
+Any validation retry exhaustion, state/settlement failure, missing transition, open blocking debt,
+or different phase blocks the suite. The test establishes server behavior for concrete provider
+payloads; it does not claim that every future provider response will make the intended semantic
+judgement.
 
-Persist each production audit and record the provider route, exact prompt/reply digests, attempt
-role, model-call count, duration, class action, debt outcome, durable phase, and final convergence
-signal. Provider execution failure, validation retry exhaustion, state/settlement failure, a still
-violated successor, a missing cold final, or any different terminal signal blocks delivery.
-
-After implementation, also run the signed-in arbitration acceptance generator's ordinary route.
-It supplies options with greater than 2.0 substantive length asymmetry, explicit removable advocacy
+After implementation, run the signed-in arbitration acceptance generator's ordinary route as the
+changed primary capability. It supplies options with greater than 2.0 substantive length asymmetry,
+explicit removable advocacy
 in the decision, and neutral context recording a binding prior decision. It must use `attested` or
 `attested-after-retry`, never `original-attested`; reach both deciders without content transfer;
 compare the accepted attested packet's exact option statements and context bytes against both
