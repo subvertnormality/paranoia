@@ -166,12 +166,11 @@ MAX_CLEANING_PROMPT_CHARS = 180000
 # block and every rendered packet field. This is an admission bound, not a quality budget.
 MAX_DECIDER_PROMPT_CHARS = 240000
 MAX_CLEANER_REPLY_CHARS = 50000
-OPTION_RATIO_MAX = 2.0
 
 _HOIST_REMEDY = (
     "Put only facts and specification shared by every option in `context`. Keep "
     "each option's distinct mechanism, scope, and consequences in that option's "
-    "own concise statement, using parallel structure and comparable detail."
+    "own concise statement."
 )
 
 
@@ -182,33 +181,14 @@ def preflight_framing(
     """Reject framing defects visible in the caller's own input, before spending a
     cleaner call on them.
 
-    Three of the first four production invocations died after two Opus attempts each
-    on exactly these arithmetic checks (issue #8). Same measurements, same message
-    shapes — just moved ahead of the spend.
-
-    The inter-option ratio is checked HERE rather than only after cleaning because
-    it is structural: "adopt X, with this precedence and this invariant" carries more
-    mechanism to state than "don't", so any scope decision trips it by construction
-    and no amount of re-cleaning fixes it. Telling the caller up front, with the
-    remedy, is the only useful response.
+    Absolute field bounds prevent an oversized cleaner packet. Relative option length
+    is not validated: substantive alternatives naturally require different amounts of
+    text, and fidelity/advocacy checks own semantic presentation quality.
     """
-    # The ratio is a BIAS bound — asymmetric detail is an argument regardless of
-    # wording — so it holds whether or not a cleaner runs. The character caps are
-    # CLEANER-CAPACITY bounds, justified by what can be round-tripped through the
-    # cleaner without the attester scoring a fidelity change, so `clean: false` (which
-    # sends the caller's statements verbatim and never invokes a cleaner) is not
-    # subject to them.
+    # The character caps are CLEANER-CAPACITY bounds, justified by what can be
+    # round-tripped through the cleaner without overflow, so `clean: false` (which
+    # sends caller statements verbatim) is not subject to them.
     lengths = {o.id: max(1, len(o.statement)) for o in options}
-    if lengths:
-        longest = max(lengths, key=lengths.__getitem__)
-        shortest = min(lengths, key=lengths.__getitem__)
-        if lengths[longest] / lengths[shortest] > OPTION_RATIO_MAX:
-            raise ArbitrationError(
-                "options are not equalized: "
-                f"{longest} is {lengths[longest]} chars, {shortest} is "
-                f"{lengths[shortest]} (ratio must be <= {OPTION_RATIO_MAX}). "
-                + _HOIST_REMEDY
-            )
     if not cleaned:
         return
     for oid, n in lengths.items():

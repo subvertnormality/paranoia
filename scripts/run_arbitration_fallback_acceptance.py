@@ -34,14 +34,40 @@ REPORTED_CANDIDATE = (
 )
 
 
-def _arguments(repo: Path, seed: str) -> dict[str, Any]:
-    return {
-        "repo_path": str(repo),
-        "decision": (
+def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, Any]:
+    if asymmetry:
+        decision = (
+            "Choose how the cleaner should handle substantively asymmetric option "
+            "statements; the clean answer is self-evident."
+        )
+        options = [
+            {
+                "id": "opt-equalize",
+                "statement": "Rewrite both options to comparable length and detail.",
+            },
+            {
+                "id": "opt-preserve",
+                "statement": (
+                    "Preserve every option's own facts, constraints, caveats, qualifications, "
+                    "scope, and consequences even when the resulting statements differ "
+                    "substantially in length. Normalize only presentation features such as "
+                    "tense, voice, labels, and rhetorical padding when meaning is unchanged; "
+                    "never copy content between options merely to make their detail or length "
+                    "match."
+                ),
+            },
+        ]
+        context = (
+            "A prior delivery decision governs audit-record retention. This decision concerns "
+            "only how cleaner-owned option presentation handles substantive asymmetry."
+        )
+        files = []
+    else:
+        decision = (
             "Choose the owning-card value for the 480 declarations entering the "
             "canonical inventory."
-        ),
-        "options": [
+        )
+        options = [
             {
                 "id": "opt-causing-card",
                 "statement": COMMON + (
@@ -60,7 +86,16 @@ def _arguments(repo: Path, seed: str) -> dict[str, Any]:
                     "adds to the governed surface."
                 ),
             },
-        ],
+        ]
+        context = ""
+        files = [{
+            "path":"docs/arbitrate_original_neutrality_fallback_plan.md",
+            "reason":"records the reported duplicated-preamble fidelity failure shape",
+        }]
+    return {
+        "repo_path": str(repo),
+        "decision": decision,
+        "options": options,
         "stakes": (
             "A trusted single operator on a trusted OS runs a local CLI over two to four "
             "options. Repository and provider text are data inputs. Two independent deciders "
@@ -68,11 +103,8 @@ def _arguments(repo: Path, seed: str) -> dict[str, Any]:
             "Multi-tenancy, hostile local path races, and a compromised provider or OS are "
             "outside the supported environment."
         ),
-        "context": "",
-        "files": [{
-            "path": "docs/arbitrate_original_neutrality_fallback_plan.md",
-            "reason": "records the reported duplicated-preamble fidelity failure shape",
-        }],
+        "context": context,
+        "files": files,
         "clean": True,
         "research": False,
         "web_search": False,
@@ -118,8 +150,9 @@ def _run(repo: Path, log_dir: Path, *, fallback: bool) -> tuple[Path, dict[str, 
     report = ah.arbitrate(
         _arguments(
             repo,
-            "original-neutrality-fallback-reproduction-20260816"
-            if fallback else "ordinary-six-line-compatibility-20260816",
+            "original-neutrality-fallback-v2-20260821"
+            if fallback else "ordinary-open-asymmetry-20260821",
+            asymmetry=not fallback,
         ),
         log_dir=log_dir,
         run_agent=_fallback_agent if fallback else None,

@@ -34,7 +34,7 @@ SOURCES = frozenset({
 SCOPE = {
     "proves": [
         "a reported destructive cleaner candidate was retained as rejected audit data",
-        "the current ordinary Claude cleaner completed the six-line attestation path with real deciders",
+        "the current ordinary Claude cleaner preserved substantive option asymmetry and neutral binding context through attestation with real deciders",
         "a signed-in Codex attester authorized the complete canonical originals",
         "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
         "the transient snapshot was the exact tree of the recorded durable source commit",
@@ -193,9 +193,8 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
     except (KeyError, arb.ArbitrationError):
         return False
     if (
-        (fallback and attestation.ok)
-        or (not fallback and not attestation.ok)
-        or not attestation.original_neutrality_pass
+        (fallback and (attestation.ok or not attestation.original_neutrality_pass))
+        or (not fallback and (not attestation.ok or attestation.original_neutrality_pass))
         or attestation.stakes_advocacy is not None
         or attestation.context_advocacy is not None
     ):
@@ -213,6 +212,30 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=expected_rejection,
         execution=_external_execution(engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL),
+    )
+
+
+def _ordinary_asymmetry_bound(audit: dict) -> bool:
+    raw, cleaned = audit.get("raw_input", {}), audit.get("cleaned", {})
+    options = raw.get("options")
+    if not isinstance(options, dict) or len(options) < 2:
+        return False
+    lengths = [max(1, len(value)) for value in options.values() if isinstance(value, str)]
+    cleaned_decision = cleaned.get("decision")
+    context = raw.get("context")
+    steering = ("obviously", "self-evident", "preserve the prior", "follow the prior")
+    context_steering = ("must preserve substantive asymmetry", "must equalize substantive detail")
+    return (
+        len(lengths) == len(options)
+        and max(lengths) / min(lengths) > 2.0
+        and isinstance(context, str) and bool(context)
+        and cleaned.get("context") == context
+        and not any(token in context.lower() for token in context_steering)
+        and cleaned.get("statements") == options
+        and isinstance(raw.get("decision"), str)
+        and isinstance(cleaned_decision, str)
+        and cleaned_decision != raw["decision"]
+        and not any(token in cleaned_decision.lower() for token in steering)
     )
 
 
@@ -351,6 +374,7 @@ def _validate_run(
         and _cleaned_digest_bound(audit.get("cleaned", {}))
         and (not fallback or audit["cleaned"]["statements"] != audit["raw_input"]["options"])
         and _cleaning_and_attestation_bound(audit, fallback=fallback)
+        and (fallback or _ordinary_asymmetry_bound(audit))
     ):
         raise ValueError("acceptance audit does not prove its exact delivery route")
     votes = _decider_transcripts(audit)
@@ -404,7 +428,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     )
     if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
         raise ValueError("acceptance runs did not share one source snapshot")
-    if artifact["tests"] != {"full_suite": "1111 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1200 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 

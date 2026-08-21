@@ -569,47 +569,18 @@ def parse_cleaned_hints(lines: Sequence[str]) -> dict[str, str]:
     return out
 
 
-def check_length_bands(cleaned: Mapping[str, str], original: Mapping[str, str]) -> None:
-    """What the CLEANER is answerable for, which is not the same as what the caller is.
+def check_cleaned_option_capacity(cleaned: Mapping[str, str]) -> None:
+    """Enforce absolute capacity without treating character ratios as semantics.
 
-    The caller's own inter-option ratio is bounded at preflight
-    (`arb.preflight_framing`). What remains here is that the cleaner must not make the
-    asymmetry *worse* than the framing it was handed — equalized input coming back
-    skewed is the cleaner introducing a length vote.
-
-    There is deliberately **no lower bound** on how far a statement may compress.
-    Issue #8: an option whose text was largely consequence-narration ("Outcome under
-    this option: …") was cut to 0.09x and rejected, though the meaning was intact —
-    the cleaner had correctly identified restatement as compressible. A character
-    ratio cannot tell dropped substance from dropped padding; the cross-vendor
-    fidelity attestation can, and it checks exactly that, per option, by id. The floor
-    was a cheap proxy for a check that already exists in stronger form.
-
-    Growth keeps its ceiling: a statement that doubles has gained content from
-    somewhere, and the id-set check cannot see added prose inside a preserved id.
+    Cross-option transfer, additions, removals, and changed qualifications are rejected
+    by the independent field-by-field fidelity attestation. Relative length cannot
+    distinguish those defects from legitimate substantive asymmetry.
     """
-    cleaned_lengths = {k: max(1, len(v)) for k, v in cleaned.items()}
-    orig_lengths = {k: max(1, len(v)) for k, v in original.items()}
-    if cleaned_lengths:
-        got = max(cleaned_lengths.values()) / min(cleaned_lengths.values())
-        allowed = arb.OPTION_RATIO_MAX
-        if orig_lengths:
-            allowed = max(allowed, max(orig_lengths.values()) / min(orig_lengths.values()))
-        if got > allowed:
-            longest = max(cleaned_lengths, key=cleaned_lengths.get)
-            shortest = min(cleaned_lengths, key=cleaned_lengths.get)
-            raise ArbitrationError(
-                "the cleaner left the options less equalized than the framing it was "
-                f"given: {longest} is {cleaned_lengths[longest]} chars, {shortest} is "
-                f"{cleaned_lengths[shortest]} (ratio {got:.2f}, allowed {allowed:.2f})"
-            )
     for oid, text in cleaned.items():
-        before = orig_lengths.get(oid, 1)
-        ratio = max(1, len(text)) / before
-        if ratio > 2.0:
+        if len(text) > arb.MAX_OPTION_CHARS:
             raise ArbitrationError(
-                f"cleaned option {oid} is {ratio:.2f}x its original length — the "
-                "cleaner may compress, but not add (max 2.0x)"
+                f"cleaned option {oid} is {len(text)} chars "
+                f"(max {arb.MAX_OPTION_CHARS})"
             )
 
 
@@ -2542,7 +2513,7 @@ def _cleaned_candidate_ineligibility(
     """Return failures that disqualify only the rewrite, not the originals."""
     issues: list[str] = []
     try:
-        check_length_bands(parsed["statements"], originals)
+        check_cleaned_option_capacity(parsed["statements"])
     except ArbitrationError as exc:
         issues.append(str(exc))
     try:

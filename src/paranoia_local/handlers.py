@@ -802,7 +802,7 @@ def _staged_structural_review(
         }, ensure_ascii=False, separators=(",", ":"))
         try:
             prompt = prompts.compose(
-                f"{prompts.STAGED_CONSOLIDATION_INSTRUCTIONS}\n"
+                f"{prompts.staged_consolidation_instructions(mode)}\n"
                 f"{sp.citation_instructions(mode)}\n"
                 f"{sp.class_decision_instructions('census', active_classes=active_classes)}",
                 consolidation_body,
@@ -1582,7 +1582,10 @@ def critique_plan(
     try:
         body = _plan_body(plan_view, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
-        instructions = prompts.PLAN_REVIEW_INSTRUCTIONS
+        instructions = (
+            prompts.PLAN_REVIEW_CORE_INSTRUCTIONS
+            if closure else prompts.PLAN_REVIEW_INSTRUCTIONS
+        )
         if closure:
             instructions += "\n\n" + prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS
         prompt = prompts.compose(instructions, _prepend(calibration, body))

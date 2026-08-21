@@ -60,6 +60,13 @@ class TestToolListing:
         assert "attester independently rejects" in description
         assert "Neutralized" not in description
 
+    def test_arbitrate_schema_allows_substantive_option_detail_asymmetry(self) -> None:
+        tool = next(t for t in server.TOOLS if t.name == "arbitrate")
+        statement = tool.inputSchema["properties"]["options"]["items"]["properties"]["statement"]
+        assert statement["maxLength"] == 1200
+        assert "Substantive detail may differ" in statement["description"]
+        assert "2x" not in statement["description"]
+
     def test_arbitrate_schema_defers_normalized_hint_reason_limit_to_runtime(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "arbitrate")
         reason = tool.inputSchema["properties"]["files"]["items"]["properties"]["reason"]

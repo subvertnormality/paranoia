@@ -865,19 +865,12 @@ def test_a_held_selection_still_needs_a_citation_that_resolves():
     assert sub == {"claude": False}
 
 
-def test_preflight_rejects_unequal_option_lengths_before_spending_a_cleaner_call():
-    """Issue #8 fix 5: three of four field invocations burned two Opus attempts each
-    on defects visible in the input alone."""
-    with pytest.raises(arb.ArbitrationError) as exc:
-        arb.preflight_framing(
-            decision="d",
-            context="",
-            options=(Option("A_only", "x" * 400), Option("B_plus", "y" * 1300)),
-        )
-    msg = str(exc.value)
-    assert "not equalized" in msg and "1300" in msg and "400" in msg
-    # and it must teach the remedy, not just the bound
-    assert "context" in msg.lower()
+def test_preflight_accepts_substantive_option_length_asymmetry():
+    arb.preflight_framing(
+        decision="d",
+        context="",
+        options=(Option("A_only", "x" * 300), Option("B_plus", "y" * 900)),
+    )
 
 
 def test_preflight_rejects_an_over_long_option_statement():

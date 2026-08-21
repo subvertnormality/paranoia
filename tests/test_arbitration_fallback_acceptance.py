@@ -21,6 +21,71 @@ def test_checked_in_original_fallback_acceptance_is_valid():
     validator.validate(ARTIFACT, ROOT)
 
 
+def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
+    arguments = runner._arguments(ROOT, "seed", asymmetry=True)
+    lengths = [len(row["statement"]) for row in arguments["options"]]
+    assert max(lengths) / min(lengths) > 2
+    assert {row["id"] for row in arguments["options"]} == {
+        "opt-equalize", "opt-preserve",
+    }
+    assert "self-evident" in arguments["decision"]
+    assert arguments["context"] == (
+        "A prior delivery decision governs audit-record retention. This decision concerns "
+        "only how cleaner-owned option presentation handles substantive asymmetry."
+    )
+    assert arguments["files"] == []
+
+
+@pytest.mark.parametrize(
+    "mutation", ["asymmetry", "context", "context-steering", "options", "advocacy"],
+)
+def test_ordinary_acceptance_rejects_each_unproved_framing_claim(mutation: str):
+    audit = copy.deepcopy(_audit("ordinary"))
+    assert validator._ordinary_asymmetry_bound(audit)
+    if mutation == "asymmetry":
+        audit["raw_input"]["options"] = {"one":"same", "two":"same"}
+    elif mutation == "context":
+        audit["cleaned"]["context"] = "changed context"
+    elif mutation == "context-steering":
+        audit["raw_input"]["context"] = "The cleaner must preserve substantive asymmetry."
+        audit["cleaned"]["context"] = audit["raw_input"]["context"]
+    elif mutation == "options":
+        key = next(iter(audit["cleaned"]["statements"]))
+        audit["cleaned"]["statements"][key] += " copied content"
+    else:
+        audit["cleaned"]["decision"] = "Follow the prior decision."
+    assert not validator._ordinary_asymmetry_bound(audit)
+
+
+@pytest.mark.parametrize("kind", ["ordinary-original-neutral", "fallback-fidelity-pass"])
+def test_acceptance_rejects_route_inverting_attestation_mutations(kind: str):
+    fallback = kind.startswith("fallback")
+    audit = copy.deepcopy(_audit("fallback" if fallback else "ordinary"))
+    if fallback:
+        fidelity = audit["attestation"].splitlines()[0]
+        reply = audit["attestation"].replace(
+            fidelity, fidelity.replace(" CHANGED", " PRESERVED"),
+        )
+        detail = next(
+            line for line in reply.splitlines() if line.startswith("FIDELITY-DETAIL:")
+        )
+        reply = reply.replace(detail, "FIDELITY-DETAIL: NONE")
+    else:
+        original_neutrality = next(
+            line for line in audit["attestation"].splitlines()
+            if line.startswith("ORIGINAL-NEUTRALITY:")
+        )
+        reply = audit["attestation"].replace(
+            original_neutrality, "ORIGINAL-NEUTRALITY: PASS",
+        )
+    audit["attestation"] = reply
+    record = audit["phase_attempts"][1]
+    record["reply"] = reply
+    record["reply_sha256"] = validator._text_digest(reply)
+    record["rejection"] = None
+    assert not validator._cleaning_and_attestation_bound(audit, fallback=fallback)
+
+
 @pytest.mark.parametrize(
     ("fallback", "outcome", "cleaning"),
     [

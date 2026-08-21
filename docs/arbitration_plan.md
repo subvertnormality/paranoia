@@ -65,8 +65,9 @@ context, stakes, the repo, and the files that bear on it. The server:
    materialized as a separate inert tree per decider. Both search the same pinned
    bytes and snapshot-derived bounded history. Ref movement during setup fails;
    later movement is reported without changing the pinned verdict (§3.1).
-2. **Cleans** the framing with an Opus agent — strips advocacy, equalizes the
-   options, normalizes format. Never touches `stakes`. Never judges the merits.
+2. **Cleans** the framing with an Opus agent — strips advocacy and normalizes
+   presentation without transferring substantive content between options. Never
+   touches `stakes`. Never judges the merits.
 3. **Attests** the cleaned framing with the *other* vendor, field by field. One
    retry maximum, then fail. The cleaner's vendor never signs off on its own work.
 4. **Fans out** to both engines in parallel, each cold, each seeing a
@@ -91,62 +92,34 @@ disagree for a reason other than the evidence.
 
 ### 2.1 The caller's own view leaks into the framing — closed
 
-Option 1 gets three sentences and option 3 gets four words; the framing says "the
-obvious approach"; the caller's recommendation rides along. §2 of the
+Loaded wording, a recommendation, rhetorical emphasis, or selective persuasive padding can expose
+the caller's preference. Unequal substantive length or detail alone is not bias: alternatives often
+need different amounts of text to preserve their own facts, constraints, caveats, qualifications,
+scope, and consequences. §2 of the
 adjudication doc: *"Do not include your own recommendation: it anchors both
 reviewers onto one answer and correlates their errors, destroying the
-independence the mechanism runs on."* Today that is enforced by the caller
-remembering it. Closed by the cleaner (§3.2), validated and cross-vendor attested
-field by field (§3.3). Raw framing reaches no decider.
+independence the mechanism runs on."* The cleaner removes those rhetorical vectors while preserving
+substantive asymmetry; cross-vendor attestation validates fidelity and neutrality field by field
+(§3.2–§3.3). Raw framing reaches no decider.
 
 ### 2.1a Framing bounds are checked before anything is spent
 
-Three of the first four production invocations died after two Opus cleaning attempts
-each, on defects visible in the caller's own input: an inter-option length ratio, an
-over-long option, an over-long decision (issue #8). The measurements were right and the
-diagnostics were excellent — they were simply taken after the spend.
+`preflight_framing` enforces absolute capacity before the cleaner: option statements
+≤ 1200 chars, `decision` ≤ 2500, and `context` ≤ 20000. `context` is bounded more
+loosely because it is the designated home for genuinely shared detail.
 
-`preflight_framing` now runs them before the cleaner: option statements ≤ 1200 chars,
-longest ÷ shortest ≤ 2.0, `decision` ≤ 2500, `context` ≤ 20000. Same measurements, same
-message shapes, no agent turn. `context` is bounded far more loosely because it is the
-designated home for detail and is not per-option, so its length cannot be a vote
-between the options.
+Issue #55 removed the inter-option length ratio. Substantive alternatives naturally
+need different amounts of text, and character counts cannot distinguish legitimate
+detail from advocacy. Fidelity and neutrality attestation own that semantic boundary.
 
-The inter-option ratio belongs here rather than only after cleaning because it is
-**structural, not stylistic**: "adopt X, with this precedence and this invariant"
-carries more mechanism to state than "don't", so any scope decision trips it by
-construction and no amount of re-cleaning fixes it. The supported remedy is therefore
-a framing idiom, and the error states it: hoist the shared mechanism — including the
-full specification of what only one option adopts — into `context`, and leave each
-option statement to say only how much of it is adopted and what follows. Both options
-then describe scope-of-adoption, and equalize on their own. The field run landed at
-~780 vs ~810 chars this way, having failed at 483 vs 1262.
+### 2.2 Presentation asymmetry is audited semantically — closed
 
-### 2.2 Length and detail asymmetry are a vote — closed
-
-A four-line option beside a six-word option is an argument. The caller's own ratio is
-bounded at preflight (§2.1a); what this band adds is what the **cleaner** is answerable
-for, which is not the same thing:
-
-- across cleaned options: the ratio may not exceed `max(2.0, the caller's own ratio)` —
-  equalized framing coming back skewed is the cleaner introducing a length vote;
-- each cleaned option against its own original: `ratio ≤ 2.0`. Growth keeps a ceiling
-  because a statement that doubles has gained content from somewhere, and the id-set
-  check cannot see added prose inside a preserved id.
-
-Revision 2 specified the second band as "within a ratio bound" with no number, which
-two implementations could satisfy differently while passing every stated test.
-
-**There is deliberately no lower bound.** Revisions 2-4 set one at `0.5`, and the first
-production run showed it firing on the wrong signal (issue #8): an option whose text was
-largely consequence-narration ("Outcome under this option: …") was compressed to 0.09x
-and rejected, though its meaning was intact — the cleaner had correctly identified
-restatement as compressible, while the option describing *mechanism* survived verbatim.
-A character ratio cannot distinguish dropped substance from dropped padding. The
-cross-vendor fidelity attestation can, and checks exactly that, per option, by id
-(§3.2). The floor was a cheap proxy for a check that already exists in stronger form,
-and its only observed effect was to penalise a caller for explaining an option's
-outcome. Outside a surviving band → one cleaner retry with the measurement, then fail.
+The cleaner may normalize tense, voice, labels, and rhetorical padding only while
+preserving meaning. It must preserve substantive asymmetry and may never copy facts,
+constraints, caveats, or qualifications between options to make their lengths match.
+The independent attester rejects additions, removals, narrowing, widening, and changed
+qualifications field by field. Absolute option capacity remains enforced; relative
+character ratios are not semantic evidence.
 
 ### 2.3 Presentation order tilts both deciders the same way — **reduced**
 
@@ -607,13 +580,13 @@ symlink.
 ### 3.2 The cleaner
 
 **MUST**: strip advocacy and loaded adjectives; remove the caller's own
-recommendation and any attribution; equalize detail across options; normalize
-tense, voice, altitude; neutralize argumentative hint reasons; reproduce caller
+recommendation and any attribution; normalize presentation only while preserving
+meaning; preserve substantive differences in detail; neutralize argumentative hint reasons; reproduce caller
 `context` byte-for-byte; echo each option under the caller-stable id the server
 gives it.
 
 **MUST NOT**: add, remove, merge, split, or reorder options; change any option's
-meaning; add facts not in the input; express or hint at a preference; investigate
+meaning; copy facts, constraints, caveats, or qualifications between options; add facts not in the input; express or hint at a preference; investigate
 the repo; **touch `stakes` or rewrite, reflow, summarize, or omit `context`**.
 
 `stakes` and `context` pass through **verbatim**. Stakes are server-owned read-only
@@ -635,8 +608,8 @@ silent violation of the operator's fixed Opus-stage decision. The attester model
 is likewise pinned rather than inherited. Both defaults are tested.
 
 **Machine-checked:** the emitted caller-id set is exactly the input set, 1:1, each
-non-empty; §2.2's two bands hold; **§2.4 rule 3 is re-run over the cleaner's
-output** — no caller-id token and no issued label may appear in any field the
+non-empty; absolute field and prompt capacity bounds hold; **§2.4 rule 3 is re-run
+over the cleaner's output** — no caller-id token and no issued label may appear in any field the
 deciders will see, whether the caller put it there or the cleaner did. Any failure
 → one cleaner retry with the specific measurement, then fail.
 
@@ -1066,7 +1039,7 @@ injected.
   asserted) / `labels_are_clear` (§2.4 rule 1: absence over framing, snapshot
   blobs, snapshot pathnames, and commit messages),
   `resolve_stakes`, `build_clean_prompt`, `parse_cleaned_packet`
-  (id-set fidelity, both numeric bands), `build_attest_prompt`,
+  (id-set fidelity and absolute capacity), `build_attest_prompt`,
   `parse_attestation`, `build_decider_prompt`, `parse_verdict` (six-line trailer,
   exact label membership), `parse_citations` (§2.5 grammar + normalization),
   `to_regions` / `merge_regions` (anchor → carried interval, per-path merge),
@@ -1184,7 +1157,8 @@ at any context cap ≥ 1 — count as the same region and do not run round 2**; 
 is the round-3 FATAL as a regression test. Interval merging is asserted per path,
 including touching-but-not-overlapping windows and clamping at file bounds.
 
-*Framing.* Cleaned options outside either numeric band retry once then fail; a
+*Framing.* Cleaned options over the absolute capacity bound retry once then fail;
+substantive inter-option length asymmetry is admitted and independently fidelity-attested; a
 `CHANGED` on `decision`/`hints`/any option, a `FAIL` neutrality,
 `STAKES-ADVOCACY: PRESENT`, and `CONTEXT-ADVOCACY: PRESENT` each take their specified
 path; the attester is always the non-cleaning vendor; `stakes` and `context` reach the deciders byte-identical to the

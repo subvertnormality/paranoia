@@ -1,10 +1,10 @@
 {
   "acceptance_kind": "arbitration-original-fallback-v2",
-  "source_commit": "321c1d20849934a5a7eec2139441f0bc25ca701c",
+  "source_commit": "8c5bfe401ce8fd1863a1ba5af94071494fcfdab8",
   "acceptance_scope": {
     "proves": [
       "a reported destructive cleaner candidate was retained as rejected audit data",
-      "the current ordinary Claude cleaner completed the six-line attestation path with real deciders",
+      "the current ordinary Claude cleaner preserved substantive option asymmetry and neutral binding context through attestation with real deciders",
       "a signed-in Codex attester authorized the complete canonical originals",
       "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
       "the transient snapshot was the exact tree of the recorded durable source commit",
@@ -20,15 +20,15 @@
   "audits": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-audit.json",
-      "sha256": "39af2262a0ceae50a33023de96b58552b161476ae8cce8384ac59309b2a10508",
-      "snapshot": "f1ca255915dc787ded9fd34d7e072b2f3caa46db",
+      "sha256": "c502d7e1772785ec79decc79b70ae11a2c9c692366a9bbb85d99057c0cbde15d",
+      "snapshot": "49a3592f8a90e5761428f31605e672b934a1141f",
       "cleaning": "attested",
       "result": "CONVERGED"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/original-attested-audit.json",
-      "sha256": "fbf34e74a01f2337b01ae108024179a64cd1c42a175478685019234bced0bb64",
-      "snapshot": "f1ca255915dc787ded9fd34d7e072b2f3caa46db",
+      "sha256": "98d5192c87bf60f1648e77fa0a49d96468ae352970a237d6b91176c3b53acb10",
+      "snapshot": "49a3592f8a90e5761428f31605e672b934a1141f",
       "cleaning": "original-attested",
       "result": "CONVERGED"
     }
@@ -36,33 +36,33 @@
   "timings": {
     "ordinary": {
       "path": "docs/arbitration_fallback_evidence/ordinary-timing.json",
-      "sha256": "5a5a03a835ef331c98a2c1bbfb7311d10fa369512b307746efcc73fa736890be"
+      "sha256": "4f34adca5d90e08473d57bba406f1a920de8bb53a7a093865c2f28432a5e63eb"
     },
     "fallback": {
       "path": "docs/arbitration_fallback_evidence/timing.json",
-      "sha256": "f3eb6571ee43dc3f515ec19335bb09a5a35d66a102302fca23f661041a476ad0"
+      "sha256": "a0b22bb8eec55f8e4fa61306ce9600ab5d65e2d53660cd6b9a1d59539ded1d6c"
     }
   },
   "snapshot_binding": {
     "commit_object": "docs/arbitration_fallback_evidence/snapshot-commit.txt",
-    "sha256": "6688662ad3fc5b8c99aab821ad4bd48c2363544a022a50e7d5ebb4006927b4b1",
-    "source_commit": "247ea27974deb5d2ebd8c8d4405ccb41396d675b",
-    "tree": "8dc205aa3216f50a950067a692152ac3eae8b275"
+    "sha256": "a883e403dca1cd1141bfae82e7d5608a67c75ed140f4729627bfe96cc9e3d49a",
+    "source_commit": "8c5bfe401ce8fd1863a1ba5af94071494fcfdab8",
+    "tree": "7a6fb59ecceab130ee849a43ac57292b6ddb8225"
   },
   "source_sha256": {
-    "src/paranoia_local/arbitrate_handler.py": "e29b98d3a1e8f29982943c327dc4166656a0ea54f95eda2ef556aa0499763bd0",
-    "src/paranoia_local/arbitration.py": "85e8b08bc07efc592f39f4e73cfaa3d43e563923b9321d7654a08bcbdf07a14c",
-    "src/paranoia_local/engines.py": "13210732e9e059bdf71135c1ecb8742345aac1d0a1fad3b9200ea0de129638b2",
+    "src/paranoia_local/arbitrate_handler.py": "2c77aa1972ffa5b637d4681a31f9b466d946d28382119c7d1a44f73058f005e0",
+    "src/paranoia_local/arbitration.py": "979bdc82e68e5e6e87100d405fdb07fa205298d31e109df9549e116e01a678f3",
+    "src/paranoia_local/engines.py": "e60f0765058c5c57f300d0d248e53e11ec8e4bce3f45d1645365d93581fe7210",
     "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
-    "src/paranoia_local/prompts.py": "6b0323b860d6e80980fca936ffc76d1c81fa8f6ecd41764c05d85051e6c9c91a",
-    "src/paranoia_local/server.py": "acf67a80eeb57c49d68a27baaa49e62034bb5b15ff4da1428176bdbe0732ecf7",
-    "scripts/run_arbitration_fallback_acceptance.py": "3855364403dade913193357e4cd2bfd9a931a3083e553a90efee712ee2fe4a4e",
-    "scripts/validate_arbitration_fallback_acceptance.py": "6478500a70659513f7f88c9e6dc4ae46f00b3c018766143a81fdf6cead7b2665",
-    "tests/test_arbitrate_handler.py": "2ae7ac0e338e8ba4a5f01b23965af52dd5bc12164e849f18a1cfe4138d6ac993",
-    "tests/test_arbitration_fallback_acceptance.py": "45cfc4673fbb134cc186409c33bde5428a55656c52d872972fc03ee73a9b4e5d"
+    "src/paranoia_local/prompts.py": "1731d978dd2d967bb469b377ccf86b53cf9b7ce65de789036e179fee56c04410",
+    "src/paranoia_local/server.py": "8ee5c81adefe1d28cc03808aba4296cdb527dab04f5e33f30213a76f4683579e",
+    "scripts/run_arbitration_fallback_acceptance.py": "ceb1a0e8eb21f22d2975697b4c784a73cb7c7ddfa105273be6992a7175c7d79b",
+    "scripts/validate_arbitration_fallback_acceptance.py": "d0974d50da43ea0d3f38350eb9414cdba8fb5fb6d6a1c66018f46ff56d9d85e7",
+    "tests/test_arbitrate_handler.py": "f047adacbc6fd702660ef21278ef87b5e4a03d1c6ce179a6daed414ba6af61dd",
+    "tests/test_arbitration_fallback_acceptance.py": "5b31ae4794bc3bc2fe42745457b8da2651888c902f64b7ad657262a5532c1395"
   },
   "tests": {
-    "full_suite": "1111 passed",
+    "full_suite": "1200 passed",
     "exit_status": 0
   }
 }
