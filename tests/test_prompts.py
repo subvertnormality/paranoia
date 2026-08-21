@@ -45,6 +45,19 @@ class TestPlanReviewInstructions:
         for heading in ("## What works", "## What doesn't work", "## Risks", "## Gaps", "## Improvements"):
             assert heading in prompts.PLAN_REVIEW_INSTRUCTIONS
 
+    def test_future_implementation_proof_is_bound_not_demanded_from_the_plan(self) -> None:
+        text = prompts.PLAN_PHASE_CLASS_INSTRUCTIONS
+        assert "do not require" in text
+        assert "exact implementation\nscope" in text
+        assert "executable acceptance evidence" in text
+        assert "fail-closed behavior" in text
+        assert "never substitutes for scope" in text
+        assert "named durable residual" in text
+        assert "MINOR, OUT-OF-SCOPE, stakes-excluded" in text
+        assert "replace it with a phase-correct invariant" in text
+        assert text in prompts.PLAN_REVIEW_INSTRUCTIONS
+        assert text in prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS
+
 
 class TestCalibration:
     def test_both_reviews_honour_stakes_and_round(self) -> None:
@@ -119,6 +132,27 @@ class TestStagedReviewInstructions:
             assert "`repository/<path>:<line>`" in text
             assert "literal `repository/` prefix is required" in text
             assert "read repository files through that directory" in text
+
+    def test_every_plan_class_role_receives_the_same_phase_semantics(self) -> None:
+        shared = prompts.PLAN_PHASE_CLASS_INSTRUCTIONS
+        assert shared in prompts.staged_census_instructions("plan", "integrity")
+        assert shared in prompts.staged_followup_instructions("plan")
+        assert shared in prompts.staged_consolidation_instructions("plan")
+        assert shared not in prompts.staged_census_instructions("branch", "integrity")
+        assert shared not in prompts.staged_followup_instructions("branch")
+        assert shared not in prompts.staged_consolidation_instructions("branch")
+
+
+def test_cleaning_preserves_substantive_asymmetry_and_binding_context():
+    cleaner = prompts.CLEANER_INSTRUCTIONS
+    attester = prompts.ATTEST_INSTRUCTIONS
+    assert "EQUALIZE" not in cleaner
+    assert "Never copy facts, constraints" in cleaner
+    assert "Preserve substantive differences" in cleaner
+    assert "Unequal substantive detail" in attester
+    assert "is not advocacy by itself" in attester
+    assert "prior decision exists and governs the current bytes" in attester
+    assert "directing the deciders to follow it is advocacy" in attester
 
 
 def test_branch_staged_prompts_forbid_the_plan_alias():

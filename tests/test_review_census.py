@@ -1953,6 +1953,7 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "STRUCTURAL-PHASE: clear" in third
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
+    assert all(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in prompt for prompt in calls)
     assert '"existing_debt": []' in calls[5]
     assert all(key in calls[5] for key in sp.CHECKLIST)
     assert third.count("## What works") == 1
@@ -1979,6 +1980,126 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
     assert third_audit["staged_settlement"]["_finding_id_renames"] == {"G1":"F1"}
     assert third_audit["staged_settlement"]["findings"][0]["id"] == "F1"
+
+
+def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
+    repo, tmp_path, monkeypatch,
+):
+    stakes = "trusted local tool"
+    predecessor = "artifact-proof"
+    state = rc.normalize_state({}, stakes=stakes, snapshot="prior")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
+        "summary":"produce a future runtime attestation",
+        "evidence":["plan:3"], "remedy":"bind implementation acceptance",
+        "source_ids":[], "class_ids":[predecessor],
+        "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            "phase-bound-plan", mode=cc.PLAN_MODE, rounds=1, next_seq=2,
+            classes={predecessor:cc.TrackedClass(
+                predecessor,
+                "the plan must contain a runtime attestation produced by future code",
+                "MAJOR", 1, cc.OPEN, procedure="inspect the future runtime artifact",
+            )},
+            review_state=state,
+        ),
+    )
+    calls: list[str] = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        assert prompt.count(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS) == 1
+        active = json.loads(prompt.split("===== TASK INPUT =====\n", 1)[1])[
+            "active_classes"
+        ]
+        class_id = active[0]["class_id"]
+        if class_id == predecessor:
+            value = {
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D1", "status":"open", "evidence":["plan:3"],
+                    "reason":"replace the future-artifact invariant before closure",
+                }],
+                "class_outcomes":[{
+                    "class_id":predecessor, "verdict":"violated",
+                    "evidence":["plan:3"],
+                    "basis":{"kind":"carried_debt", "debt_id":"D1"},
+                }],
+                "class_actions":[{
+                    "kind":"replace", "class_id":predecessor,
+                    "definition":{
+                        "invariant":(
+                            "the plan names implementation scope, executable acceptance "
+                            "evidence, and fail-closed behavior"
+                        ),
+                        "severity":"MAJOR",
+                        "procedure":"inspect the implementation and acceptance sections",
+                    },
+                }],
+            }
+        else:
+            value = {
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D1", "status":"closed", "evidence":["plan:3"],
+                }],
+                "class_outcomes":[{
+                    "class_id":class_id, "verdict":"satisfied",
+                    "evidence":["plan:3"],
+                }],
+                "class_actions":{class_id:None},
+            }
+        text = wire(value)
+        return Review(
+            text=text, session_ref=f"phase-{len(calls)}", raw=text,
+            duration_ms=100 * len(calls), usage={"total_tokens":10 * len(calls)},
+        )
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    arguments = {
+        "plan_text":(
+            "# Plan\n\nImplement the verifier in `src/verifier.py`; run "
+            "`pytest tests/test_verifier.py`; any failure blocks delivery."
+        ),
+        "repo_path":str(repo), "lineage":"phase-bound-plan",
+        "claim_verification":False, "stakes":stakes,
+    }
+    first = handlers.critique_plan(
+        {**arguments, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"PB1",
+    )
+    assert "REPLACE artifact-proof" in first
+    assert "STRUCTURAL-PHASE: correction" in first
+    intermediate = cc.load_lineage(
+        cc.default_state_root(), "phase-bound-plan", stamp="PB2", mode=cc.PLAN_MODE,
+    )
+    successor = intermediate.classes[predecessor].superseded_by
+    assert successor and intermediate.classes[successor].status == cc.OPEN
+    assert intermediate.review_state["debt"][0]["class_ids"] == [successor]
+
+    second = handlers.critique_plan(
+        {**arguments, "round":3}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"PB2",
+    )
+    assert f"CLOSE {successor}" in second
+    assert "STRUCTURAL-PHASE: final" in second
+    settled = cc.load_lineage(
+        cc.default_state_root(), "phase-bound-plan", stamp="PB3", mode=cc.PLAN_MODE,
+    )
+    assert settled.classes[successor].status == cc.CLOSED
+    assert settled.review_state["debt"][0]["status"] == "closed"
+    assert len(calls) == 2
+    audits = [
+        json.loads(next((tmp_path / "logs").glob(f"{stamp}-critique_plan-*.json")).read_text())
+        for stamp in ("PB1", "PB2")
+    ]
+    assert [row["attempt_ledger"][0]["role"] for row in audits] == [
+        "correction", "correction",
+    ]
+    assert [row["attempt_ledger"][0]["duration_ms"] for row in audits] == [100, 200]
 
 
 def test_final_collision_audit_preserves_class_and_debt_lifecycle(

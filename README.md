@@ -349,6 +349,14 @@ soon as the wording changes, so predicates are not accepted there at all. Plan
 closure gives you *non-forgetting plus explicit closure*, not automatic recurrence
 detection.
 
+Plan-class satisfaction is phase-relative: reviewers judge whether the plan completely binds an
+in-card implementation obligation to named scope, executable acceptance evidence, and fail-closed
+behavior. Ownership is additional metadata, not a substitute for scope. They do not demand that
+future runtime artifacts already exist. A vague
+promise remains violated, while an inherited class that itself demands implementation execution is
+replaced with a plan-reviewable invariant instead of recurring forever. This does not certify the
+implementation; tracked branch review remains a separate broad cold review of the code and tests.
+
 **Class transitions** a reviewer can emit, besides a new class:
 
 | Record | Effect |
@@ -733,8 +741,10 @@ What it does, in order:
    Git refs and the reflog are digested before and after. Movement while the snapshot
    is being built fails before model spend; later movement is reported as
    `REFS-MOVED: yes` provenance and cannot change the inert views the deciders saw.
-2. **Neutralizes the framing** with an Opus agent — advocacy stripped, options
-   equalized in detail — then has the *other* vendor attest that field by field.
+2. **Neutralizes the framing** with an Opus agent — advocacy and rhetorical presentation
+   asymmetry stripped without transferring facts, constraints, caveats, or qualifications between
+   options — then has the *other* vendor attest that field by field. Substantive differences in
+   option detail remain intact for the deciders.
    `stakes` and caller `context` are passed through verbatim, never rewritten.
    Stakes are server-owned read-only cleaner input and are not part of the cleaner's
    output schema; undeclared cleaner output blocks are rejected.
@@ -743,6 +753,8 @@ What it does, in order:
    cleaner candidate is unusable but those originals pass, the server atomically
    sends the original decision, options, and validated hints to both deciders and
    reports `CLEANING: original-attested`; it never mixes original and cleaned fields.
+   A neutral record that a prior decision exists and governs the current bytes is shared context,
+   not advocacy; praise for that result or an instruction to follow it still fails the context gate.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
@@ -802,7 +814,6 @@ the other CLI.
 | Bound | Limit |
 |---|---|
 | option statement | 1200 chars |
-| longest ÷ shortest option | 2.0 |
 | `decision` | 2500 chars |
 | `context` | 20000 chars |
 | `stakes` | 20000 chars |
@@ -811,10 +822,10 @@ the other CLI.
 | complete cleaner or attester prompt | 180000 chars |
 | complete initial or correction decider prompt | 240000 chars |
 
-The shape that passes these naturally: put only facts and specification shared by
-every option in `context`. Keep each option's distinct mechanism, scope, and
-consequences in its own concise statement, using parallel structure and comparable
-detail.
+Put only facts and specification shared by every option in `context`. Keep each
+option's distinct mechanism, scope, consequences, caveats, and qualifications in that
+option's own statement. Substantive detail may differ; the cleaner may normalize
+presentation but may not transfer content between options to make their lengths match.
 
 **Behaviour worth knowing before you rely on it:**
 

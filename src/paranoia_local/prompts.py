@@ -130,6 +130,30 @@ For a plan, read the sections as: "What doesn't work" = premises the code contra
 - Quote the specific plan claim or step you are attacking. When the repo contradicts it, quote the file path and offending lines too.
 - Tag every finding with exactly one of: [FATAL] (kills the plan as written), [MAJOR] (must address before execution), [MINOR] (worth noting, not blocking), [OUT-OF-SCOPE] (real, but beyond the plan's stated stakes/intent — record it separately, do NOT grow the plan to fix it). Hardening or robustness beyond the stated STAKES is [OUT-OF-SCOPE], never [MAJOR]."""
 
+
+PLAN_PHASE_CLASS_INSTRUCTIONS = """## Plan-phase class semantics
+
+Judge whether the PLAN completely and correctly binds future implementation work; do not require
+the plan itself to contain artifacts that can exist only after implementation runs. An in-card
+implementation obligation is phase-satisfied only when the plan names its exact implementation
+scope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful
+metadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains
+violated.
+
+An otherwise blocking in-scope obligation deferred outside this card remains blocking unless the
+plan routes it to a named durable residual with an owner and acceptance boundary. This rule never
+promotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.
+
+Every new plan class must state a plan-reviewable invariant about the completeness or correctness of
+that contract, never an invariant satisfiable only by executing future code. If an inherited plan
+class itself demands produced implementation artifacts, replace it with a phase-correct invariant;
+do not recur solely because the future artifact does not exist, and do not claim implementation has
+passed. A later branch review independently judges the resulting code and tests."""
+
+
+PLAN_REVIEW_CORE_INSTRUCTIONS = PLAN_REVIEW_INSTRUCTIONS
+PLAN_REVIEW_INSTRUCTIONS += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+
 QUERY_INSTRUCTIONS = """You are Paranoia in QUERY mode: a fast, rigorous second opinion on a single question. This is NOT a full review — do NOT produce the five-section report.
 
 You are running as an autonomous agent with READ access to the repository (when one is provided). Answer the question by looking at the actual code, data, and git history — not from assumption. Open the specific files that bear on the question before answering.
@@ -157,7 +181,9 @@ CLEANER_INSTRUCTIONS = """You are a NEUTRALIZER. You are not deciding anything, 
 You MUST:
 - Strip advocacy, loaded adjectives, and rhetorical framing ("the obvious choice", "the clean way", "unfortunately").
 - Remove the requester's own recommendation and any attribution ("I think", "we prefer", "X suggested").
-- EQUALIZE the level of detail across options. A four-line option beside a six-word option is an argument regardless of wording. Bring them to the same altitude: same tense, same voice, same kind of specificity, comparable length.
+- Normalize tense, voice, labels, and rhetorical padding only when doing so preserves meaning.
+- Preserve substantive differences in option detail for the deciders. Never copy facts, constraints,
+  caveats, or qualifications from one option into another merely to make their lengths or detail match.
 - Reproduce the CONTEXT byte-for-byte. It is shared specification/data, not cleaner-owned prose.
 - Neutralize argumentative text in file-hint reasons, keeping the factual content.
 - Emit every option under EXACTLY the id it was given.
@@ -198,12 +224,15 @@ ATTEST_INSTRUCTIONS = """You are a TEXT AUDITOR. Another model has rewritten a d
 You are given, field by field, the ORIGINAL text and the CLEANED text. Judge three things:
 
 1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.
-2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option, through wording, emphasis, asymmetric detail, or what it leaves out? If so, say which option and quote the words that do it.
+2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option through loaded wording,
+recommendation, rhetorical emphasis, or selective persuasive padding? Unequal substantive detail is
+part of the caller-owned alternatives and is not advocacy by itself. If the presentation favours an
+option, say which one and quote the words that do it.
 3. ORIGINAL NEUTRALITY — independently judge whether the complete ORIGINAL decision,
 options, and hints (every path and reason) are neutral enough to show to both deciders without cleaning.
 If not, name one exact original field and quote an exact non-empty passage from it.
 
-Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is.
+Separately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision ("this is low-stakes so just pick the fast one")? Stating a real deployment boundary or shared specification is not advocacy; steering the answer is. A neutral factual statement that a prior decision exists and governs the current bytes is shared context, not advocacy. Praising that result, asserting it was correct, or directing the deciders to follow it is advocacy.
 
 Output EXACTLY these six lines, nothing before or after. The FIDELITY line must
 name EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —
@@ -328,18 +357,26 @@ def staged_census_instructions(mode: str, lane: str) -> str:
     instructions = STAGED_CENSUS_INSTRUCTIONS.replace("ANCHOR_POLICY", policy).replace(
         "LANE", lane,
     )
-    return (
+    instructions = (
         CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
         if mode == "branch" else instructions
+    )
+    return (
+        instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        if mode == "plan" else instructions
     )
 
 
 def staged_followup_instructions(mode: str) -> str:
     policy = PLAN_EVIDENCE_ANCHORS if mode == "plan" else BRANCH_EVIDENCE_ANCHORS
     instructions = STAGED_FOLLOWUP_INSTRUCTIONS.replace("ANCHOR_POLICY", policy)
-    return (
+    instructions = (
         CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
         if mode == "branch" else instructions
+    )
+    return (
+        instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        if mode == "plan" else instructions
     )
 
 
@@ -376,6 +413,14 @@ condition; closed needs current evidence. Do not invent debt or IDs. class_actio
 active class: use null when no independent action is needed, otherwise one lifecycle/severity
 decision. Closed mechanized violation requires replace with a corrected violation-only predicate;
 reopen applies only to unmechanized classes."""
+
+
+def staged_consolidation_instructions(mode: str) -> str:
+    if mode == "plan":
+        return STAGED_CONSOLIDATION_INSTRUCTIONS + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+    if mode == "branch":
+        return STAGED_CONSOLIDATION_INSTRUCTIONS
+    raise ValueError(f"invalid staged mode {mode!r}")
 
 
 STAGED_FOLLOWUP_INSTRUCTIONS = """Perform the staged structural role named in the task. Correction
@@ -498,6 +543,8 @@ CLASS: <restated invariant>        (optional)
 
 Rules: one field per line; SEVERITY here is the class's ONLY severity; an unknown class
 id is rejected; PATTERN and PATHSPEC are NOT accepted for a plan review."""
+
+PLAN_CLASS_REGISTER_INSTRUCTIONS += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
 
 
 def register_retry(reason: str) -> str:

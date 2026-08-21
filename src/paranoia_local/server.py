@@ -307,8 +307,9 @@ TOOLS: list[Tool] = [
             "whole-call deadline. "
             "SHAPE THE INPUT LIKE THIS: put only facts and specification shared by every "
             "option in `context`. Keep each option's distinct mechanism, scope, and "
-            "consequences in that option's own concise statement, using parallel structure "
-            "and comparable detail. Framing bounds are checked before anything is spent; fully "
+            "consequences in that option's own concise statement. Substantive detail may differ; "
+            "the cleaner may normalize presentation but never transfer content. Absolute framing "
+            "bounds are checked before anything is spent; fully "
             "composed cleaner/attester prompts are capped at 180,000 characters and initial or "
             "correction decider prompts at 240,000."
         ),
@@ -332,7 +333,7 @@ TOOLS: list[Tool] = [
                         "type": "object",
                         "properties": {
                             "id": {"type": "string", "description": "Stable id — the vocabulary of the record. Never shown to a decider."},
-                            "statement": {"type": "string", "maxLength": 1200, "description": "What this option is (max 1200 chars, and no option may be more than 2x the length of the shortest — asymmetric detail is an argument regardless of wording). Include this option's distinct mechanism, scope, and consequences concisely and in parallel with the others. Self-contained: never reference another option by id, since the two deciders see different orders."},
+                            "statement": {"type": "string", "maxLength": 1200, "description": "What this option is (max 1200 chars). Include this option's distinct mechanism, scope, and consequences. Substantive detail may differ from other options; presentation is normalized without transferring content. Self-contained: never reference another option by id, since the two deciders see different orders."},
                         },
                         "required": ["id", "statement"],
                     },

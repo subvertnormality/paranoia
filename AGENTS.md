@@ -185,6 +185,16 @@ Treat operational timeouts as generous circuit breakers, not review-quality budg
 shorten a normal thorough review to control cost; use bounded model-call counts, batches, packet
 sizes, and convergence phases to stop pathological work while allowing valid calls to finish.
 
+In plan review, judge whether an in-card implementation obligation is completely bound by named
+scope, executable acceptance evidence, and fail-closed behavior; never require the plan itself
+to produce future runtime artifacts. New plan classes must state plan-reviewable invariants. Replace
+an inherited class whose invariant demands implementation execution with a phase-correct invariant
+instead of recurring on the absent artifact or pretending implementation has passed. A routed
+out-of-card blocking obligation needs a named durable residual, owner, and acceptance boundary.
+Ownership never substitutes for in-card scope, and advisory, OUT-OF-SCOPE, stakes-excluded, and
+declared non-goal work is not promoted to blocking debt. Branch review remains the broad cold proof
+of the resulting code and tests.
+
 ## Claim-verification invariants
 
 - Verification is on by default for real plan reviews. Codex live search or Claude `WebSearch`
@@ -378,6 +388,11 @@ When the cross-vendor attester finds a cleaned semantic change or cleaner-introd
 the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
 never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and
 an advocating original packet must still be faithfully neutralized or fail.
+Cleaning may normalize presentation but must never copy facts, constraints, caveats, or
+qualifications between options merely to equalize length or detail. Preserve substantive asymmetry
+for the deciders. A neutral factual statement that a prior decision exists and governs the current
+bytes is context, not advocacy; endorsement of that result or an instruction to follow it remains
+advocacy.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid

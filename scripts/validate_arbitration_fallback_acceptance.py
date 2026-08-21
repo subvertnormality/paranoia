@@ -34,7 +34,7 @@ SOURCES = frozenset({
 SCOPE = {
     "proves": [
         "a reported destructive cleaner candidate was retained as rejected audit data",
-        "the current ordinary Claude cleaner completed the six-line attestation path with real deciders",
+        "the current ordinary Claude cleaner preserved substantive option asymmetry and neutral binding context through attestation with real deciders",
         "a signed-in Codex attester authorized the complete canonical originals",
         "both signed-in decider prompts contained the complete canonical originals and no substituted cleaned field",
         "the transient snapshot was the exact tree of the recorded durable source commit",

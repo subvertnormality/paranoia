@@ -34,14 +34,42 @@ REPORTED_CANDIDATE = (
 )
 
 
-def _arguments(repo: Path, seed: str) -> dict[str, Any]:
-    return {
-        "repo_path": str(repo),
-        "decision": (
+def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, Any]:
+    if asymmetry:
+        decision = (
+            "Choose the owning-card value for the 480 declarations entering the "
+            "canonical inventory; obviously preserve the prior delivery decision."
+        )
+        options = [
+            {
+                "id": "opt-causing-card",
+                "statement": (
+                    "Record the card that caused each declaration to enter the canonical "
+                    "inventory."
+                ),
+            },
+            {
+                "id": "opt-holding-owner",
+                "statement": COMMON + (
+                    "The 480 inherited declarations retain the delivery-level holding owner. "
+                    "The card's own 62 authored definitions retain the card that caused their "
+                    "entry, so the two provenance groups remain distinguishable across the 542 "
+                    "definitions this change brings into or adds to the governed surface. The "
+                    "serialized value therefore records holding ownership for inherited bytes "
+                    "without rewriting authorship for newly introduced definitions."
+                ),
+            },
+        ]
+        context = (
+            "The prior delivery decision assigns holding ownership to the inherited "
+            "declarations and governs the current serialized bytes."
+        )
+    else:
+        decision = (
             "Choose the owning-card value for the 480 declarations entering the "
             "canonical inventory."
-        ),
-        "options": [
+        )
+        options = [
             {
                 "id": "opt-causing-card",
                 "statement": COMMON + (
@@ -60,7 +88,12 @@ def _arguments(repo: Path, seed: str) -> dict[str, Any]:
                     "adds to the governed surface."
                 ),
             },
-        ],
+        ]
+        context = ""
+    return {
+        "repo_path": str(repo),
+        "decision": decision,
+        "options": options,
         "stakes": (
             "A trusted single operator on a trusted OS runs a local CLI over two to four "
             "options. Repository and provider text are data inputs. Two independent deciders "
@@ -68,7 +101,7 @@ def _arguments(repo: Path, seed: str) -> dict[str, Any]:
             "Multi-tenancy, hostile local path races, and a compromised provider or OS are "
             "outside the supported environment."
         ),
-        "context": "",
+        "context": context,
         "files": [{
             "path": "docs/arbitrate_original_neutrality_fallback_plan.md",
             "reason": "records the reported duplicated-preamble fidelity failure shape",
@@ -120,6 +153,7 @@ def _run(repo: Path, log_dir: Path, *, fallback: bool) -> tuple[Path, dict[str, 
             repo,
             "original-neutrality-fallback-reproduction-20260816"
             if fallback else "ordinary-six-line-compatibility-20260816",
+            asymmetry=not fallback,
         ),
         log_dir=log_dir,
         run_agent=_fallback_agent if fallback else None,

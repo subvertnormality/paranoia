@@ -21,6 +21,17 @@ def test_checked_in_original_fallback_acceptance_is_valid():
     validator.validate(ARTIFACT, ROOT)
 
 
+def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
+    arguments = runner._arguments(ROOT, "seed", asymmetry=True)
+    lengths = [len(row["statement"]) for row in arguments["options"]]
+    assert max(lengths) / min(lengths) > 2
+    assert "obviously" in arguments["decision"]
+    assert arguments["context"] == (
+        "The prior delivery decision assigns holding ownership to the inherited "
+        "declarations and governs the current serialized bytes."
+    )
+
+
 @pytest.mark.parametrize(
     ("fallback", "outcome", "cleaning"),
     [
