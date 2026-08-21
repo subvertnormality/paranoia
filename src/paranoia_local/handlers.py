@@ -36,8 +36,10 @@ from .worktree import worktree_at
 
 Clock = Callable[[], str]
 
-PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 600
-PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 6000
+PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
+PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC = 300
+PLAN_EVIDENCE_SCHEDULING_SLACK_SEC = 60
+PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 6960
 PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 7080
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
@@ -48,11 +50,18 @@ STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
 STAGED_FORMAT_RETRY_TIMEOUT_SEC = 600
 STAGED_CENSUS_RESERVE_SEC = 4320
 STAGED_FOLLOWUP_RESERVE_SEC = 3120
-MAX_PLAN_EVIDENCE_MODEL_CALLS = 9
+MAX_PLAN_EVIDENCE_MODEL_CALLS = 22
 PLAN_BINDING_MARKER = "=== PLAN EVIDENCE BINDING JSON ==="
 MAX_PLAN_BINDING_BATCH_CHARS = 400_000
+MAX_PLAN_EXPANDED_PROMPT_CHARS = 685_000
+MAX_BINDING_DIAGNOSTIC_CHARS = 2_000
+MAX_BINDING_LOCATION_CHARS = 1_000
+MAX_BINDING_PASSAGE_CHARS = 8_000
+MAX_ATTESTATION_REPLY_CHARS = 500_000
+MAX_ATTESTATION_REASON_CHARS = 1_000
 MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
+MAX_PLAN_ATTESTATION_BATCHES = 5
 
 
 class _OmittedBinding:
@@ -1903,6 +1912,7 @@ class _CapturedClaimEngine:
         frozen_ids: frozenset[str] = frozenset(),
         deadline: float | None = None,
         attempt_ledger: list[dict[str, Any]] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.engine = engine
         self.plan_text = plan_text
@@ -1912,14 +1922,17 @@ class _CapturedClaimEngine:
         self.frozen_ids = frozen_ids
         self.deadline = deadline
         self.attempt_ledger = attempt_ledger
+        self.clock = clock
         self.model_calls = 0
         self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
         self.binding_engine: Engine | None = None
+        self.expanded_captures: set[tuple[int, int]] = set()
         self.last_session: str | None = None
         self.discovery: pc.Audit | None = None
         self.allow_missing = False
         self.captures: dict[tuple[int, int], external_sources.Capture] = {}
         self.attestation_raw = ""
+        self.non_model_deadline: float | None = None
 
     def close(self) -> None:
         shutil.rmtree(self.launch, ignore_errors=True)
@@ -1933,7 +1946,8 @@ class _CapturedClaimEngine:
     ) -> Review:
         discovery_kwargs = dict(kwargs)
         try:
-            discovery_kwargs["timeout"] = self._next_model_timeout()
+            self._admit_complete_graph()
+            discovery_kwargs["timeout"] = self._next_model_timeout(reserve_calls=2)
         except pc.AuditError as error:
             return self._deadline_failure(error)
         discoverer = self.engine.for_role(eng.ROLE_DISCOVERY)
@@ -1947,6 +1961,7 @@ class _CapturedClaimEngine:
         try:
             discovery = self._parse_discovery(first.text)
         except pc.AuditError as error:
+            self._mark_last_validation_invalid(str(error), first, "/claims")
             try:
                 discovery_kwargs["timeout"] = self._next_model_timeout()
             except pc.AuditError as deadline_error:
@@ -1959,13 +1974,18 @@ class _CapturedClaimEngine:
                 ),
                 self.launch, model, effort, True, **discovery_kwargs,
             )
-            self._record("claim-discovery-retry", discoverer, corrected)
+            self._record(
+                "claim-discovery-validation-retry", discoverer, corrected,
+            )
             raw_parts.append(corrected.raw)
             if corrected.error or not corrected.session_ref:
                 return corrected
             try:
                 discovery = self._parse_discovery(corrected.text)
             except pc.AuditError as second:
+                self._mark_last_validation_invalid(
+                    str(second), corrected, "/claims",
+                )
                 # The discovery role has spent its one correction. If the corrected
                 # document is otherwise valid and only retained coverage is incomplete,
                 # preserve its useful packets and let reconciliation carry each omission
@@ -1998,6 +2018,9 @@ class _CapturedClaimEngine:
             session_ref = first.session_ref
 
         try:
+            self.non_model_deadline = self.clock() + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+            if self.deadline is not None:
+                self.non_model_deadline = min(self.non_model_deadline, self.deadline)
             captures = self._capture(discovery)
             self.discovery = discovery
             self.captures = captures
@@ -2030,24 +2053,57 @@ class _CapturedClaimEngine:
             duration_ms=last_binding.duration_ms,
         )
 
-    def _next_model_timeout(self) -> int:
-        if self.model_calls >= MAX_PLAN_EVIDENCE_MODEL_CALLS:
+    def _next_model_timeout(self, *, reserve_calls: int = 1) -> int:
+        if self.model_calls + reserve_calls > MAX_PLAN_EVIDENCE_MODEL_CALLS:
             raise pc.AuditError(
-                f"plan evidence model-call ceiling is {MAX_PLAN_EVIDENCE_MODEL_CALLS}"
+                "plan evidence model-call ceiling cannot admit the initial call and its "
+                f"reserved correction ({self.model_calls}+{reserve_calls} > "
+                f"{MAX_PLAN_EVIDENCE_MODEL_CALLS})"
             )
         if self.deadline is not None and (
-            time.monotonic() + PLAN_EVIDENCE_PHASE_TIMEOUT_SEC > self.deadline
+            self.clock() + PLAN_EVIDENCE_PHASE_TIMEOUT_SEC * reserve_calls
+            > self.deadline
         ):
             raise pc.AuditError(
-                "plan evidence deadline leaves insufficient time for another bounded "
-                f"{PLAN_EVIDENCE_PHASE_TIMEOUT_SEC}-second model call"
+                "plan evidence deadline leaves insufficient time for the initial call and "
+                f"its {reserve_calls - 1} reserved correction call(s)"
             )
         self.model_calls += 1
         return PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
 
+    def _admit_complete_graph(self) -> None:
+        required = (
+            MAX_PLAN_EVIDENCE_MODEL_CALLS * PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+        )
+        if self.deadline is not None and self.clock() + required > self.deadline:
+            raise pc.AuditError(
+                "plan evidence deadline cannot admit the complete maximum model-call "
+                f"graph plus {PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC} seconds of capture "
+                "and bounded local processing"
+            )
+
     def _record(self, role: str, engine: Engine, review: Review) -> None:
         if self.attempt_ledger is not None:
             self.attempt_ledger.append(_attempt(role, engine, review).json())
+
+    def _mark_last_validation_invalid(
+        self, issue: str, review: Review, pointer: str,
+    ) -> None:
+        if self.attempt_ledger:
+            row = self.attempt_ledger[-1]
+            row["outcome"] = "validation-invalid"
+            row["validation_issue"] = rc.bounded_diagnostic(
+                issue, sp.MAX_ISSUE_CHARS,
+            )
+            row["validation_pointer"] = pointer
+            row.update(_review_failure_projection(review))
+            row["rejected_reply_sha256"] = hashlib.sha256(
+                review.text.encode("utf-8", "surrogatepass")
+            ).hexdigest()
+            row["rejected_reply_excerpt"] = rc.bounded_diagnostic(
+                review.text, rc.MAX_REJECTED_PAYLOAD_CHARS,
+            )
 
     @staticmethod
     def _deadline_failure(
@@ -2125,9 +2181,141 @@ class _CapturedClaimEngine:
                 f"{MAX_PLAN_CAPTURE_SOURCES}"
             )
         captured = external_sources.capture_all(
-            candidates, workers=16, deadline=self.deadline,
+            candidates, workers=16, deadline=self.non_model_deadline,
+            clock=self.clock,
         )
+        self._check_non_model_deadline()
         return dict(zip(keys, captured, strict=True))
+
+    def _check_non_model_deadline(self) -> None:
+        if self.non_model_deadline is not None and self.clock() > self.non_model_deadline:
+            raise pc.AuditError(
+                "plan evidence capture and pre-binding processing exceeded its aggregate "
+                f"{PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC}-second reserve"
+            )
+
+    @staticmethod
+    def _binding_prompt(rendered: str, issue: str | None = None) -> str:
+        if issue is None:
+            lead = (
+                "Bind every indexed candidate below using only its server capture. Return "
+                "exactly one row per (claim_index,evidence_index); preserve both indices. "
+                "A capture_ref points to an earlier row in this batch with identical final "
+                "URL and content/text digests; use that earlier row's line-numbered text. "
+                "Use binding_target as the exact proposition to bind. Copy a precise "
+                "location and exact passage only when usable, otherwise use nulls. Do not "
+                "return claims or source metadata.\n\n"
+                f"{PLAN_BINDING_MARKER}\n"
+                '{"bindings":[{"claim_index":0,"evidence_index":0,"usable":true,'
+                '"location":"section/table/page","passage":"exact captured passage"}]}\n\n'
+            )
+        else:
+            lead = (
+                f"Your indexed binding was rejected: {issue}. Return one corrected "
+                f"{PLAN_BINDING_MARKER} object for exactly this batch. If a passage did "
+                "not match, copy it character-for-character from line_numbered_text "
+                "without line numbers, ellipses, normalization, or paraphrase.\n\n"
+            )
+        return lead + rendered
+
+    @classmethod
+    def _binding_prompts_fit(cls, rows: list[dict[str, Any]], limit: int) -> bool:
+        rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+        issue = "x" * MAX_BINDING_DIAGNOSTIC_CHARS
+        return max(
+            len(cls._binding_prompt(rendered)),
+            len(cls._binding_prompt(rendered, issue)),
+        ) <= limit
+
+    @staticmethod
+    def _binding_target(claim: dict[str, Any], item: dict[str, Any]) -> str:
+        if item["relation"] == "supports_replacement":
+            return str(claim.get("replacement") or "")
+        return str(claim["proposition"])
+
+    @staticmethod
+    def _attestation_prompt(items: list[dict[str, Any]]) -> str:
+        return (
+            "You are a cold evidence attester with no web or repository tools. Independently "
+            "judge only whether each named publisher governs the exact proposition and whether "
+            "the exact passage entails the declared relation in the supplied captured context. "
+            "Return only:\n=== EVIDENCE ATTESTATION JSON ===\n"
+            '{"attestations":[{"claim_index":0,"evidence_index":0,'
+            '"publisher_authority":true,"authority_reason":"specific reason",'
+            '"passage_entailment":true,"entailment_reason":"specific reason"}]}\n\n'
+            + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    @staticmethod
+    def _attestation_correction_prompt(rendered: str, issue: str) -> str:
+        return (
+            f"Your cold evidence attestation was rejected: {issue}. Return one corrected "
+            "=== EVIDENCE ATTESTATION JSON === object for exactly this packet.\n\n"
+            + rendered
+        )
+
+    @classmethod
+    def _attestation_prompts_fit(
+        cls, items: list[dict[str, Any]], limit: int,
+    ) -> bool:
+        rendered = json.dumps(items, ensure_ascii=False, separators=(",", ":"))
+        return max(
+            len(cls._attestation_prompt(items)),
+            len(cls._attestation_correction_prompt(
+                rendered, "x" * MAX_BINDING_DIAGNOSTIC_CHARS,
+            )),
+        ) <= limit
+
+    def _expanded_source_fits(
+        self, row: dict[str, Any], claim: dict[str, Any], item: dict[str, Any],
+        capture: external_sources.Capture,
+    ) -> bool:
+        if not self._binding_prompts_fit([row], MAX_PLAN_EXPANDED_PROMPT_CHARS):
+            return False
+        worst = "\x01"
+        attestation = {
+            "claim_index": row["claim_index"],
+            "evidence_index": row["evidence_index"],
+            "proposition": self._binding_target(claim, item),
+            "publisher": item["publisher"],
+            "authority_basis": item["authority_basis"],
+            "relation": item["relation"],
+            "location": worst * MAX_BINDING_LOCATION_CHARS,
+            "passage": worst * MAX_BINDING_PASSAGE_CHARS,
+            "capture": {
+                "final_url": capture.final_url,
+                "status": capture.status,
+                "content_type": capture.content_type,
+                "content_sha256": capture.content_sha256,
+                "text_sha256": capture.text_sha256,
+                "complete_line_numbered_text": external_sources.numbered_text(
+                    capture.text or ""
+                ),
+            },
+        }
+        return self._attestation_prompts_fit(
+            [attestation], MAX_PLAN_EXPANDED_PROMPT_CHARS,
+        )
+
+    def _expanded_source_allowed(
+        self, row: dict[str, Any], claim: dict[str, Any], item: dict[str, Any],
+        capture: external_sources.Capture,
+    ) -> bool:
+        effective = replace(
+            capture.candidate,
+            url=capture.final_url or capture.candidate.url,
+        )
+        plan_self = bool(
+            self.plan_repo_path
+            and pc._is_plan_self_url(
+                effective.url, self.repo, self.plan_repo_path,
+            )
+        )
+        return (
+            external_sources.structurally_governing(effective)
+            and not plan_self
+            and self._expanded_source_fits(row, claim, item, capture)
+        )
 
     def _binding_batches(
         self, discovery: pc.Audit,
@@ -2135,21 +2323,23 @@ class _CapturedClaimEngine:
     ) -> list[list[dict[str, Any]]]:
         batches: list[list[dict[str, Any]]] = []
         current: list[dict[str, Any]] = []
-        current_chars = 2
         seen_captures: dict[
             tuple[str | None, str | None, str | None], tuple[int, int]
         ] = {}
         for (claim_index, evidence_index), capture in captures.items():
+            if not capture.usable:
+                continue
             claim = discovery.claims[claim_index]
             item = claim["evidence"][evidence_index]
             identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
-            referenceable = capture.usable and all(identity)
+            referenceable = all(identity)
 
             def make_row(capture_ref: tuple[int, int] | None) -> dict[str, Any]:
                 return {
                     "claim_index": claim_index,
                     "evidence_index": evidence_index,
                     "proposition": claim["proposition"],
+                    "binding_target": self._binding_target(claim, item),
                     "candidate": {
                         key: item[key] for key in (
                             "url", "title", "publisher", "source_kind",
@@ -2180,47 +2370,42 @@ class _CapturedClaimEngine:
 
             capture_ref = seen_captures.get(identity) if referenceable else None
             row = make_row(capture_ref)
-            row_chars = len(json.dumps(row, ensure_ascii=False, separators=(",", ":"))) + 1
-            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
-                capture = replace(
-                    capture, text=None,
-                    error=external_sources.BINDING_BUDGET_ERROR,
-                )
-                captures[(claim_index, evidence_index)] = capture
-                referenceable = False
-                capture_ref = None
-                row = make_row(None)
-                row_chars = len(
-                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
-                ) + 1
-            if current and current_chars + row_chars > MAX_PLAN_BINDING_BATCH_CHARS:
+            if current and not self._binding_prompts_fit(
+                current + [row], MAX_PLAN_BINDING_BATCH_CHARS,
+            ):
+                standalone = make_row(None)
+                if (
+                    not self._binding_prompts_fit(
+                        [standalone], MAX_PLAN_BINDING_BATCH_CHARS,
+                    )
+                    and not self._expanded_source_allowed(
+                        standalone, claim, item, capture,
+                    )
+                ):
+                    captures[(claim_index, evidence_index)] = replace(
+                        capture, text=None,
+                        error=external_sources.BINDING_BUDGET_ERROR,
+                    )
+                    continue
                 batches.append(current)
                 current = []
-                current_chars = 2
                 seen_captures = {}
                 capture_ref = None
-                row = make_row(capture_ref)
-                row_chars = len(
-                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
-                ) + 1
-            if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
+                row = standalone
+            if not self._binding_prompts_fit([row], MAX_PLAN_BINDING_BATCH_CHARS):
+                if self._expanded_source_allowed(row, claim, item, capture):
+                    batches.append([row])
+                    self.expanded_captures.add((claim_index, evidence_index))
+                    current = []
+                    seen_captures = {}
+                    continue
                 capture = replace(
                     capture, text=None,
                     error=external_sources.BINDING_BUDGET_ERROR,
                 )
                 captures[(claim_index, evidence_index)] = capture
-                referenceable = False
-                capture_ref = None
-                row = make_row(None)
-                row_chars = len(
-                    json.dumps(row, ensure_ascii=False, separators=(",", ":"))
-                ) + 1
-                if row_chars + 2 > MAX_PLAN_BINDING_BATCH_CHARS:
-                    raise pc.AuditError(
-                        "one capture's non-text metadata exceeds the plan binding batch budget"
-                    )
+                continue
             current.append(row)
-            current_chars += row_chars
             if referenceable and capture_ref is None:
                 seen_captures[identity] = (claim_index, evidence_index)
         if current:
@@ -2244,22 +2429,26 @@ class _CapturedClaimEngine:
         ] = {}
         reviews: list[Review] = []
         current_session = session_ref
-        for batch in self._binding_batches(discovery, captures):
+        batches = self._binding_batches(discovery, captures)
+        self._check_non_model_deadline()
+        self.non_model_deadline = None
+        decisions.update({key: None for key, capture in captures.items() if not capture.usable})
+        for batch in batches:
             rendered = json.dumps(batch, ensure_ascii=False, separators=(",", ":"))
-            instruction = (
-                "Bind every indexed candidate below using only its server capture. Return "
-                "exactly one row per (claim_index,evidence_index); preserve both indices. "
-                "A capture_ref points to an earlier row in this batch with identical final "
-                "URL and content/text digests; use that earlier row's line-numbered text. "
-                "Copy a precise location and exact passage only when usable, otherwise use "
-                "nulls. Do not return claims or source metadata.\n\n"
-                f"{PLAN_BINDING_MARKER}\n"
-                '{"bindings":[{"claim_index":0,"evidence_index":0,"usable":true,'
-                '"location":"section/table/page","passage":"exact captured passage"}]}\n\n'
-                + rendered
-            )
+            instruction = self._binding_prompt(rendered)
+            only_key = (batch[0]["claim_index"], batch[0]["evidence_index"])
+            expanded = len(batch) == 1 and only_key in self.expanded_captures
+
+            def source_local_failure(detail: str) -> None:
+                capture = captures[only_key]
+                captures[only_key] = replace(
+                    capture, text=None,
+                    error=pc.bounded_diagnostic(detail),
+                )
+                decisions[only_key] = None
+
             call_kwargs = dict(binding_kwargs)
-            call_kwargs["timeout"] = self._next_model_timeout()
+            call_kwargs["timeout"] = self._next_model_timeout(reserve_calls=2)
             review = self.binding_engine.resume(
                 current_session, instruction, self.launch, model, effort, False,
                 **call_kwargs,
@@ -2267,6 +2456,12 @@ class _CapturedClaimEngine:
             self._record("claim-binding", self.binding_engine, review)
             reviews.append(review)
             if review.error or not review.session_ref:
+                if expanded:
+                    source_local_failure(
+                        review.failure_detail or review.stderr or
+                        "dedicated expanded binding call failed"
+                    )
+                    continue
                 raise pc.AuditError(
                     "captured-text binding call failed", review.raw,
                     failure_detail=review.failure_detail or "", stderr=review.stderr or "",
@@ -2275,23 +2470,43 @@ class _CapturedClaimEngine:
             try:
                 parsed = self._parse_indexed_binding(review.text, batch, captures)
             except pc.AuditError as first:
+                self._mark_last_validation_invalid(str(first), review, "/bindings")
                 call_kwargs["timeout"] = self._next_model_timeout()
+                issue = pc.bounded_diagnostic(str(first))[:MAX_BINDING_DIAGNOSTIC_CHARS]
                 correction = self.binding_engine.resume(
                     review.session_ref,
-                    f"Your indexed binding was rejected: {first}. Return one corrected "
-                    f"{PLAN_BINDING_MARKER} object for exactly this batch.\n\n{rendered}",
+                    self._binding_prompt(rendered, issue),
                     self.launch, model, effort, False, **call_kwargs,
                 )
-                self._record("claim-binding-retry", self.binding_engine, correction)
+                self._record(
+                    "claim-binding-validation-retry", self.binding_engine, correction,
+                )
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
+                    if expanded:
+                        source_local_failure(
+                            correction.failure_detail or correction.stderr or
+                            "dedicated expanded binding correction failed"
+                        )
+                        continue
                     raise pc.AuditError(
                         "captured-text binding correction failed", correction.raw,
                         failure_detail=correction.failure_detail or "",
                         stderr=correction.stderr or "",
                         returncode=correction.returncode,
                     )
-                parsed = self._parse_indexed_binding(correction.text, batch, captures)
+                try:
+                    parsed = self._parse_indexed_binding(
+                        correction.text, batch, captures,
+                    )
+                except pc.AuditError as second:
+                    self._mark_last_validation_invalid(
+                        str(second), correction, "/bindings",
+                    )
+                    if expanded:
+                        source_local_failure(str(second))
+                        continue
+                    raise
                 review = correction
             decisions.update(parsed)
             current_session = review.session_ref
@@ -2299,9 +2514,25 @@ class _CapturedClaimEngine:
         claims = [deepcopy(claim) for claim in discovery.claims]
         for claim_index, claim in enumerate(claims):
             claim["capture_attestations"] = []
+            claim["capture_provenance"] = []
             for evidence_index, item in enumerate(claim["evidence"]):
                 capture = captures[(claim_index, evidence_index)]
+                requested_url = item["url"]
                 item["url"] = capture.final_url or item["url"]
+                claim["capture_provenance"].append({
+                    "evidence_index": evidence_index,
+                    "requested_url": requested_url,
+                    "final_url": capture.final_url,
+                    "status": capture.status,
+                    "content_type": capture.content_type,
+                    "fallback_attempted": capture.fallback_attempted,
+                    "content_sha256": capture.content_sha256,
+                    "text_sha256": capture.text_sha256,
+                    "error": (
+                        external_sources._bounded_error(capture.error)
+                        if capture.error else None
+                    ),
+                })
                 binding = decisions[(claim_index, evidence_index)]
                 if binding is _OMITTED_BINDING:
                     item["relation"] = "context"
@@ -2326,7 +2557,7 @@ class _CapturedClaimEngine:
         )
         audit = pc.parse_audit(
             _render_audit(combined), self.plan_text, repo=self.repo,
-            plan_repo_path=self.plan_repo_path,
+            plan_repo_path=self.plan_repo_path, require_capture_provenance=True,
         )
         return audit, reviews
 
@@ -2373,6 +2604,14 @@ class _CapturedClaimEngine:
                 passage = pc._one_line(row["passage"], "binding.passage")
             except ValueError as exc:
                 raise pc.AuditError(str(exc), text) from exc
+            if len(location) > MAX_BINDING_LOCATION_CHARS:
+                raise pc.AuditError(
+                    f"binding.location exceeds {MAX_BINDING_LOCATION_CHARS} characters", text,
+                )
+            if len(passage) > MAX_BINDING_PASSAGE_CHARS:
+                raise pc.AuditError(
+                    f"binding.passage exceeds {MAX_BINDING_PASSAGE_CHARS} characters", text,
+                )
             if not external_sources.passage_matches(passage, capture.text):
                 raise pc.AuditError("indexed binding passage is not in captured text", text)
             result[key] = (location, passage)
@@ -2422,6 +2661,7 @@ class _CapturedClaimEngine:
 
     def _attest(self, audit: pc.Audit, model: str, effort: str) -> pc.Audit | Review:
         items: list[dict[str, Any]] = []
+        local_failures: dict[tuple[int, int], str] = {}
         for claim_index, claim in enumerate(audit.claims):
             for evidence_index, item in enumerate(claim["evidence"]):
                 if item["source_kind"] not in pc.AUTHORITATIVE_KINDS:
@@ -2436,6 +2676,17 @@ class _CapturedClaimEngine:
                     if item["relation"] == "supports_replacement"
                     else claim["proposition"]
                 )
+                capture_data: dict[str, Any] = {
+                    "final_url": capture.final_url if capture else None,
+                    "status": capture.status if capture else None,
+                    "content_type": capture.content_type if capture else None,
+                    "content_sha256": capture.content_sha256 if capture else None,
+                    "text_sha256": capture.text_sha256 if capture else None,
+                }
+                if (claim_index, evidence_index) in self.expanded_captures and capture:
+                    capture_data["complete_line_numbered_text"] = (
+                        external_sources.numbered_text(capture.text or "")
+                    )
                 items.append({
                     "claim_index": claim_index,
                     "evidence_index": evidence_index,
@@ -2445,48 +2696,71 @@ class _CapturedClaimEngine:
                     "relation": item["relation"],
                     "location": item["location"],
                     "passage": item["quote"],
-                    "capture": {
-                        "final_url": capture.final_url if capture else None,
-                        "status": capture.status if capture else None,
-                        "content_type": capture.content_type if capture else None,
-                        "content_sha256": capture.content_sha256 if capture else None,
-                        "text_sha256": capture.text_sha256 if capture else None,
-                    },
+                    "capture": capture_data,
                 })
-        if not items:
-            return audit
-        prompt = (
-            "You are a cold evidence attester with no web or repository tools. Independently "
-            "judge only whether each named publisher governs the exact proposition and whether "
-            "the exact passage entails the declared relation. Return only:\n"
-            "=== EVIDENCE ATTESTATION JSON ===\n"
-            '{"attestations":[{"claim_index":0,"evidence_index":0,'
-            '"publisher_authority":true,"authority_reason":"specific reason",'
-            '"passage_entailment":true,"entailment_reason":"specific reason"}]}\n\n'
-            + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
-        )
         attester = self.engine.for_role(eng.ROLE_TEXT)
-        try:
-            timeout = self._next_model_timeout()
-        except pc.AuditError as error:
-            return self._deadline_failure(error)
-        review = attester.run(
-            prompt, self.launch, model, effort, False, timeout=timeout,
-        )
-        self._record("claim-attestation", attester, review)
-        self.attestation_raw = review.raw
-        if review.error:
-            return review
-        try:
+        ordinary_items = [
+            row for row in items
+            if (row["claim_index"], row["evidence_index"]) not in self.expanded_captures
+        ]
+        ordinary: list[list[dict[str, Any]]] = []
+        current: list[dict[str, Any]] = []
+        for row in ordinary_items:
+            if current and not self._attestation_prompts_fit(
+                current + [row], MAX_PLAN_BINDING_BATCH_CHARS,
+            ):
+                ordinary.append(current)
+                current = []
+            if not self._attestation_prompts_fit(
+                [row], MAX_PLAN_BINDING_BATCH_CHARS,
+            ):
+                local_failures[(row["claim_index"], row["evidence_index"])] = (
+                    "one ordinary attestation item exceeds the exact prompt bound"
+                )
+                continue
+            current.append(row)
+        if current:
+            ordinary.append(current)
+        expanded = [
+            [row] for row in items
+            if (row["claim_index"], row["evidence_index"]) in self.expanded_captures
+        ]
+        attestation_batches = ordinary + expanded
+        if len(attestation_batches) > MAX_PLAN_ATTESTATION_BATCHES:
+            return Review(
+                text=(
+                    "[paranoia-local error] evidence attestation requires "
+                    f"{len(attestation_batches)} batches; aggregate ceiling is "
+                    f"{MAX_PLAN_ATTESTATION_BATCHES}"
+                ),
+                session_ref=None,
+                raw="",
+                returncode=1,
+                error=True,
+            )
+        decisions: dict[tuple[int, int], dict[str, Any]] = {}
+        attestation_raw: list[str] = []
+
+        def parse_attestation(
+            review: Review, attestation_batch: list[dict[str, Any]],
+        ) -> dict[tuple[int, int], dict[str, Any]]:
+            if len(review.text) > MAX_ATTESTATION_REPLY_CHARS:
+                raise ValueError(
+                    "attestation reply exceeds "
+                    f"{MAX_ATTESTATION_REPLY_CHARS} characters"
+                )
             tail = review.text.split("=== EVIDENCE ATTESTATION JSON ===", 1)[1].strip()
             value, end = json.JSONDecoder().raw_decode(tail)
             if tail[end:].strip() or set(value) != {"attestations"}:
                 raise ValueError("invalid attestation envelope")
             rows = value["attestations"]
-            if not isinstance(rows, list) or len(rows) != len(items):
+            if not isinstance(rows, list) or len(rows) != len(attestation_batch):
                 raise ValueError("attestation inventory differs from the requested inventory")
-            expected = {(row["claim_index"], row["evidence_index"]) for row in items}
-            decisions: dict[tuple[int, int], dict[str, Any]] = {}
+            expected = {
+                (row["claim_index"], row["evidence_index"])
+                for row in attestation_batch
+            }
+            parsed: dict[tuple[int, int], dict[str, Any]] = {}
             for row in rows:
                 if not isinstance(row, dict) or set(row) != {
                     "claim_index", "evidence_index", "publisher_authority",
@@ -2498,7 +2772,7 @@ class _CapturedClaimEngine:
                 ) is not int:
                     raise ValueError("attestation row indices must be integers")
                 key = (row["claim_index"], row["evidence_index"])
-                if key not in expected or key in decisions:
+                if key not in expected or key in parsed or key in decisions:
                     raise ValueError("unknown or duplicate attestation row")
                 if type(row["publisher_authority"]) is not bool or type(
                     row["passage_entailment"]
@@ -2510,30 +2784,189 @@ class _CapturedClaimEngine:
                     "entailment_reason"
                 ].strip():
                     raise ValueError("attestation reasons must be non-empty strings")
-                decisions[key] = row
-        except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-            return Review(
-                text=f"[paranoia-local error] evidence attestation invalid: {exc}",
-                session_ref=review.session_ref, raw=review.raw, error=True,
+                if len(row["authority_reason"]) > MAX_ATTESTATION_REASON_CHARS or len(
+                    row["entailment_reason"]
+                ) > MAX_ATTESTATION_REASON_CHARS:
+                    raise ValueError(
+                        "attestation reason exceeds "
+                        f"{MAX_ATTESTATION_REASON_CHARS} characters"
+                    )
+                parsed[key] = row
+            return parsed
+
+        for attestation_batch in attestation_batches:
+            prompt = self._attestation_prompt(attestation_batch)
+            limit = (
+                MAX_PLAN_EXPANDED_PROMPT_CHARS
+                if len(attestation_batch) == 1 and (
+                    attestation_batch[0]["claim_index"],
+                    attestation_batch[0]["evidence_index"],
+                ) in self.expanded_captures
+                else MAX_PLAN_BINDING_BATCH_CHARS
             )
+            if not self._attestation_prompts_fit(attestation_batch, limit):
+                for row in attestation_batch:
+                    local_failures[(row["claim_index"], row["evidence_index"])] = (
+                        "evidence attestation prompt or correction exceeds its "
+                        f"{limit}-character bound"
+                    )
+                continue
+            try:
+                timeout = self._next_model_timeout(reserve_calls=2)
+            except pc.AuditError as error:
+                return self._deadline_failure(error, raw_parts=attestation_raw)
+            review = attester.run(
+                prompt, self.launch, model, effort, False, timeout=timeout,
+            )
+            self._record("claim-attestation", attester, review)
+            attestation_raw.append(review.raw)
+            if review.error:
+                if len(attestation_batch) == 1 and (
+                    attestation_batch[0]["claim_index"],
+                    attestation_batch[0]["evidence_index"],
+                ) in self.expanded_captures:
+                    key = (
+                        attestation_batch[0]["claim_index"],
+                        attestation_batch[0]["evidence_index"],
+                    )
+                    local_failures[key] = pc.bounded_diagnostic(
+                        review.failure_detail or review.stderr or review.text
+                        or "dedicated expanded attestation call failed"
+                    )
+                    continue
+                return review
+            try:
+                parsed = parse_attestation(review, attestation_batch)
+            except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+                self._mark_last_validation_invalid(
+                    str(exc), review, "/attestations",
+                )
+                issue = pc.bounded_diagnostic(str(exc))[:MAX_BINDING_DIAGNOSTIC_CHARS]
+                if not review.session_ref:
+                    if len(attestation_batch) == 1 and (
+                        attestation_batch[0]["claim_index"],
+                        attestation_batch[0]["evidence_index"],
+                    ) in self.expanded_captures:
+                        key = (
+                            attestation_batch[0]["claim_index"],
+                            attestation_batch[0]["evidence_index"],
+                        )
+                        local_failures[key] = pc.bounded_diagnostic(str(exc))
+                        continue
+                    return Review(
+                        text="[paranoia-local error] evidence attestation invalid and "
+                        f"cannot be corrected without a provider session: {exc}",
+                        raw=review.raw, error=True,
+                    )
+                rendered = json.dumps(
+                    attestation_batch, ensure_ascii=False, separators=(",", ":"),
+                )
+                try:
+                    timeout = self._next_model_timeout()
+                except pc.AuditError as error:
+                    return self._deadline_failure(error, raw_parts=attestation_raw)
+                correction = attester.resume(
+                    review.session_ref,
+                    self._attestation_correction_prompt(rendered, issue),
+                    self.launch, model, effort, False, timeout=timeout,
+                )
+                self._record("claim-attestation-validation-retry", attester, correction)
+                attestation_raw.append(correction.raw)
+                if correction.error:
+                    if len(attestation_batch) == 1 and (
+                        attestation_batch[0]["claim_index"],
+                        attestation_batch[0]["evidence_index"],
+                    ) in self.expanded_captures:
+                        key = (
+                            attestation_batch[0]["claim_index"],
+                            attestation_batch[0]["evidence_index"],
+                        )
+                        local_failures[key] = pc.bounded_diagnostic(
+                            correction.failure_detail or correction.stderr
+                            or correction.text
+                            or "dedicated expanded attestation correction failed"
+                        )
+                        continue
+                    return correction
+                try:
+                    parsed = parse_attestation(correction, attestation_batch)
+                except (
+                    ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError,
+                ) as second:
+                    self._mark_last_validation_invalid(
+                        str(second), correction, "/attestations",
+                    )
+                    if len(attestation_batch) == 1 and (
+                        attestation_batch[0]["claim_index"],
+                        attestation_batch[0]["evidence_index"],
+                    ) in self.expanded_captures:
+                        key = (
+                            attestation_batch[0]["claim_index"],
+                            attestation_batch[0]["evidence_index"],
+                        )
+                        local_failures[key] = pc.bounded_diagnostic(str(second))
+                        continue
+                    return Review(
+                        text=f"[paranoia-local error] evidence attestation invalid: {second}",
+                        session_ref=correction.session_ref, raw=correction.raw, error=True,
+                    )
+            decisions.update(parsed)
+        self.attestation_raw = "\n--- attestation ---\n".join(attestation_raw)
+        try:
+            if len(decisions) + len(local_failures) != len(items):
+                raise ValueError("attestation inventory differs from the requested inventory")
+        except ValueError as exc:
+            return Review(text=f"[paranoia-local error] {exc}", error=True)
         claims = [dict(claim) for claim in audit.claims]
         for index, claim in enumerate(claims):
             claim["capture_attestations"] = []
             for evidence_index, item in enumerate(claim["evidence"]):
                 row = decisions.get((index, evidence_index))
+                local_failure = local_failures.get((index, evidence_index))
+                bounded_local_failure = (
+                    rc.bounded_diagnostic(
+                        local_failure, MAX_ATTESTATION_REASON_CHARS,
+                    )
+                    if local_failure else None
+                )
                 capture = self.captures.get((index, evidence_index))
-                if row is None or capture is None or not capture.text_sha256:
+                if capture is None or not capture.text_sha256:
                     continue
-                claim["capture_attestations"].append({
+                provenance: dict[str, Any] = {
                     "evidence_index": evidence_index,
                     "final_url": capture.final_url or item["url"],
                     "text_sha256": capture.text_sha256,
                     "relation": item["relation"],
-                    "publisher_authority": row["publisher_authority"],
-                    "authority_reason": row["authority_reason"],
-                    "passage_entailment": row["passage_entailment"],
-                    "entailment_reason": row["entailment_reason"],
-                })
+                    "publisher_authority": row["publisher_authority"] if row else False,
+                    "authority_reason": row["authority_reason"] if row else (
+                        bounded_local_failure
+                        or "Server-owned source processing failure prevented attestation."
+                    ),
+                    "passage_entailment": row["passage_entailment"] if row else False,
+                    "entailment_reason": row["entailment_reason"] if row else (
+                        bounded_local_failure
+                        or "No provider passage was accepted from the retained capture."
+                    ),
+                    "fallback_attempted": capture.fallback_attempted,
+                }
+                if capture.content_sha256:
+                    provenance["content_sha256"] = capture.content_sha256
+                if capture.status is not None:
+                    provenance["status"] = capture.status
+                if capture.content_type:
+                    provenance["content_type"] = capture.content_type
+                if capture.error or local_failure:
+                    provenance["capture_error"] = external_sources._bounded_error(
+                        local_failure or capture.error
+                    )
+                claim["capture_attestations"].append(provenance)
+                if local_failure:
+                    for capture_row in claim.get("capture_provenance", []):
+                        if capture_row.get("evidence_index") == evidence_index:
+                            capture_row["error"] = external_sources._bounded_error(
+                                local_failure
+                            )
+                            break
             relation = "supports_claim" if claim["verdict"] == "supported" else "refutes_claim"
             qualifying = any(
                 item["relation"] == relation

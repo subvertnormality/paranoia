@@ -31,7 +31,7 @@ UGC_HOSTS = (
 )
 
 MAX_RESPONSE_BYTES = 5_000_000
-MAX_EXTRACTED_CHARS = 100_000
+MAX_EXTRACTED_CHARS = 1_000_000
 CONNECT_TIMEOUT_SEC = 20
 READ_TIMEOUT_SEC = 40
 MAX_REDIRECTS = 5
@@ -56,6 +56,18 @@ BINDING_BUDGET_ERROR = (
 
 class SourceError(ValueError):
     pass
+
+
+class RedirectRejected(SourceError):
+    """A redirect response whose computed target cannot be followed safely."""
+
+    def __init__(
+        self, target: str, status: int, content_type: str | None, reason: str,
+    ) -> None:
+        super().__init__(f"rejected final URL: {reason}")
+        self.target = target
+        self.status = status
+        self.content_type = content_type
 
 
 class CaptureGroupError(RuntimeError):
@@ -181,10 +193,16 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
         self.count += 1
-        if self.count > MAX_REDIRECTS:
-            raise SourceError("too many redirects")
         target = urljoin(req.full_url, newurl)
-        _validate_public_url(target)
+        content_type = headers.get_content_type().lower() if headers else None
+        if self.count > MAX_REDIRECTS:
+            raise RedirectRejected(target, int(code), content_type, "too many redirects")
+        try:
+            _validate_public_url(target)
+        except SourceError as exc:
+            raise RedirectRejected(
+                target, int(code), content_type, _bounded_error(exc),
+            ) from exc
         return super().redirect_request(req, fp, code, msg, headers, target)
 
 
@@ -272,6 +290,11 @@ def capture(
 ) -> Capture:
     candidate = normalize_candidate(candidate)
     fallback_attempted = False
+    final_url: str | None = None
+    status: int | None = None
+    content_type: str | None = None
+    content_sha256: str | None = None
+    text_sha256: str | None = None
     try:
         started = clock()
         capture_deadline = started + CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC
@@ -325,29 +348,50 @@ def capture(
         assert response is not None
         with response:  # type: ignore[attr-defined]
             final_url = response.geturl()
-            _validate_public_url(final_url)
             status = int(getattr(response, "status", 200))
             content_type = response.headers.get_content_type().lower()
+            _validate_public_url(final_url)
             if content_type not in {"text/html", "application/xhtml+xml", "text/plain"}:
                 raise SourceError(f"unsupported content type {content_type!r}")
             body = _read_body(response, deadline=capture_deadline, clock=clock)
+            content_sha256 = hashlib.sha256(body).hexdigest()
             if len(body) > MAX_RESPONSE_BYTES:
                 raise SourceError(f"response exceeds {MAX_RESPONSE_BYTES} bytes")
         text = _extract(body, content_type)
+        text_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
         return Capture(
             candidate=candidate,
             final_url=final_url,
             status=status,
             content_type=content_type,
-            content_sha256=hashlib.sha256(body).hexdigest(),
-            text_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            content_sha256=content_sha256,
+            text_sha256=text_sha256,
             text=text,
+            fallback_attempted=fallback_attempted,
+        )
+    except RedirectRejected as exc:
+        return Capture(
+            candidate=candidate,
+            final_url=exc.target,
+            status=exc.status,
+            content_type=exc.content_type,
+            content_sha256=content_sha256,
+            text_sha256=text_sha256,
+            text=None,
+            error=_bounded_error(exc),
             fallback_attempted=fallback_attempted,
         )
     except (SourceError, urllib.error.URLError, OSError, ValueError) as exc:
         return Capture(
-            candidate, None, None, None, None, None, None, _bounded_error(exc),
-            fallback_attempted,
+            candidate=candidate,
+            final_url=final_url,
+            status=status,
+            content_type=content_type,
+            content_sha256=content_sha256,
+            text_sha256=text_sha256,
+            text=None,
+            error=_bounded_error(exc),
+            fallback_attempted=fallback_attempted,
         )
 
 

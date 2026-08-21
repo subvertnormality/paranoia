@@ -1,4 +1,5 @@
 from email.message import Message
+import hashlib
 import threading
 import time
 import urllib.error
@@ -128,6 +129,85 @@ def test_oversized_response_is_visible_non_governing(monkeypatch):
     got = es.capture(candidate(), opener=lambda _request, _timeout: Response(body, "text/plain"))
     assert not got.usable
     assert "exceeds" in got.error
+    assert got.final_url == "https://docs.example.com/page"
+    assert got.status == 200
+    assert got.content_type == "text/plain"
+    assert got.content_sha256 == hashlib.sha256(body).hexdigest()
+    assert got.text_sha256 is None
+
+
+def test_extraction_failure_retains_known_response_provenance(monkeypatch):
+    monkeypatch.setattr(es, "_validate_public_url", lambda _url: None)
+    body = b"   \n\t"
+    got = es.capture(candidate(), opener=lambda _request, _timeout: Response(body))
+    assert not got.usable
+    assert got.final_url == "https://docs.example.com/page"
+    assert got.status == 200
+    assert got.content_type == "text/html"
+    assert got.content_sha256 == hashlib.sha256(body).hexdigest()
+    assert got.text_sha256 is None
+    assert "no text" in got.error
+
+
+def test_rejected_final_url_retains_actual_destination_and_headers(monkeypatch):
+    original = candidate("https://official.example/redirect")
+    rejected = "http://127.0.0.1/private"
+
+    def validate(url):
+        if url == original.url:
+            return
+        raise es.SourceError("non-public final address")
+
+    monkeypatch.setattr(es, "_validate_public_url", validate)
+    got = es.capture(
+        original,
+        opener=lambda _request, _timeout: Response(
+            b"must not be read", "text/plain", url=rejected,
+        ),
+    )
+    assert not got.usable
+    assert got.final_url == rejected
+    assert got.status == 200
+    assert got.content_type == "text/plain"
+    assert got.content_sha256 is None
+    assert got.text_sha256 is None
+    assert "non-public final address" in got.error
+
+
+def test_default_redirect_handler_retains_rejected_target_and_response_metadata(
+    monkeypatch,
+):
+    original = candidate("https://official.example/redirect")
+    rejected = "http://127.0.0.1/private"
+    redirect_headers = Message()
+    redirect_headers["Content-Type"] = "text/plain; charset=utf-8"
+
+    def validate(url):
+        if url == original.url:
+            return
+        raise es.SourceError("source host resolves to non-public address 127.0.0.1")
+
+    class Opener:
+        def __init__(self, handler):
+            self.handler = handler
+
+        def open(self, request, timeout):
+            return self.handler.redirect_request(
+                request, None, 302, "Found", redirect_headers, rejected,
+            )
+
+    monkeypatch.setattr(es, "_validate_public_url", validate)
+    monkeypatch.setattr(
+        es.urllib.request, "build_opener", lambda handler: Opener(handler),
+    )
+    got = es.capture(original)
+    assert not got.usable
+    assert got.final_url == rejected
+    assert got.status == 302
+    assert got.content_type == "text/plain"
+    assert got.content_sha256 is None
+    assert got.text_sha256 is None
+    assert "non-public address 127.0.0.1" in got.error
 
 
 def test_raw_response_reader_admits_exact_byte_boundary():
@@ -147,8 +227,8 @@ def test_large_extracted_page_keeps_deep_evidence(monkeypatch):
 
 
 def test_extracted_character_cap_admits_boundary_and_rejects_next_character():
-    assert len(es._extract(b"x" * es.MAX_EXTRACTED_CHARS, "text/plain")) == 100_000
-    with pytest.raises(es.SourceError, match="extracted page has 100001 characters"):
+    assert len(es._extract(b"x" * es.MAX_EXTRACTED_CHARS, "text/plain")) == 1_000_000
+    with pytest.raises(es.SourceError, match="extracted page has 1000001 characters"):
         es._extract(b"x" * (es.MAX_EXTRACTED_CHARS + 1), "text/plain")
 
 

@@ -60,7 +60,12 @@ an empty, verified register.
    only the corrected complete inventory proceeds to capture.
 3. The server downloads each candidate directly under bounded HTTP(S), redirect, response-size,
    and extracted-text limits, then extracts main text with Trafilatura. Responses remain capped at
-   5,000,000 bytes; complete extracted text through 100,000 characters is admitted. Repeated
+   5,000,000 bytes; complete extracted text through 1,000,000 characters is admitted. Plan
+   binding preserves complete-source context: a structurally governing primary or authoritative
+   capture may use one dedicated expanded packet when its exact rendered prompt fits 685,000
+   characters, with eligibility recomputed from the final URL. Its complete capture accompanies
+   the selected passage into a separately size-checked cold attestation prompt. Admission reserves
+   the worst-case bounded binding correction and attestation output envelopes. Repeated
    captures with the same final URL and content/text digests appear once per serialized binding
    prompt or batch and later rows reference that exact capture. If distinct arbitration captures
    exceed its single 400,000-character binding prompt, the largest capture groups are
@@ -85,34 +90,54 @@ an empty, verified register.
    second database, CAS protocol, or journal.
 7. The cold structural reviewer receives the evidence register and an inert raw-tree repository
    materialization, with live web and Git-helper execution unavailable. It is explicitly forbidden
-   from demanding claim packets for repository mechanics or “missing atomic bridges.” It still
-   performs the complete ordinary FATAL/MAJOR review over the plan and repository every round.
+   from demanding claim packets for repository mechanics or “missing atomic bridges.” It performs
+   a broad census on a new snapshot, targeted correction reviews over durable debt and repair
+   effects, and one mandatory broad cold final regression after that debt closes.
 8. The computed verdict combines external-claim closure and structural-class closure.
 
 The active inventory ceiling is 500 external claims and 20 evidence records per claim. The
 composed execution budget additionally allows at most 200 source captures and five binding
 batches of 400,000 characters in one audit. These are pathology/corruption guards, not
-pagination limits. They cover ordinary large plans while preventing the multiplicative maxima
+evidence-quality targets. A single authoritative source may flex from an ordinary batch to one
+dedicated expanded packet. They cover ordinary large plans while preventing the multiplicative maxima
 from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Each discovery, captured-text binding, and cold-attestation model call has a 600-second cap;
-discovery and each binding batch allow at most one correction. The complete evidence phase has
-a 6,000-second monotonic deadline and at most nine model calls, including enough capacity for
-one discovery correction and one binding correction at the five-batch maximum. These
-limits let a large real plan complete useful research without making either a call sequence or
-an individual model call unbounded.
+Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
+each locally invalid response allows at most one same-session correction. Cold attestation is
+packed by its exact rendered initial and correction prompts into at most five batches, rather than
+assuming every accepted passage fits one call. The complete evidence phase has a 6,960-second
+monotonic circuit breaker and at most 22 model calls: discovery + five binding + five attestation
+calls, with one correction reserved for every initial call. Before discovery spend, admission
+reserves that entire graph plus 300 seconds for capture/bounded pre-binding processing and 60
+seconds of scheduling slack. The capture pool and exact local packing share an enforced monotonic
+300-second deadline; exhausting it blocks before the first binding call. The handler also checks
+both remaining calls and two full 300-second windows before each initial invocation. The retained
+acceptance record reports the measured live latency for each 627,000-character Codex and Claude
+packet. These remain generous circuit breakers, not review-quality budgets; an admitted call may
+use its full time and context to establish authoritative evidence.
 Captured sources are downloaded with up to 16 workers under the same monotonic deadline and
 per-source wall-clock bounds, then bound in deterministic indexed batches in the same corrected
-discovery session. Exact 5,000,000-byte and 100,000-character boundaries are admitted; the first
-unit above either is rejected. Serialized numbering, metadata, and JSON escaping count against
-the existing 400,000-character binding limit. Arbitration degrades the largest distinct capture
+discovery session. Exact 5,000,000-byte and 1,000,000-character boundaries are admitted; the first
+unit above either is rejected. Numbering, metadata, JSON escaping, and the full instruction
+envelope count against either the ordinary 400,000-character prompt or the dedicated
+685,000-character governing-source prompt. Arbitration degrades the largest distinct capture
 groups per-source when its aggregate would overflow; the plan path retains its five deterministic
-batches. One oversized source, a sixth plan batch, an expired capture, or a failed batch
+batches. An aggregate sixth plan batch, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
-If numbering or JSON escaping makes one plan capture row exceed a batch by itself, only that
-capture becomes unusable with the bounded server-owned binding-budget reason; it cannot abort
-unrelated claim captures.
+For binding and cold attestation, that aggregate rejection is global: no prefix is settled or
+made eligible for later freezing as a way to paginate the inventory across rounds.
+If a row is ineligible for expansion or its complete expanded prompt cannot fit, only that capture
+becomes unusable with the bounded server-owned binding-budget reason; it cannot abort unrelated
+claim captures. Unavailable captures bypass model binding and retain their known server-owned
+failure rather than becoming model-omission provenance. A failed dedicated expanded call is also
+source-local and retains its attempt diagnostics; unrelated batches continue.
+Every source outcome carries a closed server-owned `capture_provenance` row with its requested
+location, nullable effective HTTP(S) final URL, explicit nullable status, content type, both capture
+digests, fallback fact, and bounded error. A null final URL preserves non-web context as an
+uncaptured outcome rather than inventing a web capture. Dedicated binding or attestation failure
+preserves that immutable provenance, records a negative attestation, and continues unrelated
+batches.
 
 The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
 reserve within the documented 7,200-second MCP client timeout. After evidence state is persisted,
@@ -123,6 +148,13 @@ repeating research. A malformed class register gets one 600-second retry only wh
 fits the same deadline.
 
 ## Evidence and authority
+
+The retained live acceptance for the long-authoritative-source path is
+`docs/authoritative_capture_acceptance_2026-08-20.json`. It records the official 590,177-character
+Spotify SEC filing, exact 627k live prompts, the 682,351-character worst-case production preflight,
+successful Codex and Claude routes, a public two-claim `critique_plan` lifecycle with durable
+reload, bounded format retries, cold verdicts, digests, elapsed time, and full-suite
+result.
 
 Every source needs a canonical absolute URL, publisher, title, precise section/table/page,
 exact passage reproduced in the server capture, evidence relation, and an explanation of why
@@ -169,8 +201,9 @@ quotation, code, negation, relocation, parent-list changes, or surrounding asser
 re-verification while harmless line wrapping remains stable. The
 verifier receives only added or edited eligible wording, retained `refuted` or `unverified`
 claims, and removal candidates. An unchanged, fully supported register causes no evidence-model
-call or web search. This optimization applies only to claim verification: the full cold
-structural review still runs each round.
+call or web search. Structural review remains independent: the initial census and mandatory final
+regression are broad and cold, while intervening correction rounds target durable structural debt,
+the claimed repairs, and their transitive effects.
 
 An edited proposition inherits no verdict. Every unresolved or otherwise non-freezable claim,
 including an exact retained refutation, must return as a complete current server-captured and
