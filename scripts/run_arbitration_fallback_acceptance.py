@@ -63,7 +63,7 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
         )
         files = [{
             "path":"docs/arbitration_plan.md",
-            "reason":"defines the governing cleaner fidelity and neutrality contract",
+            "reason":"",
         }]
     else:
         decision = (
