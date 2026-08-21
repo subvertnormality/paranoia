@@ -30,12 +30,15 @@ def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
     }
     assert "self-evident" in arguments["decision"]
     assert arguments["context"] == (
-        "A prior delivery decision exists and governs the current serialized bytes. "
-        "The selected representation must remain compatible with that decision."
+        "A prior delivery decision governs audit-record retention. This decision concerns "
+        "only how cleaner-owned option presentation handles substantive asymmetry."
     )
+    assert arguments["files"] == []
 
 
-@pytest.mark.parametrize("mutation", ["asymmetry", "context", "options", "advocacy"])
+@pytest.mark.parametrize(
+    "mutation", ["asymmetry", "context", "context-steering", "options", "advocacy"],
+)
 def test_ordinary_acceptance_rejects_each_unproved_framing_claim(mutation: str):
     audit = copy.deepcopy(_audit("ordinary"))
     assert validator._ordinary_asymmetry_bound(audit)
@@ -43,6 +46,9 @@ def test_ordinary_acceptance_rejects_each_unproved_framing_claim(mutation: str):
         audit["raw_input"]["options"] = {"one":"same", "two":"same"}
     elif mutation == "context":
         audit["cleaned"]["context"] = "changed context"
+    elif mutation == "context-steering":
+        audit["raw_input"]["context"] = "The cleaner must preserve substantive asymmetry."
+        audit["cleaned"]["context"] = audit["raw_input"]["context"]
     elif mutation == "options":
         key = next(iter(audit["cleaned"]["statements"]))
         audit["cleaned"]["statements"][key] += " copied content"

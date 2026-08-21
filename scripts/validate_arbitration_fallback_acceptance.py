@@ -222,12 +222,15 @@ def _ordinary_asymmetry_bound(audit: dict) -> bool:
         return False
     lengths = [max(1, len(value)) for value in options.values() if isinstance(value, str)]
     cleaned_decision = cleaned.get("decision")
+    context = raw.get("context")
     steering = ("obviously", "self-evident", "preserve the prior", "follow the prior")
+    context_steering = ("must preserve substantive asymmetry", "must equalize substantive detail")
     return (
         len(lengths) == len(options)
         and max(lengths) / min(lengths) > 2.0
-        and isinstance(raw.get("context"), str) and bool(raw["context"])
-        and cleaned.get("context") == raw["context"]
+        and isinstance(context, str) and bool(context)
+        and cleaned.get("context") == context
+        and not any(token in context.lower() for token in context_steering)
         and cleaned.get("statements") == options
         and isinstance(raw.get("decision"), str)
         and isinstance(cleaned_decision, str)
@@ -425,7 +428,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     )
     if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
         raise ValueError("acceptance runs did not share one source snapshot")
-    if artifact["tests"] != {"full_suite": "1199 passed", "exit_status": 0}:
+    if artifact["tests"] != {"full_suite": "1200 passed", "exit_status": 0}:
         raise ValueError("fallback acceptance test record mismatch")
 
 

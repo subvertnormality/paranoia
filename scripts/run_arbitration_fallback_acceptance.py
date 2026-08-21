@@ -58,13 +58,10 @@ def _arguments(repo: Path, seed: str, *, asymmetry: bool = False) -> dict[str, A
             },
         ]
         context = (
-            "A prior delivery decision exists and governs the current serialized bytes. "
-            "The selected representation must remain compatible with that decision."
+            "A prior delivery decision governs audit-record retention. This decision concerns "
+            "only how cleaner-owned option presentation handles substantive asymmetry."
         )
-        files = [{
-            "path":"docs/arbitration_plan.md",
-            "reason":"",
-        }]
+        files = []
     else:
         decision = (
             "Choose the owning-card value for the 480 declarations entering the "

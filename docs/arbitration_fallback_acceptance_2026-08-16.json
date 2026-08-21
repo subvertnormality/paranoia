@@ -62,7 +62,7 @@
     "tests/test_arbitration_fallback_acceptance.py": "4b9c7cbc794d8f874793b47fff4f2652c9779980ef6e868b53929f9940473c89"
   },
   "tests": {
-    "full_suite": "1199 passed",
+    "full_suite": "1200 passed",
     "exit_status": 0
   }
 }
