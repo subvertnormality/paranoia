@@ -126,6 +126,29 @@ TOOLS: list[Tool] = [
                     "type": "integer",
                     "description": "Total character budget for the converge packet (default 400000). The already_raised list is always preserved; only file evidence is trimmed.",
                 },
+                "plan_text": {
+                    "type": "string",
+                    "description": (
+                        "Optional frozen implementation contract for tracked convergence. "
+                        "Provide this OR absolute plan_path. The first lineage reservation "
+                        "freezes exact text/digest; later rounds may omit it to reuse state."
+                    ),
+                },
+                "plan_path": {
+                    "type": "string",
+                    "description": (
+                        "Optional absolute path to the frozen implementation contract. "
+                        "Read once; provide this OR plan_text."
+                    ),
+                },
+                "plan_digest": {
+                    "type": "string",
+                    "pattern": "^(?:[0-9a-f]{16}|[0-9a-f]{64})$",
+                    "description": (
+                        "Optional 16-hex critique_plan digest prefix or full 64-hex "
+                        "SHA-256 assertion; requires plan_text or plan_path."
+                    ),
+                },
                 "project_summary": {"type": "string", "description": "Neutral factual description of the project (not advocacy). The reviewer tests the diff against it."},
                 "diff_intent": {"type": "string", "description": "What the diff is SUPPOSED to achieve — treated as a claim to verify."},
                 "focus": {"type": "string", "description": "Narrow the review to a specific concern."},
@@ -185,6 +208,25 @@ TOOLS: list[Tool] = [
                 **_COMMON,
             },
             "required": ["repo_path"],
+            "oneOf": [
+                {
+                    "not": {
+                        "anyOf": [
+                            {"required": ["plan_text"]},
+                            {"required": ["plan_path"]},
+                            {"required": ["plan_digest"]},
+                        ],
+                    },
+                },
+                {
+                    "required": ["plan_text"],
+                    "not": {"required": ["plan_path"]},
+                },
+                {
+                    "required": ["plan_path"],
+                    "not": {"required": ["plan_text"]},
+                },
+            ],
         },
     ),
     Tool(

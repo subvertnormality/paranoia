@@ -48,14 +48,17 @@ MAX_DECISION_RESPONSE_CHARS = 1_000_000
 MAX_CONSOLIDATION_CONTEXT_CHARS = 200_000
 
 
-def citation_instructions(mode: str) -> str:
+def citation_instructions(mode: str, *, plan_contract: bool = False) -> str:
     """Return the shared model-facing evidence object contract."""
     if mode == cc.PLAN_MODE:
         alternatives = (
             '`plan:<line-or-range>` or `repository/<path>:<line-or-range>`'
         )
     elif mode == cc.BRANCH_MODE:
-        alternatives = '`repository/<path>:<line-or-range>`'
+        alternatives = (
+            '`plan:<line-or-range>` or `repository/<path>:<line-or-range>`'
+            if plan_contract else '`repository/<path>:<line-or-range>`'
+        )
     else:
         raise ValueError(f"invalid staged mode {mode!r}")
     return (
@@ -1002,6 +1005,7 @@ def class_record_candidates(
 def materialize_decision_value(
     value: dict[str, Any], *, mode: str, role: str,
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
+    source_evidence: dict[str, Sequence[str]] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
     assessment_findings: dict[str, str | None] | None = None,
     assessment_evidence: dict[str, Sequence[str]] | None = None,
@@ -1049,6 +1053,7 @@ def materialize_decision_value(
         expected_sources = set(source_ids)
         for finding_index, finding in enumerate(findings):
             finding_pointer = f"/governing_findings/{finding_index}"
+            allowed_evidence: set[str] = set()
             for source in finding["source_ids"]:
                 if source not in expected_sources:
                     issues.append(
@@ -1057,11 +1062,18 @@ def materialize_decision_value(
                     continue
                 source_rows.append({"source_id": source, "governing_id": finding["id"]})
                 governing_by_source.setdefault(source, []).append(finding["id"])
+                allowed_evidence.update((source_evidence or {}).get(source, ()))
                 severity = (source_severities or {}).get(source)
                 if severity and _rank(finding["severity"]) < _rank(severity):
                     issues.append(
                         f"{finding_pointer}/severity: cannot downgrade {source}"
                     )
+            foreign_evidence = sorted(set(finding["evidence"]) - allowed_evidence)
+            if source_evidence is not None and foreign_evidence:
+                issues.append(
+                    f"{finding_pointer}/evidence: citations must come from mapped "
+                    f"source evidence; foreign={foreign_evidence}"
+                )
         if set(governing_by_source) != expected_sources:
             missing = sorted(expected_sources - set(governing_by_source))
             issues.append(
@@ -1462,6 +1474,7 @@ def materialize_decision_value(
 def materialize_decision(
     text: str, *, mode: str, role: str,
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
+    source_evidence: dict[str, Sequence[str]] | None = None,
     assessment_verdicts: dict[str, str] | None = None,
     assessment_findings: dict[str, str | None] | None = None,
     assessment_evidence: dict[str, Sequence[str]] | None = None,
@@ -1476,6 +1489,7 @@ def materialize_decision(
     return materialize_decision_value(
         value, mode=mode, role=role, source_ids=source_ids,
         source_severities=source_severities,
+        source_evidence=source_evidence,
         assessment_verdicts=assessment_verdicts,
         assessment_findings=assessment_findings,
         assessment_evidence=assessment_evidence,
