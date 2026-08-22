@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -1316,7 +1317,7 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
     state = {
         "phase": "correction", "last_round": 57,
         "debt": [{
-            "id": "debt-a", "status": "open", "severity": cc.MAJOR,
+            "id": "debt-a", "status": "open", "severity": cc.MINOR,
             "first_round": 34, "class_ids": ["6cf3f68b"],
         }],
     }
@@ -1327,7 +1328,7 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
     )
 
     assert (
-        "PERSISTENCE: 6cf3f68b currently open; tracked across 57 recorded rounds "
+        "PERSISTENCE: 6cf3f68b currently open; round-label span 57 "
         "(first raised 1, now 57), current debt open since 34"
     ) in rendered
     assert "rebut with session_ref=session-57" in rendered
@@ -1363,6 +1364,96 @@ def test_trailer_marks_reopen_wave_without_inventing_history() -> None:
         "class-a, class-c"
     ) in rendered
     assert "re-arm any prior disposition" in rendered
+
+
+def test_failed_staged_round_retains_persistent_class_without_fake_session(tmp_path) -> None:
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(
+        phase="correction", last_round=3,
+        debt=[{
+            "id": "debt-a", "status": "open", "severity": cc.MINOR,
+            "first_round": 2, "class_ids": ["class-a"],
+        }],
+    )
+    lineage = cc.Lineage(
+        "persistent-failure", mode=cc.PLAN_MODE, rounds=2,
+        classes={"class-a": cc.TrackedClass(
+            class_id="class-a", invariant="still open", severity=cc.MAJOR,
+            first_round=1, status=cc.OPEN, procedure="inspect it",
+        )},
+        review_state=state,
+    )
+    cc.save_lineage(tmp_path, lineage)
+    closure = handlers._PlanClassClosure(
+        "persistent-failure", round_no=3, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = handlers._staged_error(
+        "provider unavailable", role="correction", kind="provider",
+    )
+
+    _, rendered, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+
+    assert "PERSISTENCE: class-a currently open; round-label span 3" in rendered
+    assert "rebut" not in rendered
+    assert "session_ref=" not in rendered
+
+
+def test_prepare_detects_server_owned_mechanized_reopen(tmp_path) -> None:
+    class SweepClosure(handlers._ClosureRound):
+        def _sweep(self, only=None):
+            assert self.lineage is not None
+            tracked = self.lineage.classes["class-a"]
+            self.lineage.classes["class-a"] = replace(tracked, status=cc.OPEN)
+
+    cc.save_lineage(tmp_path, cc.Lineage(
+        "mechanized-reopen", mode=cc.BRANCH_MODE,
+        classes={"class-a": cc.TrackedClass(
+            class_id="class-a", invariant="bad token absent", severity=cc.MAJOR,
+            first_round=1, status=cc.CLOSED, pattern="BAD", pathspec="app.py",
+        )},
+    ))
+    closure = SweepClosure(
+        "mechanized-reopen", round_no=4, state_root=tmp_path, stamp="T",
+    )
+
+    closure.prepare()
+    try:
+        assert closure.reopened_class_ids == ("class-a",)
+    finally:
+        closure.abandon()
+        closure.release()
+
+
+def test_stakes_change_reports_only_closed_unmechanized_reopens() -> None:
+    lineage = cc.Lineage(
+        "stakes-reopen", mode=cc.PLAN_MODE,
+        classes={
+            "closed-model": cc.TrackedClass(
+                class_id="closed-model", invariant="review this", severity=cc.MAJOR,
+                first_round=1, status=cc.CLOSED, procedure="inspect it",
+            ),
+            "closed-mechanized": cc.TrackedClass(
+                class_id="closed-mechanized", invariant="token absent",
+                severity=cc.MAJOR, first_round=1, status=cc.CLOSED,
+                pattern="BAD", pathspec="app.py",
+            ),
+            "already-open": cc.TrackedClass(
+                class_id="already-open", invariant="still open", severity=cc.MAJOR,
+                first_round=1, status=cc.OPEN, procedure="inspect it",
+            ),
+        },
+    )
+
+    reopened = handlers._reopen_unmechanized_for_stakes(lineage)
+
+    assert reopened == ("closed-model",)
+    assert lineage.classes["closed-model"].status == cc.OPEN
+    assert lineage.classes["closed-mechanized"].status == cc.CLOSED
+    assert lineage.classes["already-open"].status == cc.OPEN
 
 
 @pytest.mark.parametrize(

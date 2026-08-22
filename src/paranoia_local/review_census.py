@@ -314,13 +314,14 @@ def trailer(
     reopened_class_ids: Sequence[str] = (),
     session_ref: str | None = None,
 ) -> str:
-    debt = [d for d in state.get("debt", []) if d.get("status") == "open" and d.get("severity") in BLOCKING]
+    open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
+    debt = [d for d in open_debt if d.get("severity") in BLOCKING]
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
     current_round = state.get("last_round")
     if isinstance(current_round, int) and class_first_rounds:
         debt_first_by_class: dict[str, int] = {}
-        for item in debt:
+        for item in open_debt:
             first = item.get("first_round")
             if not isinstance(first, int):
                 continue
@@ -338,17 +339,17 @@ def trailer(
                 continue
             debt_first = debt_first_by_class.get(class_id)
             rebut = (
-                f"rebut with session_ref={trailer_diagnostic(session_ref)}"
-                if session_ref else "use rebut against the current reviewer session"
+                f"; rebut with session_ref={trailer_diagnostic(session_ref)}"
+                if session_ref else ""
             )
             lines.append(
                 f"PERSISTENCE: {trailer_diagnostic(class_id)} currently open; "
-                f"tracked across {age} recorded rounds (first raised {first}, now "
+                f"round-label span {age} (first raised {first}, now "
                 f"{current_round})"
                 + (f", current debt open since {debt_first}" if debt_first is not None
                    else ", no governing debt is currently bound")
                 + " — repeated correction may be unsatisfiable within this unit's "
-                f"scope; {rebut}"
+                f"scope{rebut}"
             )
     reopened = sorted(dict.fromkeys(
         class_id for class_id in reopened_class_ids if isinstance(class_id, str)
