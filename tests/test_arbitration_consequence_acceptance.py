@@ -84,6 +84,9 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "file-empty", "file-duplicate",
         "version-bool", "version-float", "version-string", "version-null",
         "calls-bool", "calls-float", "calls-string", "calls-null",
+        "positive-calls-bool", "positive-calls-float", "positive-calls-string",
+        "positive-calls-null", "negative-version-bool", "negative-version-float",
+        "negative-version-string", "negative-version-null",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -222,6 +225,14 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
     elif mutation.startswith("calls-"):
         values = {"bool": True, "float": 2.0, "string": "2", "null": None}
         negative["model_call_count"] = values[mutation.removeprefix("calls-")]
+        sync = False
+    elif mutation.startswith("positive-calls-"):
+        values = {"bool": True, "float": 4.0, "string": "4", "null": None}
+        positive["model_call_count"] = values[mutation.removeprefix("positive-calls-")]
+        sync = False
+    elif mutation.startswith("negative-version-"):
+        values = {"bool": True, "float": 1.0, "string": "1", "null": None}
+        negative["version"] = values[mutation.removeprefix("negative-version-")]
         sync = False
     else:
         target = negative
