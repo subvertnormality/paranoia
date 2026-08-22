@@ -150,9 +150,16 @@ def main() -> None:
         not isinstance(row.get("requested_timeout_sec"), int)
         or not isinstance(row.get("duration_ms"), int)
         or row["duration_ms"] < 0
+        or not isinstance(row.get("returncode"), int)
+        or any(
+            not isinstance(row.get(f"{channel}_sha256"), str)
+            or len(row[f"{channel}_sha256"]) != 64
+            or not isinstance(row.get(f"{channel}_excerpt"), str)
+            for channel in ("raw", "failure_detail", "stderr")
+        )
         for row in audit["attempt_ledger"]
     ):
-        raise SystemExit("production attempt ledger lacks actual timeout/duration telemetry")
+        raise SystemExit("production attempt ledger lacks required execution telemetry")
     role_timeouts = {
         row["role"]: row["requested_timeout_sec"]
         for row in audit["attempt_ledger"]

@@ -103,9 +103,9 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "a36e42b71bae7b381bffd1d95a3810db61d67ba726283aed74eb26b54abde7e3",
-      "additions": 170,
-      "deletions": 35,
+      "sha256": "93564907604085aff5f960cc221f828781d2d13ffd5403e22f27ff863232dd81",
+      "additions": 171,
+      "deletions": 36,
       "scope": "Plan structural prompt composition, a role-specific discovery timeout, combined claim/structural trailer composition, exact claim-only phase migration, and attempt timeout telemetry; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {

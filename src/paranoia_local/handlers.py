@@ -84,7 +84,7 @@ def _attempt(
     requested_timeout_sec: int | None = None,
 ) -> rc.Attempt:
     response = review.text or ""
-    projection = _review_failure_projection(review) if review.error else {}
+    projection = _review_failure_projection(review)
     return rc.Attempt(
         role, engine.name, review.session_ref,
         "failed" if review.error else "completed",
