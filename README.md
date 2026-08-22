@@ -764,8 +764,11 @@ What it does, in order:
    cleaner candidate is unusable but those originals pass, the server atomically
    sends the original decision, options, and validated hints to both deciders and
    reports `CLEANING: original-attested`; it never mixes original and cleaned fields.
-   A neutral record that a prior decision exists and governs the current bytes is shared context,
-   not advocacy; praise for that result or an instruction to follow it still fails the context gate.
+   Facts, governing constraints, costs, risks, tradeoffs, and consequences remain merits context even
+   when they affect the options unequally; asymmetry alone is not advocacy. A neutral record that a
+   prior decision exists and governs the current bytes is shared context. Directives, endorsements,
+   rhetorical preference, pre-emptive conclusions, praise for a prior result, or instructions to
+   follow it still fail the context/stakes gate.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

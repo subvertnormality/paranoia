@@ -413,8 +413,10 @@ an advocating original packet must still be faithfully neutralized or fail.
 Cleaning may normalize presentation but must never copy facts, constraints, caveats, or
 qualifications between options merely to equalize length or detail. Preserve substantive asymmetry
 for the deciders. A neutral factual statement that a prior decision exists and governs the current
-bytes is context, not advocacy; endorsement of that result or an instruction to follow it remains
-advocacy.
+bytes is context, not advocacy. Substantive facts, governing constraints, costs, risks, tradeoffs,
+and consequences remain merits context even when they affect options unequally; asymmetry alone is
+not advocacy. Directives, endorsements, rhetorical preference, pre-emptive conclusions, or an
+instruction to follow a prior result remain advocacy.
 
 Use `apply_patch` for edits and preserve unrelated user changes. Add focused tests for root
 invariants and the real model-facing schema. Model JSON examples must contain concrete valid

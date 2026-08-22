@@ -152,7 +152,13 @@ def test_cleaning_preserves_substantive_asymmetry_and_binding_context():
     assert "Unequal substantive detail" in attester
     assert "is not advocacy by itself" in attester
     assert "prior decision exists and governs the current bytes" in attester
-    assert "directing the deciders to follow it is advocacy" in attester
+    assert "asymmetry is not advocacy by itself" in attester
+    assert "effort spent on one activity is unavailable for another" in attester
+    assert "a wrong choice causes rework" in attester
+    assert "certified evidence may not be mutated" in attester
+    assert 'Saying "do not treat this as blocking"' in attester
+    assert 'an option "should instead" be chosen' in attester
+    assert "directing the deciders to follow it remains advocacy" in attester
 
 
 def test_branch_staged_prompts_forbid_the_plan_alias():
