@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -1312,6 +1313,201 @@ def test_untrusted_failure_diagnostic_cannot_forge_review_or_trailer_structure(t
     assert closure.lineage.review_state["staged_failure"]["message"] == message
 
 
+def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
+    state = {
+        "phase": "correction", "last_round": 57,
+        "debt": [{
+            "id": "debt-a", "status": "open", "severity": cc.MINOR,
+            "first_round": 34, "class_ids": ["6cf3f68b"],
+        }],
+    }
+
+    rendered = rc.trailer(
+        state, class_first_rounds={"6cf3f68b": 1},
+        session_ref="session-57",
+    )
+
+    assert (
+        "PERSISTENCE: 6cf3f68b currently open; round-label span 57 "
+        "(first raised 1, now 57), current debt open since 34"
+    ) in rendered
+    assert "rebut with session_ref=session-57" in rendered
+
+
+def test_trailer_omits_persistence_until_third_tracked_round() -> None:
+    state = {
+        "phase": "correction", "last_round": 2,
+        "debt": [{
+            "id": "debt-a", "status": "open", "severity": cc.BLOCKER,
+            "first_round": 1, "class_ids": ["class-a"],
+        }],
+    }
+
+    assert "PERSISTENCE:" not in rc.trailer(
+        state, class_first_rounds={"class-a": 1}, session_ref="s",
+    )
+    state["last_round"] = 3
+    assert "PERSISTENCE:" in rc.trailer(
+        state, class_first_rounds={"class-a": 1}, session_ref="s",
+    )
+
+
+def test_trailer_marks_reopen_wave_without_inventing_history() -> None:
+    state = {"phase": "correction", "last_round": 37, "debt": []}
+
+    rendered = rc.trailer(
+        state, reopened_class_ids=("class-c", "class-a", "class-c"),
+    )
+
+    assert (
+        "REOPEN-WAVE: 2 previously closed class(es) reopened this round: "
+        "class-a, class-c"
+    ) in rendered
+    assert "re-arm any prior disposition" in rendered
+
+
+@pytest.mark.parametrize("cacheable_validation", [False, True])
+def test_failed_staged_round_retains_persistent_class_without_fake_session(
+    tmp_path, cacheable_validation,
+) -> None:
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(
+        phase="correction", last_round=2,
+        debt=[{
+            "id": "debt-a", "status": "open", "severity": cc.MINOR,
+            "first_round": 2, "class_ids": ["class-a"],
+        }],
+    )
+    lineage = cc.Lineage(
+        "persistent-failure", mode=cc.PLAN_MODE, rounds=2,
+        classes={"class-a": cc.TrackedClass(
+            class_id="class-a", invariant="still open", severity=cc.MAJOR,
+            first_round=1, status=cc.OPEN, procedure="inspect it",
+        )},
+        review_state=state,
+    )
+    cc.save_lineage(tmp_path, lineage)
+    closure = handlers._PlanClassClosure(
+        "persistent-failure", round_no=3, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    error = handlers._staged_error(
+        "provider unavailable", role="correction", kind="provider",
+    )
+    if cacheable_validation:
+        error.census_cache = {"schema_version": 1}  # type: ignore[attr-defined]
+
+    _, rendered, _ = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
+    )
+    closure.release()
+
+    assert "PERSISTENCE: class-a currently open; round-label span 3" in rendered
+    assert closure.lineage.review_state["last_round"] == 2
+    assert "rebut" not in rendered
+    assert "session_ref=" not in rendered
+
+
+def test_prepare_detects_server_owned_mechanized_reopen(tmp_path) -> None:
+    class SweepClosure(handlers._ClosureRound):
+        def _sweep(self, only=None):
+            assert self.lineage is not None
+            tracked = self.lineage.classes["class-a"]
+            self.lineage.classes["class-a"] = replace(tracked, status=cc.OPEN)
+
+    cc.save_lineage(tmp_path, cc.Lineage(
+        "mechanized-reopen", mode=cc.BRANCH_MODE,
+        classes={"class-a": cc.TrackedClass(
+            class_id="class-a", invariant="bad token absent", severity=cc.MAJOR,
+            first_round=1, status=cc.CLOSED, pattern="BAD", pathspec="app.py",
+        )},
+    ))
+    closure = SweepClosure(
+        "mechanized-reopen", round_no=4, state_root=tmp_path, stamp="T",
+    )
+
+    closure.prepare()
+    try:
+        assert closure.reopened_class_ids == ("class-a",)
+    finally:
+        closure.abandon()
+        closure.release()
+
+
+def test_stakes_change_reports_only_closed_unmechanized_reopens() -> None:
+    lineage = cc.Lineage(
+        "stakes-reopen", mode=cc.PLAN_MODE,
+        classes={
+            "closed-model": cc.TrackedClass(
+                class_id="closed-model", invariant="review this", severity=cc.MAJOR,
+                first_round=1, status=cc.CLOSED, procedure="inspect it",
+            ),
+            "closed-mechanized": cc.TrackedClass(
+                class_id="closed-mechanized", invariant="token absent",
+                severity=cc.MAJOR, first_round=1, status=cc.CLOSED,
+                pattern="BAD", pathspec="app.py",
+            ),
+            "already-open": cc.TrackedClass(
+                class_id="already-open", invariant="still open", severity=cc.MAJOR,
+                first_round=1, status=cc.OPEN, procedure="inspect it",
+            ),
+        },
+    )
+
+    reopened = handlers._reopen_unmechanized_for_stakes(lineage)
+
+    assert reopened == ("closed-model",)
+    assert lineage.classes["closed-model"].status == cc.OPEN
+    assert lineage.classes["closed-mechanized"].status == cc.CLOSED
+    assert lineage.classes["already-open"].status == cc.OPEN
+
+
+def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/class_persistence_acceptance_2026-08-22.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "code-branch-class-persistence-reopen-lifecycle"
+    )
+    source_revision = artifact["source_revision"]
+    assert len(source_revision) == 40
+    for relative in (
+        "src/paranoia_local/handlers.py",
+        "src/paranoia_local/review_census.py",
+        "scripts/run_class_persistence_acceptance.py",
+    ):
+        accepted = subprocess.run(
+            ["git", "show", f"{source_revision}:{relative}"],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert accepted == (root / relative).read_bytes()
+    assert artifact["provider"]["engine"] == "codex"
+    assert artifact["provider"]["web_search"] is False
+    assert artifact["fixture"]["class_before"] == cc.CLOSED
+    assert artifact["fixture"]["class_after"] == cc.OPEN
+    assert artifact["fixture"]["class_first_round"] == 1
+    assert artifact["fixture"]["round"] == 3
+    assert artifact["attempt_ledger"] == [{
+        **artifact["attempt_ledger"][0],
+        "role": "final", "outcome": "completed", "returncode": 0,
+    }]
+    assert artifact["attempt_ledger"][0]["session_ref"]
+    assert artifact["settlement"]["class_records"] == [{
+        "op": "reopen", "class_id": artifact["fixture"]["class_id"],
+    }]
+    result = artifact["result_text"]
+    assert hashlib.sha256(result.encode("utf-8", "surrogatepass")).hexdigest() == (
+        artifact["result_sha256"]
+    )
+    assert "PERSISTENCE: 60c1a55e currently open; round-label span 3" in result
+    assert "REOPEN-WAVE: 1 previously closed class(es) reopened this round" in result
+    assert result.count(
+        "rebut with session_ref=" + artifact["attempt_ledger"][0]["session_ref"]
+    ) == 1
+    assert "CONVERGENCE: BLOCKED" in result
+
+
 @pytest.mark.parametrize(
     ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
     [
@@ -2141,7 +2337,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
             "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
             "basis":{"kind":"new_finding", "finding_id":"G1"},
         }],
-        "class_actions":[{"kind":"reopen", "class_id":"class-a"}],
+        "class_actions":{"class-a":None},
         "coverage":payload(lane(findings=[final_finding]))["coverage"],
     })
 
@@ -2162,6 +2358,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
     settlement = audit["staged_settlement"]
     assert settlement["_finding_id_renames"] == {"G1":"F1"}
     assert settlement["class_records"] == [{"op":"reopen", "class_id":"class-a"}]
+    assert settlement["_class_record_pointers"] == ["/class_outcomes/class-a"]
     assert settlement["findings"][0]["id"] == "F1"
     assert settlement["debt"][0]["finding_id"] == "F1"
 

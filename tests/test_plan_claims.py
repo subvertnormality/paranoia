@@ -234,7 +234,8 @@ def test_authoritative_capture_acceptance_record() -> None:
     ).stdout
     assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
     assert census_allowed["scope"] == (
-        "Adds requested timeout and separate provider duration to attempt telemetry only."
+        "Adds requested timeout, separate provider duration, and diagnostic-only class "
+        "persistence and reopen-wave trailer rendering."
     )
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"

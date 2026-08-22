@@ -464,7 +464,15 @@ def _settle_staged_failure(
     )
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
-        rc.trailer(state),
+        rc.trailer(
+            state,
+            class_first_rounds={
+                item.class_id: item.first_round
+                for item in closure.lineage.blocking()
+            },
+            reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
+            round_label=closure.round_no,
+        ),
         rc.attempt_trailer(attempts),
     ))
     if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
@@ -507,6 +515,19 @@ def _structural_pending_review(
     return _settle_staged_failure(
         closure, stakes=stakes, snapshot=snapshot, error=error, mode=mode,
     )
+
+
+def _reopen_unmechanized_for_stakes(lineage: cc.Lineage) -> tuple[str, ...]:
+    """Reopen closed model-owned classes and report the exact transition set."""
+    reopened = tuple(
+        cid for cid, cls in lineage.classes.items()
+        if cls.status == cc.CLOSED and not cls.mechanized
+    )
+    lineage.classes = {
+        cid: replace(cls, status=cc.OPEN) if not cls.mechanized else cls
+        for cid, cls in lineage.classes.items()
+    }
+    return reopened
 
 
 def _is_legacy_claim_only_phase(
@@ -1054,10 +1075,18 @@ def _staged_structural_review(
     closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
+    explicit_reopened = tuple(
+        row["class_id"] for row in settlement["class_records"]
+        if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)
+    )
     trailer = _staged_success_trailer(
         lineage=lineage, state=state, mode=mode,
         register_status=closure.register_status, minted=minted, attempts=attempts,
         claims_enabled=closure.claims_enabled,
+        session_ref=review.session_ref,
+        reopened_class_ids=tuple(dict.fromkeys(
+            (*getattr(closure, "reopened_class_ids", ()), *explicit_reopened)
+        )),
     )
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
@@ -1066,13 +1095,21 @@ def _staged_structural_review(
 def _staged_success_trailer(
     *, lineage: cc.Lineage, state: dict[str, Any], mode: str,
     register_status: str, minted: list[str], attempts: list[rc.Attempt],
-    claims_enabled: bool,
+    claims_enabled: bool, session_ref: str | None = None,
+    reopened_class_ids: tuple[str, ...] = (),
 ) -> str:
     class_trailer = cc.render_trailer(
         lineage, register_status=register_status, minted=minted,
         include_verdict=False,
     )
-    structural_trailer = rc.trailer(state)
+    structural_trailer = rc.trailer(
+        state,
+        class_first_rounds={
+            item.class_id: item.first_round for item in lineage.blocking()
+        },
+        reopened_class_ids=reopened_class_ids,
+        session_ref=session_ref,
+    )
     if mode != cc.PLAN_MODE or not claims_enabled:
         return "\n".join((
             class_trailer, structural_trailer, rc.attempt_trailer(attempts),
@@ -1619,10 +1656,10 @@ def critique_plan(
             # verdict may freeze across this transition. The next enabled call performs
             # a full audit over that preserved inventory.
             closure.lineage.claim_reverify_required = True
-            closure.lineage.classes = {
-                cid: replace(cls, status=cc.OPEN) if not cls.mechanized else cls
-                for cid, cls in closure.lineage.classes.items()
-            }
+            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
+            closure.reopened_class_ids = tuple(dict.fromkeys(
+                (*closure.reopened_class_ids, *stakes_reopened)
+            ))
             blocks = closure._blocks()
     claim_state: dict[str, Any] = (
         closure.lineage.claim_state
@@ -3298,6 +3335,7 @@ class _ClosureRound:
         self.register_status: str | None = None
         self.deadline: float | None = None
         self.claims_enabled = False
+        self.reopened_class_ids: tuple[str, ...] = ()
         self._latched = False
         self._settled = False
 
@@ -3317,7 +3355,15 @@ class _ClosureRound:
             return []
         self._latched = True
         self._before_sweep()
+        closed_before = {
+            item.class_id for item in self.lineage.active()
+            if item.status == cc.CLOSED
+        }
         self._sweep()
+        self.reopened_class_ids = tuple(sorted(
+            class_id for class_id in closed_before
+            if self.lineage.classes[class_id].status in cc.UNPROVEN_STATUSES
+        ))
         return self._blocks()
 
     # ── hooks the plan subclass turns off ──
