@@ -90,7 +90,6 @@ def run_acceptance(
             "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
         },
         "input": arguments,
-        "elapsed_seconds": round(elapsed, 3),
         "model_call_count": len(attempts),
         "report": report,
         "report_sha256": hashlib.sha256(

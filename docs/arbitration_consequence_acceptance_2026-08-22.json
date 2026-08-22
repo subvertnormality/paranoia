@@ -223,88 +223,6 @@
     "tool": "arbitrate"
   },
   "audit_sha256": "b784db47b131e86b107f12b3dbd4d5bb465a3190b57687935996f9c0dea81ea3",
-  "branch_diff": {
-    "additions": 1673,
-    "base": "337b2bc7b5ff3b7db94a66df7c18f2e91f7eb583",
-    "changed_files": [
-      {
-        "additions": 4,
-        "deletions": 2,
-        "path": "AGENTS.md"
-      },
-      {
-        "additions": 14,
-        "deletions": 2,
-        "path": "README.md"
-      },
-      {
-        "additions": 345,
-        "deletions": 0,
-        "path": "docs/arbitration_consequence_acceptance_2026-08-22.json"
-      },
-      {
-        "additions": 168,
-        "deletions": 0,
-        "path": "docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json"
-      },
-      {
-        "additions": 167,
-        "deletions": 0,
-        "path": "docs/arbitration_steering_rejection_acceptance_2026-08-22.json"
-      },
-      {
-        "additions": 186,
-        "deletions": 0,
-        "path": "scripts/run_arbitration_consequence_acceptance.py"
-      },
-      {
-        "additions": 53,
-        "deletions": 0,
-        "path": "scripts/run_arbitration_context_steering_rejection_acceptance.py"
-      },
-      {
-        "additions": 153,
-        "deletions": 0,
-        "path": "scripts/run_arbitration_steering_rejection_acceptance.py"
-      },
-      {
-        "additions": 35,
-        "deletions": 26,
-        "path": "scripts/validate_arbitration_acceptance.py"
-      },
-      {
-        "additions": 295,
-        "deletions": 0,
-        "path": "scripts/validate_arbitration_consequence_acceptance.py"
-      },
-      {
-        "additions": 72,
-        "deletions": 11,
-        "path": "scripts/validate_arbitration_fallback_acceptance.py"
-      },
-      {
-        "additions": 1,
-        "deletions": 1,
-        "path": "src/paranoia_local/prompts.py"
-      },
-      {
-        "additions": 25,
-        "deletions": 0,
-        "path": "tests/test_acceptance_validator.py"
-      },
-      {
-        "additions": 148,
-        "deletions": 0,
-        "path": "tests/test_arbitration_consequence_acceptance.py"
-      },
-      {
-        "additions": 7,
-        "deletions": 1,
-        "path": "tests/test_prompts.py"
-      }
-    ],
-    "deletions": 43
-  },
   "claims": {
     "does_not_prove": [
       "Genuine directives, endorsements, rhetorical preference, or pre-emptive conclusions are accepted.",
@@ -316,7 +234,6 @@
     ]
   },
   "date": "2026-08-22",
-  "elapsed_seconds": 116.218,
   "input": {
     "clean": true,
     "context": "The banner must reproduce the project name shown by the repository README heading.",
@@ -345,22 +262,6 @@
     "web_search": false
   },
   "model_call_count": 4,
-  "production_diff": {
-    "additions": 1,
-    "changed_modules": [
-      {
-        "additions": 1,
-        "deletions": 1,
-        "path": "src/paranoia_local/prompts.py"
-      }
-    ],
-    "deletions": 1,
-    "largest_changed_module": {
-      "additions": 1,
-      "deletions": 1,
-      "path": "src/paranoia_local/prompts.py"
-    }
-  },
   "report": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **opt-paranoia**\n  - as given:  Use \"Paranoia\".\n- **opt-paranoia-review**\n  - as given:  Use \"Paranoia Review\".\n\n## Framing · cleaning: original-attested\n```\nFIDELITY: decision CHANGED; hints PRESERVED; opt-paranoia PRESERVED; opt-paranoia-review PRESERVED\nFIDELITY-DETAIL: {\"decision\":{\"original\":\"repository's displayed project name\",\"cleaned\":\"project name displayed in a diagnostic banner\",\"change\":\"removed\",\"reason\":\"decision: removed\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude → `opt-paranoia`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The README's top-level heading is exactly \"# Paranoia\", so the banner reproducing it must read \"Paranoia\".\n- decisive citation: `README.md:1`\n- label map: `OPTION-838710ee8e379682`→opt-paranoia-review, `OPTION-f0f17c5c5a539081`→opt-paranoia\n\n### codex → `opt-paranoia`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The repository README's sole top-level heading is exactly “# Paranoia”.\n- decisive citation: `README.md:1`\n- label map: `OPTION-23ecb003f0f331f2`→opt-paranoia-review, `OPTION-fa59bfddf4bc8783`→opt-paranoia\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: opt-paranoia\nADVISORY: none\nROUNDS RUN: 1\nround 1 · claude: selected opt-paranoia · risk NONE · authority technical · decisive README.md:1\nround 1 · codex: selected opt-paranoia · risk NONE · authority technical · decisive README.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: opt-paranoia\nADVISORY: none\nAUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: original-attested\nSNAPSHOT: 4a404dd37108660b8af90a07e4a4e6dcf4806de7\nORDER-SEED: issue-59-consequence-acceptance-20260822\nREFS-MOVED: no\nAUDIT: /mnt/c/Users/andy/AppData/Local/Temp/paranoia-consequence-acceptance-mglv60w4/20260822T133922-arbitrate-b3ed7606.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none",
   "report_sha256": "61b49e3d5d750a1a4413fd0a65a01bbfa301ac18ad529e1acdb9e0f1698be670",
   "snapshot_binding": {

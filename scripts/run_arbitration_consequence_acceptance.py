@@ -109,20 +109,6 @@ def main() -> int:
     if len(audit.get("rounds", [])) < 1:
         raise RuntimeError("acceptance did not exercise both deciders")
 
-    diff_numstat = _git("diff", "--numstat", "main...HEAD").splitlines()
-    changed = []
-    for row in diff_numstat:
-        additions, deletions, path = row.split("\t", 2)
-        changed.append({
-            "path": path,
-            "additions": None if additions == "-" else int(additions),
-            "deletions": None if deletions == "-" else int(deletions),
-        })
-    production = [row for row in changed if row["path"].startswith("src/")]
-    largest_production = max(
-        production,
-        key=lambda row: (row["additions"] or 0) + (row["deletions"] or 0),
-    )
     source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
     snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
     artifact = {
@@ -141,20 +127,7 @@ def main() -> int:
             "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
         },
         "input": arguments,
-        "elapsed_seconds": round(elapsed, 3),
         "model_call_count": len(attempts),
-        "branch_diff": {
-            "base": _git("rev-parse", "main"),
-            "changed_files": changed,
-            "additions": sum(row["additions"] or 0 for row in changed),
-            "deletions": sum(row["deletions"] or 0 for row in changed),
-        },
-        "production_diff": {
-            "changed_modules": production,
-            "additions": sum(row["additions"] or 0 for row in production),
-            "deletions": sum(row["deletions"] or 0 for row in production),
-            "largest_changed_module": largest_production,
-        },
         "report_sha256": hashlib.sha256(
             report.encode("utf-8", "surrogatepass")
         ).hexdigest(),

@@ -118,7 +118,6 @@
     ]
   },
   "date": "2026-08-22",
-  "elapsed_seconds": 22.404,
   "input": {
     "clean": true,
     "context": "The banner must reproduce the project name shown by the repository README heading.",

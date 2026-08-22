@@ -781,7 +781,10 @@ What it does, in order:
    and recomputed outcomes. Acceptance inputs may not override the cleaner model; validator changes
    do not force a provider rerun when the recorded production route is unchanged. Every historical
    blob read first resolves the recorded revision as that exact commit; missing or non-commit objects
-   fail before any `revision:path` specification is constructed.
+   fail before any `revision:path` specification is constructed. The proof envelope has a closed
+   top-level and input schema and server-owned claim/limitation text. Unbound wall-clock and branch-
+   diff observations are intentionally omitted; the retained provider attempt ledger is the execution
+   evidence.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

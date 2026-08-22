@@ -37,7 +37,6 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     assert artifact["input"]["research"] is False
     assert artifact["input"]["web_search"] is False
     assert artifact["model_call_count"] == 4
-    assert artifact["elapsed_seconds"] > 0
 
     audit = artifact["audit"]
     assert audit["outcome"] == "CONVERGED"
@@ -64,11 +63,6 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         assert (route["engine"], route["route"]) == (engine, "external-cli")
         assert route["cli_version"]
 
-    production = artifact["production_diff"]
-    assert (production["additions"], production["deletions"]) == (1, 1)
-    assert production["largest_changed_module"]["path"] == (
-        "src/paranoia_local/prompts.py"
-    )
     report = artifact["report"]
     assert hashlib.sha256(report.encode("utf-8", "surrogatepass")).hexdigest() == (
         artifact["report_sha256"]
@@ -82,7 +76,8 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "decider-prompt", "vote", "outcome", "negative-rounds", "negative-reason",
         "context-rounds", "context-reason", "manifest-extra", "manifest-delete",
         "production-drift", "cleaner-model", "attester-model",
-        "input-cleaner-override",
+        "input-cleaner-override", "claims", "limitation", "top-level-extra",
+        "top-level-delete",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -148,6 +143,18 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
         context_negative["audit"]["phase_attempts"][1]["execution"]["model"] = "other-attester"
     elif mutation == "input-cleaner-override":
         negative["input"]["cleaner_model"] = "other-cleaner"
+        sync = False
+    elif mutation == "claims":
+        positive["claims"]["proves"][0] = "Everything is proven."
+        sync = False
+    elif mutation == "limitation":
+        context_negative["claims"]["does_not_prove"] = []
+        sync = False
+    elif mutation == "top-level-extra":
+        positive["observational_elapsed_seconds"] = 1.0
+        sync = False
+    elif mutation == "top-level-delete":
+        del negative["date"]
         sync = False
     else:
         target = negative

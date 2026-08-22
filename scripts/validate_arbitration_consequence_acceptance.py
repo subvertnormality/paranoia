@@ -46,6 +46,40 @@ REPLAYED_PRODUCTION_SOURCES = frozenset({
     "src/paranoia_local/inert_git.py",
     "src/paranoia_local/prompts.py",
 })
+POSITIVE_CLAIMS = {
+    "proves": [
+        "The real cleaner and cross-vendor attester admitted consequence-only stakes and governing factual context.",
+        "Both real deciders received the accepted packet and the arbitration converged.",
+    ],
+    "does_not_prove": [
+        "Genuine directives, endorsements, rhetorical preference, or pre-emptive conclusions are accepted.",
+        "Every future provider version will classify every framing correctly.",
+    ],
+}
+
+
+def _negative_claims(field: str) -> dict[str, list[str]]:
+    return {
+        "proves": [
+            f"The real cleaner and cross-vendor attester rejected this explicit {field}-steering packet.",
+            f"No decider ran after the attester's {field}-advocacy verdict.",
+        ],
+        "does_not_prove": [
+            "Each phrase in the compound packet independently causes rejection.",
+            "Every future provider version will classify every framing correctly.",
+        ],
+    }
+
+
+COMMON_TOP_LEVEL = {
+    "acceptance_kind", "audit", "audit_sha256", "claims", "date", "input",
+    "model_call_count", "report", "report_sha256", "snapshot_binding",
+    "source_revision", "source_sha256", "version",
+}
+INPUT_FIELDS = {
+    "clean", "context", "decision", "effort", "files", "options", "order_seed",
+    "repo_path", "research", "stakes", "web_search",
+}
 
 
 def _canonical_digest(value: object) -> str:
@@ -115,7 +149,9 @@ def _common(
 def _raw_input_bound(artifact: dict, audit: dict) -> bool:
     arguments, raw = artifact.get("input", {}), audit.get("raw_input", {})
     return (
-        raw.get("decision") == arguments.get("decision")
+        isinstance(arguments, dict)
+        and set(arguments) == INPUT_FIELDS
+        and raw.get("decision") == arguments.get("decision")
         and raw.get("stakes") == arguments.get("stakes")
         and raw.get("context") == arguments.get("context")
         and raw.get("files") == arguments.get("files")
@@ -129,11 +165,17 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
 
 
 def _positive(artifact: dict, repo: Path) -> None:
+    if set(artifact) != COMMON_TOP_LEVEL:
+        raise ValueError("positive acceptance top-level schema mismatch")
     audit, instructions, source = _common(
         artifact, repo, expected_sources=POSITIVE_SOURCES,
     )
     if artifact.get("acceptance_kind") != "arbitration-consequence-not-advocacy":
         raise ValueError("positive acceptance kind mismatch")
+    if artifact.get("version") != 1 or artifact.get("date") != "2026-08-22":
+        raise ValueError("positive acceptance version metadata mismatch")
+    if artifact.get("claims") != POSITIVE_CLAIMS:
+        raise ValueError("positive acceptance claim scope mismatch")
     if not _raw_input_bound(artifact, audit):
         raise ValueError("positive acceptance input mismatch")
     if not (
@@ -172,11 +214,17 @@ def _positive(artifact: dict, repo: Path) -> None:
 def _negative(
     artifact: dict, repo: Path, *, field: str, expected_sources: frozenset[str],
 ) -> None:
+    if set(artifact) != COMMON_TOP_LEVEL:
+        raise ValueError("negative acceptance top-level schema mismatch")
     audit, instructions, _ = _common(
         artifact, repo, expected_sources=expected_sources,
     )
     if artifact.get("acceptance_kind") != f"arbitration-{field}-steering-rejected":
         raise ValueError("negative acceptance kind mismatch")
+    if artifact.get("version") != 1 or artifact.get("date") != "2026-08-22":
+        raise ValueError("negative acceptance version metadata mismatch")
+    if artifact.get("claims") != _negative_claims(field):
+        raise ValueError("negative acceptance claim scope mismatch")
     if not _raw_input_bound(artifact, audit):
         raise ValueError("negative acceptance input mismatch")
     raw, cleaned = audit.get("raw_input", {}), audit.get("cleaned", {})
