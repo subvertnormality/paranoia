@@ -1312,6 +1312,59 @@ def test_untrusted_failure_diagnostic_cannot_forge_review_or_trailer_structure(t
     assert closure.lineage.review_state["staged_failure"]["message"] == message
 
 
+def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
+    state = {
+        "phase": "correction", "last_round": 57,
+        "debt": [{
+            "id": "debt-a", "status": "open", "severity": cc.MAJOR,
+            "first_round": 34, "class_ids": ["6cf3f68b"],
+        }],
+    }
+
+    rendered = rc.trailer(
+        state, class_first_rounds={"6cf3f68b": 1},
+        session_ref="session-57",
+    )
+
+    assert (
+        "PERSISTENCE: 6cf3f68b currently open; tracked across 57 recorded rounds "
+        "(first raised 1, now 57), current debt open since 34"
+    ) in rendered
+    assert "rebut with session_ref=session-57" in rendered
+
+
+def test_trailer_omits_persistence_until_third_tracked_round() -> None:
+    state = {
+        "phase": "correction", "last_round": 2,
+        "debt": [{
+            "id": "debt-a", "status": "open", "severity": cc.BLOCKER,
+            "first_round": 1, "class_ids": ["class-a"],
+        }],
+    }
+
+    assert "PERSISTENCE:" not in rc.trailer(
+        state, class_first_rounds={"class-a": 1}, session_ref="s",
+    )
+    state["last_round"] = 3
+    assert "PERSISTENCE:" in rc.trailer(
+        state, class_first_rounds={"class-a": 1}, session_ref="s",
+    )
+
+
+def test_trailer_marks_reopen_wave_without_inventing_history() -> None:
+    state = {"phase": "correction", "last_round": 37, "debt": []}
+
+    rendered = rc.trailer(
+        state, reopened_class_ids=("class-c", "class-a", "class-c"),
+    )
+
+    assert (
+        "REOPEN-WAVE: 2 previously closed class(es) reopened this round: "
+        "class-a, class-c"
+    ) in rendered
+    assert "re-arm any prior disposition" in rendered
+
+
 @pytest.mark.parametrize(
     ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
     [

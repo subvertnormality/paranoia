@@ -1058,6 +1058,11 @@ def _staged_structural_review(
         lineage=lineage, state=state, mode=mode,
         register_status=closure.register_status, minted=minted, attempts=attempts,
         claims_enabled=closure.claims_enabled,
+        session_ref=review.session_ref,
+        reopened_class_ids=tuple(
+            row["class_id"] for row in settlement["class_records"]
+            if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)
+        ),
     )
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
@@ -1066,13 +1071,21 @@ def _staged_structural_review(
 def _staged_success_trailer(
     *, lineage: cc.Lineage, state: dict[str, Any], mode: str,
     register_status: str, minted: list[str], attempts: list[rc.Attempt],
-    claims_enabled: bool,
+    claims_enabled: bool, session_ref: str | None = None,
+    reopened_class_ids: tuple[str, ...] = (),
 ) -> str:
     class_trailer = cc.render_trailer(
         lineage, register_status=register_status, minted=minted,
         include_verdict=False,
     )
-    structural_trailer = rc.trailer(state)
+    structural_trailer = rc.trailer(
+        state,
+        class_first_rounds={
+            item.class_id: item.first_round for item in lineage.blocking()
+        },
+        reopened_class_ids=reopened_class_ids,
+        session_ref=session_ref,
+    )
     if mode != cc.PLAN_MODE or not claims_enabled:
         return "\n".join((
             class_trailer, structural_trailer, rc.attempt_trailer(attempts),

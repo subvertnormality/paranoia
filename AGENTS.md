@@ -333,6 +333,10 @@ of the resulting code and tests.
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
+  Surface every currently blocking class tracked across at least three recorded rounds with its
+  class age, current-debt age, and current reviewer session for `rebut`; do not infer a per-round
+  presence count that durable state does not store. Mark any class reopen transition as a reopen
+  wave so a prior scope disposition is explicitly re-armed. These are diagnostics, not new gates.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and

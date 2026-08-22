@@ -1020,6 +1020,7 @@ CLASS-CLOSURE: 1 open, 0 closed
   19ef00ab repeated state transitions preserve their owner (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)
 STRUCTURAL-PHASE: correction
 STRUCTURAL-DEBT: 2 blocking open
+PERSISTENCE: 19ef00ab currently open; tracked across 3 recorded rounds (first raised 1, now 3), current debt open since 1 — repeated correction may be unsatisfiable within this unit's scope; rebut with session_ref=...
 STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0
 CONVERGENCE: BLOCKED — staged structural debt remains open.
 ```
@@ -1030,6 +1031,8 @@ CONVERGENCE: BLOCKED — staged structural debt remains open.
 | `CLASS-CLOSURE` | Open/closed reusable-class counts plus blocking class detail |
 | `STRUCTURAL-PHASE: census\|correction\|final\|clear` | The next broad/targeted gate; `final` requires one fresh cold regression |
 | `STRUCTURAL-DEBT: N blocking open` | Concrete governing findings still requiring correction |
+| `PERSISTENCE` | A currently blocking class has survived at least three recorded rounds; names its class age, current-debt age, and the exact `rebut` session when available |
+| `REOPEN-WAVE` | One or more previously closed classes reopened this round; prior scope/disposition decisions need to be re-armed before another correction |
 | `STAGED-ATTEMPTS: total=N validation-retries=N validation-invalid=N execution-failed=N` | Exact call shape derived from the ledger: retry-role count, locally invalid response count, and all other non-completed attempts |
 | `CONVERGENCE: NOT-BLOCKED` | Structural debt/classes and, for plans, external claims are clear |
 | `CONVERGENCE: BLOCKED` | The named phase, debt, class, claim, format, or state condition still blocks |
@@ -1041,6 +1044,10 @@ first-class blocker in `CLASS-CLOSURE`; it is not duplicated into synthetic find
 invented evidence anchors. The class trailer lists bounded path/line/text match detail and renders a
 binary recurrence as `path: binary match (line not shown)`. In that case the governing line says
 class closure remains open.
+Persistence is deliberately diagnostic, not another blocking rule. It uses only facts the durable
+lineage proves: the first class round, current round, and first round of the currently open debt. It
+does not claim how many intervening rounds contained a finding. On the third tracked round it
+surfaces `rebut`, which resumes the current reviewer session for a concede-or-hold scope dispute.
 
 One-shot, injected-engine, and successfully persisted staged tracked trailers all retain
 `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and unmechanized-class detail. If lineage state cannot be

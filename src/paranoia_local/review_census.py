@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from . import class_closure as cc, staged_protocol as sp
 
@@ -23,6 +23,7 @@ MAX_REJECTED_PAYLOAD_CHARS = 12_000
 MAX_ENGINE_FAILURE_MESSAGE_CHARS = 4_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
 CENSUS_CACHE_VERSION = 3
+PERSISTENCE_REBUT_ROUNDS = 3
 
 
 class CensusError(ValueError):
@@ -307,10 +308,57 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     return out
 
 
-def trailer(state: dict[str, Any]) -> str:
+def trailer(
+    state: dict[str, Any], *,
+    class_first_rounds: Mapping[str, int] | None = None,
+    reopened_class_ids: Sequence[str] = (),
+    session_ref: str | None = None,
+) -> str:
     debt = [d for d in state.get("debt", []) if d.get("status") == "open" and d.get("severity") in BLOCKING]
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
+    current_round = state.get("last_round")
+    if isinstance(current_round, int) and class_first_rounds:
+        debt_first_by_class: dict[str, int] = {}
+        for item in debt:
+            first = item.get("first_round")
+            if not isinstance(first, int):
+                continue
+            for class_id in item.get("class_ids", []):
+                if isinstance(class_id, str):
+                    debt_first_by_class[class_id] = min(
+                        first, debt_first_by_class.get(class_id, first),
+                    )
+        for class_id in sorted(class_first_rounds):
+            first = class_first_rounds.get(class_id)
+            if not isinstance(first, int):
+                continue
+            age = current_round - first + 1
+            if age < PERSISTENCE_REBUT_ROUNDS:
+                continue
+            debt_first = debt_first_by_class.get(class_id)
+            rebut = (
+                f"rebut with session_ref={trailer_diagnostic(session_ref)}"
+                if session_ref else "use rebut against the current reviewer session"
+            )
+            lines.append(
+                f"PERSISTENCE: {trailer_diagnostic(class_id)} currently open; "
+                f"tracked across {age} recorded rounds (first raised {first}, now "
+                f"{current_round})"
+                + (f", current debt open since {debt_first}" if debt_first is not None
+                   else ", no governing debt is currently bound")
+                + " — repeated correction may be unsatisfiable within this unit's "
+                f"scope; {rebut}"
+            )
+    reopened = sorted(dict.fromkeys(
+        class_id for class_id in reopened_class_ids if isinstance(class_id, str)
+    ))
+    if reopened:
+        lines.append(
+            f"REOPEN-WAVE: {len(reopened)} previously closed class(es) reopened this "
+            f"round: {', '.join(trailer_diagnostic(item) for item in reopened)} — "
+            "re-arm any prior disposition and reassess scope before another correction"
+        )
     validation_debt = state.get("validation_debt") or state.get("format_debt")
     if state.get("staged_failure"):
         failure = state["staged_failure"]
