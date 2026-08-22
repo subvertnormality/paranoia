@@ -931,7 +931,6 @@
         }
       },
       "audit_canonical_sha256": "f3dffedfb9ea572a73697fc552eb5eb213e6d4cce03062063f9668ee82057fbb",
-      "audit_sha256": "5853e0521189beb3cdd5a9a5fb66eee9caa3055b2e0645954ae5b5122762bb63",
       "base_id": "521b4a12adc83156e5380153f51a5ca1a7c60f66",
       "engine": "codex",
       "expected": "nonconforming",
@@ -1058,7 +1057,6 @@
         "rounds": 1
       },
       "lineage_state_canonical_sha256": "2970b5bd1decc5b0965c7b389f475ff2dcde8e5e205ccd4113a040da5f81ada9",
-      "lineage_state_sha256": "b90e7e3e2ec498ccf0e8a2cb0cf2729b4990ca382d90425e11a5332694dd67bb",
       "model": "gpt-5.6-sol",
       "packet": "=== UNDER REVIEW ===\nworking-tree snapshot 521b4a12adc8..13b5dc35d0db in issue63-exact-fixture\n\n=== DIFFSTAT ===\nREADME.md              |  2 +-\n reviewer.py            | 10 +++++++++-\n tests/test_fidelity.py |  6 ++++++\n 3 files changed, 16 insertions(+), 2 deletions(-)\n\n=== DIFF (git diff 521b4a12adc8..13b5dc35d0db) ===\ndiff --git a/README.md b/README.md\nindex e796c7a..18e94ee 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,3 @@\n # Fidelity fixture\n \n-The feature branch must implement the frozen contract supplied by the reviewer.\n+The feature branch claims the frozen contract is complete, but the placeholder remains.\ndiff --git a/reviewer.py b/reviewer.py\nindex 67cf633..f5be692 100644\n--- a/reviewer.py\n+++ b/reviewer.py\n@@ -1,2 +1,10 @@\n+import json\n+from pathlib import Path\n+\n+\n def critique_branch(contract: str) -> None:\n-    \"\"\"Placeholder public entry point.\"\"\"\n+    \"\"\"Persist the deliberately wrong artifact shape for the negative fixture.\"\"\"\n+    Path(\"result.json\").write_text(\n+        json.dumps({\"branch_contract\": contract, \"extra_state\": True}) + \"\\n\",\n+        encoding=\"utf-8\",\n+    )\ndiff --git a/tests/test_fidelity.py b/tests/test_fidelity.py\nnew file mode 100644\nindex 0000000..8a01f09\n--- /dev/null\n+++ b/tests/test_fidelity.py\n@@ -0,0 +1,6 @@\n+def helper_that_does_not_invoke_the_public_entry_point() -> str:\n+    return \"tested the wrong seam\"\n+\n+\n+def test_wrong_seam() -> None:\n+    assert helper_that_does_not_invoke_the_public_entry_point()\n\n\n=== FILE README.md [M] ===\n# Fidelity fixture\n\nThe feature branch claims the frozen contract is complete, but the placeholder remains.\n\n\n=== FILE reviewer.py [M] ===\nimport json\nfrom pathlib import Path\n\n\ndef critique_branch(contract: str) -> None:\n    \"\"\"Persist the deliberately wrong artifact shape for the negative fixture.\"\"\"\n    Path(\"result.json\").write_text(\n        json.dumps({\"branch_contract\": contract, \"extra_state\": True}) + \"\\n\",\n        encoding=\"utf-8\",\n    )\n\n\n=== FILE tests/test_fidelity.py [A] ===\ndef helper_that_does_not_invoke_the_public_entry_point() -> str:\n    return \"tested the wrong seam\"\n\n\ndef test_wrong_seam() -> None:\n    assert helper_that_does_not_invoke_the_public_entry_point()\n",
       "packet_sha256": "8c9955a308c311d848b3c393200c55da4d40add9bc0f2417ea8a6c0893619c6b",
@@ -1824,7 +1822,6 @@
         }
       },
       "audit_canonical_sha256": "5525c1960ccf2da38a578f0129ea27781836983f02add7ad109dd8eebc5b7dab",
-      "audit_sha256": "59c2ac1832f557a60768d32b3d3f8efffe8305f53a29c9f305659a919e5b32da",
       "base_id": "521b4a12adc83156e5380153f51a5ca1a7c60f66",
       "engine": "codex",
       "expected": "conforming",
@@ -1856,7 +1853,6 @@
         "rounds": 1
       },
       "lineage_state_canonical_sha256": "cf1cf9845a0f5d777fd3c565c364a486d48e71290ef60c3637d97f842caf7299",
-      "lineage_state_sha256": "df492d360d6b744a44e56691b31414e85a028c412967303a23cbeeaa0f092d86",
       "model": "gpt-5.6-sol",
       "packet": "=== UNDER REVIEW ===\nworking-tree snapshot 521b4a12adc8..95a9c6370b1e in issue63-exact-fixture\n\n=== DIFFSTAT ===\nreviewer.py            | 11 ++++++++++-\n tests/test_fidelity.py | 12 ++++++++++++\n 2 files changed, 22 insertions(+), 1 deletion(-)\n\n=== DIFF (git diff 521b4a12adc8..95a9c6370b1e) ===\ndiff --git a/reviewer.py b/reviewer.py\nindex 67cf633..09baaf3 100644\n--- a/reviewer.py\n+++ b/reviewer.py\n@@ -1,2 +1,11 @@\n+import json\n+from pathlib import Path\n+\n+\n def critique_branch(contract: str) -> None:\n-    \"\"\"Placeholder public entry point.\"\"\"\n+    \"\"\"Emit the contracted artifact through the public entry point.\"\"\"\n+    output = Path(\"fidelity.json\")\n+    output.write_text(\n+        json.dumps({\"branch_contract\": contract}, sort_keys=True) + \"\\n\",\n+        encoding=\"utf-8\",\n+    )\ndiff --git a/tests/test_fidelity.py b/tests/test_fidelity.py\nnew file mode 100644\nindex 0000000..9afaee3\n--- /dev/null\n+++ b/tests/test_fidelity.py\n@@ -0,0 +1,12 @@\n+import json\n+\n+from reviewer import critique_branch\n+\n+\n+def test_public_entry_point_emits_only_the_contract(tmp_path, monkeypatch) -> None:\n+    monkeypatch.chdir(tmp_path)\n+    critique_branch(\"frozen\")\n+    output = tmp_path / \"fidelity.json\"\n+    assert json.loads(output.read_text(encoding=\"utf-8\")) == {\n+        \"branch_contract\": \"frozen\",\n+    }\n\n\n=== FILE reviewer.py [M] ===\nimport json\nfrom pathlib import Path\n\n\ndef critique_branch(contract: str) -> None:\n    \"\"\"Emit the contracted artifact through the public entry point.\"\"\"\n    output = Path(\"fidelity.json\")\n    output.write_text(\n        json.dumps({\"branch_contract\": contract}, sort_keys=True) + \"\\n\",\n        encoding=\"utf-8\",\n    )\n\n\n=== FILE tests/test_fidelity.py [A] ===\nimport json\n\nfrom reviewer import critique_branch\n\n\ndef test_public_entry_point_emits_only_the_contract(tmp_path, monkeypatch) -> None:\n    monkeypatch.chdir(tmp_path)\n    critique_branch(\"frozen\")\n    output = tmp_path / \"fidelity.json\"\n    assert json.loads(output.read_text(encoding=\"utf-8\")) == {\n        \"branch_contract\": \"frozen\",\n    }\n",
       "packet_sha256": "874f8aa3bfc455c229b3a96038f621e645cc2236f02d2a1d1e7e57ee5257d31c",
@@ -1880,15 +1876,15 @@
       "structural_snapshot": "320b6f674b3824a3ed358aac8c7be8d2068f6144a3b7aff4b2b3ca5615939cf8"
     }
   ],
-  "source_revision": "1bd90a62cfd698c6c8d3a6fd15dc3029bba32325",
+  "source_revision": "ac2c30edee7d3675e5bc27526638842d878c2418",
   "source_sha256": {
-    "scripts/build_branch_plan_fidelity_acceptance.py": "c93ddc4bf816e3774a98557a5ef2894da5d4a4702bba5b329e1f174f8041e046",
+    "scripts/build_branch_plan_fidelity_acceptance.py": "69be88a4cf394fcd28f8b53b075b70efeeef67949fe6aa01d7b30b2dfc1d15ec",
     "src/paranoia_local/class_closure.py": "43d7d6053ecfda8a1f0d02df678ce1936b288bdded4f12834f03736b3d280f35",
     "src/paranoia_local/handlers.py": "422cdf98cbc92839cd57a810b8d000b644970d78f0d8999361de8b30a3620fce",
     "src/paranoia_local/prompts.py": "c848e47655d5b01a877cc0cf0efb202e4546ac99a8ccfac5fbf5867c45dd1dae",
     "src/paranoia_local/runner.py": "fbbe1131126ab959eb84e9df9e0e0c10b040d08ee4a44870e3b9472042079c73",
     "src/paranoia_local/server.py": "57f5ae783524cc77abda8e379bbabafb940095e20e80c7ef1d7664e2ee55fbf2",
     "src/paranoia_local/staged_protocol.py": "7288cdf4b53986dcc6c455efe76d58901ef22863daf84b025e3acd7f8b168483",
-    "tests/test_branch_plan_fidelity.py": "a718b8fc74975b0d5226afe31ff6a5b8ce7f73f6de23ee465c6cbd288c4eb5c8"
+    "tests/test_branch_plan_fidelity.py": "7c1610823b5513ea7a0777b9961beb646f09838769d81a170f41cec54d3dc46e"
   }
 }
