@@ -7,10 +7,10 @@ same-session validation correction a 900-second circuit breaker while retaining 
 300-second limit for later binding and cold-attestation calls. The retained
 [`claim_discovery_timeout_acceptance_2026-08-22.json`](claim_discovery_timeout_acceptance_2026-08-22.json)
 record exercises the public `critique_plan` handler with the exact 94,110-byte historical
-plan that repeatedly failed at the former boundary. Its claim phase took 732,183 ms,
-completed four model attempts without an execution timeout, persisted 22 claim outcomes,
+plan that repeatedly failed at the former boundary. Its claim phase took 884,185 ms,
+completed four model attempts without an execution timeout, persisted 20 claim outcomes,
 and continued into the structural census. The artifact deliberately retains the final
-`CONVERGENCE: BLOCKED`: seventeen claims remained unverified, and the historical plan acquired
+`CONVERGENCE: BLOCKED`: two claims were refuted, thirteen remained unverified, and the historical plan acquired
 structural debt. It proves recovery of this concrete timeout failure, not universal
 provider latency or correctness of that plan.
 The runner starts with empty audit and lineage directories, binds the public handler through
