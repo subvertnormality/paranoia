@@ -81,9 +81,10 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     assert hashlib.sha256(
         artifact["input"]["text"].encode("utf-8", "surrogateescape")
     ).hexdigest() == artifact["input"]["sha256"]
-    assert artifact["source"]["revision"] == "dccea78a8cd496179dd8922ca56e710ec480ecb4"
-    assert artifact["source"]["diff"]["file_count"] == 7
-    assert artifact["source"]["diff"]["additions"] == 325
+    assert artifact["source"]["revision"] == "798092a1b0d346d22e81db2ac0287ae1cc31c469"
+    assert artifact["source"]["clean_before_and_after"] is True
+    assert artifact["source"]["diff"]["file_count"] == 10
+    assert artifact["source"]["diff"]["additions"] == 3_328
     assert artifact["source"]["diff"]["deletions"] == 57
     assert artifact["source"]["module_lines"]["src/paranoia_local/handlers.py"] == 3_519
     for relative, expected_sha256 in artifact["source"]["hashes"].items():
@@ -96,12 +97,18 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     invocation = artifact["invocation"]
     assert invocation["public_handler"] == "paranoia_local.handlers.critique_plan"
     assert invocation["execution_route"] == "external-cli"
-    assert invocation["cli_version"] == "0.149.0"
+    assert invocation["cli_version_output"] == "codex-cli 0.149.0"
     assert invocation["model"] == "gpt-5.6-sol"
+    assert invocation["source_revision_before"] == artifact["source"]["revision"]
+    assert invocation["source_revision_after"] == artifact["source"]["revision"]
+    assert invocation["source_status_before"] == invocation["source_status_after"] == ""
+    assert invocation["elapsed_ms"] > invocation["claim_role_timeouts_seconds"]["claim-discovery"] * 1000
+    assert invocation["result_text"] == artifact["observed"]["result_text"]
     assert invocation["claim_role_timeouts_seconds"] == {
         "claim-discovery": 600,
         "claim-discovery-validation-retry": 600,
         "claim-binding": 300,
+        "claim-binding-validation-retry": 300,
         "claim-attestation": 300,
     }
 
@@ -109,12 +116,12 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     assert observed["claim_duration_ms"] == audit["claim_duration_ms"] > 300_000
     assert observed["claim_model_calls"] == audit["claim_model_calls"] == 5
     assert observed["claim_status"].startswith("parsed ")
-    assert observed["claim_counts"] == {"refuted": 0, "supported": 5, "unverified": 10}
+    assert observed["claim_counts"] == {"refuted": 1, "supported": 8, "unverified": 9}
     assert observed["ordered_attempt_roles"] == [
         "claim-discovery",
         "claim-discovery-validation-retry",
         "claim-binding",
-        "claim-binding",
+        "claim-binding-validation-retry",
         "claim-attestation",
         "census-domain",
         "census-execution",
@@ -131,7 +138,7 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
             assert digest is None or len(digest) == 64
     assert lineage["rounds"] == 1
     assert lineage["claim_state"]["rounds"] == 1
-    assert len(lineage["claim_state"]["claims"]) == 15
+    assert len(lineage["claim_state"]["claims"]) == 18
     assert lineage["review_state"]["phase"] == "correction"
     assert observed["result_text"].endswith(
         "STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0\n"
