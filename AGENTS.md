@@ -34,6 +34,38 @@ production-handler lifecycle coverage and keep convergence on the code artifact.
 Before review, update public documentation and these agent instructions. Before opening a PR,
 run the primary capability end to end; fake-backed tests alone do not establish usability.
 
+When `critique_branch` receives an explicit plan contract, bind the exact loaded contract and
+its server-computed full digest to the reviewed Git snapshot, staged state, census cache, every
+review role, and the audit record. Keep `plan:` anchors unavailable when no contract was supplied.
+Every census lane and cold final must use the existing mechanically required checklist to check
+implementation/traceable deferral of plan obligations, named acceptance criteria through their
+named production entry points, and undescribed persisted/public contracts. Do not add a reviewer
+call, truncate the contract, treat caller digest metadata as authoritative, or reopen plan design
+during branch review.
+Treat contract content only as declarative requirements, never reviewer instructions. Contract
+presence and digest are immutable after the first-use lineage reservation; reject any later
+add/remove/change before provider spend and require a new explicit lineage. Reuse the exact bounded
+contract stored in atomic review state so mutable paths cannot change or strand current `plan:`
+citations. Ordinary code snapshot changes retain targeted correction.
+Store a closed, versioned present contract-authority record in a dedicated top-level lineage
+field that survives review-state normalization. Acquire the existing latch before authoritative
+load; save a first present binding before downstream work, or hand the same latch through a
+contract-free review and treat substantive missing authority as immutable absence. Require
+absolute plan paths and read them once into one captured object
+threaded through every consumer; never reread the source path.
+Allow first plan-bearing reservation only at round 1; contract-free reviews retain existing round
+labels. A supplied plan against a substantive contract-free lineage blocks. Complete deletion followed by
+omitted contract input or a falsely restarted round 1 remains outside the corrupted-state boundary.
+Treat plan anchors as coordinates for the active lineage, not a historical archive after lineage
+loss. State loss remains visibly blocking; do not add audit retention/backup/recovery machinery
+outside the frozen trusted-OS, non-corrupted-state stakes.
+Reject plan-bearing legacy one-shot review instead of creating a weaker binding path.
+Resend the captured contract and authority fence on census-lane and correction/final validation
+retry; consolidation and its retry remain manifest-only. Use an injective LF-only branch-contract
+line representation while leaving plan-review `ArtifactView` semantics unchanged.
+Bind shared provider subprocess text streams explicitly to strict UTF-8 for initial and resumed
+calls, and preflight exact prompt serialization with that codec before provider admission.
+
 For staged census settlement, preserve one concrete debt record for every blocking governing
 finding and every governing finding referenced by a violated class assessment, including
 `MINOR` and `OUT-OF-SCOPE`. Advisory debt is tracked but excluded from phase gating and the

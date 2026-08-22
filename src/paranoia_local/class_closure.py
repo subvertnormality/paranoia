@@ -327,6 +327,11 @@ class Lineage:
     #: Staged structural-review phase and concrete finding debt. Kept in the same
     #: atomic file as classes and claims so no partial clearance can cross stores.
     review_state: dict[str, Any] = field(default_factory=dict)
+    #: Immutable critique_branch plan-contract authority. ``None`` means a lineage
+    #: created before the feature (or a genuinely new, not-yet-settled lineage);
+    #: plan-bound branch lineages use a closed versioned present record; substantive
+    #: branch state with no record is immutable contract-free authority.
+    branch_contract: dict[str, Any] | None = None
     #: Which tool created this lineage. A plan lineage holds only unmechanized classes
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
@@ -368,7 +373,7 @@ def _paths(root: Path, lineage_id: str) -> tuple[Path, Path]:
 
 
 def load_lineage(root: Path, lineage_id: str, *, stamp: str,
-                 mode: str = BRANCH_MODE) -> Lineage:
+                 mode: str = BRANCH_MODE, pending_owned: bool = False) -> Lineage:
     """`mode` is the tool asking. Opening a lineage created by the other tool is
     REFUSED, not merged: a plan round that loaded a branch lineage would either sweep
     mechanized predicates with no reviewed snapshot, or skip the sweep and carry a
@@ -382,7 +387,7 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
             f"lineage {lineage_id} has quarantined state — repair or delete "
             f"{quarantined[-1]} before this lineage can be used again"
         )
-    if pending.exists():
+    if pending.exists() and not pending_owned:
         raise StateUnavailable(
             f"a previous round left a pending write latch at {pending}; its state write "
             "may not have completed. Inspect and remove it to continue."
@@ -434,11 +439,12 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         claim_state=deepcopy(raw.get("claim_state", {})),
         claim_reverify_required=bool(raw.get("claim_reverify_required", False)),
         review_state=deepcopy(raw.get("review_state", {})),
+        branch_contract=deepcopy(raw.get("branch_contract")),
     )
 
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
-    return {
+    payload = {
         "mode": lineage.mode,
         "rounds": lineage.rounds,
         "next_seq": lineage.next_seq,
@@ -452,6 +458,9 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
         "claim_reverify_required": lineage.claim_reverify_required,
         "review_state": lineage.review_state,
     }
+    if lineage.branch_contract is not None:
+        payload["branch_contract"] = lineage.branch_contract
+    return payload
 
 
 def open_latch(root: Path, lineage_id: str) -> None:
@@ -560,6 +569,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
         mode=lineage.mode, claim_state=deepcopy(lineage.claim_state),
         claim_reverify_required=lineage.claim_reverify_required,
         review_state=deepcopy(lineage.review_state),
+        branch_contract=deepcopy(lineage.branch_contract),
     )
 
 

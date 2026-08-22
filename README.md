@@ -108,7 +108,7 @@ You get back a five-section critique with severity-tagged findings, and a comput
 
 | Tool | Use it to | Needs |
 |---|---|---|
-| [`critique_branch`](#critique_branch) | Review a git branch, a diff, or the dirty working tree | `repo_path` |
+| [`critique_branch`](#critique_branch) | Review a git branch, a diff, or the dirty working tree, optionally against an explicit plan contract | `repo_path` |
 | [`critique_plan`](#critique_plan) | Review a plan or design doc against the code it claims things about | `repo_path` + `plan_text` \| `plan_path` |
 | [`query`](#query) | Ask one question and get a cited answer — not a full review | `question` |
 | [`rebut`](#rebut) | Dispute a finding from a review you just got | `session_ref` from that review |
@@ -657,6 +657,9 @@ Returns a [five-section critique](#review-output) plus a
 | `isolate` | boolean | `true` | Review inside a throwaway worktree of `head_ref`. Ignored for uncommitted reviews |
 | `converge` | boolean | `true` | Pre-gather a bounded deterministic diff/file packet and materialize an immutable snapshot for tracked broad review. Always materializes, overriding `isolate` |
 | `max_packet_chars` | integer | `400000` | Character budget for that packet. `already_raised` is always preserved; only file evidence is trimmed |
+| `plan_text` | string | — | Optional implementation contract for tracked convergence. Mutually exclusive with `plan_path`; its exact accepted UTF-8 text is checked throughout the branch lifecycle |
+| `plan_path` | string | — | Optional path to the implementation contract. Read once before review and then treated identically to `plan_text` |
+| `plan_digest` | string | — | Optional assertion for the supplied plan: the existing 16-hex frozen digest or a full 64-hex SHA-256. The server computes the authoritative full digest |
 | `class_closure` | boolean | `true` | Track defect classes across rounds. `false` is the one-shot mode |
 | `lineage` | string | derived | Explicit class-closure key. Required when the reviewed ref is not a branch |
 | `exempt` / `unexempt` | array | — | Mark or revoke false positives of a class's regex — see [above](#handling-a-false-positive) |
@@ -669,6 +672,35 @@ Returns a [five-section critique](#review-output) plus a
 
 `converge: false` falls back to a legacy in-place review that has no class closure,
 so it must be paired with `class_closure: false`.
+
+When a plan contract is supplied, branch review checks every plan obligation for an
+implementation or traceable deferral, every named acceptance criterion through its named
+entry point, and every new persisted/public contract for correspondence with the plan.
+The plan is displayed under a separate numbered `plan:` evidence namespace and is bound
+with the pinned Git snapshot across census, retry, correction, and cold final. It is
+project-authored specification data, not external evidence, and branch review does not
+reopen the plan's design review.
+Plan-bearing reviews require `converge:true` and `class_closure:true`; the legacy
+one-shot path is rejected rather than given a weaker repository/contract binding.
+The first plan-bearing branch-lineage round freezes the contract's full digest and exact
+text in a closed, versioned top-level authority record before provider work. A contract-free
+lineage retains the acquired authority latch through its first review; once substantive, missing
+authority is immutable absence, so neither kind of first review can race the other.
+Later rounds reuse that stored text; adding,
+removing, or changing the contract requires a new explicit lineage. Audit logs remain
+diagnostic and need no special retention for plan evidence.
+`plan_path` must be absolute; it is resolved/read once, and all review consumers use the
+captured text rather than rereading the mutable path.
+The first plan-bearing reservation requires `round: 1`; contract-free branch reviews keep
+their existing round-label behavior. Supplying a plan for a missing lineage at a later
+round blocks instead of silently recreating contract authority.
+Plan anchors govern only while that active lineage state is available. A continuing round
+with missing/unreadable lineage yields `STATE-UNAVAILABLE`; paranoia-local does not treat best-effort logs as a
+backup authority or promise historical citation replay after state loss.
+The checked-in `docs/branch_plan_fidelity_acceptance_2026-08-22.json` records bounded,
+source-bound signed-in Codex attempts for one blocked nonconforming branch and one independently
+clear conforming branch through the production handler; its claims are deliberately limited to
+those two fixtures.
 
 ### `critique_plan`
 

@@ -33,6 +33,8 @@ def run_capture(
             cwd=str(cwd),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="strict",
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
@@ -70,6 +72,8 @@ def run_streaming(
             stderr=subprocess.PIPE,
             cwd=str(cwd),
             text=True,
+            encoding="utf-8",
+            errors="strict",
         )
     except FileNotFoundError as exc:
         return RunResult(
