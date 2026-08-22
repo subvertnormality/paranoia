@@ -21,6 +21,27 @@ def test_checked_in_original_fallback_acceptance_is_valid():
     validator.validate(ARTIFACT, ROOT)
 
 
+def test_missing_source_commit_fails_before_any_historical_blob_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    artifact = json.loads(ARTIFACT.read_text())
+    missing = "0" * 40
+    artifact["source_commit"] = missing
+    path = tmp_path / "acceptance.json"
+    path.write_text(json.dumps(artifact))
+    calls: list[list[str]] = []
+    invoke = validator.inert_git.invoke
+
+    def recording_invoke(repo: Path, args: list[str]):
+        calls.append(list(args))
+        return invoke(repo, args)
+
+    monkeypatch.setattr(validator.inert_git, "invoke", recording_invoke)
+    with pytest.raises(ValueError, match="source commit is unavailable"):
+        validator.validate(path, ROOT)
+    assert calls == [["rev-parse", "--verify", f"{missing}^{{commit}}"]]
+
+
 def test_ordinary_acceptance_exercises_asymmetry_advocacy_and_binding_context():
     arguments = runner._arguments(ROOT, "seed", asymmetry=True)
     lengths = [len(row["statement"]) for row in arguments["options"]]

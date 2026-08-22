@@ -84,8 +84,21 @@ def _text_digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
+def _validated_commit(repo: Path, source_commit: str) -> str:
+    result = inert_git.invoke(
+        repo, ["rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+    )
+    if result.returncode != 0:
+        raise ValueError("fallback acceptance source commit is unavailable")
+    resolved = result.stdout.decode("ascii", errors="strict").strip()
+    if resolved != source_commit:
+        raise ValueError("fallback acceptance source commit does not resolve exactly")
+    return resolved
+
+
 def _historical_prompt_instructions(repo: Path, source_commit: str) -> dict[str, str]:
     """Read inert string constants from the source revision the audit actually ran."""
+    source_commit = _validated_commit(repo, source_commit)
     blob = inert_git.invoke(
         repo, ["show", f"{source_commit}:src/paranoia_local/prompts.py"],
     )
@@ -463,6 +476,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     source_commit = artifact.get("source_commit")
     if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("fallback acceptance source commit is invalid")
+    source_commit = _validated_commit(repo, source_commit)
     for relative, digest in artifact["source_sha256"].items():
         blob = inert_git.invoke(repo, ["show", f"{source_commit}:{relative}"])
         if (
