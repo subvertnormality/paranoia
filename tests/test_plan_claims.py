@@ -81,11 +81,11 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     assert hashlib.sha256(
         artifact["input"]["text"].encode("utf-8", "surrogateescape")
     ).hexdigest() == artifact["input"]["sha256"]
-    assert artifact["source"]["revision"] == "d88eea03a2c866d88f13577eac50ef8c079595d5"
+    assert artifact["source"]["revision"] == "bbca246386c6f1aa493031ff45be01990a633c80"
     assert artifact["source"]["clean_before_and_after"] is True
     assert artifact["source"]["diff"]["file_count"] == 14
-    assert artifact["source"]["diff"]["additions"] == 3_772
-    assert artifact["source"]["diff"]["deletions"] == 69
+    assert artifact["source"]["diff"]["additions"] == 3_588
+    assert artifact["source"]["diff"]["deletions"] == 70
     assert artifact["source"]["module_lines"]["src/paranoia_local/handlers.py"] == 3_550
     for relative, expected_sha256 in artifact["source"]["hashes"].items():
         content = subprocess.run(
@@ -106,17 +106,19 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     assert invocation["result_text"] == artifact["observed"]["result_text"]
     assert invocation["claim_role_timeouts_seconds"] == {
         "claim-discovery": 900,
+        "claim-discovery-validation-retry": 900,
         "claim-binding": 300,
         "claim-attestation": 300,
     }
 
     observed = artifact["observed"]
     assert observed["claim_duration_ms"] == audit["claim_duration_ms"] > 300_000
-    assert observed["claim_model_calls"] == audit["claim_model_calls"] == 3
+    assert observed["claim_model_calls"] == audit["claim_model_calls"] == 4
     assert observed["claim_status"].startswith("parsed ")
-    assert observed["claim_counts"] == {"refuted": 1, "supported": 6, "unverified": 10}
+    assert observed["claim_counts"] == {"refuted": 0, "supported": 5, "unverified": 17}
     assert observed["ordered_attempt_roles"] == [
         "claim-discovery",
+        "claim-discovery-validation-retry",
         "claim-binding",
         "claim-attestation",
         "census-domain",
@@ -126,21 +128,27 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     ]
     for row in audit["attempt_ledger"]:
         assert row["outcome"] in {"completed", "validation-invalid"}
-        assert row["returncode"] in {None, 0}
+        assert row["returncode"] == 0
         for channel in ("response", "raw", "failure_detail", "stderr"):
             assert f"{channel}_sha256" in row
             assert f"{channel}_excerpt" in row
             digest = row[f"{channel}_sha256"]
-            assert digest is None or len(digest) == 64
+            if channel == "response":
+                assert digest is None or len(digest) == 64
+            else:
+                assert isinstance(digest, str) and len(digest) == 64
+            assert isinstance(row[f"{channel}_excerpt"], str)
         assert isinstance(row["requested_timeout_sec"], int)
         assert isinstance(row["duration_ms"], int) and row["duration_ms"] >= 0
     assert [row["requested_timeout_sec"] for row in audit["attempt_ledger"]] == [
-        900, 300, 300, 1_800, 1_800, 1_800, 1_200,
+        900, 900, 300, 300, 1_800, 1_800, 1_800, 1_200,
     ]
-    assert audit["attempt_ledger"][0]["duration_ms"] > 600_000
+    assert sum(
+        row["duration_ms"] for row in audit["attempt_ledger"][:2]
+    ) > 600_000
     assert lineage["rounds"] == 1
     assert lineage["claim_state"]["rounds"] == 1
-    assert len(lineage["claim_state"]["claims"]) == 17
+    assert len(lineage["claim_state"]["claims"]) == 22
     assert lineage["review_state"]["phase"] == "correction"
     assert observed["result_text"].endswith(
         "STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0\n"
