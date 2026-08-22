@@ -46,7 +46,7 @@ def main() -> int:
         "repo_path": str(ROOT),
         "decision": "Choose the repository's displayed project name for a diagnostic banner.",
         "options": [
-            {"id": "opt-paranoia-local", "statement": 'Use "Paranoia Local".'},
+            {"id": "opt-paranoia", "statement": 'Use "Paranoia".'},
             {"id": "opt-paranoia-review", "statement": 'Use "Paranoia Review".'},
         ],
         "stakes": (
