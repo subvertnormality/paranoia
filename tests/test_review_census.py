@@ -1462,7 +1462,7 @@ def test_stakes_change_reports_only_closed_unmechanized_reopens() -> None:
     assert lineage.classes["already-open"].status == cc.OPEN
 
 
-def test_real_plan_class_persistence_acceptance_is_source_bound() -> None:
+def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     artifact = json.loads(
         (root / "docs/class_persistence_acceptance_2026-08-22.json").read_text()
