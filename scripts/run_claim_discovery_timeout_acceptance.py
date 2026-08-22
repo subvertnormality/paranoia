@@ -6,12 +6,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from paranoia_local import engines
+from paranoia_local import class_closure as cc, engines
 from paranoia_local.handlers import critique_plan
 
 
@@ -60,9 +61,23 @@ def main() -> None:
         [str(args.codex), "--version"], check=True, capture_output=True, text=True,
     ).stdout.strip()
 
+    if args.log_dir.exists() and any(args.log_dir.iterdir()):
+        raise SystemExit("acceptance log directory must start empty")
+    if args.state_root.exists() and any(args.state_root.iterdir()):
+        raise SystemExit("acceptance state root must start empty")
     args.log_dir.mkdir(parents=True, exist_ok=True)
     args.state_root.mkdir(parents=True, exist_ok=True)
-    engines.CodexEngine.binary = str(args.codex)
+    effective_state_root = args.state_root.resolve()
+    os.environ[cc.STATE_ROOT_ENV] = str(effective_state_root)
+    if cc.default_state_root().resolve() != effective_state_root:
+        raise SystemExit("public handler did not resolve the requested state root")
+    engine = engines.CodexEngine()
+    engine.binary = str(args.codex.resolve())
+    discovery_argv = engine.for_role(engines.ROLE_DISCOVERY).build_argv(
+        args.plan_repo, "gpt-5.6-sol", "high", True,
+    )
+    if Path(discovery_argv[0]).resolve() != args.codex.resolve():
+        raise SystemExit("claim discovery did not resolve the requested executable")
     invocation = {
         "source_revision_before": source_revision,
         "source_status_before": source_status_before,
@@ -73,6 +88,8 @@ def main() -> None:
         "plan_lines": len(plan_bytes.decode("utf-8", "surrogateescape").splitlines()),
         "execution_route": "external-cli",
         "executable": str(args.codex),
+        "effective_executable": discovery_argv[0],
+        "effective_state_root": str(effective_state_root),
         "cli_version_output": version,
         "model": "gpt-5.6-sol",
         "effort": "high",
@@ -98,7 +115,7 @@ def main() -> None:
             "effort": "high",
             "web_search": True,
         },
-        engine=engines.CodexEngine(),
+        engine=engine,
         log_dir=args.log_dir,
         on_progress=lambda message: print(message, flush=True),
     )

@@ -91,6 +91,7 @@ class Review:
     duration_ms: int | None = None
     failure_detail: str | None = None
     stderr: str | None = None
+    provider_duration_ms: int | None = None
 
 
 class Engine(ABC):
@@ -116,6 +117,7 @@ class Engine(ABC):
         clone = type(self)()
         clone.text_only = self.text_only
         clone.role = role
+        clone.binary = self.binary
         return clone
 
     @abstractmethod
@@ -248,16 +250,16 @@ class Engine(ABC):
                 raw=result.stdout,
                 returncode=result.returncode,
                 error=True,
+                duration_ms=measured_duration_ms,
                 failure_detail=detail,
                 stderr=stderr,
+                provider_duration_ms=review.duration_ms,
             )
         return replace(
             review, returncode=result.returncode, error=failed,
-            duration_ms=(
-                review.duration_ms
-                if review.duration_ms is not None else measured_duration_ms
-            ),
+            duration_ms=measured_duration_ms,
             failure_detail=failure_detail, stderr=stderr,
+            provider_duration_ms=review.duration_ms,
         )
 
     def _structured_argv(
@@ -326,13 +328,13 @@ class CodexEngine(Engine):
         if self.role in EVIDENCE_ROLES:
             sandbox = "workspace-write" if self.role in {ROLE_DISCOVERY, ROLE_REPOSITORY} else "read-only"
             return [
-                "codex", "exec", "--json", "--ignore-user-config",
+                self.binary, "exec", "--json", "--ignore-user-config",
                 "--skip-git-repo-check", "-s", sandbox, "-C", str(cwd), "-m", model,
                 "-c", f'model_reasoning_effort="{effort}"',
                 *self._evidence_flags(), "-",
             ]
         argv = [
-            "codex", "exec",
+            self.binary, "exec",
             "--json",
             # Auth still comes from CODEX_HOME, but user config (especially registered
             # MCP servers) must not widen a spawned reviewer into recursive delegation.
@@ -354,7 +356,7 @@ class CodexEngine(Engine):
     ) -> list[str]:
         if self.role in EVIDENCE_ROLES:
             return [
-                "codex", "exec", "resume", session_ref, "--json",
+                self.binary, "exec", "resume", session_ref, "--json",
                 "--ignore-user-config", "--skip-git-repo-check", "-m", model,
                 "-c", f'model_reasoning_effort="{effort}"',
                 *self._evidence_flags(resumed=True), "-",
@@ -364,7 +366,7 @@ class CodexEngine(Engine):
         # on the process cwd (set by the runner). --skip-git-repo-check keeps it
         # working even if the original cwd (an isolated worktree) is gone.
         argv = [
-            "codex", "exec", "resume", session_ref,
+            self.binary, "exec", "resume", session_ref,
             "--json",
             "--ignore-user-config",
             "--skip-git-repo-check",
@@ -515,9 +517,9 @@ class ClaudeEngine(Engine):
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         if self.role in EVIDENCE_ROLES:
-            return ["claude", "-p", *self._evidence_argv(model, effort)]
+            return [self.binary, "-p", *self._evidence_argv(model, effort)]
         return [
-            "claude", "-p",
+            self.binary, "-p",
             "--output-format", "json",
             "--model", model,
             "--effort", effort,
@@ -536,11 +538,11 @@ class ClaudeEngine(Engine):
     ) -> list[str]:
         if self.role in EVIDENCE_ROLES:
             return [
-                "claude", "-p", "--resume", session_ref,
+                self.binary, "-p", "--resume", session_ref,
                 *self._evidence_argv(model, effort),
             ]
         return [
-            "claude", "-p",
+            self.binary, "-p",
             "--resume", session_ref,
             "--output-format", "json",
             "--model", model,

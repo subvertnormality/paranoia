@@ -93,6 +93,7 @@ def _attempt(
         if response else None,
         response[:4000] if response else None, sequence,
         **projection, requested_timeout_sec=requested_timeout_sec,
+        provider_duration_ms=review.provider_duration_ms,
     )
 
 
@@ -508,6 +509,36 @@ def _structural_pending_review(
     )
 
 
+def _is_legacy_claim_only_phase(
+    lineage: cc.Lineage, state: dict[str, Any], *, snapshot: str,
+) -> bool:
+    """Recognize the exact pre-issue-58 state that requires no model call."""
+    debt_class_ids = {
+        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        for cid in debt.get("class_ids", [])
+    }
+    unbound_blocking = {
+        item.class_id for item in lineage.blocking()
+        if item.class_id not in debt_class_ids
+    }
+    has_blocking_debt = any(
+        debt.get("status") == "open" and debt.get("severity") in rc.BLOCKING
+        for debt in state.get("debt", [])
+    )
+    return (
+        not lineage.debt
+        and state.get("phase") == "correction"
+        and state.get("snapshot_digest") == snapshot
+        and not has_blocking_debt
+        and not lineage.blocking()
+        and not unbound_blocking
+        and not any(state.get(key) for key in (
+            "staged_failure", "validation_debt", "format_debt",
+            "unbound_class_ids", "unbound_classes",
+        ))
+    )
+
+
 def _staged_structural_review(
     *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
     closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
@@ -558,16 +589,8 @@ def _staged_structural_review(
         d.get("status") == "open" and d.get("severity") in rc.BLOCKING
         for d in state.get("debt", [])
     )
-    legacy_claim_only_phase = (
-        phase == "correction"
-        and state.get("snapshot_digest") == snapshot
-        and not has_blocking_debt
-        and not lineage.blocking()
-        and not unbound_blocking
-        and not any(state.get(key) for key in (
-            "staged_failure", "validation_debt", "format_debt",
-            "unbound_class_ids", "unbound_classes",
-        ))
+    legacy_claim_only_phase = _is_legacy_claim_only_phase(
+        lineage, state, snapshot=snapshot,
     )
     if legacy_claim_only_phase:
         # Versions before issue 58 persisted correction solely because claim debt was
@@ -1711,8 +1734,18 @@ def critique_plan(
                     if closure and closure.lineage else "census"
                 )
                 structural_reserve = (
-                    STAGED_CENSUS_RESERVE_SEC
-                    if staged_phase == "census" else STAGED_FOLLOWUP_RESERVE_SEC
+                    0
+                    if closure and closure.lineage and _is_legacy_claim_only_phase(
+                        closure.lineage,
+                        rc.normalize_state(
+                            closure.lineage.review_state, stakes=stakes or "",
+                            snapshot=structural_snapshot,
+                        ),
+                        snapshot=structural_snapshot,
+                    )
+                    else STAGED_CENSUS_RESERVE_SEC
+                    if staged_phase == "census"
+                    else STAGED_FOLLOWUP_RESERVE_SEC
                 )
                 if closure and closure.unavailable:
                     review, trailer, structural_attempts = _state_unavailable_review(

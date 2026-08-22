@@ -227,7 +227,9 @@ def test_authoritative_capture_acceptance_record() -> None:
         cwd=root, check=True, stdout=subprocess.PIPE,
     ).stdout
     assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
-    assert census_allowed["scope"] == "Adds requested timeout to attempt telemetry only."
+    assert census_allowed["scope"] == (
+        "Adds requested timeout and separate provider duration to attempt telemetry only."
+    )
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
@@ -2732,6 +2734,10 @@ def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     monkeypatch.setattr(handlers.orientation, "snapshot_tree", lambda *args, **kwargs: "tree")
     monkeypatch.setattr(handlers.orientation, "wrap_commit", lambda *args, **kwargs: snapshot)
+    monkeypatch.setattr(
+        handlers, "STAGED_FOLLOWUP_RESERVE_SEC",
+        handlers.PLAN_REVIEW_TOTAL_TIMEOUT_SEC + 1,
+    )
     monkeypatch.setattr(
         handlers.eng.CodexEngine, "run",
         lambda *args, **kwargs: pytest.fail("migration must not call a structural reviewer"),

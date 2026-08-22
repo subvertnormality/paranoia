@@ -13,6 +13,10 @@ and continued into the structural census. The artifact deliberately retains the 
 `CONVERGENCE: BLOCKED`: seventeen claims remained unverified, and the historical plan acquired
 structural debt. It proves recovery of this concrete timeout failure, not universal
 provider latency or correctness of that plan.
+The runner starts with empty audit and lineage directories, binds the public handler through
+`PARANOIA_STATE_ROOT`, and verifies that fresh and resumed evidence roles use the exact recorded
+Codex executable. Its attempt durations are local monotonic measurements; a provider duration is
+retained separately when supplied.
 
 ## Purpose and stakes
 

@@ -395,6 +395,55 @@ class TestRunWithInjectedRunner:
 
         assert review.duration_ms == 125
 
+    def test_run_keeps_local_duration_on_blank_failure(self, monkeypatch) -> None:
+        e = engines.get_engine("claude")
+        ticks = iter((20.0, 20.250))
+        monkeypatch.setattr(engines.time, "monotonic", lambda: next(ticks))
+
+        review = e.run(
+            prompt="x", cwd=Path("/repo"), model="m", effort="high",
+            web_search=False,
+            runner=lambda *args, **kwargs: RunResult(
+                returncode=124, stdout="", stderr="timed out",
+            ),
+        )
+
+        assert review.error is True
+        assert review.duration_ms == 250
+        assert review.provider_duration_ms is None
+
+    def test_provider_duration_does_not_replace_local_duration(self, monkeypatch) -> None:
+        e = engines.get_engine("claude")
+        ticks = iter((30.0, 30.125))
+        monkeypatch.setattr(engines.time, "monotonic", lambda: next(ticks))
+        envelope = json.dumps({
+            "result": "ok", "session_id": "s", "duration_ms": 999,
+            "is_error": False,
+        })
+
+        review = e.run(
+            prompt="x", cwd=Path("/repo"), model="m", effort="high",
+            web_search=False,
+            runner=lambda *args, **kwargs: RunResult(
+                returncode=0, stdout=envelope, stderr="",
+            ),
+        )
+
+        assert review.duration_ms == 125
+        assert review.provider_duration_ms == 999
+
+    def test_configured_binary_survives_role_cloning_and_resume(self) -> None:
+        for engine, binary in (
+            (engines.CodexEngine(), "/opt/review/codex"),
+            (engines.ClaudeEngine(), "/opt/review/claude"),
+        ):
+            engine.binary = binary
+            role = engine.for_role(engines.ROLE_DISCOVERY)
+            assert role.build_argv(Path("/repo"), "m", "high", True)[0] == binary
+            assert role.build_resume_argv(
+                "session", Path("/repo"), "m", "high", True,
+            )[0] == binary
+
     def test_run_surfaces_nonzero_exit_as_error_text(self) -> None:
         e = engines.get_engine("claude")
 

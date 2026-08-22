@@ -534,9 +534,10 @@ the 300-second phase cap. Before first spend the server reserves that complete 2
 seconds for capture and bounded local processing, and 60 seconds of scheduling slack. Before each
 initial call it also reserves both call-count and the full timeout for its correction.
 Every claim and staged attempt row records the timeout actually supplied to the provider and the
-measured call duration, so retained acceptance can distinguish an enforced cap from an inferred
-role policy. Successful and failed rows both retain the actual return code plus separate bounded,
-hashed raw-output, structured-detail, and stderr channels.
+local monotonic call duration, with a provider-reported duration retained separately when present,
+so retained acceptance can distinguish an enforced cap from an inferred role policy. Successful
+and failed rows both retain the actual return code plus separate bounded, hashed raw-output,
+structured-detail, and stderr channels.
 The capture pool and exact pre-binding packing share that one enforced 300-second monotonic
 deadline; exhaustion blocks visibly before the first binding call rather than consuming time
 reserved for later model phases.
@@ -548,7 +549,9 @@ cross-round pagination for a partially supported inventory.
 Evidence state is persisted first. A staged census starts only when its full 4,320-second
 lane/consolidation/retry reserve still fits; correction and final use a 3,120-second reserve. If the
 reserve no longer fits, the result is visibly pending and the next round reuses frozen supported
-claims instead of repeating research. Individual structural calls use 1,800/1,200/2,400 and
+claims instead of repeating research. The exact same-snapshot legacy claim-only migration needs
+no provider call and is applied before this positive model-reserve admission. Individual structural
+calls use 1,800/1,200/2,400 and
 600-second role limits. A legacy class-register correction has its own 600-second cap under the
 same deadline.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
