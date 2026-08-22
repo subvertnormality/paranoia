@@ -37,10 +37,11 @@ from .worktree import worktree_at
 Clock = Callable[[], str]
 
 PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
+PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC = 600
 PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC = 300
 PLAN_EVIDENCE_SCHEDULING_SLACK_SEC = 60
-PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 6960
-PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 7080
+PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 7560
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 7680
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
 PLAN_TEARDOWN_RESERVE_SEC = 120
@@ -920,10 +921,6 @@ def _staged_structural_review(
                 replacements.get(cid, cid) for cid in debt.get("class_ids", [])
             ]
         debt["class_ids"] = list(dict.fromkeys(debt["class_ids"]))
-    claim_blocked = (
-        mode == cc.PLAN_MODE and closure.claims_enabled
-        and pc.is_blocked(lineage.claim_state)
-    )
     mapped_classes = {
         cid for debt in state.get("debt", []) if debt.get("status") == "open"
         for cid in debt.get("class_ids", [])
@@ -937,7 +934,7 @@ def _staged_structural_review(
         state["phase"] = "correction" if has_blocking_debt else "census"
         state["unbound_class_ids"] = [c.class_id for c in unbound]
         state.pop("unbound_classes", None)
-    elif lineage.blocking() or claim_blocked:
+    elif lineage.blocking():
         state["phase"] = "correction"
     lineage.review_state = state
     lineage.debt = None
@@ -974,16 +971,49 @@ def _staged_structural_review(
     closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
+    structural_trailer = rc.trailer(state)
     trailer = "\n".join((
         cc.render_trailer(
             lineage, register_status=closure.register_status, minted=minted,
             include_verdict=False,
         ),
-        rc.trailer(state),
+        structural_trailer,
         rc.attempt_trailer(attempts),
     ))
     if mode == cc.PLAN_MODE and closure.claims_enabled:
-        trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
+        structural_trailer = structural_trailer.replace(
+            "CONVERGENCE:", "STRUCTURAL-CONVERGENCE:", 1,
+        )
+        if pc.is_blocked(lineage.claim_state):
+            combined = "CONVERGENCE: BLOCKED — external claim closure remains open."
+        elif (
+            state.get("phase") == "clear"
+            and not any(
+                item.get("status") == "open"
+                and item.get("severity") in rc.BLOCKING
+                for item in state.get("debt", [])
+            )
+            and not any(state.get(key) for key in (
+                "staged_failure", "validation_debt", "format_debt",
+                "unbound_class_ids",
+            ))
+        ):
+            combined = (
+                "CONVERGENCE: NOT-BLOCKED — structural debt is clear and every active "
+                "external claim is supported by frozen or current authoritative evidence."
+            )
+        else:
+            combined = "CONVERGENCE: BLOCKED — structural closure remains open."
+        trailer = "\n".join((
+            pc.render_trailer(lineage.claim_state),
+            cc.render_trailer(
+                lineage, register_status=closure.register_status, minted=minted,
+                include_verdict=False,
+            ),
+            structural_trailer,
+            rc.attempt_trailer(attempts),
+            combined,
+        ))
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
 
@@ -1950,7 +1980,9 @@ class _CapturedClaimEngine:
         discovery_kwargs = dict(kwargs)
         try:
             self._admit_complete_graph()
-            discovery_kwargs["timeout"] = self._next_model_timeout(reserve_calls=2)
+            discovery_kwargs["timeout"] = self._next_model_timeout(
+                reserve_calls=2, timeout=PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC,
+            )
         except pc.AuditError as error:
             return self._deadline_failure(error)
         discoverer = self.engine.for_role(eng.ROLE_DISCOVERY)
@@ -1966,7 +1998,9 @@ class _CapturedClaimEngine:
         except pc.AuditError as error:
             self._mark_last_validation_invalid(str(error), first, "/claims")
             try:
-                discovery_kwargs["timeout"] = self._next_model_timeout()
+                discovery_kwargs["timeout"] = self._next_model_timeout(
+                    timeout=PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC,
+                )
             except pc.AuditError as deadline_error:
                 return self._deadline_failure(deadline_error, first.session_ref, raw_parts)
             corrected = discoverer.resume(
@@ -2056,7 +2090,10 @@ class _CapturedClaimEngine:
             duration_ms=last_binding.duration_ms,
         )
 
-    def _next_model_timeout(self, *, reserve_calls: int = 1) -> int:
+    def _next_model_timeout(
+        self, *, reserve_calls: int = 1,
+        timeout: int = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC,
+    ) -> int:
         if self.model_calls + reserve_calls > MAX_PLAN_EVIDENCE_MODEL_CALLS:
             raise pc.AuditError(
                 "plan evidence model-call ceiling cannot admit the initial call and its "
@@ -2064,7 +2101,7 @@ class _CapturedClaimEngine:
                 f"{MAX_PLAN_EVIDENCE_MODEL_CALLS})"
             )
         if self.deadline is not None and (
-            self.clock() + PLAN_EVIDENCE_PHASE_TIMEOUT_SEC * reserve_calls
+            self.clock() + timeout * reserve_calls
             > self.deadline
         ):
             raise pc.AuditError(
@@ -2072,11 +2109,15 @@ class _CapturedClaimEngine:
                 f"its {reserve_calls - 1} reserved correction call(s)"
             )
         self.model_calls += 1
-        return PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        return timeout
 
     def _admit_complete_graph(self) -> None:
         required = (
             MAX_PLAN_EVIDENCE_MODEL_CALLS * PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            + 2 * (
+                PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
+                - PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            )
             + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         )
         if self.deadline is not None and self.clock() + required > self.deadline:

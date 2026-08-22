@@ -73,7 +73,7 @@ every call fails:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 7200
+tool_timeout_sec = 7800
 startup_timeout_sec = 60
 ```
 
@@ -199,6 +199,10 @@ Durable lineage state carries concrete findings, reusable classes, frozen stakes
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
 `STRUCTURAL-DEBT` in the trailer show where the autonomous loop is. There is no fixed round ceiling:
 provider, parsing, deadline, or oversized-state failures block visibly rather than clearing.
+Claim debt blocks the combined `CONVERGENCE` verdict through `CLAIM-CLOSURE`, but it does not rewrite
+`STRUCTURAL-PHASE` or turn a claim-provider timeout into staged structural debt. The structural
+trailer remains independently truthful, so a retry can distinguish evidence work from code/plan
+correction work.
 
 ### `round` — lineage ordering
 
@@ -523,17 +527,17 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase has a 6,960-second monotonic circuit breaker and 22 model calls
-maximum. That admits discovery, five maximum-size binding batches, five exact-size
-cold-attestation batches, and the promised one validation correction for every call. Before each
-first spend the server reserves the complete 22-call graph, 300 seconds for capture and bounded
-local processing, and 60 seconds of scheduling slack. Before each initial call it also reserves
-both call-count and two 300-second windows for its correction.
+The complete evidence phase has a 7,560-second monotonic circuit breaker and 22 model calls
+maximum. Whole-plan discovery and its one correction each receive 600 seconds; the five
+maximum-size binding batches, five exact-size cold-attestation batches, and their corrections keep
+the 300-second phase cap. Before first spend the server reserves that complete 22-call graph, 300
+seconds for capture and bounded local processing, and 60 seconds of scheduling slack. Before each
+initial call it also reserves both call-count and the full timeout for its correction.
 The capture pool and exact pre-binding packing share that one enforced 300-second monotonic
 deadline; exhaustion blocks visibly before the first binding call rather than consuming time
 reserved for later model phases.
 These are pathology guards, not targets or reasons to shorten an admitted review. The full verified
-plan call remains bounded to 7,080 seconds.
+plan call remains bounded to 7,680 seconds inside the documented 7,800-second MCP timeout.
 If exact packing would require a sixth binding or cold-attestation batch, the complete evidence
 phase fails globally before that role spends or settles any prefix. The limit cannot act as
 cross-round pagination for a partially supported inventory.

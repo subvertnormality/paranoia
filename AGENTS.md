@@ -229,9 +229,11 @@ of the resulting code and tests.
   bounded error; retain it when an expanded packet cannot be bound or attested.
   Bound the complete evidence phase to 22 model calls (the discovery + five binding + five
   attestation topology and one reserved correction for every initial call) as a pathology guard,
-  not a quality target. Admit an initial call only when both its call-count and full latency reserve
-  fit the remaining monotonic deadline. Before the first model call, reserve the complete maximum
-  model/retry graph plus explicit non-model capture/processing time and scheduling slack.
+  not a quality target. Whole-plan discovery and its correction each receive 600 seconds; binding
+  and cold-attestation calls retain 300 seconds. Admit an initial call only when both its call-count
+  and full role-specific latency reserve fit the remaining monotonic deadline. Before the first
+  model call, reserve the complete maximum model/retry graph plus explicit non-model
+  capture/processing time and scheduling slack.
   Use the same pure prompt renderers for preflight and invocation and test the exact strings; do not
   maintain parallel size estimates.
   Packet and latency limits are circuit breakers, not
@@ -338,6 +340,9 @@ of the resulting code and tests.
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
+- Claim debt blocks combined plan convergence but never rewrites the independently settled staged
+  structural phase or masquerades as staged structural debt. Render claim and structural closure
+  separately before the single governing combined convergence verdict.
 - When discovery and its single correction both fail local claim-payload validation, preserve the
   ordered bounded validator reasons and exact initial/correction raw exchange; do not describe a
   successful provider process as a reviewer execution failure.

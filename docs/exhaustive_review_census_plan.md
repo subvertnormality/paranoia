@@ -284,7 +284,7 @@ sequence immediately before each provider run/resume boundary and are serialized
 
 ## 6. Deadlines and failure
 
-Plan review keeps a monotonic 7,080-second whole-review deadline and reserves the
+Plan review keeps a monotonic 7,680-second whole-review deadline and reserves the
 complete structural phase before starting it. In both modes, each census lane has a 1,800-second
 timeout, consolidation 1,200 seconds, correction/final 2,400 seconds, and a format correction at
 most 600 seconds. The three census lanes run concurrently.

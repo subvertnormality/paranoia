@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "ea9d9db9fac24c86785204cd1320b89febd64c7f619e7a616f4d65c8ce8c835d",
-      "additions": 5,
-      "deletions": 2,
-      "scope": "Plan structural-review consolidation and legacy prompt composition only; no claim-verification path."
+      "sha256": "cfb92a203ad58c26420aaa5ac216c4c8148f60e10ce8278b61d60ba593d35c92",
+      "additions": 60,
+      "deletions": 16,
+      "scope": "Plan structural prompt composition, a role-specific discovery timeout, and combined claim/structural trailer composition; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
@@ -126,5 +126,5 @@
     "largest_changed_module_deletions": 111,
     "largest_changed_module_lines_after": 3415
   },
-  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. Claim-verification-specific sources remain byte-identical; the shared handlers module may contain later changes outside claim verification. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed."
+  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed."
 }

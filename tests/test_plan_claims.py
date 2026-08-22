@@ -118,7 +118,7 @@ def test_authoritative_capture_acceptance_record() -> None:
         cwd=root, check=True, stdout=subprocess.PIPE,
     ).stdout
     assert hashlib.sha256(handler_diff).hexdigest() == allowed["sha256"]
-    assert "no claim-verification path" in allowed["scope"]
+    assert "does not alter capture, binding, cold-attestation" in allowed["scope"]
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
@@ -2194,14 +2194,14 @@ def test_non_model_reserve_bounds_200_source_capture_before_binding(
     engine = _RoleScript(
         {"evidence-discovery": [discovery]},
         advance=lambda: now.__setitem__(
-            0, now[0] + handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC,
+            0, now[0] + handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC,
         ),
     )
 
     def capture_all(candidates, **kwargs):
         assert len(candidates) == count
         assert kwargs["deadline"] == (
-            handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
             + handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         )
         now[0] += handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC + 1
@@ -2335,9 +2335,59 @@ def test_plan_evidence_budget_composes_at_maximum_batch_count() -> None:
     assert handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC == (
         handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS
         * handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        + 2 * (
+            handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
+            - handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        )
         + handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         + handlers.PLAN_EVIDENCE_SCHEDULING_SLACK_SEC
     )
+    assert handlers.PLAN_REVIEW_TOTAL_TIMEOUT_SEC == (
+        handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
+        + handlers.PLAN_TEARDOWN_RESERVE_SEC
+    )
+
+
+def test_large_plan_discovery_uses_the_dedicated_timeout(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    # Match the 2,328-line / 140,509-character plan from the issue-58 failure series,
+    # then exceed it substantially. Discovery sees the whole plan; later source
+    # capture and binding are deliberately irrelevant to this regression boundary.
+    line = "An external platform behavior remains subject to authoritative verification.\n"
+    plan = ("# Large plan\n\n" + line * 4_000)[:280_000]
+    seen: list[int | None] = []
+
+    class TimeoutEngine(_RoleScript):
+        def for_role(self, role: str):
+            child = TimeoutEngine(self.outputs, self.calls)
+            child.role = role
+            return child
+
+        def run(self, *args, **kwargs):
+            seen.append(kwargs.get("timeout"))
+            return Review(
+                text="discovery timed out", session_ref=None, raw="",
+                returncode=124, error=True,
+            )
+
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all",
+        lambda *args, **kwargs: pytest.fail("capture follows successful discovery"),
+    )
+    adapter = handlers._CapturedClaimEngine(
+        TimeoutEngine({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
+        deadline=float(handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC),
+        clock=lambda: 0.0,
+    )
+    try:
+        result = adapter.run(plan, tmp_path, "m", "high", True)
+        assert result.error and result.returncode == 124
+        assert len(plan) > 2 * 140_509 - 2_000
+        assert seen == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC]
+        assert seen != [handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC]
+    finally:
+        adapter.close()
 
 
 def test_plan_evidence_budget_admits_every_initial_and_validation_retry(
@@ -2408,13 +2458,21 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
             }),
         ])
     now = [0.0]
+    phase_calls = [0]
+
+    def advance() -> None:
+        timeout = (
+            handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
+            if phase_calls[0] < 2 else handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        )
+        phase_calls[0] += 1
+        now[0] += timeout
+
     engine = _RoleScript({
         "evidence-discovery": ["invalid discovery", discovery],
         "evidence-binding": binding_outputs,
         "evidence-text": attestation_outputs,
-    }, advance=lambda: now.__setitem__(
-        0, now[0] + handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC,
-    ))
+    }, advance=advance)
 
     def capture_all(candidates, **kwargs):
         now[0] += handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
@@ -2477,7 +2535,10 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
             lane = next(x.split()[-1] for x in prompt.splitlines() if x.startswith("ROLE: census lane"))
             coverage = [
                 {"id": key, "status": "covered", "summary": "checked",
-                 "evidence": ["repository/README.md:1"], "finding_ids": []}
+                 "evidence": [{
+                     "anchor": "repository/README.md:1",
+                     "rationale": "fixture coverage",
+                 }], "finding_ids": []}
                 for key in handlers.sp.CHECKLIST
             ]
             text = json.dumps({
@@ -2487,7 +2548,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
         else:
             text = json.dumps({
                 "role": "census", "governing_findings": [],
-                "debt_outcomes": [], "class_outcomes": [], "class_actions": [],
+                "debt_outcomes": [], "class_actions": {},
             })
         return Review(text=text, session_ref="structural", raw=text)
 
@@ -2496,6 +2557,9 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     monkeypatch.setattr(
         handlers.eng.CodexEngine, "run", structural_review,
+    )
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "resume", structural_review,
     )
     result = handlers.critique_plan(
         {
@@ -2512,6 +2576,11 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert observed["structural_timeout"] in {1800, 1200}
     assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
     assert "CLAIM-AUDIT-DEBT" in result
+    assert lineage.review_state["phase"] == "clear"
+    assert "STRUCTURAL-PHASE: clear" in result
+    assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
+    assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
+    assert "staged structural debt remains open" not in result
 
 
 def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(

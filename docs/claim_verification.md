@@ -103,16 +103,18 @@ dedicated expanded packet. They cover ordinary large plans while preventing the 
 from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
-each locally invalid response allows at most one same-session correction. Cold attestation is
+Whole-plan discovery and its same-session correction each have a 600-second cap. Captured-text
+binding and cold-attestation calls retain the 300-second cap; each locally invalid response allows
+at most one same-session correction. Cold attestation is
 packed by its exact rendered initial and correction prompts into at most five batches, rather than
-assuming every accepted passage fits one call. The complete evidence phase has a 6,960-second
+assuming every accepted passage fits one call. The complete evidence phase has a 7,560-second
 monotonic circuit breaker and at most 22 model calls: discovery + five binding + five attestation
 calls, with one correction reserved for every initial call. Before discovery spend, admission
-reserves that entire graph plus 300 seconds for capture/bounded pre-binding processing and 60
-seconds of scheduling slack. The capture pool and exact local packing share an enforced monotonic
-300-second deadline; exhausting it blocks before the first binding call. The handler also checks
-both remaining calls and two full 300-second windows before each initial invocation. The retained
+reserves that entire role-specific graph plus 300 seconds for capture/bounded pre-binding
+processing and 60 seconds of scheduling slack. The capture pool and exact local packing share an
+enforced monotonic 300-second deadline; exhausting it blocks before the first binding call. The
+handler also checks both remaining calls and two full role-specific windows before each initial
+invocation. The retained
 acceptance record reports the measured live latency for each 627,000-character Codex and Claude
 packet. These remain generous circuit breakers, not review-quality budgets; an admitted call may
 use its full time and context to establish authoritative evidence.
@@ -139,13 +141,27 @@ uncaptured outcome rather than inventing a web capture. Dedicated binding or att
 preserves that immutable provenance, records a negative attestation, and continues unrelated
 batches.
 
-The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
-reserve within the documented 7,200-second MCP client timeout. After evidence state is persisted,
+The complete verified plan call has a 7,680-second deadline, leaving a 120-second teardown
+reserve within the documented 7,800-second MCP client timeout. After evidence state is persisted,
 the cold structural review starts only when its current 4,320-second census or 3,120-second
 follow-up reserve still fits. If it does not,
 the round returns blocked and the next invocation reuses frozen supported claims rather than
 repeating research. A malformed class register gets one 600-second retry only when that cap also
 fits the same deadline.
+
+Claim debt, including a discovery timeout, blocks the combined plan verdict without changing the
+staged structural phase. The response reports claim closure and structural convergence separately,
+then emits one governing combined `CONVERGENCE` line. A clear structural census therefore remains
+clear rather than being mislabeled as structural correction merely because evidence tooling failed.
+
+The issue-58 regression was rerun against Parallax commit
+`c17c58e40dec7e660ec39f6d2a95e9f1d5ac1e7a`, whose 1,606-line, 94,110-byte plan has SHA-256
+`706953595c48d12a0e421266b77bdf9c18cd1db2fd93b3ac7a1724b472a0b1f0`. With the stable Codex
+0.149.0 route, whole-plan discovery crossed the former 300-second cutoff and the complete evidence
+lifecycle finished in 486.251 seconds and three calls (`claim-discovery`, `claim-binding`, and
+`claim-attestation`), parsing 14 claims with no execution failure or audit debt. Four claims were
+supported and ten remained conservatively unverified; the acceptance establishes restored lane
+operation, not that every assertion in that historical plan has qualifying evidence.
 
 ## Evidence and authority
 
