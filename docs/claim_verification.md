@@ -3,7 +3,7 @@
 ## Large-plan discovery timeout acceptance
 
 The issue-58 correction gives the initial whole-plan discovery call and its one
-same-session validation correction a 600-second circuit breaker while retaining the
+same-session validation correction a 900-second circuit breaker while retaining the
 300-second limit for later binding and cold-attestation calls. The retained
 [`claim_discovery_timeout_acceptance_2026-08-22.json`](claim_discovery_timeout_acceptance_2026-08-22.json)
 record exercises the public `critique_plan` handler with the exact 94,110-byte historical
@@ -117,11 +117,11 @@ dedicated expanded packet. They cover ordinary large plans while preventing the 
 from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Whole-plan discovery and its same-session correction each have a 600-second cap. Captured-text
+Whole-plan discovery and its same-session correction each have a 900-second cap. Captured-text
 binding and cold-attestation calls retain the 300-second cap; each locally invalid response allows
 at most one same-session correction. Cold attestation is
 packed by its exact rendered initial and correction prompts into at most five batches, rather than
-assuming every accepted passage fits one call. The complete evidence phase has a 7,560-second
+assuming every accepted passage fits one call. The complete evidence phase has an 8,160-second
 monotonic circuit breaker and at most 22 model calls: discovery + five binding + five attestation
 calls, with one correction reserved for every initial call. Before discovery spend, admission
 reserves that entire role-specific graph plus 300 seconds for capture/bounded pre-binding
@@ -155,8 +155,8 @@ uncaptured outcome rather than inventing a web capture. Dedicated binding or att
 preserves that immutable provenance, records a negative attestation, and continues unrelated
 batches.
 
-The complete verified plan call has a 7,680-second deadline, leaving a 120-second teardown
-reserve within the documented 7,800-second MCP client timeout. After evidence state is persisted,
+The complete verified plan call has an 8,280-second deadline, leaving a 120-second teardown
+reserve within the documented 8,400-second MCP client timeout. After evidence state is persisted,
 the cold structural review starts only when its current 4,320-second census or 3,120-second
 follow-up reserve still fits. If it does not,
 the round returns blocked and the next invocation reuses frozen supported claims rather than

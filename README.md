@@ -73,7 +73,7 @@ every call fails:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 7800
+tool_timeout_sec = 8400
 startup_timeout_sec = 60
 ```
 
@@ -527,8 +527,8 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase has a 7,560-second monotonic circuit breaker and 22 model calls
-maximum. Whole-plan discovery and its one correction each receive 600 seconds; the five
+The complete evidence phase has an 8,160-second monotonic circuit breaker and 22 model calls
+maximum. Whole-plan discovery and its one correction each receive 900 seconds; the five
 maximum-size binding batches, five exact-size cold-attestation batches, and their corrections keep
 the 300-second phase cap. Before first spend the server reserves that complete 22-call graph, 300
 seconds for capture and bounded local processing, and 60 seconds of scheduling slack. Before each
@@ -540,7 +540,7 @@ The capture pool and exact pre-binding packing share that one enforced 300-secon
 deadline; exhaustion blocks visibly before the first binding call rather than consuming time
 reserved for later model phases.
 These are pathology guards, not targets or reasons to shorten an admitted review. The full verified
-plan call remains bounded to 7,680 seconds inside the documented 7,800-second MCP timeout.
+plan call remains bounded to 8,280 seconds inside the documented 8,400-second MCP timeout.
 If exact packing would require a sixth binding or cold-attestation batch, the complete evidence
 phase fails globally before that role spends or settles any prefix. The limit cannot act as
 cross-round pagination for a partially supported inventory.
