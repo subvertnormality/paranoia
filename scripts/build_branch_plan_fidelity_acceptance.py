@@ -115,7 +115,6 @@ def _route(path: Path, state_path: Path, expected: str, fixture_repo: Path) -> d
         raise ValueError("audit structural snapshot does not bind the fixture packet")
     return {
         "expected": expected,
-        "audit_sha256": _sha(raw),
         "audit_canonical_sha256": _sha(_canonical(audit)),
         "audit": audit,
         "engine": audit.get("engine"),
@@ -133,7 +132,6 @@ def _route(path: Path, state_path: Path, expected: str, fixture_repo: Path) -> d
         "accepted_plan_anchors": anchors,
         "attempt_ledger": [_attempt(row) for row in audit.get("attempt_ledger", [])],
         "settlement": settlement,
-        "lineage_state_sha256": _sha(state_raw),
         "lineage_state_canonical_sha256": _sha(_canonical(state)),
         "lineage_state": state,
     }
@@ -155,7 +153,10 @@ def validate_record(record: dict, root: Path = ROOT) -> None:
     revision = record.get("source_revision")
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a commit identity")
-    for relative, expected in (record.get("source_sha256") or {}).items():
+    source_inventory = record.get("source_sha256") or {}
+    if set(source_inventory) != set(SOURCES):
+        raise ValueError("source inventory is incomplete or contains unknown files")
+    for relative, expected in source_inventory.items():
         try:
             committed = subprocess.run(
                 ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,

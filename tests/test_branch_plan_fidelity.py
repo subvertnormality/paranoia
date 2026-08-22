@@ -1048,6 +1048,63 @@ def test_public_handler_routes_every_model_prompt_through_executable_boundary(
     assert labels.count("consolidation prompt") == 1
 
 
+def test_public_handler_enforces_actual_composed_prompt_boundaries(
+    repo_with_branch: Path, tmp_path: Path, monkeypatch,
+):
+    common = {
+        "repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "stakes": "trusted local tool", "plan_text": "frozen contract",
+    }
+    active: list[ContractEngine] = []
+
+    def run(self, prompt, *args, **kwargs):
+        return active[0].run(prompt, *args, **kwargs)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+
+    baseline = ContractEngine()
+    active[:] = [baseline]
+    assert "CONVERGENCE: NOT-BLOCKED" in handlers.critique_branch(
+        {**common, "lineage": "prompt-baseline"}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs",
+    )
+    lane_limit = max(
+        len(prompt) for prompt in baseline.prompts
+        if "ROLE: census lane" in prompt
+    )
+
+    for suffix, limit in (("below", lane_limit + 1), ("exact", lane_limit)):
+        engine = ContractEngine()
+        active[:] = [engine]
+        with monkeypatch.context() as scoped:
+            scoped.setattr(handlers.rc, "MAX_STAGED_PROMPT_CHARS", limit)
+            result = handlers.critique_branch(
+                {**common, "lineage": f"prompt-{suffix}"},
+                engine=handlers.eng.CodexEngine(),
+                log_dir=tmp_path / "logs",
+            )
+        assert "CONVERGENCE: NOT-BLOCKED" in result
+        assert max(
+            len(prompt) for prompt in engine.prompts if "ROLE: census lane" in prompt
+        ) <= limit
+
+    over = ContractEngine()
+    active[:] = [over]
+    with monkeypatch.context() as scoped:
+        scoped.setattr(handlers.rc, "MAX_STAGED_PROMPT_CHARS", lane_limit - 1)
+        result = handlers.critique_branch(
+            {**common, "lineage": "prompt-over"}, engine=handlers.eng.CodexEngine(),
+            log_dir=tmp_path / "logs",
+        )
+    assert "CONVERGENCE: BLOCKED" in result and "staged rejected" in result
+    assert all(len(prompt) <= lane_limit - 1 for prompt in over.prompts)
+    lineage = cc.load_lineage(
+        cc.default_state_root(), "prompt-over", stamp="PO2", mode=cc.BRANCH_MODE,
+    )
+    assert lineage.review_state["phase"] != "clear"
+    assert not lineage.review_state.get("census_cache")
+
+
 def test_invalid_utf8_contract_blocks_before_public_provider(
     repo_with_branch: Path,
 ):
@@ -1191,6 +1248,7 @@ def test_real_branch_plan_fidelity_acceptance_is_source_and_route_bound():
     "route-audit-identity", "settlement", "authority", "snapshot",
     "attempt-ledger", "lineage-debt", "source-revision", "duplicate-source",
     "unknown-source", "coordinated-source-binding",
+    "missing-source-inventory",
 ])
 def test_acceptance_replay_rejects_cross_lifecycle_mismatches(mutation: str):
     root = Path(__file__).resolve().parents[1]
@@ -1222,6 +1280,8 @@ def test_acceptance_replay_rejects_cross_lifecycle_mismatches(mutation: str):
         ).hexdigest()
     elif mutation == "source-revision":
         changed["source_revision"] = "0" * 40
+    elif mutation == "missing-source-inventory":
+        changed["source_sha256"].pop(next(iter(changed["source_sha256"])))
     elif mutation == "duplicate-source":
         settlement = route["audit"]["staged_settlement"]
         settlement["source_dispositions"].append(
