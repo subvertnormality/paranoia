@@ -16,12 +16,11 @@ from paranoia_local import handlers
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "claim_discovery_timeout_acceptance_2026-08-22.json"
-SOURCE_REVISION = "dccea78a8cd496179dd8922ca56e710ec480ecb4"
 BASE_REVISION = "c5219e5c3a779018c66429ebb84137f2ec6f71ee"
 PLAN_REVISION = "c17c58e40dec7e660ec39f6d2a95e9f1d5ac1e7a"
 PLAN_REPO_PATH = "dataset/certification/A1-PIT-SYMBOL-RESOLUTION_plan_contract.md"
 PLAN_SHA256 = "706953595c48d12a0e421266b77bdf9c18cd1db2fd93b3ac7a1724b472a0b1f0"
-LINEAGE_ID = "issue-58-public-acceptance"
+LINEAGE_ID = "issue-58-public-acceptance-bound"
 STAKES = (
     "Trusted single operator and OS; the historical plan, repository, and fetched "
     "pages are untrusted data; public HTTP(S) is the network boundary; no hostile "
@@ -45,18 +44,18 @@ def _git(*args: str) -> bytes:
     ).stdout
 
 
-def _source_hashes() -> dict[str, str]:
-    names = _git("diff", "--name-only", BASE_REVISION, SOURCE_REVISION).decode().splitlines()
+def _source_hashes(source_revision: str) -> dict[str, str]:
+    names = _git("diff", "--name-only", BASE_REVISION, source_revision).decode().splitlines()
     return {
-        name: _sha256_bytes(_git("show", f"{SOURCE_REVISION}:{name}"))
+        name: _sha256_bytes(_git("show", f"{source_revision}:{name}"))
         for name in names
     }
 
 
-def _diff_metrics() -> dict[str, Any]:
+def _diff_metrics(source_revision: str) -> dict[str, Any]:
     rows = []
     additions = deletions = 0
-    for line in _git("diff", "--numstat", BASE_REVISION, SOURCE_REVISION).decode().splitlines():
+    for line in _git("diff", "--numstat", BASE_REVISION, source_revision).decode().splitlines():
         added, removed, path = line.split("\t", 2)
         row = {"path": path, "additions": int(added), "deletions": int(removed)}
         rows.append(row)
@@ -71,13 +70,13 @@ def _diff_metrics() -> dict[str, Any]:
     }
 
 
-def _module_lines() -> dict[str, int]:
+def _module_lines(source_revision: str) -> dict[str, int]:
     paths = [
         "AGENTS.md", "README.md", "docs/claim_verification.md",
         "src/paranoia_local/handlers.py", "tests/test_plan_claims.py",
     ]
     return {
-        path: len(_git("show", f"{SOURCE_REVISION}:{path}").decode(
+        path: len(_git("show", f"{source_revision}:{path}").decode(
             "utf-8", "surrogateescape"
         ).splitlines())
         for path in paths
@@ -121,19 +120,32 @@ def main() -> None:
     parser.add_argument("--audit", type=Path, required=True)
     parser.add_argument("--lineage", type=Path, required=True)
     parser.add_argument("--plan", type=Path, required=True)
+    parser.add_argument("--invocation", type=Path, required=True)
     args = parser.parse_args()
 
     audit_bytes = args.audit.read_bytes()
     lineage_bytes = args.lineage.read_bytes()
     plan_bytes = args.plan.read_bytes()
+    invocation_bytes = args.invocation.read_bytes()
     audit = json.loads(audit_bytes)
     lineage = json.loads(lineage_bytes)
     plan_text = plan_bytes.decode("utf-8", "surrogateescape")
+    invocation = json.loads(invocation_bytes)
     if _sha256_bytes(plan_bytes) != PLAN_SHA256:
         raise SystemExit("the supplied plan is not the issue-58 historical input")
     if audit.get("lineage") != LINEAGE_ID or audit.get("round") != 1:
         raise SystemExit("the supplied audit is not the issue-58 public round")
     result_text = _result_text(audit, args.lineage.parents[1])
+    if invocation.get("result_text") != result_text:
+        raise SystemExit("recorded public result does not match deterministic state replay")
+    source_revision = invocation.get("source_revision_before")
+    if (
+        not isinstance(source_revision, str)
+        or invocation.get("source_revision_after") != source_revision
+        or invocation.get("source_status_before")
+        or invocation.get("source_status_after")
+    ):
+        raise SystemExit("acceptance invocation was not bound to one clean source revision")
     role_timeouts = {
         row["role"]: (600 if str(row["role"]).startswith("claim-discovery") else 300)
         for row in audit["attempt_ledger"]
@@ -154,10 +166,11 @@ def main() -> None:
             "The recorded elapsed value is the handler-measured claim phase, not an estimate of total wall-clock runtime.",
         ],
         "source": {
-            "revision": SOURCE_REVISION,
-            "hashes": _source_hashes(),
-            "diff": _diff_metrics(),
-            "module_lines": _module_lines(),
+            "revision": source_revision,
+            "clean_before_and_after": True,
+            "hashes": _source_hashes(source_revision),
+            "diff": _diff_metrics(source_revision),
+            "module_lines": _module_lines(source_revision),
         },
         "input": {
             "repository_revision": PLAN_REVISION,
@@ -167,20 +180,8 @@ def main() -> None:
             "lines": len(plan_text.splitlines()),
             "text": plan_text,
         },
-        "invocation": {
+        "invocation": invocation | {
             "public_handler": "paranoia_local.handlers.critique_plan",
-            "engine": "codex",
-            "execution_route": "external-cli",
-            "executable": "/tmp/codex-stable-issue58/node_modules/.bin/codex",
-            "cli_version": "0.149.0",
-            "model": "gpt-5.6-sol",
-            "effort": "high",
-            "web_search": True,
-            "claim_verification": True,
-            "class_closure": True,
-            "lineage": LINEAGE_ID,
-            "round": 1,
-            "stakes": STAKES,
             "claim_role_timeouts_seconds": role_timeouts,
         },
         "observed": {
@@ -196,6 +197,7 @@ def main() -> None:
         "production_audit": audit,
         "durable_lineage_sha256": _sha256_bytes(lineage_bytes),
         "durable_lineage": lineage,
+        "invocation_record_sha256": _sha256_bytes(invocation_bytes),
     }
     OUTPUT.write_text(
         json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",

@@ -171,15 +171,6 @@ The upgrade path also recognizes the exact same-snapshot predecessor shape left 
 `correction` with no blocking structural debt, blocking/unbound class, or staged failure. It
 persists `clear` without a correction or final provider call while retaining claim debt unchanged.
 
-The issue-58 regression was rerun against Parallax commit
-`c17c58e40dec7e660ec39f6d2a95e9f1d5ac1e7a`, whose 1,606-line, 94,110-byte plan has SHA-256
-`706953595c48d12a0e421266b77bdf9c18cd1db2fd93b3ac7a1724b472a0b1f0`. With the stable Codex
-0.149.0 route, whole-plan discovery crossed the former 300-second cutoff and the complete evidence
-lifecycle finished in 486.251 seconds and three calls (`claim-discovery`, `claim-binding`, and
-`claim-attestation`), parsing 14 claims with no execution failure or audit debt. Four claims were
-supported and ten remained conservatively unverified; the acceptance establishes restored lane
-operation, not that every assertion in that historical plan has qualifying evidence.
-
 ## Evidence and authority
 
 The retained live acceptance for the long-authoritative-source path is
