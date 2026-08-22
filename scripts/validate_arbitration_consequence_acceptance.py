@@ -101,6 +101,7 @@ def _positive(artifact: dict, repo: Path) -> None:
         and shared._cleaned_digest_bound(audit.get("cleaned", {}))
         and shared._cleaning_and_attestation_bound(
             audit, fallback=True, instruction_set=instructions,
+            deterministic_cleaner=False,
         )
     ):
         raise ValueError("positive acceptance cleaning route does not replay")

@@ -171,10 +171,12 @@ def _effective_packet(audit: dict) -> ah.Packet:
 
 def _cleaning_and_attestation_bound(
     audit: dict, *, fallback: bool, instruction_set: dict[str, str] | None = None,
+    deterministic_cleaner: bool | None = None,
 ) -> bool:
     instruction_set = instruction_set or {
         name: getattr(prompts, name) for name in _PROMPT_NAMES
     }
+    deterministic_cleaner = fallback if deterministic_cleaner is None else deterministic_cleaner
     raw, cleaned = audit["raw_input"], audit["cleaned"]
     phase_attempts = audit.get("phase_attempts", [])
     if [row.get("role") for row in phase_attempts] != ["cleaner", "attester"]:
@@ -195,7 +197,7 @@ def _cleaning_and_attestation_bound(
                 engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
                 route="deterministic-cleaner",
             )
-            if fallback else _external_execution(
+            if deterministic_cleaner else _external_execution(
                 engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
             )
         ),
@@ -291,11 +293,20 @@ def _decider_transcripts(
     votes: list[arb.Vote] = []
     for engine, cast in audit["rounds"][0].items():
         mapping = audit.get("label_maps", {}).get(engine)
-        if not isinstance(mapping, dict) or set(mapping.values()) != set(packet.statements):
+        stored_body = cast.get("prompt")
+        if (
+            not isinstance(mapping, dict)
+            or set(mapping.values()) != set(packet.statements)
+            or not isinstance(stored_body, str)
+            or any(stored_body.count(label) != 1 for label in mapping)
+        ):
             return None
+        ordered_labels = sorted(mapping, key=stored_body.index)
         presentation = arb.Presentation(
             engine=engine,
-            items=tuple((label, packet.statements[option_id]) for label, option_id in mapping.items()),
+            items=tuple(
+                (label, packet.statements[mapping[label]]) for label in ordered_labels
+            ),
             label_to_id=dict(mapping),
             id_to_label={option_id: label for label, option_id in mapping.items()},
             reversed_order=False,
