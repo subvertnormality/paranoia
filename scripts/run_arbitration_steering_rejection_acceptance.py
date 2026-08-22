@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from paranoia_local import arbitrate_handler as ah, inert_git
 
 OUTPUT = ROOT / "docs" / "arbitration_steering_rejection_acceptance_2026-08-22.json"
-SOURCE_PATHS = (
+COMMON_SOURCE_PATHS = (
     "src/paranoia_local/arbitrate_handler.py",
     "src/paranoia_local/arbitration.py",
     "src/paranoia_local/engines.py",
@@ -51,6 +51,71 @@ def _audit_path(report: str) -> Path:
     return Path(match.group(1))
 
 
+def run_acceptance(
+    arguments: dict, *, field: str, output: Path, source_paths: tuple[str, ...],
+) -> int:
+    log_dir = Path(tempfile.mkdtemp(prefix="paranoia-steering-acceptance-"))
+    started = time.monotonic()
+    report = ah.arbitrate(arguments, log_dir=log_dir)
+    elapsed = time.monotonic() - started
+    audit = json.loads(_audit_path(report).read_text(encoding="utf-8"))
+    if audit.get("outcome") != "FAILED" or f"{field} text advocates" not in audit.get("reason", ""):
+        raise RuntimeError(f"steering acceptance did not fail closed: {audit.get('reason')}")
+    if audit.get("rounds"):
+        raise RuntimeError("a decider ran after the steering verdict")
+    attempts = audit.get("phase_attempts", [])
+    if [row.get("role") for row in attempts] != ["cleaner", "attester"]:
+        raise RuntimeError("negative acceptance did not stop after cleaner and attester")
+    if f"{field.upper()}-ADVOCACY: PRESENT" not in audit.get("attestation", ""):
+        raise RuntimeError("attester did not identify the genuine steering")
+
+    source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
+    snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
+    artifact = {
+        "acceptance_kind": f"arbitration-{field}-steering-rejected",
+        "version": 1,
+        "date": "2026-08-22",
+        "source_revision": source_revision,
+        "source_sha256": {
+            path: hashlib.sha256(_git_bytes("show", f"{source_revision}:{path}")).hexdigest()
+            for path in source_paths
+        },
+        "snapshot_binding": {
+            "commit_object": snapshot_object.decode("utf-8"),
+            "sha256": hashlib.sha256(snapshot_object).hexdigest(),
+            "source_commit": source_revision,
+            "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
+        },
+        "input": arguments,
+        "elapsed_seconds": round(elapsed, 3),
+        "model_call_count": len(attempts),
+        "report": report,
+        "report_sha256": hashlib.sha256(
+            report.encode("utf-8", "surrogatepass")
+        ).hexdigest(),
+        "audit": audit,
+        "audit_sha256": hashlib.sha256(json.dumps(
+            audit, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8", "surrogatepass")).hexdigest(),
+        "claims": {
+            "proves": [
+                f"The real cleaner and cross-vendor attester rejected this explicit {field}-steering packet.",
+                f"No decider ran after the attester's {field}-advocacy verdict.",
+            ],
+            "does_not_prove": [
+                "Each phrase in the compound packet independently causes rejection.",
+                "Every future provider version will classify every framing correctly.",
+            ],
+        },
+    }
+    output.write_text(
+        json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(f"wrote {output} from {len(attempts)} model call(s) in {elapsed:.1f}s")
+    return 0
+
+
 def main() -> int:
     arguments = {
         "repo_path": str(ROOT),
@@ -76,65 +141,9 @@ def main() -> int:
         "order_seed": "issue-59-steering-rejection-20260822",
         "effort": "medium",
     }
-    log_dir = Path(tempfile.mkdtemp(prefix="paranoia-steering-acceptance-"))
-    started = time.monotonic()
-    report = ah.arbitrate(arguments, log_dir=log_dir)
-    elapsed = time.monotonic() - started
-    audit = json.loads(_audit_path(report).read_text(encoding="utf-8"))
-    if audit.get("outcome") != "FAILED" or "stakes text advocates" not in audit.get("reason", ""):
-        raise RuntimeError(f"steering acceptance did not fail closed: {audit.get('reason')}")
-    if audit.get("rounds"):
-        raise RuntimeError("a decider ran after the steering verdict")
-    attempts = audit.get("phase_attempts", [])
-    if [row.get("role") for row in attempts] != ["cleaner", "attester"]:
-        raise RuntimeError("negative acceptance did not stop after cleaner and attester")
-    if "STAKES-ADVOCACY: PRESENT" not in audit.get("attestation", ""):
-        raise RuntimeError("attester did not identify the genuine steering")
-
-    source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
-    snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
-    artifact = {
-        "acceptance_kind": "arbitration-genuine-steering-rejected",
-        "version": 1,
-        "date": "2026-08-22",
-        "source_revision": source_revision,
-        "source_sha256": {
-            path: hashlib.sha256(_git_bytes("show", f"{source_revision}:{path}")).hexdigest()
-            for path in SOURCE_PATHS
-        },
-        "snapshot_binding": {
-            "commit_object": snapshot_object.decode("utf-8"),
-            "sha256": hashlib.sha256(snapshot_object).hexdigest(),
-            "source_commit": source_revision,
-            "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
-        },
-        "input": arguments,
-        "elapsed_seconds": round(elapsed, 3),
-        "model_call_count": len(attempts),
-        "report": report,
-        "report_sha256": hashlib.sha256(
-            report.encode("utf-8", "surrogatepass")
-        ).hexdigest(),
-        "audit": audit,
-        "audit_sha256": hashlib.sha256(json.dumps(
-            audit, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-        ).encode("utf-8", "surrogatepass")).hexdigest(),
-        "claims": {
-            "proves": [
-                "The real cleaner and cross-vendor attester rejected explicit directive, endorsement, rhetorical preference, and pre-emptive steering.",
-                "No decider ran after the attester's stakes-advocacy verdict.",
-            ],
-            "does_not_prove": [
-                "Every future provider version will classify every framing correctly.",
-            ],
-        },
-    }
-    OUTPUT.write_text(
-        json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    return run_acceptance(
+        arguments, field="stakes", output=OUTPUT, source_paths=COMMON_SOURCE_PATHS,
     )
-    print(f"wrote {OUTPUT} from {len(attempts)} model call(s) in {elapsed:.1f}s")
-    return 0
 
 
 if __name__ == "__main__":

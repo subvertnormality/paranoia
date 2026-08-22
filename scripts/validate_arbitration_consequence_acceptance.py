@@ -14,6 +14,33 @@ from paranoia_local import evidence, inert_git, prompts
 from scripts import validate_arbitration_fallback_acceptance as shared
 
 
+POSITIVE_SOURCES = frozenset({
+    "src/paranoia_local/arbitrate_handler.py",
+    "src/paranoia_local/arbitration.py",
+    "src/paranoia_local/engines.py",
+    "src/paranoia_local/evidence.py",
+    "src/paranoia_local/prompts.py",
+    "scripts/run_arbitration_consequence_acceptance.py",
+})
+STAKES_NEGATIVE_SOURCES = frozenset({
+    "src/paranoia_local/arbitrate_handler.py",
+    "src/paranoia_local/arbitration.py",
+    "src/paranoia_local/engines.py",
+    "src/paranoia_local/prompts.py",
+    "scripts/run_arbitration_steering_rejection_acceptance.py",
+})
+CONTEXT_NEGATIVE_SOURCES = STAKES_NEGATIVE_SOURCES | {
+    "scripts/run_arbitration_context_steering_rejection_acceptance.py",
+}
+REPLAYED_PRODUCTION_SOURCES = frozenset({
+    "src/paranoia_local/arbitrate_handler.py",
+    "src/paranoia_local/arbitration.py",
+    "src/paranoia_local/engines.py",
+    "src/paranoia_local/evidence.py",
+    "src/paranoia_local/prompts.py",
+})
+
+
 def _canonical_digest(value: object) -> str:
     encoded = json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
@@ -28,7 +55,9 @@ def _source_blob(repo: Path, commit: str, path: str) -> bytes:
     return result.stdout
 
 
-def _common(artifact: dict, repo: Path) -> tuple[dict, dict[str, str], str]:
+def _common(
+    artifact: dict, repo: Path, *, expected_sources: frozenset[str],
+) -> tuple[dict, dict[str, str], str]:
     source = artifact.get("source_revision")
     if not isinstance(source, str):
         raise ValueError("acceptance source revision is absent")
@@ -38,11 +67,14 @@ def _common(artifact: dict, repo: Path) -> tuple[dict, dict[str, str], str]:
     if resolved != source:
         raise ValueError("acceptance source revision is not the recorded commit")
     source_hashes = artifact.get("source_sha256")
-    if not isinstance(source_hashes, dict) or not source_hashes:
-        raise ValueError("acceptance source hashes are absent")
+    if not isinstance(source_hashes, dict) or set(source_hashes) != expected_sources:
+        raise ValueError("acceptance source manifest is not exact for its route")
     for path, expected in source_hashes.items():
-        if hashlib.sha256(_source_blob(repo, source, path)).hexdigest() != expected:
+        historical = _source_blob(repo, source, path)
+        if hashlib.sha256(historical).hexdigest() != expected:
             raise ValueError(f"acceptance source hash mismatch: {path}")
+        if path in REPLAYED_PRODUCTION_SOURCES and (repo / path).read_bytes() != historical:
+            raise ValueError(f"replayed production source differs from acceptance source: {path}")
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or _canonical_digest(audit) != artifact.get("audit_sha256"):
         raise ValueError("acceptance audit digest mismatch")
@@ -89,7 +121,9 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
 
 
 def _positive(artifact: dict, repo: Path) -> None:
-    audit, instructions, source = _common(artifact, repo)
+    audit, instructions, source = _common(
+        artifact, repo, expected_sources=POSITIVE_SOURCES,
+    )
     if artifact.get("acceptance_kind") != "arbitration-consequence-not-advocacy":
         raise ValueError("positive acceptance kind mismatch")
     if not _raw_input_bound(artifact, audit):
@@ -127,9 +161,13 @@ def _positive(artifact: dict, repo: Path) -> None:
         raise ValueError("positive acceptance terminal outcome does not recompute")
 
 
-def _negative(artifact: dict, repo: Path) -> None:
-    audit, instructions, _ = _common(artifact, repo)
-    if artifact.get("acceptance_kind") != "arbitration-genuine-steering-rejected":
+def _negative(
+    artifact: dict, repo: Path, *, field: str, expected_sources: frozenset[str],
+) -> None:
+    audit, instructions, _ = _common(
+        artifact, repo, expected_sources=expected_sources,
+    )
+    if artifact.get("acceptance_kind") != f"arbitration-{field}-steering-rejected":
         raise ValueError("negative acceptance kind mismatch")
     if not _raw_input_bound(artifact, audit):
         raise ValueError("negative acceptance input mismatch")
@@ -182,11 +220,11 @@ def _negative(artifact: dict, repo: Path) -> None:
     except arb.ArbitrationError as exc:
         raise ValueError("negative acceptance attestation is invalid") from exc
     if (
-        not attestation.stakes_advocacy
-        or attestation.context_advocacy is not None
+        not getattr(attestation, f"{field}_advocacy")
+        or getattr(attestation, f"{'context' if field == 'stakes' else 'stakes'}_advocacy") is not None
         or not attestation.original_neutrality_pass
     ):
-        raise ValueError("negative acceptance did not identify stakes steering")
+        raise ValueError(f"negative acceptance did not isolate {field} steering")
     attester_body = ah._attest_body(
         raw["decision"], raw["stakes"], raw["context"], raw["files"],
         cleaned_hints, raw["options"], parsed,
@@ -199,30 +237,45 @@ def _negative(artifact: dict, repo: Path) -> None:
     ):
         raise ValueError("negative acceptance attester attempt does not replay")
     expected_reason = (
-        "the stakes text advocates for an option, and stakes is not the cleaner's to "
-        f"rewrite — fix it and re-run: {attestation.stakes_advocacy}"
+        f"the {field} text advocates for an option, and {field} is not the cleaner's to "
+        f"rewrite — fix it and re-run: {getattr(attestation, f'{field}_advocacy')}"
     )
     if audit.get("reason") != expected_reason:
         raise ValueError("negative acceptance failure reason mismatch")
 
 
-def validate_artifacts(positive: dict, negative: dict, repo: Path) -> None:
+def validate_artifacts(
+    positive: dict, stakes_negative: dict, context_negative: dict, repo: Path,
+) -> None:
     _positive(positive, repo)
-    _negative(negative, repo)
+    _negative(
+        stakes_negative, repo, field="stakes",
+        expected_sources=STAKES_NEGATIVE_SOURCES,
+    )
+    _negative(
+        context_negative, repo, field="context",
+        expected_sources=CONTEXT_NEGATIVE_SOURCES,
+    )
 
 
-def validate(positive_path: Path, negative_path: Path, repo: Path) -> None:
+def validate(
+    positive_path: Path, stakes_path: Path, context_path: Path, repo: Path,
+) -> None:
     validate_artifacts(
         json.loads(positive_path.read_text()),
-        json.loads(negative_path.read_text()),
+        json.loads(stakes_path.read_text()),
+        json.loads(context_path.read_text()),
         repo,
     )
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: validate_arbitration_consequence_acceptance.py POSITIVE NEGATIVE")
-    validate(Path(sys.argv[1]), Path(sys.argv[2]), Path.cwd())
+    if len(sys.argv) != 4:
+        raise SystemExit(
+            "usage: validate_arbitration_consequence_acceptance.py "
+            "POSITIVE STAKES_NEGATIVE CONTEXT_NEGATIVE"
+        )
+    validate(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), Path.cwd())
 
 
 if __name__ == "__main__":

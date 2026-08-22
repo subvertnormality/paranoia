@@ -10,12 +10,14 @@ from scripts import validate_arbitration_consequence_acceptance as validator
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "docs/arbitration_consequence_acceptance_2026-08-22.json"
 NEGATIVE = ROOT / "docs/arbitration_steering_rejection_acceptance_2026-08-22.json"
+CONTEXT_NEGATIVE = ROOT / "docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json"
 
 
 def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None:
     artifact = json.loads(ARTIFACT.read_text())
     negative = json.loads(NEGATIVE.read_text())
-    validator.validate_artifacts(artifact, negative, ROOT)
+    context_negative = json.loads(CONTEXT_NEGATIVE.read_text())
+    validator.validate_artifacts(artifact, negative, context_negative, ROOT)
     assert artifact["acceptance_kind"] == "arbitration-consequence-not-advocacy"
     source_revision = artifact["source_revision"]
     resolved = inert_git.text(
@@ -78,11 +80,16 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     [
         "source", "snapshot", "audit-digest", "cleaner-prompt", "attester-reply",
         "decider-prompt", "vote", "outcome", "negative-rounds", "negative-reason",
+        "context-rounds", "context-reason", "manifest-extra", "manifest-delete",
+        "production-drift",
     ],
 )
-def test_consequence_acceptance_rejects_every_binding_mutation(mutation: str) -> None:
+def test_consequence_acceptance_rejects_every_binding_mutation(
+    mutation: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     positive = json.loads(ARTIFACT.read_text())
     negative = json.loads(NEGATIVE.read_text())
+    context_negative = json.loads(CONTEXT_NEGATIVE.read_text())
     target = positive
     sync = True
     if mutation == "source":
@@ -111,10 +118,31 @@ def test_consequence_acceptance_rejects_every_binding_mutation(mutation: str) ->
     elif mutation == "negative-rounds":
         target = negative
         negative["audit"]["rounds"] = [{"codex": {}}]
+    elif mutation == "context-rounds":
+        target = context_negative
+        context_negative["audit"]["rounds"] = [{"codex": {}}]
+    elif mutation == "context-reason":
+        target = context_negative
+        context_negative["audit"]["reason"] = "warning only"
+    elif mutation == "manifest-extra":
+        positive["source_sha256"]["README.md"] = "0" * 64
+        sync = False
+    elif mutation == "manifest-delete":
+        del positive["source_sha256"]["src/paranoia_local/evidence.py"]
+        sync = False
+    elif mutation == "production-drift":
+        original_read = Path.read_bytes
+
+        def changed_read(path: Path) -> bytes:
+            body = original_read(path)
+            return body + b"# drift\n" if path.name == "arbitration.py" else body
+
+        monkeypatch.setattr(Path, "read_bytes", changed_read)
+        sync = False
     else:
         target = negative
         negative["audit"]["reason"] = "warning only"
     if sync:
         target["audit_sha256"] = validator._canonical_digest(target["audit"])
     with pytest.raises(ValueError):
-        validator.validate_artifacts(positive, negative, ROOT)
+        validator.validate_artifacts(positive, negative, context_negative, ROOT)

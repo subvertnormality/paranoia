@@ -159,6 +159,31 @@ def fixture(tmp_path: Path) -> tuple[Path, Path]:
     return artifact, repo
 
 
+def test_legacy_validator_has_no_raw_git_subprocess_boundary() -> None:
+    assert not hasattr(legacy_validator, "subprocess")
+
+
+def test_legacy_validator_rejects_a_missing_source_object_before_blob_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact, repo = fixture(tmp_path)
+    data = json.loads(artifact.read_text())
+    data["primary_path"]["source_commit"] = "0" * 40
+    artifact.write_text(json.dumps(data))
+    calls: list[list[str]] = []
+    invoke = legacy_validator.inert_git.invoke
+
+    def recording_invoke(path: Path, args: list[str]):
+        calls.append(list(args))
+        return invoke(path, args)
+
+    monkeypatch.setattr(legacy_validator.inert_git, "invoke", recording_invoke)
+    with pytest.raises(ValueError, match="inert Git read failed"):
+        legacy_validator.validate(artifact, repo)
+    assert ["rev-parse", "--verify", f"{'0' * 40}^{{commit}}"] in calls
+    assert not any(args and args[0] == "show" for args in calls)
+
+
 def cleaning_fixture(tmp_path: Path) -> tuple[Path, Path]:
     repo = tmp_path / "cleaning-repo"
     repo.mkdir()
