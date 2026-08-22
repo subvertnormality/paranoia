@@ -153,6 +153,9 @@ Claim debt, including a discovery timeout, blocks the combined plan verdict with
 staged structural phase. The response reports claim closure and structural convergence separately,
 then emits one governing combined `CONVERGENCE` line. A clear structural census therefore remains
 clear rather than being mislabeled as structural correction merely because evidence tooling failed.
+The upgrade path also recognizes the exact same-snapshot predecessor shape left by the old bug:
+`correction` with no blocking structural debt, blocking/unbound class, or staged failure. It
+persists `clear` without a correction or final provider call while retaining claim debt unchanged.
 
 The issue-58 regression was rerun against Parallax commit
 `c17c58e40dec7e660ec39f6d2a95e9f1d5ac1e7a`, whose 1,606-line, 94,110-byte plan has SHA-256

@@ -1060,13 +1060,17 @@ ACTIONABLE SOURCE PACKETS:
   Source 1: [primary/refutes_claim] …
     Location: https://… (Section 4, table 2)
     Exact passage: …
-CLASS-CONVERGENCE: NOT-BLOCKED — …
+STRUCTURAL-CONVERGENCE: NOT-BLOCKED — staged structural debt is clear.
 CONVERGENCE: BLOCKED — external claim closure remains open.
 ```
 
 `CLAIM-AUDIT-DEBT` includes the validator reason, SHA-256, and a bounded rejected
 output excerpt. Malformed model JSON, a failed audit/retry, unsupported authority,
 or missing entailment blocks; it never becomes an empty successful register.
+On upgrade, a same-snapshot predecessor that is in `correction` with no blocking structural debt,
+blocking or unbound class, or staged failure is the mechanically recognizable legacy shape created
+by claim-only phase pinning. The server migrates that structural phase directly to `clear` without
+spending a correction or final reviewer call; claim debt continues to block the combined verdict.
 If discovery and its single correction are both rejected locally, the debt reports the
 ordered initial and correction validator reasons and hashes the exact two provider envelopes
 joined by the discovery-correction separator. A successful provider process is not labeled as

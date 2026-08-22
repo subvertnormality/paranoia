@@ -554,6 +554,62 @@ def _staged_structural_review(
         d.get("status") == "open" and d.get("severity") in rc.BLOCKING
         for d in state.get("debt", [])
     )
+    legacy_claim_only_phase = (
+        phase == "correction"
+        and state.get("snapshot_digest") == snapshot
+        and not has_blocking_debt
+        and not lineage.blocking()
+        and not unbound_blocking
+        and not any(state.get(key) for key in (
+            "staged_failure", "validation_debt", "format_debt",
+            "unbound_class_ids", "unbound_classes",
+        ))
+    )
+    if legacy_claim_only_phase:
+        # Versions before issue 58 persisted correction solely because claim debt was
+        # open.  The structural census had already cleared at this exact snapshot, so
+        # spending a correction/final call cannot add a structural judgement.  Migrate
+        # only the mechanically unambiguous predecessor shape and keep claim debt as the
+        # independent combined-verdict blocker.
+        state["phase"] = "clear"
+        lineage.review_state = state
+        lineage.debt = None
+        lineage.rounds += 1
+        closure.register_status = "staged claim-only phase migration — NONE"
+        try:
+            cc.save_lineage(closure.state_root, lineage)
+        except cc.StateUnavailable as exc:
+            closure.unavailable = str(exc)
+            review = Review(
+                text=rc.render_error_review(
+                    "[paranoia-local error] claim-only phase migration persistence "
+                    f"is ambiguous: {exc}"
+                ),
+                session_ref=None, raw=str(exc), returncode=2, error=True,
+            )
+            return review, (
+                f"CLASS-REGISTER: {closure.register_status}; persistence unavailable\n"
+                f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+                "STAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 "
+                "execution-failed=0\n"
+                "CONVERGENCE: BLOCKED — this phase migration may not have persisted."
+            ), []
+        closure._settled = True
+        review = Review(
+            text=(
+                "# STRUCTURAL STATE MIGRATED\n\n"
+                "The same-snapshot predecessor contained no blocking structural debt, "
+                "blocking or unbound class, or staged failure. Its legacy claim-only "
+                "correction phase was restored to clear without a reviewer call."
+            ),
+            session_ref=None,
+            raw=json.dumps({"migration":"claim-only-correction-to-clear"}),
+        )
+        return review, _staged_success_trailer(
+            lineage=lineage, state=state, mode=mode,
+            register_status=closure.register_status, minted=[], attempts=[],
+            claims_enabled=closure.claims_enabled,
+        ), []
     if phase == "census" and (
         state.get("unbound_class_ids") or state.get("unbound_classes")
     ) and has_blocking_debt:
@@ -971,51 +1027,55 @@ def _staged_structural_review(
     closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
-    structural_trailer = rc.trailer(state)
-    trailer = "\n".join((
-        cc.render_trailer(
-            lineage, register_status=closure.register_status, minted=minted,
-            include_verdict=False,
-        ),
-        structural_trailer,
-        rc.attempt_trailer(attempts),
-    ))
-    if mode == cc.PLAN_MODE and closure.claims_enabled:
-        structural_trailer = structural_trailer.replace(
-            "CONVERGENCE:", "STRUCTURAL-CONVERGENCE:", 1,
-        )
-        if pc.is_blocked(lineage.claim_state):
-            combined = "CONVERGENCE: BLOCKED — external claim closure remains open."
-        elif (
-            state.get("phase") == "clear"
-            and not any(
-                item.get("status") == "open"
-                and item.get("severity") in rc.BLOCKING
-                for item in state.get("debt", [])
-            )
-            and not any(state.get(key) for key in (
-                "staged_failure", "validation_debt", "format_debt",
-                "unbound_class_ids",
-            ))
-        ):
-            combined = (
-                "CONVERGENCE: NOT-BLOCKED — structural debt is clear and every active "
-                "external claim is supported by frozen or current authoritative evidence."
-            )
-        else:
-            combined = "CONVERGENCE: BLOCKED — structural closure remains open."
-        trailer = "\n".join((
-            pc.render_trailer(lineage.claim_state),
-            cc.render_trailer(
-                lineage, register_status=closure.register_status, minted=minted,
-                include_verdict=False,
-            ),
-            structural_trailer,
-            rc.attempt_trailer(attempts),
-            combined,
-        ))
+    trailer = _staged_success_trailer(
+        lineage=lineage, state=state, mode=mode,
+        register_status=closure.register_status, minted=minted, attempts=attempts,
+        claims_enabled=closure.claims_enabled,
+    )
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
+
+
+def _staged_success_trailer(
+    *, lineage: cc.Lineage, state: dict[str, Any], mode: str,
+    register_status: str, minted: list[str], attempts: list[rc.Attempt],
+    claims_enabled: bool,
+) -> str:
+    class_trailer = cc.render_trailer(
+        lineage, register_status=register_status, minted=minted,
+        include_verdict=False,
+    )
+    structural_trailer = rc.trailer(state)
+    if mode != cc.PLAN_MODE or not claims_enabled:
+        return "\n".join((
+            class_trailer, structural_trailer, rc.attempt_trailer(attempts),
+        ))
+    structural_clear = (
+        state.get("phase") == "clear"
+        and not any(
+            item.get("status") == "open" and item.get("severity") in rc.BLOCKING
+            for item in state.get("debt", [])
+        )
+        and not any(state.get(key) for key in (
+            "staged_failure", "validation_debt", "format_debt", "unbound_class_ids",
+        ))
+    )
+    structural_trailer = structural_trailer.replace(
+        "CONVERGENCE:", "STRUCTURAL-CONVERGENCE:", 1,
+    )
+    if pc.is_blocked(lineage.claim_state):
+        combined = "CONVERGENCE: BLOCKED — external claim closure remains open."
+    elif structural_clear:
+        combined = (
+            "CONVERGENCE: NOT-BLOCKED — structural debt is clear and every active "
+            "external claim is supported by frozen or current authoritative evidence."
+        )
+    else:
+        combined = "CONVERGENCE: BLOCKED — structural closure remains open."
+    return "\n".join((
+        pc.render_trailer(lineage.claim_state), class_trailer, structural_trailer,
+        rc.attempt_trailer(attempts), combined,
+    ))
 
 
 def _default_clock() -> str:

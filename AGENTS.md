@@ -343,6 +343,9 @@ of the resulting code and tests.
 - Claim debt blocks combined plan convergence but never rewrites the independently settled staged
   structural phase or masquerades as staged structural debt. Render claim and structural closure
   separately before the single governing combined convergence verdict.
+  Migrate an exact same-snapshot legacy `correction` phase directly to `clear` only when it has no
+  blocking structural debt, blocking or unbound class, staged failure, or ambiguous persistence;
+  retain claim debt and spend no correction/final provider call for that migration.
 - When discovery and its single correction both fail local claim-payload validation, preserve the
   ordered bounded validator reasons and exact initial/correction raw exchange; do not describe a
   successful provider process as a reviewer execution failure.

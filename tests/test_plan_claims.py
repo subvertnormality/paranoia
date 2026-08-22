@@ -15,6 +15,7 @@ from paranoia_local import (
     handlers,
     plan_claims as pc,
     prompts,
+    review_census as rc,
 )
 from paranoia_local.engines import Review
 
@@ -2581,6 +2582,68 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
     assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
     assert "staged structural debt remains open" not in result
+
+
+def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
+    repo: Path, tmp_path: Path, monkeypatch,
+) -> None:
+    lineage_id = "legacy-claim-only-phase"
+    stakes = "trusted local plan; correctness is high impact"
+    parent = handlers.orientation.resolve_head(repo)
+    snapshot = handlers.orientation.wrap_commit(
+        repo, handlers.orientation.snapshot_tree(repo, parent), parent,
+    )
+    structural_snapshot = rc.digest(f"{PLAN}\0{snapshot}")
+    claim_state = pc.with_debt(
+        pc.empty_state(), pc.AuditError("claim discovery timed out"),
+        round_no=4, plan_text=PLAN,
+    )
+    lineage = cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=4, claim_state=claim_state,
+        review_state={
+            "version": 1,
+            "stakes_digest": rc.digest(stakes),
+            "stakes": stakes,
+            "phase": "correction",
+            "snapshot_digest": structural_snapshot,
+            "debt": [],
+            "last_round": 4,
+        },
+    )
+    cc.save_lineage(cc.default_state_root(), lineage)
+
+    monkeypatch.setattr(
+        handlers, "_verify_plan_claims",
+        lambda plan_text, prior_state, **kwargs: (prior_state, "failed"),
+    )
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.orientation, "snapshot_tree", lambda *args, **kwargs: "tree")
+    monkeypatch.setattr(handlers.orientation, "wrap_commit", lambda *args, **kwargs: snapshot)
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "run",
+        lambda *args, **kwargs: pytest.fail("migration must not call a structural reviewer"),
+    )
+
+    result = handlers.critique_plan(
+        {
+            "plan_text": PLAN, "repo_path": str(repo), "lineage": lineage_id,
+            "round": 5, "stakes": stakes,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "T5",
+    )
+    migrated = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T6", mode=cc.PLAN_MODE,
+    )
+
+    assert migrated.review_state["phase"] == "clear"
+    assert migrated.rounds == 5
+    assert migrated.claim_state["debt"]["reason"] == "claim discovery timed out"
+    assert "STRUCTURAL STATE MIGRATED" in result
+    assert "STRUCTURAL-PHASE: clear" in result
+    assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
+    assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
+    assert "STAGED-ATTEMPTS: total=0" in result
 
 
 def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(
