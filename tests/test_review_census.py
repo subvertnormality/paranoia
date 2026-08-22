@@ -1366,10 +1366,13 @@ def test_trailer_marks_reopen_wave_without_inventing_history() -> None:
     assert "re-arm any prior disposition" in rendered
 
 
-def test_failed_staged_round_retains_persistent_class_without_fake_session(tmp_path) -> None:
+@pytest.mark.parametrize("cacheable_validation", [False, True])
+def test_failed_staged_round_retains_persistent_class_without_fake_session(
+    tmp_path, cacheable_validation,
+) -> None:
     state = rc.normalize_state(None, stakes="s", snapshot="p")
     state.update(
-        phase="correction", last_round=3,
+        phase="correction", last_round=2,
         debt=[{
             "id": "debt-a", "status": "open", "severity": cc.MINOR,
             "first_round": 2, "class_ids": ["class-a"],
@@ -1391,6 +1394,8 @@ def test_failed_staged_round_retains_persistent_class_without_fake_session(tmp_p
     error = handlers._staged_error(
         "provider unavailable", role="correction", kind="provider",
     )
+    if cacheable_validation:
+        error.census_cache = {"schema_version": 1}  # type: ignore[attr-defined]
 
     _, rendered, _ = handlers._settle_staged_failure(
         closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
@@ -1398,6 +1403,7 @@ def test_failed_staged_round_retains_persistent_class_without_fake_session(tmp_p
     closure.release()
 
     assert "PERSISTENCE: class-a currently open; round-label span 3" in rendered
+    assert closure.lineage.review_state["last_round"] == 2
     assert "rebut" not in rendered
     assert "session_ref=" not in rendered
 
@@ -1460,6 +1466,9 @@ def test_real_plan_class_persistence_acceptance_is_source_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     artifact = json.loads(
         (root / "docs/class_persistence_acceptance_2026-08-22.json").read_text()
+    )
+    assert artifact["acceptance_kind"] == (
+        "code-branch-class-persistence-reopen-lifecycle"
     )
     source_revision = artifact["source_revision"]
     assert len(source_revision) == 40

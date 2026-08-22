@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise class persistence and reopen diagnostics through critique_plan."""
+"""Exercise class persistence and reopen diagnostics through critique_branch."""
 
 from __future__ import annotations
 
@@ -22,16 +22,16 @@ from paranoia_local import engines, handlers, orientation, review_census as rc
 CLASS_ID = "60c1a55e"
 LINEAGE_ID = "class-persistence-acceptance-20260822"
 STAKES = (
-    "One trusted operator and OS; repository and plan bytes are untrusted static data; "
-    "no repository execution, hostile local race, or web access; one tiny plan and one "
-    "closed review class; false clear or omitted lifecycle diagnostics can waste repeated "
-    "review rounds; recoverable blocking is acceptable."
+    "One trusted operator and OS; repository bytes are untrusted static data; no "
+    "repository execution, hostile local race, or web access; one tiny committed diff "
+    "and one closed review class; false clear or omitted lifecycle diagnostics can waste "
+    "repeated review rounds; recoverable blocking is acceptable."
 )
-PLAN = """# Destructive migration
-
-Delete every stored account before deployment. The rollback command and rollback test are
-deliberately omitted from this plan.
-"""
+DIFF_INTENT = (
+    "Exercise one recurrence: the new migration policy deliberately omits the rollback "
+    "command and executable rollback test required by the supplied closed class."
+)
+FOCUS = "Assess the supplied active class exactly; do not invent unrelated work."
 
 
 def _run(*args: str, cwd: Path) -> str:
@@ -58,78 +58,79 @@ def main() -> int:
     fixture = Path(tempfile.mkdtemp(prefix="paranoia-persistence-fixture-"))
     state_root = Path(tempfile.mkdtemp(prefix="paranoia-persistence-state-"))
     log_root = Path(tempfile.mkdtemp(prefix="paranoia-persistence-log-"))
-    (fixture / "README.md").write_text(
-        "A minimal repository used only by the class-persistence acceptance.\n",
+    (fixture / "migration.md").write_text(
+        "# Migration policy\n\nNo destructive migration is currently proposed.\n",
         encoding="utf-8",
     )
     _run("git", "init", "-q", cwd=fixture)
     _run("git", "config", "user.name", "paranoia acceptance", cwd=fixture)
     _run("git", "config", "user.email", "paranoia@localhost", cwd=fixture)
-    _run("git", "add", "README.md", cwd=fixture)
-    _run("git", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture", cwd=fixture)
-
-    parent = orientation.resolve_head(fixture)
-    snapshot = orientation.wrap_commit(
-        fixture, orientation.snapshot_tree(fixture, parent), parent,
+    _run("git", "add", "migration.md", cwd=fixture)
+    _run("git", "-c", "commit.gpgsign=false", "commit", "-qm", "base", cwd=fixture)
+    base_id = _run("git", "rev-parse", "HEAD", cwd=fixture)
+    (fixture / "migration.md").write_text(
+        "# Destructive migration\n\nDelete every stored account before deployment. "
+        "The rollback command and rollback test are deliberately omitted.\n",
+        encoding="utf-8",
     )
-    structural_snapshot = rc.digest(f"{PLAN}\0{snapshot}")
-    state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
-    state.update(phase="final", last_round=2, debt=[])
+    _run("git", "add", "migration.md", cwd=fixture)
+    _run("git", "-c", "commit.gpgsign=false", "commit", "-qm", "unsafe change", cwd=fixture)
+    head_id = _run("git", "rev-parse", "HEAD", cwd=fixture)
+
     tracked = cc.TrackedClass(
         class_id=CLASS_ID,
         invariant=(
-            "A plan that proposes destructive stored-data deletion names an exact rollback "
-            "command and an executable rollback test before deployment."
+            "A destructive stored-data deletion change names an exact rollback command "
+            "and an executable rollback test before deployment."
         ),
         severity=cc.MAJOR,
         first_round=1,
         status=cc.CLOSED,
-        procedure="Inspect the plan for both the rollback command and rollback test.",
+        procedure="Inspect the changed policy for both the rollback command and rollback test.",
     )
-    cc.save_lineage(state_root, cc.Lineage(
-        LINEAGE_ID,
-        rounds=2,
-        classes={CLASS_ID: tracked},
-        mode=cc.PLAN_MODE,
-        review_state=state,
-    ))
+    seed = cc.Lineage(
+        LINEAGE_ID, rounds=2, classes={CLASS_ID: tracked}, mode=cc.BRANCH_MODE,
+    )
+    class_block = cc.render_unmechanized(seed)
+    assert class_block is not None
+    packet = orientation.build_packet(
+        fixture, base_id, head_id, diff_intent=DIFF_INTENT, focus=FOCUS,
+        class_blocks=[class_block],
+    )
+    structural_snapshot = rc.digest(f"{base_id}\0{head_id}\0{packet}")
+    seed.review_state = rc.normalize_state(
+        None, stakes=STAKES, snapshot=structural_snapshot,
+    )
+    seed.review_state.update(phase="final", last_round=2, debt=[])
+    cc.save_lineage(state_root, seed)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
 
     engine = engines.CodexEngine()
     engine.binary = args.codex
     started = time.monotonic()
-    result = handlers.critique_plan({
-        "repo_path": str(fixture),
-        "plan_text": PLAN,
-        "lineage": LINEAGE_ID,
-        "round": 3,
-        "converge": True,
-        "class_closure": True,
-        "claim_verification": False,
-        "model": "gpt-5.6-sol",
-        "effort": "high",
-        "web_search": False,
-        "stakes": STAKES,
-        "focus": "Assess the supplied active class exactly; do not invent unrelated work.",
+    result = handlers.critique_branch({
+        "repo_path": str(fixture), "base_ref": base_id, "head_ref": head_id,
+        "lineage": LINEAGE_ID, "round": 3, "converge": True,
+        "class_closure": True, "model": "gpt-5.6-sol", "effort": "high",
+        "web_search": False, "stakes": STAKES, "diff_intent": DIFF_INTENT,
+        "focus": FOCUS,
     }, engine=engine, log_dir=log_root)
     elapsed = time.monotonic() - started
 
     expected_fragments = (
         f"PERSISTENCE: {CLASS_ID} currently open; round-label span 3",
         "REOPEN-WAVE: 1 previously closed class(es) reopened this round",
-        "rebut with session_ref=",
-        "CONVERGENCE: BLOCKED",
+        "rebut with session_ref=", "CONVERGENCE: BLOCKED",
     )
     missing = [value for value in expected_fragments if value not in result]
     if missing:
         raise RuntimeError(f"acceptance result omitted {missing!r}")
-
     audits = list(log_root.glob("*.json"))
     if len(audits) != 1:
         raise RuntimeError(f"expected one audit record, got {len(audits)}")
     audit = json.loads(audits[0].read_text(encoding="utf-8"))
     durable = cc.load_lineage(
-        state_root, LINEAGE_ID, stamp="ACCEPTANCE", mode=cc.PLAN_MODE,
+        state_root, LINEAGE_ID, stamp="ACCEPTANCE", mode=cc.BRANCH_MODE,
     )
     if durable.classes[CLASS_ID].status != cc.OPEN:
         raise RuntimeError("reopened class was not durably persisted")
@@ -144,37 +145,26 @@ def main() -> int:
 
     source_revision = _run("git", "rev-parse", "HEAD", cwd=ROOT)
     artifact = {
-        "acceptance_kind": "plan-class-persistence-reopen-lifecycle",
-        "version": 1,
-        "date": "2026-08-22",
-        "source_revision": source_revision,
+        "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
+        "version": 2, "date": "2026-08-22", "source_revision": source_revision,
         "provider": {
-            "engine": "codex",
-            "executable": args.codex,
+            "engine": "codex", "executable": args.codex,
             "cli_version": _run(args.codex, "--version", cwd=ROOT),
-            "model": "gpt-5.6-sol",
-            "effort": "high",
-            "web_search": False,
+            "model": "gpt-5.6-sol", "effort": "high", "web_search": False,
         },
         "fixture": {
-            "plan_sha256": _digest(PLAN),
-            "repository_head": parent,
-            "structural_snapshot": structural_snapshot,
-            "lineage": LINEAGE_ID,
-            "round": 3,
-            "class_id": CLASS_ID,
-            "class_first_round": 1,
-            "class_before": cc.CLOSED,
+            "base_id": base_id, "head_id": head_id,
+            "packet_sha256": _digest(packet), "structural_snapshot": structural_snapshot,
+            "lineage": LINEAGE_ID, "round": 3, "class_id": CLASS_ID,
+            "class_first_round": 1, "class_before": cc.CLOSED,
             "class_after": durable.classes[CLASS_ID].status,
         },
-        "elapsed_seconds": round(elapsed, 3),
-        "attempt_ledger": attempts,
-        "settlement": settlement,
-        "result_text": result,
+        "elapsed_seconds": round(elapsed, 3), "attempt_ledger": attempts,
+        "settlement": settlement, "result_text": result,
         "result_sha256": _digest(result),
         "claims": {
             "proves": [
-                "The public critique_plan handler reopened the seeded closed class.",
+                "The public critique_branch handler reopened the seeded closed class.",
                 "The same response rendered persistence, reopen-wave, resumable-session, and blocked diagnostics.",
                 "The reopened class survived a durable lineage reload.",
             ],
@@ -184,12 +174,11 @@ def main() -> int:
             ],
         },
     }
-    output = Path(args.output)
-    output.write_text(
+    Path(args.output).write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    print(f"wrote {output} from {len(attempts)} provider call(s)")
+    print(f"wrote {args.output} from {len(attempts)} provider call(s)")
     return 0
 
 

@@ -103,14 +103,14 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "c11317aeb6c7bf5ab590d069e7779053969386ae55d3c2effa8bc3c7c53d5d5a",
-      "additions": 256,
+      "sha256": "90a0662be26f1847de8d404093fe2b4466fb2e60a1d398153d108387e64062a5",
+      "additions": 257,
       "deletions": 43,
       "scope": "Plan structural prompt composition, a role-specific discovery timeout, combined claim/structural trailer composition, exact claim-only phase migration before model-reserve admission, locally measured attempt telemetry, and diagnostic class-persistence/reopen context on successful and failed structural lifecycles; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
-      "sha256": "624b3e8adeb58aa464e027d33d4444f2c132615acdf196a911f628d3254f2ff9",
-      "additions": 54,
+      "sha256": "3f98e29fdd92ea78a7f6997a7744b36b0458a4f825d3d08cedc6dff7d61c302c",
+      "additions": 55,
       "deletions": 3,
       "scope": "Adds requested timeout, separate provider duration, and diagnostic-only class persistence and reopen-wave trailer rendering."
     },

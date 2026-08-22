@@ -313,12 +313,13 @@ def trailer(
     class_first_rounds: Mapping[str, int] | None = None,
     reopened_class_ids: Sequence[str] = (),
     session_ref: str | None = None,
+    round_label: int | None = None,
 ) -> str:
     open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
     debt = [d for d in open_debt if d.get("severity") in BLOCKING]
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
-    current_round = state.get("last_round")
+    current_round = round_label if isinstance(round_label, int) else state.get("last_round")
     if isinstance(current_round, int) and class_first_rounds:
         debt_first_by_class: dict[str, int] = {}
         for item in open_debt:

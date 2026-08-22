@@ -1044,13 +1044,13 @@ first-class blocker in `CLASS-CLOSURE`; it is not duplicated into synthetic find
 invented evidence anchors. The class trailer lists bounded path/line/text match detail and renders a
 binary recurrence as `path: binary match (line not shown)`. In that case the governing line says
 class closure remains open.
-Persistence is deliberately diagnostic, not another blocking rule. It uses only facts the durable
-lineage proves: the first class label, current label, and first label of the currently open debt. It
+Persistence is deliberately diagnostic, not another blocking rule. It uses the durable first-class
+and current-debt labels plus the current caller-supplied round label. It
 does not claim how many intervening rounds contained a finding. On the third tracked round it
 surfaces `rebut`, which resumes the current reviewer session for a concede-or-hold scope dispute.
 The retained [class-persistence acceptance](docs/class_persistence_acceptance_2026-08-22.json)
-exercises that reopen and diagnostic lifecycle through the public plan handler with one real Codex
-call on a tiny synthetic plan.
+exercises that reopen and diagnostic lifecycle through the public branch handler with one real
+Codex call on a tiny synthetic committed diff.
 
 One-shot, injected-engine, and successfully persisted staged tracked trailers all retain
 `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and unmechanized-class detail. If lineage state cannot be

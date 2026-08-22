@@ -471,6 +471,7 @@ def _settle_staged_failure(
                 for item in closure.lineage.blocking()
             },
             reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
+            round_label=closure.round_no,
         ),
         rc.attempt_trailer(attempts),
     ))
