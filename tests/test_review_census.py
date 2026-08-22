@@ -1502,7 +1502,9 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     )
     assert "PERSISTENCE: 60c1a55e currently open; round-label span 3" in result
     assert "REOPEN-WAVE: 1 previously closed class(es) reopened this round" in result
-    assert "rebut with session_ref=" in result
+    assert result.count(
+        "rebut with session_ref=" + artifact["attempt_ledger"][0]["session_ref"]
+    ) == 1
     assert "CONVERGENCE: BLOCKED" in result
 
 
@@ -2335,7 +2337,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
             "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
             "basis":{"kind":"new_finding", "finding_id":"G1"},
         }],
-        "class_actions":[{"kind":"reopen", "class_id":"class-a"}],
+        "class_actions":{"class-a":None},
         "coverage":payload(lane(findings=[final_finding]))["coverage"],
     })
 
@@ -2356,6 +2358,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
     settlement = audit["staged_settlement"]
     assert settlement["_finding_id_renames"] == {"G1":"F1"}
     assert settlement["class_records"] == [{"op":"reopen", "class_id":"class-a"}]
+    assert settlement["_class_record_pointers"] == ["/class_outcomes/class-a"]
     assert settlement["findings"][0]["id"] == "F1"
     assert settlement["debt"][0]["finding_id"] == "F1"
 
