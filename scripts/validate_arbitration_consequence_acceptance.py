@@ -19,15 +19,21 @@ POSITIVE_SOURCES = frozenset({
     "src/paranoia_local/arbitration.py",
     "src/paranoia_local/engines.py",
     "src/paranoia_local/evidence.py",
+    "src/paranoia_local/inert_git.py",
     "src/paranoia_local/prompts.py",
     "scripts/run_arbitration_consequence_acceptance.py",
+    "scripts/validate_arbitration_consequence_acceptance.py",
+    "scripts/validate_arbitration_fallback_acceptance.py",
 })
 STAKES_NEGATIVE_SOURCES = frozenset({
     "src/paranoia_local/arbitrate_handler.py",
     "src/paranoia_local/arbitration.py",
     "src/paranoia_local/engines.py",
+    "src/paranoia_local/inert_git.py",
     "src/paranoia_local/prompts.py",
     "scripts/run_arbitration_steering_rejection_acceptance.py",
+    "scripts/validate_arbitration_consequence_acceptance.py",
+    "scripts/validate_arbitration_fallback_acceptance.py",
 })
 CONTEXT_NEGATIVE_SOURCES = STAKES_NEGATIVE_SOURCES | {
     "scripts/run_arbitration_context_steering_rejection_acceptance.py",
@@ -37,7 +43,10 @@ REPLAYED_PRODUCTION_SOURCES = frozenset({
     "src/paranoia_local/arbitration.py",
     "src/paranoia_local/engines.py",
     "src/paranoia_local/evidence.py",
+    "src/paranoia_local/inert_git.py",
     "src/paranoia_local/prompts.py",
+    "scripts/validate_arbitration_consequence_acceptance.py",
+    "scripts/validate_arbitration_fallback_acceptance.py",
 })
 
 

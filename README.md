@@ -776,8 +776,8 @@ What it does, in order:
    cases stop after the attester. Each negative case proves its complete packet is rejected, not
    that every phrase in that packet independently triggers the gate. A closed replay validator
    requires an exact per-route source manifest, byte-identical replayed production modules, inert
-   source/snapshot evidence, exact prompts and replies, provider identities, parsed votes, and
-   recomputed outcomes.
+   Git launcher and replay-validator implementations, inert source/snapshot evidence, exact prompts
+   and replies, provider identities, parsed votes, and recomputed outcomes.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
