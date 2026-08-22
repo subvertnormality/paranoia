@@ -775,10 +775,11 @@ What it does, in order:
    and [context steering](docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json)
    cases stop after the attester. Each negative case proves its complete packet is rejected, not
    that every phrase in that packet independently triggers the gate. A closed replay validator
-   requires an exact per-route source manifest, byte-identical replayed production modules, inert
-   Git launcher and replay-validator implementations, inert source/snapshot evidence, exact prompts
-   and replies, the configured cleaner/attester engine-model identities, parsed votes, and
-   recomputed outcomes. Acceptance inputs may not override the cleaner model.
+   requires an exact per-route source manifest, byte-identical replayed production modules and inert
+   Git launcher, hash-checked historical replay-validator sources, inert source/snapshot evidence,
+   exact prompts and replies, the configured cleaner/attester engine-model identities, parsed votes,
+   and recomputed outcomes. Acceptance inputs may not override the cleaner model; validator changes
+   do not force a provider rerun when the recorded production route is unchanged.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

@@ -45,8 +45,6 @@ REPLAYED_PRODUCTION_SOURCES = frozenset({
     "src/paranoia_local/evidence.py",
     "src/paranoia_local/inert_git.py",
     "src/paranoia_local/prompts.py",
-    "scripts/validate_arbitration_consequence_acceptance.py",
-    "scripts/validate_arbitration_fallback_acceptance.py",
 })
 
 
