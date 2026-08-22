@@ -148,15 +148,40 @@ def _common(
 
 def _raw_input_bound(artifact: dict, audit: dict) -> bool:
     arguments, raw = artifact.get("input", {}), audit.get("raw_input", {})
+    options = arguments.get("options") if isinstance(arguments, dict) else None
+    files = arguments.get("files") if isinstance(arguments, dict) else None
+    options_closed = (
+        isinstance(options, list)
+        and len(options) == 2
+        and all(
+            isinstance(row, dict)
+            and set(row) == {"id", "statement"}
+            and all(isinstance(row[key], str) and row[key].strip() for key in row)
+            for row in options
+        )
+        and len({row["id"] for row in options}) == len(options)
+    )
+    files_closed = (
+        isinstance(files, list)
+        and len(files) == 1
+        and all(
+            isinstance(row, dict)
+            and set(row) == {"path", "reason"}
+            and all(isinstance(row[key], str) and row[key].strip() for key in row)
+            for row in files
+        )
+    )
     return (
         isinstance(arguments, dict)
         and set(arguments) == INPUT_FIELDS
+        and options_closed
+        and files_closed
         and raw.get("decision") == arguments.get("decision")
         and raw.get("stakes") == arguments.get("stakes")
         and raw.get("context") == arguments.get("context")
         and raw.get("files") == arguments.get("files")
         and raw.get("options") == {
-            row["id"]: row["statement"] for row in arguments.get("options", [])
+            row["id"]: row["statement"] for row in options
         }
         and arguments.get("clean") is True
         and arguments.get("research") is False

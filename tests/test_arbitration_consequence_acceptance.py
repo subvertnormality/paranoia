@@ -80,6 +80,8 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "top-level-delete", "input-decision", "input-stakes", "input-context",
         "input-files", "input-options", "input-clean", "input-research", "input-web",
         "input-order-seed", "version", "date",
+        "option-extra", "option-duplicate", "option-empty", "file-extra",
+        "file-empty", "file-duplicate",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -190,6 +192,26 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
         sync = False
     elif mutation == "date":
         context_negative["date"] = "2099-01-01"
+        sync = False
+    elif mutation == "option-extra":
+        positive["input"]["options"][0]["note"] = "unbound"
+        sync = False
+    elif mutation == "option-duplicate":
+        negative["input"]["options"][1]["id"] = negative["input"]["options"][0]["id"]
+        sync = False
+    elif mutation == "option-empty":
+        context_negative["input"]["options"][0]["statement"] = "   "
+        sync = False
+    elif mutation == "file-extra":
+        positive["input"]["files"][0]["note"] = "unbound"
+        sync = False
+    elif mutation == "file-empty":
+        negative["input"]["files"][0]["reason"] = ""
+        sync = False
+    elif mutation == "file-duplicate":
+        context_negative["input"]["files"].append(
+            dict(context_negative["input"]["files"][0])
+        )
         sync = False
     else:
         target = negative

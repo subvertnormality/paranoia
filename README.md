@@ -787,7 +787,9 @@ What it does, in order:
    evidence. Proof inputs retain only caller content plus route-defining `clean`, `research`,
    `web_search`, and `order_seed`: caller content is replayed against `raw_input`, route booleans are
    fixed to the exercised path, and the seed must equal the audit. Local paths and effort settings are
-   operational inputs, not proof claims, and are omitted from the envelope.
+   operational inputs, not proof claims, and are omitted from the envelope. Nested proof input is
+   closed too: exactly two unique, nonempty `{id, statement}` option rows and one nonempty
+   `{path, reason}` file row; extensions, duplicate IDs, and duplicate file rows reject.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
