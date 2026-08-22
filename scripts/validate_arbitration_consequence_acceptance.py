@@ -232,13 +232,17 @@ def _negative(
     attester_prompt = prompts.compose(instructions["ATTEST_INSTRUCTIONS"], attester_body)
     if not shared._attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
-        rejection=attestation.stakes_advocacy,
+        rejection=getattr(attestation, f"{field}_advocacy"),
         execution=shared._external_execution("codex", attester_record["execution"]["model"]),
     ):
         raise ValueError("negative acceptance attester attempt does not replay")
+    reason_bridge = (
+        "stakes is not the cleaner's to rewrite"
+        if field == "stakes" else "context is preserved verbatim"
+    )
     expected_reason = (
-        f"the {field} text advocates for an option, and {field} is not the cleaner's to "
-        f"rewrite — fix it and re-run: {getattr(attestation, f'{field}_advocacy')}"
+        f"the {field} text advocates for an option, and {reason_bridge} — fix it and "
+        f"re-run: {getattr(attestation, f'{field}_advocacy')}"
     )
     if audit.get("reason") != expected_reason:
         raise ValueError("negative acceptance failure reason mismatch")
