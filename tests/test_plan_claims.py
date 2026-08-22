@@ -199,7 +199,9 @@ def test_authoritative_capture_acceptance_record() -> None:
             check=True, stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(recorded).hexdigest() == expected
-        if relative != "src/paranoia_local/handlers.py":
+        if relative not in {
+            "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+        }:
             assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     allowed = snapshot["allowed_later_handlers_diff"]
     handler_diff = subprocess.run(
@@ -208,6 +210,14 @@ def test_authoritative_capture_acceptance_record() -> None:
     ).stdout
     assert hashlib.sha256(handler_diff).hexdigest() == allowed["sha256"]
     assert "does not alter capture, binding, cold-attestation" in allowed["scope"]
+    census_allowed = snapshot["allowed_later_review_census_diff"]
+    census_diff = subprocess.run(
+        ["git", "diff", "--no-ext-diff", source_commit, "--",
+         "src/paranoia_local/review_census.py"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    ).stdout
+    assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
+    assert census_allowed["scope"] == "Adds requested timeout to attempt telemetry only."
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
@@ -2446,6 +2456,7 @@ def test_large_plan_discovery_uses_the_dedicated_timeout(
     line = "An external platform behavior remains subject to authoritative verification.\n"
     plan = ("# Large plan\n\n" + line * 4_000)[:280_000]
     seen: list[int | None] = []
+    ledger: list[dict] = []
 
     class TimeoutEngine(_RoleScript):
         def for_role(self, role: str):
@@ -2467,7 +2478,7 @@ def test_large_plan_discovery_uses_the_dedicated_timeout(
     adapter = handlers._CapturedClaimEngine(
         TimeoutEngine({}), plan_text=plan, repo=_repo(tmp_path), plan_repo_path=None,
         deadline=float(handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC),
-        clock=lambda: 0.0,
+        clock=lambda: 0.0, attempt_ledger=ledger,
     )
     try:
         result = adapter.run(plan, tmp_path, "m", "high", True)
@@ -2475,6 +2486,9 @@ def test_large_plan_discovery_uses_the_dedicated_timeout(
         assert len(plan) > 2 * 140_509 - 2_000
         assert seen == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC]
         assert seen != [handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC]
+        assert ledger[0]["requested_timeout_sec"] == (
+            handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
+        )
     finally:
         adapter.close()
 

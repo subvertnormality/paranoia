@@ -533,6 +533,9 @@ maximum-size binding batches, five exact-size cold-attestation batches, and thei
 the 300-second phase cap. Before first spend the server reserves that complete 22-call graph, 300
 seconds for capture and bounded local processing, and 60 seconds of scheduling slack. Before each
 initial call it also reserves both call-count and the full timeout for its correction.
+Every claim and staged attempt row records the timeout actually supplied to the provider and the
+measured call duration, so retained acceptance can distinguish an enforced cap from an inferred
+role policy.
 The capture pool and exact pre-binding packing share that one enforced 300-second monotonic
 deadline; exhaustion blocks visibly before the first binding call rather than consuming time
 reserved for later model phases.

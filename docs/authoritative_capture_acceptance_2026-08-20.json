@@ -103,10 +103,16 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "acdab79452f1fd79d0a4a3969499405cb7906364dc071f23026e9a40d4825e55",
-      "additions": 128,
-      "deletions": 24,
-      "scope": "Plan structural prompt composition, a role-specific discovery timeout, combined claim/structural trailer composition, and exact claim-only phase migration; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "5238094539ccbcd67b2e1dfcc1a91ca8c559f89c14903faeacfa70c6f52d1a3f",
+      "additions": 170,
+      "deletions": 35,
+      "scope": "Plan structural prompt composition, a role-specific discovery timeout, combined claim/structural trailer composition, exact claim-only phase migration, and attempt timeout telemetry; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+    },
+    "allowed_later_review_census_diff": {
+      "sha256": "231f66ec66b26ac38b2c79221513895ba0061db1a9c7731fb42b6f683a9fa36c",
+      "additions": 1,
+      "deletions": 0,
+      "scope": "Adds requested timeout to attempt telemetry only."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",

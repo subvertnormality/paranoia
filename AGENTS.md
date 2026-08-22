@@ -275,6 +275,8 @@ of the resulting code and tests.
   scalar or container alias may bind authority or entailment to another claim or evidence row.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
+  Record the timeout actually supplied and the measured duration on every claim and staged attempt;
+  acceptance must validate execution telemetry rather than infer it from role names.
   Enforce the reserved non-model capture/pre-binding interval as one aggregate monotonic deadline;
   it may not consume time reserved for later model phases.
   Captured binding failure debt must retain raw provider stdout, structured failure detail, and

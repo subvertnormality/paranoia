@@ -380,6 +380,21 @@ class TestRunWithInjectedRunner:
         assert captured["cwd"] == Path("/repo")
         assert review.text == "## What works\nNothing notable."
 
+    def test_run_measures_duration_when_provider_omits_it(self, monkeypatch) -> None:
+        e = engines.get_engine("codex")
+        ticks = iter((10.0, 10.125))
+        monkeypatch.setattr(engines.time, "monotonic", lambda: next(ticks))
+
+        review = e.run(
+            prompt="x", cwd=Path("/repo"), model="m", effort="high",
+            web_search=False,
+            runner=lambda *args, **kwargs: RunResult(
+                returncode=0, stdout=CODEX_JSONL, stderr="",
+            ),
+        )
+
+        assert review.duration_ms == 125
+
     def test_run_surfaces_nonzero_exit_as_error_text(self) -> None:
         e = engines.get_engine("claude")
 

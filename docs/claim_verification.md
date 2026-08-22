@@ -10,7 +10,7 @@ record exercises the public `critique_plan` handler with the exact 94,110-byte h
 plan that repeatedly failed at the former boundary. Its claim phase took 721,844 ms,
 completed five model attempts without an execution timeout, persisted 18 claim outcomes,
 and continued into the structural census. The artifact deliberately retains the final
-`CONVERGENCE: BLOCKED`: ten claims remained unverified and the historical plan acquired
+`CONVERGENCE: BLOCKED`: one claim was refuted, nine remained unverified, and the historical plan acquired
 structural debt. It proves recovery of this concrete timeout failure, not universal
 provider latency or correctness of that plan.
 

@@ -51,6 +51,7 @@ class Attempt:
     validation_pointer: str | None = None
     rejected_reply_sha256: str | None = None
     rejected_reply_excerpt: str | None = None
+    requested_timeout_sec: int | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)

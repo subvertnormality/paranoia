@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -185,6 +186,7 @@ class Engine(ABC):
         from .runner import DEFAULT_TIMEOUT_SEC
 
         final_argv, cleanup = self._structured_argv(argv, response_schema)
+        started = time.monotonic()
         if on_progress is not None:
             def _on_line(line: str) -> None:
                 msg = self.progress_from_line(line)
@@ -205,6 +207,7 @@ class Engine(ABC):
                 )
             finally:
                 cleanup()
+        measured_duration_ms = int((time.monotonic() - started) * 1000)
         review = self.parse_output(result.stdout)
         if response_schema is not None and self.name == "claude" and not review.error:
             try:
@@ -250,6 +253,10 @@ class Engine(ABC):
             )
         return replace(
             review, returncode=result.returncode, error=failed,
+            duration_ms=(
+                review.duration_ms
+                if review.duration_ms is not None else measured_duration_ms
+            ),
             failure_detail=failure_detail, stderr=stderr,
         )
 

@@ -81,6 +81,7 @@ class _ValidationReview(Review):
 
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
+    requested_timeout_sec: int | None = None,
 ) -> rc.Attempt:
     response = review.text or ""
     projection = _review_failure_projection(review) if review.error else {}
@@ -91,7 +92,7 @@ def _attempt(
         hashlib.sha256(response.encode("utf-8", "surrogatepass")).hexdigest()
         if response else None,
         response[:4000] if response else None, sequence,
-        **projection,
+        **projection, requested_timeout_sec=requested_timeout_sec,
     )
 
 
@@ -148,7 +149,9 @@ def _staged_call(
         prompt, cwd, model, effort, web_search, timeout=timeout,
         response_schema=response_schema, **_progress_kwargs(on_progress),
     )
-    attempts = [_attempt(role, engine, review, sequence=sequence)]
+    attempts = [_attempt(
+        role, engine, review, sequence=sequence, requested_timeout_sec=timeout,
+    )]
     if review.error:
         error = _engine_failure_error(review, role=role)
         error.attempts = attempts  # type: ignore[attr-defined]
@@ -186,6 +189,7 @@ def _staged_call(
         )
         attempts.append(_attempt(
             f"{role}-validation-retry", engine, retry, sequence=retry_sequence,
+            requested_timeout_sec=min(STAGED_FORMAT_RETRY_TIMEOUT_SEC, timeout),
         ))
         if retry.error:
             error = _engine_failure_error(
@@ -1894,7 +1898,9 @@ def _verify_plan_claims(
         **_progress_kwargs(on_progress),
     )
     if captured_engine is None and attempt_ledger is not None:
-        attempt_ledger.append(_attempt("claim-audit", engine, review).json())
+        attempt_ledger.append(_attempt(
+            "claim-audit", engine, review, requested_timeout_sec=3600,
+        ).json())
     if review.error:
         validation_invalid = isinstance(review, _ValidationReview)
         error = pc.AuditError(
@@ -1939,7 +1945,9 @@ def _verify_plan_claims(
             model, effort, True, timeout=3600, **_progress_kwargs(on_progress),
         )
         if captured_engine is None and attempt_ledger is not None:
-            attempt_ledger.append(_attempt("claim-audit-retry", engine, retry).json())
+            attempt_ledger.append(_attempt(
+                "claim-audit-retry", engine, retry, requested_timeout_sec=3600,
+            ).json())
         if retry.error:
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
@@ -2049,7 +2057,10 @@ class _CapturedClaimEngine:
         first = discoverer.run(
             prompt, self.launch, model, effort, True, **discovery_kwargs,
         )
-        self._record("claim-discovery", discoverer, first)
+        self._record(
+            "claim-discovery", discoverer, first,
+            requested_timeout_sec=discovery_kwargs["timeout"],
+        )
         if first.error or not first.session_ref:
             return first
         raw_parts = [first.raw]
@@ -2073,6 +2084,7 @@ class _CapturedClaimEngine:
             )
             self._record(
                 "claim-discovery-validation-retry", discoverer, corrected,
+                requested_timeout_sec=discovery_kwargs["timeout"],
             )
             raw_parts.append(corrected.raw)
             if corrected.error or not corrected.session_ref:
@@ -2187,9 +2199,15 @@ class _CapturedClaimEngine:
                 "and bounded local processing"
             )
 
-    def _record(self, role: str, engine: Engine, review: Review) -> None:
+    def _record(
+        self, role: str, engine: Engine, review: Review, *,
+        requested_timeout_sec: int,
+    ) -> None:
         if self.attempt_ledger is not None:
-            self.attempt_ledger.append(_attempt(role, engine, review).json())
+            self.attempt_ledger.append(_attempt(
+                role, engine, review,
+                requested_timeout_sec=requested_timeout_sec,
+            ).json())
 
     def _mark_last_validation_invalid(
         self, issue: str, review: Review, pointer: str,
@@ -2246,7 +2264,10 @@ class _CapturedClaimEngine:
         corrected = role.resume(
             session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
         )
-        self._record("claim-binding-outer-retry", role, corrected)
+        self._record(
+            "claim-binding-outer-retry", role, corrected,
+            requested_timeout_sec=binding_kwargs["timeout"],
+        )
         if corrected.error or self.discovery is None:
             return corrected
         try:
@@ -2557,7 +2578,10 @@ class _CapturedClaimEngine:
                 current_session, instruction, self.launch, model, effort, False,
                 **call_kwargs,
             )
-            self._record("claim-binding", self.binding_engine, review)
+            self._record(
+                "claim-binding", self.binding_engine, review,
+                requested_timeout_sec=call_kwargs["timeout"],
+            )
             reviews.append(review)
             if review.error or not review.session_ref:
                 if expanded:
@@ -2584,6 +2608,7 @@ class _CapturedClaimEngine:
                 )
                 self._record(
                     "claim-binding-validation-retry", self.binding_engine, correction,
+                    requested_timeout_sec=call_kwargs["timeout"],
                 )
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
@@ -2922,7 +2947,10 @@ class _CapturedClaimEngine:
             review = attester.run(
                 prompt, self.launch, model, effort, False, timeout=timeout,
             )
-            self._record("claim-attestation", attester, review)
+            self._record(
+                "claim-attestation", attester, review,
+                requested_timeout_sec=timeout,
+            )
             attestation_raw.append(review.raw)
             if review.error:
                 if len(attestation_batch) == 1 and (
@@ -2974,7 +3002,10 @@ class _CapturedClaimEngine:
                     self._attestation_correction_prompt(rendered, issue),
                     self.launch, model, effort, False, timeout=timeout,
                 )
-                self._record("claim-attestation-validation-retry", attester, correction)
+                self._record(
+                    "claim-attestation-validation-retry", attester, correction,
+                    requested_timeout_sec=timeout,
+                )
                 attestation_raw.append(correction.raw)
                 if correction.error:
                     if len(attestation_batch) == 1 and (

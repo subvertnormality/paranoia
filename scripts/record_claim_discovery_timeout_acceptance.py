@@ -146,8 +146,15 @@ def main() -> None:
         or invocation.get("source_status_after")
     ):
         raise SystemExit("acceptance invocation was not bound to one clean source revision")
+    if any(
+        not isinstance(row.get("requested_timeout_sec"), int)
+        or not isinstance(row.get("duration_ms"), int)
+        or row["duration_ms"] < 0
+        for row in audit["attempt_ledger"]
+    ):
+        raise SystemExit("production attempt ledger lacks actual timeout/duration telemetry")
     role_timeouts = {
-        row["role"]: (600 if str(row["role"]).startswith("claim-discovery") else 300)
+        row["role"]: row["requested_timeout_sec"]
         for row in audit["attempt_ledger"]
         if str(row.get("role", "")).startswith("claim-")
     }

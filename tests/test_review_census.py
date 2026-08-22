@@ -488,6 +488,7 @@ def test_handler_retry_names_late_keyed_action_for_debt_bound_outcome(tmp_path):
     )
     assert parsed["class_records"] == []
     assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+    assert [row.requested_timeout_sec for row in attempts] == [10, 10]
     assert rejected[0]["validation_issue"] == (
         "/class_actions/class-b: reopen requires closed class"
     )
