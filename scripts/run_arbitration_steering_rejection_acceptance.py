@@ -17,6 +17,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from paranoia_local import arbitrate_handler as ah, inert_git
 
 OUTPUT = ROOT / "docs" / "arbitration_steering_rejection_acceptance_2026-08-22.json"
+SOURCE_PATHS = (
+    "src/paranoia_local/arbitrate_handler.py",
+    "src/paranoia_local/arbitration.py",
+    "src/paranoia_local/engines.py",
+    "src/paranoia_local/prompts.py",
+    "scripts/run_arbitration_steering_rejection_acceptance.py",
+)
 
 
 def _git(*args: str) -> str:
@@ -26,6 +33,15 @@ def _git(*args: str) -> str:
             "inert git failed: " + result.stderr.decode("utf-8", errors="replace")
         )
     return result.stdout.decode("utf-8", errors="surrogateescape").strip()
+
+
+def _git_bytes(*args: str) -> bytes:
+    result = inert_git.invoke(ROOT, list(args))
+    if result.returncode != 0:
+        raise RuntimeError(
+            "inert git failed: " + result.stderr.decode("utf-8", errors="replace")
+        )
+    return result.stdout
 
 
 def _audit_path(report: str) -> Path:
@@ -75,11 +91,23 @@ def main() -> int:
     if "STAKES-ADVOCACY: PRESENT" not in audit.get("attestation", ""):
         raise RuntimeError("attester did not identify the genuine steering")
 
+    source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
+    snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
     artifact = {
         "acceptance_kind": "arbitration-genuine-steering-rejected",
         "version": 1,
         "date": "2026-08-22",
-        "source_revision": _git("rev-parse", "--verify", "HEAD^{commit}"),
+        "source_revision": source_revision,
+        "source_sha256": {
+            path: hashlib.sha256(_git_bytes("show", f"{source_revision}:{path}")).hexdigest()
+            for path in SOURCE_PATHS
+        },
+        "snapshot_binding": {
+            "commit_object": snapshot_object.decode("utf-8"),
+            "sha256": hashlib.sha256(snapshot_object).hexdigest(),
+            "source_commit": source_revision,
+            "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
+        },
         "input": arguments,
         "elapsed_seconds": round(elapsed, 3),
         "model_call_count": len(attempts),
@@ -88,6 +116,9 @@ def main() -> int:
             report.encode("utf-8", "surrogatepass")
         ).hexdigest(),
         "audit": audit,
+        "audit_sha256": hashlib.sha256(json.dumps(
+            audit, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8", "surrogatepass")).hexdigest(),
         "claims": {
             "proves": [
                 "The real cleaner and cross-vendor attester rejected explicit directive, endorsement, rhetorical preference, and pre-emptive steering.",

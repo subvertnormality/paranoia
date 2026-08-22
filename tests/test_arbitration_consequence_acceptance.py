@@ -1,15 +1,21 @@
+import copy
 import hashlib
 import json
 from pathlib import Path
 
 from paranoia_local import inert_git
+import pytest
+from scripts import validate_arbitration_consequence_acceptance as validator
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "docs/arbitration_consequence_acceptance_2026-08-22.json"
+NEGATIVE = ROOT / "docs/arbitration_steering_rejection_acceptance_2026-08-22.json"
 
 
 def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None:
     artifact = json.loads(ARTIFACT.read_text())
+    negative = json.loads(NEGATIVE.read_text())
+    validator.validate_artifacts(artifact, negative, ROOT)
     assert artifact["acceptance_kind"] == "arbitration-consequence-not-advocacy"
     source_revision = artifact["source_revision"]
     resolved = inert_git.text(
@@ -65,3 +71,50 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     assert hashlib.sha256(report.encode("utf-8", "surrogatepass")).hexdigest() == (
         artifact["report_sha256"]
     )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "source", "snapshot", "audit-digest", "cleaner-prompt", "attester-reply",
+        "decider-prompt", "vote", "outcome", "negative-rounds", "negative-reason",
+    ],
+)
+def test_consequence_acceptance_rejects_every_binding_mutation(mutation: str) -> None:
+    positive = json.loads(ARTIFACT.read_text())
+    negative = json.loads(NEGATIVE.read_text())
+    target = positive
+    sync = True
+    if mutation == "source":
+        key = next(iter(positive["source_sha256"]))
+        positive["source_sha256"][key] = "0" * 64
+        sync = False
+    elif mutation == "snapshot":
+        positive["snapshot_binding"]["tree"] = "0" * 40
+        sync = False
+    elif mutation == "audit-digest":
+        positive["audit_sha256"] = "0" * 64
+        sync = False
+    elif mutation == "cleaner-prompt":
+        positive["audit"]["phase_attempts"][0]["prompt_sha256"] = "0" * 64
+    elif mutation == "attester-reply":
+        target = negative
+        negative["audit"]["attestation"] = negative["audit"]["attestation"].replace(
+            "STAKES-ADVOCACY: PRESENT", "STAKES-ADVOCACY: NONE",
+        )
+    elif mutation == "decider-prompt":
+        positive["audit"]["rounds"][0]["codex"]["attempts"][0]["prompt_sha256"] = "0" * 64
+    elif mutation == "vote":
+        positive["audit"]["rounds"][0]["codex"]["selected"] = "opt-paranoia-review"
+    elif mutation == "outcome":
+        positive["audit"]["outcome"] = "UNRESOLVED"
+    elif mutation == "negative-rounds":
+        target = negative
+        negative["audit"]["rounds"] = [{"codex": {}}]
+    else:
+        target = negative
+        negative["audit"]["reason"] = "warning only"
+    if sync:
+        target["audit_sha256"] = validator._canonical_digest(target["audit"])
+    with pytest.raises(ValueError):
+        validator.validate_artifacts(positive, negative, ROOT)

@@ -770,7 +770,10 @@ What it does, in order:
    rhetorical preference, pre-emptive conclusions, praise for a prior result, or instructions to
    follow it still fail the context/stakes gate.
    The retained [consequence-framing acceptance](docs/arbitration_consequence_acceptance_2026-08-22.json)
-   exercises this distinction through the real cleaner, cross-vendor attester, and both deciders.
+   exercises this distinction through the real cleaner, cross-vendor attester, and both deciders;
+   its paired [steering rejection](docs/arbitration_steering_rejection_acceptance_2026-08-22.json)
+   stops after the attester. A closed replay validator binds both routes to inert source/snapshot
+   evidence, exact prompts and replies, provider identities, parsed votes, and recomputed outcomes.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
