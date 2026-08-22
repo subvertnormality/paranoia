@@ -1456,6 +1456,47 @@ def test_stakes_change_reports_only_closed_unmechanized_reopens() -> None:
     assert lineage.classes["already-open"].status == cc.OPEN
 
 
+def test_real_plan_class_persistence_acceptance_is_source_bound() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/class_persistence_acceptance_2026-08-22.json").read_text()
+    )
+    source_revision = artifact["source_revision"]
+    assert len(source_revision) == 40
+    for relative in (
+        "src/paranoia_local/handlers.py",
+        "src/paranoia_local/review_census.py",
+        "scripts/run_class_persistence_acceptance.py",
+    ):
+        accepted = subprocess.run(
+            ["git", "show", f"{source_revision}:{relative}"],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert accepted == (root / relative).read_bytes()
+    assert artifact["provider"]["engine"] == "codex"
+    assert artifact["provider"]["web_search"] is False
+    assert artifact["fixture"]["class_before"] == cc.CLOSED
+    assert artifact["fixture"]["class_after"] == cc.OPEN
+    assert artifact["fixture"]["class_first_round"] == 1
+    assert artifact["fixture"]["round"] == 3
+    assert artifact["attempt_ledger"] == [{
+        **artifact["attempt_ledger"][0],
+        "role": "final", "outcome": "completed", "returncode": 0,
+    }]
+    assert artifact["attempt_ledger"][0]["session_ref"]
+    assert artifact["settlement"]["class_records"] == [{
+        "op": "reopen", "class_id": artifact["fixture"]["class_id"],
+    }]
+    result = artifact["result_text"]
+    assert hashlib.sha256(result.encode("utf-8", "surrogatepass")).hexdigest() == (
+        artifact["result_sha256"]
+    )
+    assert "PERSISTENCE: 60c1a55e currently open; round-label span 3" in result
+    assert "REOPEN-WAVE: 1 previously closed class(es) reopened this round" in result
+    assert "rebut with session_ref=" in result
+    assert "CONVERGENCE: BLOCKED" in result
+
+
 @pytest.mark.parametrize(
     ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
     [

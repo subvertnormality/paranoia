@@ -1048,6 +1048,9 @@ Persistence is deliberately diagnostic, not another blocking rule. It uses only 
 lineage proves: the first class label, current label, and first label of the currently open debt. It
 does not claim how many intervening rounds contained a finding. On the third tracked round it
 surfaces `rebut`, which resumes the current reviewer session for a concede-or-hold scope dispute.
+The retained [class-persistence acceptance](docs/class_persistence_acceptance_2026-08-22.json)
+exercises that reopen and diagnostic lifecycle through the public plan handler with one real Codex
+call on a tiny synthetic plan.
 
 One-shot, injected-engine, and successfully persisted staged tracked trailers all retain
 `CLASS-REGISTER`, `CLASS-CLOSURE`, match, and unmechanized-class detail. If lineage state cannot be
