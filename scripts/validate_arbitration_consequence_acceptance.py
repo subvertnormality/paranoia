@@ -199,14 +199,15 @@ def _positive(artifact: dict, repo: Path) -> None:
     )
     if artifact.get("acceptance_kind") != "arbitration-consequence-not-advocacy":
         raise ValueError("positive acceptance kind mismatch")
-    if artifact.get("version") != 1 or artifact.get("date") != "2026-08-22":
+    if type(artifact.get("version")) is not int or artifact["version"] != 1 or artifact.get("date") != "2026-08-22":
         raise ValueError("positive acceptance version metadata mismatch")
     if artifact.get("claims") != POSITIVE_CLAIMS:
         raise ValueError("positive acceptance claim scope mismatch")
     if not _raw_input_bound(artifact, audit):
         raise ValueError("positive acceptance input mismatch")
     if not (
-        artifact.get("model_call_count") == 4
+        type(artifact.get("model_call_count")) is int
+        and artifact["model_call_count"] == 4
         and audit.get("outcome") == arb.CONVERGED
         and audit.get("cleaning") == "original-attested"
         and shared._cleaned_digest_bound(audit.get("cleaned", {}))
@@ -248,7 +249,7 @@ def _negative(
     )
     if artifact.get("acceptance_kind") != f"arbitration-{field}-steering-rejected":
         raise ValueError("negative acceptance kind mismatch")
-    if artifact.get("version") != 1 or artifact.get("date") != "2026-08-22":
+    if type(artifact.get("version")) is not int or artifact["version"] != 1 or artifact.get("date") != "2026-08-22":
         raise ValueError("negative acceptance version metadata mismatch")
     if artifact.get("claims") != _negative_claims(field):
         raise ValueError("negative acceptance claim scope mismatch")
@@ -257,7 +258,8 @@ def _negative(
     raw, cleaned = audit.get("raw_input", {}), audit.get("cleaned", {})
     attempts = audit.get("phase_attempts", [])
     if (
-        artifact.get("model_call_count") != 2
+        type(artifact.get("model_call_count")) is not int
+        or artifact["model_call_count"] != 2
         or [row.get("role") for row in attempts] != ["cleaner", "attester"]
         or audit.get("outcome") != arb.FAILED
         or audit.get("cleaning") != "attestation-rejected"

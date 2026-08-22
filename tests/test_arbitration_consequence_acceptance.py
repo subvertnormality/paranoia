@@ -82,6 +82,8 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "input-order-seed", "version", "date",
         "option-extra", "option-duplicate", "option-empty", "file-extra",
         "file-empty", "file-duplicate",
+        "version-bool", "version-float", "version-string", "version-null",
+        "calls-bool", "calls-float", "calls-string", "calls-null",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -212,6 +214,14 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
         context_negative["input"]["files"].append(
             dict(context_negative["input"]["files"][0])
         )
+        sync = False
+    elif mutation.startswith("version-"):
+        values = {"bool": True, "float": 1.0, "string": "1", "null": None}
+        positive["version"] = values[mutation.removeprefix("version-")]
+        sync = False
+    elif mutation.startswith("calls-"):
+        values = {"bool": True, "float": 2.0, "string": "2", "null": None}
+        negative["model_call_count"] = values[mutation.removeprefix("calls-")]
         sync = False
     else:
         target = negative
