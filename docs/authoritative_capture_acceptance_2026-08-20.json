@@ -103,10 +103,16 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "ea9d9db9fac24c86785204cd1320b89febd64c7f619e7a616f4d65c8ce8c835d",
-      "additions": 5,
-      "deletions": 2,
-      "scope": "Plan structural-review consolidation and legacy prompt composition only; no claim-verification path."
+      "sha256": "2dda2f3be2675f45f597fb4ff3f55a05180f7a0a8f53eb9f0253d57fbd594cf2",
+      "additions": 206,
+      "deletions": 38,
+      "scope": "Plan structural prompt composition, a role-specific discovery timeout, combined claim/structural trailer composition, exact claim-only phase migration before model-reserve admission, and locally measured attempt telemetry; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+    },
+    "allowed_later_review_census_diff": {
+      "sha256": "57935ebe0d368f81facb5567bb2aa59ba3a9b4adab57cd3541f2a27b692fa4d9",
+      "additions": 2,
+      "deletions": 0,
+      "scope": "Adds requested timeout and separate provider duration to attempt telemetry only."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
@@ -126,5 +132,5 @@
     "largest_changed_module_deletions": 111,
     "largest_changed_module_lines_after": 3415
   },
-  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. Claim-verification-specific sources remain byte-identical; the shared handlers module may contain later changes outside claim verification. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed."
+  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed."
 }

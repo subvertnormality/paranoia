@@ -37,10 +37,11 @@ from .worktree import worktree_at
 Clock = Callable[[], str]
 
 PLAN_EVIDENCE_PHASE_TIMEOUT_SEC = 300
+PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC = 900
 PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC = 300
 PLAN_EVIDENCE_SCHEDULING_SLACK_SEC = 60
-PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 6960
-PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 7080
+PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 8160
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 8280
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
 PLAN_TEARDOWN_RESERVE_SEC = 120
@@ -80,9 +81,10 @@ class _ValidationReview(Review):
 
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
+    requested_timeout_sec: int | None = None,
 ) -> rc.Attempt:
     response = review.text or ""
-    projection = _review_failure_projection(review) if review.error else {}
+    projection = _review_failure_projection(review)
     return rc.Attempt(
         role, engine.name, review.session_ref,
         "failed" if review.error else "completed",
@@ -90,7 +92,8 @@ def _attempt(
         hashlib.sha256(response.encode("utf-8", "surrogatepass")).hexdigest()
         if response else None,
         response[:4000] if response else None, sequence,
-        **projection,
+        **projection, requested_timeout_sec=requested_timeout_sec,
+        provider_duration_ms=review.provider_duration_ms,
     )
 
 
@@ -147,7 +150,9 @@ def _staged_call(
         prompt, cwd, model, effort, web_search, timeout=timeout,
         response_schema=response_schema, **_progress_kwargs(on_progress),
     )
-    attempts = [_attempt(role, engine, review, sequence=sequence)]
+    attempts = [_attempt(
+        role, engine, review, sequence=sequence, requested_timeout_sec=timeout,
+    )]
     if review.error:
         error = _engine_failure_error(review, role=role)
         error.attempts = attempts  # type: ignore[attr-defined]
@@ -185,6 +190,7 @@ def _staged_call(
         )
         attempts.append(_attempt(
             f"{role}-validation-retry", engine, retry, sequence=retry_sequence,
+            requested_timeout_sec=min(STAGED_FORMAT_RETRY_TIMEOUT_SEC, timeout),
         ))
         if retry.error:
             error = _engine_failure_error(
@@ -503,6 +509,36 @@ def _structural_pending_review(
     )
 
 
+def _is_legacy_claim_only_phase(
+    lineage: cc.Lineage, state: dict[str, Any], *, snapshot: str,
+) -> bool:
+    """Recognize the exact pre-issue-58 state that requires no model call."""
+    debt_class_ids = {
+        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        for cid in debt.get("class_ids", [])
+    }
+    unbound_blocking = {
+        item.class_id for item in lineage.blocking()
+        if item.class_id not in debt_class_ids
+    }
+    has_blocking_debt = any(
+        debt.get("status") == "open" and debt.get("severity") in rc.BLOCKING
+        for debt in state.get("debt", [])
+    )
+    return (
+        not lineage.debt
+        and state.get("phase") == "correction"
+        and state.get("snapshot_digest") == snapshot
+        and not has_blocking_debt
+        and not lineage.blocking()
+        and not unbound_blocking
+        and not any(state.get(key) for key in (
+            "staged_failure", "validation_debt", "format_debt",
+            "unbound_class_ids", "unbound_classes",
+        ))
+    )
+
+
 def _staged_structural_review(
     *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
     closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
@@ -553,6 +589,54 @@ def _staged_structural_review(
         d.get("status") == "open" and d.get("severity") in rc.BLOCKING
         for d in state.get("debt", [])
     )
+    legacy_claim_only_phase = _is_legacy_claim_only_phase(
+        lineage, state, snapshot=snapshot,
+    )
+    if legacy_claim_only_phase:
+        # Versions before issue 58 persisted correction solely because claim debt was
+        # open.  The structural census had already cleared at this exact snapshot, so
+        # spending a correction/final call cannot add a structural judgement.  Migrate
+        # only the mechanically unambiguous predecessor shape and keep claim debt as the
+        # independent combined-verdict blocker.
+        state["phase"] = "clear"
+        lineage.review_state = state
+        lineage.debt = None
+        lineage.rounds += 1
+        closure.register_status = "staged claim-only phase migration — NONE"
+        try:
+            cc.save_lineage(closure.state_root, lineage)
+        except cc.StateUnavailable as exc:
+            closure.unavailable = str(exc)
+            review = Review(
+                text=rc.render_error_review(
+                    "[paranoia-local error] claim-only phase migration persistence "
+                    f"is ambiguous: {exc}"
+                ),
+                session_ref=None, raw=str(exc), returncode=2, error=True,
+            )
+            return review, (
+                f"CLASS-REGISTER: {closure.register_status}; persistence unavailable\n"
+                f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
+                "STAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 "
+                "execution-failed=0\n"
+                "CONVERGENCE: BLOCKED — this phase migration may not have persisted."
+            ), []
+        closure._settled = True
+        review = Review(
+            text=(
+                "# STRUCTURAL STATE MIGRATED\n\n"
+                "The same-snapshot predecessor contained no blocking structural debt, "
+                "blocking or unbound class, or staged failure. Its legacy claim-only "
+                "correction phase was restored to clear without a reviewer call."
+            ),
+            session_ref=None,
+            raw=json.dumps({"migration":"claim-only-correction-to-clear"}),
+        )
+        return review, _staged_success_trailer(
+            lineage=lineage, state=state, mode=mode,
+            register_status=closure.register_status, minted=[], attempts=[],
+            claims_enabled=closure.claims_enabled,
+        ), []
     if phase == "census" and (
         state.get("unbound_class_ids") or state.get("unbound_classes")
     ) and has_blocking_debt:
@@ -920,10 +1004,6 @@ def _staged_structural_review(
                 replacements.get(cid, cid) for cid in debt.get("class_ids", [])
             ]
         debt["class_ids"] = list(dict.fromkeys(debt["class_ids"]))
-    claim_blocked = (
-        mode == cc.PLAN_MODE and closure.claims_enabled
-        and pc.is_blocked(lineage.claim_state)
-    )
     mapped_classes = {
         cid for debt in state.get("debt", []) if debt.get("status") == "open"
         for cid in debt.get("class_ids", [])
@@ -937,7 +1017,7 @@ def _staged_structural_review(
         state["phase"] = "correction" if has_blocking_debt else "census"
         state["unbound_class_ids"] = [c.class_id for c in unbound]
         state.pop("unbound_classes", None)
-    elif lineage.blocking() or claim_blocked:
+    elif lineage.blocking():
         state["phase"] = "correction"
     lineage.review_state = state
     lineage.debt = None
@@ -974,18 +1054,55 @@ def _staged_structural_review(
     closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
-    trailer = "\n".join((
-        cc.render_trailer(
-            lineage, register_status=closure.register_status, minted=minted,
-            include_verdict=False,
-        ),
-        rc.trailer(state),
-        rc.attempt_trailer(attempts),
-    ))
-    if mode == cc.PLAN_MODE and closure.claims_enabled:
-        trailer = f"{pc.render_trailer(lineage.claim_state)}\n{trailer}"
+    trailer = _staged_success_trailer(
+        lineage=lineage, state=state, mode=mode,
+        register_status=closure.register_status, minted=minted, attempts=attempts,
+        claims_enabled=closure.claims_enabled,
+    )
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
+
+
+def _staged_success_trailer(
+    *, lineage: cc.Lineage, state: dict[str, Any], mode: str,
+    register_status: str, minted: list[str], attempts: list[rc.Attempt],
+    claims_enabled: bool,
+) -> str:
+    class_trailer = cc.render_trailer(
+        lineage, register_status=register_status, minted=minted,
+        include_verdict=False,
+    )
+    structural_trailer = rc.trailer(state)
+    if mode != cc.PLAN_MODE or not claims_enabled:
+        return "\n".join((
+            class_trailer, structural_trailer, rc.attempt_trailer(attempts),
+        ))
+    structural_clear = (
+        state.get("phase") == "clear"
+        and not any(
+            item.get("status") == "open" and item.get("severity") in rc.BLOCKING
+            for item in state.get("debt", [])
+        )
+        and not any(state.get(key) for key in (
+            "staged_failure", "validation_debt", "format_debt", "unbound_class_ids",
+        ))
+    )
+    structural_trailer = structural_trailer.replace(
+        "CONVERGENCE:", "STRUCTURAL-CONVERGENCE:", 1,
+    )
+    if pc.is_blocked(lineage.claim_state):
+        combined = "CONVERGENCE: BLOCKED — external claim closure remains open."
+    elif structural_clear:
+        combined = (
+            "CONVERGENCE: NOT-BLOCKED — structural debt is clear and every active "
+            "external claim is supported by frozen or current authoritative evidence."
+        )
+    else:
+        combined = "CONVERGENCE: BLOCKED — structural closure remains open."
+    return "\n".join((
+        pc.render_trailer(lineage.claim_state), class_trailer, structural_trailer,
+        rc.attempt_trailer(attempts), combined,
+    ))
 
 
 def _default_clock() -> str:
@@ -1617,8 +1734,18 @@ def critique_plan(
                     if closure and closure.lineage else "census"
                 )
                 structural_reserve = (
-                    STAGED_CENSUS_RESERVE_SEC
-                    if staged_phase == "census" else STAGED_FOLLOWUP_RESERVE_SEC
+                    0
+                    if closure and closure.lineage and _is_legacy_claim_only_phase(
+                        closure.lineage,
+                        rc.normalize_state(
+                            closure.lineage.review_state, stakes=stakes or "",
+                            snapshot=structural_snapshot,
+                        ),
+                        snapshot=structural_snapshot,
+                    )
+                    else STAGED_CENSUS_RESERVE_SEC
+                    if staged_phase == "census"
+                    else STAGED_FOLLOWUP_RESERVE_SEC
                 )
                 if closure and closure.unavailable:
                     review, trailer, structural_attempts = _state_unavailable_review(
@@ -1804,7 +1931,9 @@ def _verify_plan_claims(
         **_progress_kwargs(on_progress),
     )
     if captured_engine is None and attempt_ledger is not None:
-        attempt_ledger.append(_attempt("claim-audit", engine, review).json())
+        attempt_ledger.append(_attempt(
+            "claim-audit", engine, review, requested_timeout_sec=3600,
+        ).json())
     if review.error:
         validation_invalid = isinstance(review, _ValidationReview)
         error = pc.AuditError(
@@ -1849,7 +1978,9 @@ def _verify_plan_claims(
             model, effort, True, timeout=3600, **_progress_kwargs(on_progress),
         )
         if captured_engine is None and attempt_ledger is not None:
-            attempt_ledger.append(_attempt("claim-audit-retry", engine, retry).json())
+            attempt_ledger.append(_attempt(
+                "claim-audit-retry", engine, retry, requested_timeout_sec=3600,
+            ).json())
         if retry.error:
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
@@ -1950,14 +2081,19 @@ class _CapturedClaimEngine:
         discovery_kwargs = dict(kwargs)
         try:
             self._admit_complete_graph()
-            discovery_kwargs["timeout"] = self._next_model_timeout(reserve_calls=2)
+            discovery_kwargs["timeout"] = self._next_model_timeout(
+                reserve_calls=2, timeout=PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC,
+            )
         except pc.AuditError as error:
             return self._deadline_failure(error)
         discoverer = self.engine.for_role(eng.ROLE_DISCOVERY)
         first = discoverer.run(
             prompt, self.launch, model, effort, True, **discovery_kwargs,
         )
-        self._record("claim-discovery", discoverer, first)
+        self._record(
+            "claim-discovery", discoverer, first,
+            requested_timeout_sec=discovery_kwargs["timeout"],
+        )
         if first.error or not first.session_ref:
             return first
         raw_parts = [first.raw]
@@ -1966,7 +2102,9 @@ class _CapturedClaimEngine:
         except pc.AuditError as error:
             self._mark_last_validation_invalid(str(error), first, "/claims")
             try:
-                discovery_kwargs["timeout"] = self._next_model_timeout()
+                discovery_kwargs["timeout"] = self._next_model_timeout(
+                    timeout=PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC,
+                )
             except pc.AuditError as deadline_error:
                 return self._deadline_failure(deadline_error, first.session_ref, raw_parts)
             corrected = discoverer.resume(
@@ -1979,6 +2117,7 @@ class _CapturedClaimEngine:
             )
             self._record(
                 "claim-discovery-validation-retry", discoverer, corrected,
+                requested_timeout_sec=discovery_kwargs["timeout"],
             )
             raw_parts.append(corrected.raw)
             if corrected.error or not corrected.session_ref:
@@ -2056,7 +2195,10 @@ class _CapturedClaimEngine:
             duration_ms=last_binding.duration_ms,
         )
 
-    def _next_model_timeout(self, *, reserve_calls: int = 1) -> int:
+    def _next_model_timeout(
+        self, *, reserve_calls: int = 1,
+        timeout: int = PLAN_EVIDENCE_PHASE_TIMEOUT_SEC,
+    ) -> int:
         if self.model_calls + reserve_calls > MAX_PLAN_EVIDENCE_MODEL_CALLS:
             raise pc.AuditError(
                 "plan evidence model-call ceiling cannot admit the initial call and its "
@@ -2064,7 +2206,7 @@ class _CapturedClaimEngine:
                 f"{MAX_PLAN_EVIDENCE_MODEL_CALLS})"
             )
         if self.deadline is not None and (
-            self.clock() + PLAN_EVIDENCE_PHASE_TIMEOUT_SEC * reserve_calls
+            self.clock() + timeout * reserve_calls
             > self.deadline
         ):
             raise pc.AuditError(
@@ -2072,11 +2214,15 @@ class _CapturedClaimEngine:
                 f"its {reserve_calls - 1} reserved correction call(s)"
             )
         self.model_calls += 1
-        return PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+        return timeout
 
     def _admit_complete_graph(self) -> None:
         required = (
             MAX_PLAN_EVIDENCE_MODEL_CALLS * PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            + 2 * (
+                PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
+                - PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
+            )
             + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         )
         if self.deadline is not None and self.clock() + required > self.deadline:
@@ -2086,9 +2232,15 @@ class _CapturedClaimEngine:
                 "and bounded local processing"
             )
 
-    def _record(self, role: str, engine: Engine, review: Review) -> None:
+    def _record(
+        self, role: str, engine: Engine, review: Review, *,
+        requested_timeout_sec: int,
+    ) -> None:
         if self.attempt_ledger is not None:
-            self.attempt_ledger.append(_attempt(role, engine, review).json())
+            self.attempt_ledger.append(_attempt(
+                role, engine, review,
+                requested_timeout_sec=requested_timeout_sec,
+            ).json())
 
     def _mark_last_validation_invalid(
         self, issue: str, review: Review, pointer: str,
@@ -2145,7 +2297,10 @@ class _CapturedClaimEngine:
         corrected = role.resume(
             session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
         )
-        self._record("claim-binding-outer-retry", role, corrected)
+        self._record(
+            "claim-binding-outer-retry", role, corrected,
+            requested_timeout_sec=binding_kwargs["timeout"],
+        )
         if corrected.error or self.discovery is None:
             return corrected
         try:
@@ -2456,7 +2611,10 @@ class _CapturedClaimEngine:
                 current_session, instruction, self.launch, model, effort, False,
                 **call_kwargs,
             )
-            self._record("claim-binding", self.binding_engine, review)
+            self._record(
+                "claim-binding", self.binding_engine, review,
+                requested_timeout_sec=call_kwargs["timeout"],
+            )
             reviews.append(review)
             if review.error or not review.session_ref:
                 if expanded:
@@ -2483,6 +2641,7 @@ class _CapturedClaimEngine:
                 )
                 self._record(
                     "claim-binding-validation-retry", self.binding_engine, correction,
+                    requested_timeout_sec=call_kwargs["timeout"],
                 )
                 reviews.append(correction)
                 if correction.error or not correction.session_ref:
@@ -2821,7 +2980,10 @@ class _CapturedClaimEngine:
             review = attester.run(
                 prompt, self.launch, model, effort, False, timeout=timeout,
             )
-            self._record("claim-attestation", attester, review)
+            self._record(
+                "claim-attestation", attester, review,
+                requested_timeout_sec=timeout,
+            )
             attestation_raw.append(review.raw)
             if review.error:
                 if len(attestation_batch) == 1 and (
@@ -2873,7 +3035,10 @@ class _CapturedClaimEngine:
                     self._attestation_correction_prompt(rendered, issue),
                     self.launch, model, effort, False, timeout=timeout,
                 )
-                self._record("claim-attestation-validation-retry", attester, correction)
+                self._record(
+                    "claim-attestation-validation-retry", attester, correction,
+                    requested_timeout_sec=timeout,
+                )
                 attestation_raw.append(correction.raw)
                 if correction.error:
                     if len(attestation_batch) == 1 and (

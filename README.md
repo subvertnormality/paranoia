@@ -73,7 +73,7 @@ every call fails:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 7200
+tool_timeout_sec = 8400
 startup_timeout_sec = 60
 ```
 
@@ -199,6 +199,10 @@ Durable lineage state carries concrete findings, reusable classes, frozen stakes
 claim evidence forward; the reviewer never relies on chat memory. `STRUCTURAL-PHASE` and
 `STRUCTURAL-DEBT` in the trailer show where the autonomous loop is. There is no fixed round ceiling:
 provider, parsing, deadline, or oversized-state failures block visibly rather than clearing.
+Claim debt blocks the combined `CONVERGENCE` verdict through `CLAIM-CLOSURE`, but it does not rewrite
+`STRUCTURAL-PHASE` or turn a claim-provider timeout into staged structural debt. The structural
+trailer remains independently truthful, so a retry can distinguish evidence work from code/plan
+correction work.
 
 ### `round` — lineage ordering
 
@@ -523,24 +527,31 @@ guards, but its composed execution budget is deliberately narrower: at most 200 
 and five 400,000-character binding batches. Exceeding an aggregate budget becomes visible
 blocking debt; the server never starts a multiplicative hours-long tail or truncates it into
 false closure.
-The complete evidence phase has a 6,960-second monotonic circuit breaker and 22 model calls
-maximum. That admits discovery, five maximum-size binding batches, five exact-size
-cold-attestation batches, and the promised one validation correction for every call. Before each
-first spend the server reserves the complete 22-call graph, 300 seconds for capture and bounded
-local processing, and 60 seconds of scheduling slack. Before each initial call it also reserves
-both call-count and two 300-second windows for its correction.
+The complete evidence phase has an 8,160-second monotonic circuit breaker and 22 model calls
+maximum. Whole-plan discovery and its one correction each receive 900 seconds; the five
+maximum-size binding batches, five exact-size cold-attestation batches, and their corrections keep
+the 300-second phase cap. Before first spend the server reserves that complete 22-call graph, 300
+seconds for capture and bounded local processing, and 60 seconds of scheduling slack. Before each
+initial call it also reserves both call-count and the full timeout for its correction.
+Every claim and staged attempt row records the timeout actually supplied to the provider and the
+local monotonic call duration, with a provider-reported duration retained separately when present,
+so retained acceptance can distinguish an enforced cap from an inferred role policy. Successful
+and failed rows both retain the actual return code plus separate bounded, hashed raw-output,
+structured-detail, and stderr channels.
 The capture pool and exact pre-binding packing share that one enforced 300-second monotonic
 deadline; exhaustion blocks visibly before the first binding call rather than consuming time
 reserved for later model phases.
 These are pathology guards, not targets or reasons to shorten an admitted review. The full verified
-plan call remains bounded to 7,080 seconds.
+plan call remains bounded to 8,280 seconds inside the documented 8,400-second MCP timeout.
 If exact packing would require a sixth binding or cold-attestation batch, the complete evidence
 phase fails globally before that role spends or settles any prefix. The limit cannot act as
 cross-round pagination for a partially supported inventory.
 Evidence state is persisted first. A staged census starts only when its full 4,320-second
 lane/consolidation/retry reserve still fits; correction and final use a 3,120-second reserve. If the
 reserve no longer fits, the result is visibly pending and the next round reuses frozen supported
-claims instead of repeating research. Individual structural calls use 1,800/1,200/2,400 and
+claims instead of repeating research. The exact same-snapshot legacy claim-only migration needs
+no provider call and is applied before this positive model-reserve admission. Individual structural
+calls use 1,800/1,200/2,400 and
 600-second role limits. A legacy class-register correction has its own 600-second cap under the
 same deadline.
 The disposition parser consumes the claim ID, `removed` token, and reason while ignoring
@@ -1056,13 +1067,17 @@ ACTIONABLE SOURCE PACKETS:
   Source 1: [primary/refutes_claim] …
     Location: https://… (Section 4, table 2)
     Exact passage: …
-CLASS-CONVERGENCE: NOT-BLOCKED — …
+STRUCTURAL-CONVERGENCE: NOT-BLOCKED — staged structural debt is clear.
 CONVERGENCE: BLOCKED — external claim closure remains open.
 ```
 
 `CLAIM-AUDIT-DEBT` includes the validator reason, SHA-256, and a bounded rejected
 output excerpt. Malformed model JSON, a failed audit/retry, unsupported authority,
 or missing entailment blocks; it never becomes an empty successful register.
+On upgrade, a same-snapshot predecessor that is in `correction` with no blocking structural debt,
+blocking or unbound class, or staged failure is the mechanically recognizable legacy shape created
+by claim-only phase pinning. The server migrates that structural phase directly to `clear` without
+spending a correction or final reviewer call; claim debt continues to block the combined verdict.
 If discovery and its single correction are both rejected locally, the debt reports the
 ordered initial and correction validator reasons and hashes the exact two provider envelopes
 joined by the discovery-correction separator. A successful provider process is not labeled as

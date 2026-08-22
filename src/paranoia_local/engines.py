@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -90,6 +91,7 @@ class Review:
     duration_ms: int | None = None
     failure_detail: str | None = None
     stderr: str | None = None
+    provider_duration_ms: int | None = None
 
 
 class Engine(ABC):
@@ -115,6 +117,7 @@ class Engine(ABC):
         clone = type(self)()
         clone.text_only = self.text_only
         clone.role = role
+        clone.binary = self.binary
         return clone
 
     @abstractmethod
@@ -185,6 +188,7 @@ class Engine(ABC):
         from .runner import DEFAULT_TIMEOUT_SEC
 
         final_argv, cleanup = self._structured_argv(argv, response_schema)
+        started = time.monotonic()
         if on_progress is not None:
             def _on_line(line: str) -> None:
                 msg = self.progress_from_line(line)
@@ -205,6 +209,7 @@ class Engine(ABC):
                 )
             finally:
                 cleanup()
+        measured_duration_ms = int((time.monotonic() - started) * 1000)
         review = self.parse_output(result.stdout)
         if response_schema is not None and self.name == "claude" and not review.error:
             try:
@@ -245,12 +250,16 @@ class Engine(ABC):
                 raw=result.stdout,
                 returncode=result.returncode,
                 error=True,
+                duration_ms=measured_duration_ms,
                 failure_detail=detail,
                 stderr=stderr,
+                provider_duration_ms=review.duration_ms,
             )
         return replace(
             review, returncode=result.returncode, error=failed,
+            duration_ms=measured_duration_ms,
             failure_detail=failure_detail, stderr=stderr,
+            provider_duration_ms=review.duration_ms,
         )
 
     def _structured_argv(
@@ -319,13 +328,13 @@ class CodexEngine(Engine):
         if self.role in EVIDENCE_ROLES:
             sandbox = "workspace-write" if self.role in {ROLE_DISCOVERY, ROLE_REPOSITORY} else "read-only"
             return [
-                "codex", "exec", "--json", "--ignore-user-config",
+                self.binary, "exec", "--json", "--ignore-user-config",
                 "--skip-git-repo-check", "-s", sandbox, "-C", str(cwd), "-m", model,
                 "-c", f'model_reasoning_effort="{effort}"',
                 *self._evidence_flags(), "-",
             ]
         argv = [
-            "codex", "exec",
+            self.binary, "exec",
             "--json",
             # Auth still comes from CODEX_HOME, but user config (especially registered
             # MCP servers) must not widen a spawned reviewer into recursive delegation.
@@ -347,7 +356,7 @@ class CodexEngine(Engine):
     ) -> list[str]:
         if self.role in EVIDENCE_ROLES:
             return [
-                "codex", "exec", "resume", session_ref, "--json",
+                self.binary, "exec", "resume", session_ref, "--json",
                 "--ignore-user-config", "--skip-git-repo-check", "-m", model,
                 "-c", f'model_reasoning_effort="{effort}"',
                 *self._evidence_flags(resumed=True), "-",
@@ -357,7 +366,7 @@ class CodexEngine(Engine):
         # on the process cwd (set by the runner). --skip-git-repo-check keeps it
         # working even if the original cwd (an isolated worktree) is gone.
         argv = [
-            "codex", "exec", "resume", session_ref,
+            self.binary, "exec", "resume", session_ref,
             "--json",
             "--ignore-user-config",
             "--skip-git-repo-check",
@@ -508,9 +517,9 @@ class ClaudeEngine(Engine):
 
     def build_argv(self, cwd: Path, model: str, effort: str, web_search: bool) -> list[str]:
         if self.role in EVIDENCE_ROLES:
-            return ["claude", "-p", *self._evidence_argv(model, effort)]
+            return [self.binary, "-p", *self._evidence_argv(model, effort)]
         return [
-            "claude", "-p",
+            self.binary, "-p",
             "--output-format", "json",
             "--model", model,
             "--effort", effort,
@@ -529,11 +538,11 @@ class ClaudeEngine(Engine):
     ) -> list[str]:
         if self.role in EVIDENCE_ROLES:
             return [
-                "claude", "-p", "--resume", session_ref,
+                self.binary, "-p", "--resume", session_ref,
                 *self._evidence_argv(model, effort),
             ]
         return [
-            "claude", "-p",
+            self.binary, "-p",
             "--resume", session_ref,
             "--output-format", "json",
             "--model", model,

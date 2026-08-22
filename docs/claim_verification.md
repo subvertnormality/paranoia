@@ -1,5 +1,23 @@
 # Plan claim verification
 
+## Large-plan discovery timeout acceptance
+
+The issue-58 correction gives the initial whole-plan discovery call and its one
+same-session validation correction a 900-second circuit breaker while retaining the
+300-second limit for later binding and cold-attestation calls. The retained
+[`claim_discovery_timeout_acceptance_2026-08-22.json`](claim_discovery_timeout_acceptance_2026-08-22.json)
+record exercises the public `critique_plan` handler with the exact 94,110-byte historical
+plan that repeatedly failed at the former boundary. Its claim phase took 710,810 ms,
+completed four model attempts without an execution timeout, persisted 14 claim outcomes,
+and continued into the structural census. The artifact deliberately retains the final
+`CONVERGENCE: BLOCKED`: seven claims remained unverified, and the historical plan acquired
+structural debt. It proves recovery of this concrete timeout failure, not universal
+provider latency or correctness of that plan.
+The runner starts with empty audit and lineage directories, binds the public handler through
+`PARANOIA_STATE_ROOT`, and verifies that fresh and resumed evidence roles use the exact recorded
+Codex executable. Its attempt durations are local monotonic measurements; a provider duration is
+retained separately when supplied.
+
 ## Purpose and stakes
 
 Plan verification stops a structurally persuasive plan from converging on an unsupported
@@ -103,16 +121,18 @@ dedicated expanded packet. They cover ordinary large plans while preventing the 
 from turning into hours of model/network work. Exceeding one creates visible audit debt and
 blocks; nothing beyond a ceiling is silently discarded or called verified.
 
-Each discovery, captured-text binding, and cold-attestation model call has a 300-second cap;
-each locally invalid response allows at most one same-session correction. Cold attestation is
+Whole-plan discovery and its same-session correction each have a 900-second cap. Captured-text
+binding and cold-attestation calls retain the 300-second cap; each locally invalid response allows
+at most one same-session correction. Cold attestation is
 packed by its exact rendered initial and correction prompts into at most five batches, rather than
-assuming every accepted passage fits one call. The complete evidence phase has a 6,960-second
+assuming every accepted passage fits one call. The complete evidence phase has an 8,160-second
 monotonic circuit breaker and at most 22 model calls: discovery + five binding + five attestation
 calls, with one correction reserved for every initial call. Before discovery spend, admission
-reserves that entire graph plus 300 seconds for capture/bounded pre-binding processing and 60
-seconds of scheduling slack. The capture pool and exact local packing share an enforced monotonic
-300-second deadline; exhausting it blocks before the first binding call. The handler also checks
-both remaining calls and two full 300-second windows before each initial invocation. The retained
+reserves that entire role-specific graph plus 300 seconds for capture/bounded pre-binding
+processing and 60 seconds of scheduling slack. The capture pool and exact local packing share an
+enforced monotonic 300-second deadline; exhausting it blocks before the first binding call. The
+handler also checks both remaining calls and two full role-specific windows before each initial
+invocation. The retained
 acceptance record reports the measured live latency for each 627,000-character Codex and Claude
 packet. These remain generous circuit breakers, not review-quality budgets; an admitted call may
 use its full time and context to establish authoritative evidence.
@@ -139,13 +159,21 @@ uncaptured outcome rather than inventing a web capture. Dedicated binding or att
 preserves that immutable provenance, records a negative attestation, and continues unrelated
 batches.
 
-The complete verified plan call has a 7,080-second deadline, leaving a 120-second teardown
-reserve within the documented 7,200-second MCP client timeout. After evidence state is persisted,
+The complete verified plan call has an 8,280-second deadline, leaving a 120-second teardown
+reserve within the documented 8,400-second MCP client timeout. After evidence state is persisted,
 the cold structural review starts only when its current 4,320-second census or 3,120-second
 follow-up reserve still fits. If it does not,
 the round returns blocked and the next invocation reuses frozen supported claims rather than
 repeating research. A malformed class register gets one 600-second retry only when that cap also
 fits the same deadline.
+
+Claim debt, including a discovery timeout, blocks the combined plan verdict without changing the
+staged structural phase. The response reports claim closure and structural convergence separately,
+then emits one governing combined `CONVERGENCE` line. A clear structural census therefore remains
+clear rather than being mislabeled as structural correction merely because evidence tooling failed.
+The upgrade path also recognizes the exact same-snapshot predecessor shape left by the old bug:
+`correction` with no blocking structural debt, blocking/unbound class, or staged failure. It
+persists `clear` without a correction or final provider call while retaining claim debt unchanged.
 
 ## Evidence and authority
 

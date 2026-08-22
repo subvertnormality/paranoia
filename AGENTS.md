@@ -229,9 +229,11 @@ of the resulting code and tests.
   bounded error; retain it when an expanded packet cannot be bound or attested.
   Bound the complete evidence phase to 22 model calls (the discovery + five binding + five
   attestation topology and one reserved correction for every initial call) as a pathology guard,
-  not a quality target. Admit an initial call only when both its call-count and full latency reserve
-  fit the remaining monotonic deadline. Before the first model call, reserve the complete maximum
-  model/retry graph plus explicit non-model capture/processing time and scheduling slack.
+  not a quality target. Whole-plan discovery and its correction each receive 900 seconds; binding
+  and cold-attestation calls retain 300 seconds. Admit an initial call only when both its call-count
+  and full role-specific latency reserve fit the remaining monotonic deadline. Before the first
+  model call, reserve the complete maximum model/retry graph plus explicit non-model
+  capture/processing time and scheduling slack.
   Use the same pure prompt renderers for preflight and invocation and test the exact strings; do not
   maintain parallel size estimates.
   Packet and latency limits are circuit breakers, not
@@ -273,6 +275,13 @@ of the resulting code and tests.
   scalar or container alias may bind authority or entailment to another claim or evidence row.
   Bound the full verified plan call below the documented MCP timeout, persist claim debt before
   structural review, and start each model phase only when its full cap fits the monotonic deadline.
+  Record the timeout actually supplied and the local monotonic duration on every claim and staged
+  attempt, retaining any provider-reported duration separately;
+  acceptance must validate execution telemetry rather than infer it from role names.
+  Successful attempts retain actual return code and the same separate bounded, hashed raw output,
+  structured-detail, and stderr channels as failures; acceptance may not permit null placeholders.
+  A same-snapshot legacy claim-only phase migration is a zero-call transition and must run before
+  admitting any positive structural model reserve.
   Enforce the reserved non-model capture/pre-binding interval as one aggregate monotonic deadline;
   it may not consume time reserved for later model phases.
   Captured binding failure debt must retain raw provider stdout, structured failure detail, and
@@ -338,6 +347,12 @@ of the resulting code and tests.
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
+- Claim debt blocks combined plan convergence but never rewrites the independently settled staged
+  structural phase or masquerades as staged structural debt. Render claim and structural closure
+  separately before the single governing combined convergence verdict.
+  Migrate an exact same-snapshot legacy `correction` phase directly to `clear` only when it has no
+  blocking structural debt, blocking or unbound class, staged failure, or ambiguous persistence;
+  retain claim debt and spend no correction/final provider call for that migration.
 - When discovery and its single correction both fail local claim-payload validation, preserve the
   ordered bounded validator reasons and exact initial/correction raw exchange; do not describe a
   successful provider process as a reviewer execution failure.
