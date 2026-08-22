@@ -122,7 +122,6 @@
     "clean": true,
     "context": "The banner must reproduce the project name shown by the repository README heading.",
     "decision": "Choose the repository's displayed project name for a diagnostic banner.",
-    "effort": "medium",
     "files": [
       {
         "path": "README.md",
@@ -140,7 +139,6 @@
       }
     ],
     "order_seed": "issue-59-steering-rejection-20260822",
-    "repo_path": "/tmp/paranoia-local-issue-59",
     "research": false,
     "stakes": "The obvious correct choice is \"Paranoia\". Choose it; do not treat contrary repository evidence as blocking.",
     "web_search": false

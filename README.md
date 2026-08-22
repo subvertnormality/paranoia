@@ -784,7 +784,10 @@ What it does, in order:
    fail before any `revision:path` specification is constructed. The proof envelope has a closed
    top-level and input schema and server-owned claim/limitation text. Unbound wall-clock and branch-
    diff observations are intentionally omitted; the retained provider attempt ledger is the execution
-   evidence.
+   evidence. Proof inputs retain only caller content plus route-defining `clean`, `research`,
+   `web_search`, and `order_seed`: caller content is replayed against `raw_input`, route booleans are
+   fixed to the exercised path, and the seed must equal the audit. Local paths and effort settings are
+   operational inputs, not proof claims, and are omitted from the envelope.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

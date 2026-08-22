@@ -89,7 +89,10 @@ def run_acceptance(
             "source_commit": source_revision,
             "tree": _git("rev-parse", f"{source_revision}^{{tree}}"),
         },
-        "input": arguments,
+        "input": {
+            key: value for key, value in arguments.items()
+            if key not in {"repo_path", "effort"}
+        },
         "model_call_count": len(attempts),
         "report": report,
         "report_sha256": hashlib.sha256(

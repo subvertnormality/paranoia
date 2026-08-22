@@ -77,7 +77,9 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "context-rounds", "context-reason", "manifest-extra", "manifest-delete",
         "production-drift", "cleaner-model", "attester-model",
         "input-cleaner-override", "claims", "limitation", "top-level-extra",
-        "top-level-delete",
+        "top-level-delete", "input-decision", "input-stakes", "input-context",
+        "input-files", "input-options", "input-clean", "input-research", "input-web",
+        "input-order-seed", "version", "date",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -155,6 +157,39 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
         sync = False
     elif mutation == "top-level-delete":
         del negative["date"]
+        sync = False
+    elif mutation == "input-decision":
+        positive["input"]["decision"] += " changed"
+        sync = False
+    elif mutation == "input-stakes":
+        negative["input"]["stakes"] += " changed"
+        sync = False
+    elif mutation == "input-context":
+        context_negative["input"]["context"] += " changed"
+        sync = False
+    elif mutation == "input-files":
+        positive["input"]["files"] = []
+        sync = False
+    elif mutation == "input-options":
+        positive["input"]["options"][0]["statement"] += " changed"
+        sync = False
+    elif mutation == "input-clean":
+        negative["input"]["clean"] = False
+        sync = False
+    elif mutation == "input-research":
+        positive["input"]["research"] = True
+        sync = False
+    elif mutation == "input-web":
+        context_negative["input"]["web_search"] = True
+        sync = False
+    elif mutation == "input-order-seed":
+        positive["input"]["order_seed"] = "other-seed"
+        sync = False
+    elif mutation == "version":
+        negative["version"] = 2
+        sync = False
+    elif mutation == "date":
+        context_negative["date"] = "2099-01-01"
         sync = False
     else:
         target = negative

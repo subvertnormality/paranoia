@@ -77,8 +77,8 @@ COMMON_TOP_LEVEL = {
     "source_revision", "source_sha256", "version",
 }
 INPUT_FIELDS = {
-    "clean", "context", "decision", "effort", "files", "options", "order_seed",
-    "repo_path", "research", "stakes", "web_search",
+    "clean", "context", "decision", "files", "options", "order_seed", "research",
+    "stakes", "web_search",
 }
 
 
@@ -158,9 +158,11 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
         and raw.get("options") == {
             row["id"]: row["statement"] for row in arguments.get("options", [])
         }
+        and arguments.get("clean") is True
         and arguments.get("research") is False
         and arguments.get("web_search") is False
-        and "cleaner_model" not in arguments
+        and arguments.get("order_seed") == audit.get("order_seed")
+        and audit.get("research", {}).get("enabled") is False
     )
 
 
