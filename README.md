@@ -764,8 +764,34 @@ What it does, in order:
    cleaner candidate is unusable but those originals pass, the server atomically
    sends the original decision, options, and validated hints to both deciders and
    reports `CLEANING: original-attested`; it never mixes original and cleaned fields.
-   A neutral record that a prior decision exists and governs the current bytes is shared context,
-   not advocacy; praise for that result or an instruction to follow it still fails the context gate.
+   Facts, governing constraints, costs, risks, tradeoffs, and consequences remain merits context even
+   when they affect the options unequally; asymmetry alone is not advocacy. A neutral record that a
+   prior decision exists and governs the current bytes is shared context. Directives, endorsements,
+   rhetorical preference, pre-emptive conclusions, praise for a prior result, or instructions to
+   follow it still fail the context/stakes gate.
+   The retained [consequence-framing acceptance](docs/arbitration_consequence_acceptance_2026-08-22.json)
+   exercises this distinction through the real cleaner, cross-vendor attester, and both deciders;
+   separate [stakes steering](docs/arbitration_steering_rejection_acceptance_2026-08-22.json)
+   and [context steering](docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json)
+   cases stop after the attester. Each negative case proves its complete packet is rejected, not
+   that every phrase in that packet independently triggers the gate. A closed replay validator
+   requires an exact per-route source manifest, byte-identical replayed production modules and inert
+   Git launcher, hash-checked historical replay-validator sources, inert source/snapshot evidence,
+   exact prompts and replies, the configured cleaner/attester engine-model identities, parsed votes,
+   and recomputed outcomes. Acceptance inputs may not override the cleaner model; validator changes
+   do not force a provider rerun when the recorded production route is unchanged. Every historical
+   blob read first resolves the recorded revision as that exact commit; missing or non-commit objects
+   fail before any `revision:path` specification is constructed. The proof envelope has a closed
+   top-level and input schema and server-owned claim/limitation text. Unbound wall-clock and branch-
+   diff observations are intentionally omitted; the retained provider attempt ledger is the execution
+   evidence. Proof inputs retain only caller content plus route-defining `clean`, `research`,
+   `web_search`, and `order_seed`: caller content is replayed against `raw_input`, route booleans are
+   fixed to the exercised path, and the seed must equal the audit. Local paths and effort settings are
+   operational inputs, not proof claims, and are omitted from the envelope. Nested proof input is
+   closed too: exactly two unique, nonempty `{id, statement}` option rows and one nonempty
+   `{path, reason}` file row; extensions, duplicate IDs, and duplicate file rows reject. Numeric
+   proof fields use exact JSON integer types, so booleans, floats, strings, and nulls cannot alias
+   `version` or the retained model-call count.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -48,6 +49,10 @@ SCOPE = {
     ],
 }
 
+_PROMPT_NAMES = (
+    "CLEANER_INSTRUCTIONS", "ATTEST_INSTRUCTIONS", "ARBITRATE_INSTRUCTIONS",
+)
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -77,6 +82,49 @@ def _cleaned_digest_bound(cleaned: dict) -> bool:
 
 def _text_digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def _validated_commit(repo: Path, source_commit: str) -> str:
+    result = inert_git.invoke(
+        repo, ["rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+    )
+    if result.returncode != 0:
+        raise ValueError("fallback acceptance source commit is unavailable")
+    resolved = result.stdout.decode("ascii", errors="strict").strip()
+    if resolved != source_commit:
+        raise ValueError("fallback acceptance source commit does not resolve exactly")
+    return resolved
+
+
+def _historical_prompt_instructions(repo: Path, source_commit: str) -> dict[str, str]:
+    """Read inert string constants from the source revision the audit actually ran."""
+    source_commit = _validated_commit(repo, source_commit)
+    blob = inert_git.invoke(
+        repo, ["show", f"{source_commit}:src/paranoia_local/prompts.py"],
+    )
+    if blob.returncode != 0:
+        raise ValueError("fallback acceptance historical prompts are unavailable")
+    try:
+        module = ast.parse(blob.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, SyntaxError) as exc:
+        raise ValueError("fallback acceptance historical prompts are not parseable") from exc
+    found: dict[str, str] = {}
+    for node in module.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or target.id not in _PROMPT_NAMES:
+            continue
+        try:
+            value = ast.literal_eval(node.value)
+        except (ValueError, TypeError, SyntaxError) as exc:
+            raise ValueError(f"historical prompt {target.id} is not a literal string") from exc
+        if not isinstance(value, str):
+            raise ValueError(f"historical prompt {target.id} is not a string")
+        found[target.id] = value
+    if set(found) != set(_PROMPT_NAMES):
+        raise ValueError("fallback acceptance historical prompt set is incomplete")
+    return found
 
 
 def _external_execution(engine: str, model: str) -> dict[str, str | None]:
@@ -134,7 +182,14 @@ def _effective_packet(audit: dict) -> ah.Packet:
     )
 
 
-def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
+def _cleaning_and_attestation_bound(
+    audit: dict, *, fallback: bool, instruction_set: dict[str, str] | None = None,
+    deterministic_cleaner: bool | None = None,
+) -> bool:
+    instruction_set = instruction_set or {
+        name: getattr(prompts, name) for name in _PROMPT_NAMES
+    }
+    deterministic_cleaner = fallback if deterministic_cleaner is None else deterministic_cleaner
     raw, cleaned = audit["raw_input"], audit["cleaned"]
     phase_attempts = audit.get("phase_attempts", [])
     if [row.get("role") for row in phase_attempts] != ["cleaner", "attester"]:
@@ -146,7 +201,7 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
         raw["decision"], raw["stakes"], raw["context"], raw["files"],
         raw["options"], "",
     )
-    cleaner_prompt = prompts.compose(prompts.CLEANER_INSTRUCTIONS, cleaner_body)
+    cleaner_prompt = prompts.compose(instruction_set["CLEANER_INSTRUCTIONS"], cleaner_body)
     cleaner_reply = cleaner.get("reply")
     if not isinstance(cleaner_reply, str) or not _attempt_bound(
         cleaner, prompt=cleaner_prompt, reply=cleaner_reply, rejection=None,
@@ -155,7 +210,7 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
                 engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
                 route="deterministic-cleaner",
             )
-            if fallback else _external_execution(
+            if deterministic_cleaner else _external_execution(
                 engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
             )
         ),
@@ -207,7 +262,7 @@ def _cleaning_and_attestation_bound(audit: dict, *, fallback: bool) -> bool:
         raw["decision"], raw["stakes"], raw["context"], raw["files"],
         cleaned_hints, raw["options"], parsed,
     )
-    attester_prompt = prompts.compose(prompts.ATTEST_INSTRUCTIONS, attester_body)
+    attester_prompt = prompts.compose(instruction_set["ATTEST_INSTRUCTIONS"], attester_body)
     return _attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=expected_rejection,
@@ -239,18 +294,32 @@ def _ordinary_asymmetry_bound(audit: dict) -> bool:
     )
 
 
-def _decider_transcripts(audit: dict) -> list[arb.Vote] | None:
+def _decider_transcripts(
+    audit: dict, *, instruction_set: dict[str, str] | None = None,
+) -> list[arb.Vote] | None:
+    instruction_set = instruction_set or {
+        name: getattr(prompts, name) for name in _PROMPT_NAMES
+    }
     if len(audit.get("rounds", [])) != 1 or set(audit["rounds"][0]) != {"codex", "claude"}:
         return None
     packet = _effective_packet(audit)
     votes: list[arb.Vote] = []
     for engine, cast in audit["rounds"][0].items():
         mapping = audit.get("label_maps", {}).get(engine)
-        if not isinstance(mapping, dict) or set(mapping.values()) != set(packet.statements):
+        stored_body = cast.get("prompt")
+        if (
+            not isinstance(mapping, dict)
+            or set(mapping.values()) != set(packet.statements)
+            or not isinstance(stored_body, str)
+            or any(stored_body.count(label) != 1 for label in mapping)
+        ):
             return None
+        ordered_labels = sorted(mapping, key=stored_body.index)
         presentation = arb.Presentation(
             engine=engine,
-            items=tuple((label, packet.statements[option_id]) for label, option_id in mapping.items()),
+            items=tuple(
+                (label, packet.statements[mapping[label]]) for label in ordered_labels
+            ),
             label_to_id=dict(mapping),
             id_to_label={option_id: label for label, option_id in mapping.items()},
             reversed_order=False,
@@ -260,7 +329,7 @@ def _decider_transcripts(audit: dict) -> list[arb.Vote] | None:
         if len(attempts) != 1 or attempts[0].get("body") != expected_body:
             return None
         reply = cast.get("reply")
-        prompt = prompts.compose(prompts.ARBITRATE_INSTRUCTIONS, expected_body)
+        prompt = prompts.compose(instruction_set["ARBITRATE_INSTRUCTIONS"], expected_body)
         attempt = attempts[0]
         if (
             cast.get("prompt") != expected_body
@@ -358,7 +427,7 @@ def _timing_bound(record: dict, audit_sha256: str) -> bool:
 
 def _validate_run(
     *, repo: Path, artifact: dict, audit_meta: dict, timing_meta: dict,
-    fallback: bool,
+    fallback: bool, instruction_set: dict[str, str],
 ) -> None:
     if set(audit_meta) != {"path", "sha256", "snapshot", "cleaning", "result"}:
         raise ValueError("acceptance audit metadata schema mismatch")
@@ -373,11 +442,13 @@ def _validate_run(
         and audit_meta["result"] == audit.get("outcome") == "CONVERGED"
         and _cleaned_digest_bound(audit.get("cleaned", {}))
         and (not fallback or audit["cleaned"]["statements"] != audit["raw_input"]["options"])
-        and _cleaning_and_attestation_bound(audit, fallback=fallback)
+        and _cleaning_and_attestation_bound(
+            audit, fallback=fallback, instruction_set=instruction_set,
+        )
         and (fallback or _ordinary_asymmetry_bound(audit))
     ):
         raise ValueError("acceptance audit does not prove its exact delivery route")
-    votes = _decider_transcripts(audit)
+    votes = _decider_transcripts(audit, instruction_set=instruction_set)
     if votes is None or not _snapshot_and_outcome_bound(repo, artifact, audit, votes):
         raise ValueError("acceptance audit does not replay to its terminal result")
     if set(timing_meta) != {"path", "sha256"}:
@@ -405,6 +476,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
     source_commit = artifact.get("source_commit")
     if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("fallback acceptance source commit is invalid")
+    source_commit = _validated_commit(repo, source_commit)
     for relative, digest in artifact["source_sha256"].items():
         blob = inert_git.invoke(repo, ["show", f"{source_commit}:{relative}"])
         if (
@@ -413,6 +485,7 @@ def validate(artifact_path: Path, repo: Path) -> None:
             or hashlib.sha256(blob.stdout).hexdigest() != digest
         ):
             raise ValueError(f"fallback acceptance source hash mismatch: {relative}")
+    instruction_set = _historical_prompt_instructions(repo, source_commit)
 
     if set(artifact["audits"]) != {"ordinary", "fallback"} or set(artifact["timings"]) != {
         "ordinary", "fallback",
@@ -421,10 +494,12 @@ def validate(artifact_path: Path, repo: Path) -> None:
     _validate_run(
         repo=repo, artifact=artifact, audit_meta=artifact["audits"]["ordinary"],
         timing_meta=artifact["timings"]["ordinary"], fallback=False,
+        instruction_set=instruction_set,
     )
     _validate_run(
         repo=repo, artifact=artifact, audit_meta=artifact["audits"]["fallback"],
         timing_meta=artifact["timings"]["fallback"], fallback=True,
+        instruction_set=instruction_set,
     )
     if artifact["audits"]["ordinary"]["snapshot"] != artifact["audits"]["fallback"]["snapshot"]:
         raise ValueError("acceptance runs did not share one source snapshot")

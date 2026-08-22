@@ -6,9 +6,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+from paranoia_local import inert_git
 
 PRODUCTION_SOURCES = frozenset({
     "src/paranoia_local/arbitrate_handler.py",
@@ -24,6 +25,18 @@ PRODUCTION_SOURCES = frozenset({
 ENGINES = frozenset({"codex", "claude"})
 
 
+def _git(repo: Path, args: list[str]) -> bytes:
+    result = inert_git.invoke(repo, args)
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"legacy inert Git read failed: {detail}")
+    return result.stdout
+
+
+def _git_text(repo: Path, args: list[str]) -> str:
+    return _git(repo, args).decode("utf-8", errors="surrogateescape")
+
+
 def _is_sha256(value: object) -> bool:
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
@@ -35,11 +48,11 @@ def _tracked_evidence(repo: Path, relative: object) -> Path:
     path = (root / relative).resolve()
     if path == root or root not in path.parents:
         raise ValueError("legacy audit path escapes repository")
-    tracked = subprocess.run(
-        ["git", "ls-files", "--error-unmatch", "--", relative],
-        cwd=repo, capture_output=True,
-    )
-    if tracked.returncode or not path.is_file():
+    try:
+        _git(repo, ["ls-files", "--error-unmatch", "--", relative])
+    except ValueError as exc:
+        raise ValueError(f"legacy audit is not tracked evidence: {relative}") from exc
+    if not path.is_file():
         raise ValueError(f"legacy audit is not tracked evidence: {relative}")
     return path
 
@@ -167,25 +180,25 @@ def validate(artifact_path: Path, repo: Path) -> None:
     source_commit = primary["source_commit"]
     if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("legacy source commit schema mismatch")
+    resolved_source = _git_text(
+        repo, ["rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+    ).strip()
+    if resolved_source != source_commit:
+        raise ValueError("legacy source commit does not resolve exactly")
     if set(source_hashes) != PRODUCTION_SOURCES or any(
         not _is_sha256(value) for value in source_hashes.values()
     ):
         raise ValueError("production_source_sha256 does not name the complete source set")
     for relative, expected in source_hashes.items():
-        result = subprocess.run(
-            ["git", "show", f"{source_commit}:{relative}"], cwd=repo, capture_output=True,
-        )
-        if result.returncode or hashlib.sha256(result.stdout).hexdigest() != expected:
+        body = _git(repo, ["show", f"{resolved_source}:{relative}"])
+        if hashlib.sha256(body).hexdigest() != expected:
             raise ValueError(f"historical production hash mismatch: {relative}")
 
-    parent = subprocess.run(
-        ["git", "rev-parse", f"{source_commit}^1"], cwd=repo, check=True,
-        capture_output=True, text=True,
-    ).stdout.strip()
-    diff = subprocess.run(
-        ["git", "diff", "--numstat", parent, source_commit, "--", *sorted(PRODUCTION_SOURCES)],
-        cwd=repo, check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
+    parent = _git_text(repo, ["rev-parse", f"{resolved_source}^1"]).strip()
+    diff = _git_text(
+        repo,
+        ["diff", "--numstat", parent, resolved_source, "--", *sorted(PRODUCTION_SOURCES)],
+    ).splitlines()
     added = sum(int(row.split("\t", 2)[0]) for row in diff)
     removed = sum(int(row.split("\t", 2)[1]) for row in diff)
     if artifact["delivery_metrics"]["production_diff"] != {
@@ -193,17 +206,13 @@ def validate(artifact_path: Path, repo: Path) -> None:
         "net_lines": added - removed,
     }:
         raise ValueError("legacy production diff metrics mismatch")
-    paths = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", source_commit, "src/paranoia_local"],
-        cwd=repo, check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
+    paths = _git_text(
+        repo, ["ls-tree", "-r", "--name-only", resolved_source, "src/paranoia_local"],
+    ).splitlines()
     modules = []
     for path in paths:
         if path.endswith(".py"):
-            body = subprocess.run(
-                ["git", "show", f"{source_commit}:{path}"], cwd=repo, check=True,
-                capture_output=True, text=True,
-            ).stdout
+            body = _git_text(repo, ["show", f"{resolved_source}:{path}"])
             modules.append({"path": path, "lines": len(body.splitlines())})
     modules.sort(key=lambda row: (-row["lines"], row["path"]))
     if artifact["delivery_metrics"]["largest_production_modules"] != modules[:6]:
