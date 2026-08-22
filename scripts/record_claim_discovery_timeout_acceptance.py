@@ -147,14 +147,19 @@ def main() -> None:
     ):
         raise SystemExit("acceptance invocation was not bound to one clean source revision")
     executable = invocation.get("effective_executable")
+    resume_executable = invocation.get("effective_resume_executable")
     state_root = invocation.get("effective_state_root")
     if (
         not isinstance(executable, str)
         or Path(executable).resolve() != Path(invocation.get("executable", "")).resolve()
+        or not isinstance(resume_executable, str)
+        or Path(resume_executable).resolve() != Path(invocation.get("executable", "")).resolve()
         or not isinstance(state_root, str)
         or Path(state_root).resolve() != args.lineage.parents[1].resolve()
     ):
-        raise SystemExit("acceptance invocation did not use its recorded executable and state root")
+        raise SystemExit(
+            "acceptance invocation did not use its recorded fresh/resumed executable and state root"
+        )
     if any(
         not isinstance(row.get("requested_timeout_sec"), int)
         or not isinstance(row.get("duration_ms"), int)

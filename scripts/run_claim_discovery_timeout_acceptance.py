@@ -76,8 +76,14 @@ def main() -> None:
     discovery_argv = engine.for_role(engines.ROLE_DISCOVERY).build_argv(
         args.plan_repo, "gpt-5.6-sol", "high", True,
     )
-    if Path(discovery_argv[0]).resolve() != args.codex.resolve():
-        raise SystemExit("claim discovery did not resolve the requested executable")
+    resumed_argv = engine.for_role(engines.ROLE_DISCOVERY).build_resume_argv(
+        "acceptance-session-probe", args.plan_repo, "gpt-5.6-sol", "high", True,
+    )
+    if any(
+        Path(argv[0]).resolve() != args.codex.resolve()
+        for argv in (discovery_argv, resumed_argv)
+    ):
+        raise SystemExit("fresh or resumed claim discovery did not resolve the requested executable")
     invocation = {
         "source_revision_before": source_revision,
         "source_status_before": source_status_before,
@@ -89,6 +95,7 @@ def main() -> None:
         "execution_route": "external-cli",
         "executable": str(args.codex),
         "effective_executable": discovery_argv[0],
+        "effective_resume_executable": resumed_argv[0],
         "effective_state_root": str(effective_state_root),
         "cli_version_output": version,
         "model": "gpt-5.6-sol",
