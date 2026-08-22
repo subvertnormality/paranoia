@@ -61,6 +61,87 @@ def test_large_page_capture_acceptance_record() -> None:
         assert hashlib.sha256(content).hexdigest() == expected
 
 
+def test_claim_discovery_timeout_public_acceptance_record() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/claim_discovery_timeout_acceptance_2026-08-22.json").read_text()
+    )
+    audit = artifact["production_audit"]
+    lineage = artifact["durable_lineage"]
+
+    assert artifact["schema_version"] == 1
+    expected_input = artifact["input"] | {
+        "repository_revision": "c17c58e40dec7e660ec39f6d2a95e9f1d5ac1e7a",
+        "path": "dataset/certification/A1-PIT-SYMBOL-RESOLUTION_plan_contract.md",
+        "sha256": "706953595c48d12a0e421266b77bdf9c18cd1db2fd93b3ac7a1724b472a0b1f0",
+        "bytes": 94_110,
+        "lines": 1_606,
+    }
+    assert artifact["input"] == expected_input
+    assert hashlib.sha256(
+        artifact["input"]["text"].encode("utf-8", "surrogateescape")
+    ).hexdigest() == artifact["input"]["sha256"]
+    assert artifact["source"]["revision"] == "dccea78a8cd496179dd8922ca56e710ec480ecb4"
+    assert artifact["source"]["diff"]["file_count"] == 7
+    assert artifact["source"]["diff"]["additions"] == 325
+    assert artifact["source"]["diff"]["deletions"] == 57
+    assert artifact["source"]["module_lines"]["src/paranoia_local/handlers.py"] == 3_519
+    for relative, expected_sha256 in artifact["source"]["hashes"].items():
+        content = subprocess.run(
+            ["git", "show", f'{artifact["source"]["revision"]}:{relative}'],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(content).hexdigest() == expected_sha256
+
+    invocation = artifact["invocation"]
+    assert invocation["public_handler"] == "paranoia_local.handlers.critique_plan"
+    assert invocation["execution_route"] == "external-cli"
+    assert invocation["cli_version"] == "0.149.0"
+    assert invocation["model"] == "gpt-5.6-sol"
+    assert invocation["claim_role_timeouts_seconds"] == {
+        "claim-discovery": 600,
+        "claim-discovery-validation-retry": 600,
+        "claim-binding": 300,
+        "claim-attestation": 300,
+    }
+
+    observed = artifact["observed"]
+    assert observed["claim_duration_ms"] == audit["claim_duration_ms"] > 300_000
+    assert observed["claim_model_calls"] == audit["claim_model_calls"] == 5
+    assert observed["claim_status"].startswith("parsed ")
+    assert observed["claim_counts"] == {"refuted": 0, "supported": 5, "unverified": 10}
+    assert observed["ordered_attempt_roles"] == [
+        "claim-discovery",
+        "claim-discovery-validation-retry",
+        "claim-binding",
+        "claim-binding",
+        "claim-attestation",
+        "census-domain",
+        "census-execution",
+        "census-integrity",
+        "consolidation",
+    ]
+    for row in audit["attempt_ledger"]:
+        assert row["outcome"] in {"completed", "validation-invalid"}
+        assert row["returncode"] in {None, 0}
+        for channel in ("response", "raw", "failure_detail", "stderr"):
+            assert f"{channel}_sha256" in row
+            assert f"{channel}_excerpt" in row
+            digest = row[f"{channel}_sha256"]
+            assert digest is None or len(digest) == 64
+    assert lineage["rounds"] == 1
+    assert lineage["claim_state"]["rounds"] == 1
+    assert len(lineage["claim_state"]["claims"]) == 15
+    assert lineage["review_state"]["phase"] == "correction"
+    assert observed["result_text"].endswith(
+        "STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0\n"
+        "CONVERGENCE: BLOCKED — external claim closure remains open."
+    )
+    assert hashlib.sha256(
+        observed["result_text"].encode("utf-8", "surrogateescape")
+    ).hexdigest() == observed["result_sha256"]
+
+
 def test_authoritative_capture_acceptance_record() -> None:
     root = Path(__file__).resolve().parents[1]
     artifact = json.loads(

@@ -1,5 +1,19 @@
 # Plan claim verification
 
+## Large-plan discovery timeout acceptance
+
+The issue-58 correction gives the initial whole-plan discovery call and its one
+same-session validation correction a 600-second circuit breaker while retaining the
+300-second limit for later binding and cold-attestation calls. The retained
+[`claim_discovery_timeout_acceptance_2026-08-22.json`](claim_discovery_timeout_acceptance_2026-08-22.json)
+record exercises the public `critique_plan` handler with the exact 94,110-byte historical
+plan that repeatedly failed at the former boundary. Its claim phase took 554,742 ms,
+completed five model attempts without an execution timeout, persisted 15 claim outcomes,
+and continued into the structural census. The artifact deliberately retains the final
+`CONVERGENCE: BLOCKED`: ten claims remained unverified and the historical plan acquired
+structural debt. It proves recovery of this concrete timeout failure, not universal
+provider latency or correctness of that plan.
+
 ## Purpose and stakes
 
 Plan verification stops a structurally persuasive plan from converging on an unsupported
