@@ -96,8 +96,9 @@ def main() -> int:
             "additions": None if additions == "-" else int(additions),
             "deletions": None if deletions == "-" else int(deletions),
         })
-    largest = max(
-        changed,
+    production = [row for row in changed if row["path"].startswith("src/")]
+    largest_production = max(
+        production,
         key=lambda row: (row["additions"] or 0) + (row["deletions"] or 0),
     )
     artifact = {
@@ -108,10 +109,17 @@ def main() -> int:
         "input": arguments,
         "elapsed_seconds": round(elapsed, 3),
         "model_call_count": len(attempts),
-        "production_diff": {
+        "branch_diff": {
             "base": _git("rev-parse", "main"),
             "changed_files": changed,
-            "largest_changed_file": largest,
+            "additions": sum(row["additions"] or 0 for row in changed),
+            "deletions": sum(row["deletions"] or 0 for row in changed),
+        },
+        "production_diff": {
+            "changed_modules": production,
+            "additions": sum(row["additions"] or 0 for row in production),
+            "deletions": sum(row["deletions"] or 0 for row in production),
+            "largest_changed_module": largest_production,
         },
         "report_sha256": hashlib.sha256(
             report.encode("utf-8", "surrogatepass")

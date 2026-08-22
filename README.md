@@ -769,6 +769,8 @@ What it does, in order:
    prior decision exists and governs the current bytes is shared context. Directives, endorsements,
    rhetorical preference, pre-emptive conclusions, praise for a prior result, or instructions to
    follow it still fail the context/stakes gate.
+   The retained [consequence-framing acceptance](docs/arbitration_consequence_acceptance_2026-08-22.json)
+   exercises this distinction through the real cleaner, cross-vendor attester, and both deciders.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.
