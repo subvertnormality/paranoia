@@ -6,7 +6,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 import sys
 import tempfile
 import time
@@ -15,15 +14,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from paranoia_local import arbitrate_handler as ah
+from paranoia_local import arbitrate_handler as ah, inert_git
 
 OUTPUT = ROOT / "docs" / "arbitration_consequence_acceptance_2026-08-22.json"
 
 
 def _git(*args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=ROOT, check=True, capture_output=True, text=True,
-    ).stdout.strip()
+    result = inert_git.invoke(ROOT, list(args))
+    if result.returncode != 0:
+        raise RuntimeError(
+            "inert git failed: " + result.stderr.decode("utf-8", errors="replace")
+        )
+    return result.stdout.decode("utf-8", errors="surrogateescape").strip()
 
 
 def _audit_path(report: str) -> Path:
@@ -105,7 +107,7 @@ def main() -> int:
         "acceptance_kind": "arbitration-consequence-not-advocacy",
         "version": 1,
         "date": "2026-08-22",
-        "source_revision": _git("rev-parse", "HEAD"),
+        "source_revision": _git("rev-parse", "--verify", "HEAD^{commit}"),
         "input": arguments,
         "elapsed_seconds": round(elapsed, 3),
         "model_call_count": len(attempts),

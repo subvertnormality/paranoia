@@ -1,8 +1,8 @@
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 
+from paranoia_local import inert_git
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "docs/arbitration_consequence_acceptance_2026-08-22.json"
@@ -12,10 +12,15 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     artifact = json.loads(ARTIFACT.read_text())
     assert artifact["acceptance_kind"] == "arbitration-consequence-not-advocacy"
     source_revision = artifact["source_revision"]
-    accepted_prompt = subprocess.run(
-        ["git", "show", f"{source_revision}:src/paranoia_local/prompts.py"],
-        cwd=ROOT, check=True, stdout=subprocess.PIPE,
-    ).stdout
+    resolved = inert_git.text(
+        ROOT, ["rev-parse", "--verify", f"{source_revision}^{{commit}}"],
+    ).strip()
+    assert resolved == source_revision
+    accepted = inert_git.invoke(
+        ROOT, ["show", f"{resolved}:src/paranoia_local/prompts.py"],
+    )
+    assert accepted.returncode == 0
+    accepted_prompt = accepted.stdout
     assert accepted_prompt == (ROOT / "src/paranoia_local/prompts.py").read_bytes()
     assert artifact["input"]["stakes"] == (
         "Review effort spent on this naming decision is effort not spent on its "
