@@ -777,7 +777,8 @@ What it does, in order:
    that every phrase in that packet independently triggers the gate. A closed replay validator
    requires an exact per-route source manifest, byte-identical replayed production modules, inert
    Git launcher and replay-validator implementations, inert source/snapshot evidence, exact prompts
-   and replies, provider identities, parsed votes, and recomputed outcomes.
+   and replies, the configured cleaner/attester engine-model identities, parsed votes, and
+   recomputed outcomes. Acceptance inputs may not override the cleaner model.
 3. **Researches shared external premises by default.** Codex live search and Claude
    `WebSearch` independently discover candidate URLs in parallel. The server downloads and
    extracts them with Trafilatura; the same sessions bind exact passages with browsing disabled.

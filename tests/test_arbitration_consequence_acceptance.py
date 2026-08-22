@@ -81,7 +81,8 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "source", "snapshot", "audit-digest", "cleaner-prompt", "attester-reply",
         "decider-prompt", "vote", "outcome", "negative-rounds", "negative-reason",
         "context-rounds", "context-reason", "manifest-extra", "manifest-delete",
-        "production-drift",
+        "production-drift", "cleaner-model", "attester-model",
+        "input-cleaner-override",
     ],
 )
 def test_consequence_acceptance_rejects_every_binding_mutation(
@@ -138,6 +139,15 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
             return body + b"# drift\n" if path.name == "arbitration.py" else body
 
         monkeypatch.setattr(Path, "read_bytes", changed_read)
+        sync = False
+    elif mutation == "cleaner-model":
+        target = negative
+        negative["audit"]["phase_attempts"][0]["execution"]["model"] = "other-cleaner"
+    elif mutation == "attester-model":
+        target = context_negative
+        context_negative["audit"]["phase_attempts"][1]["execution"]["model"] = "other-attester"
+    elif mutation == "input-cleaner-override":
+        negative["input"]["cleaner_model"] = "other-cleaner"
         sync = False
     else:
         target = negative

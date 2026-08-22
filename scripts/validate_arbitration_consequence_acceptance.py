@@ -10,7 +10,7 @@ from pathlib import Path
 
 from paranoia_local import arbitrate_handler as ah
 from paranoia_local import arbitration as arb
-from paranoia_local import evidence, inert_git, prompts
+from paranoia_local import engines, evidence, inert_git, prompts
 from scripts import validate_arbitration_fallback_acceptance as shared
 
 
@@ -126,6 +126,7 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
         }
         and arguments.get("research") is False
         and arguments.get("web_search") is False
+        and "cleaner_model" not in arguments
     )
 
 
@@ -200,7 +201,9 @@ def _negative(
     cleaner_reply = cleaner.get("reply")
     if not isinstance(cleaner_reply, str) or not shared._attempt_bound(
         cleaner, prompt=cleaner_prompt, reply=cleaner_reply, rejection=None,
-        execution=shared._external_execution("claude", cleaner["execution"]["model"]),
+        execution=shared._external_execution(
+            engines.CLEANER_ENGINE, engines.CLEANER_MODEL,
+        ),
     ):
         raise ValueError("negative acceptance cleaner attempt does not replay")
     try:
@@ -242,7 +245,9 @@ def _negative(
     if not shared._attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=getattr(attestation, f"{field}_advocacy"),
-        execution=shared._external_execution("codex", attester_record["execution"]["model"]),
+        execution=shared._external_execution(
+            engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL,
+        ),
     ):
         raise ValueError("negative acceptance attester attempt does not replay")
     reason_bridge = (
