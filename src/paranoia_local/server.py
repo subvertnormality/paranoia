@@ -444,7 +444,9 @@ TOOLS: list[Tool] = [
             "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations. "
             "The optional lineage/class/mode trio is all-or-none and resets only that class's bounded correction window "
             "after a successful current-session rebut; it never closes debt, changes severity, or grants clearance. "
-            "Sessionless gate recovery uses only the exact terminal validation retry and never falls back to an earlier attempt."
+            "The durable control row is reset_round, reopen_count, and last_session_ref. The target must still be blocking; "
+            "closed/advisory classes have no session authority. Sessionless gate recovery uses only the exact terminal validation "
+            "retry and never falls back to an earlier attempt. Provider failure records no reset; ambiguous state save retains the latch."
         ),
         inputSchema={
             "type": "object",

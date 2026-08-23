@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -311,6 +312,17 @@ class TestRebut:
             "lineage":"bound-rebut", "class_id":"class-a", "lineage_mode":"plan",
         }
         assert rejected[0]["correction_control_reset"] is False
+        reloaded.classes["class-a"] = replace(
+            reloaded.classes["class-a"], status=cc.CLOSED,
+        )
+        cc.save_lineage(cc.default_state_root(), reloaded)
+        with pytest.raises(ValueError, match="not currently blocking"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"closed",
+                "lineage":"bound-rebut", "class_id":"class-a",
+                "lineage_mode":"plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        assert len(eng.calls) == 1
 
     def test_bound_rebut_identity_is_all_or_none(self, repo: Path, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="requires lineage, class_id, and lineage_mode"):

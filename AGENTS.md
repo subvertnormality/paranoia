@@ -471,3 +471,9 @@ returned trailer in plan and branch audit records.
 The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
 session authority replaces stale authority even when it is null; a terminal gate bootstrap may
 use only the exact validation-invalid terminal retry and only for a previously sessionless row.
+Clear session authority when a class becomes closed or advisory, and accept a bound rebut only for
+a currently blocking class. Repeated/backward caller labels refuse before provider, cache, snapshot,
+or worktree work; forward jumps count and failed labels may retry. Provider/validation failure does
+not advance substantive state, and ambiguous lineage or rebut saves retain the pending latch.
+Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
+server-owned audit projection.

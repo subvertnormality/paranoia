@@ -54,6 +54,29 @@ def _preflight_matrix(root: Path) -> list[dict]:
     matrix_root = Path(tempfile.mkdtemp(prefix="paranoia-gate-preflight-"))
     previous = os.environ.get(cc.STATE_ROOT_ENV)
     os.environ[cc.STATE_ROOT_ENV] = str(matrix_root)
+    forbidden_calls = {
+        "snapshot_tree":0, "wrap_commit":0, "build_packet":0, "worktree_at":0,
+        "census_cache":0,
+    }
+    originals = {
+        "snapshot_tree":orientation.snapshot_tree,
+        "wrap_commit":orientation.wrap_commit,
+        "build_packet":orientation.build_packet,
+        "worktree_at":handlers.worktree_at,
+        "census_cache":handlers._cached_census_manifests,
+    }
+
+    def forbid(name: str):
+        def blocked(*args, **kwargs):
+            forbidden_calls[name] += 1
+            raise AssertionError(f"strict-round preflight reached {name}")
+        return blocked
+
+    orientation.snapshot_tree = forbid("snapshot_tree")
+    orientation.wrap_commit = forbid("wrap_commit")
+    orientation.build_packet = forbid("build_packet")
+    handlers.worktree_at = forbid("worktree_at")
+    handlers._cached_census_manifests = forbid("census_cache")
 
     class NoCallEngine:
         name = "acceptance-no-call"
@@ -70,8 +93,12 @@ def _preflight_matrix(root: Path) -> list[dict]:
 
     rows: list[dict] = []
     try:
-        for mode in (cc.PLAN_MODE, cc.BRANCH_MODE):
-            lineage_id = f"persistent-gate-{mode}-strict-preflight"
+        for mode, caller_round in (
+            (mode, caller_round)
+            for mode in (cc.PLAN_MODE, cc.BRANCH_MODE)
+            for caller_round in (6, 5)
+        ):
+            lineage_id = f"persistent-gate-{mode}-{caller_round}-strict-preflight"
             state = rc.normalize_state(None, stakes=STAKES, snapshot="preflight")
             state.update(phase="correction", last_round=6, debt=[])
             state["correction_control"] = {"version":1, "classes":{}}
@@ -82,7 +109,7 @@ def _preflight_matrix(root: Path) -> list[dict]:
             before = hashlib.sha256(path.read_bytes()).hexdigest()
             engine = NoCallEngine()
             arguments = {
-                "repo_path":str(root), "lineage":lineage_id, "round":6,
+                "repo_path":str(root), "lineage":lineage_id, "round":caller_round,
                 "class_closure":True, "stakes":STAKES,
             }
             if mode == cc.PLAN_MODE:
@@ -99,18 +126,24 @@ def _preflight_matrix(root: Path) -> list[dict]:
                 raise AssertionError("replayed round label was not refused")
             after = hashlib.sha256(path.read_bytes()).hexdigest()
             rows.append({
-                "mode":mode, "round":6, "durable_last_round":6,
+                "mode":mode, "round":caller_round, "durable_last_round":6,
                 "error":message, "provider_calls":engine.calls,
                 "state_sha256_before":before, "state_sha256_after":after,
                 "pending_exists":(
                     cc.lineage_dir(matrix_root) / f"{lineage_id}.pending"
                 ).exists(),
+                "forbidden_work_calls":dict(forbidden_calls),
             })
     finally:
         if previous is None:
             os.environ.pop(cc.STATE_ROOT_ENV, None)
         else:
             os.environ[cc.STATE_ROOT_ENV] = previous
+        orientation.snapshot_tree = originals["snapshot_tree"]
+        orientation.wrap_commit = originals["wrap_commit"]
+        orientation.build_packet = originals["build_packet"]
+        handlers.worktree_at = originals["worktree_at"]
+        handlers._cached_census_manifests = originals["census_cache"]
     return rows
 
 
@@ -137,7 +170,8 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
             "exact validation-invalid terminal retry",
         ),
         "src/paranoia_local/server.py": (
-            "all-or-none", "never closes debt", "exact terminal validation retry",
+            "all-or-none", "never closes debt", "Sessionless gate recovery",
+            "never falls back to an earlier attempt",
         ),
     }
     for relative, required in surfaces.items():
@@ -187,11 +221,22 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         != rc.digest(f"{PLAN}\0{fixture['snapshot_commit']}")
     ):
         raise ValueError("fixture binding mismatch")
+    snapshot_tree = _run("git", "rev-parse", f"{fixture['snapshot_commit']}^{{tree}}", cwd=root)
+    source_tree = _run("git", "rev-parse", f"{revision}^{{tree}}", cwd=root)
+    if snapshot_tree != source_tree:
+        raise ValueError("reviewed snapshot tree differs from the source revision")
     expected_gate = [{
         "class_id":CLASS_ID, "reason":"persistence", "reopen_count":0, "span":7,
     }]
     audit = artifact["audit"]
     attempts = artifact["attempt_ledger"]
+    if not (
+        audit.get("tool") == "critique_plan" and audit.get("lineage") == LINEAGE
+        and audit.get("round") == 7 and audit.get("claim_verification") is False
+        and audit.get("model") == "gpt-5.6-sol"
+        and audit.get("plan_digest") == _sha(PLAN)[:16]
+    ):
+        raise ValueError("public critique_plan audit binding mismatch")
     if artifact["correction_gates"] != expected_gate:
         raise ValueError("correction gate projection mismatch")
     if audit.get("correction_gates") != expected_gate:
@@ -221,6 +266,7 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         raise ValueError("returned/audited trailer binding mismatch")
     before = artifact["before_lineage"]
     after = artifact["after_lineage"]
+    settlement = audit.get("staged_settlement")
     before_class = next(row for row in before["classes"] if row["class_id"] == CLASS_ID)
     after_class = next(row for row in after["classes"] if row["class_id"] == CLASS_ID)
     before_control = before["review_state"]["correction_control"]["classes"][CLASS_ID]
@@ -241,6 +287,37 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
     expected_outcome = "closed-or-replaced" if disposed else "terminal-gate-rejection"
     if not (disposed or terminal) or artifact["outcome"] != expected_outcome:
         raise ValueError("durable outcome does not satisfy the gate acceptance")
+    if disposed:
+        if not isinstance(settlement, dict) or settlement.get("role") != "correction":
+            raise ValueError("accepted response lacks a materialized correction settlement")
+        if not any(
+            row.get("class_id") == CLASS_ID and row.get("op") in {"close", "replace"}
+            for row in settlement.get("class_records", [])
+        ):
+            raise ValueError("settlement did not explicitly dispose the gated class")
+        if not any(
+            row.get("id") == "D1" and row.get("status") == "closed"
+            for row in settlement.get("debt_updates", [])
+        ):
+            raise ValueError("settlement did not close the gated class's debt")
+        if after["review_state"].get("last_round") != 7:
+            raise ValueError("successful settlement did not advance the durable label")
+    else:
+        if settlement is not None:
+            raise ValueError("terminal rejection published an unapplied settlement")
+        if after["review_state"].get("last_round") != 6:
+            raise ValueError("terminal rejection advanced substantive round state")
+    if after["review_state"].get("snapshot_digest") != fixture["structural_snapshot"]:
+        raise ValueError("durable state is not bound to the reviewed snapshot")
+    active_rows = [row for row in after["classes"] if row.get("status") != cc.SUPERSEDED]
+    active = [cc.TrackedClass(
+        class_id=row["class_id"], invariant=row["invariant"], severity=row["severity"],
+        first_round=row["first_round"], status=row["status"],
+        pattern=row.get("pattern"), pathspec=row.get("pathspec"),
+        procedure=row.get("procedure"), superseded_by=row.get("superseded_by"),
+        detail=row.get("detail"), matches=tuple(row.get("matches", ())),
+    ) for row in active_rows]
+    rc.normalize_correction_control(after["review_state"], active)
     if artifact["durable_reload"] is not True:
         raise ValueError("durable reload was not recorded")
     matrix = artifact["public_preflight_matrix"]
@@ -250,7 +327,8 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         row["provider_calls"] != 0
         or row["state_sha256_before"] != row["state_sha256_after"]
         or row["pending_exists"] is not False
-        or "greater than durable last_round 6; got 6" not in row["error"]
+        or any(row["forbidden_work_calls"].values())
+        or f"greater than durable last_round 6; got {row['round']}" not in row["error"]
         for row in matrix
     ):
         raise ValueError("strict-round preflight did work or mutated durable state")

@@ -1459,6 +1459,14 @@ def test_current_replacement_resets_once_and_current_session_replaces_stale() ->
         session_ref="bad\nref",
     )
     assert invalid["classes"]["successor"]["last_session_ref"] is None
+    after.classes["successor"] = replace(successor, status=cc.CLOSED)
+    closed = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction",
+        session_ref="current",
+    )
+    assert closed["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":None,
+    }
 
 
 @pytest.mark.parametrize("bad", [True, False, 0, 2])

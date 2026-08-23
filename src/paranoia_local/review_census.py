@@ -279,6 +279,10 @@ def advance_correction_control(
             # Current-attempt authority replaces stale authority even when absent or
             # malformed. A bad provider session must not poison the next lineage load.
             row["last_session_ref"] = current_session
+        else:
+            # Closed and advisory classes have no correction gate to reset. Keeping
+            # their old session would let a later bound rebut manufacture a window.
+            row["last_session_ref"] = None
         rows[item.class_id] = row
     return {"version": 1, "classes": rows}
 

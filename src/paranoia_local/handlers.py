@@ -3853,6 +3853,10 @@ def rebut(
             tracked = lineage.classes.get(class_id)
             if tracked is None or tracked.status == cc.SUPERSEDED:
                 raise ValueError("bound rebut class_id is not an active tracked class")
+            if not tracked.blocking:
+                raise ValueError(
+                    "bound rebut class_id is not currently blocking and eligible for reset"
+                )
             control = rc.normalize_correction_control(
                 lineage.review_state, lineage.active(),
             )
