@@ -125,6 +125,7 @@ def _route(path: Path, state_path: Path, expected: str, fixture_repo: Path) -> d
         "lineage": audit.get("lineage"),
         "round": audit.get("round"),
         "plan_digest": audit.get("plan_digest"),
+        "rendered_trailer": audit.get("rendered_trailer"),
         "structural_snapshot": audit.get("structural_snapshot"),
         "packet": packet,
         "packet_sha256": _sha(packet.encode("utf-8")),
@@ -212,12 +213,17 @@ def validate_record(record: dict, root: Path = ROOT) -> None:
             "session_ref": audit.get("session_ref"), "base_id": audit.get("base_id"),
             "head_id": audit.get("head_id"), "lineage": audit.get("lineage"),
             "round": audit.get("round"), "plan_digest": audit.get("plan_digest"),
+            "rendered_trailer": audit.get("rendered_trailer"),
             "structural_snapshot": audit.get("structural_snapshot"),
             "plan_contract_reused": audit.get("plan_contract_reused"),
             "settlement": audit.get("staged_settlement"),
         }
         if any(route.get(key) != value for key, value in projected.items()):
             raise ValueError("route projection does not match its audit")
+        trailer = route.get("rendered_trailer")
+        digest_line = f"PLAN-DIGEST: {contract.digest}"
+        if not isinstance(trailer, str) or trailer.splitlines().count(digest_line) != 1:
+            raise ValueError("public trailer does not contain the exact plan digest once")
         if (
             audit.get("tool") != "critique_branch"
             or audit.get("mode") != "converge-packet"
@@ -410,6 +416,7 @@ def main() -> None:
         "source_sha256": {
             relative: _sha((ROOT / relative).read_bytes()) for relative in SOURCES
         },
+        "allowed_later_source_diffs": {},
         "routes": [
             _route(
                 args.nonconforming_audit, args.nonconforming_state,
@@ -425,6 +432,7 @@ def main() -> None:
                 "A signed-in Codex census accepted plan anchors and blocked a nonconforming branch.",
                 "A separate signed-in Codex census cleared a genuinely conforming branch through critique_branch.",
                 "Both routes used the production staged handler with immutable plan digests and retained attempt ledgers.",
+                "Both public result trailers rendered the exact immutable plan digest once.",
             ],
             "does_not_prove": [
                 "Every future provider response will classify implementation fidelity correctly.",

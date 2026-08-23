@@ -1215,6 +1215,12 @@ def test_real_branch_plan_fidelity_acceptance_is_source_and_route_bound():
         route["plan_digest"] == artifact["fixture"]["contract_sha256"]
         for route in routes.values()
     )
+    assert all(
+        route["rendered_trailer"].splitlines().count(
+            f"PLAN-DIGEST: {route['plan_digest']}"
+        ) == 1
+        for route in routes.values()
+    )
     assert all(len(route["structural_snapshot"]) == 64 for route in routes.values())
     assert all(route["attempt_ledger"] for route in routes.values())
     assert all(route["accepted_plan_anchors"] for route in routes.values())
