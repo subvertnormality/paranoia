@@ -78,7 +78,9 @@ _ROUND = {
     "minimum": 1,
     "description": (
         "REQUIRED unless you pass class_closure: false (the one-shot mode). "
-        "Convergence-loop sequence number (1-based); increment it after each settled attempt. "
+        "Convergence-loop caller label (1-based). After a settled tracked round it must be "
+        "strictly greater than the durable prior label; forward jumps count toward persistence, "
+        "while a failed or rejected label may be retried. "
         "Tracked review uses it for lineage ordering while its cold census/final always cover "
         "every in-scope severity and correction targets durable debt. The legacy one-shot "
         "review retains the round-3 MAJOR-or-higher floor."
@@ -439,7 +441,12 @@ TOOLS: list[Tool] = [
         name="rebut",
         description=(
             "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
-            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations."
+            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations. "
+            "The optional lineage/class/mode trio is all-or-none and resets only that class's bounded correction window "
+            "after a successful current-session rebut; it never closes debt, changes severity, or grants clearance. "
+            "The durable control row is reset_round, reopen_count, and last_session_ref. The target must still be blocking; "
+            "closed/advisory classes have no session authority. Sessionless gate recovery uses only the exact terminal validation "
+            "retry and never falls back to an earlier attempt. Provider failure records no reset; ambiguous state save retains the latch."
         ),
         inputSchema={
             "type": "object",
@@ -447,9 +454,17 @@ TOOLS: list[Tool] = [
                 "repo_path": {"type": "string", "description": "Absolute path to the git repo (same one the review ran against)."},
                 "session_ref": {"type": "string", "description": "The session_ref printed in the prior review's footer."},
                 "rebuttal": {"type": "string", "description": "Your counter-evidence for the disputed finding."},
+                "lineage": {"type": "string", "description": "Optional tracked lineage whose correction window resets; requires class_id and lineage_mode."},
+                "class_id": {"type": "string", "description": "Optional active class whose durable current session must equal session_ref; requires lineage and lineage_mode."},
+                "lineage_mode": {"type": "string", "enum": ["plan", "branch"], "description": "Mode of the optionally bound lineage; requires lineage and class_id."},
                 **_COMMON,
             },
             "required": ["repo_path", "session_ref", "rebuttal"],
+            "dependentRequired": {
+                "lineage": ["class_id", "lineage_mode"],
+                "class_id": ["lineage", "lineage_mode"],
+                "lineage_mode": ["lineage", "class_id"],
+            },
         },
     ),
 ]

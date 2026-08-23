@@ -774,6 +774,20 @@ class TestUnstatedStakesAreSurfacedNotBlocked:
         assert "CONVERGENCE: NOT-BLOCKED" in out
         assert handlers.STAKES_NOTICE in out
 
+    def test_tracked_branch_audit_trailer_remains_the_exact_returned_suffix(
+        self, git_repo: Path, tmp_path: Path,
+    ) -> None:
+        log_dir = tmp_path / "logs"
+        out = handlers.critique_branch(
+            {"repo_path":str(git_repo), "base_ref":"main", "round":1,
+             "lineage":"unstated-stakes-branch"},
+            engine=FakeEngine(review_with("NONE")), log_dir=log_dir,
+        )
+        audit = json.loads(next(log_dir.glob("*.json")).read_text())
+        assert handlers.STAKES_NOTICE in out
+        assert out.endswith(audit["rendered_trailer"])
+        assert out.index(handlers.STAKES_NOTICE) < out.index(audit["rendered_trailer"])
+
 
 class TestThereIsExactlyOneEscape:
     """The gap round 1 named: nothing proved that an ACCEPTED branch call with closure

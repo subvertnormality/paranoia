@@ -652,7 +652,7 @@ Returns a [five-section critique](#review-output) plus a
 | `repo_path` | string | **required** | Absolute path to the git repo |
 | `base_ref` | string | `main` | Base ref for the diff |
 | `head_ref` | string | `HEAD` | Head ref to review |
-| `round` | integer | **required** unless `class_closure: false` | 1-based round number; must be an integer ≥ 1 |
+| `round` | integer | **required** unless `class_closure: false` | 1-based caller label; after a settled tracked round it must strictly increase. Forward jumps count toward persistence; a failed/rejected label may be retried |
 | `include_uncommitted` | boolean | `false` | Review the dirty working tree vs HEAD instead of a committed range. Runs in the live repo, not a worktree |
 | `isolate` | boolean | `true` | Review inside a throwaway worktree of `head_ref`. Ignored for uncommitted reviews |
 | `converge` | boolean | `true` | Pre-gather a bounded deterministic diff/file packet and materialize an immutable snapshot for tracked broad review. Always materializes, overriding `isolate` |
@@ -713,7 +713,7 @@ five sections, tagged `[FATAL]`/`[MAJOR]`/`[MINOR]`/`[OUT-OF-SCOPE]`.
 | `repo_path` | string | **required** | The repo the plan concerns |
 | `plan_text` | string | **one of these two** | The plan as markdown |
 | `plan_path` | string | **one of these two** | Absolute path to a markdown plan file |
-| `round` | integer | **required** unless `class_closure: false` | 1-based round number |
+| `round` | integer | **required** unless `class_closure: false` | 1-based caller label; after a settled tracked round it must strictly increase. Forward jumps count toward persistence; a failed/rejected label may be retried |
 | `lineage` | string | **required** unless `class_closure: false` | Globally unique, mode-qualified key. Nothing is derived |
 | `class_closure` | boolean | `true` | Unmechanized classes only. `false` is the one-shot mode |
 | `claim_verification` | boolean | `true` | Verify load-bearing external facts, externally issued design principles, and promised external behaviors with authoritative built-in web evidence before structural review. Set `false` only for an explicit legacy structural-only review |
@@ -751,7 +751,23 @@ reviewer replies `CONCEDE` or `HOLD` with fresh citations.
 | `repo_path` | string | **required** | Same repo the review ran against |
 | `session_ref` | string | **required** | From the prior review's footer |
 | `rebuttal` | string | **required** | Your counter-evidence |
+| `lineage` | string | — | With `class_id` and `lineage_mode`, reset a gated class's correction window after this rebut |
+| `class_id` | string | — | Exact gated class ID; requires `lineage` and `lineage_mode` |
+| `lineage_mode` | `plan` or `branch` | — | Mode of the named lineage; requires `lineage` and `class_id` |
 | `engine`, `model`, `effort`, `web_search` | — | see [Common arguments](#common-arguments) | |
+
+The three class-binding arguments are all-or-none. A bound rebut is accepted only for the
+current session durably stored for that class. Success grants another bounded correction window
+but does not close the class or debt, change severity, or itself produce clearance. A provider or
+state-write failure records no reset. A legacy exhausted class with no stored session gets no
+extra provider call: its ordinary gated correction and single validation retry may acquire the
+current session only when they terminate specifically on the correction gate. If neither attempt
+returns a valid session, the trailer offers only close/replacement recovery.
+Repeated or backward tracked round labels return a zero-attempt blocked review with an exact
+audited trailer; they do not call the provider or enter cache, snapshot, packet, or worktree work.
+Retained correction-gate acceptance replay also binds its bounded attempt-channel digests and
+exact response evidence to the artifact's committed Git blob; local edits cannot forge matching
+ledger copies without failing that envelope check.
 
 ### `arbitrate`
 
@@ -1102,10 +1118,27 @@ first-class blocker in `CLASS-CLOSURE`; it is not duplicated into synthetic find
 invented evidence anchors. The class trailer lists bounded path/line/text match detail and renders a
 binary recurrence as `path: binary match (line not shown)`. In that case the governing line says
 class closure remains open.
-Persistence is deliberately diagnostic, not another blocking rule. It uses the durable first-class
-and current-debt labels plus the current caller-supplied round label. It
-does not claim how many intervening rounds contained a finding. On the third tracked round it
-surfaces `rebut`, which resumes the current reviewer session for a concede-or-hold scope dispute.
+Persistence first warns without blocking. It uses the durable first-class and current-debt labels
+plus the current caller-supplied round label and does not claim how many intervening rounds
+contained a finding. After six unresolved labels, another plain correction settlement is refused:
+the class must close or be replaced, or the operator must run a class-bound `rebut` against the
+current stored session to grant a new bounded correction window. Three undisposed reopen waves use
+the same gate. A rebut reset changes only the correction window; it cannot close debt or clear a
+class. The exact rendered trailer is retained in the audit JSON.
+`CORRECTION-GATE` is the human trailer row for a load-bearing class in that call.
+`correction_gates` is the audit's closed server-owned projection of the same pre-call rows:
+`class_id`, `reason` (`persistence`, `reopen`, or both), label `span`, and `reopen_count`.
+It is empty outside correction and for an ungated correction. A failed label does not advance
+durable `last_round`, so that label may be retried; a forward jump deliberately contributes its
+full distance. Provider/validation failure keeps substantive class and debt state unchanged,
+while an ambiguous lineage write keeps the pending latch and returns state unavailable.
+The lineage's closed `review_state.correction_control` V1 map has exactly one row per active
+nonsuperseded class. `reset_round` is the last durable bound-rebut or replacement reset,
+`reopen_count` is the undisposed reopen-wave count, and `last_session_ref` is only the valid
+session from the latest successful settlement that left the class blocking. A null or invalid
+current-attempt session clears stale authority. Terminal gate bootstrap reads only the exact
+validation-invalid terminal retry and fills only a previously sessionless row; it never searches
+backward to an earlier attempt or overwrites already-bound authority.
 The retained [class-persistence acceptance](docs/class_persistence_acceptance_2026-08-22.json)
 exercises that reopen and diagnostic lifecycle through the public branch handler with one real
 Codex call on a tiny synthetic committed diff.
@@ -1203,7 +1236,7 @@ paranoia-local --engine {codex|claude} [--log-dir DIR]
 
 | Path | Contents |
 |---|---|
-| `~/.paranoia/logs/` | One JSON audit record per call: engine, model, round, `already_raised`, session ref, timings, and the review text |
+| `~/.paranoia/logs/` | One JSON audit record per call: engine, model, round, `already_raised`, session ref, timings, review text, tracked `correction_gates`, and exact returned `rendered_trailer` (`null` for one-shot calls) |
 | `~/.paranoia/lineages/` | Atomic class + external-claim state, one file per lineage. Retired and mechanically out-of-scope claims are excluded from active prompt inventory |
 
 Lineage state deliberately does **not** follow `--log-dir`, so moving your logs

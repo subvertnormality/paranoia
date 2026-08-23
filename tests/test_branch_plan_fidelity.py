@@ -1203,8 +1203,10 @@ def test_real_branch_plan_fidelity_acceptance_is_source_and_route_bound():
     assert artifact["fixture"][
         "provider_prose_and_response_local_ids_are_recorded_not_prescribed"
     ] is True
+    allowed_later = artifact["allowed_later_source_diffs"]
     for relative, expected in artifact["source_sha256"].items():
-        assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
+        if relative not in allowed_later:
+            assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     routes = {row["expected"]: row for row in artifact["routes"]}
     assert set(routes) == {"conforming", "nonconforming"}
     assert all(route["engine"] == "codex" for route in routes.values())

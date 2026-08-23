@@ -1,8 +1,10 @@
+import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from paranoia_local import handlers
+from paranoia_local import class_closure as cc, handlers, review_census as rc
 from paranoia_local.engines import Review
 from tests.conftest import git
 
@@ -260,3 +262,106 @@ class TestRebut:
                 {"repo_path": str(repo), "rebuttal": "x", "round": 1},
                 engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
             )
+
+    def test_bound_rebut_resets_only_matching_durable_class_session(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=7, debt=[])
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+        )
+        state["correction_control"] = {
+            "version":1, "classes":{"class-a":{
+                "reset_round":None, "reopen_count":3,
+                "last_session_ref":"sess-1",
+            }},
+        }
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "bound-rebut", mode=cc.PLAN_MODE,
+            classes={tracked.class_id:tracked}, review_state=state,
+        ))
+        eng = FakeEngine()
+        handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1",
+            "rebuttal":"The scope disposition is explicit.",
+            "lineage":"bound-rebut", "class_id":"class-a",
+            "lineage_mode":"plan",
+        }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        reloaded = cc.load_lineage(
+            cc.default_state_root(), "bound-rebut", stamp="T", mode=cc.PLAN_MODE,
+        )
+        row = reloaded.review_state["correction_control"]["classes"]["class-a"]
+        assert row == {
+            "reset_round":7, "reopen_count":0, "last_session_ref":"sess-1",
+        }
+        assert reloaded.classes["class-a"].status == cc.OPEN
+
+        with pytest.raises(ValueError, match="current durable session"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"stale",
+                "rebuttal":"again", "lineage":"bound-rebut",
+                "class_id":"class-a", "lineage_mode":"plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        assert len(eng.calls) == 1
+        audits = [json.loads(path.read_text()) for path in (tmp_path / "logs").glob("*.json")]
+        rejected = [row for row in audits if row.get("error")]
+        assert len(rejected) == 1
+        assert rejected[0]["lineage_binding"] == {
+            "lineage":"bound-rebut", "class_id":"class-a", "lineage_mode":"plan",
+        }
+        assert rejected[0]["correction_control_reset"] is False
+        reloaded.classes["class-a"] = replace(
+            reloaded.classes["class-a"], status=cc.CLOSED,
+        )
+        cc.save_lineage(cc.default_state_root(), reloaded)
+        with pytest.raises(ValueError, match="not currently blocking"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"closed",
+                "lineage":"bound-rebut", "class_id":"class-a",
+                "lineage_mode":"plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        assert len(eng.calls) == 1
+
+    def test_bound_rebut_identity_is_all_or_none(self, repo: Path, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="requires lineage, class_id, and lineage_mode"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"x",
+                "lineage":"only-lineage",
+            }, engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock)
+
+    def test_bound_rebut_ambiguous_save_is_audited_and_retains_latch(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=7, debt=[])
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+        )
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":3, "last_session_ref":"sess-1",
+        }}}
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "ambiguous-rebut", mode=cc.PLAN_MODE,
+            classes={"class-a":tracked}, review_state=state,
+        ))
+        monkeypatch.setattr(
+            cc, "save_lineage",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                cc.StateUnavailable("ambiguous rebut write")
+            ),
+        )
+        with pytest.raises(cc.StateUnavailable, match="ambiguous rebut write"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"scope",
+                "lineage":"ambiguous-rebut", "class_id":"class-a",
+                "lineage_mode":"plan",
+            }, engine=FakeEngine(), log_dir=tmp_path / "logs", now=fixed_clock)
+        pending = cc.lineage_dir(cc.default_state_root()) / "ambiguous-rebut.pending"
+        assert pending.exists()
+        audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+        assert audit["error"] is True
+        assert audit["correction_control_reset"] is False
+        cc.clear_latch(cc.default_state_root(), "ambiguous-rebut")

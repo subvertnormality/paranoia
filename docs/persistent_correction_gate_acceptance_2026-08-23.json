@@ -1,0 +1,455 @@
+{
+  "acceptance_kind": "persistent-correction-gate-public-plan-handler",
+  "after_lineage": {
+    "claim_reverify_required": false,
+    "claim_state": {},
+    "classes": [
+      {
+        "class_id": "gate-class",
+        "first_round": 1,
+        "invariant": "The plan requires public-handler acceptance for the correction gate.",
+        "matches": [],
+        "procedure": "Inspect the plan acceptance obligation.",
+        "severity": "MAJOR",
+        "status": "closed"
+      }
+    ],
+    "debt": null,
+    "exemptions": [],
+    "mode": "plan",
+    "next_seq": 1,
+    "review_state": {
+      "correction_control": {
+        "classes": {
+          "gate-class": {
+            "last_session_ref": null,
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt": [
+        {
+          "class_ids": [
+            "gate-class"
+          ],
+          "evidence": [
+            "plan:4",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:589-594",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:146-148"
+          ],
+          "finding_id": "G1",
+          "first_round": 1,
+          "id": "D1",
+          "last_round": 7,
+          "remedy": "exercise the handler",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "closed",
+          "summary": "the correction gate lacked public-handler acceptance"
+        }
+      ],
+      "last_round": 7,
+      "phase": "final",
+      "snapshot_digest": "824ebf9ffdd4cf974aa0a6911de3863896fca7e66c7b8cfdfbacb55eff5c13f3",
+      "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
+      "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
+      "version": 1
+    },
+    "rounds": 7
+  },
+  "attempt_ledger": [
+    {
+      "duration_ms": 50175,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f72-8a49-7a70-9376-75c25f8b9d85\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"I’m inspecting the plan’s acceptance obligation against the repository’s public-handler surface before deciding whether the persistent gate can be closed or must be replaced.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"repository/CLAUDE.md\\nrepository/README.md\\nrepository/AGENTS.md\\nrepository/pyproject.toml\\nrepository/LICENSE\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/tests/test_handlers.py\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_acceptance_validator.py\\nrepository/tests/conftest.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/doc",
+      "raw_sha256": "1585717993380e953a1161907dd559a272ccc60d4e8bc4f0581b17c9408c464e",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 2400,
+      "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate through its public handler.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:24-31\",\"rationale\":\"The acceptance runner binds the exact class, four-line plan, and review stakes supplied for this correction.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:589-594\",\"rationale\":\"The executable acceptance invokes the bound plan through the public critique_plan handler.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The current plan contains the previously missing public-handler acceptance obligation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:589-594\",\"rationale\":\"The repository acceptance runner exercises that obligation through the public plan handler.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:146-148\",\"rationale\":\"The retained acceptance audit records the parsed class closure and resulting closed class register.\"}],\"status\":\"closed\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "response_sha256": "ee25b0755d60ea927595b185f460e51509d5792b16c8cc1d656499092996bb23",
+      "returncode": 0,
+      "role": "correction",
+      "sequence": 1,
+      "session_ref": "01a02f72-8a49-7a70-9376-75c25f8b9d85",
+      "stderr_excerpt": "2026-08-23T16:27:10.332294Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T16:27:59.373247Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "fcca81252cdca55e6d8e7d3b82fbc6626594478e2494a172c949903d815ab9aa",
+      "usage": {
+        "cached_input_tokens": 61696,
+        "input_tokens": 95719,
+        "output_tokens": 1916,
+        "reasoning_output_tokens": 1135
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "audit": {
+    "already_raised": [],
+    "attempt_ledger": [
+      {
+        "duration_ms": 50175,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f72-8a49-7a70-9376-75c25f8b9d85\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"I’m inspecting the plan’s acceptance obligation against the repository’s public-handler surface before deciding whether the persistent gate can be closed or must be replaced.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"repository/CLAUDE.md\\nrepository/README.md\\nrepository/AGENTS.md\\nrepository/pyproject.toml\\nrepository/LICENSE\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/tests/test_handlers.py\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_acceptance_validator.py\\nrepository/tests/conftest.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/doc",
+        "raw_sha256": "1585717993380e953a1161907dd559a272ccc60d4e8bc4f0581b17c9408c464e",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 2400,
+        "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate through its public handler.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:24-31\",\"rationale\":\"The acceptance runner binds the exact class, four-line plan, and review stakes supplied for this correction.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:589-594\",\"rationale\":\"The executable acceptance invokes the bound plan through the public critique_plan handler.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The current plan contains the previously missing public-handler acceptance obligation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:589-594\",\"rationale\":\"The repository acceptance runner exercises that obligation through the public plan handler.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:146-148\",\"rationale\":\"The retained acceptance audit records the parsed class closure and resulting closed class register.\"}],\"status\":\"closed\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+        "response_sha256": "ee25b0755d60ea927595b185f460e51509d5792b16c8cc1d656499092996bb23",
+        "returncode": 0,
+        "role": "correction",
+        "sequence": 1,
+        "session_ref": "01a02f72-8a49-7a70-9376-75c25f8b9d85",
+        "stderr_excerpt": "2026-08-23T16:27:10.332294Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T16:27:59.373247Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "fcca81252cdca55e6d8e7d3b82fbc6626594478e2494a172c949903d815ab9aa",
+        "usage": {
+          "cached_input_tokens": 61696,
+          "input_tokens": 95719,
+          "output_tokens": 1916,
+          "reasoning_output_tokens": 1135
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      }
+    ],
+    "claim_counts": null,
+    "claim_duration_ms": null,
+    "claim_model_calls": 0,
+    "claim_status": "disabled",
+    "claim_verification": false,
+    "class_closure": true,
+    "correction_gates": [
+      {
+        "class_id": "gate-class",
+        "reason": "persistence",
+        "reopen_count": 0,
+        "span": 7
+      }
+    ],
+    "engine": "codex",
+    "error": false,
+    "grounded": true,
+    "lineage": "persistent-correction-gate-acceptance-20260823",
+    "model": "gpt-5.6-sol",
+    "plan_digest": "c2e9f84aed58a3e7",
+    "plan_path": null,
+    "register_status": "staged correction parsed — CLOSE gate-class",
+    "rejected_payloads": [],
+    "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "retry_register": null,
+    "returncode": 0,
+    "round": 7,
+    "session_ref": "01a02f72-8a49-7a70-9376-75c25f8b9d85",
+    "staged_manifests": null,
+    "staged_settlement": {
+      "_class_record_pointers": [
+        "/class_actions/gate-class"
+      ],
+      "_finding_class_refs": {},
+      "assessment_dispositions": [
+        {
+          "assessment_id": "gate-class",
+          "governing_id": null
+        }
+      ],
+      "class_assessments": [
+        {
+          "class_id": "gate-class",
+          "evidence": [
+            "plan:4",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:24-31",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:589-594"
+          ],
+          "finding_id": null,
+          "verdict": "satisfied"
+        }
+      ],
+      "class_dispositions": [],
+      "class_records": [
+        {
+          "class_id": "gate-class",
+          "op": "close"
+        }
+      ],
+      "debt": [],
+      "debt_updates": [
+        {
+          "evidence": [
+            "plan:4",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:589-594",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:146-148"
+          ],
+          "id": "D1",
+          "status": "closed"
+        }
+      ],
+      "findings": [],
+      "role": "correction",
+      "source_dispositions": []
+    },
+    "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+    "timestamp": "20260823T172759",
+    "tool": "critique_plan"
+  },
+  "before_lineage": {
+    "claim_reverify_required": false,
+    "claim_state": {},
+    "classes": [
+      {
+        "class_id": "gate-class",
+        "first_round": 1,
+        "invariant": "The plan requires public-handler acceptance for the correction gate.",
+        "matches": [],
+        "procedure": "Inspect the plan acceptance obligation.",
+        "severity": "MAJOR",
+        "status": "open"
+      }
+    ],
+    "debt": null,
+    "exemptions": [],
+    "mode": "plan",
+    "next_seq": 1,
+    "review_state": {
+      "correction_control": {
+        "classes": {
+          "gate-class": {
+            "last_session_ref": null,
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt": [
+        {
+          "class_ids": [
+            "gate-class"
+          ],
+          "evidence": [
+            "plan:4"
+          ],
+          "finding_id": "G1",
+          "first_round": 1,
+          "id": "D1",
+          "last_round": 6,
+          "reason": "acceptance was not yet exercised",
+          "remedy": "exercise the handler",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "open",
+          "summary": "the correction gate lacked public-handler acceptance"
+        }
+      ],
+      "last_round": 6,
+      "phase": "correction",
+      "snapshot_digest": "824ebf9ffdd4cf974aa0a6911de3863896fca7e66c7b8cfdfbacb55eff5c13f3",
+      "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
+      "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
+      "version": 1
+    },
+    "rounds": 6
+  },
+  "correction_gates": [
+    {
+      "class_id": "gate-class",
+      "reason": "persistence",
+      "reopen_count": 0,
+      "span": 7
+    }
+  ],
+  "date": "2026-08-23",
+  "durable_reload_lineage": {
+    "claim_reverify_required": false,
+    "claim_state": {},
+    "classes": [
+      {
+        "class_id": "gate-class",
+        "first_round": 1,
+        "invariant": "The plan requires public-handler acceptance for the correction gate.",
+        "matches": [],
+        "procedure": "Inspect the plan acceptance obligation.",
+        "severity": "MAJOR",
+        "status": "closed"
+      }
+    ],
+    "debt": null,
+    "exemptions": [],
+    "mode": "plan",
+    "next_seq": 1,
+    "review_state": {
+      "correction_control": {
+        "classes": {
+          "gate-class": {
+            "last_session_ref": null,
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt": [
+        {
+          "class_ids": [
+            "gate-class"
+          ],
+          "evidence": [
+            "plan:4",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:589-594",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:146-148"
+          ],
+          "finding_id": "G1",
+          "first_round": 1,
+          "id": "D1",
+          "last_round": 7,
+          "remedy": "exercise the handler",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "closed",
+          "summary": "the correction gate lacked public-handler acceptance"
+        }
+      ],
+      "last_round": 7,
+      "phase": "final",
+      "snapshot_digest": "824ebf9ffdd4cf974aa0a6911de3863896fca7e66c7b8cfdfbacb55eff5c13f3",
+      "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
+      "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
+      "version": 1
+    },
+    "rounds": 7
+  },
+  "elapsed_seconds": 53.65,
+  "fixture": {
+    "class_id": "gate-class",
+    "lineage": "persistent-correction-gate-acceptance-20260823",
+    "plan": "# Change\n\nImplement the correction gate.\nTests must exercise its public handler.",
+    "plan_sha256": "c2e9f84aed58a3e7a31a4b4c596349df226d5aa678e087d9d26ca65c34a7f9c0",
+    "round": 7,
+    "snapshot_commit": "0bec23b77513e2ded704411daf7ea870397d2735",
+    "structural_snapshot": "824ebf9ffdd4cf974aa0a6911de3863896fca7e66c7b8cfdfbacb55eff5c13f3"
+  },
+  "outcome": "closed-or-replaced",
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "executable": "codex",
+    "model": "gpt-5.6-sol",
+    "web_search": false
+  },
+  "provider_call_count": 1,
+  "public_preflight_matrix": [
+    {
+      "attempt_count": 0,
+      "audit_error": true,
+      "correction_gates": [],
+      "durable_last_round": 6,
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "plan",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "rendered_trailer": "LINEAGE: persistent-gate-plan-6-strict-preflight (rounds recorded: 6)\nCLASS-REGISTER: round-order rejected\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-ERROR: tracked round must be greater than durable last_round 6; got 6\nSTRUCTURAL-FAILURE: role=round-order-preflight kind=validation\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — tracked round order was rejected before review work.",
+      "result_sha256": "951ffcb8af6317c4500cff58f4eae56d2f6dc87bf94d7b3e112cdc26fbb8105b",
+      "round": 6,
+      "state_sha256_after": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5",
+      "state_sha256_before": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5"
+    },
+    {
+      "attempt_count": 0,
+      "audit_error": true,
+      "correction_gates": [],
+      "durable_last_round": 6,
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "plan",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "rendered_trailer": "LINEAGE: persistent-gate-plan-5-strict-preflight (rounds recorded: 6)\nCLASS-REGISTER: round-order rejected\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-ERROR: tracked round must be greater than durable last_round 6; got 5\nSTRUCTURAL-FAILURE: role=round-order-preflight kind=validation\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — tracked round order was rejected before review work.",
+      "result_sha256": "86045ef200dffa733a25b32a1ab5e1ab8e326f191c17f6a4b0915a3fe928a8e9",
+      "round": 5,
+      "state_sha256_after": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5",
+      "state_sha256_before": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5"
+    },
+    {
+      "attempt_count": 0,
+      "audit_error": true,
+      "correction_gates": [],
+      "durable_last_round": 6,
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "branch",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "rendered_trailer": "LINEAGE: persistent-gate-branch-6-strict-preflight (rounds recorded: 6)\nCLASS-REGISTER: round-order rejected\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-ERROR: tracked round must be greater than durable last_round 6; got 6\nSTRUCTURAL-FAILURE: role=round-order-preflight kind=validation\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — tracked round order was rejected before review work.",
+      "result_sha256": "f9c1e1aabef61a389f5b6356a54d74ff8011a02820cb55baef8a0adc3ec7134e",
+      "round": 6,
+      "state_sha256_after": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021",
+      "state_sha256_before": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021"
+    },
+    {
+      "attempt_count": 0,
+      "audit_error": true,
+      "correction_gates": [],
+      "durable_last_round": 6,
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "branch",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "rendered_trailer": "LINEAGE: persistent-gate-branch-5-strict-preflight (rounds recorded: 6)\nCLASS-REGISTER: round-order rejected\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-ERROR: tracked round must be greater than durable last_round 6; got 5\nSTRUCTURAL-FAILURE: role=round-order-preflight kind=validation\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — tracked round order was rejected before review work.",
+      "result_sha256": "328f0859ff05e5c2ebc43d1e1da36270b611b07cd1adbeb4dd9e050d9f12ef01",
+      "round": 5,
+      "state_sha256_after": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021",
+      "state_sha256_before": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021"
+    }
+  ],
+  "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "result_sha256": "e36bc9516d1206d1d39537ef132bc556555c8e85839b5884171e5a8e35890283",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f72-8a49-7a70-9376-75c25f8b9d85` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "source_revision": "1fddd33d1a4d9d1d513d34cbbef626198cdc5e03",
+  "source_sha256": {
+    "AGENTS.md": "6ae2038717c507a4ee5fd985edb2c19db28aa2d8de40f77950ee27acf8840de2",
+    "README.md": "2d7882b6fc8d90653c8dbe8d634196a4477817e0d6883317d49229ecec3a7b10",
+    "scripts/run_persistent_correction_gate_acceptance.py": "1482849a2bf4715fc84923791451f85d27dc6e521ed945e56388fa0c912bd4d9",
+    "src/paranoia_local/handlers.py": "f240165ea9a02fddb117cfaf0d722839e3fe022a75139feb10d4c52bab08f814",
+    "src/paranoia_local/prompts.py": "9f14214af5c21c61cad0b195c37ddd589730d0aaa218bf7cd70bfa28508c9490",
+    "src/paranoia_local/review_census.py": "5bf5cf939d52fe358bf5f77045b3336188e81ee3d138187a006bb7e2b2da9ea7",
+    "src/paranoia_local/server.py": "47d813cc9ffc356e7efdad4cb08e06c70ae515f07aec585858907657eb00996f",
+    "tests/test_handlers.py": "8a7dc6aba3bb10789ac6c6e170ab9d5784bf1d183e24793868a5291ba15bb2f1",
+    "tests/test_plan_claims.py": "7756961aeed1f11e3ffb864b137dbe0f7ca33eeb2164a07a1d0b7e53df9f5db2",
+    "tests/test_plan_class_closure.py": "ccd1df2a080b74b69f40f85adb0e6ef9d411a688eb7fec4c71bff9f66ed7e76b",
+    "tests/test_review_census.py": "df9145fe2dabaffd03393c94c14040e14ffed64bdbd941079e34cca6bb8bf034"
+  },
+  "version": 1
+}

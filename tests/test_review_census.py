@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -34,6 +35,84 @@ def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
         handlers.STAGED_FOLLOWUP_TIMEOUT_SEC
         + handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC
     )
+
+
+def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
+    root = Path(__file__).resolve().parents[1]
+    path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"
+    if not path.exists():
+        pytest.skip("acceptance artifact is generated after the source commit")
+    artifact = json.loads(path.read_text(encoding="utf-8"))
+    spec = importlib.util.spec_from_file_location(
+        "persistent_gate_acceptance",
+        root / "scripts/run_persistent_correction_gate_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    acceptance.validate_artifact(artifact, root)
+    assert artifact["acceptance_kind"] == (
+        "persistent-correction-gate-public-plan-handler"
+    )
+    revision = artifact["source_revision"]
+    for relative, expected in artifact["source_sha256"].items():
+        recorded = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(recorded).hexdigest() == expected
+        assert (root / relative).read_bytes() == recorded
+    assert artifact["provider"] | {
+        "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
+        "web_search":False,
+    } == artifact["provider"]
+    assert artifact["correction_gates"] == [{
+        "class_id":"gate-class", "reason":"persistence", "span":7,
+        "reopen_count":0,
+    }]
+    assert 1 <= artifact["provider_call_count"] <= 2
+    assert artifact["provider_call_count"] == len(artifact["attempt_ledger"])
+    assert artifact["result_text"].endswith(artifact["rendered_trailer"])
+    assert artifact["audit"]["rendered_trailer"] == artifact["rendered_trailer"]
+    assert artifact["audit"]["correction_gates"] == artifact["correction_gates"]
+    assert artifact["durable_reload_lineage"] == artifact["after_lineage"]
+    assert artifact["outcome"] in {"closed-or-replaced", "terminal-gate-rejection"}
+    for mutate in (
+        lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
+            summary="silently altered",
+        ),
+        lambda item: item["after_lineage"]["review_state"]["debt"][0].update(
+            evidence=["plan:1"],
+        ),
+        lambda item: item["provider"].update(executable="codex-wrapper"),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        mutate(changed)
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["result_text"] = "forged but self-consistent\n\n" + changed["rendered_trailer"]
+    changed["result_sha256"] = hashlib.sha256(
+        changed["result_text"].encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(ValueError, match="independently reconstructed"):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["audit"]["session_ref"] = "forged-session"
+    old = artifact["audit"]["session_ref"]
+    changed["result_text"] = changed["result_text"].replace(
+        f"session_ref=`{old}`", "session_ref=`forged-session`",
+    )
+    changed["result_sha256"] = hashlib.sha256(
+        changed["result_text"].encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(ValueError, match="terminal attempt"):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    for ledger in (changed["attempt_ledger"], changed["audit"]["attempt_ledger"]):
+        ledger[0]["raw_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="committed Git envelope"):
+        acceptance.validate_artifact(changed, root)
 
 
 def test_census_cache_requires_every_exact_binding():
@@ -1366,6 +1445,230 @@ def test_trailer_marks_reopen_wave_without_inventing_history() -> None:
     assert "re-arm any prior disposition" in rendered
 
 
+def test_correction_control_is_class_keyed_and_gates_label_seven() -> None:
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    state = {"last_round": 6}
+    control = rc.normalize_correction_control(state, [tracked])
+    assert control == {"version":1, "classes":{"class-a":{
+        "reset_round":None, "reopen_count":0, "last_session_ref":None,
+    }}}
+    assert rc.correction_gates([tracked], control, round_no=6) == []
+    assert rc.correction_gates([tracked], control, round_no=7) == [{
+        "class_id":"class-a", "reason":"persistence", "span":7,
+        "reopen_count":0,
+    }]
+    control["classes"]["class-a"].update(reset_round=6, reopen_count=3)
+    assert rc.correction_gates([tracked], control, round_no=7) == [{
+        "class_id":"class-a", "reason":"reopen", "span":1,
+        "reopen_count":3,
+    }]
+
+
+def test_current_replacement_resets_once_and_current_session_replaces_stale() -> None:
+    successor = cc.TrackedClass(
+        "successor", "new invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    after = cc.Lineage(
+        "replacement", mode=cc.PLAN_MODE,
+        classes={successor.class_id:successor},
+    )
+    prior = {"version":1, "classes":{"successor":{
+        "reset_round":None, "reopen_count":2, "last_session_ref":"stale",
+    }}}
+    created = rc.advance_correction_control(
+        prior, after=after, round_no=7, phase="correction",
+        session_ref="current", replacement_successor_ids=["successor"],
+    )
+    assert created["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":"current",
+    }
+    later = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction", session_ref=None,
+    )
+    assert later["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":None,
+    }
+    invalid = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction",
+        session_ref="bad\nref",
+    )
+    assert invalid["classes"]["successor"]["last_session_ref"] is None
+    after.classes["successor"] = replace(successor, status=cc.CLOSED)
+    closed = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction",
+        session_ref="current",
+    )
+    assert closed["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":None,
+    }
+
+
+@pytest.mark.parametrize("bad", [True, False, 0, 2])
+def test_correction_control_rejects_non_version_one_and_scalar_aliases(bad) -> None:
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    state = {
+        "last_round": 2,
+        "correction_control": {"version":bad, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":None,
+        }}},
+    }
+    with pytest.raises(rc.CensusError, match="invalid persisted correction_control"):
+        rc.normalize_correction_control(state, [tracked])
+
+
+def test_terminal_staged_rejection_rolls_back_prepare_reopen(tmp_path) -> None:
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(phase="correction", last_round=1, debt=[])
+    closed = cc.TrackedClass(
+        "class-a", "BAD absent", cc.MAJOR, 1, cc.CLOSED,
+        pattern="BAD", pathspec="a.py",
+    )
+    cc.save_lineage(tmp_path, cc.Lineage(
+        "rollback-reopen", mode=cc.BRANCH_MODE,
+        classes={closed.class_id:closed}, review_state=state,
+    ))
+
+    class ReopeningClosure(handlers._ClosureRound):
+        def _sweep(self, only=None):
+            item = self.lineage.classes["class-a"]
+            self.lineage.classes["class-a"] = replace(item, status=cc.OPEN)
+
+    closure = ReopeningClosure(
+        "rollback-reopen", round_no=2, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    assert closure.lineage.classes["class-a"].status == cc.OPEN
+    error = handlers._staged_error(
+        "invalid correction", role="correction-validation-retry", kind="validation",
+    )
+    handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=error, mode=cc.BRANCH_MODE,
+    )
+    closure.release()
+    reloaded = cc.load_lineage(
+        tmp_path, "rollback-reopen", stamp="T2", mode=cc.BRANCH_MODE,
+    )
+    assert reloaded.classes["class-a"].status == cc.CLOSED
+    assert reloaded.review_state["last_round"] == 1
+    assert reloaded.review_state["staged_failure"]["message"] == "invalid correction"
+
+
+def test_tracked_round_labels_must_advance_but_failed_label_can_retry(tmp_path) -> None:
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state["last_round"] = 6
+    cc.save_lineage(tmp_path, cc.Lineage(
+        "strict-round", mode=cc.PLAN_MODE, review_state=state,
+    ))
+    closure = handlers._PlanClassClosure(
+        "strict-round", round_no=6, state_root=tmp_path, stamp="T",
+    )
+    closure.prepare()
+    try:
+        with pytest.raises(ValueError, match="greater than durable last_round 6"):
+            closure.require_forward_round()
+    finally:
+        closure.abandon(); closure.release()
+    retry = handlers._PlanClassClosure(
+        "strict-round", round_no=7, state_root=tmp_path, stamp="T2",
+    )
+    retry.prepare()
+    try:
+        retry.require_forward_round()
+    finally:
+        retry.abandon(); retry.release()
+
+
+@pytest.mark.parametrize("retry_session", ["gate-retry", None, "bad\nref"])
+def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
+    tmp_path, retry_session,
+) -> None:
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(phase="correction", last_round=6, debt=[{
+        "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
+        "summary":"still broken", "reason":"condition remains",
+        "remedy":"close or replace it", "evidence":["plan:1"],
+        "source_ids":[], "class_ids":["class-a"],
+        "first_round":1, "last_round":6,
+    }])
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    lineage = cc.Lineage(
+        "gated-correction", mode=cc.PLAN_MODE, rounds=6,
+        classes={tracked.class_id:tracked}, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        register_status = None
+        staged_settlement = None
+        staged_manifests = []
+        rejected_payloads = []
+        reopened_class_ids = ()
+        correction_gates = []
+        prepared_lineage = cc.copy_lineage(lineage)
+        _settled = False
+        round_no = 7
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+    value = wire({
+        "role":"correction", "governing_findings":[],
+        "debt_outcomes":[{
+            "debt_id":"D1", "status":"open", "evidence":["plan:1"],
+            "reason":"condition remains",
+        }],
+        "class_outcomes":[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"carried_debt", "debt_id":"D1"},
+        }],
+        "class_actions":{"class-a":None},
+    })
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=value, session_ref="gate-first", raw=value)
+
+        def resume(self, *args, **kwargs):
+            return Review(text=value, session_ref=retry_session, raw=value)
+
+    closure = Closure()
+    with pytest.raises(rc.CensusError, match="correction limit reached") as caught:
+        handlers._staged_structural_review(
+            engine=Engine(), cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=closure, stakes="s",
+            snapshot="p", round_no=7, on_progress=None, plan_lines=1,
+        )
+    _, rendered, attempts = handlers._settle_staged_failure(
+        closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
+    )
+    assert [row["role"] for row in attempts] == [
+        "correction", "correction-validation-retry",
+    ]
+    assert closure.lineage.classes["class-a"].status == cc.OPEN
+    assert closure.lineage.review_state["last_round"] == 6
+    assert "CORRECTION-GATE: class-a" in rendered
+    if retry_session != "gate-retry":
+        assert "correction_control" not in closure.lineage.review_state
+        assert "rebut with session_ref=" not in rendered
+    else:
+        row = closure.lineage.review_state["correction_control"]["classes"]["class-a"]
+        assert row["last_session_ref"] == retry_session
+        assert "rebut with session_ref=gate-retry" in rendered
+
+
 @pytest.mark.parametrize("cacheable_validation", [False, True])
 def test_failed_staged_round_retains_persistent_class_without_fake_session(
     tmp_path, cacheable_validation,
@@ -1392,8 +1695,13 @@ def test_failed_staged_round_retains_persistent_class_without_fake_session(
     )
     closure.prepare()
     error = handlers._staged_error(
-        "provider unavailable", role="correction", kind="provider",
+        "ordinary validation failure", role="correction-validation-retry",
+        kind="validation",
     )
+    error.attempts = [rc.Attempt(  # type: ignore[attr-defined]
+        "correction-validation-retry", "fake", "valid-but-unauthorized",
+        "validation-invalid", 1, None,
+    )]
     if cacheable_validation:
         error.census_cache = {"schema_version": 1}  # type: ignore[attr-defined]
 

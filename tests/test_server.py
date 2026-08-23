@@ -81,6 +81,9 @@ class TestToolListing:
         tool = next(t for t in server.TOOLS if t.name == "rebut")
         req = tool.inputSchema["required"]
         assert "session_ref" in req and "rebuttal" in req
+        deps = tool.inputSchema["dependentRequired"]
+        assert deps["lineage"] == ["class_id", "lineage_mode"]
+        assert deps["class_id"] == ["lineage", "lineage_mode"]
 
 
 class TestDispatch:

@@ -460,6 +460,10 @@ fresh cold whole-artifact review over all nine checklist items and every active 
 Every anchor must resolve. The provider-supplied JSON Schema is the sole structural contract;
 return only its object, without a marker, fence, or prose.
 
+If the task contains nonempty correction_gates, close or replace every named class so it is no
+longer blocking. Rotating debt, changing evidence, or retaining another blocking severity does
+not satisfy that server-owned gate.
+
 Classify every new governing finding once as one_off, new_class with an explicit definition and
 class severity, or existing_class. Consolidate one existing class to at most one new finding.
 Every supplied open debt receives exactly one outcome; open needs current evidence and a concrete

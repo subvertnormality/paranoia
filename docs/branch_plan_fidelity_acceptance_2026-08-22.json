@@ -1,5 +1,27 @@
 {
   "acceptance_kind": "branch-plan-fidelity-public-handler-v1",
+  "allowed_later_source_diffs": {
+    "scripts/build_branch_plan_fidelity_acceptance.py": {
+      "scope": "Adds exact later-diff validation for this retained record; does not alter branch plan-contract binding, snapshot construction, settlement, or fidelity verdict semantics.",
+      "sha256": "0fccaece63ec121011259d908b1171bff7f397c0d66714dc0d1ea464e09f9771"
+    },
+    "src/paranoia_local/handlers.py": {
+      "scope": "Adds staged correction control, failure diagnostics, and audited strict-round handling after this acceptance; does not alter branch plan-contract binding, immutable contract authority, packet binding, or fidelity verdict semantics.",
+      "sha256": "8f019466c292f4e114266cee0bc5555f1bbc7ad7c754b66df828fd6c191feee6"
+    },
+    "src/paranoia_local/prompts.py": {
+      "scope": "Changes staged evidence and correction protocol instructions after this acceptance; does not alter branch plan-contract binding or the required implementation-fidelity checklist.",
+      "sha256": "6edc39d0c534248f3daa4ceb83bffe630f4b32826c19f95d370cf82cdcebaf6a"
+    },
+    "src/paranoia_local/server.py": {
+      "scope": "Documents later correction-control and rebut arguments after this acceptance; does not alter branch plan-contract binding or fidelity settlement semantics.",
+      "sha256": "cb8af61a0e58e11703bd01b88b27857798cb5461b5173d407b9e01f566902eba"
+    },
+    "tests/test_branch_plan_fidelity.py": {
+      "scope": "Teaches the retained-record test to defer exact later-source exceptions to the shared validator; does not alter branch plan-contract binding or the recorded production-handler assertions.",
+      "sha256": "4639b95768e3cb5fee8a7796cdd636b1250f82d9114811277e1d466cd09006ad"
+    }
+  },
   "claims": {
     "does_not_prove": [
       "Every future provider response will classify implementation fidelity correctly.",

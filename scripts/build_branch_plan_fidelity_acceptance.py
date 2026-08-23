@@ -156,6 +156,8 @@ def validate_record(record: dict, root: Path = ROOT) -> None:
     source_inventory = record.get("source_sha256") or {}
     if set(source_inventory) != set(SOURCES):
         raise ValueError("source inventory is incomplete or contains unknown files")
+    allowed_later = record.get("allowed_later_source_diffs") or {}
+    changed: set[str] = set()
     for relative, expected in source_inventory.items():
         try:
             committed = subprocess.run(
@@ -167,7 +169,22 @@ def validate_record(record: dict, root: Path = ROOT) -> None:
         if _sha(committed) != expected:
             raise ValueError(f"acceptance commit hash mismatch: {relative}")
         if _sha((root / relative).read_bytes()) != expected:
-            raise ValueError(f"acceptance source hash mismatch: {relative}")
+            changed.add(relative)
+            allowance = allowed_later.get(relative)
+            if not isinstance(allowance, dict):
+                raise ValueError(f"acceptance source hash mismatch: {relative}")
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha(diff) != allowance.get("sha256"):
+                raise ValueError(f"allowed later source diff mismatch: {relative}")
+            if "does not alter branch plan-contract binding" not in str(
+                allowance.get("scope", "")
+            ):
+                raise ValueError(f"allowed later source scope is incomplete: {relative}")
+    if set(allowed_later) != changed:
+        raise ValueError("allowed later source inventory is not exact")
     route_rows = record.get("routes", [])
     routes = _unique_rows(route_rows, "expected", "acceptance routes")
     if set(routes) != {"conforming", "nonconforming"}:

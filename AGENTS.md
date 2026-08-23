@@ -368,7 +368,8 @@ of the resulting code and tests.
   Surface every currently blocking class spanning at least three caller round labels with its
   round-label span, current-debt start label, and current reviewer session for `rebut`; do not infer a per-round
   presence count that durable state does not store. Mark any class reopen transition as a reopen
-  wave so a prior scope disposition is explicitly re-armed. These are diagnostics, not new gates.
+  wave so a prior scope disposition is explicitly re-armed. Early signals are diagnostic; the
+  bounded correction/reopen limits below are load-bearing settlement gates.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and
@@ -460,3 +461,23 @@ After implementation and docs pass locally, run Codex paranoia against the code 
 stakes. Accepted findings trigger one coherent change followed by a focused rerun; recurring
 classes trigger an architecture checkpoint, not endless patching. Do not open/merge a PR while
 real acceptance, tests, implementation convergence, or documented stakes remain unresolved.
+
+Persistent staged correction is a gate, not merely a trailer warning. After six unresolved
+caller-supplied round labels or three undisposed reopen waves, reject another correction that
+leaves the same class canonically blocking. Admit only a canonical close/replacement or a durable
+class-bound rebut reset against the stored current session. Rebut resets never change verdict,
+debt, or severity. Preserve this control state atomically with the lineage and store the exact
+returned trailer in plan and branch audit records.
+The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
+session authority replaces stale authority even when it is null; a terminal gate bootstrap may
+use only the exact validation-invalid terminal retry and only for a previously sessionless row.
+Clear session authority when a class becomes closed or advisory, and accept a bound rebut only for
+a currently blocking class. Repeated/backward caller labels refuse before provider, cache, snapshot,
+or worktree work, returning a zero-attempt blocked review whose exact trailer is audited; forward
+jumps count and failed labels may retry. Provider/validation failure does
+not advance substantive state, and ambiguous lineage or rebut saves retain the pending latch.
+Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
+server-owned audit projection.
+Bind bounded attempt-channel digests and exact retained response evidence to the acceptance
+artifact's committed Git blob during replay; generation runs the same semantic validator before
+that immutable envelope exists.
