@@ -75,8 +75,21 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     assert artifact["result_text"].endswith(artifact["rendered_trailer"])
     assert artifact["audit"]["rendered_trailer"] == artifact["rendered_trailer"]
     assert artifact["audit"]["correction_gates"] == artifact["correction_gates"]
-    assert artifact["durable_reload"] is True
+    assert artifact["durable_reload_lineage"] == artifact["after_lineage"]
     assert artifact["outcome"] in {"closed-or-replaced", "terminal-gate-rejection"}
+    for mutate in (
+        lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
+            summary="silently altered",
+        ),
+        lambda item: item["after_lineage"]["review_state"]["debt"][0].update(
+            evidence=["plan:1"],
+        ),
+        lambda item: item["provider"].update(executable="codex-wrapper"),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        mutate(changed)
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root)
 
 
 def test_census_cache_requires_every_exact_binding():

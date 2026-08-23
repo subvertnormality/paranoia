@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -47,6 +49,86 @@ def _git_bytes(*args: str) -> bytes:
 
 def _state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
+    state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
+    state.update(phase="correction", last_round=6, debt=[{
+        "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
+        "summary":"the correction gate lacked public-handler acceptance",
+        "reason":"acceptance was not yet exercised", "remedy":"exercise the handler",
+        "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
+        "first_round":1, "last_round":6,
+    }])
+    state["correction_control"] = {"version":1, "classes":{CLASS_ID:{
+        "reset_round":None, "reopen_count":0, "last_session_ref":None,
+    }}}
+    tracked = cc.TrackedClass(
+        CLASS_ID, "The plan requires public-handler acceptance for the correction gate.",
+        cc.MAJOR, 1, cc.OPEN, procedure="Inspect the plan acceptance obligation.",
+    )
+    return cc.Lineage(
+        LINEAGE, rounds=6, classes={CLASS_ID:tracked},
+        review_state=state, mode=cc.PLAN_MODE,
+    )
+
+
+def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> dict:
+    """Recompute the complete accepted plan transition from retained canonical rows."""
+    lineage = cc._from_json(LINEAGE, deepcopy(before))
+    state = deepcopy(lineage.review_state)
+    prior_control = rc.normalize_correction_control(state, lineage.active())
+    register = rc.register_from_records(settlement["class_records"], mechanized=False)
+    minted = cc.apply_register(lineage, register, round_no=7)
+    minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
+    state = rc.settle_state(
+        state, settlement, phase="correction",
+        snapshot=before["review_state"]["snapshot_digest"], round_no=7,
+    )
+    replacements = {
+        class_id: tracked.superseded_by
+        for class_id, tracked in lineage.classes.items()
+        if tracked.status == cc.SUPERSEDED and tracked.superseded_by
+    }
+    for debt in state.get("debt", []):
+        debt.setdefault("class_ids", []).extend(
+            minted_by_record[index] for index in debt.pop("class_record_indexes", [])
+        )
+        if debt.get("status") == "open":
+            debt["class_ids"] = [
+                replacements.get(class_id, class_id)
+                for class_id in debt.get("class_ids", [])
+            ]
+        debt["class_ids"] = list(dict.fromkeys(debt["class_ids"]))
+    mapped = {
+        class_id for debt in state.get("debt", []) if debt.get("status") == "open"
+        for class_id in debt.get("class_ids", [])
+    }
+    unbound = [row.class_id for row in lineage.blocking() if row.class_id not in mapped]
+    blocking_debt = any(
+        debt.get("status") == "open" and debt.get("severity") in rc.BLOCKING
+        for debt in state.get("debt", [])
+    )
+    if unbound:
+        state["phase"] = "correction" if blocking_debt else "census"
+        state["unbound_class_ids"] = unbound
+        state.pop("unbound_classes", None)
+    elif lineage.blocking():
+        state["phase"] = "correction"
+    replacement_successors = [
+        minted_by_record[index]
+        for index, row in enumerate(settlement["class_records"])
+        if row.get("op") == "replace"
+    ]
+    state["correction_control"] = rc.advance_correction_control(
+        prior_control, after=lineage, round_no=7, phase="correction",
+        session_ref=audit.get("session_ref"),
+        replacement_successor_ids=replacement_successors,
+    )
+    lineage.review_state = state
+    lineage.debt = None
+    lineage.rounds += 1
+    return cc._to_json(lineage)
 
 
 def _preflight_matrix(root: Path) -> list[dict]:
@@ -160,7 +242,8 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
-        "result_sha256", "rendered_trailer", "correction_gates", "durable_reload",
+        "result_sha256", "rendered_trailer", "correction_gates",
+        "durable_reload_lineage",
         "outcome", "public_preflight_matrix",
     }
     if set(artifact) != expected_keys:
@@ -209,9 +292,17 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
             raise ValueError(f"current source differs from acceptance for {relative}")
     provider = artifact["provider"]
     if not (
-        provider.get("engine") == "codex" and provider.get("model") == "gpt-5.6-sol"
+        set(provider) == {
+            "engine", "executable", "cli_version", "model", "effort", "web_search",
+        }
+        and provider.get("engine") == "codex" and provider.get("executable") == "codex"
+        and provider.get("model") == "gpt-5.6-sol"
         and provider.get("effort") == "high" and provider.get("web_search") is False
         and isinstance(provider.get("cli_version"), str)
+        and re.fullmatch(
+            r"codex-cli \d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?",
+            provider["cli_version"],
+        )
     ):
         raise ValueError("provider route is not the required real Codex route")
     fixture = artifact["fixture"]
@@ -273,6 +364,10 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         raise ValueError("returned/audited trailer binding mismatch")
     before = artifact["before_lineage"]
     after = artifact["after_lineage"]
+    if before != cc._to_json(_fixture_lineage(fixture["structural_snapshot"])):
+        raise ValueError("recorded prebuilt lineage differs from the complete fixture")
+    if artifact["durable_reload_lineage"] != after:
+        raise ValueError("durable reload differs from the recorded post-review lineage")
     settlement = audit.get("staged_settlement")
     before_class = next(row for row in before["classes"] if row["class_id"] == CLASS_ID)
     after_class = next(row for row in after["classes"] if row["class_id"] == CLASS_ID)
@@ -309,6 +404,8 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
             raise ValueError("settlement did not close the gated class's debt")
         if after["review_state"].get("last_round") != 7:
             raise ValueError("successful settlement did not advance the durable label")
+        if _replay_successful_lineage(before, settlement, audit) != after:
+            raise ValueError("complete post-review lineage differs from canonical replay")
     else:
         if settlement is not None:
             raise ValueError("terminal rejection published an unapplied settlement")
@@ -325,8 +422,6 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         detail=row.get("detail"), matches=tuple(row.get("matches", ())),
     ) for row in active_rows]
     rc.normalize_correction_control(after["review_state"], active)
-    if artifact["durable_reload"] is not True:
-        raise ValueError("durable reload was not recorded")
     matrix = artifact["public_preflight_matrix"]
     if matrix != _preflight_matrix(root):
         raise ValueError("public plan/branch strict-round preflight replay mismatch")
@@ -359,25 +454,7 @@ def main() -> int:
         ROOT, orientation.snapshot_tree(ROOT, parent), parent,
     )
     structural_snapshot = rc.digest(f"{PLAN}\0{snapshot_commit}")
-    state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
-    state.update(phase="correction", last_round=6, debt=[{
-        "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
-        "summary":"the correction gate lacked public-handler acceptance",
-        "reason":"acceptance was not yet exercised", "remedy":"exercise the handler",
-        "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
-        "first_round":1, "last_round":6,
-    }])
-    state["correction_control"] = {"version":1, "classes":{CLASS_ID:{
-        "reset_round":None, "reopen_count":0, "last_session_ref":None,
-    }}}
-    tracked = cc.TrackedClass(
-        CLASS_ID, "The plan requires public-handler acceptance for the correction gate.",
-        cc.MAJOR, 1, cc.OPEN, procedure="Inspect the plan acceptance obligation.",
-    )
-    cc.save_lineage(state_root, cc.Lineage(
-        LINEAGE, rounds=6, classes={CLASS_ID:tracked},
-        review_state=state, mode=cc.PLAN_MODE,
-    ))
+    cc.save_lineage(state_root, _fixture_lineage(structural_snapshot))
     state_path = cc.lineage_dir(state_root) / f"{LINEAGE}.json"
     before = _state(state_path)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
@@ -450,7 +527,7 @@ def main() -> int:
         "provider_call_count":len(attempts), "elapsed_seconds":round(elapsed, 3),
         "result_text":result, "result_sha256":_sha(result),
         "rendered_trailer":trailer, "correction_gates":gates,
-        "durable_reload":True,
+        "durable_reload_lineage":cc._to_json(durable),
         "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
         "public_preflight_matrix":_preflight_matrix(ROOT),
     }
