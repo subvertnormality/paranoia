@@ -473,7 +473,8 @@ session authority replaces stale authority even when it is null; a terminal gate
 use only the exact validation-invalid terminal retry and only for a previously sessionless row.
 Clear session authority when a class becomes closed or advisory, and accept a bound rebut only for
 a currently blocking class. Repeated/backward caller labels refuse before provider, cache, snapshot,
-or worktree work; forward jumps count and failed labels may retry. Provider/validation failure does
+or worktree work, returning a zero-attempt blocked review whose exact trailer is audited; forward
+jumps count and failed labels may retry. Provider/validation failure does
 not advance substantive state, and ambiguous lineage or rebut saves retain the pending latch.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.

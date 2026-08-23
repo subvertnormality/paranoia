@@ -763,6 +763,8 @@ state-write failure records no reset. A legacy exhausted class with no stored se
 extra provider call: its ordinary gated correction and single validation retry may acquire the
 current session only when they terminate specifically on the correction gate. If neither attempt
 returns a valid session, the trailer offers only close/replacement recovery.
+Repeated or backward tracked round labels return a zero-attempt blocked review with an exact
+audited trailer; they do not call the provider or enter cache, snapshot, packet, or worktree work.
 
 ### `arbitrate`
 

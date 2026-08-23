@@ -118,21 +118,28 @@ def _preflight_matrix(root: Path) -> list[dict]:
             else:
                 arguments.update(base_ref="main", head_ref="HEAD", converge=True)
                 invoke = handlers.critique_branch
-            try:
-                invoke(arguments, engine=engine, log_dir=matrix_root / "logs")
-            except ValueError as exc:
-                message = str(exc)
-            else:
-                raise AssertionError("replayed round label was not refused")
+            row_logs = matrix_root / f"logs-{mode}-{caller_round}"
+            result = invoke(arguments, engine=engine, log_dir=row_logs)
+            audit_paths = list(row_logs.glob("*.json"))
+            if len(audit_paths) != 1:
+                raise AssertionError("strict-round preflight did not write one audit")
+            audit = json.loads(audit_paths[0].read_text(encoding="utf-8"))
+            trailer = audit.get("rendered_trailer")
+            if not isinstance(trailer, str) or not result.endswith(trailer):
+                raise AssertionError("strict-round audit trailer is not the rendered suffix")
             after = hashlib.sha256(path.read_bytes()).hexdigest()
             rows.append({
                 "mode":mode, "round":caller_round, "durable_last_round":6,
-                "error":message, "provider_calls":engine.calls,
+                "provider_calls":engine.calls,
                 "state_sha256_before":before, "state_sha256_after":after,
                 "pending_exists":(
                     cc.lineage_dir(matrix_root) / f"{lineage_id}.pending"
                 ).exists(),
                 "forbidden_work_calls":dict(forbidden_calls),
+                "result_sha256":_sha(result), "rendered_trailer":trailer,
+                "audit_error":audit.get("error"),
+                "attempt_count":len(audit.get("attempt_ledger", [])),
+                "correction_gates":audit.get("correction_gates"),
             })
     finally:
         if previous is None:
@@ -328,7 +335,10 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         or row["state_sha256_before"] != row["state_sha256_after"]
         or row["pending_exists"] is not False
         or any(row["forbidden_work_calls"].values())
-        or f"greater than durable last_round 6; got {row['round']}" not in row["error"]
+        or row["audit_error"] is not True
+        or row["attempt_count"] != 0
+        or row["correction_gates"] != []
+        or f"greater than durable last_round 6; got {row['round']}" not in row["rendered_trailer"]
         for row in matrix
     ):
         raise ValueError("strict-round preflight did work or mutated durable state")

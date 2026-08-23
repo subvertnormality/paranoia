@@ -1546,7 +1546,7 @@ def test_tracked_round_labels_must_advance_but_failed_label_can_retry(tmp_path) 
         retry.abandon(); retry.release()
 
 
-@pytest.mark.parametrize("retry_session", ["gate-retry", None])
+@pytest.mark.parametrize("retry_session", ["gate-retry", None, "bad\nref"])
 def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
     tmp_path, retry_session,
 ) -> None:
@@ -1624,7 +1624,7 @@ def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
     assert closure.lineage.classes["class-a"].status == cc.OPEN
     assert closure.lineage.review_state["last_round"] == 6
     assert "CORRECTION-GATE: class-a" in rendered
-    if retry_session is None:
+    if retry_session != "gate-retry":
         assert "correction_control" not in closure.lineage.review_state
         assert "rebut with session_ref=" not in rendered
     else:

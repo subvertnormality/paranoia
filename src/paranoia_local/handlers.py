@@ -784,6 +784,28 @@ def _state_unavailable_review(
     return review, trailer, []
 
 
+def _round_order_review(
+    lineage: cc.Lineage, *, message: str,
+) -> tuple[Review, str, list[dict[str, Any]]]:
+    """Render a zero-work tracked refusal without mutating substantive lineage state."""
+    review = Review(
+        text=rc.render_error_review(f"[paranoia-local error] {message}"),
+        session_ref=None, raw=message, returncode=2, error=True,
+        failure_detail=message,
+    )
+    trailer = "\n".join((
+        cc.render_trailer(
+            lineage, register_status="round-order rejected", include_verdict=False,
+        ),
+        f"STRUCTURAL-PHASE: {lineage.review_state.get('phase', 'census')}",
+        f"STRUCTURAL-ERROR: {rc.trailer_diagnostic(message)}",
+        "STRUCTURAL-FAILURE: role=round-order-preflight kind=validation",
+        rc.attempt_trailer([]),
+        "CONVERGENCE: BLOCKED — tracked round order was rejected before review work.",
+    ))
+    return review, trailer, []
+
+
 def _structural_pending_review(
     closure: "_ClosureRound", *, mode: str, stakes: str, snapshot: str, reason: str,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
@@ -1755,6 +1777,34 @@ def critique_branch(
                 )
                 assert isinstance(reservation, tuple)
                 contract, contract_latch_owned = reservation
+            except ValueError as exc:
+                message = str(exc)
+                if not message.startswith(
+                    "tracked round must be greater than durable last_round "
+                ):
+                    raise
+                lineage = cc.load_lineage(
+                    cc.default_state_root(), lineage_id, stamp=now(), mode=cc.BRANCH_MODE,
+                )
+                review, trailer, attempts = _round_order_review(
+                    lineage, message=message,
+                )
+                _log(log_dir, "critique_branch", engine, review, now, {
+                    "target": target.description, "model": model,
+                    "mode": "round-order-preflight", "round": arguments.get("round"),
+                    "lineage": lineage_id, "attempt_ledger": attempts,
+                    "rendered_trailer": trailer, "correction_gates": [],
+                    "plan_digest": supplied_contract.digest if supplied_contract else None,
+                    "plan_digest_assertion": (
+                        supplied_contract.assertion if supplied_contract else None
+                    ),
+                    "plan_path": (
+                        supplied_contract.supplied_path if supplied_contract else None
+                    ),
+                    "plan_text": supplied_contract.original if supplied_contract else None,
+                    "plan_contract_reused": False,
+                })
+                return f"{_footer(review, engine)}{_stakes_notice(no_stakes)}\n\n{trailer}"
             except cc.StateUnavailable as exc:
                 reason = str(exc)
                 review = Review(
@@ -2144,6 +2194,29 @@ def critique_plan(
     if closure:
         try:
             closure.require_forward_round()
+        except ValueError as exc:
+            review, trailer, attempt_ledger = _round_order_review(
+                closure.lineage, message=str(exc),
+            )
+            closure.abandon()
+            closure.release()
+            _log(log_dir, "critique_plan", engine, review, now, {
+                "grounded": bool(repo), "model": model,
+                "round": arguments.get("round"), "already_raised": already,
+                "plan_digest": hashlib.sha256(
+                    plan_text.encode("utf-8", "surrogateescape")
+                ).hexdigest()[:16],
+                "plan_path": plan_path, "class_closure": True,
+                "lineage": lineage_id, "register_status": "round-order rejected",
+                "claim_verification": claim_verification,
+                "claim_status": "not-started", "claim_duration_ms": None,
+                "claim_model_calls": 0, "claim_counts": None,
+                "retry_register": None, "attempt_ledger": attempt_ledger,
+                "rendered_trailer": trailer, "correction_gates": [],
+                "rejected_payloads": None, "lane_manifests": None,
+                "settlement": None,
+            })
+            return f"{_footer(review, engine)}{_stakes_notice(no_stakes)}\n\n{trailer}"
         except BaseException:
             closure.abandon()
             closure.release()
