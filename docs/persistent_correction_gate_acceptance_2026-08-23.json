@@ -52,7 +52,7 @@
       ],
       "last_round": 7,
       "phase": "final",
-      "snapshot_digest": "154a083899a5085beec10db7b79bfd2ef9819ea07a1118c99ee9ae1ebd3fe3f7",
+      "snapshot_digest": "aa9fce619ac7d8476ffc5762ec980398ef68cfcdef5930bea43153ce86c287c7",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -61,14 +61,14 @@
   },
   "attempt_ledger": [
     {
-      "duration_ms": 91186,
+      "duration_ms": 65079,
       "engine": "codex",
       "failure_detail_excerpt": "",
       "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outcome": "completed",
       "provider_duration_ms": null,
-      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f49-64aa-7ed2-a4d3-fe63f1243ee6\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"repository/CLAUDE.md\\nrepository/AGENTS.md\\nrepository/README.md\\nrepository/pyproject.toml\\nrepository/LICENSE\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/phase_aware_plan_classes_and_framing_plan.md\\nrepository/docs/persistent_correction_gate_plan.md\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/staged_review_protocol_v2_claude_acceptance.json\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/staged_review_protocol_v2_plan.md\\nrepository/docs/staged_role_validation_reliability_plan.md\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepositor",
-      "raw_sha256": "c81c067003633dbe977dbca433fb94c012a9f5e6932dc39cd77f17a378ada404",
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f62-01a4-7220-ae2d-93169a2f0f57\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"The plan's only acceptance statement is on this line; I am checking whether it closes the inherited public-handler obligation under the plan-phase rules.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"This line expressly requires tests to exercise the correction gate's public handler, so the inherited debt's demand for that plan obligation is present; plan review does not require the future test run to have occurred.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"kind\\\":\\\"one_off\\\",\\\"reason\\\":\\\"The inherited class asks only whether a public-handler acceptance obligation exists. The separate defect is that this claim-free plan does not define an implementation-reviewable acceptance contract, and the supplied active-class set has no broader contract-completeness class.\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"These lines name only a generic correction gate and say tests must exercise its public handler; they identify no concrete handler, executable test or command, expected observable result, or fail-closed response to a failed or unavailable check.\\\"}],\\\"id\\\":\\\"G2\\\",\\\"remedy\\\":\\\"Amend the plan to identify the exact correction-gate handler and implementation scope, name an executable acceptance test or command with its expected observable result, and state that implementation or clearance must stop when that acceptance check fails or cannot run.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"The public-handler test obligation is too vague to bind implementation or fail closed.\\\"}],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"The plan's only acceptance statement is on this line; I am checking whether it closes the inherited public-handler obligation under the plan-phase rules.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"This line expressly requires tests to exercise the correction gate's public handler, so the inherited debt's demand for that plan obligation is present; plan review does not require the future test run to have occurred.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"kind\\\":\\\"one_off\\\",\\\"reason\\\":\\\"The inherited class asks only whether a public-handler acceptance obligation exists. The separate defect is that this claim-free plan does not define an implementation-reviewable acceptance contract, and the supplied active-class set has no broader contract-completeness class.\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"These lines name only a generic correction gate and say tests must exercise its public handler; they identify no concrete handler, executable test or command, expected observable result, or fail-closed response to a failed or unavailable check.\\\"}],\\\"id\\\":\\\"G2\\\",\\\"remedy\\\":\\\"Amend the plan to identify the exact correction-gate handler and implementation scope, name an executable acceptance test or command with its expected observable result, and state that implementation or clearance must stop when that acceptance check fails or cannot run.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"The public-handler test obligation is too vague to bind implementation or fail closed.\\\"}],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",",
+      "raw_sha256": "437e04f487b9b0d591a05f779d9e93fe9868a70cbfc8d14bef86fb641c8adbad",
       "rejected_reply_excerpt": null,
       "rejected_reply_sha256": null,
       "requested_timeout_sec": 2400,
@@ -77,14 +77,14 @@
       "returncode": 0,
       "role": "correction",
       "sequence": 1,
-      "session_ref": "01a02f49-64aa-7ed2-a4d3-fe63f1243ee6",
-      "stderr_excerpt": "2026-08-23T15:42:13.826063Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T15:43:43.711965Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-      "stderr_sha256": "c43022a66cb5cbb382051b3872415918c3c51fd2b1338e158e8e546a3e0277f4",
+      "session_ref": "01a02f62-01a4-7220-ae2d-93169a2f0f57",
+      "stderr_excerpt": "2026-08-23T16:09:06.770516Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T16:10:10.521391Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "661a2d920e5dfabbb38bb67d7aa39d30f163fcdc9fdfc29601166d10893c42f2",
       "usage": {
-        "cached_input_tokens": 78848,
-        "input_tokens": 121125,
-        "output_tokens": 3032,
-        "reasoning_output_tokens": 2128
+        "cached_input_tokens": 48384,
+        "input_tokens": 75295,
+        "output_tokens": 2492,
+        "reasoning_output_tokens": 1086
       },
       "validation_issue": null,
       "validation_pointer": null
@@ -94,14 +94,14 @@
     "already_raised": [],
     "attempt_ledger": [
       {
-        "duration_ms": 91186,
+        "duration_ms": 65079,
         "engine": "codex",
         "failure_detail_excerpt": "",
         "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "outcome": "completed",
         "provider_duration_ms": null,
-        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f49-64aa-7ed2-a4d3-fe63f1243ee6\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"repository/CLAUDE.md\\nrepository/AGENTS.md\\nrepository/README.md\\nrepository/pyproject.toml\\nrepository/LICENSE\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/phase_aware_plan_classes_and_framing_plan.md\\nrepository/docs/persistent_correction_gate_plan.md\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/staged_review_protocol_v2_claude_acceptance.json\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/staged_review_protocol_v2_plan.md\\nrepository/docs/staged_role_validation_reliability_plan.md\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepositor",
-        "raw_sha256": "c81c067003633dbe977dbca433fb94c012a9f5e6932dc39cd77f17a378ada404",
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f62-01a4-7220-ae2d-93169a2f0f57\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"The plan's only acceptance statement is on this line; I am checking whether it closes the inherited public-handler obligation under the plan-phase rules.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"This line expressly requires tests to exercise the correction gate's public handler, so the inherited debt's demand for that plan obligation is present; plan review does not require the future test run to have occurred.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"kind\\\":\\\"one_off\\\",\\\"reason\\\":\\\"The inherited class asks only whether a public-handler acceptance obligation exists. The separate defect is that this claim-free plan does not define an implementation-reviewable acceptance contract, and the supplied active-class set has no broader contract-completeness class.\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"These lines name only a generic correction gate and say tests must exercise its public handler; they identify no concrete handler, executable test or command, expected observable result, or fail-closed response to a failed or unavailable check.\\\"}],\\\"id\\\":\\\"G2\\\",\\\"remedy\\\":\\\"Amend the plan to identify the exact correction-gate handler and implementation scope, name an executable acceptance test or command with its expected observable result, and state that implementation or clearance must stop when that acceptance check fails or cannot run.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"The public-handler test obligation is too vague to bind implementation or fail closed.\\\"}],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"The plan's only acceptance statement is on this line; I am checking whether it closes the inherited public-handler obligation under the plan-phase rules.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"This line expressly requires tests to exercise the correction gate's public handler, so the inherited debt's demand for that plan obligation is present; plan review does not require the future test run to have occurred.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"kind\\\":\\\"one_off\\\",\\\"reason\\\":\\\"The inherited class asks only whether a public-handler acceptance obligation exists. The separate defect is that this claim-free plan does not define an implementation-reviewable acceptance contract, and the supplied active-class set has no broader contract-completeness class.\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"These lines name only a generic correction gate and say tests must exercise its public handler; they identify no concrete handler, executable test or command, expected observable result, or fail-closed response to a failed or unavailable check.\\\"}],\\\"id\\\":\\\"G2\\\",\\\"remedy\\\":\\\"Amend the plan to identify the exact correction-gate handler and implementation scope, name an executable acceptance test or command with its expected observable result, and state that implementation or clearance must stop when that acceptance check fails or cannot run.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"The public-handler test obligation is too vague to bind implementation or fail closed.\\\"}],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",",
+        "raw_sha256": "437e04f487b9b0d591a05f779d9e93fe9868a70cbfc8d14bef86fb641c8adbad",
         "rejected_reply_excerpt": null,
         "rejected_reply_sha256": null,
         "requested_timeout_sec": 2400,
@@ -110,14 +110,14 @@
         "returncode": 0,
         "role": "correction",
         "sequence": 1,
-        "session_ref": "01a02f49-64aa-7ed2-a4d3-fe63f1243ee6",
-        "stderr_excerpt": "2026-08-23T15:42:13.826063Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T15:43:43.711965Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-        "stderr_sha256": "c43022a66cb5cbb382051b3872415918c3c51fd2b1338e158e8e546a3e0277f4",
+        "session_ref": "01a02f62-01a4-7220-ae2d-93169a2f0f57",
+        "stderr_excerpt": "2026-08-23T16:09:06.770516Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T16:10:10.521391Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "661a2d920e5dfabbb38bb67d7aa39d30f163fcdc9fdfc29601166d10893c42f2",
         "usage": {
-          "cached_input_tokens": 78848,
-          "input_tokens": 121125,
-          "output_tokens": 3032,
-          "reasoning_output_tokens": 2128
+          "cached_input_tokens": 48384,
+          "input_tokens": 75295,
+          "output_tokens": 2492,
+          "reasoning_output_tokens": 1086
         },
         "validation_issue": null,
         "validation_pointer": null
@@ -150,7 +150,7 @@
     "retry_register": null,
     "returncode": 0,
     "round": 7,
-    "session_ref": "01a02f49-64aa-7ed2-a4d3-fe63f1243ee6",
+    "session_ref": "01a02f62-01a4-7220-ae2d-93169a2f0f57",
     "staged_manifests": null,
     "staged_settlement": {
       "_class_record_pointers": [
@@ -199,7 +199,7 @@
       "source_dispositions": []
     },
     "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
-    "timestamp": "20260823T164344",
+    "timestamp": "20260823T171010",
     "tool": "critique_plan"
   },
   "before_lineage": {
@@ -253,7 +253,7 @@
       ],
       "last_round": 6,
       "phase": "correction",
-      "snapshot_digest": "154a083899a5085beec10db7b79bfd2ef9819ea07a1118c99ee9ae1ebd3fe3f7",
+      "snapshot_digest": "aa9fce619ac7d8476ffc5762ec980398ef68cfcdef5930bea43153ce86c287c7",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -321,22 +321,22 @@
       ],
       "last_round": 7,
       "phase": "final",
-      "snapshot_digest": "154a083899a5085beec10db7b79bfd2ef9819ea07a1118c99ee9ae1ebd3fe3f7",
+      "snapshot_digest": "aa9fce619ac7d8476ffc5762ec980398ef68cfcdef5930bea43153ce86c287c7",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
     },
     "rounds": 7
   },
-  "elapsed_seconds": 95.516,
+  "elapsed_seconds": 68.647,
   "fixture": {
     "class_id": "gate-class",
     "lineage": "persistent-correction-gate-acceptance-20260823",
     "plan": "# Change\n\nImplement the correction gate.\nTests must exercise its public handler.",
     "plan_sha256": "c2e9f84aed58a3e7a31a4b4c596349df226d5aa678e087d9d26ca65c34a7f9c0",
     "round": 7,
-    "snapshot_commit": "aa60ccea6239dd60431008a3a0fa0e3f0123201f",
-    "structural_snapshot": "154a083899a5085beec10db7b79bfd2ef9819ea07a1118c99ee9ae1ebd3fe3f7"
+    "snapshot_commit": "12efee5584d96aca3cd4901c2d44acce84e0641d",
+    "structural_snapshot": "aa9fce619ac7d8476ffc5762ec980398ef68cfcdef5930bea43153ce86c287c7"
   },
   "outcome": "closed-or-replaced",
   "provider": {
@@ -435,21 +435,21 @@
     }
   ],
   "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "result_sha256": "06e8de2c2a7f017a48c2b3609fe70488622bac0d8f86a7cef4294c700080a0c5",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f49-64aa-7ed2-a4d3-fe63f1243ee6` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "source_revision": "8083d790d358abe3446ddc3e9a6e49e01b99bc0d",
+  "result_sha256": "73b1d6e5dd15e535607dd249e3f4da8127fbd4b1057b27176f14ca4ddaef054a",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f62-01a4-7220-ae2d-93169a2f0f57` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — CLOSE gate-class\nCLASS-CLOSURE: 0 open, 1 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "source_revision": "d1d6996171a35bf868523ea5c745f1b5e9c017dd",
   "source_sha256": {
     "AGENTS.md": "6ae2038717c507a4ee5fd985edb2c19db28aa2d8de40f77950ee27acf8840de2",
     "README.md": "2d7882b6fc8d90653c8dbe8d634196a4477817e0d6883317d49229ecec3a7b10",
     "scripts/run_persistent_correction_gate_acceptance.py": "1482849a2bf4715fc84923791451f85d27dc6e521ed945e56388fa0c912bd4d9",
-    "src/paranoia_local/handlers.py": "8201dfee5b5afe8ad4b3e52c24ef26fc646188adf87e579cb2837e11af82f5d9",
+    "src/paranoia_local/handlers.py": "f240165ea9a02fddb117cfaf0d722839e3fe022a75139feb10d4c52bab08f814",
     "src/paranoia_local/prompts.py": "9f14214af5c21c61cad0b195c37ddd589730d0aaa218bf7cd70bfa28508c9490",
     "src/paranoia_local/review_census.py": "5bf5cf939d52fe358bf5f77045b3336188e81ee3d138187a006bb7e2b2da9ea7",
     "src/paranoia_local/server.py": "47d813cc9ffc356e7efdad4cb08e06c70ae515f07aec585858907657eb00996f",
     "tests/test_handlers.py": "8a7dc6aba3bb10789ac6c6e170ab9d5784bf1d183e24793868a5291ba15bb2f1",
     "tests/test_plan_claims.py": "5b7b6ee7cbe9bfd13c25045cdd2f541c0ce17092649563961f10ffee43775317",
     "tests/test_plan_class_closure.py": "ccd1df2a080b74b69f40f85adb0e6ef9d411a688eb7fec4c71bff9f66ed7e76b",
-    "tests/test_review_census.py": "07271f902633a419090b844a2e8e0fd84e4375a5a75ebf3d9160b71eb3cad957"
+    "tests/test_review_census.py": "df9145fe2dabaffd03393c94c14040e14ffed64bdbd941079e34cca6bb8bf034"
   },
   "version": 1
 }
