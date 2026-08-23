@@ -368,7 +368,8 @@ of the resulting code and tests.
   Surface every currently blocking class spanning at least three caller round labels with its
   round-label span, current-debt start label, and current reviewer session for `rebut`; do not infer a per-round
   presence count that durable state does not store. Mark any class reopen transition as a reopen
-  wave so a prior scope disposition is explicitly re-armed. These are diagnostics, not new gates.
+  wave so a prior scope disposition is explicitly re-armed. Early signals are diagnostic; the
+  bounded correction/reopen limits below are load-bearing settlement gates.
 - Model omission and ID reuse are not removal: exact propositions alone preserve identity;
   every other predecessor requires old wording to be absent plus an explicit `removed`
   disposition. Surface absent old anchors as removal candidates on both the initial audit and
@@ -460,3 +461,10 @@ After implementation and docs pass locally, run Codex paranoia against the code 
 stakes. Accepted findings trigger one coherent change followed by a focused rerun; recurring
 classes trigger an architecture checkpoint, not endless patching. Do not open/merge a PR while
 real acceptance, tests, implementation convergence, or documented stakes remain unresolved.
+
+Persistent staged correction is a gate, not merely a trailer warning. After six unresolved
+caller-supplied round labels or three undisposed reopen waves, reject another correction that
+leaves the same class canonically blocking. Admit only a canonical close/replacement or a durable
+class-bound rebut reset against the stored current session. Rebut resets never change verdict,
+debt, or severity. Preserve this control state atomically with the lineage and store the exact
+returned trailer in plan and branch audit records.

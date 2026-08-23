@@ -23,7 +23,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, Mapping, Sequence
 
 from . import arbitration, class_closure as cc
 from . import engines as eng, external_sources, inert_git, inert_tree
@@ -180,6 +180,12 @@ def _reserve_branch_contract(
             state_root, lineage_id, stamp=stamp, mode=cc.BRANCH_MODE,
             pending_owned=True,
         )
+        last_round = lineage.review_state.get("last_round")
+        if type(last_round) is int and round_no <= last_round:
+            raise ValueError(
+                f"tracked round must be greater than durable last_round {last_round}; "
+                f"got {round_no}"
+            )
         authority = lineage.branch_contract
         if authority is None:
             substantive = bool(
@@ -630,7 +636,24 @@ def _settle_staged_failure(
     mode: str,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     assert closure.lineage is not None
-    state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
+    current = closure.lineage
+    if closure.prepared_lineage is not None:
+        restored = cc.copy_lineage(closure.prepared_lineage)
+        # Claim verification is an independently completed phase and may already have
+        # been durably saved before structural review began.
+        restored.claim_state = deepcopy(current.claim_state)
+        restored.claim_reverify_required = current.claim_reverify_required
+        restored.branch_contract = deepcopy(current.branch_contract)
+        closure.lineage = restored
+    raw_state = closure.lineage.review_state
+    if (
+        isinstance(raw_state, dict) and raw_state.get("version") == 1
+        and raw_state.get("phase") in rc.PHASES
+        and isinstance(raw_state.get("debt"), list)
+    ):
+        state = deepcopy(raw_state)
+    else:
+        state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
     state.pop("census_cache", None)
     state.pop("validation_debt", None)
     state.pop("staged_failure", None)
@@ -657,6 +680,21 @@ def _settle_staged_failure(
         state[failure_key]["rejected_payloads"] = deepcopy(rejected_payloads)
     if isinstance(cache, dict):
         state["census_cache"] = deepcopy(cache)
+    attempts = list(getattr(error, "attempts", []))
+    successful_session = next((
+        item.session_ref for item in reversed(attempts)
+        if item.outcome in {"completed", "validation-invalid"} and item.session_ref
+    ), None)
+    gates = getattr(closure, "correction_gates", [])
+    if gates and successful_session:
+        control = rc.normalize_correction_control(
+            state, closure.lineage.active(),
+        )
+        for gate in gates:
+            class_id = gate["class_id"]
+            if class_id in control["classes"]:
+                control["classes"][class_id]["last_session_ref"] = successful_session
+        state["correction_control"] = control
     closure.lineage.review_state = state
     closure.staged_manifests = getattr(error, "manifests", [])
     closure.rejected_payloads = deepcopy(rejected_payloads)
@@ -677,12 +715,12 @@ def _settle_staged_failure(
         )
         if mode == cc.PLAN_MODE and getattr(closure, "claims_enabled", False):
             trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
-        return review, trailer, [a.json() for a in getattr(error, "attempts", [])]
+        return review, trailer, [a.json() for a in attempts]
     closure._settled = True
     closure.register_status = (
         f"staged rejected: {rc.trailer_diagnostic(error)}"
     )
-    attempts = [a.json() for a in getattr(error, "attempts", [])]
+    attempts = [a.json() for a in attempts]
     review = Review(
         text=rc.render_error_review(
             f"[paranoia-local error] staged review rejected: {error}"
@@ -698,7 +736,9 @@ def _settle_staged_failure(
                 for item in closure.lineage.blocking()
             },
             reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
+            session_ref=successful_session,
             round_label=closure.round_no,
+            correction_gates=getattr(closure, "correction_gates", ()),
         ),
         rc.attempt_trailer(attempts),
     ))
@@ -711,6 +751,8 @@ def _state_unavailable_review(
     closure: "_ClosureRound", *, mode: str, claim_state: dict[str, Any] | None = None,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     """Return the established blocked result without running or mutating staged state."""
+    if closure.lineage is not None:
+        closure._settled = True
     reason = closure.unavailable or "lineage state is unavailable"
     review = Review(
         text=rc.render_error_review(
@@ -800,6 +842,28 @@ def _staged_structural_review(
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
     _staged_class_context(closure._blocks())
     state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
+    stakes_recalibration = (
+        isinstance(lineage.review_state, dict)
+        and lineage.review_state.get("version") == 1
+        and lineage.review_state.get("stakes_digest") != rc.digest(stakes)
+    )
+    control_source = (
+        lineage.review_state
+        if isinstance(lineage.review_state, dict)
+        and "correction_control" in lineage.review_state
+        else state
+    )
+    try:
+        correction_control = rc.normalize_correction_control(
+            control_source, lineage.active(),
+        )
+    except rc.CensusError as exc:
+        closure.unavailable = str(exc)
+        return _state_unavailable_review(
+            closure, mode=mode,
+            claim_state=lineage.claim_state if mode == cc.PLAN_MODE else None,
+        )
+    state["correction_control"] = deepcopy(correction_control)
     if lineage.debt:
         # A pre-staging malformed-register round is not silently normalized into an
         # empty verified register. Its only autonomous recovery is a fresh cold census
@@ -897,6 +961,13 @@ def _staged_structural_review(
         # A reopened or migrated class without governing staged debt needs the broad
         # integrity lane, not an empty targeted correction that can never settle it.
         state["phase"] = phase = "census"
+    correction_gates = (
+        rc.correction_gates(
+            lineage.active(), correction_control, round_no=round_no,
+        )
+        if phase == "correction" else []
+    )
+    closure.correction_gates = deepcopy(correction_gates)
     attempts: list[rc.Attempt] = []
     rejected_payloads: list[dict[str, Any]] = []
     sequence_lock = Lock()
@@ -999,6 +1070,32 @@ def _staged_structural_review(
             )
         except rc.CensusError as exc:
             issues.extend(str(exc).splitlines())
+        if parsed is not None and role == "correction" and correction_gates:
+            try:
+                gate_draft = cc.copy_lineage(lineage)
+                gate_register = rc.register_from_records(
+                    parsed["class_records"],
+                    mechanized=None if mode == cc.BRANCH_MODE else False,
+                )
+                cc.apply_register(gate_draft, gate_register, round_no=round_no)
+                unresolved = [
+                    row for row in correction_gates
+                    if row["class_id"] in gate_draft.classes
+                    and gate_draft.classes[row["class_id"]].blocking
+                ]
+                if unresolved:
+                    issues.append(
+                        "/class_actions: correction limit reached; close or replace "
+                        "each gated blocking class in this response, or use a bound "
+                        "rebut before retrying: "
+                        + ", ".join(
+                            f"{row['class_id']} (span={row['span']}, "
+                            f"reopen_count={row['reopen_count']})"
+                            for row in unresolved
+                        )
+                    )
+            except (rc.CensusError, cc.RegisterError) as exc:
+                issues.extend(str(exc).splitlines())
         _raise_staged_validation_issues(issues)
         assert parsed is not None
         return parsed
@@ -1211,6 +1308,7 @@ def _staged_structural_review(
         stage_body = json.dumps({
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
+            "correction_gates": correction_gates if role == "correction" else [],
             "checklist": list(sp.CHECKLIST) if role == "final" else [],
             "artifact": body,
         }, ensure_ascii=False)
@@ -1285,6 +1383,21 @@ def _staged_structural_review(
         state.pop("unbound_classes", None)
     elif lineage.blocking():
         state["phase"] = "correction"
+    explicit_reopened = tuple(
+        row["class_id"] for row in settlement["class_records"]
+        if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)
+    )
+    all_reopened = tuple(dict.fromkeys(
+        (*getattr(closure, "reopened_class_ids", ()), *explicit_reopened)
+    ))
+    state["correction_control"] = rc.advance_correction_control(
+        correction_control,
+        before=getattr(closure, "prepared_lineage", None) or lineage,
+        after=lineage,
+        round_no=round_no, phase=phase, reopened_class_ids=all_reopened,
+        session_ref=review.session_ref,
+        recalibrated=stakes_recalibration and phase == "census",
+    )
     lineage.review_state = state
     lineage.debt = None
     lineage.rounds += 1
@@ -1320,18 +1433,13 @@ def _staged_structural_review(
     closure.register_status = register_status
     closure.staged_settlement = settlement
     review = replace(review, text=rc.render_review(settlement, state))
-    explicit_reopened = tuple(
-        row["class_id"] for row in settlement["class_records"]
-        if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)
-    )
     trailer = _staged_success_trailer(
         lineage=lineage, state=state, mode=mode,
         register_status=closure.register_status, minted=minted, attempts=attempts,
         claims_enabled=closure.claims_enabled,
         session_ref=review.session_ref,
-        reopened_class_ids=tuple(dict.fromkeys(
-            (*getattr(closure, "reopened_class_ids", ()), *explicit_reopened)
-        )),
+        reopened_class_ids=all_reopened,
+        correction_gates=correction_gates,
     )
     attempts.sort(key=lambda item: item.sequence or 0)
     return review, trailer, [a.json() for a in attempts]
@@ -1342,6 +1450,7 @@ def _staged_success_trailer(
     register_status: str, minted: list[str], attempts: list[rc.Attempt],
     claims_enabled: bool, session_ref: str | None = None,
     reopened_class_ids: tuple[str, ...] = (),
+    correction_gates: Sequence[Mapping[str, Any]] = (),
 ) -> str:
     class_trailer = cc.render_trailer(
         lineage, register_status=register_status, minted=minted,
@@ -1354,6 +1463,7 @@ def _staged_success_trailer(
         },
         reopened_class_ids=reopened_class_ids,
         session_ref=session_ref,
+        correction_gates=correction_gates,
     )
     if mode != cc.PLAN_MODE or not claims_enabled:
         return "\n".join((
@@ -1642,6 +1752,7 @@ def critique_branch(
                     "target": target.description, "model": model,
                     "mode": "plan-contract-authority", "round": arguments.get("round"),
                     "lineage": lineage_id, "attempt_ledger": [],
+                    "rendered_trailer": trailer, "correction_gates": [],
                     "plan_digest": supplied_contract.digest if supplied_contract else None,
                     "plan_digest_assertion": (
                         supplied_contract.assertion if supplied_contract else None
@@ -1679,7 +1790,8 @@ def critique_branch(
 
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model,
-          "round": arguments.get("round"), "already_raised": already})
+          "round": arguments.get("round"), "already_raised": already,
+          "rendered_trailer": None, "correction_gates": []})
     return _footer(review, engine) + _stakes_notice(no_stakes)
 
 
@@ -1742,6 +1854,13 @@ def _converge_branch_review(
         latch_owned=contract_latch_owned,
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
+    if closure:
+        try:
+            closure.require_forward_round()
+        except BaseException:
+            closure.abandon()
+            closure.release()
+            raise
 
     # EVERYTHING after prepare() is inside the latch's cleanup: packet building, worktree
     # entry and the engine call can all raise, and a latch stranded there would make every
@@ -1833,6 +1952,10 @@ def _converge_branch_review(
           # the audit record; the original review only carries the malformed attempt.
           "retry_register": closure.retry_register if closure else None,
           "attempt_ledger": attempt_ledger,
+          "rendered_trailer": trailer,
+          "correction_gates": (
+              deepcopy(closure.correction_gates) if closure else []
+          ),
           "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
           "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
           "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
@@ -1993,6 +2116,13 @@ def critique_plan(
         state_root=cc.default_state_root(), stamp=now(),
     ) if closure_on else None
     blocks = closure.prepare() if closure else []
+    if closure:
+        try:
+            closure.require_forward_round()
+        except BaseException:
+            closure.abandon()
+            closure.release()
+            raise
 
     if closure and closure.lineage is not None:
         prior_review = closure.lineage.review_state
@@ -2241,6 +2371,10 @@ def critique_plan(
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
         "attempt_ledger": attempt_ledger,
+        "rendered_trailer": trailer,
+        "correction_gates": (
+            deepcopy(closure.correction_gates) if closure else []
+        ),
         "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
@@ -3645,16 +3779,83 @@ def rebut(
     repo = _require_repo(arguments)
     cfg = load_repo_config(repo)
 
+    binding_keys = ("lineage", "class_id", "lineage_mode")
+    supplied = [key for key in binding_keys if arguments.get(key) is not None]
+    if supplied and len(supplied) != len(binding_keys):
+        raise ValueError(
+            "bound rebut requires lineage, class_id, and lineage_mode together"
+        )
+    bound = bool(supplied)
+    lineage: cc.Lineage | None = None
+    state_root = cc.default_state_root()
+    latch_owned = False
+    reset_recorded = False
+    class_id = arguments.get("class_id")
+    lineage_id = arguments.get("lineage")
+    lineage_mode = arguments.get("lineage_mode")
+    if bound:
+        if lineage_mode not in {cc.PLAN_MODE, cc.BRANCH_MODE}:
+            raise ValueError("lineage_mode must be 'plan' or 'branch'")
+        cc.open_latch(state_root, lineage_id)
+        latch_owned = True
+        try:
+            lineage = cc.load_lineage(
+                state_root, lineage_id, stamp=now(), mode=lineage_mode,
+                pending_owned=True,
+            )
+            tracked = lineage.classes.get(class_id)
+            if tracked is None or tracked.status == cc.SUPERSEDED:
+                raise ValueError("bound rebut class_id is not an active tracked class")
+            control = rc.normalize_correction_control(
+                lineage.review_state, lineage.active(),
+            )
+            if control["classes"][class_id]["last_session_ref"] != session_ref:
+                raise ValueError(
+                    "bound rebut session_ref does not match the class's current durable session"
+                )
+        except BaseException:
+            cc.clear_latch(state_root, lineage_id)
+            raise
+
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     body = f"=== AUTHOR'S COUNTER-EVIDENCE ===\n{rebuttal}"
     prompt = prompts.compose(prompts.REBUT_INSTRUCTIONS, body)
-    review = engine.resume(session_ref, prompt, repo, model, effort, web_search,
-                           **_progress_kwargs(on_progress))
+    save_ambiguous = False
+    try:
+        review = engine.resume(session_ref, prompt, repo, model, effort, web_search,
+                               **_progress_kwargs(on_progress))
+        if bound and not review.error:
+            assert lineage is not None
+            control = rc.normalize_correction_control(
+                lineage.review_state, lineage.active(),
+            )
+            row = control["classes"][class_id]
+            row.update(
+                reset_round=lineage.review_state.get("last_round"),
+                reopen_count=0, last_session_ref=session_ref,
+            )
+            lineage.review_state["correction_control"] = control
+            try:
+                cc.save_lineage(state_root, lineage)
+            except cc.StateUnavailable:
+                save_ambiguous = True
+                raise
+            reset_recorded = True
+    finally:
+        if latch_owned and not save_ambiguous:
+            cc.clear_latch(state_root, lineage_id)
 
-    _log(log_dir, "rebut", engine, review, now, {"session_ref": session_ref, "model": model})
+    _log(log_dir, "rebut", engine, review, now, {
+        "session_ref": session_ref, "model": model,
+        "lineage_binding": (
+            {"lineage": lineage_id, "class_id": class_id, "lineage_mode": lineage_mode}
+            if bound else None
+        ),
+        "correction_control_reset": reset_recorded,
+    })
     return _footer(review, engine)
 
 
@@ -3697,6 +3898,8 @@ class _ClosureRound:
         self.deadline: float | None = None
         self.claims_enabled = False
         self.reopened_class_ids: tuple[str, ...] = ()
+        self.prepared_lineage: cc.Lineage | None = None
+        self.correction_gates: list[dict[str, Any]] = []
         self._latched = latch_owned
         self._settled = False
 
@@ -3720,6 +3923,9 @@ class _ClosureRound:
                 self.unavailable = str(exc)
                 return []
             self._latched = True
+        # Rejection atomicity is defined from this point. Branch sweeps, exemption
+        # folding and stakes reopenings are provisional until staged settlement saves.
+        self.prepared_lineage = cc.copy_lineage(self.lineage)
         self._before_sweep()
         closed_before = {
             item.class_id for item in self.lineage.active()
@@ -3731,6 +3937,17 @@ class _ClosureRound:
             if self.lineage.classes[class_id].status in cc.UNPROVEN_STATUSES
         ))
         return self._blocks()
+
+    def require_forward_round(self) -> None:
+        """Reject replayed/decreasing tracked labels before any provider or snapshot work."""
+        if self.lineage is None:
+            return
+        last = self.lineage.review_state.get("last_round")
+        if type(last) is int and self.round_no <= last:
+            raise ValueError(
+                f"tracked round must be greater than durable last_round {last}; "
+                f"got {self.round_no}"
+            )
 
     # ── hooks the plan subclass turns off ──
 

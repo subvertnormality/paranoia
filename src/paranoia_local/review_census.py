@@ -24,6 +24,8 @@ MAX_ENGINE_FAILURE_MESSAGE_CHARS = 4_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
 CENSUS_CACHE_VERSION = 3
 PERSISTENCE_REBUT_ROUNDS = 3
+PERSISTENCE_CORRECTION_LIMIT = 6
+REOPEN_CORRECTION_LIMIT = 3
 
 
 class CensusError(ValueError):
@@ -154,6 +156,125 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     if out["phase"] == "clear" and out.get("snapshot_digest") != snapshot:
         out.update(phase="census", snapshot_digest=snapshot, debt=[])
     return out
+
+
+def _valid_session_ref(value: Any) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, str) or not 1 <= len(value) <= 256:
+        return False
+    return all(
+        ch not in "\r\n\0" and ord(ch) >= 32 and ord(ch) != 127
+        and not 0xD800 <= ord(ch) <= 0xDFFF
+        for ch in value
+    )
+
+
+def normalize_correction_control(
+    review_state: Mapping[str, Any], active: Sequence[cc.TrackedClass],
+) -> dict[str, Any]:
+    """Validate the durable correction gate, or synthesize its sole legacy shape."""
+    expected = {item.class_id for item in active}
+    raw = review_state.get("correction_control")
+    if raw is None:
+        return {
+            "version": 1,
+            "classes": {
+                item.class_id: {
+                    "reset_round": None, "reopen_count": 0,
+                    "last_session_ref": None,
+                }
+                for item in active
+            },
+        }
+    if (
+        not isinstance(raw, dict) or set(raw) != {"version", "classes"}
+        or type(raw.get("version")) is not int or raw["version"] != 1
+        or not isinstance(raw.get("classes"), dict)
+        or set(raw["classes"]) != expected
+    ):
+        raise CensusError("invalid persisted correction_control")
+    rows: dict[str, dict[str, Any]] = {}
+    for class_id, row in raw["classes"].items():
+        if not isinstance(row, dict) or set(row) != {
+            "reset_round", "reopen_count", "last_session_ref",
+        }:
+            raise CensusError(f"invalid correction_control row for {class_id!r}")
+        reset = row["reset_round"]
+        count = row["reopen_count"]
+        last_round = review_state.get("last_round")
+        if reset is not None and (
+            type(reset) is not int or reset < 1
+            or type(last_round) is not int or reset > last_round
+        ):
+            raise CensusError(f"invalid correction_control reset_round for {class_id!r}")
+        if type(count) is not int or count < 0:
+            raise CensusError(f"invalid correction_control reopen_count for {class_id!r}")
+        if not _valid_session_ref(row["last_session_ref"]):
+            raise CensusError(f"invalid correction_control last_session_ref for {class_id!r}")
+        rows[class_id] = dict(row)
+    return {"version": 1, "classes": rows}
+
+
+def correction_gates(
+    active: Sequence[cc.TrackedClass], control: Mapping[str, Any], *, round_no: int,
+) -> list[dict[str, Any]]:
+    """Project the deterministic correction obligations for this caller round label."""
+    rows = control["classes"]
+    gates: list[dict[str, Any]] = []
+    for item in sorted(active, key=lambda value: value.class_id):
+        if not item.blocking:
+            continue
+        row = rows[item.class_id]
+        start = (
+            row["reset_round"] + 1
+            if row["reset_round"] is not None else item.first_round
+        )
+        span = round_no - start + 1
+        persistence = span > PERSISTENCE_CORRECTION_LIMIT
+        reopen = row["reopen_count"] >= REOPEN_CORRECTION_LIMIT
+        if persistence or reopen:
+            reason = (
+                "persistence+reopen" if persistence and reopen
+                else "persistence" if persistence else "reopen"
+            )
+            gates.append({
+                "class_id": item.class_id, "reason": reason,
+                "span": span, "reopen_count": row["reopen_count"],
+            })
+    return gates
+
+
+def advance_correction_control(
+    control: Mapping[str, Any], *, before: cc.Lineage, after: cc.Lineage,
+    round_no: int, phase: str, reopened_class_ids: Sequence[str] = (),
+    session_ref: str | None = None, recalibrated: bool = False,
+) -> dict[str, Any]:
+    """Advance control only after canonical settlement has succeeded."""
+    prior = control["classes"]
+    reopened = set(reopened_class_ids)
+    rows: dict[str, dict[str, Any]] = {}
+    for item in after.active():
+        predecessor = next(
+            (old for old in before.classes.values() if old.superseded_by == item.class_id),
+            None,
+        )
+        if predecessor is not None:
+            row = {"reset_round": round_no, "reopen_count": 0, "last_session_ref": None}
+        else:
+            row = dict(prior.get(item.class_id, {
+                "reset_round": None, "reopen_count": 0, "last_session_ref": None,
+            }))
+        if item.class_id in reopened:
+            row["reopen_count"] += 1
+        if phase == "final" and not item.blocking:
+            row = {"reset_round": None, "reopen_count": 0, "last_session_ref": None}
+        elif recalibrated:
+            row = {"reset_round": round_no, "reopen_count": 0, "last_session_ref": None}
+        elif item.blocking and session_ref is not None:
+            row["last_session_ref"] = session_ref
+        rows[item.class_id] = row
+    return {"version": 1, "classes": rows}
 
 
 def class_context(blocks: Iterable[str]) -> str:
@@ -314,11 +435,24 @@ def trailer(
     reopened_class_ids: Sequence[str] = (),
     session_ref: str | None = None,
     round_label: int | None = None,
+    correction_gates: Sequence[Mapping[str, Any]] = (),
 ) -> str:
     open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
     debt = [d for d in open_debt if d.get("severity") in BLOCKING]
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
+    for gate in correction_gates:
+        rebut = (
+            f"; rebut with session_ref={trailer_diagnostic(session_ref)}"
+            if session_ref and gate.get("class_id") in (class_first_rounds or {})
+            else ""
+        )
+        lines.append(
+            f"CORRECTION-GATE: {trailer_diagnostic(gate.get('class_id'))} "
+            f"reason={gate.get('reason')} span={gate.get('span')} "
+            f"reopen-count={gate.get('reopen_count')} — load-bearing this round"
+            f"{rebut}"
+        )
     current_round = round_label if isinstance(round_label, int) else state.get("last_round")
     if isinstance(current_round, int) and class_first_rounds:
         debt_first_by_class: dict[str, int] = {}

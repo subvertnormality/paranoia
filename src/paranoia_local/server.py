@@ -78,7 +78,9 @@ _ROUND = {
     "minimum": 1,
     "description": (
         "REQUIRED unless you pass class_closure: false (the one-shot mode). "
-        "Convergence-loop sequence number (1-based); increment it after each settled attempt. "
+        "Convergence-loop caller label (1-based). After a settled tracked round it must be "
+        "strictly greater than the durable prior label; forward jumps count toward persistence, "
+        "while a failed or rejected label may be retried. "
         "Tracked review uses it for lineage ordering while its cold census/final always cover "
         "every in-scope severity and correction targets durable debt. The legacy one-shot "
         "review retains the round-3 MAJOR-or-higher floor."
@@ -447,9 +449,17 @@ TOOLS: list[Tool] = [
                 "repo_path": {"type": "string", "description": "Absolute path to the git repo (same one the review ran against)."},
                 "session_ref": {"type": "string", "description": "The session_ref printed in the prior review's footer."},
                 "rebuttal": {"type": "string", "description": "Your counter-evidence for the disputed finding."},
+                "lineage": {"type": "string", "description": "Optional tracked lineage whose correction gate this rebut resets."},
+                "class_id": {"type": "string", "description": "Optional active class bound to the disputed session."},
+                "lineage_mode": {"type": "string", "enum": ["plan", "branch"], "description": "Mode of the optionally bound lineage."},
                 **_COMMON,
             },
             "required": ["repo_path", "session_ref", "rebuttal"],
+            "dependentRequired": {
+                "lineage": ["class_id", "lineage_mode"],
+                "class_id": ["lineage", "lineage_mode"],
+                "lineage_mode": ["lineage", "class_id"],
+            },
         },
     ),
 ]
