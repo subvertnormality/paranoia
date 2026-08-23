@@ -31,7 +31,7 @@
       "correction_control": {
         "classes": {
           "cd132633": {
-            "last_session_ref": "01a02eff-9bd5-7303-a7a5-a57027ff013b",
+            "last_session_ref": "01a02f0d-9e14-7730-a08a-8484f76b2cbc",
             "reopen_count": 0,
             "reset_round": null
           },
@@ -83,7 +83,7 @@
       ],
       "last_round": 7,
       "phase": "correction",
-      "snapshot_digest": "0f045200f54ff85764e8715182ff3bc1a6233608c86b13ef373e6d570c6e847f",
+      "snapshot_digest": "d7ea0ec7e8bd39dcb1f65518606ce38b2d614e268d32aa67959b70ec74eebc96",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -92,30 +92,30 @@
   },
   "attempt_ledger": [
     {
-      "duration_ms": 93170,
+      "duration_ms": 41222,
       "engine": "codex",
       "failure_detail_excerpt": "",
       "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outcome": "completed",
       "provider_duration_ms": null,
-      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02eff-9bd5-7303-a7a5-a57027ff013b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|test\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|test\\\" repository'\",\"aggregated_output\":\"repository/pyproject.toml\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/README.md\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/class_closure_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/claude_websearch_grant_acceptance_2026-08-13.md\\nrepository/docs/class_persistence_acceptance_2026-08-22.json\\nrepository/docs/cleaning_attestation_acceptance_2026-08-13.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/phase_aware_plan_classes_and_framing_plan.md\\nrepository/docs/persistent_correction_gate_plan.md\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/staged_review_protocol_v2_claude_acceptance.json\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/staged_review_protocol_v2_plan.md\\nrepository/docs/staged_role_validation_reliability_plan.md\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nreposit",
-      "raw_sha256": "625def01ad73f9454c26dcec24cf76aa23d7c3b82057d3325e2036e9dd5f4d1a",
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f0d-9e14-7730-a08a-8484f76b2cbc\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"I’m checking the gate’s acceptance obligation against the supplied plan and the pinned repository before deciding whether it can be closed.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"repository/pyproject.toml\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/README.md\\nrepository/tests/test_acceptance_validator.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/conftest.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/arbitration_reliability_acceptance_2026-08-12.json\\nrepository/docs/arbitration_plan.md\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/tests/test_handlers.py\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepo",
+      "raw_sha256": "65ac34202753ebfb9dc8439644494e3a737597fdb76af25fa4fd8d6fc03b8ac2",
       "rejected_reply_excerpt": null,
       "rejected_reply_sha256": null,
       "requested_timeout_sec": 2400,
-      "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The plan now binds implementation of the correction gate to tests exercising its public handler; this narrow plan-phase obligation does not require the future tests to have already run.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate's public handler, supplying the acceptance obligation previously absent.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails.\",\"procedure\":\"Inspect the plan against the repository's documented production-handler boundary and verify that it identifies the handler and affected behavior, specifies executable assertions for success and rejection paths, and makes failed acceptance block completion.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The entire implementation contract is a generic instruction to implement the correction gate plus a vague promise that tests will exercise an unnamed public handler; it supplies no concrete assertions, rejection path, or fail-closed completion rule.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_plan.md:210-218\",\"rationale\":\"The repository's correction-gate design identifies public critique_plan as the production acceptance entry point and requires bounded calls, canonical outcomes or rejection, retained evidence, and fail-closed replay validation, none of which the reviewed plan binds.\"},{\"anchor\":\"repository/AGENTS.md:223-228\",\"rationale\":\"Repository policy requires every in-card plan obligation to name its scope, define executable acceptance evidence, and state fail-closed behavior.\"}],\"id\":\"G2\",\"remedy\":\"Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\",\"severity\":\"MAJOR\",\"summary\":\"The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation.\"}],\"role\":\"correction\"}",
-      "response_sha256": "664b34d9a70ec76d53a3e4f5d7ae748626b7cc242cb772e01bf13ff956829cb1",
+      "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The plan now binds correction-gate implementation to tests exercising its public handler; this satisfies the narrow plan-phase invariant without requiring future tests to have already run.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate's public handler, supplying the acceptance obligation previously absent.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails.\",\"procedure\":\"Inspect the plan against the repository's documented production-handler boundary and verify that it identifies the handler and affected behavior, specifies executable assertions for success and rejection paths, and makes failed acceptance block completion.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The implementation contract is a generic instruction plus a vague promise to exercise an unnamed public handler; it defines no concrete assertions, rejection case, or fail-closed completion rule.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_plan.md:210-218\",\"rationale\":\"The repository design names public critique_plan as the production acceptance entry point and requires bounded calls, canonical closure or rejection, retained evidence, and fail-closed replay validation, none of which this plan binds.\"},{\"anchor\":\"repository/AGENTS.md:223-228\",\"rationale\":\"Repository policy requires in-card implementation obligations to name their scope, define executable acceptance evidence, and state fail-closed behavior.\"}],\"id\":\"G2\",\"remedy\":\"Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\",\"severity\":\"MAJOR\",\"summary\":\"The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation.\"}],\"role\":\"correction\"}",
+      "response_sha256": "cbe7cc2151e6c1370d31164608755b253f648783bcafeac448e25ac6f4ebd710",
       "returncode": 0,
       "role": "correction",
       "sequence": 1,
-      "session_ref": "01a02eff-9bd5-7303-a7a5-a57027ff013b",
-      "stderr_excerpt": "2026-08-23T14:21:38.239496Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T14:23:10.304446Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-      "stderr_sha256": "c837c340a721749fd9e9a6faedab019d8d5547b0b24ca488c484bff26b19ad8d",
+      "session_ref": "01a02f0d-9e14-7730-a08a-8484f76b2cbc",
+      "stderr_excerpt": "2026-08-23T14:36:55.609374Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"SELECT MAX(threads.updated_at_ms), MAX(threads.recency_at_ms) FROM …\" db.statement=\"\\n\\nSELECT MAX(threads.updated_at_ms), MAX(threads.recency_at_ms) FROM threads\\n\" rows_affected=0 rows_returned=1 elapsed=1.259371547s elapsed_secs=1.259371547 slow_threshold=1s\n2026-08-23T14:36:56.303611Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T14:37:35.138530Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "03421ea2a1bc3452eb9c194b2c02eb15bf63cabf9190687314018f3a2de4b661",
       "usage": {
-        "cached_input_tokens": 96256,
-        "input_tokens": 138830,
-        "output_tokens": 2966,
-        "reasoning_output_tokens": 1887
+        "cached_input_tokens": 61696,
+        "input_tokens": 102579,
+        "output_tokens": 1471,
+        "reasoning_output_tokens": 498
       },
       "validation_issue": null,
       "validation_pointer": null
@@ -125,30 +125,30 @@
     "already_raised": [],
     "attempt_ledger": [
       {
-        "duration_ms": 93170,
+        "duration_ms": 41222,
         "engine": "codex",
         "failure_detail_excerpt": "",
         "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "outcome": "completed",
         "provider_duration_ms": null,
-        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02eff-9bd5-7303-a7a5-a57027ff013b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|test\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|test\\\" repository'\",\"aggregated_output\":\"repository/pyproject.toml\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/README.md\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/class_closure_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/claude_websearch_grant_acceptance_2026-08-13.md\\nrepository/docs/class_persistence_acceptance_2026-08-22.json\\nrepository/docs/cleaning_attestation_acceptance_2026-08-13.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/phase_aware_plan_classes_and_framing_plan.md\\nrepository/docs/persistent_correction_gate_plan.md\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/staged_review_protocol_v2_claude_acceptance.json\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/staged_review_protocol_v2_plan.md\\nrepository/docs/staged_role_validation_reliability_plan.md\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nreposit",
-        "raw_sha256": "625def01ad73f9454c26dcec24cf76aa23d7c3b82057d3325e2036e9dd5f4d1a",
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f0d-9e14-7730-a08a-8484f76b2cbc\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"gate-class\\\":null},\\\"class_outcomes\\\":{\\\"gate-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:4\\\",\\\"rationale\\\":\\\"I’m checking the gate’s acceptance obligation against the supplied plan and the pinned repository before deciding whether it can be closed.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"correction|gate|handler|public\\\" repository'\",\"aggregated_output\":\"repository/pyproject.toml\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/README.md\\nrepository/tests/test_acceptance_validator.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/conftest.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/arbitration_reliability_acceptance_2026-08-12.json\\nrepository/docs/arbitration_plan.md\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/tests/test_handlers.py\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepo",
+        "raw_sha256": "65ac34202753ebfb9dc8439644494e3a737597fdb76af25fa4fd8d6fc03b8ac2",
         "rejected_reply_excerpt": null,
         "rejected_reply_sha256": null,
         "requested_timeout_sec": 2400,
-        "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The plan now binds implementation of the correction gate to tests exercising its public handler; this narrow plan-phase obligation does not require the future tests to have already run.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate's public handler, supplying the acceptance obligation previously absent.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails.\",\"procedure\":\"Inspect the plan against the repository's documented production-handler boundary and verify that it identifies the handler and affected behavior, specifies executable assertions for success and rejection paths, and makes failed acceptance block completion.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The entire implementation contract is a generic instruction to implement the correction gate plus a vague promise that tests will exercise an unnamed public handler; it supplies no concrete assertions, rejection path, or fail-closed completion rule.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_plan.md:210-218\",\"rationale\":\"The repository's correction-gate design identifies public critique_plan as the production acceptance entry point and requires bounded calls, canonical outcomes or rejection, retained evidence, and fail-closed replay validation, none of which the reviewed plan binds.\"},{\"anchor\":\"repository/AGENTS.md:223-228\",\"rationale\":\"Repository policy requires every in-card plan obligation to name its scope, define executable acceptance evidence, and state fail-closed behavior.\"}],\"id\":\"G2\",\"remedy\":\"Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\",\"severity\":\"MAJOR\",\"summary\":\"The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation.\"}],\"role\":\"correction\"}",
-        "response_sha256": "664b34d9a70ec76d53a3e4f5d7ae748626b7cc242cb772e01bf13ff956829cb1",
+        "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The plan now binds correction-gate implementation to tests exercising its public handler; this satisfies the narrow plan-phase invariant without requiring future tests to have already run.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate's public handler, supplying the acceptance obligation previously absent.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails.\",\"procedure\":\"Inspect the plan against the repository's documented production-handler boundary and verify that it identifies the handler and affected behavior, specifies executable assertions for success and rejection paths, and makes failed acceptance block completion.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The implementation contract is a generic instruction plus a vague promise to exercise an unnamed public handler; it defines no concrete assertions, rejection case, or fail-closed completion rule.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_plan.md:210-218\",\"rationale\":\"The repository design names public critique_plan as the production acceptance entry point and requires bounded calls, canonical closure or rejection, retained evidence, and fail-closed replay validation, none of which this plan binds.\"},{\"anchor\":\"repository/AGENTS.md:223-228\",\"rationale\":\"Repository policy requires in-card implementation obligations to name their scope, define executable acceptance evidence, and state fail-closed behavior.\"}],\"id\":\"G2\",\"remedy\":\"Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\",\"severity\":\"MAJOR\",\"summary\":\"The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation.\"}],\"role\":\"correction\"}",
+        "response_sha256": "cbe7cc2151e6c1370d31164608755b253f648783bcafeac448e25ac6f4ebd710",
         "returncode": 0,
         "role": "correction",
         "sequence": 1,
-        "session_ref": "01a02eff-9bd5-7303-a7a5-a57027ff013b",
-        "stderr_excerpt": "2026-08-23T14:21:38.239496Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T14:23:10.304446Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-        "stderr_sha256": "c837c340a721749fd9e9a6faedab019d8d5547b0b24ca488c484bff26b19ad8d",
+        "session_ref": "01a02f0d-9e14-7730-a08a-8484f76b2cbc",
+        "stderr_excerpt": "2026-08-23T14:36:55.609374Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"SELECT MAX(threads.updated_at_ms), MAX(threads.recency_at_ms) FROM …\" db.statement=\"\\n\\nSELECT MAX(threads.updated_at_ms), MAX(threads.recency_at_ms) FROM threads\\n\" rows_affected=0 rows_returned=1 elapsed=1.259371547s elapsed_secs=1.259371547 slow_threshold=1s\n2026-08-23T14:36:56.303611Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T14:37:35.138530Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "03421ea2a1bc3452eb9c194b2c02eb15bf63cabf9190687314018f3a2de4b661",
         "usage": {
-          "cached_input_tokens": 96256,
-          "input_tokens": 138830,
-          "output_tokens": 2966,
-          "reasoning_output_tokens": 1887
+          "cached_input_tokens": 61696,
+          "input_tokens": 102579,
+          "output_tokens": 1471,
+          "reasoning_output_tokens": 498
         },
         "validation_issue": null,
         "validation_pointer": null
@@ -181,7 +181,7 @@
     "retry_register": null,
     "returncode": 0,
     "round": 7,
-    "session_ref": "01a02eff-9bd5-7303-a7a5-a57027ff013b",
+    "session_ref": "01a02f0d-9e14-7730-a08a-8484f76b2cbc",
     "staged_manifests": null,
     "staged_settlement": {
       "_class_record_pointers": [
@@ -267,7 +267,7 @@
       "source_dispositions": []
     },
     "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation. [classes: cd132633] (plan:3-4, repository/docs/persistent_correction_gate_plan.md:210-218, repository/AGENTS.md:223-228)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.",
-    "timestamp": "20260823T152310",
+    "timestamp": "20260823T153735",
     "tool": "critique_plan"
   },
   "before_lineage": {
@@ -321,7 +321,7 @@
       ],
       "last_round": 6,
       "phase": "correction",
-      "snapshot_digest": "0f045200f54ff85764e8715182ff3bc1a6233608c86b13ef373e6d570c6e847f",
+      "snapshot_digest": "d7ea0ec7e8bd39dcb1f65518606ce38b2d614e268d32aa67959b70ec74eebc96",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -338,15 +338,15 @@
   ],
   "date": "2026-08-23",
   "durable_reload": true,
-  "elapsed_seconds": 96.617,
+  "elapsed_seconds": 44.671,
   "fixture": {
     "class_id": "gate-class",
     "lineage": "persistent-correction-gate-acceptance-20260823",
     "plan": "# Change\n\nImplement the correction gate.\nTests must exercise its public handler.",
     "plan_sha256": "c2e9f84aed58a3e7a31a4b4c596349df226d5aa678e087d9d26ca65c34a7f9c0",
     "round": 7,
-    "snapshot_commit": "1f11af0348462b16674b14cd44469b19bf963098",
-    "structural_snapshot": "0f045200f54ff85764e8715182ff3bc1a6233608c86b13ef373e6d570c6e847f"
+    "snapshot_commit": "57b1421dc1297d90eae9e03c09ed7ad9b96b2fd4",
+    "structural_snapshot": "d7ea0ec7e8bd39dcb1f65518606ce38b2d614e268d32aa67959b70ec74eebc96"
   },
   "outcome": "closed-or-replaced",
   "provider": {
@@ -362,6 +362,13 @@
     {
       "durable_last_round": 6,
       "error": "tracked round must be greater than durable last_round 6; got 6",
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
       "mode": "plan",
       "pending_exists": false,
       "provider_calls": 0,
@@ -371,31 +378,72 @@
     },
     {
       "durable_last_round": 6,
+      "error": "tracked round must be greater than durable last_round 6; got 5",
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "plan",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "round": 5,
+      "state_sha256_after": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5",
+      "state_sha256_before": "2bdff2bfc416051ee594e8bad3d35f8da1592396b1e482cf3a44aa8f5e7233e5"
+    },
+    {
+      "durable_last_round": 6,
       "error": "tracked round must be greater than durable last_round 6; got 6",
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
       "mode": "branch",
       "pending_exists": false,
       "provider_calls": 0,
       "round": 6,
       "state_sha256_after": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021",
       "state_sha256_before": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021"
+    },
+    {
+      "durable_last_round": 6,
+      "error": "tracked round must be greater than durable last_round 6; got 5",
+      "forbidden_work_calls": {
+        "build_packet": 0,
+        "census_cache": 0,
+        "snapshot_tree": 0,
+        "worktree_at": 0,
+        "wrap_commit": 0
+      },
+      "mode": "branch",
+      "pending_exists": false,
+      "provider_calls": 0,
+      "round": 5,
+      "state_sha256_after": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021",
+      "state_sha256_before": "ddf1681909f701a1b26be7a464c16a762cc6117555faf84ea867a967410bf021"
     }
   ],
   "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW cd132633, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  cd132633 An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "result_sha256": "e6985a5dcdebad0b8642d24189b4a48c9207539edf13fbb19800c8e7fea78b39",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation. [classes: cd132633] (plan:3-4, repository/docs/persistent_correction_gate_plan.md:210-218, repository/AGENTS.md:223-228)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02eff-9bd5-7303-a7a5-a57027ff013b` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW cd132633, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  cd132633 An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "source_revision": "5b0c4988225b9a26fa3646fe8214ad09553c71e4",
+  "result_sha256": "86b3ac1c41d37f9dcb95305b46f8d48ebbfc2f029f5ceaa819dbd12903f0a5f8",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The narrow historical gate is repaired, but the implementation card still lacks the exact handler scope, executable success and rejection evidence, and fail-closed acceptance boundary required for implementation. [classes: cd132633] (plan:3-4, repository/docs/persistent_correction_gate_plan.md:210-218, repository/AGENTS.md:223-228)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Revise the plan to name the exact public handler and correction-gate behavior being changed; require executable handler-level success and rejection cases with enumerated assertions, and state that any failed assertion prevents completion.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f0d-9e14-7730-a08a-8484f76b2cbc` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW cd132633, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  cd132633 An in-card correction-gate plan names the exact production handler and implementation scope, defines executable positive and negative acceptance evidence, and states fail-closed behavior when that evidence fails. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "source_revision": "6c14820bce32be0f95815ec41b0b5e30bcc46d1b",
   "source_sha256": {
-    "AGENTS.md": "e35a7aecfae2156ff43f45a4fa30e25e88fc9d60e5d70afa975c8c572d1ce754",
+    "AGENTS.md": "1115e5e731792623bbddf7195992c8016f53aaebc58ed12353f9a6fc3cb5f849",
     "README.md": "190ef4c00ee57374e1b65e6d1a5df87e7e95f8cd53c695c356804fcbc3d8263f",
-    "scripts/run_persistent_correction_gate_acceptance.py": "b4076f39183bda758006dce006d860999910d8d30b807f5f991a7e7204d8d21b",
-    "src/paranoia_local/handlers.py": "7465aad9b87d4e224a42ae62590a8fc6c20e17250f162782ca687212810e5ab4",
+    "scripts/run_persistent_correction_gate_acceptance.py": "2afbd77643e6d317a21097a0082a4b2aa8f6dc22665fbaf5c76d8c0225116c0d",
+    "src/paranoia_local/handlers.py": "2fd3e132b2ba9da31e30793886690b7af4979aabbdf1d6d8ca2f5f9400fbb08c",
     "src/paranoia_local/prompts.py": "9f14214af5c21c61cad0b195c37ddd589730d0aaa218bf7cd70bfa28508c9490",
-    "src/paranoia_local/review_census.py": "eb924aacc504a3f6bead51a104976d47f31db74bff8700030e019f46b8650004",
-    "src/paranoia_local/server.py": "d1b5b00737dff3e5cc4404809affd5d912ea9d3211cee9afd99145f137629813",
-    "tests/test_handlers.py": "f56bca52119cc4974c38069cded64e983c608b4e77d65e3be41c113e812e9ff9",
+    "src/paranoia_local/review_census.py": "5bf5cf939d52fe358bf5f77045b3336188e81ee3d138187a006bb7e2b2da9ea7",
+    "src/paranoia_local/server.py": "47d813cc9ffc356e7efdad4cb08e06c70ae515f07aec585858907657eb00996f",
+    "tests/test_handlers.py": "8a7dc6aba3bb10789ac6c6e170ab9d5784bf1d183e24793868a5291ba15bb2f1",
     "tests/test_plan_claims.py": "5b7b6ee7cbe9bfd13c25045cdd2f541c0ce17092649563961f10ffee43775317",
     "tests/test_plan_class_closure.py": "ccd1df2a080b74b69f40f85adb0e6ef9d411a688eb7fec4c71bff9f66ed7e76b",
-    "tests/test_review_census.py": "daf5774e8ea8f3e8b379328434b822b0c9216972f6d4a2ee1bdf1586d13bce98"
+    "tests/test_review_census.py": "16aab150d71c7772ff5d0d8b10d29e132ecd81909ec4c5a33c669ce60cd80f92"
   },
   "version": 1
 }
