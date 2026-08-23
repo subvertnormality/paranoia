@@ -2,30 +2,30 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "attempt_ledger": [
     {
-      "duration_ms": 76133,
+      "duration_ms": 45177,
       "engine": "codex",
       "failure_detail_excerpt": "",
       "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outcome": "completed",
       "provider_duration_ms": null,
-      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f41-cf74-7b42-b62d-4147833a9a4a\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"60c1a55e\\\":null},\\\"class_outcomes\\\":{\\\"60c1a55e\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The supplied policy is explicitly destructive and says both required rollback artifacts are omitted.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The complete one-file artifact is supplied and directly states its destructive action and omissions.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review packet contains the complete changed artifact.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The policy treats stored accounts as data to delete before deployment.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Repository premise relevant to the active class is explicit.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The transformation is deletion of every stored account.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The destructive transformation is explicit.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The policy applies to every stored account and therefore identifies the affected stored-data set.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The affected data population is identified.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The policy explicitly omits both the rollback command and rollback test required for recovery.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"No deployable rollback path is provided.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The executable rollback test is explicitly omitted.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Rollback acceptance evidence is absent.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The operational policy explicitly records that the exact rollback command is omitted.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Deployment operations lack the required rollback command.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"A destructive migration is proposed while its required rollback command and executable rollback test are expressly omitted.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The policy contradicts the active rollback invariant.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"For a tiny destructive policy change, naming one exact rollback command and one executable rollback test is proportionate to the stated risk.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The required remedy is bounded and proportionate.\\\"}],\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"class_id\\\":\\\"60c1a55e\\\",\\\"kind\\\":\\\"existing_class\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The change proposes deleting every stored account before deployment and expressly says the required rollback command and rollback test are omitted.\\\"}],\\\"id\\\":\\\"F1\\\",\\\"remedy\\\":\\\"Before deployment, name the exact rollback command and add an executable rollback test that demonstrates restoration after the deletion migration.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"REOPEN: 60c1a55e — destructive account deletion omits the required rollback command and executable rollback test.\\\"}],\\\"role\\\":\\\"final\\\"}\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"",
-      "raw_sha256": "7637f2cc4c5b838ef42ccc984484047bbf2e15c014c2a1ef384141c0ec60cb83",
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a02f4b-0331-7a91-a610-37f800b0c3ea\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!migration.md'\\\"' && git log --oneline --follow -- migration.md\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!migration.md'\\\"' && git log --oneline --follow -- migration.md\\\"\",\"aggregated_output\":\"/mnt/c/Users/andy/AppData/Local/Temp/paranoia-wt-sxge1ms7/tree\\n\",\"exit_code\":1,\"status\":\"failed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"git log --oneline --all --follow -- migration.md; rg --files | sed -n '1,120p'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"git log --oneline --all --follow -- migration.md; rg --files | sed -n '1,120p'\\\"\",\"aggregated_output\":\"5a0d960 unsafe change\\n22b283f base\\nmigration.md\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"60c1a55e\\\":{\\\"kind\\\":\\\"reopen\\\"}},\\\"class_outcomes\\\":{\\\"60c1a55e\\\":{\\\"basis\\\":{\\\"finding_id\\\":\\\"F1\\\",\\\"kind\\\":\\\"new_finding\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The policy mandates deletion of every stored account and explicitly says both the rollback command and rollback test are omitted, recurring against the closed class.\\\"}],\\\"verdict\\\":\\\"violated\\\"}},\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The complete changed policy is present and states the destructive operation and omissions directly.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The supplied artifact is sufficient to assess the focused class.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The repository policy itself is the authoritative statement of the proposed destructive migration.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"No unsupported repository premise is needed to identify the violation.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"Deleting every stored account is the destructive stored-data transformation governed by the active class.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The destructive transformation lacks its required rollback provisions.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:1-3\\\",\\\"rationale\\\":\\\"The change is solely a migration policy and identifies no separate runtime consumer requiring assessment.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"not_applicable\\\",\\\"summary\\\":\\\"No separate consumer is introduced or changed.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The policy explicitly omits the exact rollback command required to recover from the deletion.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"No executable recovery path is specified.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The policy explicitly omits the executable rollback test required before deployment.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Rollback acceptance cannot be demonstrated.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/migration.md:3\\\",\\\"rationale\\\":\\\"The operational policy orders pre-deployment deletion while deliberately withholding the rollback command.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Dep",
+      "raw_sha256": "fb1be74f3b73cd2358b5f0b57a50cdffc87813672743c47dcf9fa6587dc22a18",
       "rejected_reply_excerpt": null,
       "rejected_reply_sha256": null,
       "requested_timeout_sec": 2400,
-      "response_excerpt": "{\"class_actions\":{\"60c1a55e\":{\"kind\":\"reopen\"}},\"class_outcomes\":{\"60c1a55e\":{\"basis\":{\"finding_id\":\"F1\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The destructive migration deletes every stored account while explicitly omitting both required rollback artifacts.\"}],\"verdict\":\"violated\"}},\"coverage\":[{\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The supplied complete changed artifact contains the destructive migration policy and its explicit omissions.\"}],\"finding_ids\":[],\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"The one-file artifact is complete for review.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The policy identifies stored accounts as the repository data subject to deletion.\"}],\"finding_ids\":[],\"id\":\"repository-premises\",\"status\":\"covered\",\"summary\":\"The relevant stored-data premise is explicit.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The proposed transformation deletes every stored account before deployment.\"}],\"finding_ids\":[],\"id\":\"transformations\",\"status\":\"covered\",\"summary\":\"The destructive transformation is explicit.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"Every stored account is named as affected by the migration.\"}],\"finding_ids\":[],\"id\":\"consumers\",\"status\":\"covered\",\"summary\":\"The affected data population is identified.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The exact rollback command is explicitly omitted, leaving no specified recovery operation.\"}],\"finding_ids\":[\"F1\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"The required rollback path is absent.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The executable rollback test is explicitly omitted.\"}],\"finding_ids\":[\"F1\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Rollback acceptance evidence is absent.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The deployment policy does not name the exact rollback command operators must run.\"}],\"finding_ids\":[\"F1\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"Rollback operations are undocumented.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"A destructive migration is proposed despite explicit omission of the two safeguards required by the active class.\"}],\"finding_ids\":[\"F1\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"The policy violates the active rollback invariant.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"Requiring one exact rollback command and one executable rollback test is proportionate to deliberate deletion of every stored account.\"}],\"finding_ids\":[\"F1\"],\"id\":\"proportionality\",\"status\":\"finding\",\"summary\":\"The bounded required remedy matches the stated stakes.\"}],\"debt_outcomes\":[],\"governing_findings\":[{\"classification\":{\"class_id\":\"60c1a55e\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The policy proposes deleting every stored account before deployment and expressly omits both the exact rollback command and executable rollback test.\"}],\"id\":\"F1\",\"remedy\":\"Before deployment, name the exact rollback command and add an executable rollback test that proves stored accounts can be restored after the deletion migration.\",\"severity\":\"MAJOR\",\"summary\":\"REOPEN: 60c1a55e — destructive account deletion omits the required rollback command and executable rollback test.\"}],\"role\":\"final\"}",
-      "response_sha256": "d09b0139de291a13b293d2a85664a84c1d7f7c3cfbab5ec76a93aa894df53e5e",
+      "response_excerpt": "{\"class_actions\":{\"60c1a55e\":{\"kind\":\"reopen\"}},\"class_outcomes\":{\"60c1a55e\":{\"basis\":{\"finding_id\":\"F1\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The policy mandates deletion of every stored account and explicitly says both the rollback command and rollback test are omitted, recurring against the closed class.\"}],\"verdict\":\"violated\"}},\"coverage\":[{\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The complete changed policy is present and states the destructive operation and omissions directly.\"}],\"finding_ids\":[],\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"The supplied artifact is sufficient to assess the focused class.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The repository policy itself is the authoritative statement of the proposed destructive migration.\"}],\"finding_ids\":[],\"id\":\"repository-premises\",\"status\":\"covered\",\"summary\":\"No unsupported repository premise is needed to identify the violation.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"Deleting every stored account is the destructive stored-data transformation governed by the active class.\"}],\"finding_ids\":[\"F1\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The destructive transformation lacks its required rollback provisions.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:1-3\",\"rationale\":\"The change is solely a migration policy and identifies no separate runtime consumer requiring assessment.\"}],\"finding_ids\":[],\"id\":\"consumers\",\"status\":\"not_applicable\",\"summary\":\"No separate consumer is introduced or changed.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The policy explicitly omits the exact rollback command required to recover from the deletion.\"}],\"finding_ids\":[\"F1\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"No executable recovery path is specified.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The policy explicitly omits the executable rollback test required before deployment.\"}],\"finding_ids\":[\"F1\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Rollback acceptance cannot be demonstrated.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The operational policy orders pre-deployment deletion while deliberately withholding the rollback command.\"}],\"finding_ids\":[\"F1\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"Deployment operations lack the required rollback instruction.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The destructive directive and explicit omissions jointly contradict the active lifecycle invariant.\"}],\"finding_ids\":[\"F1\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"The changed policy is inconsistent with the active class.\"},{\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"Requiring one exact rollback command and one executable rollback test is directly proportional to deletion of every stored account.\"}],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"The required remedy is limited to the stated destructive-migration risk.\"}],\"debt_outcomes\":[],\"governing_findings\":[{\"classification\":{\"class_id\":\"60c1a55e\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/migration.md:3\",\"rationale\":\"The new policy mandates deletion of all stored accounts before deployment and expressly omits both required rollback artifacts.\"}],\"id\":\"F1\",\"remedy\":\"Before deployment, amend the policy to name the exact rollback command and provide an executable rollback test that demonstrates restoration after the deletion migration.\",\"severity\":\"MAJOR\",\"summary\":\"The destructive migration recurs against the closed rollback-readiness class.\"}],\"role\":\"final\"}",
+      "response_sha256": "ee60b7636bcf7b9ecdf54f992a129c1ea80744f83e2facb9b845bf49178ae429",
       "returncode": 0,
       "role": "final",
       "sequence": 1,
-      "session_ref": "01a02f41-cf74-7b42-b62d-4147833a9a4a",
-      "stderr_excerpt": "2026-08-23T15:33:56.837854Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T15:35:11.713400Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-      "stderr_sha256": "ef6e1629df56b66bb8d9091dc45d48665fae5f559fab5c4a5fe4abd756b81d06",
+      "session_ref": "01a02f4b-0331-7a91-a610-37f800b0c3ea",
+      "stderr_excerpt": "2026-08-23T15:43:59.918261Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-23T15:44:43.839054Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "1d29f8935f87af154bd76ab47ec787aaa5496ccd7a0ba8c26ba39e7b88143f3b",
       "usage": {
-        "cached_input_tokens": 36352,
-        "input_tokens": 58794,
-        "output_tokens": 3446,
-        "reasoning_output_tokens": 683
+        "cached_input_tokens": 35328,
+        "input_tokens": 54885,
+        "output_tokens": 1547,
+        "reasoning_output_tokens": 543
       },
       "validation_issue": null,
       "validation_pointer": null
@@ -43,18 +43,18 @@
     ]
   },
   "date": "2026-08-22",
-  "elapsed_seconds": 77.341,
+  "elapsed_seconds": 46.383,
   "fixture": {
-    "base_id": "26a20922ba1d77ac674dd3385ccb595c3cfcda08",
+    "base_id": "22b283feb0f7bd64b20a669fe8a9e56912f23b24",
     "class_after": "open",
     "class_before": "closed",
     "class_first_round": 1,
     "class_id": "60c1a55e",
-    "head_id": "b82b5b3abe841e2fb0378fed7ddab570bb31e48c",
+    "head_id": "5a0d9609c0a6bba29a77d94f8df27a7669f0fc92",
     "lineage": "class-persistence-acceptance-20260822",
-    "packet_sha256": "a9f672487df24df41e947819f329b175fc39ca9d72544b15dc7aa1a06286c54c",
+    "packet_sha256": "98acb07a73f8ae14cfb16839699f4076879ab2b7d08c418ed8e68ce245b4571a",
     "round": 3,
-    "structural_snapshot": "54feb0f1669f71d23d7d8b4ad6ff26cc967f89bda87a4b12b49a7a037cf3fad3"
+    "structural_snapshot": "c8fb6ed43b76768d169b8a3789cc35ff62f63ae1e467ed0d5b2c68d78ca30f60"
   },
   "provider": {
     "cli_version": "codex-cli 0.144.6",
@@ -64,8 +64,8 @@
     "model": "gpt-5.6-sol",
     "web_search": false
   },
-  "result_sha256": "fb2d6203c93d969e62a6b0f64db5988e59c1c8e4ba9a05088dd4b219428d3778",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] REOPEN: 60c1a55e — destructive account deletion omits the required rollback command and executable rollback test. [classes: 60c1a55e] (repository/migration.md:1-3)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Before deployment, name the exact rollback command and add an executable rollback test that proves stored accounts can be restored after the deletion migration.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f41-cf74-7b42-b62d-4147833a9a4a` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: class-persistence-acceptance-20260822 (rounds recorded: 3)\nCLASS-REGISTER: staged final parsed — REOPEN 60c1a55e\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  60c1a55e A destructive stored-data deletion change names an exact rollback command and an executable rollback test before deployment. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nPERSISTENCE: 60c1a55e currently open; round-label span 3 (first raised 1, now 3), current debt open since 3 — repeated correction may be unsatisfiable within this unit's scope; rebut with session_ref=01a02f41-cf74-7b42-b62d-4147833a9a4a\nREOPEN-WAVE: 1 previously closed class(es) reopened this round: 60c1a55e — re-arm any prior disposition and reassess scope before another correction\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "result_sha256": "8746db69498596c38faeae7978602d1f7f120c9dbaf025fbbc85a88c777229b7",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The destructive migration recurs against the closed rollback-readiness class. [classes: 60c1a55e] (repository/migration.md:3)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Before deployment, amend the policy to name the exact rollback command and provide an executable rollback test that demonstrates restoration after the deletion migration.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a02f4b-0331-7a91-a610-37f800b0c3ea` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: class-persistence-acceptance-20260822 (rounds recorded: 3)\nCLASS-REGISTER: staged final parsed — REOPEN 60c1a55e\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  60c1a55e A destructive stored-data deletion change names an exact rollback command and an executable rollback test before deployment. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nPERSISTENCE: 60c1a55e currently open; round-label span 3 (first raised 1, now 3), current debt open since 3 — repeated correction may be unsatisfiable within this unit's scope; rebut with session_ref=01a02f4b-0331-7a91-a610-37f800b0c3ea\nREOPEN-WAVE: 1 previously closed class(es) reopened this round: 60c1a55e — re-arm any prior disposition and reassess scope before another correction\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
   "settlement": {
     "_class_record_pointers": [
       "/class_actions/60c1a55e"
@@ -110,34 +110,36 @@
         "finding_ids": [],
         "id": "artifact-complete",
         "status": "covered",
-        "summary": "The one-file artifact is complete for review."
+        "summary": "The supplied artifact is sufficient to assess the focused class."
       },
       {
         "evidence": [
-          "repository/migration.md:3"
+          "repository/migration.md:1-3"
         ],
         "finding_ids": [],
         "id": "repository-premises",
         "status": "covered",
-        "summary": "The relevant stored-data premise is explicit."
+        "summary": "No unsupported repository premise is needed to identify the violation."
       },
       {
         "evidence": [
           "repository/migration.md:3"
         ],
-        "finding_ids": [],
+        "finding_ids": [
+          "F1"
+        ],
         "id": "transformations",
-        "status": "covered",
-        "summary": "The destructive transformation is explicit."
+        "status": "finding",
+        "summary": "The destructive transformation lacks its required rollback provisions."
       },
       {
         "evidence": [
-          "repository/migration.md:3"
+          "repository/migration.md:1-3"
         ],
         "finding_ids": [],
         "id": "consumers",
-        "status": "covered",
-        "summary": "The affected data population is identified."
+        "status": "not_applicable",
+        "summary": "No separate consumer is introduced or changed."
       },
       {
         "evidence": [
@@ -148,7 +150,7 @@
         ],
         "id": "failure-recovery",
         "status": "finding",
-        "summary": "The required rollback path is absent."
+        "summary": "No executable recovery path is specified."
       },
       {
         "evidence": [
@@ -159,7 +161,7 @@
         ],
         "id": "tests-acceptance",
         "status": "finding",
-        "summary": "Rollback acceptance evidence is absent."
+        "summary": "Rollback acceptance cannot be demonstrated."
       },
       {
         "evidence": [
@@ -170,18 +172,7 @@
         ],
         "id": "docs-operations",
         "status": "finding",
-        "summary": "Rollback operations are undocumented."
-      },
-      {
-        "evidence": [
-          "repository/migration.md:1-3"
-        ],
-        "finding_ids": [
-          "F1"
-        ],
-        "id": "consistency",
-        "status": "finding",
-        "summary": "The policy violates the active rollback invariant."
+        "summary": "Deployment operations lack the required rollback instruction."
       },
       {
         "evidence": [
@@ -190,39 +181,48 @@
         "finding_ids": [
           "F1"
         ],
-        "id": "proportionality",
+        "id": "consistency",
         "status": "finding",
-        "summary": "The bounded required remedy matches the stated stakes."
+        "summary": "The changed policy is inconsistent with the active class."
+      },
+      {
+        "evidence": [
+          "repository/migration.md:3"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The required remedy is limited to the stated destructive-migration risk."
       }
     ],
     "debt": [
       {
         "evidence": [
-          "repository/migration.md:1-3"
+          "repository/migration.md:3"
         ],
         "finding_id": "F1",
         "id": "D1",
-        "remedy": "Before deployment, name the exact rollback command and add an executable rollback test that proves stored accounts can be restored after the deletion migration.",
+        "remedy": "Before deployment, amend the policy to name the exact rollback command and provide an executable rollback test that demonstrates restoration after the deletion migration.",
         "severity": "MAJOR",
         "status": "open",
-        "summary": "REOPEN: 60c1a55e — destructive account deletion omits the required rollback command and executable rollback test."
+        "summary": "The destructive migration recurs against the closed rollback-readiness class."
       }
     ],
     "debt_updates": [],
     "findings": [
       {
         "evidence": [
-          "repository/migration.md:1-3"
+          "repository/migration.md:3"
         ],
         "id": "F1",
-        "remedy": "Before deployment, name the exact rollback command and add an executable rollback test that proves stored accounts can be restored after the deletion migration.",
+        "remedy": "Before deployment, amend the policy to name the exact rollback command and provide an executable rollback test that demonstrates restoration after the deletion migration.",
         "severity": "MAJOR",
-        "summary": "REOPEN: 60c1a55e — destructive account deletion omits the required rollback command and executable rollback test."
+        "summary": "The destructive migration recurs against the closed rollback-readiness class."
       }
     ],
     "role": "final",
     "source_dispositions": []
   },
-  "source_revision": "a5dfe15588370e065a2869655cc8ae47499fe427",
+  "source_revision": "8083d790d358abe3446ddc3e9a6e49e01b99bc0d",
   "version": 2
 }
