@@ -971,6 +971,16 @@ def render_trailer(lineage: Lineage, *, register_status: str,
         f"CLASS-REGISTER: {register_status}",
         f"CLASS-CLOSURE: {counts}",
     ]
+    # A branch review supplied with a plan contract says so in its own computed output.
+    # Consumers quote this trailer verbatim as their durable per-stage review evidence, so
+    # without this line a plan-bound review and an unbound one are indistinguishable to
+    # anything downstream — the caller would have to be believed about its own conduct.
+    # The digest comes from the immutable contract authority on the lineage, not from
+    # caller-supplied metadata, so it cannot be asserted into existence by a review that
+    # never loaded a contract.
+    contract = lineage.branch_contract
+    if contract and contract.get("present") and contract.get("digest"):
+        lines.insert(1, f"PLAN-DIGEST: {contract['digest']}")
     # A predicate can be wrong in the SAFE direction — too narrow, matching none of the
     # violations it was written for, and closing in the very round it was registered. The
     # mechanism cannot detect that, so it says so rather than presenting an ordinary close.

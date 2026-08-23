@@ -577,6 +577,39 @@ class TestLineageState:
 
 
 class TestTrailer:
+    def test_a_plan_bound_branch_review_names_its_contract_digest(self) -> None:
+        """Consumers quote this trailer verbatim as their durable per-stage evidence. Without
+        the line, a plan-bound review and an unbound one are byte-identical downstream and the
+        caller has to be believed about its own conduct."""
+        lin = lineage_with(("the invariant", cc.MAJOR, "X"))
+        lin.branch_contract = {
+            "version": 1, "present": True, "digest": "a" * 64, "text": "contract",
+        }
+        out = cc.render_trailer(lin, register_status="parsed 1")
+        assert f"PLAN-DIGEST: {'a' * 64}" in out
+        lines = [ln for ln in out.splitlines() if ln.startswith("PLAN-DIGEST:")]
+        assert len(lines) == 1, "one contract, one line"
+
+    def test_a_contract_free_branch_review_claims_no_digest(self) -> None:
+        """Immutable absence must not render as a plan that was never supplied."""
+        lin = lineage_with(("the invariant", cc.MAJOR, "X"))
+        assert lin.branch_contract is None
+        assert "PLAN-DIGEST:" not in cc.render_trailer(lin, register_status="parsed 1")
+        lin.branch_contract = {"version": 1, "present": False, "digest": None, "text": None}
+        assert "PLAN-DIGEST:" not in cc.render_trailer(lin, register_status="parsed 1")
+
+    def test_the_digest_line_does_not_disturb_the_existing_markers(self) -> None:
+        """Downstream parses this by anchored line and requires these three markers."""
+        lin = lineage_with(("the invariant", cc.MAJOR, "X"))
+        lin.branch_contract = {
+            "version": 1, "present": True, "digest": "b" * 64, "text": "contract",
+        }
+        out = cc.render_trailer(lin, register_status="parsed 1")
+        for marker in ("LINEAGE:", "CLASS-REGISTER:", "CLASS-CLOSURE:", "CONVERGENCE:"):
+            assert any(ln.startswith(marker) for ln in out.splitlines()), marker
+        assert sum(ln.startswith("CONVERGENCE:") for ln in out.splitlines()) == 1
+        assert out.splitlines()[0].startswith("LINEAGE:"), "LINEAGE stays first"
+
     def test_blocked_names_the_ids_and_voids_a_reviewer_converged(self) -> None:
         lin = lineage_with(("the invariant", cc.MAJOR, "X"))
         cid = lin.active()[0].class_id
