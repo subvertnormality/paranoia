@@ -89,14 +89,14 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         changed = json.loads(json.dumps(artifact))
         mutate(changed)
         with pytest.raises(ValueError):
-            acceptance.validate_artifact(changed, root)
+            acceptance.validate_artifact(changed, root, require_committed=False)
     changed = json.loads(json.dumps(artifact))
     changed["result_text"] = "forged but self-consistent\n\n" + changed["rendered_trailer"]
     changed["result_sha256"] = hashlib.sha256(
         changed["result_text"].encode("utf-8")
     ).hexdigest()
     with pytest.raises(ValueError, match="independently reconstructed"):
-        acceptance.validate_artifact(changed, root)
+        acceptance.validate_artifact(changed, root, require_committed=False)
     changed = json.loads(json.dumps(artifact))
     changed["audit"]["session_ref"] = "forged-session"
     old = artifact["audit"]["session_ref"]
@@ -107,6 +107,11 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         changed["result_text"].encode("utf-8")
     ).hexdigest()
     with pytest.raises(ValueError, match="terminal attempt"):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    for ledger in (changed["attempt_ledger"], changed["audit"]["attempt_ledger"]):
+        ledger[0]["raw_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="committed Git envelope"):
         acceptance.validate_artifact(changed, root)
 
 

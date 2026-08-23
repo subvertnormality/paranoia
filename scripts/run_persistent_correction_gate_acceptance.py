@@ -23,6 +23,7 @@ from paranoia_local import engines, handlers, orientation, review_census as rc
 
 LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
+ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
 PLAN = "# Change\n\nImplement the correction gate.\nTests must exercise its public handler."
 STAKES = (
     "One trusted operator and OS; repository and plan bytes are untrusted data; no "
@@ -321,8 +322,17 @@ def _preflight_matrix(root: Path) -> list[dict]:
     return rows
 
 
-def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
+def validate_artifact(
+    artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
+) -> None:
     """Shared fail-closed builder/replay validator for the retained acceptance."""
+    if require_committed:
+        try:
+            committed = json.loads(_git_bytes("show", f"HEAD:{ARTIFACT_PATH}"))
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+            raise ValueError("retained acceptance lacks a valid committed envelope") from exc
+        if committed != artifact:
+            raise ValueError("retained acceptance differs from its committed Git envelope")
     expected_keys = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
@@ -559,7 +569,7 @@ def main() -> int:
     parser.add_argument("--codex", default=os.environ.get("PARANOIA_ACCEPTANCE_CODEX", "codex"))
     parser.add_argument(
         "--output",
-        default=str(ROOT / "docs/persistent_correction_gate_acceptance_2026-08-23.json"),
+        default=str(ROOT / ARTIFACT_PATH),
     )
     args = parser.parse_args()
     state_root = Path(tempfile.mkdtemp(prefix="paranoia-gate-state-"))
@@ -646,7 +656,7 @@ def main() -> int:
         "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
         "public_preflight_matrix":_preflight_matrix(ROOT),
     }
-    validate_artifact(artifact, ROOT)
+    validate_artifact(artifact, ROOT, require_committed=False)
     Path(args.output).write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

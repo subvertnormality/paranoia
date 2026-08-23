@@ -765,6 +765,9 @@ current session only when they terminate specifically on the correction gate. If
 returns a valid session, the trailer offers only close/replacement recovery.
 Repeated or backward tracked round labels return a zero-attempt blocked review with an exact
 audited trailer; they do not call the provider or enter cache, snapshot, packet, or worktree work.
+Retained correction-gate acceptance replay also binds its bounded attempt-channel digests and
+exact response evidence to the artifact's committed Git blob; local edits cannot forge matching
+ledger copies without failing that envelope check.
 
 ### `arbitrate`
 

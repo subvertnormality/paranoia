@@ -478,3 +478,6 @@ jumps count and failed labels may retry. Provider/validation failure does
 not advance substantive state, and ambiguous lineage or rebut saves retain the pending latch.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.
+Bind bounded attempt-channel digests and exact retained response evidence to the acceptance
+artifact's committed Git blob during replay; generation runs the same semantic validator before
+that immutable envelope exists.
