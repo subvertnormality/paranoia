@@ -759,7 +759,10 @@ reviewer replies `CONCEDE` or `HOLD` with fresh citations.
 The three class-binding arguments are all-or-none. A bound rebut is accepted only for the
 current session durably stored for that class. Success grants another bounded correction window
 but does not close the class or debt, change severity, or itself produce clearance. A provider or
-state-write failure records no reset.
+state-write failure records no reset. A legacy exhausted class with no stored session gets no
+extra provider call: its ordinary gated correction and single validation retry may acquire the
+current session only when they terminate specifically on the correction gate. If neither attempt
+returns a valid session, the trailer offers only close/replacement recovery.
 
 ### `arbitrate`
 
@@ -1117,6 +1120,13 @@ the class must close or be replaced, or the operator must run a class-bound `reb
 current stored session to grant a new bounded correction window. Three undisposed reopen waves use
 the same gate. A rebut reset changes only the correction window; it cannot close debt or clear a
 class. The exact rendered trailer is retained in the audit JSON.
+`CORRECTION-GATE` is the human trailer row for a load-bearing class in that call.
+`correction_gates` is the audit's closed server-owned projection of the same pre-call rows:
+`class_id`, `reason` (`persistence`, `reopen`, or both), label `span`, and `reopen_count`.
+It is empty outside correction and for an ungated correction. A failed label does not advance
+durable `last_round`, so that label may be retried; a forward jump deliberately contributes its
+full distance. Provider/validation failure keeps substantive class and debt state unchanged,
+while an ambiguous lineage write keeps the pending latch and returns state unavailable.
 The retained [class-persistence acceptance](docs/class_persistence_acceptance_2026-08-22.json)
 exercises that reopen and diagnostic lifecycle through the public branch handler with one real
 Codex call on a tiny synthetic committed diff.

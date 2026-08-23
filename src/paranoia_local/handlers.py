@@ -681,18 +681,27 @@ def _settle_staged_failure(
     if isinstance(cache, dict):
         state["census_cache"] = deepcopy(cache)
     attempts = list(getattr(error, "attempts", []))
-    successful_session = next((
+    successful_session = rc.validated_session_ref(next((
         item.session_ref for item in reversed(attempts)
         if item.outcome in {"completed", "validation-invalid"} and item.session_ref
-    ), None)
+    ), None))
     gates = getattr(closure, "correction_gates", [])
-    if gates and successful_session:
+    terminal_gate_rejection = (
+        bool(gates) and successful_session is not None
+        and getattr(error, "failure_kind", None) == "validation"
+        and getattr(error, "stage_role", None) == "correction-validation-retry"
+        and "correction limit reached" in str(error)
+    )
+    if terminal_gate_rejection:
         control = rc.normalize_correction_control(
             state, closure.lineage.active(),
         )
         for gate in gates:
             class_id = gate["class_id"]
-            if class_id in control["classes"]:
+            if (
+                class_id in control["classes"]
+                and control["classes"][class_id]["last_session_ref"] is None
+            ):
                 control["classes"][class_id]["last_session_ref"] = successful_session
         state["correction_control"] = control
     closure.lineage.review_state = state
@@ -751,8 +760,6 @@ def _state_unavailable_review(
     closure: "_ClosureRound", *, mode: str, claim_state: dict[str, Any] | None = None,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
     """Return the established blocked result without running or mutating staged state."""
-    if closure.lineage is not None:
-        closure._settled = True
     reason = closure.unavailable or "lineage state is unavailable"
     review = Review(
         text=rc.render_error_review(
@@ -859,6 +866,8 @@ def _staged_structural_review(
         )
     except rc.CensusError as exc:
         closure.unavailable = str(exc)
+        # This is a confirmed read/validation refusal, not an ambiguous write.
+        closure._settled = True
         return _state_unavailable_review(
             closure, mode=mode,
             claim_state=lineage.claim_state if mode == cc.PLAN_MODE else None,
@@ -1390,13 +1399,17 @@ def _staged_structural_review(
     all_reopened = tuple(dict.fromkeys(
         (*getattr(closure, "reopened_class_ids", ()), *explicit_reopened)
     ))
+    replacement_successors = [
+        minted_by_record[index]
+        for index, row in enumerate(settlement["class_records"])
+        if row.get("op") == "replace"
+    ]
     state["correction_control"] = rc.advance_correction_control(
-        correction_control,
-        before=getattr(closure, "prepared_lineage", None) or lineage,
-        after=lineage,
+        correction_control, after=lineage,
         round_no=round_no, phase=phase, reopened_class_ids=all_reopened,
         session_ref=review.session_ref,
         recalibrated=stakes_recalibration and phase == "census",
+        replacement_successor_ids=replacement_successors,
     )
     lineage.review_state = state
     lineage.debt = None
@@ -1761,7 +1774,9 @@ def critique_branch(
                     "plan_text": supplied_contract.original if supplied_contract else None,
                     "plan_contract_reused": False,
                 })
-                return f"{_footer(review, engine)}\n\n{trailer}" + _stakes_notice(no_stakes)
+                return (
+                    f"{_footer(review, engine)}{_stakes_notice(no_stakes)}\n\n{trailer}"
+                )
             closure_args = {**arguments, "lineage": lineage_id}
         return _converge_branch_review(
             repo, engine, target=target, base_ref=base_ref, head_ref=head_ref,
@@ -1773,7 +1788,8 @@ def critique_branch(
             closure_on=closure_on, closure_args=closure_args,
             review_round=arguments.get("round"), include_unc=include_unc,
             branch_contract=contract, contract_latch_owned=contract_latch_owned,
-        ) + _stakes_notice(no_stakes)
+            stakes_notice=_stakes_notice(no_stakes),
+        )
 
     packet = orientation.build_orientation(
         repo, target, project_summary, diff_intent, focus, already
@@ -1822,6 +1838,7 @@ def _converge_branch_review(
     state_root: Path | None = None,
     branch_contract: _BranchContract | None = None,
     contract_latch_owned: bool = False,
+    stakes_notice: str = "",
 ) -> str:
     """Opt-in convergence path: pre-gather a deterministic packet so the reviewer skips
     the re-read/re-grep turns, and review it against an IMMUTABLE materialized worktree
@@ -1959,7 +1976,7 @@ def _converge_branch_review(
           "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
           "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
           "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
-    body = _footer(review, engine)
+    body = _footer(review, engine) + stakes_notice
     if closure and closure.retry_register:
         # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
         # supplied would otherwise be invisible in everything they can see.
@@ -3778,6 +3795,9 @@ def rebut(
         raise ValueError("rebut requires rebuttal (your counter-evidence)")
     repo = _require_repo(arguments)
     cfg = load_repo_config(repo)
+    model = resolve("model", arguments.get("model"), cfg, engine.default_model)
+    effort = resolve("effort", arguments.get("effort"), cfg, "high")
+    web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     binding_keys = ("lineage", "class_id", "lineage_mode")
     supplied = [key for key in binding_keys if arguments.get(key) is not None]
@@ -3793,6 +3813,25 @@ def rebut(
     class_id = arguments.get("class_id")
     lineage_id = arguments.get("lineage")
     lineage_mode = arguments.get("lineage_mode")
+    binding = (
+        {"lineage": lineage_id, "class_id": class_id, "lineage_mode": lineage_mode}
+        if bound else None
+    )
+
+    def failure_review(exc: BaseException) -> Review:
+        detail = rc.bounded_diagnostic(str(exc), rc.MAX_ENGINE_FAILURE_MESSAGE_CHARS)
+        return Review(
+            text=rc.render_error_review(f"[paranoia-local error] rebut failed: {detail}"),
+            session_ref=session_ref, raw=detail, returncode=2, error=True,
+            failure_detail=detail,
+        )
+
+    def log_rebut(review: Review, reset: bool) -> None:
+        _log(log_dir, "rebut", engine, review, now, {
+            "session_ref": session_ref, "model": model,
+            "lineage_binding": binding, "correction_control_reset": reset,
+        })
+
     if bound:
         if lineage_mode not in {cc.PLAN_MODE, cc.BRANCH_MODE}:
             raise ValueError("lineage_mode must be 'plan' or 'branch'")
@@ -3813,20 +3852,31 @@ def rebut(
                 raise ValueError(
                     "bound rebut session_ref does not match the class's current durable session"
                 )
-        except BaseException:
+        except BaseException as exc:
+            try:
+                log_rebut(failure_review(exc), False)
+            except BaseException:
+                # An ambiguous audit deliberately leaves the latch for operator repair.
+                raise
             cc.clear_latch(state_root, lineage_id)
             raise
-
-    model = resolve("model", arguments.get("model"), cfg, engine.default_model)
-    effort = resolve("effort", arguments.get("effort"), cfg, "high")
-    web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     body = f"=== AUTHOR'S COUNTER-EVIDENCE ===\n{rebuttal}"
     prompt = prompts.compose(prompts.REBUT_INSTRUCTIONS, body)
     save_ambiguous = False
+    audit_ambiguous = False
     try:
-        review = engine.resume(session_ref, prompt, repo, model, effort, web_search,
-                               **_progress_kwargs(on_progress))
+        try:
+            review = engine.resume(session_ref, prompt, repo, model, effort, web_search,
+                                   **_progress_kwargs(on_progress))
+        except BaseException as exc:
+            failed = failure_review(exc)
+            try:
+                log_rebut(failed, False)
+            except BaseException:
+                audit_ambiguous = True
+                raise
+            raise
         if bound and not review.error:
             assert lineage is not None
             control = rc.normalize_correction_control(
@@ -3840,23 +3890,23 @@ def rebut(
             lineage.review_state["correction_control"] = control
             try:
                 cc.save_lineage(state_root, lineage)
-            except cc.StateUnavailable:
+            except cc.StateUnavailable as exc:
                 save_ambiguous = True
+                try:
+                    log_rebut(failure_review(exc), False)
+                except BaseException:
+                    audit_ambiguous = True
                 raise
             reset_recorded = True
+        try:
+            log_rebut(review, reset_recorded)
+        except BaseException:
+            audit_ambiguous = True
+            raise
+        return _footer(review, engine)
     finally:
-        if latch_owned and not save_ambiguous:
+        if latch_owned and not save_ambiguous and not audit_ambiguous:
             cc.clear_latch(state_root, lineage_id)
-
-    _log(log_dir, "rebut", engine, review, now, {
-        "session_ref": session_ref, "model": model,
-        "lineage_binding": (
-            {"lineage": lineage_id, "class_id": class_id, "lineage_mode": lineage_mode}
-            if bound else None
-        ),
-        "correction_control_reset": reset_recorded,
-    })
-    return _footer(review, engine)
 
 
 class _ClosureRound:

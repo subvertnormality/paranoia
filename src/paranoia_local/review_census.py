@@ -170,6 +170,11 @@ def _valid_session_ref(value: Any) -> bool:
     )
 
 
+def validated_session_ref(value: Any) -> str | None:
+    """Return usable provider session authority without ever persisting poison state."""
+    return value if isinstance(value, str) and _valid_session_ref(value) else None
+
+
 def normalize_correction_control(
     review_state: Mapping[str, Any], active: Sequence[cc.TrackedClass],
 ) -> dict[str, Any]:
@@ -246,20 +251,19 @@ def correction_gates(
 
 
 def advance_correction_control(
-    control: Mapping[str, Any], *, before: cc.Lineage, after: cc.Lineage,
+    control: Mapping[str, Any], *, after: cc.Lineage,
     round_no: int, phase: str, reopened_class_ids: Sequence[str] = (),
     session_ref: str | None = None, recalibrated: bool = False,
+    replacement_successor_ids: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Advance control only after canonical settlement has succeeded."""
     prior = control["classes"]
     reopened = set(reopened_class_ids)
+    replacements = set(replacement_successor_ids)
+    current_session = validated_session_ref(session_ref)
     rows: dict[str, dict[str, Any]] = {}
     for item in after.active():
-        predecessor = next(
-            (old for old in before.classes.values() if old.superseded_by == item.class_id),
-            None,
-        )
-        if predecessor is not None:
+        if item.class_id in replacements:
             row = {"reset_round": round_no, "reopen_count": 0, "last_session_ref": None}
         else:
             row = dict(prior.get(item.class_id, {
@@ -271,8 +275,10 @@ def advance_correction_control(
             row = {"reset_round": None, "reopen_count": 0, "last_session_ref": None}
         elif recalibrated:
             row = {"reset_round": round_no, "reopen_count": 0, "last_session_ref": None}
-        elif item.blocking and session_ref is not None:
-            row["last_session_ref"] = session_ref
+        elif item.blocking:
+            # Current-attempt authority replaces stale authority even when absent or
+            # malformed. A bad provider session must not poison the next lineage load.
+            row["last_session_ref"] = current_session
         rows[item.class_id] = row
     return {"version": 1, "classes": rows}
 

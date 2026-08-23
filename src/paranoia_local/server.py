@@ -441,7 +441,9 @@ TOOLS: list[Tool] = [
         name="rebut",
         description=(
             "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
-            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations."
+            "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations. "
+            "The optional lineage/class/mode trio is all-or-none and resets only that class's bounded correction window "
+            "after a successful current-session rebut; it never closes debt, changes severity, or grants clearance."
         ),
         inputSchema={
             "type": "object",
@@ -449,9 +451,9 @@ TOOLS: list[Tool] = [
                 "repo_path": {"type": "string", "description": "Absolute path to the git repo (same one the review ran against)."},
                 "session_ref": {"type": "string", "description": "The session_ref printed in the prior review's footer."},
                 "rebuttal": {"type": "string", "description": "Your counter-evidence for the disputed finding."},
-                "lineage": {"type": "string", "description": "Optional tracked lineage whose correction gate this rebut resets."},
-                "class_id": {"type": "string", "description": "Optional active class bound to the disputed session."},
-                "lineage_mode": {"type": "string", "enum": ["plan", "branch"], "description": "Mode of the optionally bound lineage."},
+                "lineage": {"type": "string", "description": "Optional tracked lineage whose correction window resets; requires class_id and lineage_mode."},
+                "class_id": {"type": "string", "description": "Optional active class whose durable current session must equal session_ref; requires lineage and lineage_mode."},
+                "lineage_mode": {"type": "string", "enum": ["plan", "branch"], "description": "Mode of the optionally bound lineage; requires lineage and class_id."},
                 **_COMMON,
             },
             "required": ["repo_path", "session_ref", "rebuttal"],

@@ -2771,6 +2771,39 @@ def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
     assert "STAGED-ATTEMPTS: total=0" in result
 
 
+def test_ambiguous_intermediate_claim_save_retains_lineage_latch(
+    repo: Path, tmp_path: Path, monkeypatch,
+) -> None:
+    lineage_id = "ambiguous-claim-save"
+    monkeypatch.setattr(
+        handlers, "_verify_plan_claims",
+        lambda plan_text, prior_state, **kwargs: (pc.empty_state(), "parsed"),
+    )
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(
+        cc, "save_lineage",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            cc.StateUnavailable("ambiguous claim evidence write")
+        ),
+    )
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "run",
+        lambda *args, **kwargs: pytest.fail("structural provider must not run"),
+    )
+    result = handlers.critique_plan(
+        {
+            "plan_text":PLAN, "repo_path":str(repo), "lineage":lineage_id,
+            "round":1, "stakes":"trusted local plan; correctness is high impact",
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda:"T1",
+    )
+    pending = cc.lineage_dir(cc.default_state_root()) / f"{lineage_id}.pending"
+    assert pending.exists()
+    assert "STATE-UNAVAILABLE" in result
+    cc.clear_latch(cc.default_state_root(), lineage_id)
+
+
 def test_indexed_plan_binding_defaults_omission_but_rejects_unknown_key(
     tmp_path: Path,
 ) -> None:

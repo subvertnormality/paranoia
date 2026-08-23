@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -42,6 +43,14 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     if not path.exists():
         pytest.skip("acceptance artifact is generated after the source commit")
     artifact = json.loads(path.read_text(encoding="utf-8"))
+    spec = importlib.util.spec_from_file_location(
+        "persistent_gate_acceptance",
+        root / "scripts/run_persistent_correction_gate_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    acceptance.validate_artifact(artifact, root)
     assert artifact["acceptance_kind"] == (
         "persistent-correction-gate-public-plan-handler"
     )
@@ -1419,6 +1428,37 @@ def test_correction_control_is_class_keyed_and_gates_label_seven() -> None:
         "class_id":"class-a", "reason":"reopen", "span":1,
         "reopen_count":3,
     }]
+
+
+def test_current_replacement_resets_once_and_current_session_replaces_stale() -> None:
+    successor = cc.TrackedClass(
+        "successor", "new invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    after = cc.Lineage(
+        "replacement", mode=cc.PLAN_MODE,
+        classes={successor.class_id:successor},
+    )
+    prior = {"version":1, "classes":{"successor":{
+        "reset_round":None, "reopen_count":2, "last_session_ref":"stale",
+    }}}
+    created = rc.advance_correction_control(
+        prior, after=after, round_no=7, phase="correction",
+        session_ref="current", replacement_successor_ids=["successor"],
+    )
+    assert created["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":"current",
+    }
+    later = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction", session_ref=None,
+    )
+    assert later["classes"]["successor"] == {
+        "reset_round":7, "reopen_count":0, "last_session_ref":None,
+    }
+    invalid = rc.advance_correction_control(
+        created, after=after, round_no=8, phase="correction",
+        session_ref="bad\nref",
+    )
+    assert invalid["classes"]["successor"]["last_session_ref"] is None
 
 
 @pytest.mark.parametrize("bad", [True, False, 0, 2])

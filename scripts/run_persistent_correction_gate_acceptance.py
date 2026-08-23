@@ -49,6 +49,116 @@ def _state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
+    """Shared fail-closed builder/replay validator for the retained acceptance."""
+    expected_keys = {
+        "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "provider", "fixture", "before_lineage", "after_lineage", "audit",
+        "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
+        "result_sha256", "rendered_trailer", "correction_gates", "durable_reload",
+        "outcome",
+    }
+    if set(artifact) != expected_keys:
+        raise ValueError("acceptance fields are not closed and exact")
+    if artifact["acceptance_kind"] != "persistent-correction-gate-public-plan-handler":
+        raise ValueError("wrong acceptance kind")
+    revision = artifact["source_revision"]
+    expected_sources = {
+        "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+        "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
+    }
+    if not isinstance(revision, str) or len(revision) != 40:
+        raise ValueError("source revision is not a full commit")
+    if set(artifact["source_sha256"]) != expected_sources:
+        raise ValueError("source inventory is not exact")
+    for relative, expected in artifact["source_sha256"].items():
+        historical = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        if hashlib.sha256(historical).hexdigest() != expected:
+            raise ValueError(f"historical source digest mismatch for {relative}")
+        if (root / relative).read_bytes() != historical:
+            raise ValueError(f"current source differs from acceptance for {relative}")
+    provider = artifact["provider"]
+    if not (
+        provider.get("engine") == "codex" and provider.get("model") == "gpt-5.6-sol"
+        and provider.get("effort") == "high" and provider.get("web_search") is False
+        and isinstance(provider.get("cli_version"), str)
+    ):
+        raise ValueError("provider route is not the required real Codex route")
+    fixture = artifact["fixture"]
+    if set(fixture) != {
+        "lineage", "class_id", "round", "plan", "plan_sha256",
+        "snapshot_commit", "structural_snapshot",
+    }:
+        raise ValueError("fixture fields are not exact")
+    if (
+        fixture["lineage"] != LINEAGE or fixture["class_id"] != CLASS_ID
+        or fixture["round"] != 7 or fixture["plan"] != PLAN
+        or fixture["plan_sha256"] != _sha(PLAN)
+        or fixture["structural_snapshot"]
+        != rc.digest(f"{PLAN}\0{fixture['snapshot_commit']}")
+    ):
+        raise ValueError("fixture binding mismatch")
+    expected_gate = [{
+        "class_id":CLASS_ID, "reason":"persistence", "reopen_count":0, "span":7,
+    }]
+    audit = artifact["audit"]
+    attempts = artifact["attempt_ledger"]
+    if artifact["correction_gates"] != expected_gate:
+        raise ValueError("correction gate projection mismatch")
+    if audit.get("correction_gates") != expected_gate:
+        raise ValueError("audit gate projection mismatch")
+    if audit.get("attempt_ledger") != attempts:
+        raise ValueError("attempt ledger is not exact")
+    if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
+        raise ValueError("provider call topology exceeded its bound")
+    if artifact["provider_call_count"] != len(attempts):
+        raise ValueError("provider call count mismatch")
+    if any(
+        row.get("engine") != "codex"
+        or row.get("role") not in {"correction", "correction-validation-retry"}
+        or type(row.get("returncode")) is not int
+        or not row.get("raw_sha256") or not row.get("failure_detail_sha256")
+        or not row.get("stderr_sha256")
+        for row in attempts
+    ):
+        raise ValueError("attempt telemetry is incomplete or on the wrong route")
+    result = artifact["result_text"]
+    trailer = artifact["rendered_trailer"]
+    if (
+        not isinstance(result, str) or artifact["result_sha256"] != _sha(result)
+        or not isinstance(trailer, str) or not result.endswith(trailer)
+        or audit.get("rendered_trailer") != trailer
+    ):
+        raise ValueError("returned/audited trailer binding mismatch")
+    before = artifact["before_lineage"]
+    after = artifact["after_lineage"]
+    before_class = next(row for row in before["classes"] if row["class_id"] == CLASS_ID)
+    after_class = next(row for row in after["classes"] if row["class_id"] == CLASS_ID)
+    before_control = before["review_state"]["correction_control"]["classes"][CLASS_ID]
+    if not (
+        before["review_state"]["phase"] == "correction"
+        and before["review_state"]["last_round"] == 6
+        and before_class["status"] == cc.OPEN and before_class["first_round"] == 1
+        and before_control == {
+            "reset_round":None, "reopen_count":0, "last_session_ref":None,
+        }
+    ):
+        raise ValueError("prebuilt lineage is not the exhausted fixture")
+    disposed = after_class["status"] in {cc.CLOSED, cc.SUPERSEDED}
+    terminal = (
+        after_class["status"] == cc.OPEN
+        and "correction limit reached" in json.dumps(after["review_state"])
+    )
+    expected_outcome = "closed-or-replaced" if disposed else "terminal-gate-rejection"
+    if not (disposed or terminal) or artifact["outcome"] != expected_outcome:
+        raise ValueError("durable outcome does not satisfy the gate acceptance")
+    if artifact["durable_reload"] is not True:
+        raise ValueError("durable reload was not recorded")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--codex", default=os.environ.get("PARANOIA_ACCEPTANCE_CODEX", "codex"))
@@ -155,6 +265,7 @@ def main() -> int:
         "durable_reload":True,
         "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
     }
+    validate_artifact(artifact, ROOT)
     Path(args.output).write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
