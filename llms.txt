@@ -1,0 +1,31 @@
+# Paranoia Local
+
+> Paranoia Local is a local MCP server for cross-vendor adversarial review. Claude Code can run Codex as a read-only reviewer, Codex can run Claude Code, and arbitration uses both independently over pinned evidence.
+
+Use the quickstart for installation. Use the LLM operating reference when selecting or calling a tool. Runtime MCP schemas are authoritative if prose differs from the installed version. The five tools are `critique_branch`, `critique_plan`, `query`, `rebut`, and `arbitrate`.
+
+## Core documentation
+
+- [Human quickstart and overview](https://github.com/subvertnormality/paranoia-local/blob/main/README.md): Installation, first review, workflows, configuration, troubleshooting, safety, and cost.
+- [LLM operating reference](https://github.com/subvertnormality/paranoia-local/blob/main/docs/llm-reference.md): Dense selection rules, call shapes, defaults, constraints, state transitions, output parsing, and recovery.
+- [Complete tool reference](https://github.com/subvertnormality/paranoia-local/blob/main/docs/tool-reference.md): Every public MCP argument, output field, constraint, and tool-specific rule.
+- [How Paranoia works](https://github.com/subvertnormality/paranoia-local/blob/main/docs/how-it-works.md): Review lifecycle, class closure, plan contracts, external evidence, arbitration, isolation, state, limits, and failures.
+
+## Authoritative implementation
+
+- [MCP schemas](https://github.com/subvertnormality/paranoia-local/blob/main/src/paranoia_local/server.py): Public tool names, JSON schemas, descriptions, and dispatch.
+- [CLI entry point](https://github.com/subvertnormality/paranoia-local/blob/main/src/paranoia_local/cli.py): Executable flags and defaults.
+- [Provider engines](https://github.com/subvertnormality/paranoia-local/blob/main/src/paranoia_local/engines.py): Models, minimum CLI versions, capability profiles, and process construction.
+- [Package metadata](https://github.com/subvertnormality/paranoia-local/blob/main/pyproject.toml): Python version, dependencies, executable, and development extras.
+
+## Detailed protocols
+
+- [Claim verification](https://github.com/subvertnormality/paranoia-local/blob/main/docs/claim_verification.md): Claim eligibility, discovery, capture, binding, cold attestation, persistence, and acceptance boundaries.
+- [Arbitration design](https://github.com/subvertnormality/paranoia-local/blob/main/docs/arbitration_plan.md): Evidence isolation, neutralization, counterbalancing, reconciliation, outcomes, and residual risks.
+- [Class closure](https://github.com/subvertnormality/paranoia-local/blob/main/docs/class_closure_plan.md): Durable reusable defect classes and convergence semantics.
+- [Staged review protocol](https://github.com/subvertnormality/paranoia-local/blob/main/docs/staged_review_protocol_v2_plan.md): Census, correction, final, validation, and atomic settlement.
+
+## Optional
+
+- [Documentation directory](https://github.com/subvertnormality/paranoia-local/tree/main/docs): Design records and dated acceptance artifacts.
+- [Tests](https://github.com/subvertnormality/paranoia-local/tree/main/tests): Unit, integration, protocol, and acceptance coverage.
