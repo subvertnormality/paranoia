@@ -1695,8 +1695,13 @@ def test_failed_staged_round_retains_persistent_class_without_fake_session(
     )
     closure.prepare()
     error = handlers._staged_error(
-        "provider unavailable", role="correction", kind="provider",
+        "ordinary validation failure", role="correction-validation-retry",
+        kind="validation",
     )
+    error.attempts = [rc.Attempt(  # type: ignore[attr-defined]
+        "correction-validation-retry", "fake", "valid-but-unauthorized",
+        "validation-invalid", 1, None,
+    )]
     if cacheable_validation:
         error.census_cache = {"schema_version": 1}  # type: ignore[attr-defined]
 

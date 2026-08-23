@@ -695,6 +695,7 @@ def _settle_staged_failure(
         and terminal_attempt.role == "correction-validation-retry"
         and terminal_attempt.outcome == "validation-invalid"
     )
+    authorized_failure_session = successful_session if terminal_gate_rejection else None
     if terminal_gate_rejection:
         control = rc.normalize_correction_control(
             state, closure.lineage.active(),
@@ -748,7 +749,7 @@ def _settle_staged_failure(
                 for item in closure.lineage.blocking()
             },
             reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
-            session_ref=successful_session,
+            session_ref=authorized_failure_session,
             round_label=closure.round_no,
             correction_gates=getattr(closure, "correction_gates", ()),
         ),
