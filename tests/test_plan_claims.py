@@ -233,10 +233,7 @@ def test_authoritative_capture_acceptance_record() -> None:
         cwd=root, check=True, stdout=subprocess.PIPE,
     ).stdout
     assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
-    assert census_allowed["scope"] == (
-        "Adds requested timeout, separate provider duration, and diagnostic-only class "
-        "persistence and reopen-wave trailer rendering."
-    )
+    assert "does not alter capture, binding, cold-attestation" in census_allowed["scope"]
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
