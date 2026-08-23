@@ -90,6 +90,13 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         mutate(changed)
         with pytest.raises(ValueError):
             acceptance.validate_artifact(changed, root)
+    changed = json.loads(json.dumps(artifact))
+    changed["result_text"] = "forged but self-consistent\n\n" + changed["rendered_trailer"]
+    changed["result_sha256"] = hashlib.sha256(
+        changed["result_text"].encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(ValueError, match="independently reconstructed"):
+        acceptance.validate_artifact(changed, root)
 
 
 def test_census_cache_requires_every_exact_binding():

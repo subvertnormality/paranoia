@@ -131,6 +131,91 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
     return cc._to_json(lineage)
 
 
+def _successful_trailer(before: dict, after: dict, settlement: dict, audit: dict) -> str:
+    lineage = cc._from_json(LINEAGE, deepcopy(after))
+    prior_ids = {row["class_id"] for row in before["classes"]}
+    minted = [row.class_id for row in lineage.classes.values() if row.class_id not in prior_ids]
+    minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
+    status = rc.register_status(settlement["class_records"], minted_by_record, phase="correction")
+    return "\n".join((
+        cc.render_trailer(
+            lineage, register_status=status, minted=minted, include_verdict=False,
+        ),
+        rc.trailer(
+            lineage.review_state,
+            class_first_rounds={row.class_id:row.first_round for row in lineage.blocking()},
+            session_ref=audit.get("session_ref"),
+            correction_gates=audit["correction_gates"],
+        ),
+        rc.attempt_trailer(audit["attempt_ledger"]),
+    ))
+
+
+def _replay_terminal_lineage(before: dict, audit: dict) -> tuple[dict, str]:
+    """Recompute terminal gate diagnostics and the complete unchanged substantive state."""
+    message = audit.get("raw_excerpt")
+    if (
+        not isinstance(message, str)
+        or _sha(message) != audit.get("raw_sha256")
+        or audit.get("returncode") != 2 or audit.get("error") is not True
+    ):
+        raise ValueError("terminal audit does not retain its exact local failure message")
+    attempts = audit.get("attempt_ledger")
+    if not isinstance(attempts, list) or not attempts:
+        raise ValueError("terminal gate outcome lacks attempts")
+    terminal = attempts[-1]
+    if not (
+        terminal.get("role") == "correction-validation-retry"
+        and terminal.get("outcome") == "validation-invalid"
+        and "correction limit reached" in message
+    ):
+        raise ValueError("terminal attempt is not the bounded gate rejection")
+    expected = deepcopy(before)
+    state = expected["review_state"]
+    for key in ("census_cache", "validation_debt", "staged_failure", "format_debt"):
+        state.pop(key, None)
+    failure = {"role":"correction-validation-retry", "kind":"validation", "message":message}
+    rejected = audit.get("rejected_payloads")
+    if rejected:
+        failure["rejected_payloads"] = deepcopy(rejected)
+    state["staged_failure"] = failure
+    session = rc.validated_session_ref(terminal.get("session_ref"))
+    if session is not None:
+        state["correction_control"]["classes"][CLASS_ID]["last_session_ref"] = session
+    lineage = cc._from_json(LINEAGE, deepcopy(expected))
+    status = f"staged rejected: {rc.trailer_diagnostic(message)}"
+    trailer = "\n".join((
+        cc.render_trailer(lineage, register_status=status, include_verdict=False),
+        rc.trailer(
+            state,
+            class_first_rounds={row.class_id:row.first_round for row in lineage.blocking()},
+            session_ref=session, round_label=7,
+            correction_gates=audit["correction_gates"],
+        ),
+        rc.attempt_trailer(attempts),
+    ))
+    return expected, trailer
+
+
+def _public_result(*, audit: dict, settlement: dict | None, after: dict, trailer: str) -> str:
+    if settlement is not None:
+        text = rc.render_review(settlement, after["review_state"])
+        review = engines.Review(
+            text=text, session_ref=audit.get("session_ref"), raw="",
+            returncode=0, error=False,
+        )
+    else:
+        message = audit["raw_excerpt"]
+        text = rc.render_error_review(
+            f"[paranoia-local error] staged review rejected: {message}"
+        )
+        review = engines.Review(
+            text=text, session_ref=None, raw=message, returncode=2, error=True,
+        )
+    engine = type("RecordedCodex", (), {"name":"codex"})()
+    return f"{handlers._footer(review, engine)}\n\n{trailer}"
+
+
 def _preflight_matrix(root: Path) -> list[dict]:
     """Replay public strict-round refusal for both tracked seams with zero calls."""
     matrix_root = Path(tempfile.mkdtemp(prefix="paranoia-gate-preflight-"))
@@ -406,11 +491,30 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
             raise ValueError("successful settlement did not advance the durable label")
         if _replay_successful_lineage(before, settlement, audit) != after:
             raise ValueError("complete post-review lineage differs from canonical replay")
+        expected_trailer = _successful_trailer(before, after, settlement, audit)
     else:
         if settlement is not None:
             raise ValueError("terminal rejection published an unapplied settlement")
         if after["review_state"].get("last_round") != 6:
             raise ValueError("terminal rejection advanced substantive round state")
+        expected_after, expected_trailer = _replay_terminal_lineage(before, audit)
+        if expected_after != after:
+            raise ValueError("complete terminal lineage differs from canonical replay")
+    expected_result = _public_result(
+        audit=audit, settlement=settlement, after=after, trailer=expected_trailer,
+    )
+    expected_text = (
+        rc.render_review(settlement, after["review_state"])
+        if settlement is not None else rc.render_error_review(
+            f"[paranoia-local error] staged review rejected: {audit['raw_excerpt']}"
+        )
+    )
+    if (
+        trailer != expected_trailer or result != expected_result
+        or audit.get("text") != expected_text
+        or artifact["result_sha256"] != _sha(expected_result)
+    ):
+        raise ValueError("public response is not the independently reconstructed result")
     if after["review_state"].get("snapshot_digest") != fixture["structural_snapshot"]:
         raise ValueError("durable state is not bound to the reviewed snapshot")
     active_rows = [row for row in after["classes"] if row.get("status") != cc.SUPERSEDED]
