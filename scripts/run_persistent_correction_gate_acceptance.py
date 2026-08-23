@@ -439,6 +439,17 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         for row in attempts
     ):
         raise ValueError("attempt telemetry is incomplete or on the wrong route")
+    terminal_attempt = attempts[-1]
+    if artifact["outcome"] == "closed-or-replaced":
+        if (
+            terminal_attempt.get("outcome") != "completed"
+            or rc.validated_session_ref(terminal_attempt.get("session_ref")) is None
+            or audit.get("session_ref") != terminal_attempt.get("session_ref")
+            or audit.get("returncode") != 0 or audit.get("error") is not False
+        ):
+            raise ValueError("successful public session is not bound to its terminal attempt")
+    elif audit.get("session_ref") is not None:
+        raise ValueError("terminal gate failure must not publish a review-footer session")
     result = artifact["result_text"]
     trailer = artifact["rendered_trailer"]
     if (

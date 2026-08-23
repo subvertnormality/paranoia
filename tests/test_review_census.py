@@ -97,6 +97,17 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     ).hexdigest()
     with pytest.raises(ValueError, match="independently reconstructed"):
         acceptance.validate_artifact(changed, root)
+    changed = json.loads(json.dumps(artifact))
+    changed["audit"]["session_ref"] = "forged-session"
+    old = artifact["audit"]["session_ref"]
+    changed["result_text"] = changed["result_text"].replace(
+        f"session_ref=`{old}`", "session_ref=`forged-session`",
+    )
+    changed["result_sha256"] = hashlib.sha256(
+        changed["result_text"].encode("utf-8")
+    ).hexdigest()
+    with pytest.raises(ValueError, match="terminal attempt"):
+        acceptance.validate_artifact(changed, root)
 
 
 def test_census_cache_requires_every_exact_binding():
