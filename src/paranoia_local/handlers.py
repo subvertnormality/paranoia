@@ -681,16 +681,19 @@ def _settle_staged_failure(
     if isinstance(cache, dict):
         state["census_cache"] = deepcopy(cache)
     attempts = list(getattr(error, "attempts", []))
-    successful_session = rc.validated_session_ref(next((
-        item.session_ref for item in reversed(attempts)
-        if item.outcome in {"completed", "validation-invalid"} and item.session_ref
-    ), None))
+    terminal_attempt = attempts[-1] if attempts else None
+    successful_session = rc.validated_session_ref(
+        terminal_attempt.session_ref if terminal_attempt is not None else None
+    )
     gates = getattr(closure, "correction_gates", [])
     terminal_gate_rejection = (
         bool(gates) and successful_session is not None
         and getattr(error, "failure_kind", None) == "validation"
         and getattr(error, "stage_role", None) == "correction-validation-retry"
-        and "correction limit reached" in str(error)
+        and getattr(error, "correction_gate_rejection", False) is True
+        and terminal_attempt is not None
+        and terminal_attempt.role == "correction-validation-retry"
+        and terminal_attempt.outcome == "validation-invalid"
     )
     if terminal_gate_rejection:
         control = rc.normalize_correction_control(
@@ -1105,7 +1108,12 @@ def _staged_structural_review(
                     )
             except (rc.CensusError, cc.RegisterError) as exc:
                 issues.extend(str(exc).splitlines())
-        _raise_staged_validation_issues(issues)
+        try:
+            _raise_staged_validation_issues(issues)
+        except rc.CensusError as exc:
+            if any("correction limit reached" in issue for issue in issues):
+                exc.correction_gate_rejection = True  # type: ignore[attr-defined]
+            raise
         assert parsed is not None
         return parsed
 

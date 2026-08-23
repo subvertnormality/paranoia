@@ -1127,6 +1127,13 @@ It is empty outside correction and for an ungated correction. A failed label doe
 durable `last_round`, so that label may be retried; a forward jump deliberately contributes its
 full distance. Provider/validation failure keeps substantive class and debt state unchanged,
 while an ambiguous lineage write keeps the pending latch and returns state unavailable.
+The lineage's closed `review_state.correction_control` V1 map has exactly one row per active
+nonsuperseded class. `reset_round` is the last durable bound-rebut or replacement reset,
+`reopen_count` is the undisposed reopen-wave count, and `last_session_ref` is only the valid
+session from the latest successful settlement that left the class blocking. A null or invalid
+current-attempt session clears stale authority. Terminal gate bootstrap reads only the exact
+validation-invalid terminal retry and fills only a previously sessionless row; it never searches
+backward to an earlier attempt or overwrites already-bound authority.
 The retained [class-persistence acceptance](docs/class_persistence_acceptance_2026-08-22.json)
 exercises that reopen and diagnostic lifecycle through the public branch handler with one real
 Codex call on a tiny synthetic committed diff.

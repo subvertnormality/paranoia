@@ -49,6 +49,71 @@ def _state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _preflight_matrix(root: Path) -> list[dict]:
+    """Replay public strict-round refusal for both tracked seams with zero calls."""
+    matrix_root = Path(tempfile.mkdtemp(prefix="paranoia-gate-preflight-"))
+    previous = os.environ.get(cc.STATE_ROOT_ENV)
+    os.environ[cc.STATE_ROOT_ENV] = str(matrix_root)
+
+    class NoCallEngine:
+        name = "acceptance-no-call"
+        default_model = "unused"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            self.calls += 1
+            raise AssertionError("strict-round preflight admitted a provider call")
+
+        resume = run
+
+    rows: list[dict] = []
+    try:
+        for mode in (cc.PLAN_MODE, cc.BRANCH_MODE):
+            lineage_id = f"persistent-gate-{mode}-strict-preflight"
+            state = rc.normalize_state(None, stakes=STAKES, snapshot="preflight")
+            state.update(phase="correction", last_round=6, debt=[])
+            state["correction_control"] = {"version":1, "classes":{}}
+            cc.save_lineage(matrix_root, cc.Lineage(
+                lineage_id, rounds=6, mode=mode, review_state=state,
+            ))
+            path = cc.lineage_dir(matrix_root) / f"{lineage_id}.json"
+            before = hashlib.sha256(path.read_bytes()).hexdigest()
+            engine = NoCallEngine()
+            arguments = {
+                "repo_path":str(root), "lineage":lineage_id, "round":6,
+                "class_closure":True, "stakes":STAKES,
+            }
+            if mode == cc.PLAN_MODE:
+                arguments.update(plan_text=PLAN, claim_verification=False)
+                invoke = handlers.critique_plan
+            else:
+                arguments.update(base_ref="main", head_ref="HEAD", converge=True)
+                invoke = handlers.critique_branch
+            try:
+                invoke(arguments, engine=engine, log_dir=matrix_root / "logs")
+            except ValueError as exc:
+                message = str(exc)
+            else:
+                raise AssertionError("replayed round label was not refused")
+            after = hashlib.sha256(path.read_bytes()).hexdigest()
+            rows.append({
+                "mode":mode, "round":6, "durable_last_round":6,
+                "error":message, "provider_calls":engine.calls,
+                "state_sha256_before":before, "state_sha256_after":after,
+                "pending_exists":(
+                    cc.lineage_dir(matrix_root) / f"{lineage_id}.pending"
+                ).exists(),
+            })
+    finally:
+        if previous is None:
+            os.environ.pop(cc.STATE_ROOT_ENV, None)
+        else:
+            os.environ[cc.STATE_ROOT_ENV] = previous
+    return rows
+
+
 def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
     """Shared fail-closed builder/replay validator for the retained acceptance."""
     expected_keys = {
@@ -56,16 +121,37 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
         "result_sha256", "rendered_trailer", "correction_gates", "durable_reload",
-        "outcome",
+        "outcome", "public_preflight_matrix",
     }
     if set(artifact) != expected_keys:
         raise ValueError("acceptance fields are not closed and exact")
     if artifact["acceptance_kind"] != "persistent-correction-gate-public-plan-handler":
         raise ValueError("wrong acceptance kind")
+    surfaces = {
+        "README.md": (
+            "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
+            "correction_gates", "rendered_trailer", "validation-invalid terminal retry",
+        ),
+        "AGENTS.md": (
+            "reset_round", "reopen_count", "last_session_ref",
+            "exact validation-invalid terminal retry",
+        ),
+        "src/paranoia_local/server.py": (
+            "all-or-none", "never closes debt", "exact terminal validation retry",
+        ),
+    }
+    for relative, required in surfaces.items():
+        text = (root / relative).read_text(encoding="utf-8")
+        missing = [token for token in required if token not in text]
+        if missing:
+            raise ValueError(f"{relative} omits public contract tokens {missing!r}")
     revision = artifact["source_revision"]
     expected_sources = {
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
+        "src/paranoia_local/server.py", "README.md", "AGENTS.md",
+        "tests/test_review_census.py", "tests/test_handlers.py",
+        "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     }
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
@@ -157,6 +243,17 @@ def validate_artifact(artifact: dict, root: Path = ROOT) -> None:
         raise ValueError("durable outcome does not satisfy the gate acceptance")
     if artifact["durable_reload"] is not True:
         raise ValueError("durable reload was not recorded")
+    matrix = artifact["public_preflight_matrix"]
+    if matrix != _preflight_matrix(root):
+        raise ValueError("public plan/branch strict-round preflight replay mismatch")
+    if any(
+        row["provider_calls"] != 0
+        or row["state_sha256_before"] != row["state_sha256_after"]
+        or row["pending_exists"] is not False
+        or "greater than durable last_round 6; got 6" not in row["error"]
+        for row in matrix
+    ):
+        raise ValueError("strict-round preflight did work or mutated durable state")
 
 
 def main() -> int:
@@ -238,6 +335,9 @@ def main() -> int:
     source_paths = [
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
+        "src/paranoia_local/server.py", "README.md", "AGENTS.md",
+        "tests/test_review_census.py", "tests/test_handlers.py",
+        "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     ]
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
@@ -264,6 +364,7 @@ def main() -> int:
         "rendered_trailer":trailer, "correction_gates":gates,
         "durable_reload":True,
         "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
+        "public_preflight_matrix":_preflight_matrix(ROOT),
     }
     validate_artifact(artifact, ROOT)
     Path(args.output).write_text(

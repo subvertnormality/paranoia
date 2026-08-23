@@ -1538,8 +1538,9 @@ def test_tracked_round_labels_must_advance_but_failed_label_can_retry(tmp_path) 
         retry.abandon(); retry.release()
 
 
+@pytest.mark.parametrize("retry_session", ["gate-retry", None])
 def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
-    tmp_path,
+    tmp_path, retry_session,
 ) -> None:
     state = rc.normalize_state(None, stakes="s", snapshot="p")
     state.update(phase="correction", last_round=6, debt=[{
@@ -1597,7 +1598,7 @@ def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
             return Review(text=value, session_ref="gate-first", raw=value)
 
         def resume(self, *args, **kwargs):
-            return Review(text=value, session_ref="gate-retry", raw=value)
+            return Review(text=value, session_ref=retry_session, raw=value)
 
     closure = Closure()
     with pytest.raises(rc.CensusError, match="correction limit reached") as caught:
@@ -1614,10 +1615,14 @@ def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
     ]
     assert closure.lineage.classes["class-a"].status == cc.OPEN
     assert closure.lineage.review_state["last_round"] == 6
-    row = closure.lineage.review_state["correction_control"]["classes"]["class-a"]
-    assert row["last_session_ref"] == "gate-retry"
     assert "CORRECTION-GATE: class-a" in rendered
-    assert "rebut with session_ref=gate-retry" in rendered
+    if retry_session is None:
+        assert "correction_control" not in closure.lineage.review_state
+        assert "rebut with session_ref=" not in rendered
+    else:
+        row = closure.lineage.review_state["correction_control"]["classes"]["class-a"]
+        assert row["last_session_ref"] == retry_session
+        assert "rebut with session_ref=gate-retry" in rendered
 
 
 @pytest.mark.parametrize("cacheable_validation", [False, True])

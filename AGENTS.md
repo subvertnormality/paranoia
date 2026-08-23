@@ -468,3 +468,6 @@ leaves the same class canonically blocking. Admit only a canonical close/replace
 class-bound rebut reset against the stored current session. Rebut resets never change verdict,
 debt, or severity. Preserve this control state atomically with the lineage and store the exact
 returned trailer in plan and branch audit records.
+The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
+session authority replaces stale authority even when it is null; a terminal gate bootstrap may
+use only the exact validation-invalid terminal retry and only for a previously sessionless row.

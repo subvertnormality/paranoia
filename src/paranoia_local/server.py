@@ -443,7 +443,8 @@ TOOLS: list[Tool] = [
             "Dispute a specific finding from a prior review. Resumes the SAME reviewer session (cheaper and "
             "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations. "
             "The optional lineage/class/mode trio is all-or-none and resets only that class's bounded correction window "
-            "after a successful current-session rebut; it never closes debt, changes severity, or grants clearance."
+            "after a successful current-session rebut; it never closes debt, changes severity, or grants clearance. "
+            "Sessionless gate recovery uses only the exact terminal validation retry and never falls back to an earlier attempt."
         ),
         inputSchema={
             "type": "object",
