@@ -184,7 +184,7 @@ def _replay_terminal_lineage(before: dict, audit: dict) -> tuple[dict, str]:
     if session is not None:
         state["correction_control"]["classes"][CLASS_ID]["last_session_ref"] = session
     lineage = cc._from_json(LINEAGE, deepcopy(expected))
-    status = f"staged rejected: {rc.trailer_diagnostic(message)}"
+    status = f"staged rejected (validation): {rc.trailer_diagnostic(message)}"
     trailer = "\n".join((
         cc.render_trailer(lineage, register_status=status, include_verdict=False),
         rc.trailer(
@@ -208,7 +208,7 @@ def _public_result(*, audit: dict, settlement: dict | None, after: dict, trailer
     else:
         message = audit["raw_excerpt"]
         text = rc.render_error_review(
-            f"[paranoia-local error] staged review rejected: {message}"
+            f"[paranoia-local error] staged review rejected (validation): {message}"
         )
         review = engines.Review(
             text=text, session_ref=None, raw=message, returncode=2, error=True,
@@ -322,6 +322,53 @@ def _preflight_matrix(root: Path) -> list[dict]:
     return rows
 
 
+def _provider_failure_route(root: Path) -> dict:
+    """Exercise a provider failure through public critique_branch and a real process."""
+    runtime = Path(tempfile.mkdtemp(prefix="paranoia-provider-failure-"))
+    state_root = runtime / "state"
+    log_root = runtime / "logs"
+    fake = runtime / "codex"
+    fake.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.144.6'; exit 0; fi\n"
+        "cat >/dev/null\n"
+        "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"capacity-fixture\"}'\n"
+        "printf '%s\\n' '{\"type\":\"turn.failed\",\"error\":{\"message\":\"Selected model is at capacity\"}}'\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    previous = os.environ.get(cc.STATE_ROOT_ENV)
+    os.environ[cc.STATE_ROOT_ENV] = str(state_root)
+    engine = engines.CodexEngine()
+    engine.binary = str(fake)
+    try:
+        result = handlers.critique_branch({
+            "repo_path":str(root), "base_ref":"main", "head_ref":"HEAD",
+            "lineage":"staged-provider-failure-acceptance", "round":1,
+            "class_closure":True, "converge":True, "stakes":STAKES,
+            "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
+        }, engine=engine, log_dir=log_root)
+    finally:
+        if previous is None:
+            os.environ.pop(cc.STATE_ROOT_ENV, None)
+        else:
+            os.environ[cc.STATE_ROOT_ENV] = previous
+    audits = list(log_root.glob("*.json"))
+    if len(audits) != 1:
+        raise RuntimeError(f"expected one provider-failure audit, got {len(audits)}")
+    audit = _state(audits[0])
+    lineage = cc.load_lineage(
+        state_root, "staged-provider-failure-acceptance",
+        stamp="provider-failure-reload", mode=cc.BRANCH_MODE,
+    )
+    return {
+        "result_text":result, "result_sha256":_sha(result),
+        "rendered_trailer":audit.get("rendered_trailer"), "audit":audit,
+        "durable_lineage":cc._to_json(lineage),
+        "attempt_ledger":audit.get("attempt_ledger"),
+    }
+
+
 def validate_artifact(
     artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
 ) -> None:
@@ -339,14 +386,14 @@ def validate_artifact(
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
         "result_sha256", "rendered_trailer", "correction_gates",
         "durable_reload_lineage",
-        "outcome", "public_preflight_matrix",
+        "outcome", "public_preflight_matrix", "public_provider_failure_route",
     }
     if set(artifact) != expected_keys:
         raise ValueError("acceptance fields are not closed and exact")
     if artifact["acceptance_kind"] != "persistent-correction-gate-public-plan-handler":
         raise ValueError("wrong acceptance kind")
     surfaces = {
-        "README.md": (
+        "docs/how-it-works.md": (
             "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
             "correction_gates", "rendered_trailer", "validation-invalid terminal retry",
         ),
@@ -368,7 +415,7 @@ def validate_artifact(
     expected_sources = {
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "README.md", "AGENTS.md",
+        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
         "tests/test_review_census.py", "tests/test_handlers.py",
         "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     }
@@ -527,7 +574,8 @@ def validate_artifact(
     expected_text = (
         rc.render_review(settlement, after["review_state"])
         if settlement is not None else rc.render_error_review(
-            f"[paranoia-local error] staged review rejected: {audit['raw_excerpt']}"
+            "[paranoia-local error] staged review rejected (validation): "
+            f"{audit['raw_excerpt']}"
         )
     )
     if (
@@ -562,6 +610,46 @@ def validate_artifact(
         for row in matrix
     ):
         raise ValueError("strict-round preflight did work or mutated durable state")
+    failure_route = artifact["public_provider_failure_route"]
+    if set(failure_route) != {
+        "result_text", "result_sha256", "rendered_trailer", "audit",
+        "durable_lineage", "attempt_ledger",
+    }:
+        raise ValueError("provider-failure route fields are not closed and exact")
+    failure_result = failure_route["result_text"]
+    failure_trailer = failure_route["rendered_trailer"]
+    failure_audit = failure_route["audit"]
+    failure_state = failure_route["durable_lineage"]["review_state"]
+    failure_attempts = failure_route["attempt_ledger"]
+    if (
+        not isinstance(failure_result, str)
+        or failure_route["result_sha256"] != _sha(failure_result)
+        or not isinstance(failure_trailer, str)
+        or not failure_result.endswith(failure_trailer)
+        or failure_audit.get("tool") != "critique_branch"
+        or failure_audit.get("rendered_trailer") != failure_trailer
+        or failure_audit.get("error") is not True
+        or failure_state.get("staged_failure", {}).get("kind") != "provider"
+        or failure_state.get("staged_failure", {}).get("message")
+        != "Selected model is at capacity"
+        or failure_state.get("validation_debt") is not None
+        or not isinstance(failure_attempts, list) or not failure_attempts
+        or failure_audit.get("attempt_ledger") != failure_attempts
+        or any(
+            row.get("engine") != "codex" or row.get("returncode") != 0
+            or row.get("outcome") != "execution-failed"
+            or row.get("failure_detail_excerpt") != "Selected model is at capacity"
+            for row in failure_attempts
+        )
+        or "staged engine failed (provider): Selected model is at capacity"
+        not in failure_result
+        or "CLASS-REGISTER: engine failed (provider): Selected model is at capacity"
+        not in failure_trailer
+        or "STRUCTURAL-FAILURE:" not in failure_trailer
+        or "kind=provider" not in failure_trailer
+        or "CONVERGENCE: BLOCKED" not in failure_trailer
+    ):
+        raise ValueError("public provider-failure route is not exact and source-bound")
 
 
 def main() -> int:
@@ -625,13 +713,13 @@ def main() -> int:
     source_paths = [
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "README.md", "AGENTS.md",
+        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
         "tests/test_review_census.py", "tests/test_handlers.py",
         "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     ]
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
-        "version":1, "date":"2026-08-23", "source_revision":revision,
+        "version":2, "date":"2026-08-24", "source_revision":revision,
         "source_sha256":{
             path:hashlib.sha256(_git_bytes("show", f"{revision}:{path}")).hexdigest()
             for path in source_paths
@@ -655,6 +743,7 @@ def main() -> int:
         "durable_reload_lineage":cc._to_json(durable),
         "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
         "public_preflight_matrix":_preflight_matrix(ROOT),
+        "public_provider_failure_route":_provider_failure_route(ROOT),
     }
     validate_artifact(artifact, ROOT, require_committed=False)
     Path(args.output).write_text(

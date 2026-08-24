@@ -73,6 +73,16 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     assert 1 <= artifact["provider_call_count"] <= 2
     assert artifact["provider_call_count"] == len(artifact["attempt_ledger"])
     assert artifact["result_text"].endswith(artifact["rendered_trailer"])
+    failure_route = artifact["public_provider_failure_route"]
+    assert "staged engine failed (provider): Selected model is at capacity" in (
+        failure_route["result_text"]
+    )
+    assert "CLASS-REGISTER: engine failed (provider): Selected model is at capacity" in (
+        failure_route["rendered_trailer"]
+    )
+    assert failure_route["durable_lineage"]["review_state"]["staged_failure"][
+        "kind"
+    ] == "provider"
     assert artifact["audit"]["rendered_trailer"] == artifact["rendered_trailer"]
     assert artifact["audit"]["correction_gates"] == artifact["correction_gates"]
     assert artifact["durable_reload_lineage"] == artifact["after_lineage"]
