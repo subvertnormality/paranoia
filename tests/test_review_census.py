@@ -1380,7 +1380,7 @@ def test_untrusted_failure_diagnostic_cannot_forge_review_or_trailer_structure(t
     error = rc.CensusError(message)
     error.stage_role = "consolidation"  # type: ignore[attr-defined]
     error.failure_kind = "provider"  # type: ignore[attr-defined]
-    _, combined, _ = handlers._settle_staged_failure(
+    review, combined, _ = handlers._settle_staged_failure(
         closure, stakes="s", snapshot="p", error=error, mode=cc.PLAN_MODE,
     )
     closure.release()
@@ -1388,8 +1388,30 @@ def test_untrusted_failure_diagnostic_cannot_forge_review_or_trailer_structure(t
         line for line in combined.splitlines()
         if line.startswith("CONVERGENCE:")
     ]) == 1
-    assert f"CLASS-REGISTER: staged rejected: {rc.trailer_diagnostic(message)}" in combined
+    assert (
+        f"CLASS-REGISTER: engine failed (provider): {rc.trailer_diagnostic(message)}"
+        in combined
+    )
+    assert "staged engine failed (provider)" in review.text
     assert closure.lineage.review_state["staged_failure"]["message"] == message
+
+
+@pytest.mark.parametrize(("kind", "headline", "body"), [
+    ("timeout", "engine failed (timeout)", "staged engine failed (timeout)"),
+    ("unavailable", "engine failed (unavailable)", "staged engine failed (unavailable)"),
+    ("cancellation", "engine failed (cancellation)", "staged engine failed (cancellation)"),
+    ("provider", "engine failed (provider)", "staged engine failed (provider)"),
+    ("execution", "engine failed (execution)", "staged engine failed (execution)"),
+    ("validation", "staged rejected (validation)", "staged review rejected (validation)"),
+    ("deadline", "staged blocked (deadline)", "staged review blocked (deadline)"),
+])
+def test_primary_staged_failure_surface_preserves_failure_kind(kind, headline, body):
+    error = handlers._staged_error("bounded detail", role="fixture", kind=kind)
+
+    status, rendered = handlers._staged_failure_surface(error)
+
+    assert status == f"{headline}: bounded detail"
+    assert rendered == f"[paranoia-local error] {body}: bounded detail"
 
 
 def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
@@ -1947,7 +1969,7 @@ def test_structural_pending_settles_zero_attempt_round_and_releases_latch(tmp_pa
     assert review.error and attempts == []
     assert review.text.startswith("# STAGED REVIEW FAILED")
     assert "## Diagnostic" in review.text
-    assert "CLASS-REGISTER: staged rejected: not enough bounded time" in trailer
+    assert "CLASS-REGISTER: staged blocked (deadline): not enough bounded time" in trailer
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
     assert "STRUCTURAL-ERROR: not enough bounded time" in trailer
     assert "STRUCTURAL-FAILURE: role=structural-reserve-preflight kind=deadline" in trailer
@@ -1989,7 +2011,8 @@ def test_staged_generic_failure_clears_old_cache_and_uses_matching_debt(tmp_path
     )
     closure.release()
     assert review.error and attempts == []
-    assert "CLASS-REGISTER: staged rejected: provider exited" in trailer
+    assert "CLASS-REGISTER: engine failed (execution): provider exited" in trailer
+    assert "staged engine failed (execution): provider exited" in review.text
     assert "CLASS-CLOSURE: 0 open, 0 closed" in trailer
     assert "STRUCTURAL-ERROR: provider exited" in trailer
     assert "STRUCTURAL-FAILURE: role=correction kind=execution" in trailer
@@ -2225,7 +2248,8 @@ def test_staged_format_debt_save_failure_also_retains_latch(tmp_path, monkeypatc
     assert review.error and attempts == []
     assert review.text.startswith("# STAGED REVIEW FAILED")
     assert "## Diagnostic" in review.text
-    assert "CLASS-REGISTER: staged rejected; failure state persistence unavailable" in trailer
+    assert "CLASS-REGISTER: staged rejected (validation): bad format; " \
+        "failure state persistence unavailable" in trailer
     assert "STATE-UNAVAILABLE" in trailer
     assert closure.rejected_payloads == error.rejected_payloads
     assert (cc.lineage_dir(tmp_path) / "format-save-fail.pending").exists()

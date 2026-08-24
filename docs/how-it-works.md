@@ -223,6 +223,12 @@ missing executables, capture failures, and ambiguous persistence block visibly.
 None becomes an empty successful review. Validation-invalid responses receive at
 most one role-specific correction; execution failures remain distinct.
 
+The primary staged-failure headline preserves that taxonomy: provider and local
+engine outcomes render as `engine failed (<kind>)`, schema or semantic rejection
+as `staged rejected (validation)`, and reserve exhaustion as
+`staged blocked (deadline)`. These labels also appear in `CLASS-REGISTER`, so a
+transient provider failure cannot be mistaken for repeated structural rejection.
+
 A failed staged structural review begins `# STAGED REVIEW FAILED` and states
 whether failure occurred before settlement or after unconfirmed persistence. It
 never renders a clean-review scaffold.
