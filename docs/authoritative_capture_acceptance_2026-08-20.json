@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "3fa7743d934adcb8a2a0e809af7f8cff678bbfab670ffce7035d53d9a98d7678",
-      "additions": 1031,
-      "deletions": 97,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, and failure-diagnostic changes through issue #66; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "82761d0097e9aa866b5c7097d3cd398d462ff7270216347e46b20a50e203ede9",
+      "additions": 1058,
+      "deletions": 105,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, and operator-facing failure-taxonomy changes through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
       "sha256": "5d5f653e7c40e91e389325a83402dfc7148263949a8f94c1cb6206ba1e380674",
