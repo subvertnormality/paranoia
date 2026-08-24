@@ -1,6 +1,11 @@
 {
   "acceptance_kind": "branch-plan-fidelity-public-handler-v1",
-  "allowed_later_source_diffs": {},
+  "allowed_later_source_diffs": {
+    "src/paranoia_local/handlers.py": {
+      "scope": "Operator-facing staged failure taxonomy only; this does not alter branch plan-contract binding or either accepted provider route.",
+      "sha256": "2e08c3b978b2596ae8b243fcf7f55d0f7cc1540d542578f41fb459b458643ffb"
+    }
+  },
   "claims": {
     "does_not_prove": [
       "Every future provider response will classify implementation fidelity correctly.",

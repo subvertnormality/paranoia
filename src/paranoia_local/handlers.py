@@ -464,6 +464,27 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
     )
 
 
+def _staged_failure_surface(error: rc.CensusError) -> tuple[str, str]:
+    """Keep the primary operator surface aligned with durable failure taxonomy."""
+    kind = getattr(error, "failure_kind", "unknown")
+    diagnostic = rc.trailer_diagnostic(error)
+    if kind in {
+        "timeout", "unavailable", "cancellation", "provider", "execution",
+    }:
+        headline = f"engine failed ({kind})"
+        body = f"staged engine failed ({kind})"
+    elif kind == "validation":
+        headline = "staged rejected (validation)"
+        body = "staged review rejected (validation)"
+    elif kind == "deadline":
+        headline = "staged blocked (deadline)"
+        body = "staged review blocked (deadline)"
+    else:
+        headline = f"staged failed ({kind})"
+        body = f"staged review failed ({kind})"
+    return f"{headline}: {diagnostic}", f"[paranoia-local error] {body}: {error}"
+
+
 def _staged_error(message: str, *, role: str, kind: str) -> rc.CensusError:
     error = rc.CensusError(message)
     error.stage_role = role  # type: ignore[attr-defined]
@@ -711,17 +732,19 @@ def _settle_staged_failure(
     closure.lineage.review_state = state
     closure.staged_manifests = getattr(error, "manifests", [])
     closure.rejected_payloads = deepcopy(rejected_payloads)
+    register_status, error_body = _staged_failure_surface(error)
     try:
         cc.save_lineage(closure.state_root, closure.lineage)
     except cc.StateUnavailable as exc:
         closure.unavailable = str(exc)
         message = f"lineage state unavailable after staged failure: {exc}"
         review = Review(
-            text=rc.render_error_review(f"[paranoia-local error] {message}"),
+            text=rc.render_error_review(f"{error_body}; {message}"),
             session_ref=None, raw=message, returncode=2, error=True,
         )
         trailer = (
-            "CLASS-REGISTER: staged rejected; failure state persistence unavailable\n"
+            f"CLASS-REGISTER: {register_status}; "
+            "failure state persistence unavailable\n"
             f"CLASS-CLOSURE: STATE-UNAVAILABLE — {exc}\n"
             f"{rc.attempt_trailer(getattr(error, 'attempts', []))}\n"
             "CONVERGENCE: BLOCKED — staged failure state may not have persisted."
@@ -730,14 +753,10 @@ def _settle_staged_failure(
             trailer = f"{pc.render_trailer(closure.lineage.claim_state)}\n{trailer}"
         return review, trailer, [a.json() for a in attempts]
     closure._settled = True
-    closure.register_status = (
-        f"staged rejected: {rc.trailer_diagnostic(error)}"
-    )
+    closure.register_status = register_status
     attempts = [a.json() for a in attempts]
     review = Review(
-        text=rc.render_error_review(
-            f"[paranoia-local error] staged review rejected: {error}"
-        ),
+        text=rc.render_error_review(error_body),
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
     trailer = "\n".join((

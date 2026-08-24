@@ -223,6 +223,17 @@ missing executables, capture failures, and ambiguous persistence block visibly.
 None becomes an empty successful review. Validation-invalid responses receive at
 most one role-specific correction; execution failures remain distinct.
 
+The primary staged-failure headline preserves that taxonomy: provider and local
+engine outcomes render as `engine failed (<kind>)`, schema or semantic rejection
+as `staged rejected (validation)`, and reserve exhaustion as
+`staged blocked (deadline)`. These labels also appear in `CLASS-REGISTER`, so a
+transient provider failure cannot be mistaken for repeated structural rejection.
+
+Persistent correction control stores `reset_round`, `reopen_count`, and
+`last_session_ref`. A load-bearing `CORRECTION-GATE` is projected from
+`correction_gates` into the exact `rendered_trailer`; only an exact
+validation-invalid terminal retry may recover a previously sessionless gate.
+
 A failed staged structural review begins `# STAGED REVIEW FAILED` and states
 whether failure occurred before settlement or after unconfirmed persistence. It
 never renders a clean-review scaffold.
