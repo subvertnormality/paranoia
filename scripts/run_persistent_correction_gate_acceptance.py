@@ -637,7 +637,7 @@ def validate_artifact(
         or failure_audit.get("attempt_ledger") != failure_attempts
         or any(
             row.get("engine") != "codex" or row.get("returncode") != 0
-            or row.get("outcome") != "execution-failed"
+            or row.get("outcome") != "failed"
             or row.get("failure_detail_excerpt") != "Selected model is at capacity"
             for row in failure_attempts
         )
