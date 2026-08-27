@@ -180,6 +180,9 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
         def _sweep(self, only=None):
             return None
 
+        def _sweep(self, only=None):
+            return None
+
     if phase == "correction":
         value = {
             "role":"correction", "governing_findings":[],
@@ -227,7 +230,17 @@ def _task_from_prompt(prompt: str) -> dict:
     return json.loads(prompt.split("===== TASK INPUT =====\n\n", 1)[1])
 
 
-def test_plan_closure_candidate_enriches_one_existing_provider_call(tmp_path):
+def test_plan_closure_candidate_enriches_one_existing_provider_call(
+    tmp_path, monkeypatch,
+):
+    original = rc.plan_correction_blocking_units
+    invocations = []
+
+    def counted(debt, active_classes):
+        invocations.append((debt, active_classes))
+        return original(debt, active_classes)
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", counted)
     closure, engine, _ = _followup_fixture(
         tmp_path, mode=cc.PLAN_MODE, phase="correction",
     )
@@ -244,10 +257,19 @@ def test_plan_closure_candidate_enriches_one_existing_provider_call(tmp_path):
     assert task["review_scope"] == "closure_candidate"
     assert task["checklist"] == list(sp.CHECKLIST)
     assert prompt.count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    assert len(invocations) == 1
     assert closure.lineage.review_state["phase"] == "final"
 
 
-def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path):
+def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypatch):
+    original = rc.plan_correction_blocking_units
+    invocations = []
+
+    def counted(debt, active_classes):
+        invocations.append((debt, active_classes))
+        return original(debt, active_classes)
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", counted)
     closure, engine, _ = _followup_fixture(
         tmp_path, mode=cc.PLAN_MODE, phase="correction", class_count=3,
     )
@@ -261,15 +283,31 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path):
     assert task["review_scope"] == "targeted"
     assert task["checklist"] == []
     assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert len(invocations) == 1
 
 
-@pytest.mark.parametrize(("mode", "phase", "prompt_sha256"), [
-    (cc.PLAN_MODE, "final", "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4"),
-    (cc.BRANCH_MODE, "correction", "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f"),
-    (cc.BRANCH_MODE, "final", "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3"),
+@pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
+    (
+        cc.PLAN_MODE, "final",
+        "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4",
+        "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
+        "clear",
+    ),
+    (
+        cc.BRANCH_MODE, "correction",
+        "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f",
+        "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
+        "final",
+    ),
+    (
+        cc.BRANCH_MODE, "final",
+        "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3",
+        "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
+        "clear",
+    ),
 ])
 def test_closure_candidate_directives_are_absent_from_excluded_followups(
-    tmp_path, mode, phase, prompt_sha256, monkeypatch,
+    tmp_path, mode, phase, prompt_sha256, schema_sha256, next_phase, monkeypatch,
 ):
     def unexpected_helper(*args, **kwargs):
         raise AssertionError("blocking-unit helper is excluded from this role")
@@ -283,17 +321,25 @@ def test_closure_candidate_directives_are_absent_from_excluded_followups(
         body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
         on_progress=None, plan_lines=1 if mode == cc.PLAN_MODE else None,
     )
-    prompt = engine.calls[0][0]
+    prompt, schema = engine.calls[0]
     task = _task_from_prompt(prompt)
     assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
     assert "review_scope" not in task
     assert task["checklist"] == (list(sp.CHECKLIST) if phase == "final" else [])
     assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == prompt_sha256
+    assert hashlib.sha256(
+        json.dumps(schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest() == schema_sha256
+    assert closure.lineage.review_state["phase"] == next_phase
 
 
-def test_plan_census_does_not_invoke_closure_candidate_classifier(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_census_does_not_invoke_closure_candidate_classifier(
+    tmp_path, monkeypatch, mode,
+):
+    (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
     state = rc.normalize_state(None, stakes="s", snapshot="p")
-    lineage = cc.Lineage("census-scope", mode=cc.PLAN_MODE, review_state=state)
+    lineage = cc.Lineage(f"census-scope-{mode}", mode=mode, review_state=state)
 
     class Closure:
         state_root = tmp_path
@@ -315,6 +361,9 @@ def test_plan_census_does_not_invoke_closure_candidate_classifier(tmp_path, monk
         def _blocks(self):
             return []
 
+        def _sweep(self, only=None):
+            return None
+
     class Engine:
         name = "fake"
 
@@ -329,6 +378,11 @@ def test_plan_census_does_not_invoke_closure_candidate_classifier(tmp_path, monk
                     if row.startswith("ROLE: census lane ")
                 )
                 text = lane(lane_name)
+                if mode == cc.BRANCH_MODE:
+                    text = text.replace(
+                        '"anchor": "plan:1"',
+                        '"anchor": "repository/a.py:1"',
+                    )
             else:
                 text = wire({
                     "role":"census", "governing_findings":[],
@@ -342,11 +396,11 @@ def test_plan_census_does_not_invoke_closure_candidate_classifier(tmp_path, monk
     monkeypatch.setattr(rc, "plan_correction_blocking_units", unexpected_helper)
     closure, engine = Closure(), Engine()
     handlers._staged_structural_review(
-        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=mode,
         body="artifact", closure=closure, stakes="s", snapshot="p", round_no=1,
-        on_progress=None, plan_lines=1,
+        on_progress=None, plan_lines=1 if mode == cc.PLAN_MODE else None,
     )
-    assert len(engine.calls) == 4
+    assert len(engine.calls) == len(rc.LANES[mode]) + 1
 
 
 def test_legacy_census_to_correction_recovery_remains_targeted(tmp_path, monkeypatch):
@@ -419,6 +473,12 @@ def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):
 
 @pytest.mark.parametrize("malformed_debt", [
     ["not-an-object"],
+    [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+    ],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
     [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
 ])
 def test_public_plan_correction_preflights_debt_before_provider_spend(
@@ -429,7 +489,9 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     tracked = cc.TrackedClass(
         "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
     )
-    lineage_id = "malformed-plan-debt-" + str(len(json.dumps(malformed_debt)))
+    lineage_id = "malformed-plan-debt-" + hashlib.sha256(
+        json.dumps(malformed_debt, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
     cc.save_lineage(cc.default_state_root(), cc.Lineage(
         lineage_id, mode=cc.PLAN_MODE, rounds=1,
         classes={tracked.class_id:tracked}, review_state=state,

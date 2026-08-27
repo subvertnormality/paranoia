@@ -483,8 +483,8 @@ def validate_artifact(
         raise ValueError("audit gate projection mismatch")
     if audit.get("attempt_ledger") != attempts:
         raise ValueError("attempt ledger is not exact")
-    if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
-        raise ValueError("provider call topology exceeded its bound")
+    if not isinstance(attempts, list) or len(attempts) != 1:
+        raise ValueError("closure-sweep acceptance requires exactly one provider attempt")
     if artifact["provider_call_count"] != len(attempts):
         raise ValueError("provider call count mismatch")
     if any(
@@ -497,16 +497,16 @@ def validate_artifact(
     ):
         raise ValueError("attempt telemetry is incomplete or on the wrong route")
     terminal_attempt = attempts[-1]
-    if artifact["outcome"] == "closed-or-replaced":
-        if (
-            terminal_attempt.get("outcome") != "completed"
-            or rc.validated_session_ref(terminal_attempt.get("session_ref")) is None
-            or audit.get("session_ref") != terminal_attempt.get("session_ref")
-            or audit.get("returncode") != 0 or audit.get("error") is not False
-        ):
-            raise ValueError("successful public session is not bound to its terminal attempt")
-    elif audit.get("session_ref") is not None:
-        raise ValueError("terminal gate failure must not publish a review-footer session")
+    if artifact["outcome"] != "closed-with-sibling-debt":
+        raise ValueError("acceptance did not retain the required sibling-debt outcome")
+    if (
+        terminal_attempt.get("role") != "correction"
+        or terminal_attempt.get("outcome") != "completed"
+        or rc.validated_session_ref(terminal_attempt.get("session_ref")) is None
+        or audit.get("session_ref") != terminal_attempt.get("session_ref")
+        or audit.get("returncode") != 0 or audit.get("error") is not False
+    ):
+        raise ValueError("successful public session is not bound to one correction attempt")
     result = artifact["result_text"]
     trailer = artifact["rendered_trailer"]
     if (
@@ -535,13 +535,27 @@ def validate_artifact(
     ):
         raise ValueError("prebuilt lineage is not the exhausted fixture")
     disposed = after_class["status"] in {cc.CLOSED, cc.SUPERSEDED}
-    terminal = (
-        after_class["status"] == cc.OPEN
-        and "correction limit reached" in json.dumps(after["review_state"])
-    )
-    expected_outcome = "closed-or-replaced" if disposed else "terminal-gate-rejection"
-    if not (disposed or terminal) or artifact["outcome"] != expected_outcome:
-        raise ValueError("durable outcome does not satisfy the gate acceptance")
+    sibling_classes = [
+        row for row in after["classes"]
+        if row["class_id"] != CLASS_ID and row.get("first_round") == 7
+        and row.get("status") in rc.UNPROVEN_STATUSES
+        and row.get("severity") in rc.BLOCKING
+    ]
+    sibling_debt = [
+        row for row in after["review_state"].get("debt", [])
+        if row.get("status") == "open" and row.get("severity") in rc.BLOCKING
+        and row.get("finding_id") != "G1"
+        and any(
+            sibling["class_id"] in row.get("class_ids", [])
+            for sibling in sibling_classes
+        )
+    ]
+    if not (
+        disposed and sibling_classes and sibling_debt
+        and after["review_state"].get("phase") == "correction"
+        and settlement is not None
+    ):
+        raise ValueError("real correction did not durably settle a sibling blocker")
     if disposed:
         if not isinstance(settlement, dict) or settlement.get("role") != "correction":
             raise ValueError("accepted response lacks a materialized correction settlement")
@@ -581,14 +595,6 @@ def validate_artifact(
         if _replay_successful_lineage(before, settlement, audit) != after:
             raise ValueError("complete post-review lineage differs from canonical replay")
         expected_trailer = _successful_trailer(before, after, settlement, audit)
-    else:
-        if settlement is not None:
-            raise ValueError("terminal rejection published an unapplied settlement")
-        if after["review_state"].get("last_round") != 6:
-            raise ValueError("terminal rejection advanced substantive round state")
-        expected_after, expected_trailer = _replay_terminal_lineage(before, audit)
-        if expected_after != after:
-            raise ValueError("complete terminal lineage differs from canonical replay")
     expected_result = _public_result(
         audit=audit, settlement=settlement, after=after, trailer=expected_trailer,
     )
@@ -721,15 +727,24 @@ def main() -> int:
     if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
         raise RuntimeError("acceptance exceeded the correction plus one retry topology")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
-    closed_or_replaced = (
-        durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
-    )
-    terminal_gate_rejection = (
-        durable.classes[CLASS_ID].status == cc.OPEN
-        and "correction limit reached" in json.dumps(durable.review_state)
-    )
-    if not (closed_or_replaced or terminal_gate_rejection):
-        raise RuntimeError("provider result was neither a disposition nor terminal gate rejection")
+    closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
+    sibling_classes = [
+        row for row in durable.classes.values()
+        if row.class_id != CLASS_ID and row.first_round == 7
+        and row.status in rc.UNPROVEN_STATUSES and row.severity in rc.BLOCKING
+    ]
+    sibling_debt = [
+        row for row in durable.review_state.get("debt", [])
+        if row.get("status") == "open" and row.get("severity") in rc.BLOCKING
+        and row.get("finding_id") != "G1"
+        and any(item.class_id in row.get("class_ids", []) for item in sibling_classes)
+    ]
+    if not (
+        closed_or_replaced and sibling_classes and sibling_debt
+        and durable.review_state.get("phase") == "correction"
+        and len(attempts) == 1 and attempts[0].get("outcome") == "completed"
+    ):
+        raise RuntimeError("real correction did not retain the expected sibling blocker")
     revision = _run("git", "rev-parse", "HEAD")
     source_paths = [
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
@@ -762,7 +777,7 @@ def main() -> int:
         "result_text":result, "result_sha256":_sha(result),
         "rendered_trailer":trailer, "correction_gates":gates,
         "durable_reload_lineage":cc._to_json(durable),
-        "outcome":"closed-or-replaced" if closed_or_replaced else "terminal-gate-rejection",
+        "outcome":"closed-with-sibling-debt",
         "public_preflight_matrix":_preflight_matrix(ROOT),
         "public_provider_failure_route":_provider_failure_route(ROOT),
     }
