@@ -109,10 +109,10 @@
       "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, and plan-only closure-candidate correction through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
-      "sha256": "5d5f653e7c40e91e389325a83402dfc7148263949a8f94c1cb6206ba1e380674",
-      "additions": 199,
+      "sha256": "2e1df4b6411d1c2b93ee28161914785210b0b71034ba73605a88da1359c16abd",
+      "additions": 239,
       "deletions": 3,
-      "scope": "Adds requested timeout, separate provider duration, staged correction-control validation, and diagnostic class persistence/reopen rendering; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
+      "scope": "Adds requested timeout, separate provider duration, staged correction-control validation, diagnostic class persistence/reopen rendering, and the plan-correction blocking-unit classifier; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
