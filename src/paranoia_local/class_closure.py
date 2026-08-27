@@ -717,18 +717,21 @@ def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
         cls = lineage.classes.get(cid)
         if cls is None or cls.status == SUPERSEDED or not cls.mechanized:
             continue
+        pattern = cls.pattern or ""
+        pathspec = cls.pathspec or "."
+        cached = grep_result_cached(grep, pattern, pathspec)
         if (
             budget is not None and budget.exhausted()
-            and not grep_result_cached(grep, cls.pattern or "", cls.pathspec or ".")
+            and not cached
         ):
             lineage.classes[cid] = replace(
                 cls, status=UNCHECKED, matches=(),
                 detail="round closure budget exhausted before this class ran",
             )
             continue
-        started = now()
-        result = grep(cls.pattern or "", cls.pathspec or ".")
-        if budget is not None:
+        started = now() if budget is not None and not cached else 0.0
+        result = grep(pattern, pathspec)
+        if budget is not None and not cached:
             budget.charge(now() - started)
         lineage.classes[cid] = _evaluate(cls, result, lineage.exemptions)
 

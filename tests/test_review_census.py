@@ -4650,7 +4650,7 @@ def test_branch_closure_reuses_snapshot_bound_predicate_result(monkeypatch, tmp_
 
     grep = closure._grep()
     assert grep("BAD", "app.py") is expected
-    spent = cc.Budget(total=0)
+    spent = cc.Budget(total=1, spent=0.5)
     parsed = {
         "findings": [{"id":"G1", "evidence":["repository/app.py:1"]}],
         "_finding_class_refs": {"G1":"record:0"},
@@ -4669,11 +4669,20 @@ def test_branch_closure_reuses_snapshot_bound_predicate_result(monkeypatch, tmp_
             "abc", "detect recurrence", "MAJOR", 1, cc.OPEN,
             pattern="BAD", pathspec="app.py",
         ),
+        "def":cc.TrackedClass(
+            "def", "detect another recurrence", "MAJOR", 1, cc.OPEN,
+            pattern="OTHER", pathspec="app.py",
+        ),
     })
-    cc.sweep(lineage, closure._grep(), budget=spent)
+    times = iter((0.0, 0.4))
+    cc.sweep(
+        lineage, closure._grep(), budget=spent, clock=lambda: next(times),
+    )
 
     assert lineage.classes["abc"].status == cc.OPEN
-    assert calls == [("BAD", "app.py")]
+    assert lineage.classes["def"].status == cc.OPEN
+    assert spent.spent == pytest.approx(0.9)
+    assert calls == [("BAD", "app.py"), ("OTHER", "app.py")]
 
 
 def test_match_all_is_not_a_mechanized_recurrence_predicate():
