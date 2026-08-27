@@ -39,43 +39,6 @@ FOCUS = (
 )
 
 
-class FaultInjectingCodex:
-    """Inject one invalid server-visible payload around a real Codex session.
-
-    The provider's original raw channels remain intact. Only `Review.text`, the extracted
-    model payload consumed by staged validation, is changed on the initial call. Resume is
-    the ordinary production Codex route against the same provider session.
-    """
-
-    name = "codex"
-
-    def __init__(self, binary: str) -> None:
-        self.delegate = engines.CodexEngine()
-        self.delegate.binary = binary
-        self.injected = False
-
-    def __getattr__(self, name: str):
-        return getattr(self.delegate, name)
-
-    def run(self, *args, **kwargs):
-        review = self.delegate.run(*args, **kwargs)
-        value = json.loads(review.text)
-        action = value.get("class_actions", {}).get(CLASS_ID)
-        if not isinstance(action, dict) or action.get("kind") != "replace":
-            raise RuntimeError("real initial provider reply omitted the expected replacement")
-        action["definition"]["pattern"] = (
-            "arbitrary member selected from a distinct-value set"
-        )
-        self.injected = True
-        return replace(
-            review,
-            text=json.dumps(value, ensure_ascii=False, sort_keys=True),
-        )
-
-    def resume(self, *args, **kwargs):
-        return self.delegate.resume(*args, **kwargs)
-
-
 def _run(*args: str, cwd: Path) -> str:
     return subprocess.run(
         list(args), cwd=cwd, check=True, capture_output=True, text=True,
@@ -148,7 +111,30 @@ def main() -> int:
     cc.save_lineage(state_root, seed)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
 
-    engine = FaultInjectingCodex(args.codex)
+    engine = engines.CodexEngine()
+    engine.binary = args.codex
+    provider_run = engine.run
+    injected = False
+
+    def fault_injected_run(*run_args, **run_kwargs):
+        nonlocal injected
+        review = provider_run(*run_args, **run_kwargs)
+        value = json.loads(review.text)
+        action = value.get("class_actions", {}).get(CLASS_ID)
+        if not isinstance(action, dict) or action.get("kind") != "replace":
+            raise RuntimeError("real initial provider reply omitted the expected replacement")
+        action["definition"]["pattern"] = (
+            "arbitrary member selected from a distinct-value set"
+        )
+        injected = True
+        return replace(
+            review,
+            text=json.dumps(value, ensure_ascii=False, sort_keys=True),
+        )
+
+    # Keep the exact production engine type so critique_branch selects Protocol v2.
+    # Only the initial extracted payload is fault-injected; resume is untouched.
+    engine.run = fault_injected_run  # type: ignore[method-assign]
     started = time.monotonic()
     result = handlers.critique_branch({
         "repo_path":str(fixture), "base_ref":base_id, "head_ref":head_id,
@@ -158,7 +144,7 @@ def main() -> int:
         "focus":FOCUS,
     }, engine=engine, log_dir=log_root)
     elapsed = time.monotonic() - started
-    if not engine.injected:
+    if not injected:
         raise RuntimeError("acceptance fault injection did not run")
 
     audits = list(log_root.glob("*.json"))
