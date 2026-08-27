@@ -43,6 +43,13 @@ PLAN = (
 FIXED_PLAN = PLAN.replace(
     "The retained artifact does not bind a newly discovered blocker to its exact plan source line.",
     "The retained artifact binds each newly discovered blocker to its exact plan source line.",
+) + (
+    "\nThe validator requires the new debt to name source-binding-class exactly and its "
+    "governing finding evidence to contain a plan anchor whose closed range covers line 7."
+    "\nThe source-bound test mutates that class identity and evidence anchor and requires "
+    "validation to reject both changes."
+    "\nRun every identity, evidence, phase, durable-reload, and source-hash validation before "
+    "Path.write_text; any failure exits nonzero and leaves the retained artifact untouched."
 )
 SIBLING_LINE = 7
 STAKES = (

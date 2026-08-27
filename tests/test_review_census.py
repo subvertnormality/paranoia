@@ -601,6 +601,25 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
             artifact["final_attempt_ledger"],
         ),
     ))
+    changed = json.loads(json.dumps(artifact))
+    next(
+        debt for debt in changed["after_lineage"]["review_state"]["debt"]
+        if debt["finding_id"] != "G1"
+    )["class_ids"] = ["wrong-sibling-class"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    sibling_finding_ids = {
+        debt["finding_id"]
+        for debt in changed["after_lineage"]["review_state"]["debt"]
+        if debt["finding_id"] != "G1"
+    }
+    next(
+        finding for finding in changed["audit"]["staged_settlement"]["findings"]
+        if finding["id"] in sibling_finding_ids
+    )["evidence"] = ["plan:1"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",
