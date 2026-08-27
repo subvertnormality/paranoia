@@ -158,19 +158,10 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     return out
 
 
-def plan_correction_blocking_units(
-    debt: Any, active_classes: Sequence[Mapping[str, Any]],
-) -> tuple[str, ...]:
-    """Return stable blocking units for a late plan-correction sweep."""
+def validate_correction_debt(debt: Any) -> list[Mapping[str, Any]]:
+    """Validate durable correction debt before either public seam dereferences it."""
     if not isinstance(debt, list):
         raise CensusError("invalid persisted review_state debt")
-    blocking_classes = [
-        row["class_id"] for row in active_classes
-        if row.get("severity") in BLOCKING
-        and row.get("status") in cc.UNPROVEN_STATUSES
-    ]
-    blocking_ids = set(blocking_classes)
-    units = [f"class:{class_id}" for class_id in blocking_classes]
     seen_debt: set[str] = set()
     for index, row in enumerate(debt):
         pointer = f"/debt/{index}"
@@ -189,6 +180,24 @@ def plan_correction_blocking_units(
             raise CensusError(
                 f"{pointer}/class_ids: persisted class references must be strings"
             )
+    return debt
+
+
+def plan_correction_blocking_units(
+    debt: Any, active_classes: Sequence[Mapping[str, Any]],
+) -> tuple[str, ...]:
+    """Return stable blocking units for a late plan-correction sweep."""
+    rows = validate_correction_debt(debt)
+    blocking_classes = [
+        row["class_id"] for row in active_classes
+        if row.get("severity") in BLOCKING
+        and row.get("status") in cc.UNPROVEN_STATUSES
+    ]
+    blocking_ids = set(blocking_classes)
+    units = [f"class:{class_id}" for class_id in blocking_classes]
+    for row in rows:
+        debt_id = row["id"]
+        class_ids = row.get("class_ids", [])
         if (
             row.get("status") == "open"
             and row.get("severity") in BLOCKING

@@ -528,6 +528,63 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert audit["attempt_ledger"] == []
 
 
+@pytest.mark.parametrize("malformed_debt", [
+    {},
+    ["not-an-object"],
+    [{}],
+    [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [{"id":1, "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+    ],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
+])
+def test_public_branch_correction_preflights_debt_before_provider_spend(
+    repo_with_branch, tmp_path, malformed_debt, monkeypatch,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase="correction", debt=malformed_debt, last_round=1)
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "malformed-branch-debt-" + hashlib.sha256(
+        json.dumps(malformed_debt, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.BRANCH_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
+        "class_closure":True,
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "branch-logs",
+       now=lambda: "BRANCH-PREFLIGHT")
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
+    )
+    assert reloaded.review_state["debt"] == malformed_debt
+    assert reloaded.review_state["staged_failure"] == {
+        "role":"correction-preflight", "kind":"validation",
+        "message":reloaded.review_state["staged_failure"]["message"],
+    }
+    audits = list((tmp_path / "branch-logs").glob("*.json"))
+    assert len(audits) == 1
+    assert json.loads(audits[0].read_text())["attempt_ledger"] == []
+
+
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"

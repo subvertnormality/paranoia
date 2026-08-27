@@ -930,7 +930,20 @@ def _staged_structural_review(
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
     _staged_class_context(closure._blocks())
-    state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
+    try:
+        state = rc.normalize_state(
+            lineage.review_state, stakes=stakes, snapshot=snapshot,
+        )
+    except rc.CensusError as exc:
+        raw_phase = (
+            lineage.review_state.get("phase")
+            if isinstance(lineage.review_state, dict) else None
+        )
+        role = (
+            f"{raw_phase}-preflight"
+            if raw_phase in rc.PHASES else "structural-preflight"
+        )
+        raise _staged_error(str(exc), role=role, kind="validation") from exc
     stakes_recalibration = (
         isinstance(lineage.review_state, dict)
         and lineage.review_state.get("version") == 1
@@ -983,11 +996,14 @@ def _staged_structural_review(
         for c in lineage.active()
     ]
     plan_correction_units: tuple[str, ...] | None = None
-    if mode == cc.PLAN_MODE and phase == "correction":
+    if phase == "correction":
         try:
-            plan_correction_units = rc.plan_correction_blocking_units(
-                state.get("debt"), active_classes,
-            )
+            if mode == cc.PLAN_MODE:
+                plan_correction_units = rc.plan_correction_blocking_units(
+                    state.get("debt"), active_classes,
+                )
+            else:
+                rc.validate_correction_debt(state.get("debt"))
         except rc.CensusError as exc:
             raise _staged_error(
                 str(exc), role="correction-preflight", kind="validation",
