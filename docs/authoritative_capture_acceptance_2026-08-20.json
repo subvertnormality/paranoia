@@ -103,16 +103,16 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "e29776228d475d45219c34c3d93a95fc18baf4a3bce99dabe71f47167a10ed14",
-      "additions": 1157,
-      "deletions": 114,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, and plan-only malformed-state preflight through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "a40a8d6b0d32f92eea658454f4da76677b5bbaa4bbc1b73a06b2175f35320308",
+      "additions": 1174,
+      "deletions": 115,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, and shared correction-debt malformed-state preflight through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
-      "sha256": "2e1df4b6411d1c2b93ee28161914785210b0b71034ba73605a88da1359c16abd",
-      "additions": 239,
+      "sha256": "9911036b82d5c14d3700438d444bc936146dcbe445689da9933018a0f85e6ac7",
+      "additions": 248,
       "deletions": 3,
-      "scope": "Adds requested timeout, separate provider duration, staged correction-control validation, diagnostic class persistence/reopen rendering, and the plan-correction blocking-unit classifier; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
+      "scope": "Adds requested timeout, separate provider duration, staged correction-control validation, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, and shared correction-debt shape validation; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
