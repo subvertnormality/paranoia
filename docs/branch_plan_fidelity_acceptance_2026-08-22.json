@@ -2,8 +2,8 @@
   "acceptance_kind": "branch-plan-fidelity-public-handler-v1",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction through this revision; does not alter branch plan-contract binding, and frozen prompt oracles plus a real branch-final acceptance prove those routes remain unchanged.",
-      "sha256": "762725dd16a26e6ed9843e839d8ad06d036ac9ad1e91914a86ef9ca73726f70a"
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus plan-only malformed-state preflight, through this revision; does not alter branch plan-contract binding, and frozen prompt oracles plus a real branch-final acceptance prove those routes remain unchanged.",
+      "sha256": "f280e1b8604bfc97cfa5cff13194a619c7942c0a72bc2ca42285a7681a1113e7"
     }
   },
   "claims": {
