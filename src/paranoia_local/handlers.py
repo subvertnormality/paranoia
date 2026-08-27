@@ -588,6 +588,8 @@ def _repository_anchor_span(anchor: str) -> tuple[str, int, int] | None:
 
 def _mechanized_class_evidence_issues(
     parsed: dict[str, Any], *, grep: cc.GitGrep,
+    budget: cc.Budget | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> list[str]:
     """Prove each fresh mechanized predicate recognizes its cited occurrence."""
     findings = {
@@ -645,7 +647,16 @@ def _mechanized_class_evidence_issues(
                 "exists"
             )
             continue
+        if budget is not None and budget.exhausted():
+            issues.append(
+                f"{pointer}/pattern: predicate could not run: round closure budget "
+                "exhausted before this candidate ran"
+            )
+            continue
+        started = clock()
         result = grep(pattern, str(record.get("pathspec", ".")))
+        if budget is not None:
+            budget.charge(clock() - started)
         if result.error:
             issues.append(f"{pointer}/pattern: predicate could not run: {result.error}")
             continue
@@ -670,6 +681,9 @@ def _mechanized_class_evidence_issues(
 
 def _mechanized_class_candidate_view(
     value: dict[str, Any], records: list[dict[str, Any]], pointers: list[str],
+    *, role: str,
+    assessment_verdicts: dict[str, str] | None = None,
+    assessment_evidence: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     """Bind decoded wire evidence to class candidates before full materialization."""
     outcomes = {
@@ -678,6 +692,13 @@ def _mechanized_class_candidate_view(
     }
     findings: list[dict[str, Any]] = []
     refs: dict[str, str] = {}
+    derived_assessments: dict[str, dict[str, Any]] = {}
+    if role == "census":
+        for class_id, verdict in (assessment_verdicts or {}).items():
+            derived_assessments[class_id] = {
+                "class_id":class_id, "verdict":verdict,
+                "evidence":list((assessment_evidence or {}).get(class_id, [])),
+            }
     new_index = 0
     for finding in value.get("governing_findings", []):
         if not isinstance(finding, dict) or not isinstance(finding.get("id"), str):
@@ -698,6 +719,13 @@ def _mechanized_class_candidate_view(
                 and basis == {"kind":"new_finding", "finding_id":finding["id"]}
             ):
                 refs[finding["id"]] = class_id
+            elif role == "correction" and class_id not in outcomes and isinstance(
+                classification.get("assessment_evidence"), list
+            ):
+                derived_assessments[class_id] = {
+                    "class_id":class_id, "verdict":"violated",
+                    "evidence":list(classification["assessment_evidence"]),
+                }
     return {
         "findings":findings,
         "_finding_class_refs":refs,
@@ -709,7 +737,7 @@ def _mechanized_class_candidate_view(
                 "evidence":list(row.get("evidence", [])),
             }
             for row in value.get("class_outcomes", []) if isinstance(row, dict)
-        ],
+        ] + list(derived_assessments.values()),
     }
 
 
@@ -1326,6 +1354,8 @@ def _staged_structural_review(
             evidence_view = _mechanized_class_candidate_view(
                 value, class_view["class_records"],
                 class_view.get("_class_record_pointers", []),
+                role=role, assessment_verdicts=assessment_verdicts,
+                assessment_evidence=assessment_evidence,
             )
         if (
             mode == cc.BRANCH_MODE
@@ -1338,6 +1368,7 @@ def _staged_structural_review(
         ):
             issues.extend(_mechanized_class_evidence_issues(
                 evidence_view, grep=closure._grep(),
+                budget=getattr(closure, "budget", None),
             ))
         if parsed is not None and role == "correction" and correction_gates:
             try:
@@ -4548,6 +4579,7 @@ class _ClassClosure(_ClosureRound):
         )
         self.repo, self.head_id, self.args = repo, head_id, args
         self.budget = cc.Budget()
+        self._grep_results: dict[tuple[str, str], cc.GrepResult] = {}
 
     def _before_sweep(self) -> None:
         self._apply_exemption_args()
@@ -4564,7 +4596,15 @@ class _ClassClosure(_ClosureRound):
                             cc.render_exempt(self.lineage)) if b]
 
     def _grep(self) -> cc.GitGrep:
-        return cc.make_grep(self.repo, self.head_id, runner=_run_git)
+        run = cc.make_grep(self.repo, self.head_id, runner=_run_git)
+
+        def cached(pattern: str, pathspec: str) -> cc.GrepResult:
+            key = (pattern, pathspec)
+            if key not in self._grep_results:
+                self._grep_results[key] = run(pattern, pathspec)
+            return self._grep_results[key]
+
+        return cached
 
     def _apply_exemption_args(self) -> None:
         assert self.lineage is not None

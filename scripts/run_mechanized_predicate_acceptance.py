@@ -192,9 +192,12 @@ def main() -> int:
     outcomes = [row.get("outcome") for row in attempts]
     if (
         len(attempts) != 2 or outcomes[0] != "validation-invalid"
-        or outcomes[1] not in {"completed", "validation-invalid"}
+        or outcomes[1] != "completed"
     ):
-        raise RuntimeError(f"expected one bounded validation retry, got {attempts!r}")
+        raise RuntimeError(
+            "positive acceptance requires one successful bounded validation retry, "
+            f"got {attempts!r}"
+        )
     rejected = audit.get("rejected_payloads", [])
     if (
         not rejected
@@ -213,22 +216,17 @@ def main() -> int:
     )
     successor_id = durable.classes[CLASS_ID].superseded_by
     successor = durable.classes.get(successor_id or "")
-    if outcomes[1] == "completed":
-        if len(replacements) != 1:
-            raise RuntimeError("corrected settlement omitted the mechanized replacement")
-        replacement = replacements[0]
-        if (
-            replacement.get("pattern") != r"next\(iter\(distinct\)\)"
-            or replacement.get("pathspec") != "selection.py"
-        ):
-            raise RuntimeError(f"replacement predicate is not exact: {replacement!r}")
-        if successor is None or successor.status != cc.OPEN or len(successor.matches) != 1:
-            raise RuntimeError("matching successor did not survive durable reload")
-        route_outcome = "corrected-and-settled"
-    else:
-        if settlement or successor is not None or durable.classes[CLASS_ID].status != cc.CLOSED:
-            raise RuntimeError("terminal validation failure mutated substantive class state")
-        route_outcome = "provider-correction-rejected-atomically"
+    if len(replacements) != 1:
+        raise RuntimeError("corrected settlement omitted the mechanized replacement")
+    replacement = replacements[0]
+    if (
+        replacement.get("pattern") != r"next\(iter\(distinct\)\)"
+        or replacement.get("pathspec") != "selection.py"
+    ):
+        raise RuntimeError(f"replacement predicate is not exact: {replacement!r}")
+    if successor is None or successor.status != cc.OPEN or len(successor.matches) != 1:
+        raise RuntimeError("matching successor did not survive durable reload")
+    route_outcome = "corrected-and-settled"
     if "CONVERGENCE: BLOCKED" not in result:
         raise RuntimeError("public result did not remain visibly blocked")
 

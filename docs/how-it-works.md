@@ -65,6 +65,11 @@ the predicate against later snapshots; zero matches closes it and a new match
 reopens it. Invariants that cannot be represented safely carry a review procedure
 and require an explicit reviewer decision.
 
+Before a new or replacement predicate is stored, it must match a repository line
+cited for that violation. Admission and closure sweeps share one bounded grep-time
+budget and reuse exact results for the immutable reviewed snapshot; an exhausted
+budget blocks the candidate instead of admitting an unchecked class.
+
 An exact match can be marked as a false positive with `exempt`. The exemption
 binds class, path, line, and exact line text and expires when the text changes.
 `unexempt` revokes it. Later reviewers see and may challenge exemptions.

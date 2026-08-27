@@ -680,8 +680,9 @@ class Budget:
     newly registered class would be `unchecked` instead of evaluated, defeating both
     same-round evaluation and the same-round false-closure warning.
 
-    A class is only started while budget remains, and each class can then run its two
-    passes, so the real ceiling is `total + 2 * PER_CLASS_TIMEOUT`.
+    A predicate evaluation is only started while budget remains, and each evaluation
+    can then run its two passes, so the real ceiling is
+    `total + 2 * PER_CLASS_TIMEOUT`. Admission checks and sweeps share one instance.
     """
 
     total: float = ROUND_BUDGET

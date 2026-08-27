@@ -183,7 +183,9 @@ class enters durable branch state, run its predicate over the reviewed Git snaps
 to match at least one repository line cited by the governing finding or violated class assessment.
 Reject match-all `.*`; when no honest line-level violation predicate exists, require an
 unmechanized procedure. Keep this inside the existing same-session validation retry so a repairable
-predicate does not cost another review round.
+predicate does not cost another review round. Charge admission checks to the same aggregate
+per-round predicate budget as closure sweeps, reuse exact snapshot/pattern/path results within the
+round, and fail the candidate validation visibly when the remaining budget cannot admit it.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
