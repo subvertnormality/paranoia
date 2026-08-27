@@ -50,6 +50,10 @@ FIXED_PLAN = PLAN.replace(
     "validation to reject both changes."
     "\nRun every identity, evidence, phase, durable-reload, and source-hash validation before "
     "Path.write_text; any failure exits nonzero and leaves the retained artifact untouched."
+    "\nFor the separate final, retain its exact prompt and require the complete fixed plan, all "
+    "nine checklist items, the exact gate-class and source-binding-class roster, and no open debt."
+    "\nRequire correction, repair, and final to use three distinct provider sessions, and reject "
+    "a coordinated mutation of any final prompt binding before Path.write_text."
 )
 SIBLING_LINE = 7
 STAKES = (
@@ -814,9 +818,28 @@ def validate_artifact(
     )
     if not (
         final_task.get("role") == "final"
+        and final_task.get("checklist") == list(sp.CHECKLIST)
+        and final_task.get("existing_debt") == []
+        and [row.get("class_id") for row in final_task.get("active_classes", [])]
+        == [CLASS_ID, SIBLING_CLASS_ID]
+        and all(
+            line in final_task.get("artifact", "")
+            for line in FIXED_PLAN.splitlines() if line
+        )
         and handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in final_prompts[0]
+        and len({
+            audit.get("session_ref"), repair_audit.get("session_ref"),
+            final_audit.get("session_ref"),
+        }) == 3
+        and all(
+            rc.validated_session_ref(session) is not None
+            for session in (
+                audit.get("session_ref"), repair_audit.get("session_ref"),
+                final_audit.get("session_ref"),
+            )
+        )
     ):
-        raise ValueError("final prompt is not independent from correction")
+        raise ValueError("final prompt/session is not a fresh complete regression")
     active_rows = [row for row in after["classes"] if row.get("status") != cc.SUPERSEDED]
     active = [cc.TrackedClass(
         class_id=row["class_id"], invariant=row["invariant"], severity=row["severity"],

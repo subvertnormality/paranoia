@@ -623,6 +623,31 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     )["evidence"] = ["plan:1"]
     with pytest.raises(ValueError):
         acceptance.validate_artifact(changed, root, require_committed=False)
+    for mutate_final_task in (
+        lambda task: task.update(artifact="incomplete fixed plan"),
+        lambda task: task.update(checklist=task["checklist"][:-1]),
+        lambda task: task.update(active_classes=task["active_classes"][:-1]),
+        lambda task: task.update(existing_debt=[{"id":"forged-open-debt"}]),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        prefix, raw_task = changed["final_prompts"][0].split(
+            "===== TASK INPUT =====\n\n", 1,
+        )
+        final_task = json.loads(raw_task)
+        mutate_final_task(final_task)
+        changed["final_prompts"][0] = (
+            prefix + "===== TASK INPUT =====\n\n"
+            + json.dumps(final_task, ensure_ascii=False)
+        )
+        changed["final_prompt_sha256"][0] = hashlib.sha256(
+            changed["final_prompts"][0].encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["final_audit"]["session_ref"] = changed["repair_audit"]["session_ref"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",
