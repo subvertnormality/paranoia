@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus shared correction-debt malformed-state preflight, through this revision; does not alter branch plan-contract binding, and frozen prompt oracles plus a real branch-final acceptance prove those routes remain unchanged.",
-      "sha256": "9fea7758e89f904b06c5bcb0216f310a083600b29be8380d40a661da3674c6f0"
+      "sha256": "12fdff67ff2f9074da3e1db3ec05db58e7a690f28e4b9d22c79c72a95b9a51d1"
     }
   },
   "claims": {
