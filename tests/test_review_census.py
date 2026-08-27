@@ -438,19 +438,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "7bf85d4c1e7d403e569d0ce7ad8835be6f265592617a3fb515153a60bf33e1c0",
+        "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "1d7801aa654c35674eae70ba1f524286d7ec09360350bcdca4940403dea4afde",
+        "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f",
         "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "22a8960730485ace36e58c8b9ff43a6d134204ea7be7b3a9f1ebd917f2dfa2a5",
+        "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),

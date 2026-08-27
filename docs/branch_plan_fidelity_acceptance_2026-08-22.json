@@ -4,10 +4,6 @@
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation and evidence-bound mechanized-class registration through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
       "sha256": "2e51990ca1a2089241032837a757c460e95acbd2a9753471480d62ac827dc6e8"
-    },
-    "src/paranoia_local/prompts.py": {
-      "scope": "Later staged-role guidance requires fresh mechanized predicates to match cited repository evidence; it does not alter branch plan-contract binding, content, digest, authority, or reviewer propagation.",
-      "sha256": "d3f0b03fdbe2a2eff8f430568803bb86a8fa95b83378da72d6c0f04b4a027236"
     }
   },
   "claims": {
