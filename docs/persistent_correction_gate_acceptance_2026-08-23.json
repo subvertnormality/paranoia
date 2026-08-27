@@ -14,11 +14,11 @@
         "status": "closed"
       },
       {
-        "class_id": "a71581d4",
+        "class_id": "c48d96ee",
         "first_round": 7,
-        "invariant": "A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change.",
+        "invariant": "A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior.",
         "matches": [],
-        "procedure": "Read the complete plan against the current repository and verify that it names the affected files or symbols, required behavioral delta and data flow, every material consumer, failure and recovery behavior, documentation or operational effects, and executable acceptance commands with inputs, assertions, and fail-closed outcomes.",
+        "procedure": "Compare the complete plan with the current runner, validator, retained artifact, and public-handler test; verify that it names the exact files or symbols to change, the behavioral delta, every persisted consumer, an executable command with fixtures and assertions, and the failure condition that prevents invalid acceptance retention.",
         "severity": "MAJOR",
         "status": "open"
       }
@@ -30,8 +30,8 @@
     "review_state": {
       "correction_control": {
         "classes": {
-          "a71581d4": {
-            "last_session_ref": "01a04274-7863-7162-b1a8-f24baed0d423",
+          "c48d96ee": {
+            "last_session_ref": "01a04284-8109-75b3-91e4-175a5c95422b",
             "reopen_count": 0,
             "reset_round": null
           },
@@ -50,8 +50,8 @@
           ],
           "evidence": [
             "plan:4",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-709",
-            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-460"
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:777-782",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:803-808"
           ],
           "finding_id": "G1",
           "first_round": 1,
@@ -65,30 +65,31 @@
         },
         {
           "class_ids": [
-            "a71581d4"
+            "c48d96ee"
           ],
           "evidence": [
-            "plan:3-4",
-            "repository/src/paranoia_local/review_census.py:264-290",
-            "repository/src/paranoia_local/handlers.py:1053-1059",
-            "repository/src/paranoia_local/handlers.py:1162-1185",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:372-434",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-732"
+            "plan:3-7",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:30-38",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:66-75",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:821-835",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:480-487",
+            "repository/tests/test_review_census.py:528-577"
           ],
           "finding_id": "G2",
           "first_round": 7,
           "id": "D2",
           "last_round": 7,
-          "remedy": "Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.",
+          "remedy": "Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.",
           "severity": "MAJOR",
           "source_ids": [],
           "status": "open",
-          "summary": "The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change."
+          "summary": "The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair."
         }
       ],
       "last_round": 7,
       "phase": "correction",
-      "snapshot_digest": "52cfb094cc2b313fe5284a54992d5a64a6fe5957a385b33202ffdc904c7c9e04",
+      "snapshot_digest": "3e5d418664fb488ad5269f1bd523915ea0ab07eee8b2800e31b082b876660cd9",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -97,30 +98,30 @@
   },
   "attempt_ledger": [
     {
-      "duration_ms": 97409,
+      "duration_ms": 164062,
       "engine": "codex",
       "failure_detail_excerpt": "",
       "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outcome": "completed",
       "provider_duration_ms": null,
-      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a04274-7863-7162-b1a8-f24baed0d423\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"repository/llms.txt\\nrepository/LICENSE\\nrepository/pyproject.toml\\nrepository/README.md\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_plan.md\\nrepository/docs/arbitration_reliability_acceptance_2026-08-12.json\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/class_closure_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/claude_websearch_grant_acceptance_2026-08-13.md\\nrepository/docs/class_persistence_acceptance_2026-08-22.json\\nrepository/docs/cleaning_attestation_acceptance_2026-08-13.json\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal",
-      "raw_sha256": "045ba4d45efadd02321b93579cd7cab71220a05867d9a052a3934eda8d333846",
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a04284-8109-75b3-91e4-175a5c95422b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"critique_plan|correction.gate|acceptance|attempt|reload|source line|source_line|blocker\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"critique_plan|correction.gate|acceptance|attempt|reload|source line|source_line|blocker\\\" repository'\",\"aggregated_output\":\"repository/llms.txt\\nrepository/README.md\\nrepository/LICENSE\\nrepository/pyproject.toml\\nrepository/CLAUDE.md\\nrepository/AGENTS.md\\nrepository/tests/test_handlers.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/llm-reference.md\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/how-it-works.md\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/plan_correction_preclose_sweep_plan.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/phase_awa",
+      "raw_sha256": "0ca9b84267fa58403cb572a510c7e1c324c29a44ea0c2dc678b5681a24236b2e",
       "rejected_reply_excerpt": null,
       "rejected_reply_sha256": null,
       "requested_timeout_sec": 2400,
-      "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate through its public handler, satisfying this class's narrow plan-level invariant.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-709\",\"rationale\":\"The repository acceptance route invokes the public critique_plan handler with the identical correction-gate fixture.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:1-14\",\"rationale\":\"The retained public-handler acceptance records gate-class as closed.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The previously missing public-handler acceptance obligation is now explicitly present.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-709\",\"rationale\":\"Current acceptance code exercises the public critique_plan handler with the correction-gate fixture and bounded route settings.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-460\",\"rationale\":\"The retained artifact binds the identical four-line plan and records the acceptance outcome as closed-with-sibling-debt.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change.\",\"procedure\":\"Read the complete plan against the current repository and verify that it names the affected files or symbols, required behavioral delta and data flow, every material consumer, failure and recovery behavior, documentation or operational effects, and executable acceptance commands with inputs, assertions, and fail-closed outcomes.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The entire operative plan is a generic implementation instruction and vague test promise; it identifies no current-state gap, affected symbols, behavioral delta, transformations, consumers, failure recovery, documentation effects, executable command, fixture, assertions, or fail-closed outcome.\"},{\"anchor\":\"repository/src/paranoia_local/review_census.py:264-290\",\"rationale\":\"The repository already implements class-keyed gate projection from blocking status, persistence span, and reopen count, but the plan does not identify what in this existing transformation must change.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:1053-1059\",\"rationale\":\"The production review path already computes and propagates correction gates, contradicting the unexplained instruction merely to implement the gate and exposing an omitted repository premise and integration boundary.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:1162-1185\",\"rationale\":\"The production handler already dry-runs class actions and fails closed when a gated class remains blocking, while the plan defines neither a delta to this behavior nor its recovery contract.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:372-434\",\"rationale\":\"The retained-acceptance validator defines closed evidence fields, documentation surfaces, source bindings, and fail-closed mismatch behavior that the generic test sentence does not bind.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-732\",\"rationale\":\"A concrete public-handler acceptance route, call bound, durable reload, and close-or-replacement check already exist; the plan neither identifies a new gap relative to this route nor states an executable acceptance boundary.\"}],\"id\":\"G2\",\"remedy\":\"Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affecte",
-      "response_sha256": "d6c33d56bee571303ddf022384a53665a8850d5c2e9bd75901e4f8de0fda2410",
+      "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The corrected plan explicitly requires the acceptance to exercise critique_plan through its public handler, satisfying the active plan-level invariant.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:777-782\",\"rationale\":\"The acceptance runner invokes the public critique_plan handler with the plan fixture and bounded provider settings.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan now contains the previously missing public-handler acceptance obligation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:777-782\",\"rationale\":\"The runner's acceptance route is wired through the public critique_plan handler.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:803-808\",\"rationale\":\"The route bounds the attempt topology and reloads durable lineage after the handler completes.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior.\",\"procedure\":\"Compare the complete plan with the current runner, validator, retained artifact, and public-handler test; verify that it names the exact files or symbols to change, the behavioral delta, every persisted consumer, an executable command with fixtures and assertions, and the failure condition that prevents invalid acceptance retention.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-7\",\"rationale\":\"The plan gives only high-level update and validation goals and acknowledges the missing exact-source binding, but names no affected symbol or retained artifact, exact transformation, executable command and assertions, or fail-closed disposition.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:30-38\",\"rationale\":\"The current runner already defines the new seven-line fixture and identifies plan line 6 as the required sibling-defect coordinate, a current-state premise and scope boundary omitted from the plan.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:66-75\",\"rationale\":\"An exact plan-line coverage predicate already exists, so the plan does not explain what source-binding behavior still needs implementation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:821-835\",\"rationale\":\"The runner already consumes that predicate to require a fresh blocking sibling finding anchored over line 6 and fails the acceptance when the binding is absent.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458\",\"rationale\":\"The retained acceptance still records the older four-line fixture and digest, exposing the actual stale-artifact consistency repair that the plan does not identify.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:480-487\",\"rationale\":\"The validator rejects a retained fixture that differs from the runner's current PLAN constant, providing a concrete fail-closed acceptance boundary the plan should bind.\"},{\"anchor\":\"repository/tests/test_review_census.py:528-577\",\"rationale\":\"The existing public acceptance test loads the retained artifact, executes its validator, and requires durable reload and the sibling-debt outcome, but the plan names neither this executable test nor its assertions.\"}],\"id\":\"G2\",\"remedy\":\"Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validato",
+      "response_sha256": "639f02d0b226941845d4cec0c2bb20f72c1c9e2abb7167b06e61440acf719070",
       "returncode": 0,
       "role": "correction",
       "sequence": 1,
-      "session_ref": "01a04274-7863-7162-b1a8-f24baed0d423",
-      "stderr_excerpt": "2026-08-27T09:02:03.978673Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:06.611693Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:12.753323Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:39.920517Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:46.635678Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:53.844421Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:58.937020Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:06.609076Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:17.138721Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:40.048694Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-      "stderr_sha256": "bedaaeea659e3e017f09f3d7d69ae0bb17cd25089ce04fe153b7eb26e220bd06",
+      "session_ref": "01a04284-8109-75b3-91e4-175a5c95422b",
+      "stderr_excerpt": "2026-08-27T09:19:34.812473Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:26.099775Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:33.754031Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:53.210781Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:21:02.097715Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:22:17.678634Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "cf8396e6e5ee0ad54edc043de606e9fdad32dd3dc5c4cb0a1bf22ec1a02129cc",
       "usage": {
-        "cached_input_tokens": 169216,
-        "input_tokens": 209212,
-        "output_tokens": 3536,
-        "reasoning_output_tokens": 1589
+        "cached_input_tokens": 315392,
+        "input_tokens": 380083,
+        "output_tokens": 6480,
+        "reasoning_output_tokens": 4322
       },
       "validation_issue": null,
       "validation_pointer": null
@@ -130,30 +131,30 @@
     "already_raised": [],
     "attempt_ledger": [
       {
-        "duration_ms": 97409,
+        "duration_ms": 164062,
         "engine": "codex",
         "failure_detail_excerpt": "",
         "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "outcome": "completed",
         "provider_duration_ms": null,
-        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a04274-7863-7162-b1a8-f24baed0d423\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && find repository -maxdepth 2 -type f -print'\",\"aggregated_output\":\"repository/llms.txt\\nrepository/LICENSE\\nrepository/pyproject.toml\\nrepository/README.md\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_authoritative_capture_acceptance.py\\nrepository/scripts/run_arbitration_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_fallback_acceptance.py\\nrepository/scripts/run_arbitration_context_steering_rejection_acceptance.py\\nrepository/scripts/run_arbitration_consequence_acceptance.py\\nrepository/scripts/record_claim_discovery_timeout_acceptance.py\\nrepository/scripts/build_branch_plan_fidelity_acceptance.py\\nrepository/scripts/run_staged_protocol_mutation_checks.py\\nrepository/scripts/run_persistent_correction_gate_acceptance.py\\nrepository/scripts/run_keyed_handler_acceptance.py\\nrepository/scripts/run_keyed_class_provider_acceptance.py\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/validate_arbitration_consequence_acceptance.py\\nrepository/scripts/validate_arbitration_acceptance.py\\nrepository/scripts/validate_arbitration_fallback_acceptance.py\\nrepository/scripts/validate_cleaning_attestation_acceptance.py\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_plan.md\\nrepository/docs/arbitration_reliability_acceptance_2026-08-12.json\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/class_closure_plan.md\\nrepository/docs/claim_verification.md\\nrepository/docs/claim_discovery_timeout_acceptance_2026-08-22.json\\nrepository/docs/claude_websearch_grant_acceptance_2026-08-13.md\\nrepository/docs/class_persistence_acceptance_2026-08-22.json\\nrepository/docs/cleaning_attestation_acceptance_2026-08-13.json\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal",
-        "raw_sha256": "045ba4d45efadd02321b93579cd7cab71220a05867d9a052a3934eda8d333846",
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a04284-8109-75b3-91e4-175a5c95422b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"critique_plan|correction.gate|acceptance|attempt|reload|source line|source_line|blocker\\\" repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"critique_plan|correction.gate|acceptance|attempt|reload|source line|source_line|blocker\\\" repository'\",\"aggregated_output\":\"repository/llms.txt\\nrepository/README.md\\nrepository/LICENSE\\nrepository/pyproject.toml\\nrepository/CLAUDE.md\\nrepository/AGENTS.md\\nrepository/tests/test_handlers.py\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_worktree.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/__init__.py\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/external_claim_acceptance_2026-08-09.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/exhaustive_review_census_plan.md\\nrepository/docs/exhaustive_census_prototype_evidence.md\\nrepository/docs/exhaustive_census_acceptance_evidence.md\\nrepository/docs/evidence_citation_shape_plan.md\\nrepository/docs/evidence_citation_shape_handler_acceptance_2026-08-17.json\\nrepository/docs/evidence_citation_shape_acceptance_2026-08-17.json\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/persistent_correction_gate_acceptance_2026-08-23.json\\nrepository/docs/orientation_reuse_plan.md\\nrepository/docs/minimum_provider_cli_acceptance_2026-08-16.json\\nrepository/docs/minimal_claim_validation_acceptance_2026-08-18.json\\nrepository/docs/llm-reference.md\\nrepository/docs/large_page_capture_acceptance_2026-08-18.json\\nrepository/docs/keyed_class_handler_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_provider_acceptance_2026-08-19.json\\nrepository/docs/keyed_class_decision_plan.md\\nrepository/docs/how-it-works.md\\nrepository/docs/staged_review_protocol_v2_acceptance.md\\nrepository/docs/plan_correction_preclose_sweep_plan.md\\nrepository/docs/plan_class_closure_proposal.md\\nrepository/docs/phase_awa",
+        "raw_sha256": "0ca9b84267fa58403cb572a510c7e1c324c29a44ea0c2dc678b5681a24236b2e",
         "rejected_reply_excerpt": null,
         "rejected_reply_sha256": null,
         "requested_timeout_sec": 2400,
-        "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan expressly requires tests to exercise the correction gate through its public handler, satisfying this class's narrow plan-level invariant.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-709\",\"rationale\":\"The repository acceptance route invokes the public critique_plan handler with the identical correction-gate fixture.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:1-14\",\"rationale\":\"The retained public-handler acceptance records gate-class as closed.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The previously missing public-handler acceptance obligation is now explicitly present.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-709\",\"rationale\":\"Current acceptance code exercises the public critique_plan handler with the correction-gate fixture and bounded route settings.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-460\",\"rationale\":\"The retained artifact binds the identical four-line plan and records the acceptance outcome as closed-with-sibling-debt.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change.\",\"procedure\":\"Read the complete plan against the current repository and verify that it names the affected files or symbols, required behavioral delta and data flow, every material consumer, failure and recovery behavior, documentation or operational effects, and executable acceptance commands with inputs, assertions, and fail-closed outcomes.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The entire operative plan is a generic implementation instruction and vague test promise; it identifies no current-state gap, affected symbols, behavioral delta, transformations, consumers, failure recovery, documentation effects, executable command, fixture, assertions, or fail-closed outcome.\"},{\"anchor\":\"repository/src/paranoia_local/review_census.py:264-290\",\"rationale\":\"The repository already implements class-keyed gate projection from blocking status, persistence span, and reopen count, but the plan does not identify what in this existing transformation must change.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:1053-1059\",\"rationale\":\"The production review path already computes and propagates correction gates, contradicting the unexplained instruction merely to implement the gate and exposing an omitted repository premise and integration boundary.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:1162-1185\",\"rationale\":\"The production handler already dry-runs class actions and fails closed when a gated class remains blocking, while the plan defines neither a delta to this behavior nor its recovery contract.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:372-434\",\"rationale\":\"The retained-acceptance validator defines closed evidence fields, documentation surfaces, source bindings, and fail-closed mismatch behavior that the generic test sentence does not bind.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:704-732\",\"rationale\":\"A concrete public-handler acceptance route, call bound, durable reload, and close-or-replacement check already exist; the plan neither identifies a new gap relative to this route nor states an executable acceptance boundary.\"}],\"id\":\"G2\",\"remedy\":\"Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affecte",
-        "response_sha256": "d6c33d56bee571303ddf022384a53665a8850d5c2e9bd75901e4f8de0fda2410",
+        "response_excerpt": "{\"class_actions\":{\"gate-class\":{\"kind\":\"close\"}},\"class_outcomes\":{\"gate-class\":{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The corrected plan explicitly requires the acceptance to exercise critique_plan through its public handler, satisfying the active plan-level invariant.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:777-782\",\"rationale\":\"The acceptance runner invokes the public critique_plan handler with the plan fixture and bounded provider settings.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The plan now contains the previously missing public-handler acceptance obligation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:777-782\",\"rationale\":\"The runner's acceptance route is wired through the public critique_plan handler.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:803-808\",\"rationale\":\"The route bounds the attempt topology and reloads durable lineage after the handler completes.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior.\",\"procedure\":\"Compare the complete plan with the current runner, validator, retained artifact, and public-handler test; verify that it names the exact files or symbols to change, the behavioral delta, every persisted consumer, an executable command with fixtures and assertions, and the failure condition that prevents invalid acceptance retention.\",\"severity\":\"MAJOR\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:3-7\",\"rationale\":\"The plan gives only high-level update and validation goals and acknowledges the missing exact-source binding, but names no affected symbol or retained artifact, exact transformation, executable command and assertions, or fail-closed disposition.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:30-38\",\"rationale\":\"The current runner already defines the new seven-line fixture and identifies plan line 6 as the required sibling-defect coordinate, a current-state premise and scope boundary omitted from the plan.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:66-75\",\"rationale\":\"An exact plan-line coverage predicate already exists, so the plan does not explain what source-binding behavior still needs implementation.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:821-835\",\"rationale\":\"The runner already consumes that predicate to require a fresh blocking sibling finding anchored over line 6 and fails the acceptance when the binding is absent.\"},{\"anchor\":\"repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458\",\"rationale\":\"The retained acceptance still records the older four-line fixture and digest, exposing the actual stale-artifact consistency repair that the plan does not identify.\"},{\"anchor\":\"repository/scripts/run_persistent_correction_gate_acceptance.py:480-487\",\"rationale\":\"The validator rejects a retained fixture that differs from the runner's current PLAN constant, providing a concrete fail-closed acceptance boundary the plan should bind.\"},{\"anchor\":\"repository/tests/test_review_census.py:528-577\",\"rationale\":\"The existing public acceptance test loads the retained artifact, executes its validator, and requires durable reload and the sibling-debt outcome, but the plan names neither this executable test nor its assertions.\"}],\"id\":\"G2\",\"remedy\":\"Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validato",
+        "response_sha256": "639f02d0b226941845d4cec0c2bb20f72c1c9e2abb7167b06e61440acf719070",
         "returncode": 0,
         "role": "correction",
         "sequence": 1,
-        "session_ref": "01a04274-7863-7162-b1a8-f24baed0d423",
-        "stderr_excerpt": "2026-08-27T09:02:03.978673Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:06.611693Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:12.753323Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:39.920517Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:46.635678Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:53.844421Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:02:58.937020Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:06.609076Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:17.138721Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:03:40.048694Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
-        "stderr_sha256": "bedaaeea659e3e017f09f3d7d69ae0bb17cd25089ce04fe153b7eb26e220bd06",
+        "session_ref": "01a04284-8109-75b3-91e4-175a5c95422b",
+        "stderr_excerpt": "2026-08-27T09:19:34.812473Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:26.099775Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:33.754031Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:20:53.210781Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:21:02.097715Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T09:22:17.678634Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "cf8396e6e5ee0ad54edc043de606e9fdad32dd3dc5c4cb0a1bf22ec1a02129cc",
         "usage": {
-          "cached_input_tokens": 169216,
-          "input_tokens": 209212,
-          "output_tokens": 3536,
-          "reasoning_output_tokens": 1589
+          "cached_input_tokens": 315392,
+          "input_tokens": 380083,
+          "output_tokens": 6480,
+          "reasoning_output_tokens": 4322
         },
         "validation_issue": null,
         "validation_pointer": null
@@ -178,15 +179,15 @@
     "grounded": true,
     "lineage": "persistent-correction-gate-acceptance-20260823",
     "model": "gpt-5.6-sol",
-    "plan_digest": "c2e9f84aed58a3e7",
+    "plan_digest": "611d4ce11d15e603",
     "plan_path": null,
-    "register_status": "staged correction parsed — NEW a71581d4, CLOSE gate-class",
+    "register_status": "staged correction parsed — NEW c48d96ee, CLOSE gate-class",
     "rejected_payloads": [],
-    "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW a71581d4, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  a71581d4 A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW c48d96ee, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  c48d96ee A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
     "retry_register": null,
     "returncode": 0,
     "round": 7,
-    "session_ref": "01a04274-7863-7162-b1a8-f24baed0d423",
+    "session_ref": "01a04284-8109-75b3-91e4-175a5c95422b",
     "staged_manifests": null,
     "staged_settlement": {
       "_class_record_pointers": [
@@ -207,8 +208,7 @@
           "class_id": "gate-class",
           "evidence": [
             "plan:4",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-709",
-            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:1-14"
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:777-782"
           ],
           "finding_id": null,
           "verdict": "satisfied"
@@ -223,9 +223,9 @@
       ],
       "class_records": [
         {
-          "invariant": "A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change.",
+          "invariant": "A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior.",
           "op": "new",
-          "procedure": "Read the complete plan against the current repository and verify that it names the affected files or symbols, required behavioral delta and data flow, every material consumer, failure and recovery behavior, documentation or operational effects, and executable acceptance commands with inputs, assertions, and fail-closed outcomes.",
+          "procedure": "Compare the complete plan with the current runner, validator, retained artifact, and public-handler test; verify that it names the exact files or symbols to change, the behavioral delta, every persisted consumer, an executable command with fixtures and assertions, and the failure condition that prevents invalid acceptance retention.",
           "severity": "MAJOR"
         },
         {
@@ -236,27 +236,28 @@
       "debt": [
         {
           "evidence": [
-            "plan:3-4",
-            "repository/src/paranoia_local/review_census.py:264-290",
-            "repository/src/paranoia_local/handlers.py:1053-1059",
-            "repository/src/paranoia_local/handlers.py:1162-1185",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:372-434",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-732"
+            "plan:3-7",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:30-38",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:66-75",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:821-835",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:480-487",
+            "repository/tests/test_review_census.py:528-577"
           ],
           "finding_id": "G2",
           "id": "D2",
-          "remedy": "Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.",
+          "remedy": "Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.",
           "severity": "MAJOR",
           "status": "open",
-          "summary": "The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change."
+          "summary": "The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair."
         }
       ],
       "debt_updates": [
         {
           "evidence": [
             "plan:4",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-709",
-            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-460"
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:777-782",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:803-808"
           ],
           "id": "D1",
           "status": "closed"
@@ -265,24 +266,25 @@
       "findings": [
         {
           "evidence": [
-            "plan:3-4",
-            "repository/src/paranoia_local/review_census.py:264-290",
-            "repository/src/paranoia_local/handlers.py:1053-1059",
-            "repository/src/paranoia_local/handlers.py:1162-1185",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:372-434",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-732"
+            "plan:3-7",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:30-38",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:66-75",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:821-835",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:480-487",
+            "repository/tests/test_review_census.py:528-577"
           ],
           "id": "G2",
-          "remedy": "Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.",
+          "remedy": "Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.",
           "severity": "MAJOR",
-          "summary": "The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change."
+          "summary": "The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair."
         }
       ],
       "role": "correction",
       "source_dispositions": []
     },
-    "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change. [classes: a71581d4] (plan:3-4, repository/src/paranoia_local/review_census.py:264-290, repository/src/paranoia_local/handlers.py:1053-1059, repository/src/paranoia_local/handlers.py:1162-1185, repository/scripts/run_persistent_correction_gate_acceptance.py:372-434, repository/scripts/run_persistent_correction_gate_acceptance.py:704-732)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.",
-    "timestamp": "20260827T100340",
+    "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair. [classes: c48d96ee] (plan:3-7, repository/scripts/run_persistent_correction_gate_acceptance.py:30-38, repository/scripts/run_persistent_correction_gate_acceptance.py:66-75, repository/scripts/run_persistent_correction_gate_acceptance.py:821-835, repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458, repository/scripts/run_persistent_correction_gate_acceptance.py:480-487, repository/tests/test_review_census.py:528-577)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.",
+    "timestamp": "20260827T102218",
     "tool": "critique_plan"
   },
   "before_lineage": {
@@ -336,7 +338,7 @@
       ],
       "last_round": 6,
       "phase": "correction",
-      "snapshot_digest": "52cfb094cc2b313fe5284a54992d5a64a6fe5957a385b33202ffdc904c7c9e04",
+      "snapshot_digest": "3e5d418664fb488ad5269f1bd523915ea0ab07eee8b2800e31b082b876660cd9",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
@@ -351,6 +353,8 @@
       "span": 7
     }
   ],
+  "correction_prompt": "Perform the staged structural role named in the task. Correction\ntargets every open debt item, its classes, the claimed repairs, and transitive effects. Final is a\nfresh cold whole-artifact review over all nine checklist items and every active class. The plan is displayed with `NNNNN: ` coordinate prefixes that are\npresentation metadata, not plan text. Cite it only as `plan:<line>` or\n`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as\n`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned\nfilesystem repository root is the `repository/` directory relative to your current directory;\nread repository files through that directory, not from the workspace root.\nEvery anchor must resolve. The provider-supplied JSON Schema is the sole structural contract;\nreturn only its object, without a marker, fence, or prose.\n\nIf the task contains nonempty correction_gates, close or replace every named class so it is no\nlonger blocking. Rotating debt, changing evidence, or retaining another blocking severity does\nnot satisfy that server-owned gate.\n\nClassify every new governing finding once as one_off, new_class with an explicit definition and\nclass severity, or existing_class. Consolidate one existing class to at most one new finding.\nEvery supplied open debt receives exactly one outcome; open needs current evidence and a concrete\nremaining condition, closed needs current evidence. A violated class uses new_finding for a new\noccurrence, or carried_debt naming exactly one representative open debt; other historical debts\nremain independent outcomes. Satisfaction has no basis. Correction covers exactly affected\nclasses; final covers every active class and all checklist rows. class_outcomes and class_actions\nare keyed objects whose values never repeat class_id. Every active class has one action slot; use\nnull or at most one independent close, reopen,\nnon-downgrading reclassify, or replacement decision per action key. For a new existing-class finding\nwhose class has no required outcome key, put its distinct class-assessment citations in\nclassification.assessment_evidence; the server derives the violated outcome. A fresh finding for a\nrequired debt-bound class needs that authored violated outcome to use new_finding basis naming the\nfresh finding; carried_debt is only for no fresh occurrence. Open unmechanized satisfaction may omit\nits redundant close; the server derives it. Closed mechanized violation requires replace.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\n\nThis plan correction is a closure candidate. After\nchecking every supplied debt repair, scan the complete artifact against every supplied checklist\nitem and active class for sibling occurrences, cross-reference contradictions, and regressions\ncreated by the repairs. Report every discovered defect through the existing governing-finding and\nclassification fields. This broader search is not clearance; an independent cold final remains\nrequired after blocking debt closes.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\nclass_outcomes is a closed object keyed by exactly these required class IDs: [\"gate-class\"]. class_actions is a closed object with one independent-action slot per active class. Every listed key is required; use null when no independent action is needed. Allowed non-null action kinds by active class are: {\"gate-class\":[\"close\",\"reopen\",\"reclassify\",\"replace\"]}. Never put class_id inside an outcome or action value.\n\n===== TASK INPUT =====\n\n{\"role\": \"correction\", \"stakes\": \"One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.\", \"existing_debt\": [{\"id\": \"D1\", \"finding_id\": \"G1\", \"status\": \"open\", \"severity\": \"MAJOR\", \"summary\": \"the correction gate lacked public-handler acceptance\", \"reason\": \"acceptance was not yet exercised\", \"remedy\": \"exercise the handler\", \"evidence\": [\"plan:4\"], \"source_ids\": [], \"class_ids\": [\"gate-class\"], \"first_round\": 1, \"last_round\": 6}], \"active_classes\": [{\"class_id\": \"gate-class\", \"invariant\": \"The plan requires public-handler acceptance for the correction gate.\", \"severity\": \"MAJOR\", \"status\": \"open\", \"mechanized\": false, \"pattern\": null, \"pathspec\": null, \"procedure\": \"Inspect the plan acceptance obligation.\"}], \"correction_gates\": [{\"class_id\": \"gate-class\", \"reason\": \"persistence\", \"span\": 7, \"reopen_count\": 0}], \"checklist\": [\"artifact-complete\", \"repository-premises\", \"transformations\", \"consumers\", \"failure-recovery\", \"tests-acceptance\", \"docs-operations\", \"consistency\", \"proportionality\"], \"artifact\": \"=== REVIEW STAKES ===\\nOne trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.\\n\\n=== REPOSITORY IS AVAILABLE ===\\nYou are inside the repository this plan concerns. Read the code to test every premise the plan makes about current behaviour.\\n\\n=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\\n00001: # Change\\n00002: \\n00003: Update the persistent correction-gate acceptance runner.\\n00004: The acceptance must exercise critique_plan through its public handler.\\n00005: It must validate the completed attempt and durable reload.\\n00006: The acceptance does not bind a newly discovered blocker to its exact source line.\\n00007: That missing source binding is the adjacent defect this correction must detect.\\n\\n=== UNMECHANIZED CLASSES — no predicate; you are the check ===\\nNo predicate can check these — you are the check. Re-verify EVERY entry by its procedure, including the closed ones: a closed class is exactly what `REOPEN` exists for. The ROUND severity floor does not apply to any entry here, and where this block and the already-raised block conflict, THIS block governs. Emit `CLOSED: <id>` when one is genuinely closed, or `REOPEN: <id>` when a closed one is violated again — report a closed one's recurrence whatever its individual severity, because nothing else will notice it.\\n\\n[gate-class, MAJOR, open — BLOCKING, first raised round 1] The plan requires public-handler acceptance for the correction gate.\\n  procedure: Inspect the plan acceptance obligation.\\n\\nThe pinned repository evidence root is `repository/`. Treat that prefix as the project root; no live Git or web tools are available.\", \"review_scope\": \"closure_candidate\"}",
+  "correction_prompt_sha256": "2b9bae8066fcb52dcee233edc65c2902e76afe806195067220ad6dd6ca34638d",
   "date": "2026-08-24",
   "durable_reload_lineage": {
     "claim_reverify_required": false,
@@ -366,11 +370,11 @@
         "status": "closed"
       },
       {
-        "class_id": "a71581d4",
+        "class_id": "c48d96ee",
         "first_round": 7,
-        "invariant": "A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change.",
+        "invariant": "A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior.",
         "matches": [],
-        "procedure": "Read the complete plan against the current repository and verify that it names the affected files or symbols, required behavioral delta and data flow, every material consumer, failure and recovery behavior, documentation or operational effects, and executable acceptance commands with inputs, assertions, and fail-closed outcomes.",
+        "procedure": "Compare the complete plan with the current runner, validator, retained artifact, and public-handler test; verify that it names the exact files or symbols to change, the behavioral delta, every persisted consumer, an executable command with fixtures and assertions, and the failure condition that prevents invalid acceptance retention.",
         "severity": "MAJOR",
         "status": "open"
       }
@@ -382,8 +386,8 @@
     "review_state": {
       "correction_control": {
         "classes": {
-          "a71581d4": {
-            "last_session_ref": "01a04274-7863-7162-b1a8-f24baed0d423",
+          "c48d96ee": {
+            "last_session_ref": "01a04284-8109-75b3-91e4-175a5c95422b",
             "reopen_count": 0,
             "reset_round": null
           },
@@ -402,8 +406,8 @@
           ],
           "evidence": [
             "plan:4",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-709",
-            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-460"
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:777-782",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:803-808"
           ],
           "finding_id": "G1",
           "first_round": 1,
@@ -417,45 +421,46 @@
         },
         {
           "class_ids": [
-            "a71581d4"
+            "c48d96ee"
           ],
           "evidence": [
-            "plan:3-4",
-            "repository/src/paranoia_local/review_census.py:264-290",
-            "repository/src/paranoia_local/handlers.py:1053-1059",
-            "repository/src/paranoia_local/handlers.py:1162-1185",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:372-434",
-            "repository/scripts/run_persistent_correction_gate_acceptance.py:704-732"
+            "plan:3-7",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:30-38",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:66-75",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:821-835",
+            "repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458",
+            "repository/scripts/run_persistent_correction_gate_acceptance.py:480-487",
+            "repository/tests/test_review_census.py:528-577"
           ],
           "finding_id": "G2",
           "first_round": 7,
           "id": "D2",
           "last_round": 7,
-          "remedy": "Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.",
+          "remedy": "Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.",
           "severity": "MAJOR",
           "source_ids": [],
           "status": "open",
-          "summary": "The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change."
+          "summary": "The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair."
         }
       ],
       "last_round": 7,
       "phase": "correction",
-      "snapshot_digest": "52cfb094cc2b313fe5284a54992d5a64a6fe5957a385b33202ffdc904c7c9e04",
+      "snapshot_digest": "3e5d418664fb488ad5269f1bd523915ea0ab07eee8b2800e31b082b876660cd9",
       "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data; no hostile local race or repository execution; one class and one claim-free plan; false clearance is high impact and recoverable blocking is acceptable.",
       "stakes_digest": "241252a03212adae7708447f4c05289e76185a7eb363b024b25d3f101dd78fea",
       "version": 1
     },
     "rounds": 7
   },
-  "elapsed_seconds": 101.652,
+  "elapsed_seconds": 167.785,
   "fixture": {
     "class_id": "gate-class",
     "lineage": "persistent-correction-gate-acceptance-20260823",
-    "plan": "# Change\n\nImplement the correction gate.\nTests must exercise its public handler.",
-    "plan_sha256": "c2e9f84aed58a3e7a31a4b4c596349df226d5aa678e087d9d26ca65c34a7f9c0",
+    "plan": "# Change\n\nUpdate the persistent correction-gate acceptance runner.\nThe acceptance must exercise critique_plan through its public handler.\nIt must validate the completed attempt and durable reload.\nThe acceptance does not bind a newly discovered blocker to its exact source line.\nThat missing source binding is the adjacent defect this correction must detect.",
+    "plan_sha256": "611d4ce11d15e603d9ef81bb0e9e6f2330de612a1d6f53f384c7d1af4e6cab56",
     "round": 7,
-    "snapshot_commit": "1a894a6624825110c85b41e2bfafe9236ba970e6",
-    "structural_snapshot": "52cfb094cc2b313fe5284a54992d5a64a6fe5957a385b33202ffdc904c7c9e04"
+    "snapshot_commit": "110fa1df1820f9e666478ec7b2257be9a876ef82",
+    "structural_snapshot": "3e5d418664fb488ad5269f1bd523915ea0ab07eee8b2800e31b082b876660cd9"
   },
   "outcome": "closed-with-sibling-debt",
   "provider": {
@@ -556,7 +561,7 @@
   "public_provider_failure_route": {
     "attempt_ledger": [
       {
-        "duration_ms": 20,
+        "duration_ms": 19,
         "engine": "codex",
         "failure_detail_excerpt": "Selected model is at capacity",
         "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -580,7 +585,7 @@
         "validation_pointer": null
       },
       {
-        "duration_ms": 21,
+        "duration_ms": 17,
         "engine": "codex",
         "failure_detail_excerpt": "Selected model is at capacity",
         "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -604,7 +609,7 @@
         "validation_pointer": null
       },
       {
-        "duration_ms": 21,
+        "duration_ms": 18,
         "engine": "codex",
         "failure_detail_excerpt": "Selected model is at capacity",
         "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -632,7 +637,7 @@
       "already_raised": [],
       "attempt_ledger": [
         {
-          "duration_ms": 20,
+          "duration_ms": 19,
           "engine": "codex",
           "failure_detail_excerpt": "Selected model is at capacity",
           "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -656,7 +661,7 @@
           "validation_pointer": null
         },
         {
-          "duration_ms": 21,
+          "duration_ms": 17,
           "engine": "codex",
           "failure_detail_excerpt": "Selected model is at capacity",
           "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -680,7 +685,7 @@
           "validation_pointer": null
         },
         {
-          "duration_ms": 21,
+          "duration_ms": 18,
           "engine": "codex",
           "failure_detail_excerpt": "Selected model is at capacity",
           "failure_detail_sha256": "1cf0c9eff159c2d19fcae2037e6aa2853ad6f54bb6e9cfa5589c9fab66b0582a",
@@ -711,7 +716,7 @@
       "error": true,
       "failure_detail_excerpt": "",
       "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "head_id": "6de9ae888eeb767189bc1d6e79d60b4ee8169821",
+      "head_id": "3423491ef42c0959da2c719cd09569bb927f52e6",
       "lineage": "staged-provider-failure-acceptance",
       "mode": "converge-packet",
       "model": "gpt-5.6-sol",
@@ -732,10 +737,10 @@
       "staged_settlement": null,
       "stderr_excerpt": "",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "structural_snapshot": "e58dba6bc3ea08522646f05490bf2cf3062e02f89766eea7c4cc53b5216f496f",
+      "structural_snapshot": "22d3c29795a774617c9875f9c603b968dc169b3a5d6a6ace81caf46c78fa53d4",
       "target": "committed diff main...HEAD in paranoia-local-plan-convergence",
       "text": "# STAGED REVIEW FAILED\n\nThe staged structural review did not complete settlement. No durable structural verdict is available.\n\n## Diagnostic\n\n    [paranoia-local error] staged engine failed (provider): Selected model is at capacity",
-      "timestamp": "20260827T100342",
+      "timestamp": "20260827T102219",
       "tool": "critique_branch",
       "usage": null
     },
@@ -750,7 +755,7 @@
       "review_state": {
         "debt": [],
         "phase": "census",
-        "snapshot_digest": "e58dba6bc3ea08522646f05490bf2cf3062e02f89766eea7c4cc53b5216f496f",
+        "snapshot_digest": "22d3c29795a774617c9875f9c603b968dc169b3a5d6a6ace81caf46c78fa53d4",
         "staged_failure": {
           "engine_failure": {
             "failure_detail_excerpt": "Selected model is at capacity",
@@ -775,14 +780,14 @@
     "result_sha256": "41296a0c411d73fa2252b696bcf5080741126808820b7abd7f043d699e54ef6e",
     "result_text": "⚠️ REVIEW FAILED (engine=codex, exit=2) — treat the output below as an error, not a completed review.\n\n# STAGED REVIEW FAILED\n\nThe staged structural review did not complete settlement. No durable structural verdict is available.\n\n## Diagnostic\n\n    [paranoia-local error] staged engine failed (provider): Selected model is at capacity\n\n---\n_paranoia-local · engine=codex_\n\nLINEAGE: staged-provider-failure-acceptance (rounds recorded: 0)\nCLASS-REGISTER: engine failed (provider): Selected model is at capacity\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: census\nSTRUCTURAL-DEBT: 0 blocking open\nSTRUCTURAL-ERROR: Selected model is at capacity\nSTRUCTURAL-FAILURE: role=census-behaviour kind=provider\nCONVERGENCE: BLOCKED — staged provider failure did not settle.\nSTAGED-ATTEMPTS: total=3 validation-retries=0 validation-invalid=0 execution-failed=3"
   },
-  "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW a71581d4, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  a71581d4 A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "result_sha256": "6b974a0079a4be7de611825e448e2bcadff53aa8fdb93ed0b7676c873cc46a3f",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The plan closes the narrow public-handler debt but does not bind an implementable correction-gate change. [classes: a71581d4] (plan:3-4, repository/src/paranoia_local/review_census.py:264-290, repository/src/paranoia_local/handlers.py:1053-1059, repository/src/paranoia_local/handlers.py:1162-1185, repository/scripts/run_persistent_correction_gate_acceptance.py:372-434, repository/scripts/run_persistent_correction_gate_acceptance.py:704-732)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Replace the placeholder with an evidence-bound implementation plan that identifies the precise current-state gap and affected symbols, specifies the intended gate transformation and all consumers, defines failure and recovery behavior plus documentation effects, and names executable public-handler acceptance with fixtures, assertions, durable-state checks, and fail-closed outcomes.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a04274-7863-7162-b1a8-f24baed0d423` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW a71581d4, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  a71581d4 A plan proposing an in-card repository change identifies the current-state gap and exact implementation, transformation, consumer, failure-recovery, documentation or operational, and executable fail-closed acceptance boundaries needed to implement and review that change. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
-  "source_revision": "6de9ae888eeb767189bc1d6e79d60b4ee8169821",
+  "rendered_trailer": "LINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW c48d96ee, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  c48d96ee A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "result_sha256": "716ee03d91630831916719287c5fabeb6e050bd35add28acdbdfc42921fac93b",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The plan closes the narrow public-handler gate but does not bind the actual source-line and stale-artifact repair. [classes: c48d96ee] (plan:3-7, repository/scripts/run_persistent_correction_gate_acceptance.py:30-38, repository/scripts/run_persistent_correction_gate_acceptance.py:66-75, repository/scripts/run_persistent_correction_gate_acceptance.py:821-835, repository/docs/persistent_correction_gate_acceptance_2026-08-23.json:451-458, repository/scripts/run_persistent_correction_gate_acceptance.py:480-487, repository/tests/test_review_census.py:528-577)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Rewrite the plan around the actual repository delta: identify whether any source behavior remains to change, name the runner symbols and stale retained artifact, require regeneration through the public critique_plan route, and specify an executable validator/test that asserts the seven-line fixture and digest, exact plan:6 sibling binding, completed bounded attempt, durable reload, and fail-closed rejection without retaining a mismatched artifact.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a04284-8109-75b3-91e4-175a5c95422b` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: persistent-correction-gate-acceptance-20260823 (rounds recorded: 7)\nCLASS-REGISTER: staged correction parsed — NEW c48d96ee, CLOSE gate-class\nCLASS-CLOSURE: 1 open, 1 closed, 0 surviving matches, 0 exempt, 2 unmechanized\n  c48d96ee A plan changing a retained public-handler acceptance identifies the repository's actual current gap and completely binds the affected runner and retained artifact, the required evidence transformation and consumers, executable assertions, and fail-closed mismatch behavior. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCORRECTION-GATE: gate-class reason=persistence span=7 reopen-count=0 — load-bearing this round\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "source_revision": "3423491ef42c0959da2c719cd09569bb927f52e6",
   "source_sha256": {
     "AGENTS.md": "9aebec488491fb7aad38decfcc09c9490417e723135e40c30e3768afd8bebf31",
     "docs/how-it-works.md": "f67bb1b0ce2261f932fb7ac43517b7c3c6137b96c628afa437e5863b7e55c112",
-    "scripts/run_persistent_correction_gate_acceptance.py": "7b7b9e5e7a1b3aec5c3efecdf72553e5b778efc6be779fe4bda5343e4bba5335",
+    "scripts/run_persistent_correction_gate_acceptance.py": "784269670c63aea1b29a3cd34eea4a343fb6915cb4d3211bee52b80e8efd8518",
     "src/paranoia_local/handlers.py": "9ade489b32076163acea5b8c32c1abdac57b478468e68c8ea1d34a5ecd9cdd87",
     "src/paranoia_local/prompts.py": "9f14214af5c21c61cad0b195c37ddd589730d0aaa218bf7cd70bfa28508c9490",
     "src/paranoia_local/review_census.py": "758d71114cf256f65e2ad36345a1a66b8e0681dbd87acc3d5563f2a9add5fbfd",
@@ -790,7 +795,7 @@
     "tests/test_handlers.py": "8a7dc6aba3bb10789ac6c6e170ab9d5784bf1d183e24793868a5291ba15bb2f1",
     "tests/test_plan_claims.py": "7756961aeed1f11e3ffb864b137dbe0f7ca33eeb2164a07a1d0b7e53df9f5db2",
     "tests/test_plan_class_closure.py": "ccd1df2a080b74b69f40f85adb0e6ef9d411a688eb7fec4c71bff9f66ed7e76b",
-    "tests/test_review_census.py": "819c24bc625dbef756526adc6719dccd575098806bc3573754a6eb24695b918c"
+    "tests/test_review_census.py": "0e90b1725ad0d840ea5043dab25f59726f1e53aa5021e2a94a0128122f47f6d3"
   },
   "version": 2
 }
