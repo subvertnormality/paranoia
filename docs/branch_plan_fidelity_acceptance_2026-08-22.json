@@ -1,9 +1,13 @@
 {
   "acceptance_kind": "branch-plan-fidelity-public-handler-v1",
   "allowed_later_source_diffs": {
+    "src/paranoia_local/class_closure.py": {
+      "scope": "Shared predicate-budget documentation and immutable-snapshot result reuse for evidence-bound mechanized admission; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "9a7a6943a19d8a8c5b78083ab14a279abf0e1b783180b7bd2637dbba87eb368d"
+    },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation and evidence-bound mechanized-class registration through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "2e51990ca1a2089241032837a757c460e95acbd2a9753471480d62ac827dc6e8"
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation and bounded evidence-bound mechanized-class registration through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "c529e3d14faf33b178d3e4fdc0b3cf7c81e69cdf92f7ea70d6b302239619f027"
     }
   },
   "claims": {
