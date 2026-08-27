@@ -1117,7 +1117,7 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     with pytest.raises(ValueError):
         acceptance.validate_artifact(changed, root, require_committed=False)
     changed = json.loads(json.dumps(artifact))
-    changed["sibling_binding"]["provider_evidence"] = ["plan:7"]
+    changed["sibling_binding"]["provider_evidence"] = ["plan:1"]
     with pytest.raises(ValueError):
         acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate_final_task in (
