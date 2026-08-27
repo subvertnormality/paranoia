@@ -976,7 +976,31 @@ def main() -> int:
         and "STRUCTURAL-PHASE: final" in repair_result
         and "CONVERGENCE: NOT-BLOCKED" not in repair_result
     ):
-        raise RuntimeError("later real correction did not stop at the final boundary")
+        repair_diagnostic = {
+            "phase":repair_reload.review_state.get("phase"),
+            "classes":{
+                class_id:tracked.status
+                for class_id, tracked in repair_reload.classes.items()
+            },
+            "open_debt":[
+                {
+                    "finding_id":row.get("finding_id"),
+                    "summary":row.get("summary"),
+                    "class_ids":row.get("class_ids"),
+                }
+                for row in repair_reload.review_state.get("debt", [])
+                if row.get("status") == "open"
+            ],
+            "attempts":[
+                {key:row.get(key) for key in ("role", "outcome", "validation_issue")}
+                for row in repair_attempts or []
+            ],
+            "result_tail":repair_result[-1200:],
+        }
+        raise RuntimeError(
+            "later real correction did not stop at the final boundary: "
+            + json.dumps(repair_diagnostic, ensure_ascii=False, sort_keys=True)
+        )
 
     final_result, final_prompts = _critique_plan_with_prompt_capture(
         engine, {**common, "plan_text":FIXED_PLAN, "round":9}, log_root / "round9",
@@ -998,7 +1022,32 @@ def main() -> int:
         and "STRUCTURAL-PHASE: clear" in final_result
         and "CONVERGENCE: NOT-BLOCKED" in final_result
     ):
-        raise RuntimeError("separate real cold final did not exclusively reach clear")
+        raise RuntimeError(
+            "separate real cold final did not exclusively reach clear: "
+            + json.dumps({
+                "phase":final_reload.review_state.get("phase"),
+                "classes":{
+                    class_id:tracked.status
+                    for class_id, tracked in final_reload.classes.items()
+                },
+                "open_debt":[
+                    {
+                        "finding_id":row.get("finding_id"),
+                        "summary":row.get("summary"),
+                        "class_ids":row.get("class_ids"),
+                    }
+                    for row in final_reload.review_state.get("debt", [])
+                    if row.get("status") == "open"
+                ],
+                "attempts":[
+                    {key:row.get(key) for key in (
+                        "role", "outcome", "validation_issue",
+                    )}
+                    for row in final_attempts or []
+                ],
+                "result_tail":final_result[-1200:],
+            }, ensure_ascii=False, sort_keys=True)
+        )
     elapsed = time.monotonic() - started
     revision = _run("git", "rev-parse", "HEAD")
     source_paths = [
