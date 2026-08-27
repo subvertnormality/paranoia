@@ -550,11 +550,32 @@ def validate_artifact(
             for row in settlement.get("class_records", [])
         ):
             raise ValueError("settlement did not explicitly dispose the gated class")
-        if not any(
-            row.get("id") == "D1" and row.get("status") == "closed"
-            for row in settlement.get("debt_updates", [])
-        ):
-            raise ValueError("settlement did not close the gated class's debt")
+        debt_update = next(
+            (row for row in settlement.get("debt_updates", []) if row.get("id") == "D1"),
+            None,
+        )
+        if not isinstance(debt_update, dict):
+            raise ValueError("settlement omitted the gated class's debt outcome")
+        if debt_update.get("status") != "closed":
+            successor = after_class.get("superseded_by")
+            durable_debt = next(
+                (
+                    row for row in after["review_state"].get("debt", [])
+                    if row.get("id") == "D1"
+                ),
+                None,
+            )
+            if not (
+                after_class["status"] == cc.SUPERSEDED
+                and isinstance(successor, str) and successor
+                and isinstance(durable_debt, dict)
+                and durable_debt.get("status") == "open"
+                and durable_debt.get("class_ids") == [successor]
+            ):
+                raise ValueError(
+                    "settlement neither closed the gated debt nor transferred it "
+                    "to the recorded replacement"
+                )
         if after["review_state"].get("last_round") != 7:
             raise ValueError("successful settlement did not advance the durable label")
         if _replay_successful_lineage(before, settlement, audit) != after:
