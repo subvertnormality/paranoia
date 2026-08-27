@@ -2374,6 +2374,12 @@ def critique_plan(
     staged_preflight_failed = False
     preflight_review: Review | None = None
     preflight_trailer: str | None = None
+    if closure:
+        # A structural preflight can settle before claim verification starts. Attach
+        # the retained claim state first so that failure still renders the combined
+        # claim/structural closure contract without admitting a claim provider call.
+        closure.claims_enabled = claim_verification
+        closure.claim_state = claim_state
     if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
         parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
         snapshot = orientation.wrap_commit(

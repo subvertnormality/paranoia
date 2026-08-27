@@ -533,6 +533,11 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert audit["claim_verification"] is True
     assert audit["claim_status"] == "blocked-by-structural-preflight"
     assert audit["claim_model_calls"] == 0
+    assert "CLAIM-REGISTER:" in result
+    assert "CLAIM-CLOSURE:" in result
+    assert result.count("CONVERGENCE: BLOCKED") == 1
+    assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+    assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
 @pytest.mark.parametrize("malformed_debt", [
@@ -609,12 +614,14 @@ def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
         raise AssertionError("provider must not run")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     arguments = {
         "repo_path":str(repo_with_branch), "lineage":lineage_id,
         "round":2, "stakes":"s", "class_closure":True,
     }
     if mode == cc.PLAN_MODE:
-        arguments.update(plan_text="# Plan\n", claim_verification=False)
+        arguments.update(plan_text="# Plan\n")
         invoke = handlers.critique_plan
     else:
         arguments.update(base_ref="main", head_ref="feature", converge=True)
@@ -634,7 +641,16 @@ def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
     assert reloaded.review_state["staged_failure"]["kind"] == "validation"
     audits = list(logs.glob("*.json"))
     assert len(audits) == 1
-    assert json.loads(audits[0].read_text())["attempt_ledger"] == []
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert result.count("CONVERGENCE: BLOCKED") == 1
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
 @pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
@@ -714,6 +730,11 @@ def test_public_staged_handlers_settle_malformed_correction_control_without_spen
         assert audit["claim_verification"] is True
         assert audit["claim_status"] == "blocked-by-structural-preflight"
         assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert result.count("CONVERGENCE: BLOCKED") == 1
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
