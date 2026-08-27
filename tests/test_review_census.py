@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import subprocess
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -54,8 +55,10 @@ def _unit_debt(
     status: str = "open",
 ) -> dict:
     return {
-        "id": debt_id, "status": status, "severity": severity,
-        "class_ids": list(class_ids),
+        "id":debt_id, "finding_id":f"finding-{debt_id}", "status":status,
+        "severity":severity, "summary":f"summary {debt_id}",
+        "evidence":["plan:1"], "remedy":"repair it", "source_ids":[],
+        "class_ids":list(class_ids), "first_round":1, "last_round":1,
     }
 
 
@@ -123,16 +126,161 @@ def test_plan_correction_blocking_units_are_stable(classes, debt, expected):
 @pytest.mark.parametrize(("debt", "message"), [
     ({}, "review_state debt"),
     (["not-an-object"], "debt row must be an object"),
-    ([{}], "debt id must be a nonempty string"),
-    ([{"id":"", "class_ids":[]}], "debt id must be a nonempty string"),
-    ([{"id":1, "class_ids":[]}], "debt id must be a nonempty string"),
-    ([{"id":"D1", "class_ids":[]}, {"id":"D1", "class_ids":[]}], "duplicate"),
-    ([{"id":"D1", "class_ids":"a"}], "class_ids must be a list"),
-    ([{"id":"D1", "class_ids":[1]}], "class references must be strings"),
+    ([{}], "invalid persisted debt fields"),
+    ([{**_unit_debt("D1"), "id":""}], "debt id must be a nonempty string"),
+    ([{**_unit_debt("D1"), "id":1}], "debt id must be a nonempty string"),
+    ([_unit_debt("D1"), _unit_debt("D1")], "duplicate persisted debt id"),
+    ([{**_unit_debt("D1"), "class_ids":"a"}], "persisted value must be a list"),
+    ([{**_unit_debt("D1"), "class_ids":[1]}], "persisted members"),
+    ([{**_unit_debt("D1"), "status":[]}], "invalid persisted debt status"),
+    ([{**_unit_debt("D1"), "severity":{}}], "invalid persisted debt severity"),
 ])
 def test_plan_correction_blocking_units_reject_malformed_debt(debt, message):
     with pytest.raises(rc.CensusError, match=message):
         rc.plan_correction_blocking_units(debt, [_unit_class("a")])
+
+
+def _closed_persisted_state() -> dict:
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="correction", last_round=1, debt=[_unit_debt("D1")])
+    return state
+
+
+def _set_nested(value, path, replacement):
+    cursor = value
+    for key in path[:-1]:
+        cursor = cursor[key]
+    cursor[path[-1]] = replacement
+
+
+def test_closed_persisted_state_validator_accepts_every_supported_envelope():
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    base = _closed_persisted_state()
+    base["debt"][0]["class_ids"] = ["class-a"]
+    accepted = [base]
+
+    failure = deepcopy(base)
+    failure["staged_failure"] = {
+        "role":"correction", "kind":"provider", "message":"capacity",
+        "engine_failure":{
+            "returncode":0, "raw_sha256":"raw", "raw_excerpt":"raw",
+            "failure_detail_sha256":"detail", "failure_detail_excerpt":"detail",
+            "stderr_sha256":"stderr", "stderr_excerpt":"stderr",
+        },
+        "rejected_payloads":[{
+            "role":"correction", "sequence":1, "sha256":"reply",
+            "excerpt":"reply", "validation_issue":"/debt: invalid",
+        }],
+    }
+    accepted.append(failure)
+
+    cached = deepcopy(base)
+    cached["validation_debt"] = {
+        "role":"consolidation-validation-retry", "kind":"validation",
+        "message":"invalid settlement",
+    }
+    cached["census_cache"] = {
+        "version":rc.CENSUS_CACHE_VERSION, "mode":cc.PLAN_MODE,
+        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+        "input_digest":"input", "active_classes_digest":"classes",
+        "manifests":[{"lane":"domain"}],
+    }
+    accepted.append(cached)
+
+    legacy_format = deepcopy(base)
+    legacy_format["format_debt"] = "legacy validation failure"
+    accepted.append(legacy_format)
+    legacy_unbound = deepcopy(base)
+    legacy_unbound["unbound_classes"] = [{
+        "class_id":"class-a", "severity":cc.MAJOR,
+        "summary":"invariant", "reason":"OPEN: review required",
+    }]
+    accepted.append(legacy_unbound)
+    current_unbound = deepcopy(base)
+    current_unbound["unbound_class_ids"] = ["class-a"]
+    accepted.append(current_unbound)
+
+    for state in accepted:
+        validated = rc.validate_persisted_state(state, [tracked])
+        assert validated["debt"] == state["debt"]
+        assert validated["correction_control"]["classes"] == {
+            "class-a":{
+                "reset_round":None, "reopen_count":0, "last_session_ref":None,
+            },
+        }
+
+
+@pytest.mark.parametrize(("path", "replacement", "message"), [
+    (("version",), True, "version"),
+    (("stakes_digest",), [], "stakes_digest"),
+    (("stakes",), None, "stakes"),
+    (("phase",), "unknown", "phase"),
+    (("phase",), [], "phase"),
+    (("snapshot_digest",), {}, "snapshot_digest"),
+    (("debt",), {}, "review_state debt"),
+    (("last_round",), False, "last_round"),
+    (("debt", 0, "id"), [], "debt id"),
+    (("debt", 0, "finding_id"), None, "finding_id"),
+    (("debt", 0, "status"), [], "debt status"),
+    (("debt", 0, "status"), "pending", "debt status"),
+    (("debt", 0, "severity"), {}, "debt severity"),
+    (("debt", 0, "severity"), "CRITICAL", "debt severity"),
+    (("debt", 0, "summary"), "", "summary"),
+    (("debt", 0, "evidence"), "plan:1", "evidence"),
+    (("debt", 0, "remedy"), 1, "remedy"),
+    (("debt", 0, "source_ids"), [1], "source_ids"),
+    (("debt", 0, "class_ids"), ["a", "a"], "class_ids"),
+    (("debt", 0, "first_round"), -1, "round bounds"),
+    (("debt", 0, "last_round"), 0, "round bounds"),
+])
+def test_closed_persisted_state_validator_rejects_each_typed_boundary(
+    path, replacement, message,
+):
+    state = _closed_persisted_state()
+    _set_nested(state, path, replacement)
+    with pytest.raises(rc.CensusError, match=message):
+        rc.validate_persisted_state(state, [])
+
+
+@pytest.mark.parametrize(("mutation", "message"), [
+    ({"unexpected":True}, "unexpected"),
+    ({"staged_failure":{}}, "failure record"),
+    ({"validation_debt":{}, "format_debt":"legacy"}, "conflicting failure"),
+    ({"census_cache":{}}, "cache envelope"),
+    ({"unbound_class_ids":"class-a"}, "must be a list"),
+    ({"unbound_classes":[{}]}, "legacy unbound class"),
+    ({"unbound_class_ids":[], "unbound_classes":[]}, "conflicting unbound"),
+])
+def test_closed_persisted_state_validator_rejects_each_envelope_boundary(
+    mutation, message,
+):
+    state = _closed_persisted_state()
+    state.update(mutation)
+    with pytest.raises(rc.CensusError, match=message):
+        rc.validate_persisted_state(state, [])
+
+
+def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
+    cache_state = _closed_persisted_state()
+    cache_state["validation_debt"] = "legacy validation failure"
+    cache_state["census_cache"] = {
+        "version":rc.CENSUS_CACHE_VERSION, "mode":[],
+        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+        "input_digest":"input", "active_classes_digest":"classes",
+        "manifests":[],
+    }
+    with pytest.raises(rc.CensusError, match="cache mode"):
+        rc.validate_persisted_state(cache_state, [])
+
+    unbound_state = _closed_persisted_state()
+    unbound_state["unbound_classes"] = [{
+        "class_id":"class-a", "severity":{}, "summary":"summary",
+        "reason":"reason",
+    }]
+    with pytest.raises(rc.CensusError, match="class severity"):
+        rc.validate_persisted_state(unbound_state, [])
 
 
 def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
@@ -484,6 +632,8 @@ def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):
     ],
     [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
     [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
+    [{**_unit_debt("D1"), "status":[]}],
+    [{**_unit_debt("D1"), "severity":{}}],
 ])
 def test_public_plan_correction_preflights_debt_before_provider_spend(
     repo, tmp_path, malformed_debt, monkeypatch,
@@ -549,6 +699,8 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     ],
     [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
     [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
+    [{**_unit_debt("D1"), "status":[]}],
+    [{**_unit_debt("D1"), "severity":{}}],
 ])
 def test_public_branch_correction_preflights_debt_before_provider_spend(
     repo_with_branch, tmp_path, malformed_debt, monkeypatch,
@@ -595,12 +747,14 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
 
 
 @pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("invalid_phase", ["not-a-phase", []])
 def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
-    repo_with_branch, tmp_path, monkeypatch, mode,
+    repo_with_branch, tmp_path, monkeypatch, mode, invalid_phase,
 ):
     state = rc.normalize_state(None, stakes="s", snapshot="old")
-    state.update(phase="not-a-phase", debt=[], last_round=1)
-    lineage_id = f"invalid-phase-{mode}"
+    state.update(phase=invalid_phase, debt=[], last_round=1)
+    suffix = "text" if isinstance(invalid_phase, str) else "container"
+    lineage_id = f"invalid-phase-{mode}-{suffix}"
     cc.save_lineage(cc.default_state_root(), cc.Lineage(
         lineage_id, mode=mode, rounds=1, review_state=state,
     ))
@@ -633,7 +787,7 @@ def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=mode,
     )
-    assert reloaded.review_state["phase"] == "not-a-phase"
+    assert reloaded.review_state["phase"] == invalid_phase
     assert reloaded.review_state["staged_failure"]["role"] == "structural-preflight"
     assert reloaded.review_state["staged_failure"]["kind"] == "validation"
     audits = list(logs.glob("*.json"))
@@ -3064,8 +3218,8 @@ def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state.update(phase="correction", debt=[{
         "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
-        "summary":"fix", "evidence":["plan:1"], "source_ids":[],
-        "first_round":1, "last_round":1,
+        "summary":"fix", "evidence":["plan:1"], "remedy":"repair it",
+        "source_ids":[], "class_ids":[], "first_round":1, "last_round":1,
     }])
     cc.save_lineage(
         tmp_path,

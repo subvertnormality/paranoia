@@ -679,7 +679,8 @@ def _settle_staged_failure(
     ).endswith("-preflight")
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
-        and raw_state.get("phase") in rc.PHASES
+        and isinstance(raw_state.get("phase"), str)
+        and raw_state["phase"] in rc.PHASES
         and isinstance(raw_state.get("debt"), list)
     ):
         state = deepcopy(raw_state)
@@ -785,7 +786,8 @@ def _settle_staged_failure(
             **state,
             "phase":(
                 state.get("phase")
-                if state.get("phase") in rc.PHASES else "census"
+                if isinstance(state.get("phase"), str)
+                and state["phase"] in rc.PHASES else "census"
             ),
             "debt":[],
         }
@@ -940,7 +942,15 @@ def _staged_structural_review(
         state = rc.normalize_state(
             lineage.review_state, stakes=stakes, snapshot=snapshot,
         )
-        rc.validate_correction_debt(state.get("debt"))
+        control_source = (
+            lineage.review_state
+            if isinstance(lineage.review_state, dict)
+            and "correction_control" in lineage.review_state
+            else state
+        )
+        state = rc.validate_persisted_state(
+            state, lineage.active(), correction_control_source=control_source,
+        )
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -948,7 +958,8 @@ def _staged_structural_review(
         )
         role = (
             f"{raw_phase}-preflight"
-            if raw_phase in rc.PHASES else "structural-preflight"
+            if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+            else "structural-preflight"
         )
         raise _staged_error(str(exc), role=role, kind="validation") from exc
     stakes_recalibration = (
@@ -956,21 +967,7 @@ def _staged_structural_review(
         and lineage.review_state.get("version") == 1
         and lineage.review_state.get("stakes_digest") != rc.digest(stakes)
     )
-    control_source = (
-        lineage.review_state
-        if isinstance(lineage.review_state, dict)
-        and "correction_control" in lineage.review_state
-        else state
-    )
-    try:
-        correction_control = rc.normalize_correction_control(
-            control_source, lineage.active(),
-        )
-    except rc.CensusError as exc:
-        raise _staged_error(
-            str(exc), role=f"{state['phase']}-preflight", kind="validation",
-        ) from exc
-    state["correction_control"] = deepcopy(correction_control)
+    correction_control = state["correction_control"]
     if lineage.debt:
         # A pre-staging malformed-register round is not silently normalized into an
         # empty verified register. Its only autonomous recovery is a fresh cold census
@@ -2395,17 +2392,15 @@ def critique_plan(
                     closure.lineage.review_state, stakes=stakes or "",
                     snapshot=structural_snapshot,
                 )
-                rc.validate_correction_debt(
-                    normalized_structural_state.get("debt")
-                )
                 control_source = (
                     closure.lineage.review_state
                     if isinstance(closure.lineage.review_state, dict)
                     and "correction_control" in closure.lineage.review_state
                     else normalized_structural_state
                 )
-                rc.normalize_correction_control(
-                    control_source, closure.lineage.active(),
+                normalized_structural_state = rc.validate_persisted_state(
+                    normalized_structural_state, closure.lineage.active(),
+                    correction_control_source=control_source,
                 )
             except rc.CensusError as exc:
                 raw_phase = (
@@ -2415,7 +2410,8 @@ def critique_plan(
                 )
                 role = (
                     f"{raw_phase}-preflight"
-                    if raw_phase in rc.PHASES else "structural-preflight"
+                    if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+                    else "structural-preflight"
                 )
                 error = _staged_error(str(exc), role=role, kind="validation")
                 preflight_review, preflight_trailer, structural_attempts = (
