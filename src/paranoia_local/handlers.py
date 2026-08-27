@@ -2372,7 +2372,52 @@ def critique_plan(
     claim_status = "disabled"
     claim_duration_ms: int | None = None
     attempt_ledger: list[dict[str, Any]] = []
-    if claim_verification:
+    snapshot: str | None = None
+    structural_snapshot: str | None = None
+    normalized_structural_state: dict[str, Any] | None = None
+    staged_preflight_failed = False
+    preflight_review: Review | None = None
+    preflight_trailer: str | None = None
+    if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+        parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
+        snapshot = orientation.wrap_commit(
+            repo,
+            orientation.snapshot_tree(
+                repo, parent or orientation.empty_tree(repo),
+            ),
+            parent,
+        )
+        structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+        if closure.lineage:
+            try:
+                normalized_structural_state = rc.normalize_state(
+                    closure.lineage.review_state, stakes=stakes or "",
+                    snapshot=structural_snapshot,
+                )
+                if normalized_structural_state["phase"] == "correction":
+                    rc.validate_correction_debt(
+                        normalized_structural_state.get("debt")
+                    )
+            except rc.CensusError as exc:
+                raw_phase = (
+                    closure.lineage.review_state.get("phase")
+                    if isinstance(closure.lineage.review_state, dict)
+                    else None
+                )
+                role = (
+                    f"{raw_phase}-preflight"
+                    if raw_phase in rc.PHASES else "structural-preflight"
+                )
+                error = _staged_error(str(exc), role=role, kind="validation")
+                preflight_review, preflight_trailer, structural_attempts = (
+                    _settle_staged_failure(
+                        closure, stakes=stakes or "", snapshot=structural_snapshot,
+                        error=error, mode=cc.PLAN_MODE,
+                    )
+                )
+                attempt_ledger.extend(structural_attempts)
+                staged_preflight_failed = True
+    if claim_verification and not staged_preflight_failed:
         claim_started = time.monotonic()
         if closure and closure.unavailable:
             claim_state = pc.with_debt(
@@ -2424,11 +2469,14 @@ def critique_plan(
                     closure.unavailable = str(exc)
         blocks.append(pc.review_context(claim_state))
         claim_duration_ms = int((time.monotonic() - claim_started) * 1000)
+    elif claim_verification:
+        claim_status = "blocked-by-structural-preflight"
+        claim_duration_ms = 0
     if closure:
         closure.claims_enabled = claim_verification
         closure.claim_state = claim_state
 
-    trailer: str | None = None
+    trailer: str | None = preflight_trailer
     try:
         body = _plan_body(plan_view, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -2443,15 +2491,17 @@ def critique_plan(
             closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
         )
         if type(engine) in (eng.CodexEngine, eng.ClaudeEngine) and (claim_verification or closure):
-            parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
-            snapshot = orientation.wrap_commit(
-                repo,
-                orientation.snapshot_tree(
-                    repo, parent or orientation.empty_tree(repo),
-                ),
-                parent,
-            )
-            structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+            if snapshot is None:
+                parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
+                snapshot = orientation.wrap_commit(
+                    repo,
+                    orientation.snapshot_tree(
+                        repo, parent or orientation.empty_tree(repo),
+                    ),
+                    parent,
+                )
+                structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+            assert structural_snapshot is not None
             with inert_tree.evidence_workspace(repo, snapshot) as workspace:
                 reviewer = engine.for_role(eng.ROLE_REPOSITORY)
                 review_cwd = workspace.cwd_for(engine.name)
@@ -2459,33 +2509,9 @@ def critique_plan(
                     "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                     "prefix as the project root; no live Git or web tools are available."
                 )
-                staged_preflight_failed = False
-                normalized_structural_state = None
-                if closure and closure.lineage:
-                    try:
-                        normalized_structural_state = rc.normalize_state(
-                            closure.lineage.review_state, stakes=stakes or "",
-                            snapshot=structural_snapshot,
-                        )
-                    except rc.CensusError as exc:
-                        raw_phase = (
-                            closure.lineage.review_state.get("phase")
-                            if isinstance(closure.lineage.review_state, dict)
-                            else None
-                        )
-                        role = (
-                            f"{raw_phase}-preflight"
-                            if raw_phase in rc.PHASES else "structural-preflight"
-                        )
-                        error = _staged_error(
-                            str(exc), role=role, kind="validation",
-                        )
-                        review, trailer, structural_attempts = _settle_staged_failure(
-                            closure, stakes=stakes or "", snapshot=structural_snapshot,
-                            error=error, mode=cc.PLAN_MODE,
-                        )
-                        attempt_ledger.extend(structural_attempts)
-                        staged_preflight_failed = True
+                if staged_preflight_failed:
+                    assert preflight_review is not None
+                    review = preflight_review
                 staged_phase = (
                     normalized_structural_state["phase"]
                     if normalized_structural_state is not None else "census"

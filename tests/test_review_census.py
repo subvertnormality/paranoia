@@ -511,10 +511,12 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
         raise AssertionError("provider must not run")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     engine = handlers.eng.CodexEngine()
     result = handlers.critique_plan({
         "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
-        "round":2, "stakes":"s", "claim_verification":False,
+        "round":2, "stakes":"s",
     }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "PREFLIGHT")
     assert calls == []
     assert "CONVERGENCE: BLOCKED" in result
@@ -526,6 +528,9 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert reloaded.review_state["staged_failure"]["kind"] == "validation"
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
     assert audit["attempt_ledger"] == []
+    assert audit["claim_verification"] is True
+    assert audit["claim_status"] == "blocked-by-structural-preflight"
+    assert audit["claim_model_calls"] == 0
 
 
 @pytest.mark.parametrize("malformed_debt", [
