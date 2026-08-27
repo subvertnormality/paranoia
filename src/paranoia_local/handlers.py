@@ -637,6 +637,12 @@ def _mechanized_class_evidence_issues(
             if span is not None
         ]
         if not spans:
+            issues.append(
+                f"{pointer}/pattern: mechanized predicate requires at least one "
+                "repository line cited by its governing finding or violated class "
+                "assessment; use an unmechanized procedure when no such occurrence "
+                "exists"
+            )
             continue
         result = grep(pattern, str(record.get("pathspec", ".")))
         if result.error:

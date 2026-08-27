@@ -2949,6 +2949,48 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert "CONVERGENCE: BLOCKED" in result
 
 
+def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
+    root = Path(__file__).resolve().parents[1]
+    path = root / "docs/mechanized_predicate_acceptance_2026-08-27.json"
+    if not path.exists():
+        pytest.skip("acceptance artifact is generated after the source commit")
+    artifact = json.loads(path.read_text(encoding="utf-8"))
+    assert artifact["acceptance_kind"] == (
+        "evidence-bound-mechanized-predicate-public-branch"
+    )
+    revision = artifact["source_revision"]
+    assert len(revision) == 40
+    assert set(artifact["source_sha256"]) == {
+        "src/paranoia_local/handlers.py",
+        "src/paranoia_local/review_census.py",
+        "scripts/run_mechanized_predicate_acceptance.py",
+    }
+    for relative, expected in artifact["source_sha256"].items():
+        accepted = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(accepted).hexdigest() == expected
+        assert accepted == (root / relative).read_bytes()
+    assert artifact["provider"]["engine"] == "codex"
+    assert artifact["provider"]["web_search"] is False
+    assert [row["outcome"] for row in artifact["attempt_ledger"]] == [
+        "validation-invalid", "completed",
+    ]
+    assert [row["role"] for row in artifact["attempt_ledger"]] == [
+        "final", "final-validation-retry",
+    ]
+    assert "did not match any cited violation line" in artifact[
+        "rejected_payload"
+    ]["validation_issue"]
+    successor = artifact["durable_successor"]
+    assert successor["status"] == cc.OPEN
+    assert successor["pattern"] == r"next\(iter\(distinct\)\)"
+    assert successor["pathspec"] == "selection.py"
+    assert len(successor["matches"]) == 1
+    assert "CONVERGENCE: BLOCKED" in artifact["result_text"]
+
+
 @pytest.mark.parametrize(
     ("engine_name", "stdout", "stderr", "expected_text", "expected_detail"),
     [
@@ -4399,6 +4441,50 @@ def test_mechanized_replacement_binds_to_class_assessment_evidence():
     issues = handlers._mechanized_class_evidence_issues(
         parsed,
         grep=lambda pattern, pathspec: cc.GrepResult(paths=(), matches=()),
+    )
+
+    assert len(issues) == 1
+    assert issues[0].startswith("/class_actions/abc/pattern:")
+
+
+@pytest.mark.parametrize("evidence", [[], ["plan:1"]])
+def test_mechanized_class_without_repository_occurrence_is_rejected(evidence):
+    parsed = {
+        "findings": [{"id":"G1", "evidence":evidence}],
+        "_finding_class_refs": {"G1":"record:0"},
+        "_class_record_pointers": ["/definition"],
+        "class_records": [{
+            "op":"new", "invariant":"detect the recurrence", "severity":"MAJOR",
+            "pattern":"BAD", "pathspec":".",
+        }],
+        "class_assessments": [],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: pytest.fail("missing evidence must fail before grep"),
+    )
+
+    assert len(issues) == 1
+    assert "requires at least one repository line cited" in issues[0]
+
+
+def test_standalone_mechanized_replacement_without_violation_is_rejected():
+    parsed = {
+        "findings": [], "_finding_class_refs": {},
+        "_class_record_pointers": ["/class_actions/abc"],
+        "class_records": [{
+            "op":"replace", "class_id":"abc", "invariant":"detect recurrence",
+            "severity":"MAJOR", "pattern":"BAD", "pathspec":".",
+        }],
+        "class_assessments": [{
+            "class_id":"abc", "verdict":"satisfied", "evidence":[],
+        }],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: pytest.fail("satisfied class has no occurrence"),
     )
 
     assert len(issues) == 1
