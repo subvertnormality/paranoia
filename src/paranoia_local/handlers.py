@@ -674,11 +674,23 @@ def _settle_staged_failure(
         restored.branch_contract = deepcopy(current.branch_contract)
         closure.lineage = restored
     raw_state = closure.lineage.review_state
+    preflight_failure = str(
+        getattr(error, "stage_role", "")
+    ).endswith("-preflight")
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
         and raw_state.get("phase") in rc.PHASES
         and isinstance(raw_state.get("debt"), list)
     ):
+        state = deepcopy(raw_state)
+    elif (
+        preflight_failure and isinstance(raw_state, dict)
+        and raw_state.get("version") == 1
+        and raw_state.get("phase") in rc.PHASES
+    ):
+        # A structural preflight may be rejecting the top-level debt container
+        # itself. Preserve those malformed durable bytes for diagnosis while adding
+        # the structured failure beside them; rendering uses a sanitized projection.
         state = deepcopy(raw_state)
     else:
         state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
@@ -767,7 +779,7 @@ def _settle_staged_failure(
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
     trailer_state = state
-    if getattr(error, "stage_role", None) == "correction-preflight":
+    if preflight_failure:
         # Preserve the malformed durable bytes for diagnosis, but never feed them to
         # the normal debt renderer that assumes canonical rows.
         trailer_state = {**state, "debt": []}
@@ -2425,28 +2437,53 @@ def critique_plan(
                     "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                     "prefix as the project root; no live Git or web tools are available."
                 )
+                staged_preflight_failed = False
+                normalized_structural_state = None
+                if closure and closure.lineage:
+                    try:
+                        normalized_structural_state = rc.normalize_state(
+                            closure.lineage.review_state, stakes=stakes or "",
+                            snapshot=structural_snapshot,
+                        )
+                    except rc.CensusError as exc:
+                        raw_phase = (
+                            closure.lineage.review_state.get("phase")
+                            if isinstance(closure.lineage.review_state, dict)
+                            else None
+                        )
+                        role = (
+                            f"{raw_phase}-preflight"
+                            if raw_phase in rc.PHASES else "structural-preflight"
+                        )
+                        error = _staged_error(
+                            str(exc), role=role, kind="validation",
+                        )
+                        review, trailer, structural_attempts = _settle_staged_failure(
+                            closure, stakes=stakes or "", snapshot=structural_snapshot,
+                            error=error, mode=cc.PLAN_MODE,
+                        )
+                        attempt_ledger.extend(structural_attempts)
+                        staged_preflight_failed = True
                 staged_phase = (
-                    rc.normalize_state(
-                        closure.lineage.review_state, stakes=stakes or "",
-                        snapshot=structural_snapshot,
-                    )["phase"]
-                    if closure and closure.lineage else "census"
+                    normalized_structural_state["phase"]
+                    if normalized_structural_state is not None else "census"
                 )
                 structural_reserve = (
                     0
+                    if staged_preflight_failed
+                    else 0
                     if closure and closure.lineage and _is_legacy_claim_only_phase(
                         closure.lineage,
-                        rc.normalize_state(
-                            closure.lineage.review_state, stakes=stakes or "",
-                            snapshot=structural_snapshot,
-                        ),
+                        normalized_structural_state,
                         snapshot=structural_snapshot,
                     )
                     else STAGED_CENSUS_RESERVE_SEC
                     if staged_phase == "census"
                     else STAGED_FOLLOWUP_RESERVE_SEC
                 )
-                if closure and closure.unavailable:
+                if staged_preflight_failed:
+                    pass
+                elif closure and closure.unavailable:
                     review, trailer, structural_attempts = _state_unavailable_review(
                         closure, mode=cc.PLAN_MODE, claim_state=claim_state,
                     )

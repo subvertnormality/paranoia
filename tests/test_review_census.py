@@ -476,6 +476,7 @@ def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):
 
 
 @pytest.mark.parametrize("malformed_debt", [
+    {},
     ["not-an-object"],
     [{}],
     [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
@@ -520,6 +521,8 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
     )
+    assert reloaded.review_state["debt"] == malformed_debt
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
     assert reloaded.review_state["staged_failure"]["kind"] == "validation"
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
     assert audit["attempt_ledger"] == []
