@@ -359,9 +359,12 @@ of the resulting code and tests.
   plan reviews with claim verification explicitly disabled, retain claim packets without rendering
   or gating on them; if stakes change, persist a re-verification requirement and exhaustively audit
   the preserved inventory when verification is next enabled. For tracked plan structural review,
-  a new plan snapshot's census and the final regression are broad and cold; intervening correction
-  rounds are deliberately targeted to open findings/classes, the claimed corrections, and their
-  transitive effects. Tracked branch review uses the same broad cold census, targeted correction,
+  a new plan snapshot's census and the final regression are broad and cold. Plan correction is
+  targeted to open findings/classes, claimed corrections, and transitive effects until it starts
+  with one or two blocking units; that closure-candidate correction uses the same single call but
+  also scans the complete plan against the full checklist and all active classes for sibling and
+  repair-created defects. It still advances only to an independent cold final and does not promise
+  a fixed round count. Tracked branch review uses the same broad cold census, targeted correction,
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.

@@ -158,6 +158,46 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     return out
 
 
+def plan_correction_blocking_units(
+    debt: Any, active_classes: Sequence[Mapping[str, Any]],
+) -> tuple[str, ...]:
+    """Return stable blocking units for a late plan-correction sweep."""
+    if not isinstance(debt, list):
+        raise CensusError("invalid persisted review_state debt")
+    blocking_classes = [
+        row["class_id"] for row in active_classes
+        if row.get("severity") in BLOCKING
+        and row.get("status") in cc.UNPROVEN_STATUSES
+    ]
+    blocking_ids = set(blocking_classes)
+    units = [f"class:{class_id}" for class_id in blocking_classes]
+    seen_debt: set[str] = set()
+    for index, row in enumerate(debt):
+        pointer = f"/debt/{index}"
+        if not isinstance(row, Mapping):
+            raise CensusError(f"{pointer}: persisted debt row must be an object")
+        debt_id = row.get("id")
+        if not isinstance(debt_id, str) or not debt_id:
+            raise CensusError(f"{pointer}/id: persisted debt id must be a nonempty string")
+        if debt_id in seen_debt:
+            raise CensusError(f"{pointer}/id: duplicate persisted debt id {debt_id!r}")
+        seen_debt.add(debt_id)
+        class_ids = row.get("class_ids", [])
+        if not isinstance(class_ids, list):
+            raise CensusError(f"{pointer}/class_ids: persisted class_ids must be a list")
+        if any(not isinstance(class_id, str) for class_id in class_ids):
+            raise CensusError(
+                f"{pointer}/class_ids: persisted class references must be strings"
+            )
+        if (
+            row.get("status") == "open"
+            and row.get("severity") in BLOCKING
+            and not any(class_id in blocking_ids for class_id in class_ids)
+        ):
+            units.append(f"debt:{debt_id}")
+    return tuple(units)
+
+
 def _valid_session_ref(value: Any) -> bool:
     if value is None:
         return True

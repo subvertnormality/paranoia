@@ -759,10 +759,15 @@ def _settle_staged_failure(
         text=rc.render_error_review(error_body),
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
+    trailer_state = state
+    if getattr(error, "stage_role", None) == "correction-preflight":
+        # Preserve the malformed durable bytes for diagnosis, but never feed them to
+        # the normal debt renderer that assumes canonical rows.
+        trailer_state = {**state, "debt": []}
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(
-            state,
+            trailer_state,
             class_first_rounds={
                 item.class_id: item.first_round
                 for item in closure.lineage.blocking()
@@ -855,8 +860,21 @@ def _is_legacy_claim_only_phase(
     lineage: cc.Lineage, state: dict[str, Any], *, snapshot: str,
 ) -> bool:
     """Recognize the exact pre-issue-58 state that requires no model call."""
+    debt_rows = state.get("debt", [])
+    if not isinstance(debt_rows, list) or any(
+        not isinstance(debt, Mapping)
+        or not isinstance(debt.get("class_ids", []), list)
+        or any(
+            not isinstance(class_id, str)
+            for class_id in debt.get("class_ids", [])
+        )
+        for debt in debt_rows
+    ):
+        # Malformed state can never satisfy the exact legacy migration shape.  The
+        # staged correction preflight owns the typed, durable validation failure.
+        return False
     debt_class_ids = {
-        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        cid for debt in debt_rows if debt.get("status") == "open"
         for cid in debt.get("class_ids", [])
     }
     unbound_blocking = {
@@ -865,7 +883,7 @@ def _is_legacy_claim_only_phase(
     }
     has_blocking_debt = any(
         debt.get("status") == "open" and debt.get("severity") in rc.BLOCKING
-        for debt in state.get("debt", [])
+        for debt in debt_rows
     )
     return (
         not lineage.debt
@@ -945,6 +963,16 @@ def _staged_structural_review(
         }
         for c in lineage.active()
     ]
+    plan_correction_units: tuple[str, ...] | None = None
+    if mode == cc.PLAN_MODE and phase == "correction":
+        try:
+            plan_correction_units = rc.plan_correction_blocking_units(
+                state.get("debt"), active_classes,
+            )
+        except rc.CensusError as exc:
+            raise _staged_error(
+                str(exc), role="correction-preflight", kind="validation",
+            ) from exc
     active_ids = [c["class_id"] for c in active_classes]
     debt_class_ids = {
         cid for debt in state.get("debt", []) if debt.get("status") == "open"
@@ -1361,18 +1389,36 @@ def _staged_structural_review(
         role = "final" if phase == "final" else "correction"
         open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
         existing = [d["id"] for d in open_debt]
+        closure_candidate = (
+            mode == cc.PLAN_MODE
+            and role == "correction"
+            and plan_correction_units is not None
+            and 1 <= len(plan_correction_units) <= 2
+        )
         outcome_class_ids = sp.expected_outcome_class_ids(
             role, active_classes=active_classes, durable_debt=open_debt,
         )
-        stage_body = json.dumps({
+        stage_task = {
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
             "correction_gates": correction_gates if role == "correction" else [],
-            "checklist": list(sp.CHECKLIST) if role == "final" else [],
+            "checklist": list(sp.CHECKLIST) if role == "final" or closure_candidate else [],
             "artifact": body,
-        }, ensure_ascii=False)
+        }
+        if mode == cc.PLAN_MODE and role == "correction":
+            stage_task["review_scope"] = (
+                "closure_candidate" if closure_candidate else "targeted"
+            )
+        stage_body = json.dumps(stage_task, ensure_ascii=False)
+        followup_instructions = prompts.staged_followup_instructions(
+            mode, plan_contract=plan_contract,
+        )
+        if closure_candidate:
+            followup_instructions += (
+                "\n\n" + prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
+            )
         prompt = prompts.compose(
-            f"{prompts.staged_followup_instructions(mode, plan_contract=plan_contract)}\n"
+            f"{followup_instructions}\n"
             f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
             f"{sp.class_decision_instructions(role, active_classes=active_classes, outcome_class_ids=outcome_class_ids)}",
             stage_body,
