@@ -4631,7 +4631,10 @@ def test_mechanized_candidates_share_one_aggregate_round_budget():
 
 def test_branch_closure_reuses_snapshot_bound_predicate_result(monkeypatch, tmp_path):
     calls = []
-    expected = cc.GrepResult(paths=("app.py",))
+    expected = cc.GrepResult(
+        paths=("app.py",),
+        matches=({"path":"app.py", "line":1, "text":"BAD"},),
+    )
 
     def make_grep(repo, head_id, *, runner):
         def grep(pattern, pathspec):
@@ -4645,8 +4648,31 @@ def test_branch_closure_reuses_snapshot_bound_predicate_result(monkeypatch, tmp_
     closure.head_id = "snapshot"
     closure._grep_results = {}
 
-    assert closure._grep()("BAD", "app.py") is expected
-    assert closure._grep()("BAD", "app.py") is expected
+    grep = closure._grep()
+    assert grep("BAD", "app.py") is expected
+    spent = cc.Budget(total=0)
+    parsed = {
+        "findings": [{"id":"G1", "evidence":["repository/app.py:1"]}],
+        "_finding_class_refs": {"G1":"record:0"},
+        "_class_record_pointers": ["/definition"],
+        "class_records": [{
+            "op":"new", "invariant":"detect recurrence", "severity":"MAJOR",
+            "pattern":"BAD", "pathspec":"app.py",
+        }],
+        "class_assessments": [],
+    }
+    assert handlers._mechanized_class_evidence_issues(
+        parsed, grep=closure._grep(), budget=spent,
+    ) == []
+    lineage = cc.Lineage("cached", classes={
+        "abc":cc.TrackedClass(
+            "abc", "detect recurrence", "MAJOR", 1, cc.OPEN,
+            pattern="BAD", pathspec="app.py",
+        ),
+    })
+    cc.sweep(lineage, closure._grep(), budget=spent)
+
+    assert lineage.classes["abc"].status == cc.OPEN
     assert calls == [("BAD", "app.py")]
 
 

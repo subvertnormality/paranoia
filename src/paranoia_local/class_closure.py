@@ -670,6 +670,12 @@ class GrepResult:
 GitGrep = Callable[[str, str], GrepResult]
 
 
+def grep_result_cached(grep: GitGrep, pattern: str, pathspec: str) -> bool:
+    """Whether this exact immutable-snapshot grep can return without execution."""
+    check = getattr(grep, "is_cached", None)
+    return bool(callable(check) and check(pattern, pathspec))
+
+
 @dataclass
 class Budget:
     """The round's closure budget, measured in GREP time only.
@@ -711,7 +717,10 @@ def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
         cls = lineage.classes.get(cid)
         if cls is None or cls.status == SUPERSEDED or not cls.mechanized:
             continue
-        if budget is not None and budget.exhausted():
+        if (
+            budget is not None and budget.exhausted()
+            and not grep_result_cached(grep, cls.pattern or "", cls.pathspec or ".")
+        ):
             lineage.classes[cid] = replace(
                 cls, status=UNCHECKED, matches=(),
                 detail="round closure budget exhausted before this class ran",

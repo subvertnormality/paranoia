@@ -647,15 +647,17 @@ def _mechanized_class_evidence_issues(
                 "exists"
             )
             continue
-        if budget is not None and budget.exhausted():
+        pathspec = str(record.get("pathspec", "."))
+        cached = cc.grep_result_cached(grep, pattern, pathspec)
+        if budget is not None and budget.exhausted() and not cached:
             issues.append(
                 f"{pointer}/pattern: predicate could not run: round closure budget "
                 "exhausted before this candidate ran"
             )
             continue
         started = clock()
-        result = grep(pattern, str(record.get("pathspec", ".")))
-        if budget is not None:
+        result = grep(pattern, pathspec)
+        if budget is not None and not cached:
             budget.charge(clock() - started)
         if result.error:
             issues.append(f"{pointer}/pattern: predicate could not run: {result.error}")
@@ -4603,6 +4605,10 @@ class _ClassClosure(_ClosureRound):
             if key not in self._grep_results:
                 self._grep_results[key] = run(pattern, pathspec)
             return self._grep_results[key]
+
+        cached.is_cached = (  # type: ignore[attr-defined]
+            lambda pattern, pathspec: (pattern, pathspec) in self._grep_results
+        )
 
         return cached
 
