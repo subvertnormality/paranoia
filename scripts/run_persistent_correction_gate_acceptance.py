@@ -538,7 +538,7 @@ def validate_artifact(
     sibling_classes = [
         row for row in after["classes"]
         if row["class_id"] != CLASS_ID and row.get("first_round") == 7
-        and row.get("status") in rc.UNPROVEN_STATUSES
+        and row.get("status") in cc.UNPROVEN_STATUSES
         and row.get("severity") in rc.BLOCKING
     ]
     sibling_debt = [
@@ -731,7 +731,7 @@ def main() -> int:
     sibling_classes = [
         row for row in durable.classes.values()
         if row.class_id != CLASS_ID and row.first_round == 7
-        and row.status in rc.UNPROVEN_STATUSES and row.severity in rc.BLOCKING
+        and row.status in cc.UNPROVEN_STATUSES and row.severity in rc.BLOCKING
     ]
     sibling_debt = [
         row for row in durable.review_state.get("debt", [])
