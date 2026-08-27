@@ -686,7 +686,6 @@ def _settle_staged_failure(
     elif (
         preflight_failure and isinstance(raw_state, dict)
         and raw_state.get("version") == 1
-        and raw_state.get("phase") in rc.PHASES
     ):
         # A structural preflight may be rejecting the top-level debt container
         # itself. Preserve those malformed durable bytes for diagnosis while adding
@@ -782,7 +781,14 @@ def _settle_staged_failure(
     if preflight_failure:
         # Preserve the malformed durable bytes for diagnosis, but never feed them to
         # the normal debt renderer that assumes canonical rows.
-        trailer_state = {**state, "debt": []}
+        trailer_state = {
+            **state,
+            "phase":(
+                state.get("phase")
+                if state.get("phase") in rc.PHASES else "census"
+            ),
+            "debt":[],
+        }
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(

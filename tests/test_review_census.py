@@ -585,6 +585,51 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
     assert json.loads(audits[0].read_text())["attempt_ledger"] == []
 
 
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
+    repo_with_branch, tmp_path, monkeypatch, mode,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase="not-a-phase", debt=[], last_round=1)
+    lineage_id = f"invalid-phase-{mode}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments.update(plan_text="# Plan\n", claim_verification=False)
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"invalid-phase-{mode}-logs"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"INVALID-PHASE-{mode}",
+    )
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["phase"] == "not-a-phase"
+    assert reloaded.review_state["staged_failure"]["role"] == "structural-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    assert json.loads(audits[0].read_text())["attempt_ledger"] == []
+
+
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"
