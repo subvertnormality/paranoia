@@ -103,8 +103,8 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "09a38180f88f6197df9461e91e3ec2e56d196e6eb0bda8aa7ade3319b8021362",
-      "additions": 1222,
+      "sha256": "8313bc9687eba44c62c3947c3a9bc02e4e27599e7302985fe06e36b93e0a5383",
+      "additions": 1228,
       "deletions": 126,
       "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, and shared correction-debt malformed-state preflight through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
     },
