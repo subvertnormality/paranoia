@@ -839,6 +839,19 @@ def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = Non
     ))
 
 
+def anchor_coordinates(anchor: str) -> tuple[str, int, int] | None:
+    """Parse one accepted anchor into path and inclusive line coordinates."""
+    path, sep, raw_line = anchor.rpartition(":")
+    raw_start, dash, raw_end = raw_line.partition("-")
+    raw_end = raw_end if dash else raw_start
+    if (
+        not sep or not raw_start.isdigit() or not raw_end.isdigit()
+        or int(raw_start) < 1 or int(raw_end) < int(raw_start)
+    ):
+        return None
+    return path, int(raw_start), int(raw_end)
+
+
 def resolve_anchors(
     value: Any, *, root: Any, plan_lines: int | None = None,
     trusted_roots: dict[str, Any] | None = None,
@@ -848,20 +861,15 @@ def resolve_anchors(
     base = Path(root).resolve()
     issues: list[str] = []
     for pointer, anchor in _walk_evidence(value):
-        path, sep, raw_line = anchor.rpartition(":")
         # `path:start-end` is accepted alongside `path:line`. The prompt asks
         # reviewers to quote the offending *lines*, so a range is the natural
         # citation for a multi-line defect and engines emit one unprompted.
-        raw_start, dash, raw_end = raw_line.partition("-")
-        raw_end = raw_end if dash else raw_start
-        if (
-            not sep or not raw_start.isdigit() or not raw_end.isdigit()
-            or int(raw_start) < 1 or int(raw_end) < int(raw_start)
-        ):
+        coordinates = anchor_coordinates(anchor)
+        if coordinates is None:
             issues.append(f"{pointer}: unresolvable evidence anchor {anchor!r}")
             continue
+        path, _, line = coordinates
         # Bound-check the END: a range ending inside the file starts inside it.
-        line = int(raw_end)
         if path == "plan":
             if plan_lines is None or line > plan_lines:
                 issues.append(f"{pointer}: unresolvable plan anchor {anchor!r}")

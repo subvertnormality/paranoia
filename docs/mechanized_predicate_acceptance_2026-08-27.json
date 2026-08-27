@@ -1,0 +1,309 @@
+{
+  "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
+  "attempt_ledger": [
+    {
+      "duration_ms": 48007,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "validation-invalid",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0454b-ae50-7d81-a6b2-8113673aff9c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!selection.py'\\\"' && rg -n \\\\\\\"\\\\\\\\bchoose\\\\\\\\s*\\\\\\\\(\\\\\\\" -g '\\\"'!selection.py'\\\"' . && git log --oneline --follow -- selection.py\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!selection.py'\\\"' && rg -n \\\\\\\"\\\\\\\\bchoose\\\\\\\\s*\\\\\\\\(\\\\\\\" -g '\\\"'!selection.py'\\\"' . && git log --oneline --follow -- selection.py\\\"\",\"aggregated_output\":\"/mnt/c/Users/andy/AppData/Local/Temp/paranoia-wt-0lu3usy3/tree\\n\",\"exit_code\":1,\"status\":\"failed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!selection.py'\\\"'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg --files -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!selection.py'\\\"'\\\"\",\"aggregated_output\":\"\",\"exit_code\":1,\"status\":\"failed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n \\\\\\\"\\\\\\\\bchoose\\\\\\\\s*\\\\\\\\(\\\\\\\" -g '\\\"'!selection.py'\\\"' .\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n \\\\\\\"\\\\\\\\bchoose\\\\\\\\s*\\\\\\\\(\\\\\\\" -g '\\\"'!selection.py'\\\"' .\\\"\",\"aggregated_output\":\"\",\"exit_code\":1,\"status\":\"failed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files'\",\"aggregated_output\":\"selection.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_4\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log --oneline --follow -- selection.py'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_4\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log --oneline --follow -- selection.py'\",\"aggregated_output\":\"134b6fa unsafe selection\\n888c0d8 base\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_5\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- selection.py'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_5\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- selection.py'\",\"aggregated_output\":\"commit 134b6faec7b314eb134336b6d0f74ca901a55ac3\\nAuthor: paranoia acceptance <paranoia@localhost>\\nDate:   Thu Aug 27 23:16:19 2026 +0100\\n\\n    unsafe selection\\n\\ndiff --git a/selection.py b/selection.py\\nindex 32ee729..1b77247 100644\\n--- a/selection.py\\n+++ b/selection.py\\n@@ -1,2 +1,2 @@\\n def choose(distinct):\\n-    return None\\n+    return next(iter(distinct))\\n\\ncommit 888c0d8284e489b20a6e43f5e7d0f27cf2c9648b\\nAuthor: paranoia acceptance <paranoia@localhost>\\nDate:   Thu Aug 27 23:16:19 2026 +0100\\n\\n    base\\n\\ndiff --git a/selection.py b/selection.py\\nnew file mode 100644\\nindex 0000000..32ee729\\n--- /dev/null\\n+++ b/selection.py\\n@@ -0,0 +1,2 @@\\n+def choose(distinct):\\n+    return None\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_6\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"predicate-acceptance\\\":{\\\"kind\\\":\\\"reclassify\\\",\\\"severity\\\":\\\"MAJOR\\\"}},\\\"class_outcomes\\\":{\\\"predicate-acceptance\\\":{\\\"basis\\\":{\\\"finding_id\\\":\\\"F1\\\",\\\"kind\\\":\\\"new_finding\\\"},\\\"evidence\\\":[{\\\"a",
+      "raw_sha256": "bec9e1f71a9e68d73fef0dbba9dbdb9999e515276e2df8fb33c37bc7b2cdcb2d",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 2400,
+      "response_excerpt": "{\"class_actions\": {\"predicate-acceptance\": {\"definition\": {\"invariant\": \"Distinct selection requires cardinality refusal.\", \"pathspec\": \"selection.py\", \"pattern\": \"arbitrary member selected from a distinct-value set\", \"severity\": \"MAJOR\"}, \"kind\": \"replace\"}}, \"class_outcomes\": {\"predicate-acceptance\": {\"basis\": {\"finding_id\": \"F1\", \"kind\": \"new_finding\"}, \"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"verdict\": \"violated\"}}, \"coverage\": [{\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"artifact-complete\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"repository-premises\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [\"F1\"], \"id\": \"transformations\", \"status\": \"finding\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"consumers\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"failure-recovery\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"tests-acceptance\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"docs-operations\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"consistency\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"proportionality\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}], \"debt_outcomes\": [], \"governing_findings\": [{\"classification\": {\"class_id\": \"predicate-acceptance\", \"kind\": \"existing_class\"}, \"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"id\": \"F1\", \"remedy\": \"Refuse unsupported cardinality before selecting a member.\", \"severity\": \"MAJOR\", \"summary\": \"Distinct-member selection lacks a cardinality refusal.\"}], \"role\": \"final\"}",
+      "response_sha256": "46cfccc332318723bba69ff27f06d5e6f526178f6365b502f98b8af0eee54f49",
+      "returncode": 0,
+      "role": "final",
+      "sequence": 1,
+      "session_ref": "01a0454b-ae50-7d81-a6b2-8113673aff9c",
+      "stderr_excerpt": "2026-08-27T22:16:22.375515Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T22:16:44.394664Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-27T22:17:08.982827Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "c9847af8ebbf1d8db173743921c38f67affbc32849347190f36a0c1892528e8b",
+      "usage": {
+        "cached_input_tokens": 52480,
+        "input_tokens": 73937,
+        "output_tokens": 2009,
+        "reasoning_output_tokens": 710
+      },
+      "validation_issue": "/class_actions/predicate-acceptance/pattern: mechanized predicate did not match any cited violation line (repository/selection.py:2, repository/selection.py:2); use a violation-only POSIX ERE that matches the occurrence, or use an unmechanized procedure",
+      "validation_pointer": null
+    },
+    {
+      "duration_ms": 24169,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0454b-ae50-7d81-a6b2-8113673aff9c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"predicate-acceptance\\\":{\\\"definition\\\":{\\\"invariant\\\":\\\"next\\\\\\\\(iter\\\\\\\\(distinct\\\\\\\\)\\\\\\\\)\\\",\\\"pathspec\\\":\\\"selection.py\\\",\\\"pattern\\\":\\\"next\\\\\\\\(iter\\\\\\\\(distinct\\\\\\\\)\\\\\\\\)\\\",\\\"severity\\\":\\\"MAJOR\\\"},\\\"kind\\\":\\\"replace\\\"}},\\\"class_outcomes\\\":{\\\"predicate-acceptance\\\":{\\\"basis\\\":{\\\"finding_id\\\":\\\"F1\\\",\\\"kind\\\":\\\"new_finding\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"The function selects and returns the first member through next(iter(distinct)) without any preceding cardinality refusal.\\\"}],\\\"verdict\\\":\\\"violated\\\"}},\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:1-2\\\",\\\"rationale\\\":\\\"The complete two-line artifact is supplied and sufficient to assess the active class.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The reviewed artifact is complete.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:1-2\\\",\\\"rationale\\\":\\\"The function accepts distinct from its caller without establishing any trusted cardinality premise.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The input premise required for safe selection is not validated.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"The sole transformation converts the input into an iterator and immediately selects one member.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Selection occurs before cardinality validation.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"The selected member is returned directly to the caller, so arbitrary acceptance reaches the function consumer.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The unsafe selection is the public result.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"An empty input raises StopIteration, while a multi-member input silently returns one member; neither path explicitly refuses invalid cardinality.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Invalid cardinalities are not explicitly refused.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"The cited statement directly violates the mechanized acceptance criterion and provides the replacement predicate occurrence.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The active acceptance class fails.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:1-2\\\",\\\"rationale\\\":\\\"This isolated selection function exposes no operational or documentation surface requiring separate assessment.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"not_applicable\\\",\\\"summary\\\":\\\"No documentation or operational behavior is present.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:1-2\\\",\\\"rationale\\\":\\\"The implementation is internally simple, but its behavior conflicts with the supplied cardinality-refusal invariant.\\\"}],\\\"finding_ids\\\":[\\\"F1\\\"],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Implementation and active invariant are inconsistent.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"The finding is confined to the exact unsafe selection occurrence and requires only an explicit cardinality refusal before it.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The assessment and remedy are proportionate to the stated stakes.\\\"}],\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"class_id\\\":\\\"predicate-acceptance\\\",\\\"kind\\\":\\\"existing_class\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/selection.py:2\\\",\\\"rationale\\\":\\\"next(iter(distinct)) selects a member wit",
+      "raw_sha256": "ef23553ec53cba1904cbef0fcec46d03d556fb5b6bead11cfb1e906c6484aa14",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 600,
+      "response_excerpt": "{\"class_actions\":{\"predicate-acceptance\":{\"definition\":{\"invariant\":\"next\\\\(iter\\\\(distinct\\\\)\\\\)\",\"pathspec\":\"selection.py\",\"pattern\":\"next\\\\(iter\\\\(distinct\\\\)\\\\)\",\"severity\":\"MAJOR\"},\"kind\":\"replace\"}},\"class_outcomes\":{\"predicate-acceptance\":{\"basis\":{\"finding_id\":\"F1\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"The function selects and returns the first member through next(iter(distinct)) without any preceding cardinality refusal.\"}],\"verdict\":\"violated\"}},\"coverage\":[{\"evidence\":[{\"anchor\":\"repository/selection.py:1-2\",\"rationale\":\"The complete two-line artifact is supplied and sufficient to assess the active class.\"}],\"finding_ids\":[],\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"The reviewed artifact is complete.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:1-2\",\"rationale\":\"The function accepts distinct from its caller without establishing any trusted cardinality premise.\"}],\"finding_ids\":[\"F1\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The input premise required for safe selection is not validated.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"The sole transformation converts the input into an iterator and immediately selects one member.\"}],\"finding_ids\":[\"F1\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"Selection occurs before cardinality validation.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"The selected member is returned directly to the caller, so arbitrary acceptance reaches the function consumer.\"}],\"finding_ids\":[\"F1\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"The unsafe selection is the public result.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"An empty input raises StopIteration, while a multi-member input silently returns one member; neither path explicitly refuses invalid cardinality.\"}],\"finding_ids\":[\"F1\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Invalid cardinalities are not explicitly refused.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"The cited statement directly violates the mechanized acceptance criterion and provides the replacement predicate occurrence.\"}],\"finding_ids\":[\"F1\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"The active acceptance class fails.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:1-2\",\"rationale\":\"This isolated selection function exposes no operational or documentation surface requiring separate assessment.\"}],\"finding_ids\":[],\"id\":\"docs-operations\",\"status\":\"not_applicable\",\"summary\":\"No documentation or operational behavior is present.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:1-2\",\"rationale\":\"The implementation is internally simple, but its behavior conflicts with the supplied cardinality-refusal invariant.\"}],\"finding_ids\":[\"F1\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"Implementation and active invariant are inconsistent.\"},{\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"The finding is confined to the exact unsafe selection occurrence and requires only an explicit cardinality refusal before it.\"}],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"The assessment and remedy are proportionate to the stated stakes.\"}],\"debt_outcomes\":[],\"governing_findings\":[{\"classification\":{\"class_id\":\"predicate-acceptance\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/selection.py:2\",\"rationale\":\"next(iter(distinct)) selects a member without first refusing invalid cardinality.\"}],\"id\":\"F1\",\"remedy\":\"Add an explicit cardinality refusal before selecting a member from distinct.\",\"severity\":\"MAJOR\",\"summary\":\"Distinct-value selection lacks the required cardinality refusal.\"}],\"role\":\"final\"}",
+      "response_sha256": "811a36a16fda7227a419ea5a1f057b18b469d13527e503f7c646d480cb5e182e",
+      "returncode": 0,
+      "role": "final-validation-retry",
+      "sequence": 2,
+      "session_ref": "01a0454b-ae50-7d81-a6b2-8113673aff9c",
+      "stderr_excerpt": "2026-08-27T22:17:10.217074Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-27T22:17:33.442659Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "eed4feca82da640cd02a49800c3549d4bbe40c5d778b90744e9e99990243cfaa",
+      "usage": {
+        "cached_input_tokens": 70656,
+        "input_tokens": 94375,
+        "output_tokens": 2975,
+        "reasoning_output_tokens": 853
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "claims": {
+    "does_not_prove": [
+      "The real provider authored the substituted invalid initial payload or pattern.",
+      "Every future provider response will choose a mechanized class or repair it correctly.",
+      "A line-level POSIX ERE completely represents every semantic recurrence."
+    ],
+    "proves": [
+      "The public critique_branch handler rejected a disclosed fault-injected prose-like mechanized replacement against its cited line.",
+      "The public handler used exactly one bounded retry on the same real Codex session.",
+      "The corrected predicate settled and reloaded with its live occurrence."
+    ]
+  },
+  "date": "2026-08-27",
+  "durable_original": {
+    "class_id": "predicate-acceptance",
+    "detail": null,
+    "first_round": 1,
+    "invariant": "Selecting a member from distinct values requires an explicit cardinality refusal before selection.",
+    "matches": [],
+    "pathspec": "selection.py",
+    "pattern": "UNSAFE_DISTINCT_SELECTION",
+    "procedure": null,
+    "severity": "MAJOR",
+    "status": "superseded",
+    "superseded_by": "a40a6e58"
+  },
+  "durable_successor": {
+    "class_id": "a40a6e58",
+    "detail": null,
+    "first_round": 1,
+    "invariant": "next\\(iter\\(distinct\\)\\)",
+    "matches": [
+      {
+        "line": 2,
+        "path": "selection.py",
+        "text": "    return next(iter(distinct))"
+      }
+    ],
+    "pathspec": "selection.py",
+    "pattern": "next\\(iter\\(distinct\\)\\)",
+    "procedure": null,
+    "severity": "MAJOR",
+    "status": "open",
+    "superseded_by": null
+  },
+  "elapsed_seconds": 73.998,
+  "fixture": {
+    "base_id": "888c0d8284e489b20a6e43f5e7d0f27cf2c9648b",
+    "class_id": "predicate-acceptance",
+    "head_id": "134b6faec7b314eb134336b6d0f74ca901a55ac3",
+    "initial_payload_fault_injection": "After a real Codex call established the session and raw channels, the harness substituted one deterministic schema-valid extracted payload whose sole intended invalidity was a prose mechanized pattern. The provider raw channels and session identity were retained.",
+    "lineage": "mechanized-predicate-acceptance-20260827",
+    "packet_sha256": "c4fa73e84f70327b20b44c770db78675644203ebf85f8b7a52c1625de13ea02a",
+    "round": 2,
+    "structural_snapshot": "1229db880f7a529ab206a7f9987fc9b848bd1f05b54460cc4cdf6d2c95ebf179",
+    "successor_id": "a40a6e58"
+  },
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "executable": "codex",
+    "model": "gpt-5.6-sol",
+    "web_search": false
+  },
+  "rejected_payload": {
+    "excerpt": "{\"class_actions\": {\"predicate-acceptance\": {\"definition\": {\"invariant\": \"Distinct selection requires cardinality refusal.\", \"pathspec\": \"selection.py\", \"pattern\": \"arbitrary member selected from a distinct-value set\", \"severity\": \"MAJOR\"}, \"kind\": \"replace\"}}, \"class_outcomes\": {\"predicate-acceptance\": {\"basis\": {\"finding_id\": \"F1\", \"kind\": \"new_finding\"}, \"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"verdict\": \"violated\"}}, \"coverage\": [{\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"artifact-complete\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"repository-premises\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [\"F1\"], \"id\": \"transformations\", \"status\": \"finding\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"consumers\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"failure-recovery\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"tests-acceptance\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"docs-operations\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"consistency\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}, {\"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"finding_ids\": [], \"id\": \"proportionality\", \"status\": \"covered\", \"summary\": \"The acceptance fixture was inspected for this checklist item.\"}], \"debt_outcomes\": [], \"governing_findings\": [{\"classification\": {\"class_id\": \"predicate-acceptance\", \"kind\": \"existing_class\"}, \"evidence\": [{\"anchor\": \"repository/selection.py:2\", \"rationale\": \"The changed function selects a member without a cardinality refusal.\"}], \"id\": \"F1\", \"remedy\": \"Refuse unsupported cardinality before selecting a member.\", \"severity\": \"MAJOR\", \"summary\": \"Distinct-member selection lacks a cardinality refusal.\"}], \"role\": \"final\"}",
+    "role": "final",
+    "sequence": 1,
+    "sha256": "46cfccc332318723bba69ff27f06d5e6f526178f6365b502f98b8af0eee54f49",
+    "validation_issue": "/class_actions/predicate-acceptance/pattern: mechanized predicate did not match any cited violation line (repository/selection.py:2, repository/selection.py:2); use a violation-only POSIX ERE that matches the occurrence, or use an unmechanized procedure"
+  },
+  "result_sha256": "d2548a6c70bfa702ca73700d9b45a387e2c88fc9f9131451da8da13e51655540",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] Distinct-value selection lacks the required cardinality refusal. [classes: a40a6e58] (repository/selection.py:2)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Add an explicit cardinality refusal before selecting a member from distinct.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a0454b-ae50-7d81-a6b2-8113673aff9c` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: mechanized-predicate-acceptance-20260827 (rounds recorded: 2)\nCLASS-REGISTER: staged final parsed — REPLACE predicate-acceptance -> a40a6e58\nCLASS-CLOSURE: 1 open, 0 closed, 1 surviving matches, 0 exempt, 0 unmechanized\n  a40a6e58 next\\\\(iter\\\\(distinct\\\\)\\\\) (mechanized: 1 match(es))\n    selection.py:2:     return next(iter(distinct))\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=2 validation-retries=1 validation-invalid=1 execution-failed=0",
+  "route_outcome": "corrected-and-settled",
+  "settlement": {
+    "_class_record_pointers": [
+      "/class_actions/predicate-acceptance"
+    ],
+    "_finding_class_refs": {
+      "F1": "predicate-acceptance"
+    },
+    "assessment_dispositions": [
+      {
+        "assessment_id": "predicate-acceptance",
+        "governing_id": "F1"
+      }
+    ],
+    "class_assessments": [
+      {
+        "class_id": "predicate-acceptance",
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_id": "F1",
+        "verdict": "violated"
+      }
+    ],
+    "class_dispositions": [
+      {
+        "class_id": "predicate-acceptance",
+        "finding_id": "F1",
+        "kind": "existing_class"
+      }
+    ],
+    "class_records": [
+      {
+        "class_id": "predicate-acceptance",
+        "invariant": "next\\(iter\\(distinct\\)\\)",
+        "op": "replace",
+        "pathspec": "selection.py",
+        "pattern": "next\\(iter\\(distinct\\)\\)",
+        "severity": "MAJOR"
+      }
+    ],
+    "coverage": [
+      {
+        "evidence": [
+          "repository/selection.py:1-2"
+        ],
+        "finding_ids": [],
+        "id": "artifact-complete",
+        "status": "covered",
+        "summary": "The reviewed artifact is complete."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:1-2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "repository-premises",
+        "status": "finding",
+        "summary": "The input premise required for safe selection is not validated."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "Selection occurs before cardinality validation."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "consumers",
+        "status": "finding",
+        "summary": "The unsafe selection is the public result."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "failure-recovery",
+        "status": "finding",
+        "summary": "Invalid cardinalities are not explicitly refused."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "The active acceptance class fails."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:1-2"
+        ],
+        "finding_ids": [],
+        "id": "docs-operations",
+        "status": "not_applicable",
+        "summary": "No documentation or operational behavior is present."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:1-2"
+        ],
+        "finding_ids": [
+          "F1"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "Implementation and active invariant are inconsistent."
+      },
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The assessment and remedy are proportionate to the stated stakes."
+      }
+    ],
+    "debt": [
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "finding_id": "F1",
+        "id": "D1",
+        "remedy": "Add an explicit cardinality refusal before selecting a member from distinct.",
+        "severity": "MAJOR",
+        "status": "open",
+        "summary": "Distinct-value selection lacks the required cardinality refusal."
+      }
+    ],
+    "debt_updates": [],
+    "findings": [
+      {
+        "evidence": [
+          "repository/selection.py:2"
+        ],
+        "id": "F1",
+        "remedy": "Add an explicit cardinality refusal before selecting a member from distinct.",
+        "severity": "MAJOR",
+        "summary": "Distinct-value selection lacks the required cardinality refusal."
+      }
+    ],
+    "role": "final",
+    "source_dispositions": []
+  },
+  "source_revision": "c71a24c3acf99714374de4cdefd5f4056cddeec4",
+  "source_sha256": {
+    "scripts/run_mechanized_predicate_acceptance.py": "c0009ca82d84d5181e434f26ac3f0d23f1f7d14319428a781a6e1408ae09d94c",
+    "src/paranoia_local/class_closure.py": "ef657392205ef181956227a8b98d2c7421a8af5cf9d6dca54cc563b52bf340eb",
+    "src/paranoia_local/handlers.py": "5db7966b73dccd5366873412f1c217353e517cd2f113f3c642646dff01017623",
+    "src/paranoia_local/review_census.py": "6715f1aa0928fc478fe9093a61e09506e90210357fd519bb707631ac59ca2335"
+  },
+  "version": 1
+}

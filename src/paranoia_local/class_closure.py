@@ -670,6 +670,12 @@ class GrepResult:
 GitGrep = Callable[[str, str], GrepResult]
 
 
+def grep_result_cached(grep: GitGrep, pattern: str, pathspec: str) -> bool:
+    """Whether this exact immutable-snapshot grep can return without execution."""
+    check = getattr(grep, "is_cached", None)
+    return bool(callable(check) and check(pattern, pathspec))
+
+
 @dataclass
 class Budget:
     """The round's closure budget, measured in GREP time only.
@@ -680,8 +686,9 @@ class Budget:
     newly registered class would be `unchecked` instead of evaluated, defeating both
     same-round evaluation and the same-round false-closure warning.
 
-    A class is only started while budget remains, and each class can then run its two
-    passes, so the real ceiling is `total + 2 * PER_CLASS_TIMEOUT`.
+    A predicate evaluation is only started while budget remains, and each evaluation
+    can then run its two passes, so the real ceiling is
+    `total + 2 * PER_CLASS_TIMEOUT`. Admission checks and sweeps share one instance.
     """
 
     total: float = ROUND_BUDGET
@@ -710,15 +717,21 @@ def sweep(lineage: Lineage, grep: GitGrep, *, only: Iterable[str] | None = None,
         cls = lineage.classes.get(cid)
         if cls is None or cls.status == SUPERSEDED or not cls.mechanized:
             continue
-        if budget is not None and budget.exhausted():
+        pattern = cls.pattern or ""
+        pathspec = cls.pathspec or "."
+        cached = grep_result_cached(grep, pattern, pathspec)
+        if (
+            budget is not None and budget.exhausted()
+            and not cached
+        ):
             lineage.classes[cid] = replace(
                 cls, status=UNCHECKED, matches=(),
                 detail="round closure budget exhausted before this class ran",
             )
             continue
-        started = now()
-        result = grep(cls.pattern or "", cls.pathspec or ".")
-        if budget is not None:
+        started = now() if budget is not None and not cached else 0.0
+        result = grep(pattern, pathspec)
+        if budget is not None and not cached:
             budget.charge(now() - started)
         lineage.classes[cid] = _evaluate(cls, result, lineage.exemptions)
 

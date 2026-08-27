@@ -577,6 +577,172 @@ def _validate_materialized_class_records(
         )
 
 
+def _repository_anchor_span(anchor: str) -> tuple[str, int, int] | None:
+    """Return the repository-relative path and inclusive line span for an anchor."""
+    coordinates = rc.anchor_coordinates(anchor)
+    if coordinates is None or not coordinates[0].startswith("repository/"):
+        return None
+    path, start, end = coordinates
+    return path.removeprefix("repository/"), start, end
+
+
+def _mechanized_class_evidence_issues(
+    parsed: dict[str, Any], *, grep: cc.GitGrep,
+    budget: cc.Budget | None = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> list[str]:
+    """Prove each fresh mechanized predicate recognizes its cited occurrence."""
+    findings = {
+        row["id"]: row for row in parsed.get("findings", [])
+        if isinstance(row, dict) and isinstance(row.get("id"), str)
+    }
+    finding_refs = parsed.get("_finding_class_refs", {})
+    assessment_evidence = {
+        row.get("class_id"): row.get("evidence", [])
+        for row in parsed.get("class_assessments", [])
+        if isinstance(row, dict) and row.get("verdict") == "violated"
+    }
+    pointers = parsed.get("_class_record_pointers", [])
+    issues: list[str] = []
+    for index, record in enumerate(parsed.get("class_records", [])):
+        if (
+            not isinstance(record, dict)
+            or record.get("op") not in {"new", "replace"}
+            or not isinstance(record.get("pattern"), str)
+        ):
+            continue
+        pointer = pointers[index] if index < len(pointers) else f"/class_records/{index}"
+        pattern = record["pattern"]
+        if pattern.strip() == ".*":
+            issues.append(
+                f"{pointer}/pattern: mechanized predicate '.*' is a match-all, not a "
+                "violation-only recurrence predicate"
+            )
+            continue
+
+        evidence: list[str] = []
+        if record["op"] == "new":
+            ref = f"record:{index}"
+            for finding_id, class_ref in finding_refs.items():
+                if class_ref == ref and finding_id in findings:
+                    evidence.extend(findings[finding_id].get("evidence", []))
+        else:
+            class_id = record.get("class_id")
+            evidence.extend(assessment_evidence.get(class_id, []))
+            for finding_id, class_ref in finding_refs.items():
+                if class_ref == class_id and finding_id in findings:
+                    evidence.extend(findings[finding_id].get("evidence", []))
+
+        spans = [
+            span for anchor in evidence
+            if isinstance(anchor, str)
+            for span in [_repository_anchor_span(anchor)]
+            if span is not None
+        ]
+        if not spans:
+            issues.append(
+                f"{pointer}/pattern: mechanized predicate requires at least one "
+                "repository line cited by its governing finding or violated class "
+                "assessment; use an unmechanized procedure when no such occurrence "
+                "exists"
+            )
+            continue
+        pathspec = str(record.get("pathspec", "."))
+        cached = cc.grep_result_cached(grep, pattern, pathspec)
+        if budget is not None and budget.exhausted() and not cached:
+            issues.append(
+                f"{pointer}/pattern: predicate could not run: round closure budget "
+                "exhausted before this candidate ran"
+            )
+            continue
+        started = clock()
+        result = grep(pattern, pathspec)
+        if budget is not None and not cached:
+            budget.charge(clock() - started)
+        if result.error:
+            issues.append(f"{pointer}/pattern: predicate could not run: {result.error}")
+            continue
+        if not any(
+            match.get("path") == path
+            and isinstance(match.get("line"), int)
+            and start <= match["line"] <= end
+            for path, start, end in spans
+            for match in result.matches
+        ):
+            cited = ", ".join(
+                f"repository/{path}:{start}" + (f"-{end}" if end != start else "")
+                for path, start, end in spans
+            )
+            issues.append(
+                f"{pointer}/pattern: mechanized predicate did not match any cited "
+                f"violation line ({cited}); use a violation-only POSIX ERE that matches "
+                "the occurrence, or use an unmechanized procedure"
+            )
+    return issues
+
+
+def _mechanized_class_candidate_view(
+    value: dict[str, Any], records: list[dict[str, Any]], pointers: list[str],
+    *, role: str,
+    assessment_verdicts: dict[str, str] | None = None,
+    assessment_evidence: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    """Bind decoded wire evidence to class candidates before full materialization."""
+    outcomes = {
+        row.get("class_id"): row
+        for row in value.get("class_outcomes", []) if isinstance(row, dict)
+    }
+    findings: list[dict[str, Any]] = []
+    refs: dict[str, str] = {}
+    derived_assessments: dict[str, dict[str, Any]] = {}
+    if role == "census":
+        for class_id, verdict in (assessment_verdicts or {}).items():
+            derived_assessments[class_id] = {
+                "class_id":class_id, "verdict":verdict,
+                "evidence":list((assessment_evidence or {}).get(class_id, [])),
+            }
+    new_index = 0
+    for finding in value.get("governing_findings", []):
+        if not isinstance(finding, dict) or not isinstance(finding.get("id"), str):
+            continue
+        findings.append({
+            "id":finding["id"], "evidence":list(finding.get("evidence", [])),
+        })
+        classification = finding.get("classification", {})
+        if classification.get("kind") == "new_class":
+            refs[finding["id"]] = f"record:{new_index}"
+            new_index += 1
+        elif classification.get("kind") == "existing_class":
+            class_id = classification.get("class_id")
+            outcome = outcomes.get(class_id)
+            basis = outcome.get("basis") if isinstance(outcome, dict) else None
+            if (
+                isinstance(outcome, dict) and outcome.get("verdict") == "violated"
+                and basis == {"kind":"new_finding", "finding_id":finding["id"]}
+            ):
+                refs[finding["id"]] = class_id
+            elif role == "correction" and class_id not in outcomes and isinstance(
+                classification.get("assessment_evidence"), list
+            ):
+                derived_assessments[class_id] = {
+                    "class_id":class_id, "verdict":"violated",
+                    "evidence":list(classification["assessment_evidence"]),
+                }
+    return {
+        "findings":findings,
+        "_finding_class_refs":refs,
+        "_class_record_pointers":pointers,
+        "class_records":records,
+        "class_assessments":[
+            {
+                "class_id":row.get("class_id"), "verdict":row.get("verdict"),
+                "evidence":list(row.get("evidence", [])),
+            }
+            for row in value.get("class_outcomes", []) if isinstance(row, dict)
+        ] + list(derived_assessments.values()),
+    }
+
+
 def _raise_staged_validation_issues(issues: list[str]) -> None:
     """Raise one bounded deterministic diagnostic spanning validation layers."""
     ordered = sorted(dict.fromkeys(issues))
@@ -1185,6 +1351,27 @@ def _staged_structural_review(
             )
         except rc.CensusError as exc:
             issues.extend(str(exc).splitlines())
+        evidence_view = parsed
+        if evidence_view is None:
+            evidence_view = _mechanized_class_candidate_view(
+                value, class_view["class_records"],
+                class_view.get("_class_record_pointers", []),
+                role=role, assessment_verdicts=assessment_verdicts,
+                assessment_evidence=assessment_evidence,
+            )
+        if (
+            mode == cc.BRANCH_MODE
+            and any(
+                isinstance(record, dict)
+                and record.get("op") in {"new", "replace"}
+                and isinstance(record.get("pattern"), str)
+                for record in evidence_view.get("class_records", [])
+            )
+        ):
+            issues.extend(_mechanized_class_evidence_issues(
+                evidence_view, grep=closure._grep(),
+                budget=getattr(closure, "budget", None),
+            ))
         if parsed is not None and role == "correction" and correction_gates:
             try:
                 gate_draft = cc.copy_lineage(lineage)
@@ -4394,6 +4581,7 @@ class _ClassClosure(_ClosureRound):
         )
         self.repo, self.head_id, self.args = repo, head_id, args
         self.budget = cc.Budget()
+        self._grep_results: dict[tuple[str, str], cc.GrepResult] = {}
 
     def _before_sweep(self) -> None:
         self._apply_exemption_args()
@@ -4410,7 +4598,19 @@ class _ClassClosure(_ClosureRound):
                             cc.render_exempt(self.lineage)) if b]
 
     def _grep(self) -> cc.GitGrep:
-        return cc.make_grep(self.repo, self.head_id, runner=_run_git)
+        run = cc.make_grep(self.repo, self.head_id, runner=_run_git)
+
+        def cached(pattern: str, pathspec: str) -> cc.GrepResult:
+            key = (pattern, pathspec)
+            if key not in self._grep_results:
+                self._grep_results[key] = run(pattern, pathspec)
+            return self._grep_results[key]
+
+        cached.is_cached = (  # type: ignore[attr-defined]
+            lambda pattern, pathspec: (pattern, pathspec) in self._grep_results
+        )
+
+        return cached
 
     def _apply_exemption_args(self) -> None:
         assert self.lineage is not None

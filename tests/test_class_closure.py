@@ -391,6 +391,25 @@ class TestClosure:
             "the reviewer's own runtime must not exhaust the closure budget"
         )
 
+    def test_cached_sweep_is_free_and_preserves_budget_for_uncached_class(self) -> None:
+        lin = lineage_with(
+            ("cached", cc.MAJOR, "X"), ("uncached", cc.MAJOR, "Y"),
+        )
+        calls: list[tuple[str, str]] = []
+
+        def grep(pattern: str, pathspec: str) -> cc.GrepResult:
+            calls.append((pattern, pathspec))
+            return cc.GrepResult(paths=("a.py",))
+
+        grep.is_cached = lambda pattern, pathspec: pattern == "X"  # type: ignore[attr-defined]
+        budget = cc.Budget(total=1.0, spent=0.5)
+        ticks = iter((0.0, 0.4))
+        cc.sweep(lin, grep, budget=budget, clock=lambda: next(ticks))
+
+        assert [row.status for row in lin.active()] == [cc.OPEN, cc.OPEN]
+        assert budget.spent == pytest.approx(0.9)
+        assert calls == [("X", "."), ("Y", ".")]
+
     def test_a_new_mechanized_class_starts_unchecked_and_blocking(self) -> None:
         """Round 10's FATAL: a class registered this round was never evaluated in it."""
         lin = lineage_with(("inv", cc.MAJOR, "X"))

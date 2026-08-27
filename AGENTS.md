@@ -178,7 +178,17 @@ Resolve all independent model-owned anchors and dry-run all independent class ac
 bounded, pointer-addressed retry diagnostic; derived mirror debt must not create unrepairable
 diagnostic pointers. Reject whitespace-only semantic text and oversized raw staged replies before
 JSON decoding. Cross-layer tests must carry accepted class actions through the canonical engine and
-durable settlement, not stop at materializer row shape.
+durable settlement, not stop at materializer row shape. Before a fresh or replacement mechanized
+class enters durable branch state, run its predicate over the reviewed Git snapshot and require it
+to match at least one repository line cited by the governing finding or violated class assessment.
+Reject match-all `.*`; when no honest line-level violation predicate exists, require an
+unmechanized procedure. Keep this inside the existing same-session validation retry so a repairable
+predicate does not cost another review round. Charge admission checks to the same aggregate
+per-round predicate budget as closure sweeps, reuse exact snapshot/pattern/path results within the
+round even after execution budget exhaustion, and fail candidate validation visibly only when an
+uncached execution cannot be admitted.
+Any retained public acceptance for this admission-and-sweep lifecycle must bind the class-closure
+executor as well as the staged handler and anchor resolver.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing
