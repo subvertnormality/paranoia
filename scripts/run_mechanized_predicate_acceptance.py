@@ -123,6 +123,10 @@ def main() -> int:
         action = value.get("class_actions", {}).get(CLASS_ID)
         if not isinstance(action, dict) or action.get("kind") != "replace":
             raise RuntimeError("real initial provider reply omitted the expected replacement")
+        # Remove unrelated provider checklist bookkeeping variance so the one
+        # server-visible invalidity under test is the predicate/evidence mismatch.
+        for row in value.get("coverage", []):
+            row["finding_ids"] = ["F1"] if row.get("status") == "finding" else []
         action["definition"]["pattern"] = (
             "arbitrary member selected from a distinct-value set"
         )
@@ -208,8 +212,10 @@ def main() -> int:
             "round":2, "class_id":CLASS_ID, "successor_id":successor_id,
             "packet_sha256":_digest(packet), "structural_snapshot":structural_snapshot,
             "initial_payload_fault_injection":(
-                "The harness replaced only the first extracted pattern after a real "
-                "Codex call; provider raw channels and session identity were retained."
+                "After a real Codex call, the harness normalized checklist finding_ids "
+                "to their declared finding/non-finding statuses, then replaced only the "
+                "first extracted pattern; provider raw channels and session identity "
+                "were retained."
             ),
         },
         "elapsed_seconds":round(elapsed, 3),
