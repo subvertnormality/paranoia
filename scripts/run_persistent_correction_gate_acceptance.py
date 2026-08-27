@@ -75,20 +75,6 @@ def _anchor_covers_plan_line(anchor: object, line: int) -> bool:
     return lower <= line <= upper
 
 
-class _PromptCapturingCodexEngine(engines.CodexEngine):
-    def __init__(self) -> None:
-        super().__init__()
-        self.prompts: list[str] = []
-
-    def run(self, prompt, *args, **kwargs):
-        self.prompts.append(prompt)
-        return super().run(prompt, *args, **kwargs)
-
-    def resume(self, session_ref, prompt, *args, **kwargs):
-        self.prompts.append(prompt)
-        return super().resume(session_ref, prompt, *args, **kwargs)
-
-
 def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
     state.update(phase="correction", last_round=6, debt=[{
@@ -768,15 +754,35 @@ def main() -> int:
     state_path = cc.lineage_dir(state_root) / f"{LINEAGE}.json"
     before = _state(state_path)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
-    engine = _PromptCapturingCodexEngine()
+    engine = engines.CodexEngine()
     engine.binary = args.codex
+    captured_prompts: list[str] = []
+    original_run = engines.CodexEngine.run
+    original_resume = engines.CodexEngine.resume
+
+    def capture_run(self, prompt, *call_args, **call_kwargs):
+        captured_prompts.append(prompt)
+        return original_run(self, prompt, *call_args, **call_kwargs)
+
+    def capture_resume(self, session_ref, prompt, *call_args, **call_kwargs):
+        captured_prompts.append(prompt)
+        return original_resume(
+            self, session_ref, prompt, *call_args, **call_kwargs,
+        )
+
+    engines.CodexEngine.run = capture_run
+    engines.CodexEngine.resume = capture_resume
     started = time.monotonic()
-    result = handlers.critique_plan({
-        "repo_path":str(ROOT), "plan_text":PLAN, "lineage":LINEAGE,
-        "round":7, "class_closure":True, "claim_verification":False,
-        "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
-        "stakes":STAKES,
-    }, engine=engine, log_dir=log_root)
+    try:
+        result = handlers.critique_plan({
+            "repo_path":str(ROOT), "plan_text":PLAN, "lineage":LINEAGE,
+            "round":7, "class_closure":True, "claim_verification":False,
+            "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
+            "stakes":STAKES,
+        }, engine=engine, log_dir=log_root)
+    finally:
+        engines.CodexEngine.run = original_run
+        engines.CodexEngine.resume = original_resume
     elapsed = time.monotonic() - started
     after = _state(state_path)
     audits = list(log_root.glob("*.json"))
@@ -796,7 +802,7 @@ def main() -> int:
     attempts = audit.get("attempt_ledger")
     if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
         raise RuntimeError("acceptance exceeded the correction plus one retry topology")
-    if len(engine.prompts) != 1:
+    if len(captured_prompts) != 1:
         raise RuntimeError("acceptance did not use exactly one captured correction prompt")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
     closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
@@ -859,8 +865,8 @@ def main() -> int:
         "result_text":result, "result_sha256":_sha(result),
         "rendered_trailer":trailer, "correction_gates":gates,
         "durable_reload_lineage":cc._to_json(durable),
-        "correction_prompt":engine.prompts[0],
-        "correction_prompt_sha256":_sha(engine.prompts[0]),
+        "correction_prompt":captured_prompts[0],
+        "correction_prompt_sha256":_sha(captured_prompts[0]),
         "outcome":"closed-with-sibling-debt",
         "public_preflight_matrix":_preflight_matrix(ROOT),
         "public_provider_failure_route":_provider_failure_route(ROOT),
