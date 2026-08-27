@@ -187,6 +187,8 @@ predicate does not cost another review round. Charge admission checks to the sam
 per-round predicate budget as closure sweeps, reuse exact snapshot/pattern/path results within the
 round even after execution budget exhaustion, and fail candidate validation visibly only when an
 uncached execution cannot be admitted.
+Any retained public acceptance for this admission-and-sweep lifecycle must bind the class-closure
+executor as well as the staged handler and anchor resolver.
 
 Preserve full class-closure semantics on every tracked staged plan and branch path. Every governing
 finding must have exactly one explicit disposition: genuine one-off, new reusable class, or existing

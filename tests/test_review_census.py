@@ -2961,6 +2961,7 @@ def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
     revision = artifact["source_revision"]
     assert len(revision) == 40
     assert set(artifact["source_sha256"]) == {
+        "src/paranoia_local/class_closure.py",
         "src/paranoia_local/handlers.py",
         "src/paranoia_local/review_census.py",
         "scripts/run_mechanized_predicate_acceptance.py",

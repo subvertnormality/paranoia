@@ -232,6 +232,7 @@ def main() -> int:
 
     source_revision = _run("git", "rev-parse", "HEAD", cwd=ROOT)
     sources = (
+        "src/paranoia_local/class_closure.py",
         "src/paranoia_local/handlers.py",
         "src/paranoia_local/review_census.py",
         "scripts/run_mechanized_predicate_acceptance.py",
