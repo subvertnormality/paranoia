@@ -526,7 +526,9 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert reloaded.review_state["debt"] == malformed_debt
     assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
     assert reloaded.review_state["staged_failure"]["kind"] == "validation"
-    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    audits = list((tmp_path / "logs").glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
     assert audit["attempt_ledger"] == []
     assert audit["claim_verification"] is True
     assert audit["claim_status"] == "blocked-by-structural-preflight"
