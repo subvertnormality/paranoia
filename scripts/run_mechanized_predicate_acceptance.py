@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,12 +33,44 @@ DIFF_INTENT = (
     "class must be replaced with a predicate matching the cited occurrence."
 )
 FOCUS = (
-    "Assess only the supplied class. For the initial replacement definition, deliberately "
-    "use the semantic prose pattern 'arbitrary member selected from a distinct-value set' "
-    "to exercise the server validator. When the server reports that it does not match the "
-    "cited line, correct it in the same session with the POSIX ERE "
-    "'next\\(iter\\(distinct\\)\\)' and keep pathspec selection.py."
+    "Assess only the supplied class. Replace its stale predicate with the POSIX ERE "
+    "'next\\(iter\\(distinct\\)\\)' over pathspec selection.py so the definition matches "
+    "the cited violation line."
 )
+
+
+class FaultInjectingCodex:
+    """Inject one invalid server-visible payload around a real Codex session.
+
+    The provider's original raw channels remain intact. Only `Review.text`, the extracted
+    model payload consumed by staged validation, is changed on the initial call. Resume is
+    the ordinary production Codex route against the same provider session.
+    """
+
+    name = "codex"
+
+    def __init__(self, binary: str) -> None:
+        self.delegate = engines.CodexEngine()
+        self.delegate.binary = binary
+        self.injected = False
+
+    def run(self, *args, **kwargs):
+        review = self.delegate.run(*args, **kwargs)
+        value = json.loads(review.text)
+        action = value.get("class_actions", {}).get(CLASS_ID)
+        if not isinstance(action, dict) or action.get("kind") != "replace":
+            raise RuntimeError("real initial provider reply omitted the expected replacement")
+        action["definition"]["pattern"] = (
+            "arbitrary member selected from a distinct-value set"
+        )
+        self.injected = True
+        return replace(
+            review,
+            text=json.dumps(value, ensure_ascii=False, sort_keys=True),
+        )
+
+    def resume(self, *args, **kwargs):
+        return self.delegate.resume(*args, **kwargs)
 
 
 def _run(*args: str, cwd: Path) -> str:
@@ -113,8 +145,7 @@ def main() -> int:
     cc.save_lineage(state_root, seed)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
 
-    engine = engines.CodexEngine()
-    engine.binary = args.codex
+    engine = FaultInjectingCodex(args.codex)
     started = time.monotonic()
     result = handlers.critique_branch({
         "repo_path":str(fixture), "base_ref":base_id, "head_ref":head_id,
@@ -124,6 +155,8 @@ def main() -> int:
         "focus":FOCUS,
     }, engine=engine, log_dir=log_root)
     elapsed = time.monotonic() - started
+    if not engine.injected:
+        raise RuntimeError("acceptance fault injection did not run")
 
     audits = list(log_root.glob("*.json"))
     if len(audits) != 1:
@@ -185,6 +218,10 @@ def main() -> int:
             "base_id":base_id, "head_id":head_id, "lineage":LINEAGE_ID,
             "round":2, "class_id":CLASS_ID, "successor_id":successor_id,
             "packet_sha256":_digest(packet), "structural_snapshot":structural_snapshot,
+            "initial_payload_fault_injection":(
+                "The harness replaced only the first extracted pattern after a real "
+                "Codex call; provider raw channels and session identity were retained."
+            ),
         },
         "elapsed_seconds":round(elapsed, 3),
         "attempt_ledger":attempts,
@@ -195,11 +232,12 @@ def main() -> int:
         "result_sha256":_digest(result),
         "claims":{
             "proves":[
-                "The public critique_branch handler rejected a prose-like mechanized replacement against its cited line.",
+                "The public critique_branch handler rejected a disclosed fault-injected prose-like mechanized replacement against its cited line.",
                 "The same Codex session repaired the predicate and the corrected settlement was applied atomically.",
                 "The matching successor remained open with one occurrence after durable reload.",
             ],
             "does_not_prove":[
+                "The real provider itself authored the injected invalid initial pattern.",
                 "Every future provider response will choose a mechanized class or repair it correctly.",
                 "A line-level POSIX ERE completely represents every semantic recurrence.",
             ],
