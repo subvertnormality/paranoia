@@ -506,7 +506,10 @@ def validate_artifact(
         or audit.get("session_ref") != terminal_attempt.get("session_ref")
         or audit.get("returncode") != 0 or audit.get("error") is not False
     ):
-        raise ValueError("successful public session is not bound to one correction attempt")
+        raise ValueError(
+            "successful public session is not bound to its terminal attempt "
+            "or did not use exactly one correction"
+        )
     result = artifact["result_text"]
     trailer = artifact["rendered_trailer"]
     if (
