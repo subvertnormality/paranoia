@@ -577,7 +577,7 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     assert artifact["outcome"] == "closed-with-sibling-debt"
     sibling_classes = [
         row for row in artifact["after_lineage"]["classes"]
-        if row["class_id"] != "gate-class" and row["first_round"] == 7
+        if row["class_id"] == acceptance.SIBLING_CLASS_ID
         and row["status"] in cc.UNPROVEN_STATUSES
         and row["severity"] in rc.BLOCKING
     ]
@@ -590,6 +590,17 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         for debt in artifact["after_lineage"]["review_state"]["debt"]
     )
     assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
+    assert artifact["after_repair_lineage"]["review_state"]["phase"] == "final"
+    assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
+    assert artifact["final_lineage"]["review_state"]["phase"] == "clear"
+    assert "CONVERGENCE: NOT-BLOCKED" in artifact["final_result_text"]
+    assert artifact["total_provider_call_count"] == sum(map(
+        len,
+        (
+            artifact["attempt_ledger"], artifact["repair_attempt_ledger"],
+            artifact["final_attempt_ledger"],
+        ),
+    ))
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",

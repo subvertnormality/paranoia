@@ -26,16 +26,25 @@ from paranoia_local import (
 
 LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
+SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
 PLAN = (
     "# Change\n\n"
-    "Update the persistent correction-gate acceptance runner.\n"
-    "The acceptance must exercise critique_plan through its public handler.\n"
-    "It must validate the completed attempt and durable reload.\n"
-    "The acceptance does not bind a newly discovered blocker to its exact source line.\n"
-    "That missing source binding is the adjacent defect this correction must detect."
+    "Update only scripts/run_persistent_correction_gate_acceptance.py and its retained artifact.\n"
+    "Invoke critique_plan through the public handler with an exact CodexEngine.\n"
+    "Seed the declared active classes and durable correction debt before provider spend.\n"
+    "Record the completed attempt, settlement, prompt digest, and durable reload.\n"
+    "The retained artifact does not bind a newly discovered blocker to its exact plan source line.\n"
+    "Fail generation on provider, validation, persistence, source-binding, or phase mismatch.\n"
+    "Replay the fixed plan through a later correction and require its debt to close.\n"
+    "Then invoke a separate cold final and require that final alone to reach clear.\n"
+    "Tests verify source hashes, prompt roles, class/debt identity, phase order, and tamper rejection."
 )
-SIBLING_LINE = 6
+FIXED_PLAN = PLAN.replace(
+    "The retained artifact does not bind a newly discovered blocker to its exact plan source line.",
+    "The retained artifact binds each newly discovered blocker to its exact plan source line.",
+)
+SIBLING_LINE = 7
 STAKES = (
     "One trusted operator and OS; repository and plan bytes are untrusted data; no "
     "hostile local race or repository execution; one class and one claim-free plan; "
@@ -75,6 +84,34 @@ def _anchor_covers_plan_line(anchor: object, line: int) -> bool:
     return lower <= line <= upper
 
 
+def _critique_plan_with_prompt_capture(
+    engine: engines.CodexEngine, arguments: dict, log_dir: Path,
+) -> tuple[str, list[str]]:
+    """Invoke the exact built-in route while observing prompts sent by role clones."""
+    captured: list[str] = []
+    original_run = engines.CodexEngine.run
+    original_resume = engines.CodexEngine.resume
+
+    def capture_run(self, prompt, *call_args, **call_kwargs):
+        captured.append(prompt)
+        return original_run(self, prompt, *call_args, **call_kwargs)
+
+    def capture_resume(self, session_ref, prompt, *call_args, **call_kwargs):
+        captured.append(prompt)
+        return original_resume(
+            self, session_ref, prompt, *call_args, **call_kwargs,
+        )
+
+    engines.CodexEngine.run = capture_run
+    engines.CodexEngine.resume = capture_resume
+    try:
+        result = handlers.critique_plan(arguments, engine=engine, log_dir=log_dir)
+    finally:
+        engines.CodexEngine.run = original_run
+        engines.CodexEngine.resume = original_resume
+    return result, captured
+
+
 def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
     state.update(phase="correction", last_round=6, debt=[{
@@ -84,15 +121,26 @@ def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
         "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
         "first_round":1, "last_round":6,
     }])
-    state["correction_control"] = {"version":1, "classes":{CLASS_ID:{
-        "reset_round":None, "reopen_count":0, "last_session_ref":None,
-    }}}
+    state["correction_control"] = {"version":1, "classes":{
+        CLASS_ID:{
+            "reset_round":None, "reopen_count":0, "last_session_ref":None,
+        },
+        SIBLING_CLASS_ID:{
+            "reset_round":None, "reopen_count":0, "last_session_ref":None,
+        },
+    }}
     tracked = cc.TrackedClass(
         CLASS_ID, "The plan requires public-handler acceptance for the correction gate.",
         cc.MAJOR, 1, cc.OPEN, procedure="Inspect the plan acceptance obligation.",
     )
+    sibling = cc.TrackedClass(
+        SIBLING_CLASS_ID,
+        "The retained acceptance binds every newly discovered blocker to its exact plan source line.",
+        cc.MAJOR, 6, cc.OPEN,
+        procedure="Inspect the retained finding and debt evidence against the plan source line.",
+    )
     return cc.Lineage(
-        LINEAGE, rounds=6, classes={CLASS_ID:tracked},
+        LINEAGE, rounds=6, classes={CLASS_ID:tracked, SIBLING_CLASS_ID:sibling},
         review_state=state, mode=cc.PLAN_MODE,
     )
 
@@ -410,6 +458,13 @@ def validate_artifact(
         "result_sha256", "rendered_trailer", "correction_gates",
         "durable_reload_lineage",
         "correction_prompt", "correction_prompt_sha256",
+        "repair_plan", "repair_plan_sha256", "repair_result_text",
+        "repair_result_sha256", "repair_prompts", "repair_prompt_sha256",
+        "repair_audit", "repair_attempt_ledger", "after_repair_lineage",
+        "repair_durable_reload_lineage", "final_result_text",
+        "final_result_sha256", "final_prompts", "final_prompt_sha256",
+        "final_audit", "final_attempt_ledger", "final_lineage",
+        "final_durable_reload_lineage", "total_provider_call_count",
         "outcome", "public_preflight_matrix", "public_provider_failure_route",
     }
     if set(artifact) != expected_keys:
@@ -501,7 +556,7 @@ def validate_artifact(
         and len(task.get("existing_debt", [])) == 1
         and task["existing_debt"][0].get("id") == "D1"
         and [row.get("class_id") for row in task.get("active_classes", [])]
-        == [CLASS_ID]
+        == [CLASS_ID, SIBLING_CLASS_ID]
         and PLAN.splitlines()[SIBLING_LINE - 1] in task.get("artifact", "")
     ):
         raise ValueError("captured correction task is not the closure-candidate fixture")
@@ -584,7 +639,7 @@ def validate_artifact(
     disposed = after_class["status"] in {cc.CLOSED, cc.SUPERSEDED}
     sibling_classes = [
         row for row in after["classes"]
-        if row["class_id"] != CLASS_ID and row.get("first_round") == 7
+        if row["class_id"] == SIBLING_CLASS_ID
         and row.get("status") in cc.UNPROVEN_STATUSES
         and row.get("severity") in rc.BLOCKING
     ]
@@ -669,6 +724,92 @@ def validate_artifact(
         raise ValueError("public response is not the independently reconstructed result")
     if after["review_state"].get("snapshot_digest") != fixture["structural_snapshot"]:
         raise ValueError("durable state is not bound to the reviewed snapshot")
+
+    repair_plan = artifact["repair_plan"]
+    repair_result = artifact["repair_result_text"]
+    repair_prompts = artifact["repair_prompts"]
+    repair_audit = artifact["repair_audit"]
+    repair_attempts = artifact["repair_attempt_ledger"]
+    after_repair = artifact["after_repair_lineage"]
+    if not (
+        repair_plan == FIXED_PLAN
+        and artifact["repair_plan_sha256"] == _sha(FIXED_PLAN)
+        and isinstance(repair_result, str)
+        and artifact["repair_result_sha256"] == _sha(repair_result)
+        and isinstance(repair_prompts, list) and repair_prompts
+        and artifact["repair_prompt_sha256"] == [_sha(row) for row in repair_prompts]
+        and repair_audit.get("round") == 8
+        and repair_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and repair_audit.get("attempt_ledger") == repair_attempts
+        and isinstance(repair_attempts, list) and 1 <= len(repair_attempts) <= 2
+        and repair_attempts[-1].get("role") in {
+            "correction", "correction-validation-retry",
+        }
+        and repair_attempts[-1].get("outcome") == "completed"
+        and repair_result.endswith(repair_audit.get("rendered_trailer", ""))
+        and artifact["repair_durable_reload_lineage"] == after_repair
+        and after_repair["review_state"].get("phase") == "final"
+        and not any(
+            row.get("status") == "open" and row.get("severity") in rc.BLOCKING
+            for row in after_repair["review_state"].get("debt", [])
+        )
+        and next(
+            row for row in after_repair["classes"]
+            if row["class_id"] == SIBLING_CLASS_ID
+        )["status"] == cc.CLOSED
+        and "STRUCTURAL-PHASE: final" in repair_result
+        and "CONVERGENCE: NOT-BLOCKED" not in repair_result
+    ):
+        raise ValueError("later correction does not stop at the final boundary")
+    repair_task = json.loads(
+        repair_prompts[0].split("===== TASK INPUT =====\n\n", 1)[1]
+    )
+    if not (
+        repair_task.get("role") == "correction"
+        and repair_task.get("review_scope") == "closure_candidate"
+        and repair_task.get("checklist") == list(sp.CHECKLIST)
+        and FIXED_PLAN.splitlines()[SIBLING_LINE - 1]
+        in repair_task.get("artifact", "")
+        and repair_prompts[0].count(
+            handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
+        ) == 1
+    ):
+        raise ValueError("repair prompt is not the expected closure-candidate correction")
+
+    final_result = artifact["final_result_text"]
+    final_prompts = artifact["final_prompts"]
+    final_audit = artifact["final_audit"]
+    final_attempts = artifact["final_attempt_ledger"]
+    final_lineage = artifact["final_lineage"]
+    if not (
+        isinstance(final_result, str)
+        and artifact["final_result_sha256"] == _sha(final_result)
+        and isinstance(final_prompts, list) and final_prompts
+        and artifact["final_prompt_sha256"] == [_sha(row) for row in final_prompts]
+        and final_audit.get("round") == 9
+        and final_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and final_audit.get("attempt_ledger") == final_attempts
+        and isinstance(final_attempts, list) and 1 <= len(final_attempts) <= 2
+        and final_attempts[-1].get("role") in {"final", "final-validation-retry"}
+        and final_attempts[-1].get("outcome") == "completed"
+        and final_result.endswith(final_audit.get("rendered_trailer", ""))
+        and artifact["final_durable_reload_lineage"] == final_lineage
+        and final_lineage["review_state"].get("phase") == "clear"
+        and "STRUCTURAL-PHASE: clear" in final_result
+        and "CONVERGENCE: NOT-BLOCKED" in final_result
+        and artifact["total_provider_call_count"] == (
+            len(attempts) + len(repair_attempts) + len(final_attempts)
+        )
+    ):
+        raise ValueError("separate cold final does not exclusively reach clear")
+    final_task = json.loads(
+        final_prompts[0].split("===== TASK INPUT =====\n\n", 1)[1]
+    )
+    if not (
+        final_task.get("role") == "final"
+        and handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in final_prompts[0]
+    ):
+        raise ValueError("final prompt is not independent from correction")
     active_rows = [row for row in after["classes"] if row.get("status") != cc.SUPERSEDED]
     active = [cc.TrackedClass(
         class_id=row["class_id"], invariant=row["invariant"], severity=row["severity"],
@@ -756,36 +897,17 @@ def main() -> int:
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
     engine = engines.CodexEngine()
     engine.binary = args.codex
-    captured_prompts: list[str] = []
-    original_run = engines.CodexEngine.run
-    original_resume = engines.CodexEngine.resume
-
-    def capture_run(self, prompt, *call_args, **call_kwargs):
-        captured_prompts.append(prompt)
-        return original_run(self, prompt, *call_args, **call_kwargs)
-
-    def capture_resume(self, session_ref, prompt, *call_args, **call_kwargs):
-        captured_prompts.append(prompt)
-        return original_resume(
-            self, session_ref, prompt, *call_args, **call_kwargs,
-        )
-
-    engines.CodexEngine.run = capture_run
-    engines.CodexEngine.resume = capture_resume
     started = time.monotonic()
-    try:
-        result = handlers.critique_plan({
-            "repo_path":str(ROOT), "plan_text":PLAN, "lineage":LINEAGE,
-            "round":7, "class_closure":True, "claim_verification":False,
-            "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
-            "stakes":STAKES,
-        }, engine=engine, log_dir=log_root)
-    finally:
-        engines.CodexEngine.run = original_run
-        engines.CodexEngine.resume = original_resume
-    elapsed = time.monotonic() - started
+    common = {
+        "repo_path":str(ROOT), "lineage":LINEAGE, "class_closure":True,
+        "claim_verification":False, "model":"gpt-5.6-sol", "effort":"high",
+        "web_search":False, "stakes":STAKES,
+    }
+    result, captured_prompts = _critique_plan_with_prompt_capture(
+        engine, {**common, "plan_text":PLAN, "round":7}, log_root / "round7",
+    )
     after = _state(state_path)
-    audits = list(log_root.glob("*.json"))
+    audits = list((log_root / "round7").glob("*.json"))
     if len(audits) != 1:
         raise RuntimeError(f"expected one audit, got {len(audits)}")
     audit = _state(audits[0])
@@ -806,11 +928,7 @@ def main() -> int:
         raise RuntimeError("acceptance did not use exactly one captured correction prompt")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
     closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
-    sibling_classes = [
-        row for row in durable.classes.values()
-        if row.class_id != CLASS_ID and row.first_round == 7
-        and row.status in cc.UNPROVEN_STATUSES and row.severity in rc.BLOCKING
-    ]
+    sibling_classes = [durable.classes[SIBLING_CLASS_ID]]
     sibling_debt = [
         row for row in durable.review_state.get("debt", [])
         if row.get("status") == "open" and row.get("severity") in rc.BLOCKING
@@ -833,6 +951,55 @@ def main() -> int:
         and len(attempts) == 1 and attempts[0].get("outcome") == "completed"
     ):
         raise RuntimeError("real correction did not retain the expected sibling blocker")
+
+    repair_result, repair_prompts = _critique_plan_with_prompt_capture(
+        engine, {**common, "plan_text":FIXED_PLAN, "round":8}, log_root / "round8",
+    )
+    after_repair = _state(state_path)
+    repair_audits = list((log_root / "round8").glob("*.json"))
+    if len(repair_audits) != 1:
+        raise RuntimeError(f"expected one repair audit, got {len(repair_audits)}")
+    repair_audit = _state(repair_audits[0])
+    repair_attempts = repair_audit.get("attempt_ledger")
+    repair_reload = cc.load_lineage(
+        state_root, LINEAGE, stamp="repair-reload", mode=cc.PLAN_MODE,
+    )
+    if not (
+        isinstance(repair_attempts, list) and 1 <= len(repair_attempts) <= 2
+        and repair_attempts[-1].get("outcome") == "completed"
+        and repair_reload.review_state.get("phase") == "final"
+        and repair_reload.classes[SIBLING_CLASS_ID].status == cc.CLOSED
+        and not any(
+            row.get("status") == "open" and row.get("severity") in rc.BLOCKING
+            for row in repair_reload.review_state.get("debt", [])
+        )
+        and "STRUCTURAL-PHASE: final" in repair_result
+        and "CONVERGENCE: NOT-BLOCKED" not in repair_result
+    ):
+        raise RuntimeError("later real correction did not stop at the final boundary")
+
+    final_result, final_prompts = _critique_plan_with_prompt_capture(
+        engine, {**common, "plan_text":FIXED_PLAN, "round":9}, log_root / "round9",
+    )
+    final_lineage = _state(state_path)
+    final_audits = list((log_root / "round9").glob("*.json"))
+    if len(final_audits) != 1:
+        raise RuntimeError(f"expected one final audit, got {len(final_audits)}")
+    final_audit = _state(final_audits[0])
+    final_attempts = final_audit.get("attempt_ledger")
+    final_reload = cc.load_lineage(
+        state_root, LINEAGE, stamp="final-reload", mode=cc.PLAN_MODE,
+    )
+    if not (
+        isinstance(final_attempts, list) and 1 <= len(final_attempts) <= 2
+        and final_attempts[-1].get("role") in {"final", "final-validation-retry"}
+        and final_attempts[-1].get("outcome") == "completed"
+        and final_reload.review_state.get("phase") == "clear"
+        and "STRUCTURAL-PHASE: clear" in final_result
+        and "CONVERGENCE: NOT-BLOCKED" in final_result
+    ):
+        raise RuntimeError("separate real cold final did not exclusively reach clear")
+    elapsed = time.monotonic() - started
     revision = _run("git", "rev-parse", "HEAD")
     source_paths = [
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
@@ -867,6 +1034,24 @@ def main() -> int:
         "durable_reload_lineage":cc._to_json(durable),
         "correction_prompt":captured_prompts[0],
         "correction_prompt_sha256":_sha(captured_prompts[0]),
+        "repair_plan":FIXED_PLAN, "repair_plan_sha256":_sha(FIXED_PLAN),
+        "repair_result_text":repair_result,
+        "repair_result_sha256":_sha(repair_result),
+        "repair_prompts":repair_prompts,
+        "repair_prompt_sha256":[_sha(prompt) for prompt in repair_prompts],
+        "repair_audit":repair_audit, "repair_attempt_ledger":repair_attempts,
+        "after_repair_lineage":after_repair,
+        "repair_durable_reload_lineage":cc._to_json(repair_reload),
+        "final_result_text":final_result,
+        "final_result_sha256":_sha(final_result),
+        "final_prompts":final_prompts,
+        "final_prompt_sha256":[_sha(prompt) for prompt in final_prompts],
+        "final_audit":final_audit, "final_attempt_ledger":final_attempts,
+        "final_lineage":final_lineage,
+        "final_durable_reload_lineage":cc._to_json(final_reload),
+        "total_provider_call_count":(
+            len(attempts) + len(repair_attempts) + len(final_attempts)
+        ),
         "outcome":"closed-with-sibling-debt",
         "public_preflight_matrix":_preflight_matrix(ROOT),
         "public_provider_failure_route":_provider_failure_route(ROOT),
