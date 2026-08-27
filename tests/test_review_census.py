@@ -552,7 +552,7 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         "class_id":"gate-class", "reason":"persistence", "span":7,
         "reopen_count":0,
     }]
-    assert 1 <= artifact["provider_call_count"] <= 2
+    assert artifact["provider_call_count"] == 1
     assert artifact["provider_call_count"] == len(artifact["attempt_ledger"])
     assert artifact["result_text"].endswith(artifact["rendered_trailer"])
     failure_route = artifact["public_provider_failure_route"]
@@ -568,7 +568,22 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     assert artifact["audit"]["rendered_trailer"] == artifact["rendered_trailer"]
     assert artifact["audit"]["correction_gates"] == artifact["correction_gates"]
     assert artifact["durable_reload_lineage"] == artifact["after_lineage"]
-    assert artifact["outcome"] in {"closed-or-replaced", "terminal-gate-rejection"}
+    assert artifact["outcome"] == "closed-with-sibling-debt"
+    sibling_classes = [
+        row for row in artifact["after_lineage"]["classes"]
+        if row["class_id"] != "gate-class" and row["first_round"] == 7
+        and row["status"] in cc.UNPROVEN_STATUSES
+        and row["severity"] in rc.BLOCKING
+    ]
+    assert sibling_classes
+    assert any(
+        debt["finding_id"] != "G1" and debt["status"] == "open"
+        and any(
+            row["class_id"] in debt["class_ids"] for row in sibling_classes
+        )
+        for debt in artifact["after_lineage"]["review_state"]["debt"]
+    )
+    assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",
