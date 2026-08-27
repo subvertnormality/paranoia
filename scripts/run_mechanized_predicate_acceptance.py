@@ -54,6 +54,9 @@ class FaultInjectingCodex:
         self.delegate.binary = binary
         self.injected = False
 
+    def __getattr__(self, name: str):
+        return getattr(self.delegate, name)
+
     def run(self, *args, **kwargs):
         review = self.delegate.run(*args, **kwargs)
         value = json.loads(review.text)
