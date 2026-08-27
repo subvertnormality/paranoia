@@ -966,13 +966,9 @@ def _staged_structural_review(
             control_source, lineage.active(),
         )
     except rc.CensusError as exc:
-        closure.unavailable = str(exc)
-        # This is a confirmed read/validation refusal, not an ambiguous write.
-        closure._settled = True
-        return _state_unavailable_review(
-            closure, mode=mode,
-            claim_state=lineage.claim_state if mode == cc.PLAN_MODE else None,
-        )
+        raise _staged_error(
+            str(exc), role=f"{state['phase']}-preflight", kind="validation",
+        ) from exc
     state["correction_control"] = deepcopy(correction_control)
     if lineage.debt:
         # A pre-staging malformed-register round is not silently normalized into an
@@ -2398,6 +2394,15 @@ def critique_plan(
                     rc.validate_correction_debt(
                         normalized_structural_state.get("debt")
                     )
+                control_source = (
+                    closure.lineage.review_state
+                    if isinstance(closure.lineage.review_state, dict)
+                    and "correction_control" in closure.lineage.review_state
+                    else normalized_structural_state
+                )
+                rc.normalize_correction_control(
+                    control_source, closure.lineage.active(),
+                )
             except rc.CensusError as exc:
                 raw_phase = (
                     closure.lineage.review_state.get("phase")

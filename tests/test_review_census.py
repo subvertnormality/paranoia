@@ -637,6 +637,85 @@ def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
     assert json.loads(audits[0].read_text())["attempt_ledger"] == []
 
 
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("malformed_control", [
+    {},
+    {"version":1, "classes":{"class-a":{}}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":"1", "reopen_count":0, "last_session_ref":None,
+    }}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":None, "reopen_count":True, "last_session_ref":None,
+    }}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":None, "reopen_count":0, "last_session_ref":"bad\nref",
+    }}},
+])
+def test_public_staged_handlers_settle_malformed_correction_control_without_spend(
+    repo_with_branch, tmp_path, monkeypatch, mode, malformed_control,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(
+        phase="correction", last_round=1,
+        debt=[{
+            "id":"D1", "status":"open", "severity":cc.MAJOR,
+            "class_ids":["class-a"],
+        }],
+        correction_control=malformed_control,
+    )
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    identity = hashlib.sha256(json.dumps(
+        [mode, malformed_control], sort_keys=True,
+    ).encode("utf-8")).hexdigest()[:12]
+    lineage_id = f"malformed-control-{identity}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments["plan_text"] = "# Plan\n"
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"malformed-control-{mode}-{identity}"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"MALFORMED-CONTROL-{mode}",
+    )
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["correction_control"] == malformed_control
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_verification"] is True
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+
+
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"
