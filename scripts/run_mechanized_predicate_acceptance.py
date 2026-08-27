@@ -119,17 +119,50 @@ def main() -> int:
     def fault_injected_run(*run_args, **run_kwargs):
         nonlocal injected
         review = provider_run(*run_args, **run_kwargs)
-        value = json.loads(review.text)
-        action = value.get("class_actions", {}).get(CLASS_ID)
-        if not isinstance(action, dict) or action.get("kind") != "replace":
-            raise RuntimeError("real initial provider reply omitted the expected replacement")
-        # Remove unrelated provider checklist bookkeeping variance so the one
-        # server-visible invalidity under test is the predicate/evidence mismatch.
-        for row in value.get("coverage", []):
-            row["finding_ids"] = ["F1"] if row.get("status") == "finding" else []
-        action["definition"]["pattern"] = (
-            "arbitrary member selected from a distinct-value set"
-        )
+        evidence = [{
+            "anchor":"repository/selection.py:2",
+            "rationale":"The changed function selects a member without a cardinality refusal.",
+        }]
+        value = {
+            "role":"final",
+            "governing_findings":[{
+                "id":"F1", "severity":"MAJOR",
+                "summary":"Distinct-member selection lacks a cardinality refusal.",
+                "evidence":evidence,
+                "remedy":"Refuse unsupported cardinality before selecting a member.",
+                "classification":{"kind":"existing_class", "class_id":CLASS_ID},
+            }],
+            "debt_outcomes":[],
+            "class_outcomes":{
+                CLASS_ID:{
+                    "verdict":"violated", "evidence":evidence,
+                    "basis":{"kind":"new_finding", "finding_id":"F1"},
+                },
+            },
+            "class_actions":{
+                CLASS_ID:{
+                    "kind":"replace", "definition":{
+                        "invariant":"Distinct selection requires cardinality refusal.",
+                        "severity":"MAJOR",
+                        "pattern":"arbitrary member selected from a distinct-value set",
+                        "pathspec":"selection.py",
+                    },
+                },
+            },
+            "coverage":[
+                {
+                    "id":check, "status":"finding" if check == "transformations" else "covered",
+                    "summary":"The acceptance fixture was inspected for this checklist item.",
+                    "evidence":evidence,
+                    "finding_ids":["F1"] if check == "transformations" else [],
+                }
+                for check in (
+                    "artifact-complete", "repository-premises", "transformations",
+                    "consumers", "failure-recovery", "tests-acceptance",
+                    "docs-operations", "consistency", "proportionality",
+                )
+            ],
+        }
         injected = True
         return replace(
             review,
@@ -212,10 +245,10 @@ def main() -> int:
             "round":2, "class_id":CLASS_ID, "successor_id":successor_id,
             "packet_sha256":_digest(packet), "structural_snapshot":structural_snapshot,
             "initial_payload_fault_injection":(
-                "After a real Codex call, the harness normalized checklist finding_ids "
-                "to their declared finding/non-finding statuses, then replaced only the "
-                "first extracted pattern; provider raw channels and session identity "
-                "were retained."
+                "After a real Codex call established the session and raw channels, the "
+                "harness substituted one deterministic schema-valid extracted payload "
+                "whose sole intended invalidity was a prose mechanized pattern. The "
+                "provider raw channels and session identity were retained."
             ),
         },
         "elapsed_seconds":round(elapsed, 3),
@@ -232,7 +265,7 @@ def main() -> int:
                 "The matching successor remained open with one occurrence after durable reload.",
             ],
             "does_not_prove":[
-                "The real provider itself authored the injected invalid initial pattern.",
+                "The real provider authored the substituted invalid initial payload or pattern.",
                 "Every future provider response will choose a mechanized class or repair it correctly.",
                 "A line-level POSIX ERE completely represents every semantic recurrence.",
             ],
