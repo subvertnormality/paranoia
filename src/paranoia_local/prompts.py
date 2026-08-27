@@ -478,7 +478,9 @@ whose class has no required outcome key, put its distinct class-assessment citat
 classification.assessment_evidence; the server derives the violated outcome. A fresh finding for a
 required debt-bound class needs that authored violated outcome to use new_finding basis naming the
 fresh finding; carried_debt is only for no fresh occurrence. Open unmechanized satisfaction may omit
-its redundant close; the server derives it. Closed mechanized violation requires replace."""
+its redundant close; the server derives it. A fresh or replacement mechanized predicate must be a
+violation-only POSIX ERE that matches at least one repository line cited for that occurrence; use a
+procedure when no honest line-level predicate exists. Closed mechanized violation requires replace."""
 
 
 # ── class closure ─────────────────────────────────────────────────────────────

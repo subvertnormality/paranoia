@@ -438,19 +438,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4",
+        "7bf85d4c1e7d403e569d0ce7ad8835be6f265592617a3fb515153a60bf33e1c0",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f",
+        "1d7801aa654c35674eae70ba1f524286d7ec09360350bcdca4940403dea4afde",
         "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3",
+        "22a8960730485ace36e58c8b9ff43a6d134204ea7be7b3a9f1ebd917f2dfa2a5",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),
@@ -4235,12 +4235,13 @@ def test_branch_settlement_persists_a_new_procedure_class(
 
 
 def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
-    (tmp_path / "a.py").write_text("broken\n")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("BROKEN\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
     state["debt"] = [{
         "id":"historic", "finding_id":"historic", "status":"closed",
-        "severity":"MAJOR", "summary":"past occurrence", "evidence":["repository/a.py:1"],
+        "severity":"MAJOR", "summary":"past occurrence", "evidence":["repository/src/a.py:1"],
         "remedy":"already fixed", "source_ids":[], "class_ids":["abc"],
         "first_round":1, "last_round":1,
     }]
@@ -4268,15 +4269,21 @@ def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
         def _sweep(self, only=None):
             return None
 
+        def _grep(self):
+            return lambda pattern, pathspec: cc.GrepResult(
+                paths=("src/a.py",),
+                matches=({"path":"src/a.py", "line":1, "text":"BROKEN"},),
+            )
+
     class Engine:
         name = "fake"
 
         def run(self, *args, **kwargs):
             findings = [finding("G1", "MAJOR")]
             coverage = payload(lane(findings=findings))["coverage"]
-            findings[0]["evidence"] = ["repository/a.py:1"]
+            findings[0]["evidence"] = ["repository/src/a.py:1"]
             for row in coverage:
-                row["evidence"] = ["repository/a.py:1"]
+                row["evidence"] = ["repository/src/a.py:1"]
             coverage[0].update(status="finding", finding_ids=["G1"])
             value = {
                 "role":"final", "governing_findings":[{
@@ -4293,7 +4300,7 @@ def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
                 "coverage":coverage,
                 "class_outcomes":[{
                     "class_id":"abc", "verdict":"violated",
-                    "evidence":["repository/a.py:1"],
+                    "evidence":["repository/src/a.py:1"],
                     "basis":{"kind":"new_finding", "finding_id":"G1"},
                 }],
             }
@@ -4316,6 +4323,200 @@ def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
     assert historic["class_ids"] == ["abc"]
     assert lineage.review_state["phase"] == "correction"
     assert "STRUCTURAL-PHASE: correction" in trailer
+
+
+def test_fresh_mechanized_class_must_match_its_cited_violation():
+    parsed = {
+        "findings": [{"id":"G1", "evidence":["repository/app.py:7-9"]}],
+        "_finding_class_refs": {"G1":"record:0"},
+        "_class_record_pointers": [
+            "/governing_findings/0/classification/definition",
+        ],
+        "class_records": [{
+            "op":"new", "invariant":"reject arbitrary selection",
+            "severity":"MAJOR", "pattern":"English prose about selection",
+            "pathspec":"app.py",
+        }],
+        "class_assessments": [],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: cc.GrepResult(
+            paths=("app.py",),
+            matches=({"path":"app.py", "line":3, "text":"unrelated"},),
+        ),
+    )
+
+    assert len(issues) == 1
+    assert issues[0].startswith(
+        "/governing_findings/0/classification/definition/pattern:"
+    )
+    assert "did not match any cited violation line (repository/app.py:7-9)" in issues[0]
+
+
+def test_fresh_mechanized_class_accepts_a_match_within_cited_range():
+    parsed = {
+        "findings": [{"id":"G1", "evidence":["repository/app.py:7-9"]}],
+        "_finding_class_refs": {"G1":"record:0"},
+        "_class_record_pointers": ["/definition"],
+        "class_records": [{
+            "op":"new", "invariant":"reject arbitrary selection",
+            "severity":"MAJOR", "pattern":r"next\(iter\(distinct\)\)",
+            "pathspec":"app.py",
+        }],
+        "class_assessments": [],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: cc.GrepResult(
+            paths=("app.py",),
+            matches=({
+                "path":"app.py", "line":8,
+                "text":"value = next(iter(distinct))",
+            },),
+        ),
+    )
+
+    assert issues == []
+
+
+def test_mechanized_replacement_binds_to_class_assessment_evidence():
+    parsed = {
+        "findings": [], "_finding_class_refs": {},
+        "_class_record_pointers": ["/class_actions/abc"],
+        "class_records": [{
+            "op":"replace", "class_id":"abc", "invariant":"reject bad calls",
+            "severity":"MAJOR", "pattern":"BAD_CALL", "pathspec":"src/*.py",
+        }],
+        "class_assessments": [{
+            "class_id":"abc", "verdict":"violated",
+            "evidence":["repository/src/a.py:12"],
+        }],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: cc.GrepResult(paths=(), matches=()),
+    )
+
+    assert len(issues) == 1
+    assert issues[0].startswith("/class_actions/abc/pattern:")
+
+
+def test_match_all_is_not_a_mechanized_recurrence_predicate():
+    parsed = {
+        "findings": [{"id":"G1", "evidence":["repository/app.py:1"]}],
+        "_finding_class_refs": {"G1":"record:0"},
+        "_class_record_pointers": ["/definition"],
+        "class_records": [{
+            "op":"new", "invariant":"anything", "severity":"MAJOR",
+            "pattern":".*", "pathspec":".",
+        }],
+        "class_assessments": [],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: pytest.fail("match-all must fail before git grep"),
+    )
+
+    assert issues == [
+        "/definition/pattern: mechanized predicate '.*' is a match-all, not a "
+        "violation-only recurrence predicate"
+    ]
+
+
+def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
+    (tmp_path / "app.py").write_text("value = next(iter(distinct))\n")
+    state = rc.normalize_state({}, stakes="s", snapshot="p")
+    state["phase"] = "final"
+    lineage = cc.Lineage(
+        "predicate-retry", mode=cc.BRANCH_MODE, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        staged_settlement = None
+        register_status = None
+        _settled = False
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _grep(self):
+            def grep(pattern, pathspec):
+                if pattern == r"next\(iter\(distinct\)\)" and pathspec == "app.py":
+                    return cc.GrepResult(
+                        paths=("app.py",),
+                        matches=({
+                            "path":"app.py", "line":1,
+                            "text":"value = next(iter(distinct))",
+                        },),
+                    )
+                return cc.GrepResult()
+            return grep
+
+        def _sweep(self, only=None):
+            cc.sweep(self.lineage, self._grep(), only=only)
+
+    def response(pattern):
+        findings = [finding("G1", "MAJOR")]
+        findings[0]["evidence"] = ["repository/app.py:1"]
+        coverage = payload(lane(findings=findings))["coverage"]
+        for row in coverage:
+            row["evidence"] = ["repository/app.py:1"]
+        coverage[0].update(status="finding", finding_ids=["G1"])
+        return wire({
+            "role":"final", "governing_findings":[{
+                **findings[0],
+                "classification":{"kind":"new_class", "definition":{
+                    "invariant":"arbitrary distinct selection is refused",
+                    "severity":"MAJOR", "pattern":pattern, "pathspec":"app.py",
+                }},
+            }],
+            "debt_outcomes":[], "class_actions":{}, "class_outcomes":{},
+            "coverage":coverage,
+        })
+
+    invalid = response("arbitrary member selected from a distinct-value set")
+    corrected = response(r"next\(iter\(distinct\)\)")
+
+    class Engine:
+        name = "fake"
+
+        def __init__(self):
+            self.retry_prompt = ""
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="s", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            self.retry_prompt = prompt
+            return Review(text=corrected, session_ref=session_ref, raw=corrected)
+
+    engine = Engine()
+    _, trailer, attempts = handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=Closure(), stakes="s",
+        snapshot="p", round_no=1, on_progress=None,
+    )
+
+    assert "did not match any cited violation line" in engine.retry_prompt
+    assert [attempt["outcome"] for attempt in attempts] == [
+        "validation-invalid", "completed",
+    ]
+    active = lineage.active()
+    assert len(active) == 1
+    assert active[0].pattern == r"next\(iter\(distinct\)\)"
+    assert active[0].status == cc.OPEN
+    assert "CLASS-REGISTER: staged final parsed" in trailer
 
 
 def test_unbound_mechanized_class_uses_match_dict_evidence_without_crashing(tmp_path):
