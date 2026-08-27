@@ -26,6 +26,17 @@ CENSUS_CACHE_VERSION = 3
 PERSISTENCE_REBUT_ROUNDS = 3
 PERSISTENCE_CORRECTION_LIMIT = 6
 REOPEN_CORRECTION_LIMIT = 3
+DEBT_STATUSES = frozenset({"open", "closed"})
+STATE_KEYS = frozenset({
+    "version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt",
+    "last_round", "format_debt", "validation_debt", "staged_failure",
+    "census_cache", "unbound_classes", "unbound_class_ids",
+    "correction_control",
+})
+DEBT_KEYS = frozenset({
+    "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
+    "source_ids", "class_ids", "first_round", "last_round", "reason",
+})
 
 
 class CensusError(ValueError):
@@ -151,11 +162,256 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
             "phase": "census", "snapshot_digest": snapshot, "debt": [],
         }
     out = dict(raw)
-    if out.get("phase") not in PHASES or not isinstance(out.get("debt"), list):
+    if (
+        not isinstance(out.get("phase"), str) or out["phase"] not in PHASES
+        or not isinstance(out.get("debt"), list)
+    ):
         raise CensusError("invalid persisted review_state")
     if out["phase"] == "clear" and out.get("snapshot_digest") != snapshot:
         out.update(phase="census", snapshot_digest=snapshot, debt=[])
     return out
+
+
+def _persisted_text(value: Any, pointer: str, *, optional: bool = False) -> None:
+    if value is None and optional:
+        return
+    if not isinstance(value, str) or not value:
+        raise CensusError(f"{pointer}: persisted value must be a nonempty string")
+
+
+def _persisted_string_list(value: Any, pointer: str) -> None:
+    if not isinstance(value, list):
+        raise CensusError(f"{pointer}: persisted value must be a list")
+    if any(not isinstance(item, str) or not item for item in value):
+        raise CensusError(f"{pointer}: persisted members must be nonempty strings")
+    if len(value) != len(set(value)):
+        raise CensusError(f"{pointer}: persisted members must be unique")
+
+
+def validate_persisted_debt(debt: Any) -> list[Mapping[str, Any]]:
+    """Validate the complete durable debt-row boundary before any consumer uses it."""
+    if not isinstance(debt, list):
+        raise CensusError("invalid persisted review_state debt")
+    seen_debt: set[str] = set()
+    seen_findings: set[str] = set()
+    for index, row in enumerate(debt):
+        pointer = f"/debt/{index}"
+        if not isinstance(row, Mapping):
+            raise CensusError(f"{pointer}: persisted debt row must be an object")
+        unexpected = set(row) - DEBT_KEYS
+        required = DEBT_KEYS - {"reason"}
+        missing = required - set(row)
+        if missing or unexpected:
+            raise CensusError(
+                f"{pointer}: invalid persisted debt fields: missing {sorted(missing)}, "
+                f"unexpected {sorted(unexpected)}"
+            )
+        debt_id = row.get("id")
+        if not isinstance(debt_id, str) or not debt_id:
+            raise CensusError(f"{pointer}/id: persisted debt id must be a nonempty string")
+        if debt_id in seen_debt:
+            raise CensusError(f"{pointer}/id: duplicate persisted debt id {debt_id!r}")
+        seen_debt.add(debt_id)
+        finding_id = row.get("finding_id")
+        _persisted_text(finding_id, f"{pointer}/finding_id")
+        if finding_id in seen_findings:
+            raise CensusError(
+                f"{pointer}/finding_id: duplicate persisted finding id {finding_id!r}"
+            )
+        seen_findings.add(finding_id)
+        status = row.get("status")
+        if not isinstance(status, str) or status not in DEBT_STATUSES:
+            raise CensusError(f"{pointer}/status: invalid persisted debt status")
+        severity = row.get("severity")
+        if not isinstance(severity, str) or severity not in cc.SEVERITIES:
+            raise CensusError(f"{pointer}/severity: invalid persisted debt severity")
+        for key in ("summary", "remedy"):
+            _persisted_text(row.get(key), f"{pointer}/{key}")
+        for key in ("evidence", "source_ids", "class_ids"):
+            _persisted_string_list(row.get(key), f"{pointer}/{key}")
+        first_round = row.get("first_round")
+        last_round = row.get("last_round")
+        if (
+            type(first_round) is not int or first_round < 0
+            or type(last_round) is not int or last_round < first_round
+        ):
+            raise CensusError(f"{pointer}: invalid persisted debt round bounds")
+        if "reason" in row:
+            _persisted_text(row.get("reason"), f"{pointer}/reason")
+    return debt
+
+
+def _validate_rejected_payloads(value: Any, pointer: str) -> None:
+    if not isinstance(value, list):
+        raise CensusError(f"{pointer}: rejected payloads must be a list")
+    for index, row in enumerate(value):
+        item = f"{pointer}/{index}"
+        required = {"role", "sequence", "sha256", "excerpt"}
+        allowed = required | {"validation_issue"}
+        if not isinstance(row, Mapping) or set(row) - allowed or required - set(row):
+            raise CensusError(f"{item}: invalid persisted rejected payload")
+        _persisted_text(row.get("role"), f"{item}/role")
+        if row.get("sequence") is not None and (
+            type(row.get("sequence")) is not int or row["sequence"] < 1
+        ):
+            raise CensusError(f"{item}/sequence: invalid persisted attempt sequence")
+        _persisted_text(row.get("sha256"), f"{item}/sha256")
+        if not isinstance(row.get("excerpt"), str):
+            raise CensusError(f"{item}/excerpt: persisted excerpt must be a string")
+        if "validation_issue" in row and not isinstance(row["validation_issue"], str):
+            raise CensusError(f"{item}/validation_issue: persisted issue must be a string")
+
+
+def _validate_engine_failure(value: Any, pointer: str) -> None:
+    required = {
+        "returncode", "raw_sha256", "raw_excerpt", "failure_detail_sha256",
+        "failure_detail_excerpt", "stderr_sha256", "stderr_excerpt",
+    }
+    if not isinstance(value, Mapping) or set(value) != required:
+        raise CensusError(f"{pointer}: invalid persisted engine failure")
+    if value["returncode"] is not None and type(value["returncode"]) is not int:
+        raise CensusError(f"{pointer}/returncode: invalid persisted return code")
+    for key in required - {"returncode"}:
+        if not isinstance(value[key], str):
+            raise CensusError(f"{pointer}/{key}: persisted channel must be a string")
+
+
+def _validate_failure(value: Any, pointer: str, *, legacy_string: bool = False) -> None:
+    if legacy_string and isinstance(value, str) and value:
+        return
+    required = {"role", "kind", "message"}
+    allowed = required | {"engine_failure", "rejected_payloads"}
+    if not isinstance(value, Mapping) or set(value) - allowed or required - set(value):
+        raise CensusError(f"{pointer}: invalid persisted failure record")
+    for key in required:
+        _persisted_text(value.get(key), f"{pointer}/{key}")
+    if "engine_failure" in value:
+        _validate_engine_failure(value["engine_failure"], f"{pointer}/engine_failure")
+    if "rejected_payloads" in value:
+        _validate_rejected_payloads(
+            value["rejected_payloads"], f"{pointer}/rejected_payloads"
+        )
+
+
+def validate_persisted_state(
+    state: Any, active: Sequence[cc.TrackedClass], *,
+    correction_control_source: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate and canonicalize the closed version-1 staged-state boundary."""
+    required = {"version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt"}
+    if not isinstance(state, Mapping):
+        raise CensusError("invalid persisted review_state")
+    missing = required - set(state)
+    unexpected = set(state) - STATE_KEYS
+    if missing or unexpected:
+        raise CensusError(
+            "invalid persisted review_state fields: "
+            f"missing {sorted(missing)}, unexpected {sorted(unexpected)}"
+        )
+    if type(state.get("version")) is not int or state["version"] != 1:
+        raise CensusError("/version: invalid persisted review_state version")
+    for key in ("stakes_digest", "snapshot_digest"):
+        _persisted_text(state.get(key), f"/{key}")
+    if not isinstance(state.get("stakes"), str):
+        raise CensusError("/stakes: persisted stakes must be a string")
+    if not isinstance(state.get("phase"), str) or state["phase"] not in PHASES:
+        raise CensusError("/phase: invalid persisted review_state phase")
+    if "last_round" in state and (
+        type(state["last_round"]) is not int or state["last_round"] < 1
+    ):
+        raise CensusError("/last_round: invalid persisted round")
+    validate_persisted_debt(state.get("debt"))
+    failure_keys = [
+        key for key in ("format_debt", "validation_debt", "staged_failure")
+        if key in state
+    ]
+    if len(failure_keys) > 1:
+        raise CensusError("persisted review_state has conflicting failure records")
+    if "format_debt" in state:
+        _validate_failure(state["format_debt"], "/format_debt", legacy_string=True)
+    if "validation_debt" in state:
+        _validate_failure(
+            state["validation_debt"], "/validation_debt", legacy_string=True,
+        )
+    if "staged_failure" in state:
+        _validate_failure(
+            state["staged_failure"], "/staged_failure", legacy_string=True,
+        )
+    if "census_cache" in state:
+        cache = state["census_cache"]
+        cache_keys = {
+            "version", "mode", "snapshot_digest", "stakes_digest", "input_digest",
+            "active_classes_digest", "manifests",
+        }
+        if not isinstance(cache, Mapping) or set(cache) != cache_keys:
+            raise CensusError("/census_cache: invalid persisted cache envelope")
+        if type(cache["version"]) is not int or cache["version"] != CENSUS_CACHE_VERSION:
+            raise CensusError("/census_cache/version: invalid persisted cache version")
+        if (
+            not isinstance(cache["mode"], str)
+            or cache["mode"] not in {cc.PLAN_MODE, cc.BRANCH_MODE}
+        ):
+            raise CensusError("/census_cache/mode: invalid persisted cache mode")
+        for key in (
+            "snapshot_digest", "stakes_digest", "input_digest", "active_classes_digest",
+        ):
+            _persisted_text(cache.get(key), f"/census_cache/{key}")
+        if not isinstance(cache.get("manifests"), list) or any(
+            not isinstance(row, Mapping) for row in cache["manifests"]
+        ):
+            raise CensusError("/census_cache/manifests: invalid persisted manifests")
+        if "validation_debt" not in state:
+            raise CensusError("/census_cache: cache requires validation_debt")
+    if "unbound_class_ids" in state:
+        _persisted_string_list(state["unbound_class_ids"], "/unbound_class_ids")
+    if "unbound_classes" in state:
+        rows = state["unbound_classes"]
+        if not isinstance(rows, list):
+            raise CensusError("/unbound_classes: persisted value must be a list")
+        for index, row in enumerate(rows):
+            pointer = f"/unbound_classes/{index}"
+            if not isinstance(row, Mapping) or set(row) != {
+                "class_id", "severity", "summary", "reason",
+            }:
+                raise CensusError(f"{pointer}: invalid legacy unbound class")
+            for key in ("class_id", "summary", "reason"):
+                _persisted_text(row.get(key), f"{pointer}/{key}")
+            if (
+                not isinstance(row.get("severity"), str)
+                or row["severity"] not in cc.SEVERITIES
+            ):
+                raise CensusError(f"{pointer}/severity: invalid class severity")
+    if "unbound_class_ids" in state and "unbound_classes" in state:
+        raise CensusError("persisted review_state has conflicting unbound class records")
+    source = correction_control_source or state
+    control = normalize_correction_control(source, active)
+    out = dict(state)
+    out["correction_control"] = control
+    return out
+
+
+def plan_correction_blocking_units(
+    debt: Any, active_classes: Sequence[Mapping[str, Any]],
+) -> tuple[str, ...]:
+    """Return stable blocking units for a late plan-correction sweep."""
+    rows = validate_persisted_debt(debt)
+    blocking_classes = [
+        row["class_id"] for row in active_classes
+        if row.get("severity") in BLOCKING
+        and row.get("status") in cc.UNPROVEN_STATUSES
+    ]
+    blocking_ids = set(blocking_classes)
+    units = [f"class:{class_id}" for class_id in blocking_classes]
+    for row in rows:
+        debt_id = row["id"]
+        class_ids = row.get("class_ids", [])
+        if (
+            row.get("status") == "open"
+            and row.get("severity") in BLOCKING
+            and not any(class_id in blocking_ids for class_id in class_ids)
+        ):
+            units.append(f"debt:{debt_id}")
+    return tuple(units)
 
 
 def _valid_session_ref(value: Any) -> bool:

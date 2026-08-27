@@ -35,6 +35,16 @@ Tracked review is the default for `critique_branch` and `critique_plan`.
    transitive effects.
 3. **Final:** after debt closes, one fresh whole-artifact regression must pass.
 
+For plan review only, a correction that starts with one or two blocking units is
+a closure candidate. Its existing single reviewer call also receives the full
+nine-item checklist and must search the complete plan for sibling occurrences,
+cross-reference contradictions, and repair-created regressions before closing
+debt. A blocking unit is an active blocking class, plus an unbound blocking debt
+that has no such class. This broader search is intended to reduce repeated
+correction/final cycles; it does not guarantee a fixed round count and cannot
+clear the lineage. The independent cold final remains mandatory. Branch
+correction is unchanged and remains targeted.
+
 A clear census can converge immediately. Otherwise, increase `round` after each
 successfully settled edit. Failed or rejected rounds may reuse their label.
 Repeated or backward labels after settlement block without provider spend.
@@ -214,6 +224,8 @@ Audit logs are diagnostic, not a recovery protocol.
 - A tracked census normally uses three concurrent calls plus consolidation.
 - Correction and final use one main call; each staged role can receive one
   bounded same-session validation correction.
+- A late plan correction may broaden the search within that same main call; it
+  does not add a role or another provider call.
 - Verified plan round 1 adds discovery, binding, and cold attestation.
 - `query` is the lower-cost focused operation.
 - `arbitrate` is the only tool that spends from both subscriptions in one call.

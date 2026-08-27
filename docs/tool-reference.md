@@ -218,6 +218,13 @@ recurrences include `[RECURRENCE <class-id>]`.
 A terminal staged failure begins `# STAGED REVIEW FAILED`, contains a bounded
 diagnostic, and never implies that missing findings mean success.
 
+Tracked plan correction uses a broader closure-candidate search when the round
+starts with one or two active blocking-class/unbound-debt units. The task packet
+includes the complete checklist, but settlement remains correction: clearing its
+debt advances to the independent `final` phase, never directly to `clear`.
+Tracked branch correction and all final prompts retain their existing scope.
+This is a convergence-efficiency heuristic, not a fixed-round guarantee.
+
 | Trailer field | Meaning |
 |---|---|
 | `CLASS-REGISTER` | Class operations applied in this settlement |

@@ -3,10 +3,13 @@ import importlib.util
 import json
 import os
 import subprocess
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
+from scripts import build_branch_plan_fidelity_acceptance as branch_acceptance
 
 from paranoia_local import (
     class_closure as cc, engines, handlers, plan_claims as pc, prompts,
@@ -35,6 +38,983 @@ def test_staged_timeouts_are_generous_and_reserves_cover_full_retry_paths():
         handlers.STAGED_FOLLOWUP_TIMEOUT_SEC
         + handlers.STAGED_FORMAT_RETRY_TIMEOUT_SEC
     )
+
+
+def _unit_class(
+    class_id: str, *, severity: str = cc.MAJOR, status: str = cc.OPEN,
+) -> dict:
+    return {
+        "class_id": class_id, "invariant": f"invariant {class_id}",
+        "severity": severity, "status": status, "mechanized": False,
+        "pattern": None, "pathspec": None, "procedure": "inspect it",
+    }
+
+
+def _unit_debt(
+    debt_id: str, *, class_ids=(), severity: str = cc.MAJOR,
+    status: str = "open",
+) -> dict:
+    return {
+        "id":debt_id, "finding_id":f"finding-{debt_id}", "status":status,
+        "severity":severity, "summary":f"summary {debt_id}",
+        "evidence":["plan:1"], "remedy":"repair it", "source_ids":[],
+        "class_ids":list(class_ids), "first_round":1, "last_round":1,
+    }
+
+
+@pytest.mark.parametrize(("classes", "debt", "expected"), [
+    ([], [], ()),
+    ([_unit_class("a")], [], ("class:a",)),
+    ([_unit_class("a"), _unit_class("b")], [], ("class:a", "class:b")),
+    (
+        [_unit_class("a"), _unit_class("b"), _unit_class("c")], [],
+        ("class:a", "class:b", "class:c"),
+    ),
+    (
+        [_unit_class("a")],
+        [_unit_debt("D1", class_ids=["a"]), _unit_debt("D2", class_ids=["a"])],
+        ("class:a",),
+    ),
+    ([], [_unit_debt("D1")], ("debt:D1",)),
+    (
+        [_unit_class("a")], [_unit_debt("D1", class_ids=["a", "unknown"])],
+        ("class:a",),
+    ),
+    (
+        [_unit_class("a"), _unit_class("b")],
+        [_unit_debt("D1", class_ids=["a", "b"])],
+        ("class:a", "class:b"),
+    ),
+    (
+        [_unit_class("advisory", severity=cc.MINOR)],
+        [_unit_debt("D1", class_ids=["advisory"])],
+        ("debt:D1",),
+    ),
+    (
+        [_unit_class("closed", status=cc.CLOSED)],
+        [_unit_debt("D1", class_ids=["closed"])],
+        ("debt:D1",),
+    ),
+    (
+        [_unit_class("superseded", status=cc.SUPERSEDED)],
+        [_unit_debt("D1", class_ids=["superseded"])],
+        ("debt:D1",),
+    ),
+    (
+        [_unit_class("malformed", status=cc.MALFORMED)],
+        [_unit_debt("D1", class_ids=["malformed"])],
+        ("class:malformed",),
+    ),
+    (
+        [
+            _unit_class("malformed", status=cc.MALFORMED),
+            _unit_class("unchecked", status=cc.UNCHECKED),
+        ],
+        [_unit_debt("D1", class_ids=["malformed", "unchecked"])],
+        ("class:malformed", "class:unchecked"),
+    ),
+    (
+        [_unit_class("a")],
+        [_unit_debt("closed-debt", status="closed"), _unit_debt("minor", severity=cc.MINOR)],
+        ("class:a",),
+    ),
+])
+def test_plan_correction_blocking_units_are_stable(classes, debt, expected):
+    assert rc.plan_correction_blocking_units(debt, classes) == expected
+
+
+@pytest.mark.parametrize(("debt", "message"), [
+    ({}, "review_state debt"),
+    (["not-an-object"], "debt row must be an object"),
+    ([{}], "invalid persisted debt fields"),
+    ([{**_unit_debt("D1"), "id":""}], "debt id must be a nonempty string"),
+    ([{**_unit_debt("D1"), "id":1}], "debt id must be a nonempty string"),
+    ([_unit_debt("D1"), _unit_debt("D1")], "duplicate persisted debt id"),
+    ([{**_unit_debt("D1"), "class_ids":"a"}], "persisted value must be a list"),
+    ([{**_unit_debt("D1"), "class_ids":[1]}], "persisted members"),
+    ([{**_unit_debt("D1"), "status":[]}], "invalid persisted debt status"),
+    ([{**_unit_debt("D1"), "severity":{}}], "invalid persisted debt severity"),
+])
+def test_plan_correction_blocking_units_reject_malformed_debt(debt, message):
+    with pytest.raises(rc.CensusError, match=message):
+        rc.plan_correction_blocking_units(debt, [_unit_class("a")])
+
+
+def _closed_persisted_state() -> dict:
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="correction", last_round=1, debt=[_unit_debt("D1")])
+    return state
+
+
+def _set_nested(value, path, replacement):
+    cursor = value
+    for key in path[:-1]:
+        cursor = cursor[key]
+    cursor[path[-1]] = replacement
+
+
+def test_closed_persisted_state_validator_accepts_every_supported_envelope():
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    base = _closed_persisted_state()
+    base["debt"][0]["class_ids"] = ["class-a"]
+    accepted = [base]
+
+    failure = deepcopy(base)
+    failure["staged_failure"] = {
+        "role":"correction", "kind":"provider", "message":"capacity",
+        "engine_failure":{
+            "returncode":0, "raw_sha256":"raw", "raw_excerpt":"raw",
+            "failure_detail_sha256":"detail", "failure_detail_excerpt":"detail",
+            "stderr_sha256":"stderr", "stderr_excerpt":"stderr",
+        },
+        "rejected_payloads":[{
+            "role":"correction", "sequence":1, "sha256":"reply",
+            "excerpt":"reply", "validation_issue":"/debt: invalid",
+        }],
+    }
+    accepted.append(failure)
+
+    cached = deepcopy(base)
+    cached["validation_debt"] = {
+        "role":"consolidation-validation-retry", "kind":"validation",
+        "message":"invalid settlement",
+    }
+    cached["census_cache"] = {
+        "version":rc.CENSUS_CACHE_VERSION, "mode":cc.PLAN_MODE,
+        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+        "input_digest":"input", "active_classes_digest":"classes",
+        "manifests":[{"lane":"domain"}],
+    }
+    accepted.append(cached)
+
+    legacy_format = deepcopy(base)
+    legacy_format["format_debt"] = "legacy validation failure"
+    accepted.append(legacy_format)
+    legacy_unbound = deepcopy(base)
+    legacy_unbound["unbound_classes"] = [{
+        "class_id":"class-a", "severity":cc.MAJOR,
+        "summary":"invariant", "reason":"OPEN: review required",
+    }]
+    accepted.append(legacy_unbound)
+    current_unbound = deepcopy(base)
+    current_unbound["unbound_class_ids"] = ["class-a"]
+    accepted.append(current_unbound)
+
+    for state in accepted:
+        validated = rc.validate_persisted_state(state, [tracked])
+        assert validated["debt"] == state["debt"]
+        assert validated["correction_control"]["classes"] == {
+            "class-a":{
+                "reset_round":None, "reopen_count":0, "last_session_ref":None,
+            },
+        }
+
+
+@pytest.mark.parametrize(("path", "replacement", "message"), [
+    (("version",), True, "version"),
+    (("stakes_digest",), [], "stakes_digest"),
+    (("stakes",), None, "stakes"),
+    (("phase",), "unknown", "phase"),
+    (("phase",), [], "phase"),
+    (("snapshot_digest",), {}, "snapshot_digest"),
+    (("debt",), {}, "review_state debt"),
+    (("last_round",), False, "last_round"),
+    (("debt", 0, "id"), [], "debt id"),
+    (("debt", 0, "finding_id"), None, "finding_id"),
+    (("debt", 0, "status"), [], "debt status"),
+    (("debt", 0, "status"), "pending", "debt status"),
+    (("debt", 0, "severity"), {}, "debt severity"),
+    (("debt", 0, "severity"), "CRITICAL", "debt severity"),
+    (("debt", 0, "summary"), "", "summary"),
+    (("debt", 0, "evidence"), "plan:1", "evidence"),
+    (("debt", 0, "remedy"), 1, "remedy"),
+    (("debt", 0, "source_ids"), [1], "source_ids"),
+    (("debt", 0, "class_ids"), ["a", "a"], "class_ids"),
+    (("debt", 0, "first_round"), -1, "round bounds"),
+    (("debt", 0, "last_round"), 0, "round bounds"),
+])
+def test_closed_persisted_state_validator_rejects_each_typed_boundary(
+    path, replacement, message,
+):
+    state = _closed_persisted_state()
+    _set_nested(state, path, replacement)
+    with pytest.raises(rc.CensusError, match=message):
+        rc.validate_persisted_state(state, [])
+
+
+@pytest.mark.parametrize(("mutation", "message"), [
+    ({"unexpected":True}, "unexpected"),
+    ({"staged_failure":{}}, "failure record"),
+    ({"validation_debt":{}, "format_debt":"legacy"}, "conflicting failure"),
+    ({"census_cache":{}}, "cache envelope"),
+    ({"unbound_class_ids":"class-a"}, "must be a list"),
+    ({"unbound_classes":[{}]}, "legacy unbound class"),
+    ({"unbound_class_ids":[], "unbound_classes":[]}, "conflicting unbound"),
+])
+def test_closed_persisted_state_validator_rejects_each_envelope_boundary(
+    mutation, message,
+):
+    state = _closed_persisted_state()
+    state.update(mutation)
+    with pytest.raises(rc.CensusError, match=message):
+        rc.validate_persisted_state(state, [])
+
+
+def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
+    cache_state = _closed_persisted_state()
+    cache_state["validation_debt"] = "legacy validation failure"
+    cache_state["census_cache"] = {
+        "version":rc.CENSUS_CACHE_VERSION, "mode":[],
+        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+        "input_digest":"input", "active_classes_digest":"classes",
+        "manifests":[],
+    }
+    with pytest.raises(rc.CensusError, match="cache mode"):
+        rc.validate_persisted_state(cache_state, [])
+
+    unbound_state = _closed_persisted_state()
+    unbound_state["unbound_classes"] = [{
+        "class_id":"class-a", "severity":{}, "summary":"summary",
+        "reason":"reason",
+    }]
+    with pytest.raises(rc.CensusError, match="class severity"):
+        rc.validate_persisted_state(unbound_state, [])
+
+
+def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
+    anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
+    (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
+    classes = {}
+    debt = []
+    for index in range(class_count):
+        class_id = f"class-{index}"
+        classes[class_id] = cc.TrackedClass(
+            class_id, f"invariant {index}", cc.MAJOR, 1,
+            cc.OPEN if phase == "correction" else cc.CLOSED,
+            procedure=f"inspect {index}",
+        )
+        if phase == "correction":
+            debt.append({
+                "id":f"D{index}", "finding_id":f"G{index}", "status":"open",
+                "severity":cc.MAJOR, "summary":f"defect {index}",
+                "evidence":[anchor], "remedy":"repair it", "source_ids":[],
+                "class_ids":[class_id], "first_round":1, "last_round":1,
+            })
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(phase=phase, debt=debt, last_round=1)
+    lineage = cc.Lineage(
+        "scope-fixture", mode=mode, classes=classes,
+        next_seq=class_count + 1, review_state=state,
+    )
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        register_status = None
+        staged_settlement = None
+        staged_manifests = []
+        rejected_payloads = []
+        reopened_class_ids = ()
+        correction_gates = []
+        prepared_lineage = cc.copy_lineage(lineage)
+        _settled = False
+        round_no = 2
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    if phase == "correction":
+        value = {
+            "role":"correction", "governing_findings":[],
+            "debt_outcomes":[{
+                "debt_id":f"D{index}", "status":"closed", "evidence":[anchor],
+            } for index in range(class_count)],
+            "class_outcomes":[{
+                "class_id":f"class-{index}", "verdict":"satisfied",
+                "evidence":[anchor],
+            } for index in range(class_count)],
+            "class_actions":{f"class-{index}":None for index in range(class_count)},
+        }
+    else:
+        value = {
+            "role":"final", "governing_findings":[], "debt_outcomes":[],
+            "coverage":payload(lane())["coverage"],
+            "class_outcomes":[{
+                "class_id":f"class-{index}", "verdict":"satisfied",
+                "evidence":[anchor],
+            } for index in range(class_count)],
+            "class_actions":{f"class-{index}":None for index in range(class_count)},
+        }
+        if mode == cc.BRANCH_MODE:
+            for row in value["coverage"]:
+                row["evidence"] = [anchor]
+
+    class Engine:
+        name = "fake"
+
+        def __init__(self):
+            self.calls = []
+
+        def run(self, prompt, *args, **kwargs):
+            self.calls.append((prompt, kwargs.get("response_schema")))
+            text = wire(value)
+            return Review(text=text, session_ref="scope-session", raw=text)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            return self.run(prompt, *args, **kwargs)
+
+    return Closure(), Engine(), anchor
+
+
+def _task_from_prompt(prompt: str) -> dict:
+    return json.loads(prompt.split("===== TASK INPUT =====\n\n", 1)[1])
+
+
+def test_plan_closure_candidate_enriches_one_existing_provider_call(
+    tmp_path, monkeypatch,
+):
+    original = rc.plan_correction_blocking_units
+    invocations = []
+
+    def counted(debt, active_classes):
+        invocations.append((debt, active_classes))
+        return original(debt, active_classes)
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", counted)
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase="correction",
+    )
+    review, _, attempts = handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    assert not review.error
+    assert len(engine.calls) == 1
+    assert len(attempts) == 1
+    prompt = engine.calls[0][0]
+    task = _task_from_prompt(prompt)
+    assert task["review_scope"] == "closure_candidate"
+    assert task["checklist"] == list(sp.CHECKLIST)
+    assert prompt.count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    assert len(invocations) == 1
+    assert closure.lineage.review_state["phase"] == "final"
+
+
+def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypatch):
+    original = rc.plan_correction_blocking_units
+    invocations = []
+
+    def counted(debt, active_classes):
+        invocations.append((debt, active_classes))
+        return original(debt, active_classes)
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", counted)
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase="correction", class_count=3,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    prompt = engine.calls[0][0]
+    task = _task_from_prompt(prompt)
+    assert task["review_scope"] == "targeted"
+    assert task["checklist"] == []
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert len(invocations) == 1
+
+
+@pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
+    (
+        cc.PLAN_MODE, "final",
+        "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4",
+        "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
+        "clear",
+    ),
+    (
+        cc.BRANCH_MODE, "correction",
+        "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f",
+        "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
+        "final",
+    ),
+    (
+        cc.BRANCH_MODE, "final",
+        "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3",
+        "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
+        "clear",
+    ),
+])
+def test_closure_candidate_directives_are_absent_from_excluded_followups(
+    tmp_path, mode, phase, prompt_sha256, schema_sha256, next_phase, monkeypatch,
+):
+    def unexpected_helper(*args, **kwargs):
+        raise AssertionError("blocking-unit helper is excluded from this role")
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", unexpected_helper)
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=mode, phase=phase,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=mode,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1 if mode == cc.PLAN_MODE else None,
+    )
+    prompt, schema = engine.calls[0]
+    task = _task_from_prompt(prompt)
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert "review_scope" not in task
+    assert task["checklist"] == (list(sp.CHECKLIST) if phase == "final" else [])
+    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == prompt_sha256
+    assert hashlib.sha256(
+        json.dumps(schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest() == schema_sha256
+    assert closure.lineage.review_state["phase"] == next_phase
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_census_does_not_invoke_closure_candidate_classifier(
+    tmp_path, monkeypatch, mode,
+):
+    (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    lineage = cc.Lineage(f"census-scope-{mode}", mode=mode, review_state=state)
+
+    class Closure:
+        state_root = tmp_path
+        unavailable = None
+        claims_enabled = False
+        register_status = None
+        staged_settlement = None
+        staged_manifests = []
+        rejected_payloads = []
+        reopened_class_ids = ()
+        correction_gates = []
+        prepared_lineage = cc.copy_lineage(lineage)
+        _settled = False
+        round_no = 1
+
+        def __init__(self):
+            self.lineage = lineage
+
+        def _blocks(self):
+            return []
+
+        def _sweep(self, only=None):
+            return None
+
+    class Engine:
+        name = "fake"
+
+        def __init__(self):
+            self.calls = []
+
+        def run(self, prompt, *args, **kwargs):
+            self.calls.append(prompt)
+            if "ROLE: census lane " in prompt:
+                lane_name = next(
+                    row.split()[-1] for row in prompt.splitlines()
+                    if row.startswith("ROLE: census lane ")
+                )
+                text = lane(lane_name)
+                if mode == cc.BRANCH_MODE:
+                    text = text.replace(
+                        '"anchor": "plan:1"',
+                        '"anchor": "repository/a.py:1"',
+                    )
+            else:
+                text = wire({
+                    "role":"census", "governing_findings":[],
+                    "debt_outcomes":[], "class_actions":{},
+                })
+            return Review(text=text, session_ref="census-session", raw=text)
+
+    def unexpected_helper(*args, **kwargs):
+        raise AssertionError("census must not invoke correction classifier")
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", unexpected_helper)
+    closure, engine = Closure(), Engine()
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=mode,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=1,
+        on_progress=None, plan_lines=1 if mode == cc.PLAN_MODE else None,
+    )
+    assert len(engine.calls) == len(rc.LANES[mode]) + 1
+
+
+def test_legacy_census_to_correction_recovery_remains_targeted(tmp_path, monkeypatch):
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase="correction",
+    )
+    closure.lineage.review_state["phase"] = "census"
+    closure.lineage.review_state["unbound_class_ids"] = ["class-0"]
+
+    def unexpected_helper(*args, **kwargs):
+        raise AssertionError("legacy census recovery must not invoke classifier")
+
+    monkeypatch.setattr(rc, "plan_correction_blocking_units", unexpected_helper)
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    prompt = engine.calls[0][0]
+    task = _task_from_prompt(prompt)
+    assert task["role"] == "correction"
+    assert task["checklist"] == []
+    assert task["review_scope"] == "targeted"
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+
+
+def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):
+    closure, engine, anchor = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase="correction", class_count=2,
+    )
+    closure.lineage.review_state["debt"] = closure.lineage.review_state["debt"][:1]
+    value = {
+        "role":"correction",
+        "governing_findings":[{
+            "id":"sibling", "severity":"MAJOR", "summary":"sibling defect",
+            "evidence":[anchor], "remedy":"repair the sibling",
+            "classification":{
+                "kind":"existing_class", "class_id":"class-1",
+                "assessment_evidence":[anchor],
+            },
+        }],
+        "debt_outcomes":[
+            {"debt_id":"D0", "status":"closed", "evidence":[anchor]},
+        ],
+        "class_outcomes":[
+            {"class_id":"class-0", "verdict":"satisfied", "evidence":[anchor]},
+        ],
+        "class_actions":{"class-0":None, "class-1":None},
+    }
+
+    def run(prompt, *args, **kwargs):
+        engine.calls.append((prompt, kwargs.get("response_schema")))
+        text = wire(value)
+        return Review(text=text, session_ref="scope-session", raw=text)
+
+    engine.run = run
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    sibling = next(
+        row for row in closure.lineage.review_state["debt"]
+        if row["finding_id"] == "sibling"
+    )
+    assert sibling["status"] == "open"
+    assert sibling["class_ids"] == ["class-1"]
+    assert closure.lineage.review_state["phase"] == "correction"
+
+
+@pytest.mark.parametrize("malformed_debt", [
+    {},
+    ["not-an-object"],
+    [{}],
+    [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [{"id":1, "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+    ],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
+    [{**_unit_debt("D1"), "status":[]}],
+    [{**_unit_debt("D1"), "severity":{}}],
+])
+def test_public_plan_correction_preflights_debt_before_provider_spend(
+    repo, tmp_path, malformed_debt, monkeypatch,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase="correction", debt=malformed_debt, last_round=1)
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "malformed-plan-debt-" + hashlib.sha256(
+        json.dumps(malformed_debt, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    engine = handlers.eng.CodexEngine()
+    result = handlers.critique_plan({
+        "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
+        "round":2, "stakes":"s",
+    }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "PREFLIGHT")
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert reloaded.review_state["debt"] == malformed_debt
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list((tmp_path / "logs").glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    assert audit["claim_verification"] is True
+    assert audit["claim_status"] == "blocked-by-structural-preflight"
+    assert audit["claim_model_calls"] == 0
+    assert "CLAIM-REGISTER:" in result
+    assert "CLAIM-CLOSURE:" in result
+    assert result.count("CONVERGENCE: BLOCKED") == 1
+    assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+    assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+@pytest.mark.parametrize("malformed_debt", [
+    {},
+    ["not-an-object"],
+    [{}],
+    [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [{"id":1, "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+        {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
+    ],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":"class-a"}],
+    [{"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[1]}],
+    [{**_unit_debt("D1"), "status":[]}],
+    [{**_unit_debt("D1"), "severity":{}}],
+])
+def test_public_branch_correction_preflights_debt_before_provider_spend(
+    repo_with_branch, tmp_path, malformed_debt, monkeypatch,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase="correction", debt=malformed_debt, last_round=1)
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "malformed-branch-debt-" + hashlib.sha256(
+        json.dumps(malformed_debt, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.BRANCH_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
+        "class_closure":True,
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "branch-logs",
+       now=lambda: "BRANCH-PREFLIGHT")
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
+    )
+    assert reloaded.review_state["debt"] == malformed_debt
+    assert reloaded.review_state["staged_failure"] == {
+        "role":"correction-preflight", "kind":"validation",
+        "message":reloaded.review_state["staged_failure"]["message"],
+    }
+    audits = list((tmp_path / "branch-logs").glob("*.json"))
+    assert len(audits) == 1
+    assert json.loads(audits[0].read_text())["attempt_ledger"] == []
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("invalid_phase", ["not-a-phase", []])
+def test_public_staged_handlers_settle_invalid_phase_without_provider_spend(
+    repo_with_branch, tmp_path, monkeypatch, mode, invalid_phase,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase=invalid_phase, debt=[], last_round=1)
+    suffix = "text" if isinstance(invalid_phase, str) else "container"
+    lineage_id = f"invalid-phase-{mode}-{suffix}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments.update(plan_text="# Plan\n")
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"invalid-phase-{mode}-logs"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"INVALID-PHASE-{mode}",
+    )
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["phase"] == invalid_phase
+    assert reloaded.review_state["staged_failure"]["role"] == "structural-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert result.count("CONVERGENCE: BLOCKED") == 1
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("phase", ["census", "final"])
+def test_public_staged_handlers_preflight_malformed_debt_rows_in_every_phase(
+    repo_with_branch, tmp_path, monkeypatch, mode, phase,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase=phase, debt=["not-an-object"], last_round=1)
+    lineage_id = f"malformed-{phase}-debt-{mode}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments["plan_text"] = "# Plan\n"
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"malformed-{phase}-debt-{mode}-logs"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"MALFORMED-{phase.upper()}-{mode}",
+    )
+    assert calls == []
+    assert result.count("CONVERGENCE: BLOCKED") == 1
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["debt"] == ["not-an-object"]
+    assert reloaded.review_state["staged_failure"]["role"] == f"{phase}-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("phase", ["census", "correction", "final"])
+@pytest.mark.parametrize(("field", "malformation", "replacement"), [
+    ("status", "missing", None),
+    ("status", "unknown-string", "pending"),
+    ("status", "non-string", 1),
+    ("status", "unhashable", []),
+    ("severity", "missing", None),
+    ("severity", "unknown-string", "CRITICAL"),
+    ("severity", "non-string", 1),
+    ("severity", "unhashable", {}),
+])
+def test_public_staged_handlers_preflight_every_status_and_severity_malformation(
+    repo_with_branch, tmp_path, monkeypatch, mode, phase, field, malformation,
+    replacement,
+):
+    malformed = _unit_debt("D1")
+    if malformation == "missing":
+        malformed.pop(field)
+    else:
+        malformed[field] = replacement
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase=phase, debt=[malformed], last_round=1)
+    lineage_id = f"malformed-{phase}-{field}-{malformation}-{mode}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments["plan_text"] = "# Plan\n"
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"logs-{phase}-{field}-{malformation}-{mode}"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"MALFORMED-{phase.upper()}-{field.upper()}-{mode}",
+    )
+
+    assert calls == []
+    assert result.count("CONVERGENCE: BLOCKED") == 1
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["debt"] == [malformed]
+    assert reloaded.review_state["staged_failure"]["role"] == f"{phase}-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("malformed_control", [
+    {},
+    {"version":1, "classes":{"class-a":{}}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":"1", "reopen_count":0, "last_session_ref":None,
+    }}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":None, "reopen_count":True, "last_session_ref":None,
+    }}},
+    {"version":1, "classes":{"class-a":{
+        "reset_round":None, "reopen_count":0, "last_session_ref":"bad\nref",
+    }}},
+])
+def test_public_staged_handlers_settle_malformed_correction_control_without_spend(
+    repo_with_branch, tmp_path, monkeypatch, mode, malformed_control,
+):
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(
+        phase="correction", last_round=1,
+        debt=[{
+            "id":"D1", "status":"open", "severity":cc.MAJOR,
+            "class_ids":["class-a"],
+        }],
+        correction_control=malformed_control,
+    )
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    identity = hashlib.sha256(json.dumps(
+        [mode, malformed_control], sort_keys=True,
+    ).encode("utf-8")).hexdigest()[:12]
+    lineage_id = f"malformed-control-{identity}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments["plan_text"] = "# Plan\n"
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"malformed-control-{mode}-{identity}"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"MALFORMED-CONTROL-{mode}",
+    )
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["correction_control"] == malformed_control
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_verification"] is True
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert result.count("CONVERGENCE: BLOCKED") == 1
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
@@ -70,7 +1050,7 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         "class_id":"gate-class", "reason":"persistence", "span":7,
         "reopen_count":0,
     }]
-    assert 1 <= artifact["provider_call_count"] <= 2
+    assert artifact["provider_call_count"] == 1
     assert artifact["provider_call_count"] == len(artifact["attempt_ledger"])
     assert artifact["result_text"].endswith(artifact["rendered_trailer"])
     failure_route = artifact["public_provider_failure_route"]
@@ -86,7 +1066,113 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     assert artifact["audit"]["rendered_trailer"] == artifact["rendered_trailer"]
     assert artifact["audit"]["correction_gates"] == artifact["correction_gates"]
     assert artifact["durable_reload_lineage"] == artifact["after_lineage"]
-    assert artifact["outcome"] in {"closed-or-replaced", "terminal-gate-rejection"}
+    assert artifact["outcome"] == "closed-with-sibling-debt"
+    sibling_classes = [
+        row for row in artifact["after_lineage"]["classes"]
+        if row["class_id"] == acceptance.SIBLING_CLASS_ID
+        and row["status"] in cc.UNPROVEN_STATUSES
+        and row["severity"] in rc.BLOCKING
+    ]
+    assert sibling_classes
+    assert any(
+        debt["finding_id"] != "G1" and debt["status"] == "open"
+        and any(
+            row["class_id"] in debt["class_ids"] for row in sibling_classes
+        )
+        for debt in artifact["after_lineage"]["review_state"]["debt"]
+    )
+    assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
+    assert artifact["after_repair_lineage"]["review_state"]["phase"] == "final"
+    assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
+    assert artifact["final_lineage"]["review_state"]["phase"] == "clear"
+    assert "CONVERGENCE: NOT-BLOCKED" in artifact["final_result_text"]
+    assert artifact["total_provider_call_count"] == sum(map(
+        len,
+        (
+            artifact["attempt_ledger"], artifact["repair_attempt_ledger"],
+            artifact["final_attempt_ledger"],
+        ),
+    ))
+    changed = json.loads(json.dumps(artifact))
+    next(
+        debt for debt in changed["after_lineage"]["review_state"]["debt"]
+        if debt["finding_id"] != "G1"
+    )["class_ids"] = ["wrong-sibling-class"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    sibling_finding_ids = {
+        debt["finding_id"]
+        for debt in changed["after_lineage"]["review_state"]["debt"]
+        if debt["finding_id"] != "G1"
+    }
+    next(
+        finding for finding in changed["audit"]["staged_settlement"]["findings"]
+        if finding["id"] in sibling_finding_ids
+    )["evidence"] = ["plan:1"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["sibling_binding"]["anchor"] = "plan:8"
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["sibling_binding"]["provider_evidence"] = ["plan:1"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    for mutate_final_task in (
+        lambda task: task.update(artifact="incomplete fixed plan"),
+        lambda task: task.update(checklist=task["checklist"][:-1]),
+        lambda task: task.update(active_classes=task["active_classes"][:-1]),
+        lambda task: task.update(existing_debt=[{"id":"forged-open-debt"}]),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        prefix, raw_task = changed["final_prompts"][0].split(
+            "===== TASK INPUT =====\n\n", 1,
+        )
+        final_task = json.loads(raw_task)
+        mutate_final_task(final_task)
+        changed["final_prompts"][0] = (
+            prefix + "===== TASK INPUT =====\n\n"
+            + json.dumps(final_task, ensure_ascii=False)
+        )
+        changed["final_prompt_sha256"][0] = hashlib.sha256(
+            changed["final_prompts"][0].encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["final_audit"]["session_ref"] = changed["repair_audit"]["session_ref"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    for prompt_field, digest_field, index in (
+        ("correction_prompt", "correction_prompt_sha256", None),
+        ("repair_prompts", "repair_prompt_sha256", 0),
+        ("final_prompts", "final_prompt_sha256", 0),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        prompt = (
+            changed[prompt_field]
+            if index is None else changed[prompt_field][index]
+        )
+        prefix, raw_task = prompt.split("===== TASK INPUT =====\n\n", 1)
+        task = json.loads(raw_task)
+        task["stakes"] = "one-class forged stakes"
+        prompt = (
+            prefix + "===== TASK INPUT =====\n\n"
+            + json.dumps(task, ensure_ascii=False)
+        )
+        digest = hashlib.sha256(
+            prompt.encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        if index is None:
+            changed[prompt_field] = prompt
+            changed[digest_field] = digest
+        else:
+            changed[prompt_field][index] = prompt
+            changed[digest_field][index] = digest
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",
@@ -123,6 +1209,21 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         ledger[0]["raw_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="committed Git envelope"):
         acceptance.validate_artifact(changed, root)
+
+
+def test_complete_prechange_branch_audits_remain_the_exclusion_oracle() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/branch_plan_fidelity_acceptance_2026-08-22.json").read_text()
+    )
+    branch_acceptance.validate_record(artifact, root)
+    assert artifact["allowed_later_source_diffs"][
+        "src/paranoia_local/handlers.py"
+    ]["scope"].startswith("Operator-facing staged failure taxonomy and plan-only")
+    for route in artifact["routes"]:
+        assert route["audit_canonical_sha256"] == hashlib.sha256(
+            branch_acceptance._canonical(route["audit"])
+        ).hexdigest()
 
 
 def test_census_cache_requires_every_exact_binding():
@@ -2190,8 +3291,8 @@ def test_staged_settlement_save_failure_retains_latch_and_five_heading_result(
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state.update(phase="correction", debt=[{
         "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
-        "summary":"fix", "evidence":["plan:1"], "source_ids":[],
-        "first_round":1, "last_round":1,
+        "summary":"fix", "evidence":["plan:1"], "remedy":"repair it",
+        "source_ids":[], "class_ids":[], "first_round":1, "last_round":1,
     }])
     cc.save_lineage(
         tmp_path,
@@ -2496,6 +3597,11 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
     assert all(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in prompt for prompt in calls)
+    correction_task = _task_from_prompt(calls[4])
+    assert correction_task["review_scope"] == "closure_candidate"
+    assert correction_task["checklist"] == list(sp.CHECKLIST)
+    assert calls[4].count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in calls[5]
     assert '"existing_debt": []' in calls[5]
     assert all(key in calls[5] for key in sp.CHECKLIST)
     assert third.count("## What works") == 1

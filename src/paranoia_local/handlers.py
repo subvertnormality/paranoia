@@ -50,6 +50,13 @@ STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
 STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
 STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
 STAGED_FORMAT_RETRY_TIMEOUT_SEC = 600
+
+PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS = """This plan correction is a closure candidate. After
+checking every supplied debt repair, scan the complete artifact against every supplied checklist
+item and active class for sibling occurrences, cross-reference contradictions, and regressions
+created by the repairs. Report every discovered defect through the existing governing-finding and
+classification fields. This broader search is not clearance; an independent cold final remains
+required after blocking debt closes."""
 STAGED_CENSUS_RESERVE_SEC = 4320
 STAGED_FOLLOWUP_RESERVE_SEC = 3120
 MAX_PLAN_EVIDENCE_MODEL_CALLS = 22
@@ -667,11 +674,23 @@ def _settle_staged_failure(
         restored.branch_contract = deepcopy(current.branch_contract)
         closure.lineage = restored
     raw_state = closure.lineage.review_state
+    preflight_failure = str(
+        getattr(error, "stage_role", "")
+    ).endswith("-preflight")
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
-        and raw_state.get("phase") in rc.PHASES
+        and isinstance(raw_state.get("phase"), str)
+        and raw_state["phase"] in rc.PHASES
         and isinstance(raw_state.get("debt"), list)
     ):
+        state = deepcopy(raw_state)
+    elif (
+        preflight_failure and isinstance(raw_state, dict)
+        and raw_state.get("version") == 1
+    ):
+        # A structural preflight may be rejecting the top-level debt container
+        # itself. Preserve those malformed durable bytes for diagnosis while adding
+        # the structured failure beside them; rendering uses a sanitized projection.
         state = deepcopy(raw_state)
     else:
         state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
@@ -759,10 +778,23 @@ def _settle_staged_failure(
         text=rc.render_error_review(error_body),
         session_ref=None, raw=str(error), returncode=2, error=True,
     )
+    trailer_state = state
+    if preflight_failure:
+        # Preserve the malformed durable bytes for diagnosis, but never feed them to
+        # the normal debt renderer that assumes canonical rows.
+        trailer_state = {
+            **state,
+            "phase":(
+                state.get("phase")
+                if isinstance(state.get("phase"), str)
+                and state["phase"] in rc.PHASES else "census"
+            ),
+            "debt":[],
+        }
     trailer = "\n".join((
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(
-            state,
+            trailer_state,
             class_first_rounds={
                 item.class_id: item.first_round
                 for item in closure.lineage.blocking()
@@ -855,8 +887,21 @@ def _is_legacy_claim_only_phase(
     lineage: cc.Lineage, state: dict[str, Any], *, snapshot: str,
 ) -> bool:
     """Recognize the exact pre-issue-58 state that requires no model call."""
+    debt_rows = state.get("debt", [])
+    if not isinstance(debt_rows, list) or any(
+        not isinstance(debt, Mapping)
+        or not isinstance(debt.get("class_ids", []), list)
+        or any(
+            not isinstance(class_id, str)
+            for class_id in debt.get("class_ids", [])
+        )
+        for debt in debt_rows
+    ):
+        # Malformed state can never satisfy the exact legacy migration shape.  The
+        # staged correction preflight owns the typed, durable validation failure.
+        return False
     debt_class_ids = {
-        cid for debt in state.get("debt", []) if debt.get("status") == "open"
+        cid for debt in debt_rows if debt.get("status") == "open"
         for cid in debt.get("class_ids", [])
     }
     unbound_blocking = {
@@ -865,7 +910,7 @@ def _is_legacy_claim_only_phase(
     }
     has_blocking_debt = any(
         debt.get("status") == "open" and debt.get("severity") in rc.BLOCKING
-        for debt in state.get("debt", [])
+        for debt in debt_rows
     )
     return (
         not lineage.debt
@@ -893,31 +938,36 @@ def _staged_structural_review(
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
     _staged_class_context(closure._blocks())
-    state = rc.normalize_state(lineage.review_state, stakes=stakes, snapshot=snapshot)
+    try:
+        state = rc.normalize_state(
+            lineage.review_state, stakes=stakes, snapshot=snapshot,
+        )
+        control_source = (
+            lineage.review_state
+            if isinstance(lineage.review_state, dict)
+            and "correction_control" in lineage.review_state
+            else state
+        )
+        state = rc.validate_persisted_state(
+            state, lineage.active(), correction_control_source=control_source,
+        )
+    except rc.CensusError as exc:
+        raw_phase = (
+            lineage.review_state.get("phase")
+            if isinstance(lineage.review_state, dict) else None
+        )
+        role = (
+            f"{raw_phase}-preflight"
+            if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+            else "structural-preflight"
+        )
+        raise _staged_error(str(exc), role=role, kind="validation") from exc
     stakes_recalibration = (
         isinstance(lineage.review_state, dict)
         and lineage.review_state.get("version") == 1
         and lineage.review_state.get("stakes_digest") != rc.digest(stakes)
     )
-    control_source = (
-        lineage.review_state
-        if isinstance(lineage.review_state, dict)
-        and "correction_control" in lineage.review_state
-        else state
-    )
-    try:
-        correction_control = rc.normalize_correction_control(
-            control_source, lineage.active(),
-        )
-    except rc.CensusError as exc:
-        closure.unavailable = str(exc)
-        # This is a confirmed read/validation refusal, not an ambiguous write.
-        closure._settled = True
-        return _state_unavailable_review(
-            closure, mode=mode,
-            claim_state=lineage.claim_state if mode == cc.PLAN_MODE else None,
-        )
-    state["correction_control"] = deepcopy(correction_control)
+    correction_control = state["correction_control"]
     if lineage.debt:
         # A pre-staging malformed-register round is not silently normalized into an
         # empty verified register. Its only autonomous recovery is a fresh cold census
@@ -945,6 +995,17 @@ def _staged_structural_review(
         }
         for c in lineage.active()
     ]
+    plan_correction_units: tuple[str, ...] | None = None
+    if phase == "correction":
+        try:
+            if mode == cc.PLAN_MODE:
+                plan_correction_units = rc.plan_correction_blocking_units(
+                    state.get("debt"), active_classes,
+                )
+        except rc.CensusError as exc:
+            raise _staged_error(
+                str(exc), role="correction-preflight", kind="validation",
+            ) from exc
     active_ids = [c["class_id"] for c in active_classes]
     debt_class_ids = {
         cid for debt in state.get("debt", []) if debt.get("status") == "open"
@@ -1361,18 +1422,36 @@ def _staged_structural_review(
         role = "final" if phase == "final" else "correction"
         open_debt = [d for d in state.get("debt", []) if d.get("status") == "open"]
         existing = [d["id"] for d in open_debt]
+        closure_candidate = (
+            mode == cc.PLAN_MODE
+            and role == "correction"
+            and plan_correction_units is not None
+            and 1 <= len(plan_correction_units) <= 2
+        )
         outcome_class_ids = sp.expected_outcome_class_ids(
             role, active_classes=active_classes, durable_debt=open_debt,
         )
-        stage_body = json.dumps({
+        stage_task = {
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
             "correction_gates": correction_gates if role == "correction" else [],
-            "checklist": list(sp.CHECKLIST) if role == "final" else [],
+            "checklist": list(sp.CHECKLIST) if role == "final" or closure_candidate else [],
             "artifact": body,
-        }, ensure_ascii=False)
+        }
+        if mode == cc.PLAN_MODE and role == "correction":
+            stage_task["review_scope"] = (
+                "closure_candidate" if closure_candidate else "targeted"
+            )
+        stage_body = json.dumps(stage_task, ensure_ascii=False)
+        followup_instructions = prompts.staged_followup_instructions(
+            mode, plan_contract=plan_contract,
+        )
+        if closure_candidate:
+            followup_instructions += (
+                "\n\n" + PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
+            )
         prompt = prompts.compose(
-            f"{prompts.staged_followup_instructions(mode, plan_contract=plan_contract)}\n"
+            f"{followup_instructions}\n"
             f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
             f"{sp.class_decision_instructions(role, active_classes=active_classes, outcome_class_ids=outcome_class_ids)}",
             stage_body,
@@ -2285,7 +2364,65 @@ def critique_plan(
     claim_status = "disabled"
     claim_duration_ms: int | None = None
     attempt_ledger: list[dict[str, Any]] = []
-    if claim_verification:
+    snapshot: str | None = None
+    structural_snapshot: str | None = None
+    normalized_structural_state: dict[str, Any] | None = None
+    staged_preflight_failed = False
+    preflight_review: Review | None = None
+    preflight_trailer: str | None = None
+    if closure:
+        # A structural preflight can settle before claim verification starts. Attach
+        # the retained claim state first so that failure still renders the combined
+        # claim/structural closure contract without admitting a claim provider call.
+        closure.claims_enabled = claim_verification
+        closure.claim_state = claim_state
+    if closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine):
+        parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
+        snapshot = orientation.wrap_commit(
+            repo,
+            orientation.snapshot_tree(
+                repo, parent or orientation.empty_tree(repo),
+            ),
+            parent,
+        )
+        structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+        if closure.lineage:
+            try:
+                normalized_structural_state = rc.normalize_state(
+                    closure.lineage.review_state, stakes=stakes or "",
+                    snapshot=structural_snapshot,
+                )
+                control_source = (
+                    closure.lineage.review_state
+                    if isinstance(closure.lineage.review_state, dict)
+                    and "correction_control" in closure.lineage.review_state
+                    else normalized_structural_state
+                )
+                normalized_structural_state = rc.validate_persisted_state(
+                    normalized_structural_state, closure.lineage.active(),
+                    correction_control_source=control_source,
+                )
+            except rc.CensusError as exc:
+                raw_phase = (
+                    closure.lineage.review_state.get("phase")
+                    if isinstance(closure.lineage.review_state, dict)
+                    else None
+                )
+                role = (
+                    f"{raw_phase}-preflight"
+                    if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+                    else "structural-preflight"
+                )
+                error = _staged_error(str(exc), role=role, kind="validation")
+                preflight_review, preflight_trailer, structural_attempts = (
+                    _settle_staged_failure(
+                        closure, stakes=stakes or "", snapshot=structural_snapshot,
+                        error=error, mode=cc.PLAN_MODE,
+                    )
+                )
+                attempt_ledger.extend(structural_attempts)
+                staged_preflight_failed = True
+    if claim_verification and not staged_preflight_failed:
         claim_started = time.monotonic()
         if closure and closure.unavailable:
             claim_state = pc.with_debt(
@@ -2337,11 +2474,14 @@ def critique_plan(
                     closure.unavailable = str(exc)
         blocks.append(pc.review_context(claim_state))
         claim_duration_ms = int((time.monotonic() - claim_started) * 1000)
+    elif claim_verification:
+        claim_status = "blocked-by-structural-preflight"
+        claim_duration_ms = 0
     if closure:
         closure.claims_enabled = claim_verification
         closure.claim_state = claim_state
 
-    trailer: str | None = None
+    trailer: str | None = preflight_trailer
     try:
         body = _plan_body(plan_view, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -2356,15 +2496,17 @@ def critique_plan(
             closure and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
         )
         if type(engine) in (eng.CodexEngine, eng.ClaudeEngine) and (claim_verification or closure):
-            parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
-            snapshot = orientation.wrap_commit(
-                repo,
-                orientation.snapshot_tree(
-                    repo, parent or orientation.empty_tree(repo),
-                ),
-                parent,
-            )
-            structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+            if snapshot is None:
+                parent = orientation.resolve_head(repo) if orientation.has_head(repo) else None
+                snapshot = orientation.wrap_commit(
+                    repo,
+                    orientation.snapshot_tree(
+                        repo, parent or orientation.empty_tree(repo),
+                    ),
+                    parent,
+                )
+                structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
+            assert structural_snapshot is not None
             with inert_tree.evidence_workspace(repo, snapshot) as workspace:
                 reviewer = engine.for_role(eng.ROLE_REPOSITORY)
                 review_cwd = workspace.cwd_for(engine.name)
@@ -2372,28 +2514,29 @@ def critique_plan(
                     "\n\nThe pinned repository evidence root is `repository/`. Treat that "
                     "prefix as the project root; no live Git or web tools are available."
                 )
+                if staged_preflight_failed:
+                    assert preflight_review is not None
+                    review = preflight_review
                 staged_phase = (
-                    rc.normalize_state(
-                        closure.lineage.review_state, stakes=stakes or "",
-                        snapshot=structural_snapshot,
-                    )["phase"]
-                    if closure and closure.lineage else "census"
+                    normalized_structural_state["phase"]
+                    if normalized_structural_state is not None else "census"
                 )
                 structural_reserve = (
                     0
+                    if staged_preflight_failed
+                    else 0
                     if closure and closure.lineage and _is_legacy_claim_only_phase(
                         closure.lineage,
-                        rc.normalize_state(
-                            closure.lineage.review_state, stakes=stakes or "",
-                            snapshot=structural_snapshot,
-                        ),
+                        normalized_structural_state,
                         snapshot=structural_snapshot,
                     )
                     else STAGED_CENSUS_RESERVE_SEC
                     if staged_phase == "census"
                     else STAGED_FOLLOWUP_RESERVE_SEC
                 )
-                if closure and closure.unavailable:
+                if staged_preflight_failed:
+                    pass
+                elif closure and closure.unavailable:
                     review, trailer, structural_attempts = _state_unavailable_review(
                         closure, mode=cc.PLAN_MODE, claim_state=claim_state,
                     )
