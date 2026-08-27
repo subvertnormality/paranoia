@@ -623,6 +623,14 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     )["evidence"] = ["plan:1"]
     with pytest.raises(ValueError):
         acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["sibling_binding"]["anchor"] = "plan:8"
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
+    changed = json.loads(json.dumps(artifact))
+    changed["sibling_binding"]["provider_evidence"] = ["plan:7"]
+    with pytest.raises(ValueError):
+        acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate_final_task in (
         lambda task: task.update(artifact="incomplete fixed plan"),
         lambda task: task.update(checklist=task["checklist"][:-1]),

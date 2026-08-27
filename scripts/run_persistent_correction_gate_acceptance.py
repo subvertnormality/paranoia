@@ -55,6 +55,10 @@ FIXED_PLAN = PLAN.replace(
     "nine checklist items, the exact gate-class and source-binding-class roster, and no open debt."
     "\nRequire correction, repair, and final to use three distinct provider sessions, and reject "
     "a coordinated mutation of any final prompt binding before Path.write_text."
+    "\nRetain one closed server-owned sibling binding with class ID source-binding-class, the "
+    "exact coordinate plan:7, its debt and finding IDs, and the provider evidence unchanged."
+    "\nValidate the exact coordinate independently from provider-range containment, and reject "
+    "a mutation of either channel before Path.write_text."
 )
 SIBLING_LINE = 7
 STAKES = (
@@ -470,6 +474,7 @@ def validate_artifact(
         "result_sha256", "rendered_trailer", "correction_gates",
         "durable_reload_lineage",
         "correction_prompt", "correction_prompt_sha256",
+        "sibling_binding",
         "repair_plan", "repair_plan_sha256", "repair_result_text",
         "repair_result_sha256", "repair_prompts", "repair_prompt_sha256",
         "repair_audit", "repair_attempt_ledger", "after_repair_lineage",
@@ -680,6 +685,22 @@ def validate_artifact(
         and settlement is not None
     ):
         raise ValueError("real correction did not durably settle a sibling blocker")
+    sibling_binding = artifact["sibling_binding"]
+    if not (
+        set(sibling_binding) == {
+            "class_id", "debt_id", "finding_id", "anchor", "provider_evidence",
+        }
+        and sibling_binding["class_id"] == SIBLING_CLASS_ID
+        and sibling_binding["anchor"] == f"plan:{SIBLING_LINE}"
+        and sibling_binding["debt_id"] in {row["id"] for row in sibling_debt}
+        and sibling_binding["finding_id"] in sibling_finding_ids
+        and sibling_binding["provider_evidence"] == sibling_findings[0]["evidence"]
+        and any(
+            _anchor_covers_plan_line(anchor, SIBLING_LINE)
+            for anchor in sibling_binding["provider_evidence"]
+        )
+    ):
+        raise ValueError("exact server-owned sibling binding is not source-faithful")
     if disposed:
         if not isinstance(settlement, dict) or settlement.get("role") != "correction":
             raise ValueError("accepted response lacks a materialized correction settlement")
@@ -1117,6 +1138,13 @@ def main() -> int:
         "durable_reload_lineage":cc._to_json(durable),
         "correction_prompt":captured_prompts[0],
         "correction_prompt_sha256":_sha(captured_prompts[0]),
+        "sibling_binding":{
+            "class_id":SIBLING_CLASS_ID,
+            "debt_id":sibling_debt[0]["id"],
+            "finding_id":sibling_findings[0]["id"],
+            "anchor":f"plan:{SIBLING_LINE}",
+            "provider_evidence":sibling_findings[0]["evidence"],
+        },
         "repair_plan":FIXED_PLAN, "repair_plan_sha256":_sha(FIXED_PLAN),
         "repair_result_text":repair_result,
         "repair_result_sha256":_sha(repair_result),
