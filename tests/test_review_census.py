@@ -4497,6 +4497,31 @@ def test_standalone_mechanized_replacement_without_violation_is_rejected():
     assert issues[0].startswith("/class_actions/abc/pattern:")
 
 
+def test_satisfied_assessment_evidence_cannot_authorize_a_replacement():
+    parsed = {
+        "findings": [], "_finding_class_refs": {},
+        "_class_record_pointers": ["/class_actions/abc"],
+        "class_records": [{
+            "op":"replace", "class_id":"abc", "invariant":"detect recurrence",
+            "severity":"MAJOR", "pattern":"BAD", "pathspec":"app.py",
+        }],
+        "class_assessments": [{
+            "class_id":"abc", "verdict":"satisfied",
+            "evidence":["repository/app.py:7"],
+        }],
+    }
+
+    issues = handlers._mechanized_class_evidence_issues(
+        parsed,
+        grep=lambda pattern, pathspec: pytest.fail(
+            "a satisfied assessment cannot supply a violation occurrence"
+        ),
+    )
+
+    assert len(issues) == 1
+    assert "requires at least one repository line cited" in issues[0]
+
+
 def test_match_all_is_not_a_mechanized_recurrence_predicate():
     parsed = {
         "findings": [{"id":"G1", "evidence":["repository/app.py:1"]}],
@@ -4558,13 +4583,15 @@ def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
         def _sweep(self, only=None):
             cc.sweep(self.lineage, self._grep(), only=only)
 
-    def response(pattern):
+    def response(pattern, *, corrupt_coverage=False):
         findings = [finding("G1", "MAJOR")]
         findings[0]["evidence"] = ["repository/app.py:1"]
         coverage = payload(lane(findings=findings))["coverage"]
         for row in coverage:
             row["evidence"] = ["repository/app.py:1"]
         coverage[0].update(status="finding", finding_ids=["G1"])
+        if corrupt_coverage:
+            coverage[-1].update(status="covered", finding_ids=["G1"])
         return wire({
             "role":"final", "governing_findings":[{
                 **findings[0],
@@ -4577,7 +4604,10 @@ def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
             "coverage":coverage,
         })
 
-    invalid = response("arbitrary member selected from a distinct-value set")
+    invalid = response(
+        "arbitrary member selected from a distinct-value set",
+        corrupt_coverage=True,
+    )
     corrected = response(r"next\(iter\(distinct\)\)")
 
     class Engine:
@@ -4601,6 +4631,7 @@ def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
     )
 
     assert "did not match any cited violation line" in engine.retry_prompt
+    assert "finding status and finding_ids must agree" in engine.retry_prompt
     assert [attempt["outcome"] for attempt in attempts] == [
         "validation-invalid", "completed",
     ]

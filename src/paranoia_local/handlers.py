@@ -597,7 +597,8 @@ def _mechanized_class_evidence_issues(
     finding_refs = parsed.get("_finding_class_refs", {})
     assessment_evidence = {
         row.get("class_id"): row.get("evidence", [])
-        for row in parsed.get("class_assessments", []) if isinstance(row, dict)
+        for row in parsed.get("class_assessments", [])
+        if isinstance(row, dict) and row.get("verdict") == "violated"
     }
     pointers = parsed.get("_class_record_pointers", [])
     issues: list[str] = []
@@ -665,6 +666,51 @@ def _mechanized_class_evidence_issues(
                 "the occurrence, or use an unmechanized procedure"
             )
     return issues
+
+
+def _mechanized_class_candidate_view(
+    value: dict[str, Any], records: list[dict[str, Any]], pointers: list[str],
+) -> dict[str, Any]:
+    """Bind decoded wire evidence to class candidates before full materialization."""
+    outcomes = {
+        row.get("class_id"): row
+        for row in value.get("class_outcomes", []) if isinstance(row, dict)
+    }
+    findings: list[dict[str, Any]] = []
+    refs: dict[str, str] = {}
+    new_index = 0
+    for finding in value.get("governing_findings", []):
+        if not isinstance(finding, dict) or not isinstance(finding.get("id"), str):
+            continue
+        findings.append({
+            "id":finding["id"], "evidence":list(finding.get("evidence", [])),
+        })
+        classification = finding.get("classification", {})
+        if classification.get("kind") == "new_class":
+            refs[finding["id"]] = f"record:{new_index}"
+            new_index += 1
+        elif classification.get("kind") == "existing_class":
+            class_id = classification.get("class_id")
+            outcome = outcomes.get(class_id)
+            basis = outcome.get("basis") if isinstance(outcome, dict) else None
+            if (
+                isinstance(outcome, dict) and outcome.get("verdict") == "violated"
+                and basis == {"kind":"new_finding", "finding_id":finding["id"]}
+            ):
+                refs[finding["id"]] = class_id
+    return {
+        "findings":findings,
+        "_finding_class_refs":refs,
+        "_class_record_pointers":pointers,
+        "class_records":records,
+        "class_assessments":[
+            {
+                "class_id":row.get("class_id"), "verdict":row.get("verdict"),
+                "evidence":list(row.get("evidence", [])),
+            }
+            for row in value.get("class_outcomes", []) if isinstance(row, dict)
+        ],
+    }
 
 
 def _raise_staged_validation_issues(issues: list[str]) -> None:
@@ -1275,17 +1321,23 @@ def _staged_structural_review(
             )
         except rc.CensusError as exc:
             issues.extend(str(exc).splitlines())
+        evidence_view = parsed
+        if evidence_view is None:
+            evidence_view = _mechanized_class_candidate_view(
+                value, class_view["class_records"],
+                class_view.get("_class_record_pointers", []),
+            )
         if (
-            parsed is not None and mode == cc.BRANCH_MODE
+            mode == cc.BRANCH_MODE
             and any(
                 isinstance(record, dict)
                 and record.get("op") in {"new", "replace"}
                 and isinstance(record.get("pattern"), str)
-                for record in parsed.get("class_records", [])
+                for record in evidence_view.get("class_records", [])
             )
         ):
             issues.extend(_mechanized_class_evidence_issues(
-                parsed, grep=closure._grep(),
+                evidence_view, grep=closure._grep(),
             ))
         if parsed is not None and role == "correction" and correction_gates:
             try:
