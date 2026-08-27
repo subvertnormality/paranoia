@@ -648,6 +648,34 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     changed["final_audit"]["session_ref"] = changed["repair_audit"]["session_ref"]
     with pytest.raises(ValueError):
         acceptance.validate_artifact(changed, root, require_committed=False)
+    for prompt_field, digest_field, index in (
+        ("correction_prompt", "correction_prompt_sha256", None),
+        ("repair_prompts", "repair_prompt_sha256", 0),
+        ("final_prompts", "final_prompt_sha256", 0),
+    ):
+        changed = json.loads(json.dumps(artifact))
+        prompt = (
+            changed[prompt_field]
+            if index is None else changed[prompt_field][index]
+        )
+        prefix, raw_task = prompt.split("===== TASK INPUT =====\n\n", 1)
+        task = json.loads(raw_task)
+        task["stakes"] = "one-class forged stakes"
+        prompt = (
+            prefix + "===== TASK INPUT =====\n\n"
+            + json.dumps(task, ensure_ascii=False)
+        )
+        digest = hashlib.sha256(
+            prompt.encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        if index is None:
+            changed[prompt_field] = prompt
+            changed[digest_field] = digest
+        else:
+            changed[prompt_field][index] = prompt
+            changed[digest_field][index] = digest
+        with pytest.raises(ValueError):
+            acceptance.validate_artifact(changed, root, require_committed=False)
     for mutate in (
         lambda item: item["before_lineage"]["review_state"]["debt"][0].update(
             summary="silently altered",

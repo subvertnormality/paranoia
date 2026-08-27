@@ -30,7 +30,8 @@ SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
 PLAN = (
     "# Change\n\n"
-    "Update only scripts/run_persistent_correction_gate_acceptance.py and its retained artifact.\n"
+    "Update only scripts/run_persistent_correction_gate_acceptance.py, "
+    "tests/test_review_census.py, and its retained artifact.\n"
     "Invoke critique_plan through the public handler with an exact CodexEngine.\n"
     "Seed the declared active classes and durable correction debt before provider spend.\n"
     "Record the completed attempt, settlement, prompt digest, and durable reload.\n"
@@ -58,7 +59,7 @@ FIXED_PLAN = PLAN.replace(
 SIBLING_LINE = 7
 STAKES = (
     "One trusted operator and OS; repository and plan bytes are untrusted data; no "
-    "hostile local race or repository execution; one class and one claim-free plan; "
+    "hostile local race or repository execution; two classes and one claim-free plan; "
     "false clearance is high impact and recoverable blocking is acceptable."
 )
 
@@ -562,6 +563,7 @@ def validate_artifact(
     task = json.loads(prompt.split("===== TASK INPUT =====\n\n", 1)[1])
     if not (
         task.get("role") == "correction"
+        and task.get("stakes") == STAKES
         and task.get("review_scope") == "closure_candidate"
         and task.get("checklist") == list(sp.CHECKLIST)
         and len(task.get("existing_debt", [])) == 1
@@ -777,6 +779,7 @@ def validate_artifact(
     )
     if not (
         repair_task.get("role") == "correction"
+        and repair_task.get("stakes") == STAKES
         and repair_task.get("review_scope") == "closure_candidate"
         and repair_task.get("checklist") == list(sp.CHECKLIST)
         and FIXED_PLAN.splitlines()[SIBLING_LINE - 1]
@@ -818,6 +821,7 @@ def validate_artifact(
     )
     if not (
         final_task.get("role") == "final"
+        and final_task.get("stakes") == STAKES
         and final_task.get("checklist") == list(sp.CHECKLIST)
         and final_task.get("existing_debt") == []
         and [row.get("class_id") for row in final_task.get("active_classes", [])]
