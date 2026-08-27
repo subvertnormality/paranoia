@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts import build_branch_plan_fidelity_acceptance as branch_acceptance
+
 from paranoia_local import (
     class_closure as cc, engines, handlers, plan_claims as pc, prompts,
     review_census as rc, runner, staged_protocol as sp,
@@ -121,7 +123,9 @@ def test_plan_correction_blocking_units_are_stable(classes, debt, expected):
 @pytest.mark.parametrize(("debt", "message"), [
     ({}, "review_state debt"),
     (["not-an-object"], "debt row must be an object"),
+    ([{}], "debt id must be a nonempty string"),
     ([{"id":"", "class_ids":[]}], "debt id must be a nonempty string"),
+    ([{"id":1, "class_ids":[]}], "debt id must be a nonempty string"),
     ([{"id":"D1", "class_ids":[]}, {"id":"D1", "class_ids":[]}], "duplicate"),
     ([{"id":"D1", "class_ids":"a"}], "class_ids must be a list"),
     ([{"id":"D1", "class_ids":[1]}], "class references must be strings"),
@@ -473,7 +477,9 @@ def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):
 
 @pytest.mark.parametrize("malformed_debt", [
     ["not-an-object"],
+    [{}],
     [{"id":"", "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
+    [{"id":1, "status":"open", "severity":cc.MAJOR, "class_ids":[]}],
     [
         {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
         {"id":"D1", "status":"open", "severity":cc.MAJOR, "class_ids":[]},
@@ -620,6 +626,21 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         ledger[0]["raw_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="committed Git envelope"):
         acceptance.validate_artifact(changed, root)
+
+
+def test_complete_prechange_branch_audits_remain_the_exclusion_oracle() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact = json.loads(
+        (root / "docs/branch_plan_fidelity_acceptance_2026-08-22.json").read_text()
+    )
+    branch_acceptance.validate_record(artifact, root)
+    assert artifact["allowed_later_source_diffs"][
+        "src/paranoia_local/handlers.py"
+    ]["scope"].startswith("Operator-facing staged failure taxonomy and plan-only")
+    for route in artifact["routes"]:
+        assert route["audit_canonical_sha256"] == hashlib.sha256(
+            branch_acceptance._canonical(route["audit"])
+        ).hexdigest()
 
 
 def test_census_cache_requires_every_exact_binding():
@@ -2993,6 +3014,11 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "CONVERGENCE: NOT-BLOCKED" in third
     assert len(calls) == 6
     assert all(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in prompt for prompt in calls)
+    correction_task = _task_from_prompt(calls[4])
+    assert correction_task["review_scope"] == "closure_candidate"
+    assert correction_task["checklist"] == list(sp.CHECKLIST)
+    assert calls[4].count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in calls[5]
     assert '"existing_debt": []' in calls[5]
     assert all(key in calls[5] for key in sp.CHECKLIST)
     assert third.count("## What works") == 1

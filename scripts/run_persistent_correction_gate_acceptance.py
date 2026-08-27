@@ -19,12 +19,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
-from paranoia_local import engines, handlers, orientation, review_census as rc
+from paranoia_local import (
+    engines, handlers, orientation, prompts, review_census as rc,
+    staged_protocol as sp,
+)
 
 LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
-PLAN = "# Change\n\nImplement the correction gate.\nTests must exercise its public handler."
+PLAN = (
+    "# Change\n\n"
+    "Update the persistent correction-gate acceptance runner.\n"
+    "The acceptance must exercise critique_plan through its public handler.\n"
+    "It must validate the completed attempt and durable reload.\n"
+    "The acceptance does not bind a newly discovered blocker to its exact source line.\n"
+    "That missing source binding is the adjacent defect this correction must detect."
+)
+SIBLING_LINE = 6
 STAKES = (
     "One trusted operator and OS; repository and plan bytes are untrusted data; no "
     "hostile local race or repository execution; one class and one claim-free plan; "
@@ -50,6 +61,32 @@ def _git_bytes(*args: str) -> bytes:
 
 def _state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _anchor_covers_plan_line(anchor: object, line: int) -> bool:
+    if not isinstance(anchor, str) or not anchor.startswith("plan:"):
+        return False
+    raw = anchor.removeprefix("plan:")
+    start, dash, end = raw.partition("-")
+    if not start.isdigit() or (dash and not end.isdigit()):
+        return False
+    lower = int(start)
+    upper = int(end) if dash else lower
+    return lower <= line <= upper
+
+
+class _PromptCapturingCodexEngine(engines.CodexEngine):
+    def __init__(self) -> None:
+        super().__init__()
+        self.prompts: list[str] = []
+
+    def run(self, prompt, *args, **kwargs):
+        self.prompts.append(prompt)
+        return super().run(prompt, *args, **kwargs)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        self.prompts.append(prompt)
+        return super().resume(session_ref, prompt, *args, **kwargs)
 
 
 def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
@@ -386,6 +423,7 @@ def validate_artifact(
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
         "result_sha256", "rendered_trailer", "correction_gates",
         "durable_reload_lineage",
+        "correction_prompt", "correction_prompt_sha256",
         "outcome", "public_preflight_matrix", "public_provider_failure_route",
     }
     if set(artifact) != expected_keys:
@@ -461,6 +499,26 @@ def validate_artifact(
         != rc.digest(f"{PLAN}\0{fixture['snapshot_commit']}")
     ):
         raise ValueError("fixture binding mismatch")
+    prompt = artifact["correction_prompt"]
+    if (
+        not isinstance(prompt, str)
+        or artifact["correction_prompt_sha256"] != _sha(prompt)
+        or prompt.count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) != 1
+        or "===== TASK INPUT =====\n\n" not in prompt
+    ):
+        raise ValueError("captured correction prompt is not exact")
+    task = json.loads(prompt.split("===== TASK INPUT =====\n\n", 1)[1])
+    if not (
+        task.get("role") == "correction"
+        and task.get("review_scope") == "closure_candidate"
+        and task.get("checklist") == list(sp.CHECKLIST)
+        and len(task.get("existing_debt", [])) == 1
+        and task["existing_debt"][0].get("id") == "D1"
+        and [row.get("class_id") for row in task.get("active_classes", [])]
+        == [CLASS_ID]
+        and PLAN.splitlines()[SIBLING_LINE - 1] in task.get("artifact", "")
+    ):
+        raise ValueError("captured correction task is not the closure-candidate fixture")
     snapshot_tree = _run("git", "rev-parse", f"{fixture['snapshot_commit']}^{{tree}}", cwd=root)
     source_tree = _run("git", "rev-parse", f"{revision}^{{tree}}", cwd=root)
     if snapshot_tree != source_tree:
@@ -553,8 +611,17 @@ def validate_artifact(
             for sibling in sibling_classes
         )
     ]
+    sibling_finding_ids = {row["finding_id"] for row in sibling_debt}
+    sibling_findings = [
+        row for row in settlement.get("findings", [])
+        if row.get("id") in sibling_finding_ids
+        and any(
+            _anchor_covers_plan_line(anchor, SIBLING_LINE)
+            for anchor in row.get("evidence", [])
+        )
+    ]
     if not (
-        disposed and sibling_classes and sibling_debt
+        disposed and sibling_classes and sibling_debt and sibling_findings
         and after["review_state"].get("phase") == "correction"
         and settlement is not None
     ):
@@ -701,7 +768,7 @@ def main() -> int:
     state_path = cc.lineage_dir(state_root) / f"{LINEAGE}.json"
     before = _state(state_path)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
-    engine = engines.CodexEngine()
+    engine = _PromptCapturingCodexEngine()
     engine.binary = args.codex
     started = time.monotonic()
     result = handlers.critique_plan({
@@ -729,6 +796,8 @@ def main() -> int:
     attempts = audit.get("attempt_ledger")
     if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
         raise RuntimeError("acceptance exceeded the correction plus one retry topology")
+    if len(engine.prompts) != 1:
+        raise RuntimeError("acceptance did not use exactly one captured correction prompt")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
     closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
     sibling_classes = [
@@ -742,8 +811,18 @@ def main() -> int:
         and row.get("finding_id") != "G1"
         and any(item.class_id in row.get("class_ids", []) for item in sibling_classes)
     ]
+    settlement = audit.get("staged_settlement") or {}
+    sibling_finding_ids = {row["finding_id"] for row in sibling_debt}
+    sibling_findings = [
+        row for row in settlement.get("findings", [])
+        if row.get("id") in sibling_finding_ids
+        and any(
+            _anchor_covers_plan_line(anchor, SIBLING_LINE)
+            for anchor in row.get("evidence", [])
+        )
+    ]
     if not (
-        closed_or_replaced and sibling_classes and sibling_debt
+        closed_or_replaced and sibling_classes and sibling_debt and sibling_findings
         and durable.review_state.get("phase") == "correction"
         and len(attempts) == 1 and attempts[0].get("outcome") == "completed"
     ):
@@ -780,6 +859,8 @@ def main() -> int:
         "result_text":result, "result_sha256":_sha(result),
         "rendered_trailer":trailer, "correction_gates":gates,
         "durable_reload_lineage":cc._to_json(durable),
+        "correction_prompt":engine.prompts[0],
+        "correction_prompt_sha256":_sha(engine.prompts[0]),
         "outcome":"closed-with-sibling-debt",
         "public_preflight_matrix":_preflight_matrix(ROOT),
         "public_provider_failure_route":_provider_failure_route(ROOT),
