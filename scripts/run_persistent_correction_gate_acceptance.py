@@ -43,7 +43,7 @@ PLAN = (
 )
 FIXED_PLAN = PLAN.replace(
     "The retained artifact does not bind a newly discovered blocker to its exact plan source line.",
-    "The retained artifact binds each newly discovered blocker to its exact plan source line.",
+    "The retained artifact binds the seeded source-binding blocker to its exact plan source line.",
 ) + (
     "\nThe validator requires the new debt to name source-binding-class exactly and its "
     "governing finding evidence to contain a plan anchor whose closed range covers line 7."
@@ -151,7 +151,7 @@ def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
     )
     sibling = cc.TrackedClass(
         SIBLING_CLASS_ID,
-        "The retained acceptance binds every newly discovered blocker to its exact plan source line.",
+        "The retained acceptance binds the seeded source-binding blocker to its exact plan source line.",
         cc.MAJOR, 6, cc.OPEN,
         procedure="Inspect the retained finding and debt evidence against the plan source line.",
     )
