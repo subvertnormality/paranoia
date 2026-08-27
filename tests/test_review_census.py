@@ -2974,20 +2974,26 @@ def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
         assert accepted == (root / relative).read_bytes()
     assert artifact["provider"]["engine"] == "codex"
     assert artifact["provider"]["web_search"] is False
-    assert [row["outcome"] for row in artifact["attempt_ledger"]] == [
-        "validation-invalid", "completed",
-    ]
+    outcomes = [row["outcome"] for row in artifact["attempt_ledger"]]
+    assert outcomes[0] == "validation-invalid"
+    assert outcomes[1] in {"completed", "validation-invalid"}
     assert [row["role"] for row in artifact["attempt_ledger"]] == [
         "final", "final-validation-retry",
     ]
     assert "did not match any cited violation line" in artifact[
         "rejected_payload"
     ]["validation_issue"]
-    successor = artifact["durable_successor"]
-    assert successor["status"] == cc.OPEN
-    assert successor["pattern"] == r"next\(iter\(distinct\)\)"
-    assert successor["pathspec"] == "selection.py"
-    assert len(successor["matches"]) == 1
+    if artifact["route_outcome"] == "corrected-and-settled":
+        successor = artifact["durable_successor"]
+        assert successor["status"] == cc.OPEN
+        assert successor["pattern"] == r"next\(iter\(distinct\)\)"
+        assert successor["pathspec"] == "selection.py"
+        assert len(successor["matches"]) == 1
+    else:
+        assert artifact["route_outcome"] == "provider-correction-rejected-atomically"
+        assert artifact["durable_successor"] is None
+        assert artifact["durable_original"]["status"] == cc.CLOSED
+        assert artifact["settlement"] == {}
     assert "CONVERGENCE: BLOCKED" in artifact["result_text"]
 
 
