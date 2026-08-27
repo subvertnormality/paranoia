@@ -940,6 +940,7 @@ def _staged_structural_review(
         state = rc.normalize_state(
             lineage.review_state, stakes=stakes, snapshot=snapshot,
         )
+        rc.validate_correction_debt(state.get("debt"))
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -1004,8 +1005,6 @@ def _staged_structural_review(
                 plan_correction_units = rc.plan_correction_blocking_units(
                     state.get("debt"), active_classes,
                 )
-            else:
-                rc.validate_correction_debt(state.get("debt"))
         except rc.CensusError as exc:
             raise _staged_error(
                 str(exc), role="correction-preflight", kind="validation",
@@ -2396,10 +2395,9 @@ def critique_plan(
                     closure.lineage.review_state, stakes=stakes or "",
                     snapshot=structural_snapshot,
                 )
-                if normalized_structural_state["phase"] == "correction":
-                    rc.validate_correction_debt(
-                        normalized_structural_state.get("debt")
-                    )
+                rc.validate_correction_debt(
+                    normalized_structural_state.get("debt")
+                )
                 control_source = (
                     closure.lineage.review_state
                     if isinstance(closure.lineage.review_state, dict)
