@@ -861,6 +861,79 @@ def test_public_staged_handlers_preflight_malformed_debt_rows_in_every_phase(
 
 
 @pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("phase", ["census", "correction", "final"])
+@pytest.mark.parametrize(("field", "malformation", "replacement"), [
+    ("status", "missing", None),
+    ("status", "unknown-string", "pending"),
+    ("status", "non-string", 1),
+    ("status", "unhashable", []),
+    ("severity", "missing", None),
+    ("severity", "unknown-string", "CRITICAL"),
+    ("severity", "non-string", 1),
+    ("severity", "unhashable", {}),
+])
+def test_public_staged_handlers_preflight_every_status_and_severity_malformation(
+    repo_with_branch, tmp_path, monkeypatch, mode, phase, field, malformation,
+    replacement,
+):
+    malformed = _unit_debt("D1")
+    if malformation == "missing":
+        malformed.pop(field)
+    else:
+        malformed[field] = replacement
+    state = rc.normalize_state(None, stakes="s", snapshot="old")
+    state.update(phase=phase, debt=[malformed], last_round=1)
+    lineage_id = f"malformed-{phase}-{field}-{malformation}-{mode}"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=mode, rounds=1, review_state=state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    arguments = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
+        "round":2, "stakes":"s", "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments["plan_text"] = "# Plan\n"
+        invoke = handlers.critique_plan
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        invoke = handlers.critique_branch
+    logs = tmp_path / f"logs-{phase}-{field}-{malformation}-{mode}"
+    result = invoke(
+        arguments, engine=handlers.eng.CodexEngine(), log_dir=logs,
+        now=lambda: f"MALFORMED-{phase.upper()}-{field.upper()}-{mode}",
+    )
+
+    assert calls == []
+    assert result.count("CONVERGENCE: BLOCKED") == 1
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state["debt"] == [malformed]
+    assert reloaded.review_state["staged_failure"]["role"] == f"{phase}-preflight"
+    assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    audits = list(logs.glob("*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit["attempt_ledger"] == []
+    if mode == cc.PLAN_MODE:
+        assert audit["claim_status"] == "blocked-by-structural-preflight"
+        assert audit["claim_model_calls"] == 0
+        assert "CLAIM-REGISTER:" in result
+        assert "CLAIM-CLOSURE:" in result
+        assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
+        assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
 @pytest.mark.parametrize("malformed_control", [
     {},
     {"version":1, "classes":{"class-a":{}}},
