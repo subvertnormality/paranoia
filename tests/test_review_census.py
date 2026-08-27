@@ -243,7 +243,7 @@ def test_plan_closure_candidate_enriches_one_existing_provider_call(tmp_path):
     task = _task_from_prompt(prompt)
     assert task["review_scope"] == "closure_candidate"
     assert task["checklist"] == list(sp.CHECKLIST)
-    assert prompt.count(prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    assert prompt.count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
     assert closure.lineage.review_state["phase"] == "final"
 
 
@@ -260,7 +260,7 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path):
     task = _task_from_prompt(prompt)
     assert task["review_scope"] == "targeted"
     assert task["checklist"] == []
-    assert prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
 
 
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256"), [
@@ -285,7 +285,7 @@ def test_closure_candidate_directives_are_absent_from_excluded_followups(
     )
     prompt = engine.calls[0][0]
     task = _task_from_prompt(prompt)
-    assert prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
     assert "review_scope" not in task
     assert task["checklist"] == (list(sp.CHECKLIST) if phase == "final" else [])
     assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == prompt_sha256
@@ -370,7 +370,7 @@ def test_legacy_census_to_correction_recovery_remains_targeted(tmp_path, monkeyp
     assert task["role"] == "correction"
     assert task["checklist"] == []
     assert task["review_scope"] == "targeted"
-    assert prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
 
 
 def test_plan_closure_candidate_settles_a_sibling_finding_durably(tmp_path):

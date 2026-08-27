@@ -50,6 +50,13 @@ STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
 STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
 STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
 STAGED_FORMAT_RETRY_TIMEOUT_SEC = 600
+
+PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS = """This plan correction is a closure candidate. After
+checking every supplied debt repair, scan the complete artifact against every supplied checklist
+item and active class for sibling occurrences, cross-reference contradictions, and regressions
+created by the repairs. Report every discovered defect through the existing governing-finding and
+classification fields. This broader search is not clearance; an independent cold final remains
+required after blocking debt closes."""
 STAGED_CENSUS_RESERVE_SEC = 4320
 STAGED_FOLLOWUP_RESERVE_SEC = 3120
 MAX_PLAN_EVIDENCE_MODEL_CALLS = 22
@@ -1415,7 +1422,7 @@ def _staged_structural_review(
         )
         if closure_candidate:
             followup_instructions += (
-                "\n\n" + prompts.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
+                "\n\n" + PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
             )
         prompt = prompts.compose(
             f"{followup_instructions}\n"

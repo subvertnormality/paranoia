@@ -481,14 +481,6 @@ fresh finding; carried_debt is only for no fresh occurrence. Open unmechanized s
 its redundant close; the server derives it. Closed mechanized violation requires replace."""
 
 
-PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS = """This plan correction is a closure candidate. After
-checking every supplied debt repair, scan the complete artifact against every supplied checklist
-item and active class for sibling occurrences, cross-reference contradictions, and regressions
-created by the repairs. Report every discovered defect through the existing governing-finding and
-classification fields. This broader search is not clearance; an independent cold final remains
-required after blocking debt closes."""
-
-
 # ── class closure ─────────────────────────────────────────────────────────────
 # The register is the ONLY channel by which a defect class becomes durable. Nothing in
 # the five prose sections is parsed: nine review rounds established that policing free
