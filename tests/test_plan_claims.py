@@ -217,6 +217,7 @@ def test_authoritative_capture_acceptance_record() -> None:
         assert hashlib.sha256(recorded).hexdigest() == expected
         if relative not in {
             "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+            "src/paranoia_local/plan_claims.py",
         }:
             assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     allowed = snapshot["allowed_later_handlers_diff"]
@@ -234,6 +235,14 @@ def test_authoritative_capture_acceptance_record() -> None:
     ).stdout
     assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
     assert "does not alter capture, binding, cold-attestation" in census_allowed["scope"]
+    claims_allowed = snapshot["allowed_later_plan_claims_diff"]
+    claims_diff = subprocess.run(
+        ["git", "diff", "--no-ext-diff", source_commit, "--",
+         "src/paranoia_local/plan_claims.py"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    ).stdout
+    assert hashlib.sha256(claims_diff).hexdigest() == claims_allowed["sha256"]
+    assert "does not alter capture, binding, cold-attestation" in claims_allowed["scope"]
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
