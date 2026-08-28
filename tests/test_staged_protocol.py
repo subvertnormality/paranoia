@@ -295,28 +295,73 @@ def test_class_decision_instructions_are_state_severity_and_gate_specific():
                      mechanized=True),
     ]
     rendered = sp.class_decision_instructions(
-        "correction", active_classes=classes,
+        cc.BRANCH_MODE, "correction", active_classes=classes,
         outcome_class_ids=["open-manual"],
+        correction_gates=[{"class_id":"open-manual"}],
     )
     prefix = "The exact current decision surface is: "
     surface = json.loads(rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0])
     assert surface["open-manual"] == {
         "status":"open", "severity":"MAJOR", "mechanized":False,
-        "required_outcome":True,
+        "required_outcome":True, "correction_gate":True,
         "lifecycle":["close"],
         "reclassify_severities":["FATAL", "BLOCKER", "MAJOR"],
-        "replacement":"schema-admitted definition preserving mechanization",
+        "replacement_forms":["procedure", "mechanized-pattern"],
     }
     assert surface["closed-manual"]["lifecycle"] == ["reopen"]
     assert surface["closed-manual"]["reclassify_severities"] == [
         "FATAL", "BLOCKER", "MAJOR", "MINOR",
     ]
     assert surface["closed-mechanized"]["lifecycle"] == []
-    assert surface["closed-mechanized"]["replacement"] == (
-        "schema-admitted definition preserving mechanization"
-    )
+    assert surface["closed-mechanized"]["replacement_forms"] == [
+        "mechanized-pattern",
+    ]
     assert "a violated gated class needs a valid replacement" in rendered
     assert "never downgrade" in rendered
+
+    plan = sp.class_decision_instructions(
+        cc.PLAN_MODE, "final", active_classes=[classes[0]],
+        outcome_class_ids=["open-manual"],
+    )
+    assert '"replacement_forms":["procedure"]' in plan
+
+
+def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
+    classes = [
+        active_class(
+            f"class-{index:03d}", severity=cc.SEVERITIES[index % len(cc.SEVERITIES)],
+            status=cc.OPEN if index % 2 else cc.CLOSED,
+            mechanized=bool(index % 3 == 0),
+        )
+        for index in range(sp.MAX_ACTIVE_CLASSES)
+    ]
+    rendered = sp.class_decision_instructions(
+        cc.BRANCH_MODE, "correction", active_classes=classes,
+        outcome_class_ids=[row["class_id"] for row in classes],
+        correction_gates=[{"class_id":row["class_id"]} for row in classes],
+    )
+    encoded = rendered.encode("utf-8", errors="strict")
+    assert len(encoded) < rc.MAX_STAGED_PROMPT_CHARS
+    for token in (
+        '"correction_gate":true',
+        '"replacement_forms":["procedure","mechanized-pattern"]',
+        '"replacement_forms":["mechanized-pattern"]',
+        "a violated gated class needs a valid replacement",
+        "never downgrade",
+    ):
+        assert token in rendered
+
+    surfaces = {
+        "CLAUDE.md": "initial staged prompt retained by",
+        "docs/staged_review_protocol_v2_acceptance.md": (
+            "initial staged prompt retained by that same-session corrective retry"
+        ),
+    }
+    for relative, token in surfaces.items():
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert token in text
+        assert "100-class" in text
+        assert "all-or-nothing settlement" in text
 
 
 

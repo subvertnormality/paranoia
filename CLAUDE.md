@@ -53,7 +53,7 @@
   unmechanized branch replacement forms, mechanization-preserving replacement, and the distinct
   census/final/correction/fresh-finding outcome-authority paths. A violated gated class requires
   replacement. Keep the 100-class/schema/provider boundary, durable failure diagnostics, and atomic
-  settlement unchanged; add no cross-round repair state.
+  settlement unchanged; this remains all-or-nothing settlement, with no cross-round repair state.
 - derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
   post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,
   active-class state, engine settings, plan context, exact composed lane prompts, and cache schema

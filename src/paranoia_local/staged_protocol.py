@@ -71,11 +71,18 @@ def citation_instructions(mode: str, *, plan_contract: bool = False) -> str:
 
 
 def class_decision_instructions(
-    role: str, *, active_classes: Sequence[dict[str, Any]],
+    mode: str, role: str, *, active_classes: Sequence[dict[str, Any]],
     outcome_class_ids: Sequence[str] = (),
+    correction_gates: Sequence[dict[str, Any]] = (),
 ) -> str:
     """Render the keyed surface and canonical action rules beside the schema."""
+    if mode not in {cc.PLAN_MODE, cc.BRANCH_MODE}:
+        raise ValueError(f"invalid staged mode {mode!r}")
     outcome_ids = set(outcome_class_ids)
+    gated_ids = {
+        row.get("class_id") for row in correction_gates
+        if isinstance(row, dict) and isinstance(row.get("class_id"), str)
+    }
     actions: dict[str, dict[str, Any]] = {}
     for cls in active_classes:
         class_id = cls["class_id"]
@@ -91,9 +98,14 @@ def class_decision_instructions(
             "severity":severity,
             "mechanized":bool(cls.get("mechanized", False)),
             "required_outcome":class_id in outcome_ids,
+            "correction_gate":class_id in gated_ids,
             "lifecycle":lifecycle,
             "reclassify_severities":list(cc.SEVERITIES[:cc.SEVERITIES.index(severity) + 1]),
-            "replacement":"schema-admitted definition preserving mechanization",
+            "replacement_forms":(
+                ["mechanized-pattern"] if cls.get("mechanized", False)
+                else ["procedure"] if mode == cc.PLAN_MODE
+                else ["procedure", "mechanized-pattern"]
+            ),
         }
     authority = {
         "census":"server derives outcomes from integrity assessments",
