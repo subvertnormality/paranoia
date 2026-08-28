@@ -1760,12 +1760,14 @@ def test_public_claim_path_persists_capture_deadline_as_retrieval(
     assert "BINDING-FAILED" not in trailer
 
 
-def test_public_claim_path_renders_failed_sibling_without_demoting_support(
-    tmp_path: Path, monkeypatch,
+@pytest.mark.parametrize("verdict", ["supported", "refuted"])
+def test_public_claim_path_renders_failed_sibling_without_demoting_verdict(
+    tmp_path: Path, monkeypatch, verdict: str,
 ) -> None:
-    good = _source()
+    relation = "supports_claim" if verdict == "supported" else "refutes_claim"
+    good = _source(relation=relation)
     failed = _source(url="https://example.com/unavailable-sibling")
-    discovery = _audit(_claim(evidence=[good, failed]))
+    discovery = _audit(_claim(verdict=verdict, evidence=[good, failed]))
     binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
         "bindings": [{
             "claim_index": 0, "evidence_index": 0, "usable": True,
@@ -1807,12 +1809,20 @@ def test_public_claim_path_renders_failed_sibling_without_demoting_support(
 
     assert status == "parsed 1 new + 0 targeted retained + 0 frozen"
     record = next(iter(state["claims"].values()))
-    assert record["verdict"] == "supported"
+    assert record["verdict"] == verdict
     assert record["capture_provenance"][1]["error"] == "server returned HTTP 503"
     trailer = pc.render_trailer(state)
-    assert "CLAIM-CLOSURE: 1 supported" in trailer
-    assert "RETRIEVAL-FAILED (non-governing sibling; claim independently supported)" in trailer
-    assert "retain the supported verdict from the independently adjudicated source" in trailer
+    assert f"1 {verdict}" in trailer
+    assert (
+        f"RETRIEVAL-FAILED (non-governing sibling; claim independently {verdict})"
+        in trailer
+    )
+    assert (
+        f"retain the {verdict} verdict from the independently adjudicated source"
+        in trailer
+    )
+    if verdict == "refuted":
+        assert "Replacement: none proven; remove, weaken, or research" in trailer
 
 
 def test_captured_claim_retry_cannot_bypass_capture_validation(

@@ -1229,6 +1229,29 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
                     "  Next action: retry cold authority-and-entailment attestation; retain the "
                     "supported verdict from the independently adjudicated source",
                 ])
+    elif failure_phases and claim.get("verdict") == "refuted":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "retain the refuted verdict from the independently adjudicated source",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry captured-text binding; retain the refuted verdict "
+                    "from the independently adjudicated source",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry cold authority-and-entailment attestation; retain the "
+                    "refuted verdict from the independently adjudicated source",
+                ])
     elif failure_phases and claim.get("verdict") == "unverified":
         for failure_phase in failure_phases:
             if failure_phase == "capture":
@@ -1249,9 +1272,9 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
                     "  Next action: retry cold authority-and-entailment attestation; do not remove "
                     "or weaken the assertion solely because attestation failed",
                 ])
-    elif claim.get("replacement"):
+    if claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
-    else:
+    elif not failure_phases or claim.get("verdict") == "refuted":
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
     if claim.get("rationale"):
         lines.append(f"  Assessment: {claim['rationale']}")
@@ -1523,6 +1546,9 @@ def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
 
 
+# This is an intentionally closed operational grammar, not a claim to recognize every
+# English sentence with universal force. Exhaustive tests bind every admitted form to
+# the same pre-capture comparison; broader semantic scope remains reviewer judgement.
 UNIVERSAL_FORMS = (
     "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "both", "each",
     "entire", "every", "everybody", "everyone", "everything", "everywhere",

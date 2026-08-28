@@ -354,8 +354,10 @@ of the resulting code and tests.
   force one exhaustive audit, never normalize to an empty verified register.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
-  Reject an extracted claim proposition that introduces an explicit universal quantifier
-  absent from its verbatim plan wording before capture. A failed source capture remains
+  Reject an extracted claim proposition that introduces a form from the closed, documented
+  `UNIVERSAL_FORMS` grammar absent from its verbatim plan wording before capture. This is an
+  operational pre-capture guard, not a claim to decide every English expression of scope.
+  A failed source capture remains
   blocking, but durable/rendered diagnostics must identify retrieval failure and must not
   tell the author to weaken or remove the proposition solely because retrieval failed.
   Response acquisition, text extraction, and the aggregate capture/pre-binding processing
@@ -365,7 +367,8 @@ of the resulting code and tests.
   phase-specific retry guidance rather than relabeling either as retrieval failure. Preserve
   every affected phase for mixed and partial source failures; processing failure alone never
   warrants editing the proposition. Render a failed sibling's phase and retry even when another
-  independently adjudicated source keeps the claim supported, without demoting that verdict.
+  independently adjudicated source keeps the claim supported or refuted, without demoting that
+  verdict or removing replacement guidance.
   Ordinary terminal provider or role-admission failure must
   carry that same server-owned phase through durable claim debt and rendered recovery guidance.
   The plan under review is context, not evidence for its own assertions; require authoritative
