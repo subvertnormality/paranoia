@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "05641ce2754604560ff6cff504cfcdbf512abbf5a41912113940838ecc0b95dd",
-      "additions": 1429,
-      "deletions": 130,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, and server-owned labels on source-local binding/attestation failures through this revision; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "f7a5372c117ab0458bf77f4f9a02e07e9338fecd3e74c318cb75cd7342ff64b8",
+      "additions": 1441,
+      "deletions": 132,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, and server-owned labels on every source-local binding/attestation failure through this revision; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
       "sha256": "3ba4d261a47ef13a724a66497fa3ef6f266ecba7c6edfb52c86f6ec6263fe1e6",
@@ -115,8 +115,8 @@
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "allowed_later_plan_claims_diff": {
-      "sha256": "c9eb7ea73af5479bad8c48978dcdbcf6020fc2d37604ed8674bc6a06463bb5bd",
-      "additions": 133,
+      "sha256": "fcbbae55a6b8d9d77ffbd756cc195b911667e4ecf652f53b9bae10b5a61c4baf",
+      "additions": 135,
       "deletions": 5,
       "scope": "Rejects provider-introduced universal forms before capture and preserves retrieval, binding, and attestation phases for all-source, mixed, and partial failures in durable diagnostics without demoting an independently attested sibling source; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
     },

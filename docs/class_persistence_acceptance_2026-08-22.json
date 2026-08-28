@@ -1,5 +1,11 @@
 {
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
+  "allowed_later_source_diffs": {
+    "src/paranoia_local/handlers.py": {
+      "scope": "Claim-evidence failure-phase classification only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
+      "sha256": "b2e4df15a496973ecdb8719d062c11504457471470d462644f605d0357299f10"
+    }
+  },
   "attempt_ledger": [
     {
       "duration_ms": 41861,
