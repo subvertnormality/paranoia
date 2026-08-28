@@ -98,7 +98,6 @@ def class_decision_instructions(
             "severity":severity,
             "mechanized":bool(cls.get("mechanized", False)),
             "required_outcome":class_id in outcome_ids,
-            "correction_gate":class_id in gated_ids,
             "lifecycle":lifecycle,
             "reclassify_severities":list(cc.SEVERITIES[:cc.SEVERITIES.index(severity) + 1]),
             "replacement_forms":(
@@ -116,6 +115,15 @@ def class_decision_instructions(
         ),
         "final":"author one outcome for every active class",
     }[role]
+    gate_guidance = ""
+    if role == "correction" and gated_ids:
+        gate_guidance = (
+            " Correction-gated class IDs are exactly: "
+            f"{json.dumps(sorted(gated_ids), ensure_ascii=False, separators=(',', ':'))}. "
+            "Each listed class must become nonblocking: a violated gated class needs a "
+            "valid replacement, while satisfied open unmechanized state closes by "
+            "derivation; retaining a blocking severity does not satisfy the gate."
+        )
     return (
         "class_outcomes is a closed object keyed by exactly these required class IDs: "
         f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
@@ -128,9 +136,7 @@ def class_decision_instructions(
         "violated; outcome-free standalone lifecycle actions remain legal only as listed. "
         "Reclassify and replace may retain or strengthen severity but never downgrade. "
         "Replacement preserves a mechanized class; use only a listed replacement form. "
-        "A correction-gated class must become nonblocking: a violated gated class needs a "
-        "valid replacement, while satisfied open unmechanized state closes by derivation; "
-        "retaining a blocking severity does not satisfy the gate. Never put class_id inside "
+        f"{gate_guidance} Never put class_id inside "
         "an outcome or action value."
     )
 

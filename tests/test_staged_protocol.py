@@ -303,7 +303,7 @@ def test_class_decision_instructions_are_state_severity_and_gate_specific():
     surface = json.loads(rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0])
     assert surface["open-manual"] == {
         "status":"open", "severity":"MAJOR", "mechanized":False,
-        "required_outcome":True, "correction_gate":True,
+        "required_outcome":True,
         "lifecycle":["close"],
         "reclassify_severities":["FATAL", "BLOCKER", "MAJOR"],
         "replacement_forms":["procedure", "mechanized-pattern"],
@@ -317,6 +317,7 @@ def test_class_decision_instructions_are_state_severity_and_gate_specific():
         "mechanized-pattern",
     ]
     assert "a violated gated class needs a valid replacement" in rendered
+    assert 'Correction-gated class IDs are exactly: ["open-manual"]' in rendered
     assert "never downgrade" in rendered
 
     plan = sp.class_decision_instructions(
@@ -324,6 +325,7 @@ def test_class_decision_instructions_are_state_severity_and_gate_specific():
         outcome_class_ids=["open-manual"],
     )
     assert '"replacement_forms":["procedure"]' in plan
+    assert "Correction-gated class IDs" not in plan
 
 
 def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
@@ -343,7 +345,7 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
     encoded = rendered.encode("utf-8", errors="strict")
     assert len(encoded) < rc.MAX_STAGED_PROMPT_CHARS
     for token in (
-        '"correction_gate":true',
+        'Correction-gated class IDs are exactly: ["class-000","class-001"',
         '"replacement_forms":["procedure","mechanized-pattern"]',
         '"replacement_forms":["mechanized-pattern"]',
         "a violated gated class needs a valid replacement",
@@ -351,17 +353,37 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
     ):
         assert token in rendered
 
-    surfaces = {
-        "CLAUDE.md": "initial staged prompt retained by",
-        "docs/staged_review_protocol_v2_acceptance.md": (
-            "initial staged prompt retained by that same-session corrective retry"
-        ),
-    }
-    for relative, token in surfaces.items():
-        text = (ROOT / relative).read_text(encoding="utf-8")
-        assert token in text
-        assert "100-class" in text
-        assert "all-or-nothing settlement" in text
+    surfaces = [
+        ROOT / "docs/issue_78_action_schema_plan.md",
+        ROOT / "CLAUDE.md",
+        ROOT / "docs/staged_review_protocol_v2_acceptance.md",
+    ]
+    def contract(text):
+        lowered = text.lower().replace("-", " ")
+        return {
+            "outcome_paths":all(token in lowered for token in (
+                "census", "final", "debt bound", "fresh finding",
+            )),
+            "standalone_lifecycle":"outcome free" in lowered,
+            "severity_floor":(
+                "non downgrading" in lowered or "same or stronger" in lowered
+            ),
+            "replacement_forms":all(token in lowered for token in (
+                "procedural", "mechanized replacement",
+            )),
+            "scale":"100 class" in lowered or "100 active class" in lowered,
+            "schema_unchanged":"schema" in lowered and "unchanged" in lowered,
+            "single_retry":(
+                "one retry" in lowered or "single corrective retry" in lowered
+                or "one same session validation retry" in lowered
+            ),
+            "provider_failure":"provider" in lowered and "failure" in lowered,
+            "durable_diagnostics":"durable" in lowered and "diagnostic" in lowered,
+            "atomic":"all or nothing settlement" in lowered,
+        }
+    compared = [contract(path.read_text(encoding="utf-8")) for path in surfaces]
+    assert compared[0] == compared[1] == compared[2]
+    assert all(compared[0].values())
 
 
 

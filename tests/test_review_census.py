@@ -438,19 +438,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "196b59d241a9224e0c57b7c2e067d9a28fe4422e097ba5b1405ee629b043a486",
+        "aaf19f3d87ea814501d7a326f643ba1853a34eeb1252a4aefc9a0e72fca6c64a",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "c510280480f1936f7df638466a9d935ce54adb708b1f4df1fbc7d4403df64e41",
+        "8c620e52d12a3dbe764872c7607d78dd7e811d0c02a53e42b2f8ebb53964a39c",
         "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "3e2804a3e13bb35d0f2b6d58034b9261418a7d5813f827ba238aafd4f7bf0ef8",
+        "0e9bf853f4aa92e0777962e90fa7318c4a46345028c8d5bfc48925fcf6624e57",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),
@@ -4957,7 +4957,7 @@ def test_correction_assessment_anchor_retries_before_durable_settlement(tmp_path
             prompt = args[0]
             assert '"abc":{"status":"open","severity":"MAJOR"' in prompt
             assert '"replacement_forms":["procedure","mechanized-pattern"]' in prompt
-            assert "a violated gated class needs a valid replacement" in prompt
+            assert "Correction-gated class IDs" not in prompt
             text = response("repository/a.py:2")
             return Review(text=text, session_ref="s", raw=text)
 
