@@ -148,8 +148,8 @@ Eligible external claims are only load-bearing external facts, externally issued
 governing requirements/principles, and promised external-system behavior.
 Repository facts and local design choices belong to structural review.
 The server rejects a claim proposition that introduces an explicit universal
-quantifier absent from its verbatim plan wording. A source-capture failure remains
-blocking, but is reported as retrieval failure rather than evidence that the plan's
+quantifier absent from its verbatim plan wording. A source response-acquisition or
+text-extraction failure remains blocking, but is reported as retrieval failure rather than evidence that the plan's
 assertion should be weakened or removed. Captured-text binding and cold-attestation
 failures retain their own labels and retry instructions. Mixed or partial source failures
 render every affected server phase; processing failure alone never justifies editing the

@@ -654,7 +654,7 @@ def _source_failure_phases(
             phase = "binding"
         elif error.startswith(ATTESTATION_FAILURE_PREFIX):
             phase = "attestation"
-        elif row.get("content_sha256") is None and row.get("text_sha256") is None:
+        elif row.get("text_sha256") is None:
             phase = "capture"
         else:
             # Preserve other recognized rows even if one legacy/unlabelled row has no

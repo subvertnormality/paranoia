@@ -358,6 +358,8 @@ of the resulting code and tests.
   absent from its verbatim plan wording before capture. A failed source capture remains
   blocking, but durable/rendered diagnostics must identify retrieval failure and must not
   tell the author to weaken or remove the proposition solely because retrieval failed.
+  Response acquisition and text extraction are both retrieval-stage failures even when
+  response metadata and a content digest are available.
   Preserve server-owned binding and attestation failure phases distinctly and render
   phase-specific retry guidance rather than relabeling either as retrieval failure. Preserve
   every affected phase for mixed and partial source failures; processing failure alone never

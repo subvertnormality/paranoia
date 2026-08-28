@@ -1687,6 +1687,43 @@ def test_public_claim_path_preserves_attestation_admission_failure_phase(
     assert "retry cold authority-and-entailment attestation" in trailer
 
 
+def test_public_claim_path_renders_response_extraction_failure_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                None, None, error="capture contained no extracted text",
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="response-extraction-failure",
+        round_no=1, stakes="trusted local tool", engine=engine,
+        repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+        on_progress=None,
+    )
+
+    assert status == "parsed 1 new + 0 targeted retained + 0 frozen"
+    record = next(iter(state["claims"].values()))
+    assert record["verdict"] == "unverified"
+    assert record["capture_provenance"][0]["status"] == 200
+    assert record["capture_provenance"][0]["content_sha256"] == "a" * 64
+    assert record["capture_provenance"][0]["text_sha256"] is None
+    trailer = pc.render_trailer(state)
+    assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+    assert "remove, weaken, or research" not in trailer
+
+
 def test_captured_claim_retry_cannot_bypass_capture_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -1734,6 +1771,18 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         assert isinstance(retry, handlers._EvidencePhaseReview)
         assert retry.evidence_phase == "binding"
         assert "binding changed immutable source metadata" in retry.text
+        debt_state = pc.with_debt(
+            pc.empty_state(),
+            pc.AuditError(
+                "claim-binding reviewer failed (exit 0)", retry.raw,
+                returncode=retry.returncode, failure_phase=retry.evidence_phase,
+            ),
+            round_no=1, plan_text=PLAN,
+        )
+        assert debt_state["debt"]["failure_phase"] == "binding"
+        trailer = pc.render_trailer(debt_state)
+        assert "EVIDENCE status: BINDING-FAILED" in trailer
+        assert "retry captured-text binding" in trailer
         assert [row["role"] for row in ledger] == [
             "claim-discovery", "claim-binding", "claim-attestation",
             "claim-binding-outer-retry",
