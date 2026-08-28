@@ -3163,11 +3163,21 @@ class _CapturedClaimEngine:
         else:
             session_ref = first.session_ref
 
+        self.non_model_deadline = self.clock() + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+        if self.deadline is not None:
+            self.non_model_deadline = min(self.non_model_deadline, self.deadline)
         try:
-            self.non_model_deadline = self.clock() + PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
-            if self.deadline is not None:
-                self.non_model_deadline = min(self.non_model_deadline, self.deadline)
             captures = self._capture(discovery)
+        except pc.AuditError as error:
+            return _EvidencePhaseReview(
+                text=f"[paranoia-local error] retrieval failed: {error}",
+                session_ref=session_ref, raw=error.raw, error=True,
+                failure_detail=error.failure_detail_raw or error.reason,
+                stderr=error.stderr_raw,
+                returncode=error.returncode if error.returncode is not None else 1,
+                evidence_phase="capture",
+            )
+        try:
             self.discovery = discovery
             self.captures = captures
             self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)

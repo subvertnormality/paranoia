@@ -59,7 +59,9 @@ class AuditError(ValueError):
         self.stderr_raw = stderr
         self.returncode = returncode
         self.failure_phase = (
-            failure_phase if failure_phase in {"binding", "attestation"} else None
+            failure_phase
+            if failure_phase in {"capture", "binding", "attestation"}
+            else None
         )
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
         self.excerpt = _excerpt(raw)
@@ -1163,7 +1165,13 @@ def render_trailer(state_raw: Any) -> str:
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
         failure_phase = debt.get("failure_phase")
-        if failure_phase == "binding":
+        if failure_phase == "capture":
+            lines.extend([
+                "EVIDENCE status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+                "EVIDENCE next action: retry capture or supply another authoritative public "
+                "URL; do not remove or weaken the assertion solely because retrieval failed",
+            ])
+        elif failure_phase == "binding":
             lines.extend([
                 "EVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)",
                 "EVIDENCE next action: retry captured-text binding; do not remove or weaken "

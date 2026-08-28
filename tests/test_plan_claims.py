@@ -1724,6 +1724,42 @@ def test_public_claim_path_renders_response_extraction_failure_as_retrieval(
     assert "remove, weaken, or research" not in trailer
 
 
+def test_public_claim_path_persists_capture_deadline_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers, "PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC", -1)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, "captured text",
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="capture-deadline", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "capture-failed"
+    assert state["debt"]["failure_phase"] == "capture"
+    assert "capture and pre-binding processing exceeded" in (
+        state["debt"]["failure_detail"]
+    )
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+    assert "remove or weaken the assertion solely" in trailer
+    assert "BINDING-FAILED" not in trailer
+
+
 def test_captured_claim_retry_cannot_bypass_capture_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:

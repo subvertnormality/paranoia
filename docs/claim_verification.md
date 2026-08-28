@@ -271,7 +271,8 @@ diagnostics include the reason, output hash, and bounded excerpt. Frozen support
 usable and successful evidence work is persisted before structural review, so a later structural
 failure does not restart research.
 
-Retrieval (including response acquisition and text extraction), captured-text binding, and
+Retrieval (including response acquisition, text extraction, and the aggregate capture/pre-binding
+processing deadline), captured-text binding, and
 cold-attestation failures remain distinct server-owned
 phases through reconciliation and rendering, including when only some source rows fail or one
 claim contains failures from multiple phases. Each affected phase names its own retry. None of
