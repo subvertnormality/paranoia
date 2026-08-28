@@ -9,8 +9,8 @@ atomic settlement boundary: findings, debt, outcomes, and actions settle togethe
 ## Operating boundary
 
 Paranoia is a trusted-single-operator local tool. Repository, plan, and provider payloads are
-untrusted data. Codex and Claude correction/final roles, one same-session validation correction,
-and tracked cross-round state are in scope. False settlement and inconsistent class/debt state are
+untrusted data. Codex and Claude correction/final roles and one same-session validation correction
+are in scope. False settlement and inconsistent class/debt state are
 high impact; a recoverable blocked result is acceptable. Hostile local races, compromised OS,
 multi-tenancy, corrupted-state recovery, partial settlement, extra reviewer calls, schema changes,
 and new persistence mechanisms are excluded.
@@ -51,18 +51,11 @@ single canonical dry-run and atomic transition.
    consolidation, correction, and final in plan and branch modes. Preserve the exact branch plan
    contract after it. Do not maintain a second hand-written row-shape catalogue or parse provider
    prose.
-4. When a validation retry terminates unsuccessfully, retain its already-bounded validation issue
-   in durable staged-failure state as today. On the next correction/final round, copy only a failure
-   whose durable `kind` is `validation`, whose role is the immediately preceding matching staged
-   role suffixed `-validation-retry`, and whose message is a nonempty bounded string into a clearly
-   labelled `prior_validation_failure` field
-   of the server-owned staged task. This is reviewer context, never authority: it cannot settle,
-   reopen, close, classify, or satisfy anything. Non-validation provider failures are not presented
-   as model-repair instructions. A successful settlement clears the failure through the existing
-   state transition.
+4. Leave terminal failure persistence unchanged. Its bounded role/message, rejected-payload
+   diagnostics, and trailer remain visible, but no new cross-round repair context or failure
+   discriminator is added.
 5. Update `AGENTS.md`, the applicable `CLAUDE.md` summary, and staged Protocol v2 acceptance
-   documentation to describe the repair contract, cross-round validation context, one-retry bound,
-   and unchanged atomicity.
+   documentation to describe the repair guidance, one-retry bound, and unchanged atomicity.
 
 The documentation edits are closed: amend `AGENTS.md` under “For the staged Protocol v2 cutover”,
 `CLAUDE.md` under its staged Protocol v2 summary, and
@@ -70,8 +63,8 @@ The documentation edits are closed: amend `AGENTS.md` under “For the staged Pr
 four outcome-authority paths above, outcome-free standalone lifecycle legality, non-downgrading
 severity, both procedural and mechanized replacements for an unmechanized branch class,
 mechanization-preserving replacement for a mechanized class, the unchanged 100-active-class
-boundary and schema identifiers, the single retry and provider-failure behavior, bounded matching
-prior-validation context, and all-or-nothing settlement. A named test reads those three sections
+boundary and schema identifiers, the single retry and provider-failure behavior, unchanged durable
+terminal diagnostics, and all-or-nothing settlement. A named test reads those three sections
 and asserts the shared normative sentences/identifiers are present; publication blocks if it fails.
 
 ## Acceptance evidence
@@ -88,27 +81,18 @@ and asserts the shared normative sentences/identifiers are present; publication 
   class register, debt, phase, lineage binding, correction controls, claims, plan-contract
   authority, and settlement fields remain unchanged except for the existing enumerated diagnostic
   ledger/failure fields.
-- Start the next correction from that durable terminal validation failure. Assert its bounded role
-  and message appear once in `prior_validation_failure`, while provider/capacity/timeout failures
-  do not. A later valid settlement clears the prior failure and does not replay it again.
 - Exercise the same `_staged_call` retry consumer through the actual top-level `critique_plan` and
   `critique_branch` production handlers for census consolidation, correction, and final. Use one
   durable plan lineage and one durable branch lineage across save/reload boundaries. For each role
-  and mode, cover invalid-then-valid and invalid-then-invalid. Durable carry-forward
-  has one positive family only: the terminal attempt exists, has outcome `validation-invalid`, its
-  role exactly equals the current state's immediately preceding staged role plus
-  `-validation-retry`, durable failure kind is `validation`, and its bounded message is nonempty.
-  Prove final-to-final reload carries that row once. Negatively cover initial invalid with no
-  session, prompt/preflight and consolidation-preflight validation, response-capacity rejection,
-  provider error, timeout, cancellation, generic execution failure, non-resumable failure, and a
-  role mismatch; none enters `prior_validation_failure`. In every exhausted case, compare the
-  pre-round substantive state with durable reload allowing only the enumerated attempt/rejected-
-  payload/failure diagnostics. A later valid settlement atomically clears the context.
+  and mode, cover invalid-then-valid and invalid-then-invalid. In every exhausted case, compare the
+  pre-round substantive state with durable reload allowing only the existing enumerated attempt,
+  rejected-payload, and failure diagnostics. A later valid settlement atomically clears the
+  existing terminal failure.
 - Exact prompt tests cover census consolidation, correction, and final; plan and branch modes;
   open/closed and mechanized/unmechanized classes; required and absent outcomes; all severities;
   correction gates; and branch-contract ordering. At the existing 100-active-class maximum, render
-  the most verbose legal metadata, all gates, the maximum bounded prior failure, and a branch
-  contract; prove the exact initial and retry prompts remain below their production bounds and
+  the most verbose legal metadata, all gates, and a branch contract; prove the exact initial and
+  retry prompts remain below their production bounds and
   pass strict UTF-8 preflight. Overflow remains visibly fail-closed before a provider call.
 - Existing canonical semantic and dry-run tests continue to reject lifecycle/outcome conflicts,
   downgrades, invalid replacement, finding/basis/debt mismatches, and incompatible action
