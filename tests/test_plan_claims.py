@@ -1760,6 +1760,48 @@ def test_public_claim_path_persists_capture_deadline_as_retrieval(
     assert "BINDING-FAILED" not in trailer
 
 
+def test_public_claim_path_persists_capture_group_failure_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    completed = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        source["quote"],
+    )
+
+    def capture_all(candidates, **kwargs):
+        raise external_sources.CaptureGroupError(
+            "RuntimeError: capture worker exploded", (completed,),
+        )
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="capture-group-failure", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "capture-failed"
+    debt = state["debt"]
+    assert debt["failure_phase"] == "capture"
+    assert debt["completed_captures"] == [{
+        "requested_url": source["url"], "final_url": source["url"],
+        "status": 200, "content_type": "text/html", "fallback_attempted": False,
+        "content_sha256": "a" * 64, "text_sha256": "b" * 64, "error": None,
+    }]
+    assert "RuntimeError: capture worker exploded" in debt["failure_detail"]
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+
+
 @pytest.mark.parametrize("verdict", ["supported", "refuted"])
 def test_public_claim_path_renders_failed_sibling_without_demoting_verdict(
     tmp_path: Path, monkeypatch, verdict: str,
@@ -3990,6 +4032,52 @@ def test_outer_claim_verification_persists_binding_failure_channels(
     trailer = pc.render_trailer(state)
     assert "EVIDENCE status: BINDING-FAILED" in trailer
     assert "retry captured-text binding" in trailer
+
+
+def test_outer_claim_verification_persists_both_invalid_binding_attempts(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        source["quote"],
+    )
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [_audit(_claim())],
+        "evidence-binding": ["initial invalid", "correction invalid"],
+    })
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    ledger: list[dict] = []
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="binding-invalid-retry", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+        attempt_ledger=ledger,
+    )
+
+    assert status == "binding-failed"
+    debt = state["debt"]
+    assert debt["failure_phase"] == "binding"
+    assert [row["role"] for row in debt["attempts"]] == [
+        "claim-binding", "claim-binding-validation-retry",
+    ]
+    assert [row["outcome"] for row in debt["attempts"]] == [
+        "validation-invalid", "validation-invalid",
+    ]
+    assert [row["rejected_reply_excerpt"] for row in debt["attempts"]] == [
+        "initial invalid", "correction invalid",
+    ]
+    assert all(row["raw_sha256"] for row in debt["attempts"])
+    assert all(row["failure_detail_sha256"] for row in debt["attempts"])
+    assert all(row["stderr_sha256"] for row in debt["attempts"])
+    assert "EVIDENCE status: BINDING-FAILED" in pc.render_trailer(state)
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:

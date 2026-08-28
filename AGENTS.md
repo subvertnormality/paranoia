@@ -371,6 +371,9 @@ of the resulting code and tests.
   verdict or removing replacement guidance.
   Ordinary terminal provider or role-admission failure must
   carry that same server-owned phase through durable claim debt and rendered recovery guidance.
+  Terminal evidence validation debt retains the initial and corrected attempts as separate,
+  ordered bounded channel records. Unexpected parallel capture-worker failure becomes retrieval
+  debt and retains bounded metadata for every sibling completed before the group failed.
   The plan under review is context, not evidence for its own assertions; require authoritative
   external sources.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.

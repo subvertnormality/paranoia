@@ -52,6 +52,8 @@ class AuditError(ValueError):
     def __init__(
         self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
         returncode: int | None = None, failure_phase: str | None = None,
+        attempts: Iterable[dict[str, Any]] = (),
+        completed_captures: Iterable[dict[str, Any]] = (),
     ) -> None:
         self.reason = reason
         self.raw = raw
@@ -63,6 +65,8 @@ class AuditError(ValueError):
             if failure_phase in {"capture", "binding", "attestation"}
             else None
         )
+        self.attempts = deepcopy(list(attempts))
+        self.completed_captures = deepcopy(list(completed_captures))
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
         self.excerpt = _excerpt(raw)
         self.failure_detail_sha256 = hashlib.sha256(
@@ -74,7 +78,7 @@ class AuditError(ValueError):
         super().__init__(reason)
 
     def debt(self, round_no: int) -> dict[str, Any]:
-        return {
+        debt = {
             "round": round_no,
             "reason": self.reason,
             "returncode": self.returncode,
@@ -86,6 +90,11 @@ class AuditError(ValueError):
             "stderr": self.stderr,
             "failure_phase": self.failure_phase,
         }
+        if self.attempts:
+            debt["attempts"] = self.attempts
+        if self.completed_captures:
+            debt["completed_captures"] = self.completed_captures
+        return debt
 
 
 def bounded_diagnostic(text: str) -> str:

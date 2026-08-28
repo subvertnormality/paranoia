@@ -283,7 +283,10 @@ these processing failures alone is evidence to remove, weaken, or otherwise edit
 wording changes require authoritative evidence that refutes or fails to entail it. Ordinary
 terminal provider failures and role-admission failures retain the binding or attestation phase
 in durable claim debt and render that same phase's retry action; phase fidelity is not limited
-to expanded source-local failures.
+to expanded source-local failures. A terminal validation retry retains both the initial and
+corrected attempts as separate bounded channel records in claim debt. An unexpected parallel
+capture-worker failure becomes retrieval debt and retains bounded metadata for siblings that
+completed before the group failed; it does not escape the plan-claim lifecycle.
 
 ## Recorded real acceptance
 

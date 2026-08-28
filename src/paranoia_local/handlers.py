@@ -286,6 +286,7 @@ class _EvidencePhaseReview(Review):
     """A terminal evidence-provider failure with a server-owned processing phase."""
 
     evidence_phase: str = ""
+    completed_captures: tuple[dict[str, Any], ...] = ()
 
 
 def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
@@ -2936,6 +2937,17 @@ def _verify_plan_claims(
         evidence_phase = (
             review.evidence_phase if isinstance(review, _EvidencePhaseReview) else None
         )
+        phase_attempts: list[dict[str, Any]] = []
+        if evidence_phase in {"binding", "attestation"} and attempt_ledger:
+            prefix = f"claim-{'attestation' if evidence_phase == 'attestation' else 'binding'}"
+            candidates = [
+                row for row in attempt_ledger
+                if str(row.get("role", "")).startswith(prefix)
+            ]
+            phase_attempts = candidates[-2:] if (
+                candidates
+                and str(candidates[-1].get("role", "")).endswith("validation-retry")
+            ) else candidates[-1:]
         error = pc.AuditError(
             review.validation_detail if validation_invalid else (
                 f"claim-{evidence_phase or 'audit'} reviewer failed "
@@ -2944,6 +2956,11 @@ def _verify_plan_claims(
             review.raw,
             failure_detail=review.failure_detail or "", stderr=review.stderr or "",
             returncode=review.returncode, failure_phase=evidence_phase,
+            attempts=phase_attempts,
+            completed_captures=(
+                review.completed_captures
+                if isinstance(review, _EvidencePhaseReview) else ()
+            ),
         )
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
@@ -3176,6 +3193,7 @@ class _CapturedClaimEngine:
                 stderr=error.stderr_raw,
                 returncode=error.returncode if error.returncode is not None else 1,
                 evidence_phase="capture",
+                completed_captures=tuple(error.completed_captures),
             )
         try:
             self.discovery = discovery
@@ -3361,10 +3379,30 @@ class _CapturedClaimEngine:
                 f"plan audit proposed {len(candidates)} sources; aggregate capture ceiling is "
                 f"{MAX_PLAN_CAPTURE_SOURCES}"
             )
-        captured = external_sources.capture_all(
-            candidates, workers=16, deadline=self.non_model_deadline,
-            clock=self.clock,
-        )
+        try:
+            captured = external_sources.capture_all(
+                candidates, workers=16, deadline=self.non_model_deadline,
+                clock=self.clock,
+            )
+        except external_sources.CaptureGroupError as exc:
+            completed = tuple({
+                "requested_url": item.candidate.url,
+                "final_url": item.final_url,
+                "status": item.status,
+                "content_type": item.content_type,
+                "fallback_attempted": item.fallback_attempted,
+                "content_sha256": item.content_sha256,
+                "text_sha256": item.text_sha256,
+                "error": (
+                    external_sources._bounded_error(item.error)
+                    if item.error else None
+                ),
+            } for item in exc.completed)
+            error = pc.AuditError(
+                f"source capture worker failed: {exc}",
+                failure_detail=str(exc), completed_captures=completed,
+            )
+            raise error from exc
         self._check_non_model_deadline()
         return dict(zip(keys, captured, strict=True))
 
