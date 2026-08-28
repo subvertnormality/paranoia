@@ -397,7 +397,7 @@ class TestAuditValidation:
     def test_mixed_partial_source_failures_preserve_every_server_phase(self) -> None:
         evidence = [
             _source(url=f"https://example.com/source-{index}", relation="context")
-            for index in range(3)
+            for index in range(4)
         ]
         provenance = [
             {
@@ -419,6 +419,13 @@ class TestAuditValidation:
                 "content_type": "text/html", "fallback_attempted": False,
                 "content_sha256": "c" * 64, "text_sha256": "d" * 64,
                 "error": pc.ATTESTATION_FAILURE_PREFIX + "provider unavailable",
+            },
+            {
+                "evidence_index": 3, "requested_url": evidence[3]["url"],
+                "final_url": evidence[3]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "e" * 64, "text_sha256": "f" * 64,
+                "error": "legacy unlabelled processing failure",
             },
         ]
         failed = _claim(
@@ -1538,13 +1545,14 @@ class _RoleScript:
         return self._next()
 
 
+@pytest.mark.parametrize("form", ["always", "invariably", "nothing", "nobody", "nowhere"])
 def test_public_claim_path_repairs_scope_expansion_before_capture(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path, monkeypatch, form: str,
 ) -> None:
     plan = "The two named JSON documents contain the required fields.\n"
     widened = _audit(_claim(
         anchor="The two named JSON documents contain the required fields.",
-        proposition="Always, JSON documents contain the required fields.",
+        proposition=f"{form.title()}, JSON documents contain the required fields.",
     ))
     engine = _RoleScript({"evidence-discovery": [widened, _audit()]})
     monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
@@ -2296,7 +2304,9 @@ def test_long_capture_redirect_to_reviewed_plan_cannot_expand(
     try:
         assert adapter._binding_batches(audit, captures) == []
         assert (0, 0) not in adapter.expanded_captures
-        assert captures[(0, 0)].error == external_sources.BINDING_BUDGET_ERROR
+        assert captures[(0, 0)].error == (
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        )
     finally:
         adapter.close()
 
@@ -2312,16 +2322,28 @@ def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: 
         candidate, candidate.url, 200, "text/plain", "a" * 64, "b" * 64,
         "\n" * 100_000,
     )}
+    engine = _RoleScript({})
     adapter = handlers._CapturedClaimEngine(
-        _RoleScript({}), plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
     )
+    adapter.binding_engine = engine.for_role("evidence-binding")
     try:
-        batches = adapter._binding_batches(audit, captures)
+        bound, reviews = adapter._bind_indexed(
+            "session", audit, captures, "m", "high", {},
+        )
     finally:
         adapter.close()
-    assert batches == []
+    assert reviews == []
     assert not captures[(0, 0)].usable
-    assert captures[(0, 0)].error == external_sources.BINDING_BUDGET_ERROR
+    assert captures[(0, 0)].error == (
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    )
+    state = pc.reconcile(
+        {}, bound, lineage_id="binding-budget", round_no=1, plan_text=PLAN,
+    )
+    trailer = pc.render_trailer(state)
+    assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+    assert "remove, weaken, or research" not in trailer
 
 
 def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
@@ -2354,7 +2376,9 @@ def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
         adapter.close()
     assert len(batches) == 1
     assert len(batches[0]) == 3
-    assert captures[(3, 0)].error == external_sources.BINDING_BUDGET_ERROR
+    assert captures[(3, 0)].error == (
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    )
 
 
 def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
@@ -2392,7 +2416,9 @@ def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
     assert len(batches) == 1
     assert [row["claim_index"] for row in batches[0]] == [0, 2, 4, 6, 8, 10]
     assert all(
-        captures[(index, 0)].error == external_sources.BINDING_BUDGET_ERROR
+        captures[(index, 0)].error == (
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        )
         for index in range(1, 12, 2)
     )
 
@@ -3126,6 +3152,13 @@ def test_binding_omission_survives_capture_attestation_and_reconciliation(
         assert omitted["relation"] == "context"
         assert omitted["location"] == "No binding row returned for captured source"
         assert omitted["quote"] == "The model omitted this captured-source binding."
+        omitted_provenance = records[second_anchor]["capture_provenance"][0]
+        assert omitted_provenance["error"] == (
+            pc.BINDING_FAILURE_PREFIX + "expected binding row omitted by provider"
+        )
+        trailer = pc.render_trailer(state)
+        assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
         assert pc.is_blocked(state)
     finally:
         adapter.close()

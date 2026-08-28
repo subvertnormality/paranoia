@@ -653,8 +653,9 @@ def _source_failure_phases(
         elif row.get("content_sha256") is None and row.get("text_sha256") is None:
             phase = "capture"
         else:
-            # A digest-bearing, unlabelled error has no trustworthy server phase.
-            return ()
+            # Preserve other recognized rows even if one legacy/unlabelled row has no
+            # trustworthy server phase of its own.
+            continue
         if phase not in phases:
             phases.append(phase)
     return tuple(phases)
@@ -1473,7 +1474,8 @@ UNIVERSAL_FORMS = (
     "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "each",
     "entire", "every", "everybody", "everyone", "everything", "everywhere",
     "in all cases", "invariably", "never", "no", "none", "throughout",
-    "under all circumstances", "universally", "whole", "wholly", "without exception",
+    "nobody", "nothing", "nowhere", "under all circumstances", "universally",
+    "whole", "wholly", "without exception",
 )
 _UNIVERSAL_QUANTIFIER = re.compile(
     rf"\b(?:{'|'.join(map(re.escape, UNIVERSAL_FORMS))})\b", re.IGNORECASE,

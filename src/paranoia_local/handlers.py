@@ -3522,7 +3522,10 @@ class _CapturedClaimEngine:
                 ):
                     captures[(claim_index, evidence_index)] = replace(
                         capture, text=None,
-                        error=external_sources.BINDING_BUDGET_ERROR,
+                        error=(
+                            pc.BINDING_FAILURE_PREFIX
+                            + external_sources.BINDING_BUDGET_ERROR
+                        ),
                     )
                     continue
                 batches.append(current)
@@ -3539,7 +3542,10 @@ class _CapturedClaimEngine:
                     continue
                 capture = replace(
                     capture, text=None,
-                    error=external_sources.BINDING_BUDGET_ERROR,
+                    error=(
+                        pc.BINDING_FAILURE_PREFIX
+                        + external_sources.BINDING_BUDGET_ERROR
+                    ),
                 )
                 captures[(claim_index, evidence_index)] = capture
                 continue
@@ -3677,6 +3683,10 @@ class _CapturedClaimEngine:
                 })
                 binding = decisions[(claim_index, evidence_index)]
                 if binding is _OMITTED_BINDING:
+                    claim["capture_provenance"][-1]["error"] = (
+                        pc.BINDING_FAILURE_PREFIX
+                        + "expected binding row omitted by provider"
+                    )
                     item["relation"] = "context"
                     item["location"] = "No binding row returned for captured source"
                     item["quote"] = "The model omitted this captured-source binding."
