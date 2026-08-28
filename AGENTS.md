@@ -359,7 +359,9 @@ of the resulting code and tests.
   blocking, but durable/rendered diagnostics must identify retrieval failure and must not
   tell the author to weaken or remove the proposition solely because retrieval failed.
   Preserve server-owned binding and attestation failure phases distinctly and render
-  phase-specific retry guidance rather than relabeling either as retrieval failure.
+  phase-specific retry guidance rather than relabeling either as retrieval failure. Preserve
+  every affected phase for mixed and partial source failures; processing failure alone never
+  warrants editing the proposition.
   The plan under review is context, not evidence for its own assertions; require authoritative
   external sources.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.

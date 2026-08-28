@@ -1179,7 +1179,8 @@ def test_every_trailer_field_is_always_present(repo: Path, tmp_path: Path):
     """Nothing is signalled by absence, so a consumer never has to infer."""
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
     for field in ("ARBITRATION", "SELECTED", "PROVISIONAL-SELECTED", "ADVISORY", "AUTHORITY-POLICY",
-                  "CLEANING", "SNAPSHOT", "ORDER-SEED", "REFS-MOVED", "AUDIT", "ROUNDS"):
+                  "CLEANING", "SNAPSHOT", "ORDER-SEED", "RESEARCH", "RESEARCH-DIGEST",
+                  "REFS-MOVED", "AUDIT", "ROUNDS"):
         assert trailer_field(report, field)
 
 

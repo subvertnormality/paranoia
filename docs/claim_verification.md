@@ -271,6 +271,12 @@ diagnostics include the reason, output hash, and bounded excerpt. Frozen support
 usable and successful evidence work is persisted before structural review, so a later structural
 failure does not restart research.
 
+Retrieval, captured-text binding, and cold-attestation failures remain distinct server-owned
+phases through reconciliation and rendering, including when only some source rows fail or one
+claim contains failures from multiple phases. Each affected phase names its own retry. None of
+these processing failures alone is evidence to remove, weaken, or otherwise edit the proposition;
+wording changes require authoritative evidence that refutes or fails to entail it.
+
 ## Recorded real acceptance
 
 The indexed binding correction is recorded in

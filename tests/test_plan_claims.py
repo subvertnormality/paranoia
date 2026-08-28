@@ -394,6 +394,48 @@ class TestAuditValidation:
         record = next(iter(state["claims"].values()))
         assert "capture failed before authority or entailment" in record["rationale"]
 
+    def test_mixed_partial_source_failures_preserve_every_server_phase(self) -> None:
+        evidence = [
+            _source(url=f"https://example.com/source-{index}", relation="context")
+            for index in range(3)
+        ]
+        provenance = [
+            {
+                "evidence_index": 0, "requested_url": evidence[0]["url"],
+                "final_url": evidence[0]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+                "error": None,
+            },
+            {
+                "evidence_index": 1, "requested_url": evidence[1]["url"],
+                "final_url": None, "status": 503, "content_type": "text/html",
+                "fallback_attempted": False, "content_sha256": None,
+                "text_sha256": None, "error": "server returned HTTP 503",
+            },
+            {
+                "evidence_index": 2, "requested_url": evidence[2]["url"],
+                "final_url": evidence[2]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "c" * 64, "text_sha256": "d" * 64,
+                "error": pc.ATTESTATION_FAILURE_PREFIX + "provider unavailable",
+            },
+        ]
+        failed = _claim(
+            verdict="unverified", evidence=evidence, capture_provenance=provenance,
+        )
+        state = pc.reconcile(
+            {}, pc.parse_audit(_audit(failed), PLAN),
+            lineage_id="mixed-source-failure", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+        assert "ATTESTATION-FAILED (blocking; bound passage not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
+        assert "capture, attestation phase(s)" in next(
+            iter(state["claims"].values())
+        )["rationale"]
+
     def test_reddit_is_never_upgraded_to_primary_by_model_output(self) -> None:
         reddit = _source(url="https://www.reddit.com/r/python/comments/x", kind="primary")
         claim = pc.parse_audit(_audit(_claim(evidence=[reddit])), PLAN).claims[0]

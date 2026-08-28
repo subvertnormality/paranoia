@@ -495,7 +495,7 @@ def _validate_claim(
         e for e in checked
         if _qualifying(e, scope, repo=repo, plan_repo_path=plan_repo_path)
     ]
-    failure_phase = _source_failure_phase(capture_provenance, checked)
+    failure_phases = _source_failure_phases(capture_provenance, checked)
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
         demotion = "claimed support lacked claim-entailing authoritative evidence"
@@ -507,21 +507,23 @@ def _validate_claim(
         # conservatively blocking instead of discarding every other valid packet.
         verdict = "unverified"
         replacement = None
-        if failure_phase is None:
+        if not failure_phases:
             rationale = f"{rationale} Server demotion: {demotion}.".strip()
-    if failure_phase is not None:
+    if failure_phases:
         verdict = "unverified"
         replacement = None
-        if failure_phase == "capture":
+        if failure_phases == ("capture",):
             rationale = (
                 "Server capture failed before authority or entailment could be adjudicated; "
                 "provider-authored assessment is not evidence, and the proposition remains "
                 "unverified."
             )
         else:
+            named_phases = ", ".join(failure_phases)
             rationale = (
-                f"Server {failure_phase} failed after capture but before authority and "
-                "entailment could be fully adjudicated; the proposition remains unverified."
+                f"Server evidence processing failed in the {named_phases} phase(s) before "
+                "authority and entailment could be fully adjudicated; the proposition "
+                "remains unverified."
             )
     if replacement is not None:
         if verdict != "refuted" or not any(
@@ -613,25 +615,30 @@ def _validate_capture_provenance(
     return rows
 
 
-def _source_failure_phase(
+def _source_failure_phases(
     provenance: list[dict[str, Any]], evidence: list[dict[str, str]],
-) -> str | None:
-    """Return one common server failure phase, never inferring it from provider prose."""
-    if not evidence or len(provenance) != len(evidence) or not all(
-        row.get("error") for row in provenance
-    ):
-        return None
-    errors = [str(row["error"]) for row in provenance]
-    if all(error.startswith(BINDING_FAILURE_PREFIX) for error in errors):
-        return "binding"
-    if all(error.startswith(ATTESTATION_FAILURE_PREFIX) for error in errors):
-        return "attestation"
-    if all(
-        row.get("content_sha256") is None and row.get("text_sha256") is None
-        for row in provenance
-    ):
-        return "capture"
-    return None
+) -> tuple[str, ...]:
+    """Return every server-owned failed phase, including mixed/partial failures."""
+    if not evidence or len(provenance) != len(evidence):
+        return ()
+    phases: list[str] = []
+    for row in provenance:
+        raw_error = row.get("error")
+        if not raw_error:
+            continue
+        error = str(raw_error)
+        if error.startswith(BINDING_FAILURE_PREFIX):
+            phase = "binding"
+        elif error.startswith(ATTESTATION_FAILURE_PREFIX):
+            phase = "attestation"
+        elif row.get("content_sha256") is None and row.get("text_sha256") is None:
+            phase = "capture"
+        else:
+            # A digest-bearing, unlabelled error has no trustworthy server phase.
+            return ()
+        if phase not in phases:
+            phases.append(phase)
+    return tuple(phases)
 
 
 def _validate_capture_attestations(
@@ -1146,28 +1153,29 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         f"  Plan wording: {claim.get('anchor')}",
         f"  Atomic proposition: {claim.get('proposition')}",
     ]
-    failure_phase = _source_failure_phase(
+    failure_phases = _source_failure_phases(
         claim.get("capture_provenance", []), claim.get("evidence", []),
     )
-    if failure_phase is not None and claim.get("verdict") == "unverified":
-        if failure_phase == "capture":
-            lines.extend([
-                "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-                "  Next action: retry capture or supply another authoritative public URL; "
-                "do not remove or weaken the assertion solely because retrieval failed",
-            ])
-        elif failure_phase == "binding":
-            lines.extend([
-                "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
-                "  Next action: retry captured-text binding; do not remove or weaken the "
-                "assertion solely because binding failed",
-            ])
-        else:
-            lines.extend([
-                "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
-                "  Next action: retry cold authority-and-entailment attestation; do not remove "
-                "or weaken the assertion solely because attestation failed",
-            ])
+    if failure_phases and claim.get("verdict") == "unverified":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "do not remove or weaken the assertion solely because retrieval failed",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
+                    "  Next action: retry captured-text binding; do not remove or weaken the "
+                    "assertion solely because binding failed",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+                    "  Next action: retry cold authority-and-entailment attestation; do not remove "
+                    "or weaken the assertion solely because attestation failed",
+                ])
     elif claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     else:
@@ -1442,7 +1450,12 @@ def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
 
 
-UNIVERSAL_FORMS = ("all", "always", "any", "each", "every", "never", "no", "none")
+UNIVERSAL_FORMS = (
+    "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "each",
+    "entire", "every", "everybody", "everyone", "everything", "everywhere",
+    "in all cases", "invariably", "never", "no", "none", "throughout",
+    "under all circumstances", "universally", "whole", "wholly", "without exception",
+)
 _UNIVERSAL_QUANTIFIER = re.compile(
     rf"\b(?:{'|'.join(map(re.escape, UNIVERSAL_FORMS))})\b", re.IGNORECASE,
 )
