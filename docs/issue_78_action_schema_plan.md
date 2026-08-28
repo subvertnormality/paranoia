@@ -33,21 +33,29 @@ single canonical dry-run and atomic transition.
 
 1. Keep the provider schema, canonical semantic validator, class-engine dry-run, correction-gate
    semantics, one retry, and atomic state transition unchanged.
-2. Build one bounded server-owned action-repair contract from the exact active classes, required
-   outcome IDs, correction gates, role, and severity order already supplied to validation. It must
-   state, per relevant class: current status/severity/mechanization; whether an outcome is required;
-   `close` requires an authored/derived satisfied outcome and an open unmechanized class; `reopen`
-   requires a violated outcome and a closed unmechanized class; reclassification may retain or
-   strengthen severity but never downgrade; replacement must preserve mechanization and may not
-   downgrade; and a correction gate must actually leave the class nonblocking, so a violated gated
-   class needs a valid replacement rather than close or reclassification.
-3. Append that exact contract to the existing same-session validation retry for census
+2. Extend the existing server-owned class-decision instructions; do not structurally constrain or
+   remove any action. For each active class, render current status, severity, mechanization, the
+   complete state-compatible lifecycle choices, every legal same-or-stronger reclassification
+   severity, and both legal unmechanized replacement forms. State the canonical cross-field rules:
+   census outcomes are derived from integrity assessments; final outcomes are authored for every
+   active class; correction outcomes are authored for debt-bound classes, while a fresh finding may
+   author the debt-bound outcome through exact `new_finding` basis or derive a distinct
+   non-debt-bound violated outcome through `assessment_evidence`; `close` requires a satisfied
+   outcome when one exists; `reopen` requires a violated outcome when one exists; and replacement
+   preserves mechanization and may not downgrade. Outcome-free standalone close/reopen remain legal.
+   A correction-gate section names only gated classes and explains that they must become
+   nonblocking: a violated gated class needs a valid replacement, while a satisfied open
+   unmechanized class is closed by the existing derivation; retaining a blocking severity cannot
+   satisfy the gate.
+3. Append those exact instructions to the existing same-session validation retry for census
    consolidation, correction, and final in plan and branch modes. Preserve the exact branch plan
    contract after it. Do not maintain a second hand-written row-shape catalogue or parse provider
    prose.
 4. When a validation retry terminates unsuccessfully, retain its already-bounded validation issue
-   in durable staged-failure state as today. On the next correction/final round, copy only that
-   bounded prior validation role/message into a clearly labelled `prior_validation_failure` field
+   in durable staged-failure state as today. On the next correction/final round, copy only a failure
+   whose durable `kind` is `validation`, whose role is the immediately preceding matching staged
+   role suffixed `-validation-retry`, and whose message is a nonempty bounded string into a clearly
+   labelled `prior_validation_failure` field
    of the server-owned staged task. This is reviewer context, never authority: it cannot settle,
    reopen, close, classify, or satisfy anything. Non-validation provider failures are not presented
    as model-repair instructions. A successful settlement clears the failure through the existing
@@ -75,7 +83,10 @@ single canonical dry-run and atomic transition.
   do not. A later valid settlement clears the prior failure and does not replay it again.
 - Exact prompt tests cover census consolidation, correction, and final; plan and branch modes;
   open/closed and mechanized/unmechanized classes; required and absent outcomes; all severities;
-  correction gates; and branch-contract ordering. Prompt preflight and size bounds remain enforced.
+  correction gates; and branch-contract ordering. At the existing 100-active-class maximum, render
+  the most verbose legal metadata, all gates, the maximum bounded prior failure, and a branch
+  contract; prove the exact initial and retry prompts remain below their production bounds and
+  pass strict UTF-8 preflight. Overflow remains visibly fail-closed before a provider call.
 - Existing canonical semantic and dry-run tests continue to reject lifecycle/outcome conflicts,
   downgrades, invalid replacement, finding/basis/debt mismatches, and incompatible action
   composition before substantive settlement.
