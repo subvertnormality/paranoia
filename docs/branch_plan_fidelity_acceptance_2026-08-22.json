@@ -6,8 +6,8 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, and source-local claim failure classification through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "6be26cc0293357c37f9804cc984777a01b4b3804b8d0ab21734f09eecacf1ff4"
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, and source-local/aggregate capture claim failure classification through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "2f0a77c022bc7f94f33c6d132884afc768b16d5e75a3af413090204d0a8db42d"
     }
   },
   "claims": {

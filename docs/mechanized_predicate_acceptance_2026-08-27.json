@@ -2,8 +2,8 @@
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Claim-evidence failure-phase prefixes, source-local binding omission classification, and terminal claim-debt projection only; this does not alter staged schema validation, mechanized predicate matching, correction routing, class settlement, or durable reload.",
-      "sha256": "3db896ca488c28d251f58adfd5d8bdec61c7c9977e1d6142a3166e4961bea22f"
+      "scope": "Claim-evidence failure-phase prefixes, source-local binding omission and aggregate capture-deadline classification, and terminal claim-debt projection only; this does not alter staged schema validation, mechanized predicate matching, correction routing, class settlement, or durable reload.",
+      "sha256": "21b917fc65407ed212943f598efe1e3d074981470ba91b275bc8f194b581756c"
     }
   },
   "attempt_ledger": [
