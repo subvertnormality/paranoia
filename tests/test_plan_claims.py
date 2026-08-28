@@ -1545,7 +1545,9 @@ class _RoleScript:
         return self._next()
 
 
-@pytest.mark.parametrize("form", ["always", "invariably", "nothing", "nobody", "nowhere"])
+@pytest.mark.parametrize(
+    "form", ["always", "invariably", "nothing", "nobody", "nowhere", "both", "neither"],
+)
 def test_public_claim_path_repairs_scope_expansion_before_capture(
     tmp_path: Path, monkeypatch, form: str,
 ) -> None:
@@ -1628,6 +1630,63 @@ def test_public_claim_path_preserves_terminal_evidence_failure_phase(
     assert ledger[-1]["outcome"] == "failed"
 
 
+@pytest.mark.parametrize("correction", [False, True])
+def test_public_claim_path_preserves_attestation_admission_failure_phase(
+    tmp_path: Path, monkeypatch, correction: bool,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [discovery],
+        "evidence-binding": [binding],
+    }
+    if correction:
+        outputs["evidence-text"] = ["invalid attestation"]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, source["quote"],
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    original_timeout = handlers._CapturedClaimEngine._next_model_timeout
+
+    def exhaust_at_attestation(self, *args, **kwargs):
+        threshold = 3 if correction else 2
+        if self.model_calls >= threshold:
+            raise pc.AuditError("attestation admission exhausted")
+        return original_timeout(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        handlers._CapturedClaimEngine, "_next_model_timeout", exhaust_at_attestation,
+    )
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id=f"attestation-admission-{correction}",
+        round_no=1, stakes="trusted local tool", engine=engine,
+        repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+        on_progress=None,
+    )
+
+    assert status == "attestation-failed"
+    assert state["debt"]["failure_phase"] == "attestation"
+    assert state["debt"]["returncode"] == 124
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: ATTESTATION-FAILED" in trailer
+    assert "retry cold authority-and-entailment attestation" in trailer
+
+
 def test_captured_claim_retry_cannot_bypass_capture_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -1672,6 +1731,8 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         assert not first.error
         retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
         assert retry.error
+        assert isinstance(retry, handlers._EvidencePhaseReview)
+        assert retry.evidence_phase == "binding"
         assert "binding changed immutable source metadata" in retry.text
         assert [row["role"] for row in ledger] == [
             "claim-discovery", "claim-binding", "claim-attestation",

@@ -276,9 +276,9 @@ phases through reconciliation and rendering, including when only some source row
 claim contains failures from multiple phases. Each affected phase names its own retry. None of
 these processing failures alone is evidence to remove, weaken, or otherwise edit the proposition;
 wording changes require authoritative evidence that refutes or fails to entail it. Ordinary
-terminal provider failures retain the binding or attestation phase in durable claim debt and
-render that same phase's retry action; phase fidelity is not limited to expanded source-local
-failures.
+terminal provider failures and role-admission failures retain the binding or attestation phase
+in durable claim debt and render that same phase's retry action; phase fidelity is not limited
+to expanded source-local failures.
 
 ## Recorded real acceptance
 

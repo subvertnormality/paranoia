@@ -3268,13 +3268,14 @@ class _CapturedClaimEngine:
     @staticmethod
     def _deadline_failure(
         error: pc.AuditError, session_ref: str | None = None,
-        raw_parts: list[str] | None = None,
+        raw_parts: list[str] | None = None, phase: str | None = None,
     ) -> Review:
-        return Review(
+        review = Review(
             text=f"[paranoia-local error] evidence budget exhausted: {error}",
             session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts or []),
             returncode=124, error=True,
         )
+        return _evidence_phase_review(review, phase) if phase else review
 
     def _parse_discovery(self, text: str) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""
@@ -3298,7 +3299,7 @@ class _CapturedClaimEngine:
         try:
             binding_kwargs["timeout"] = self._next_model_timeout()
         except pc.AuditError as error:
-            return self._deadline_failure(error, session_ref)
+            return self._deadline_failure(error, session_ref, phase="binding")
         corrected = role.resume(
             session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
         )
@@ -3306,14 +3307,21 @@ class _CapturedClaimEngine:
             "claim-binding-outer-retry", role, corrected,
             requested_timeout_sec=binding_kwargs["timeout"],
         )
-        if corrected.error or self.discovery is None:
-            return corrected
+        if corrected.error:
+            return _evidence_phase_review(corrected, "binding")
+        if self.discovery is None:
+            return _EvidencePhaseReview(
+                text="[paranoia-local error] corrected binding has no discovery state",
+                session_ref=corrected.session_ref, raw=corrected.raw, error=True,
+                evidence_phase="binding",
+            )
         try:
             audit = self._parse_bound(corrected.text, self.discovery, self.captures)
         except pc.AuditError as error:
             return _EvidencePhaseReview(
                 text=f"[paranoia-local error] corrected binding audit invalid: {error}",
                 session_ref=corrected.session_ref, raw=corrected.raw, error=True,
+                evidence_phase="binding",
             )
         attested = self._attest(audit, model, effort)
         if isinstance(attested, Review):
@@ -3992,7 +4000,9 @@ class _CapturedClaimEngine:
             try:
                 timeout = self._next_model_timeout(reserve_calls=2)
             except pc.AuditError as error:
-                return self._deadline_failure(error, raw_parts=attestation_raw)
+                return self._deadline_failure(
+                    error, raw_parts=attestation_raw, phase="attestation",
+                )
             review = attester.run(
                 prompt, self.launch, model, effort, False, timeout=timeout,
             )
@@ -4045,7 +4055,9 @@ class _CapturedClaimEngine:
                 try:
                     timeout = self._next_model_timeout()
                 except pc.AuditError as error:
-                    return self._deadline_failure(error, raw_parts=attestation_raw)
+                    return self._deadline_failure(
+                        error, raw_parts=attestation_raw, phase="attestation",
+                    )
                 correction = attester.resume(
                     review.session_ref,
                     self._attestation_correction_prompt(rendered, issue),

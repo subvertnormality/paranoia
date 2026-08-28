@@ -361,8 +361,8 @@ of the resulting code and tests.
   Preserve server-owned binding and attestation failure phases distinctly and render
   phase-specific retry guidance rather than relabeling either as retrieval failure. Preserve
   every affected phase for mixed and partial source failures; processing failure alone never
-  warrants editing the proposition. Ordinary terminal provider failure must carry that same
-  server-owned phase through durable claim debt and rendered recovery guidance.
+  warrants editing the proposition. Ordinary terminal provider or role-admission failure must
+  carry that same server-owned phase through durable claim debt and rendered recovery guidance.
   The plan under review is context, not evidence for its own assertions; require authoritative
   external sources.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.
