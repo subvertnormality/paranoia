@@ -3581,7 +3581,7 @@ class _CapturedClaimEngine:
                 capture = captures[only_key]
                 captures[only_key] = replace(
                     capture, text=None,
-                    error=pc.bounded_diagnostic(detail),
+                    error=pc.BINDING_FAILURE_PREFIX + pc.bounded_diagnostic(detail),
                 )
                 decisions[only_key] = None
 
@@ -4105,14 +4105,17 @@ class _CapturedClaimEngine:
                     provenance["content_type"] = capture.content_type
                 if capture.error or local_failure:
                     provenance["capture_error"] = external_sources._bounded_error(
-                        local_failure or capture.error
+                        (
+                            pc.ATTESTATION_FAILURE_PREFIX + local_failure
+                            if local_failure else capture.error
+                        )
                     )
                 claim["capture_attestations"].append(provenance)
                 if local_failure:
                     for capture_row in claim.get("capture_provenance", []):
                         if capture_row.get("evidence_index") == evidence_index:
                             capture_row["error"] = external_sources._bounded_error(
-                                local_failure
+                                pc.ATTESTATION_FAILURE_PREFIX + local_failure
                             )
                             break
             relation = "supports_claim" if claim["verdict"] == "supported" else "refutes_claim"

@@ -198,9 +198,13 @@ Processing sequence:
 | `UNRESOLVED` | Split decision or unsubstantiated agreement |
 | `FAILED` | Preflight, execution, cleaning, capture, parsing, or protocol failure |
 
-The trailer always includes `ARBITRATION`, `SELECTED`, `ADVISORY`,
+The trailer always includes `ARBITRATION`, `SELECTED`, `PROVISIONAL-SELECTED`, `ADVISORY`,
 `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`,
 `ROUNDS`, `RESEARCH`, and `RESEARCH-DIGEST`.
+
+When the final votes are unanimous but not substantiated, the result remains
+`UNRESOLVED`: `SELECTED` is `none`, while `PROVISIONAL-SELECTED` reports the
+common option as non-binding diagnostic information.
 
 `ADVISORY: human-owner` is informational. `SNAPSHOT` is provenance, not a durable
 replay handle, unless `retain_snapshot: true` was used. That option is the only

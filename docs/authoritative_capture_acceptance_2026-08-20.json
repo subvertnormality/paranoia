@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "c5893306e048fe5740647a669550da4fa298df6387f70cbf206669ccfd374db7",
-      "additions": 1423,
-      "deletions": 127,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, and bounded evidence-bound mechanized-class registration through this revision; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "05641ce2754604560ff6cff504cfcdbf512abbf5a41912113940838ecc0b95dd",
+      "additions": 1429,
+      "deletions": 130,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, and server-owned labels on source-local binding/attestation failures through this revision; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
       "sha256": "3ba4d261a47ef13a724a66497fa3ef6f266ecba7c6edfb52c86f6ec6263fe1e6",
@@ -115,10 +115,10 @@
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "allowed_later_plan_claims_diff": {
-      "sha256": "ea1399e0b43d7c7d677de63901b212e627400e8249543186df57a40f250a5c64",
-      "additions": 56,
+      "sha256": "7e1be848e69a093150dd21e924240824c53aa7b82a87c8ba21fd0f59adf3e48b",
+      "additions": 98,
       "deletions": 2,
-      "scope": "Rejects provider-introduced universal quantifiers before capture and distinguishes all-source retrieval failure in durable diagnostics; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics proved by this record."
+      "scope": "Rejects provider-introduced universal forms before capture and distinguishes all-source retrieval, binding, and attestation failures in durable diagnostics; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",

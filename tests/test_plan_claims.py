@@ -345,15 +345,16 @@ class TestAuditValidation:
         )
         assert len(pc.parse_audit(_audit(claim), wrapped).claims) == 1
 
-    def test_claim_cannot_introduce_a_universal_quantifier(self) -> None:
+    @pytest.mark.parametrize("form", pc.UNIVERSAL_FORMS)
+    def test_claim_cannot_introduce_a_universal_quantifier(self, form: str) -> None:
         plan = "The two named JSON documents contain the required fields.\n"
         claim = _claim(
             anchor="The two named JSON documents contain the required fields.",
-            proposition="Every JSON document contains the required fields.",
+            proposition=f"{form.title()} JSON documents contain the required fields.",
         )
         with pytest.raises(
             pc.AuditError,
-            match="introduces universal quantifier.*every",
+            match=rf"introduces universal quantifier.*{form}",
         ):
             pc.parse_audit(_audit(claim), plan)
 
@@ -1493,6 +1494,32 @@ class _RoleScript:
     def resume(self, *args, **kwargs):
         self.calls.append((self.role, args[1]))
         return self._next()
+
+
+def test_public_claim_path_repairs_scope_expansion_before_capture(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    plan = "The two named JSON documents contain the required fields.\n"
+    widened = _audit(_claim(
+        anchor="The two named JSON documents contain the required fields.",
+        proposition="Always, JSON documents contain the required fields.",
+    ))
+    engine = _RoleScript({"evidence-discovery": [widened, _audit()]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    state, status = handlers._verify_plan_claims(
+        plan, pc.empty_state(), lineage_id="scope-repair", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "parsed 0 new + 0 targeted retained + 0 frozen"
+    assert state["debt"] is None
+    assert state["claims"] == {}
+    assert [role for role, _ in engine.calls] == [
+        "evidence-discovery", "evidence-discovery",
+    ]
+    assert "introduces universal quantifier(s)" in engine.calls[1][1]
 
 
 def test_captured_claim_retry_cannot_bypass_capture_validation(
@@ -3203,8 +3230,17 @@ def test_expanded_binding_rejection_is_source_local_with_durable_provenance(
             "fallback_attempted": False,
             "content_sha256": "a" * 64,
             "text_sha256": "b" * 64,
-            "error": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
+            "error": (
+                "binding failure: expected exactly one "
+                "=== PLAN EVIDENCE BINDING JSON === marker"
+            ),
         }
+        state = pc.reconcile(
+            {}, persisted, lineage_id="binding-failed", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
     finally:
         adapter.close()
 
@@ -3277,12 +3313,19 @@ def test_expanded_attestation_failure_is_source_local_and_preserves_sibling(
         assert [claim["verdict"] for claim in result.claims] == [
             "supported", "unverified",
         ]
-        assert "expanded attester failed" in result.claims[1][
+        assert "attestation failure: expanded attester failed" in result.claims[1][
             "capture_attestations"
         ][0]["capture_error"]
         assert result.claims[1]["capture_provenance"][0]["error"] == (
-            "expanded attester failed"
+            "attestation failure: expanded attester failed"
         )
+        state = pc.reconcile(
+            {}, result, lineage_id="attestation-failed", round_no=1,
+            plan_text=plan,
+        )
+        trailer = pc.render_trailer(state)
+        assert "ATTESTATION-FAILED (blocking; bound passage not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
         assert ledger[-1]["outcome"] == "failed"
         assert ledger[-1]["raw_sha256"] and ledger[-1]["stderr_sha256"]
     finally:

@@ -27,6 +27,8 @@ MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
+BINDING_FAILURE_PREFIX = "binding failure: "
+ATTESTATION_FAILURE_PREFIX = "attestation failure: "
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
 SCOPES = frozenset({"external"})
@@ -493,7 +495,7 @@ def _validate_claim(
         e for e in checked
         if _qualifying(e, scope, repo=repo, plan_repo_path=plan_repo_path)
     ]
-    capture_failed = _all_captures_failed(capture_provenance, checked)
+    failure_phase = _source_failure_phase(capture_provenance, checked)
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
         demotion = "claimed support lacked claim-entailing authoritative evidence"
@@ -505,16 +507,22 @@ def _validate_claim(
         # conservatively blocking instead of discarding every other valid packet.
         verdict = "unverified"
         replacement = None
-        if not capture_failed:
+        if failure_phase is None:
             rationale = f"{rationale} Server demotion: {demotion}.".strip()
-    if capture_failed:
+    if failure_phase is not None:
         verdict = "unverified"
         replacement = None
-        rationale = (
-            "Server capture failed before authority or entailment could be adjudicated; "
-            "provider-authored assessment is not evidence, and the proposition remains "
-            "unverified."
-        )
+        if failure_phase == "capture":
+            rationale = (
+                "Server capture failed before authority or entailment could be adjudicated; "
+                "provider-authored assessment is not evidence, and the proposition remains "
+                "unverified."
+            )
+        else:
+            rationale = (
+                f"Server {failure_phase} failed after capture but before authority and "
+                "entailment could be fully adjudicated; the proposition remains unverified."
+            )
     if replacement is not None:
         if verdict != "refuted" or not any(
             e["relation"] == "supports_replacement" for e in qualifying
@@ -605,13 +613,25 @@ def _validate_capture_provenance(
     return rows
 
 
-def _all_captures_failed(
+def _source_failure_phase(
     provenance: list[dict[str, Any]], evidence: list[dict[str, str]],
-) -> bool:
-    """Whether every proposed source failed before evidence adjudication."""
-    return bool(evidence) and len(provenance) == len(evidence) and all(
+) -> str | None:
+    """Return one common server failure phase, never inferring it from provider prose."""
+    if not evidence or len(provenance) != len(evidence) or not all(
         row.get("error") for row in provenance
-    )
+    ):
+        return None
+    errors = [str(row["error"]) for row in provenance]
+    if all(error.startswith(BINDING_FAILURE_PREFIX) for error in errors):
+        return "binding"
+    if all(error.startswith(ATTESTATION_FAILURE_PREFIX) for error in errors):
+        return "attestation"
+    if all(
+        row.get("content_sha256") is None and row.get("text_sha256") is None
+        for row in provenance
+    ):
+        return "capture"
+    return None
 
 
 def _validate_capture_attestations(
@@ -1126,15 +1146,28 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         f"  Plan wording: {claim.get('anchor')}",
         f"  Atomic proposition: {claim.get('proposition')}",
     ]
-    capture_failed = _all_captures_failed(
+    failure_phase = _source_failure_phase(
         claim.get("capture_provenance", []), claim.get("evidence", []),
     )
-    if capture_failed and claim.get("verdict") == "unverified":
-        lines.extend([
-            "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-            "  Next action: retry capture or supply another authoritative public URL; "
-            "do not remove or weaken the assertion solely because retrieval failed",
-        ])
+    if failure_phase is not None and claim.get("verdict") == "unverified":
+        if failure_phase == "capture":
+            lines.extend([
+                "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+                "  Next action: retry capture or supply another authoritative public URL; "
+                "do not remove or weaken the assertion solely because retrieval failed",
+            ])
+        elif failure_phase == "binding":
+            lines.extend([
+                "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
+                "  Next action: retry captured-text binding; do not remove or weaken the "
+                "assertion solely because binding failed",
+            ])
+        else:
+            lines.extend([
+                "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+                "  Next action: retry cold authority-and-entailment attestation; do not remove "
+                "or weaken the assertion solely because attestation failed",
+            ])
     elif claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     else:
@@ -1206,8 +1239,7 @@ Preserve the original event, actor, date, modality, scope, and chronology when f
 atomic proposition. An anchor saying that a dated audit/report occurred is not verified by
 evidence that contains only the underlying condition. The current plan/dossier is the
 assertion under review, not evidence for itself.
-Do not introduce `all`, `any`, `each`, `every`, or `no` into a proposition unless that exact
-universal quantifier occurs in the verbatim anchor. The server rejects that scope expansion.
+{_universal_scope_instruction()}
 
 Prior packets below are candidate leads, never inherited verdicts. Re-open or search each
 retained URL and return every still-present retained proposition as a full current claim/evidence
@@ -1310,8 +1342,7 @@ condition does not prove that a dated external audit/report event occurred. Use 
 for new or edited eligible external propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
-Do not introduce `all`, `any`, `each`, `every`, or `no` into a proposition unless that exact
-universal quantifier occurs in the verbatim anchor. The server rejects that scope expansion.
+{_universal_scope_instruction()}
 
 RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
 {full_packets}
@@ -1411,7 +1442,18 @@ def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
 
 
-_UNIVERSAL_QUANTIFIER = re.compile(r"\b(?:all|any|each|every|no)\b", re.IGNORECASE)
+UNIVERSAL_FORMS = ("all", "always", "any", "each", "every", "never", "no", "none")
+_UNIVERSAL_QUANTIFIER = re.compile(
+    rf"\b(?:{'|'.join(map(re.escape, UNIVERSAL_FORMS))})\b", re.IGNORECASE,
+)
+
+
+def _universal_scope_instruction() -> str:
+    examples = ", ".join(f"`{term}`" for term in UNIVERSAL_FORMS)
+    return (
+        f"Do not introduce {examples} into a proposition unless that exact universal "
+        "form occurs in the verbatim anchor. The server rejects that scope expansion."
+    )
 
 
 def _introduced_universal_quantifiers(anchor: str, proposition: str) -> tuple[str, ...]:

@@ -308,8 +308,10 @@ Recovery:
 - Persistence gate: close/replace the class or use the named class-bound rebut.
 - `STATE-UNAVAILABLE`: repair or intentionally abandon the diagnosed state path;
   never synthesize convergence from logs.
-- Claim evidence failure: remove, weaken, or replace wording only as supported by
-  the actionable evidence packet.
+- Claim evidence failure: follow the phase-specific packet. Retry retrieval,
+  captured-text binding, or cold attestation when that server phase failed; do not
+  weaken or remove an assertion solely because evidence processing failed. Change
+  wording only when authoritative evidence actually refutes or fails to entail it.
 
 ## Sources of truth
 
