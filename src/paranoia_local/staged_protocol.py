@@ -74,21 +74,52 @@ def class_decision_instructions(
     role: str, *, active_classes: Sequence[dict[str, Any]],
     outcome_class_ids: Sequence[str] = (),
 ) -> str:
-    """Render the exact keyed decision surface beside the executable schema."""
-    actions = {}
+    """Render the keyed surface and canonical action rules beside the schema."""
+    outcome_ids = set(outcome_class_ids)
+    actions: dict[str, dict[str, Any]] = {}
     for cls in active_classes:
-        kinds = ["reclassify", "replace"]
+        class_id = cls["class_id"]
+        severity = cls["severity"]
+        lifecycle: list[str] = []
         if not cls.get("mechanized", False):
-            kinds[:0] = ["close", "reopen"]
-        actions[cls["class_id"]] = kinds
+            if cls.get("status") == cc.OPEN:
+                lifecycle = ["close"]
+            elif cls.get("status") == cc.CLOSED:
+                lifecycle = ["reopen"]
+        actions[class_id] = {
+            "status":cls.get("status"),
+            "severity":severity,
+            "mechanized":bool(cls.get("mechanized", False)),
+            "required_outcome":class_id in outcome_ids,
+            "lifecycle":lifecycle,
+            "reclassify_severities":list(cc.SEVERITIES[:cc.SEVERITIES.index(severity) + 1]),
+            "replacement":"schema-admitted definition preserving mechanization",
+        }
+    authority = {
+        "census":"server derives outcomes from integrity assessments",
+        "correction":(
+            "author outcomes for debt-bound classes; a fresh finding for a debt-bound "
+            "class uses its exact new_finding basis, while a distinct non-debt-bound "
+            "fresh finding supplies assessment_evidence and the server derives violation"
+        ),
+        "final":"author one outcome for every active class",
+    }[role]
     return (
         "class_outcomes is a closed object keyed by exactly these required class IDs: "
         f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
         "class_actions is a closed object with one independent-action slot per active "
         "class. Every listed key is required; use null when no "
-        "independent action is needed. Allowed non-null action kinds by active class are: "
+        "independent action is needed. The exact current decision surface is: "
         f"{json.dumps(actions, ensure_ascii=False, separators=(',', ':'))}. "
-        "Never put class_id inside an outcome or action value."
+        f"Outcome authority for this role: {authority}. "
+        "When an authoritative outcome exists, close requires satisfied and reopen requires "
+        "violated; outcome-free standalone lifecycle actions remain legal only as listed. "
+        "Reclassify and replace may retain or strengthen severity but never downgrade. "
+        "Replacement preserves a mechanized class; use only a listed replacement form. "
+        "A correction-gated class must become nonblocking: a violated gated class needs a "
+        "valid replacement, while satisfied open unmechanized state closes by derivation; "
+        "retaining a blocking severity does not satisfy the gate. Never put class_id inside "
+        "an outcome or action value."
     )
 
 

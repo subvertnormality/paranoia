@@ -438,19 +438,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "31e301e63a612ca3f02911ad6a975ee615eefb1d693169db8e6baf4c7d886ba4",
+        "efe54942f23fdef2fc71ede21f7e0791bb8962ec87452d14645a226b4ae2fcbb",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "be246a5343caad414d3754366da532d24a5da6df875fe6032ebb79846ff3ab2f",
+        "0ec60f889ee8b6d10096bb8bdf671106cb8d935809c10583f3eb932a622e583d",
         "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "23672994c21bee97514f5d14dcf31637359ae9fcb4db44924a599685ac3354d3",
+        "56b634fa3ec7741f0fc71965bc659519c329c2034fec35b38ffe3c3510227601",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),
@@ -4954,6 +4954,10 @@ def test_correction_assessment_anchor_retries_before_durable_settlement(tmp_path
         name = "fake"
 
         def run(self, *args, **kwargs):
+            prompt = args[0]
+            assert '"abc":{"status":"open","severity":"MAJOR"' in prompt
+            assert '"replacement":"schema-admitted definition preserving mechanization"' in prompt
+            assert "a violated gated class needs a valid replacement" in prompt
             text = response("repository/a.py:2")
             return Review(text=text, session_ref="s", raw=text)
 

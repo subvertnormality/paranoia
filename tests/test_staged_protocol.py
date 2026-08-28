@@ -287,6 +287,39 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
     assert with_assessment["properties"]["class_id"]["enum"] == ["mechanized"]
 
 
+def test_class_decision_instructions_are_state_severity_and_gate_specific():
+    classes = [
+        active_class("open-manual", severity="MAJOR"),
+        active_class("closed-manual", severity="MINOR", status=cc.CLOSED),
+        active_class("closed-mechanized", severity="BLOCKER", status=cc.CLOSED,
+                     mechanized=True),
+    ]
+    rendered = sp.class_decision_instructions(
+        "correction", active_classes=classes,
+        outcome_class_ids=["open-manual"],
+    )
+    prefix = "The exact current decision surface is: "
+    surface = json.loads(rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0])
+    assert surface["open-manual"] == {
+        "status":"open", "severity":"MAJOR", "mechanized":False,
+        "required_outcome":True,
+        "lifecycle":["close"],
+        "reclassify_severities":["FATAL", "BLOCKER", "MAJOR"],
+        "replacement":"schema-admitted definition preserving mechanization",
+    }
+    assert surface["closed-manual"]["lifecycle"] == ["reopen"]
+    assert surface["closed-manual"]["reclassify_severities"] == [
+        "FATAL", "BLOCKER", "MAJOR", "MINOR",
+    ]
+    assert surface["closed-mechanized"]["lifecycle"] == []
+    assert surface["closed-mechanized"]["replacement"] == (
+        "schema-admitted definition preserving mechanization"
+    )
+    assert "a violated gated class needs a valid replacement" in rendered
+    assert "never downgrade" in rendered
+
+
+
 @pytest.mark.parametrize("role", ["census", "correction", "final"])
 def test_exact_empty_active_set_cannot_target_an_existing_class(role):
     schema = sp.decision_schema(

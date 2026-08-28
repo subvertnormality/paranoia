@@ -47,18 +47,21 @@ single canonical dry-run and atomic transition.
    nonblocking: a violated gated class needs a valid replacement, while a satisfied open
    unmechanized class is closed by the existing derivation; retaining a blocking severity cannot
    satisfy the gate.
-3. Append those exact instructions to the existing same-session validation retry for census
-   consolidation, correction, and final in plan and branch modes. Preserve the exact branch plan
-   contract after it. Do not maintain a second hand-written row-shape catalogue or parse provider
-   prose.
+3. Put those exact instructions in the original census consolidation, correction, and final prompt
+   in plan and branch modes. The existing same-session retry retains that original provider context
+   and adds the bounded executable validator issue; keep its branch-plan-contract resend unchanged.
+   Do not duplicate a second repair catalogue or parse provider prose.
 4. Leave terminal failure persistence unchanged. Its bounded role/message, rejected-payload
    diagnostics, and trailer remain visible, but no new cross-round repair context or failure
    discriminator is added.
-5. Update `AGENTS.md`, the applicable `CLAUDE.md` summary, and staged Protocol v2 acceptance
-   documentation to describe the repair guidance, one-retry bound, and unchanged atomicity.
+5. Update the applicable `CLAUDE.md` summary and staged Protocol v2 acceptance documentation to
+   describe the repair guidance, one-retry bound, and unchanged atomicity. `AGENTS.md` already
+   governs the same-session retry, canonical semantic validation, legal action surface, and atomic
+   settlement, so record an explicit no-change disposition rather than perturbing source-bound
+   historical acceptance.
 
-The documentation edits are closed: amend `AGENTS.md` under “For the staged Protocol v2 cutover”,
-`CLAUDE.md` under its staged Protocol v2 summary, and
+The documentation edits are closed: leave `AGENTS.md` under “For the staged Protocol v2 cutover”
+unchanged for the reason above; amend `CLAUDE.md` under its staged Protocol v2 summary and
 `docs/staged_review_protocol_v2_acceptance.md` under “Keyed class decisions”. Each must state the
 four outcome-authority paths above, outcome-free standalone lifecycle legality, non-downgrading
 severity, both procedural and mechanized replacements for an unmechanized branch class,
@@ -88,7 +91,7 @@ and asserts the shared normative sentences/identifiers are present; publication 
   pre-round substantive state with durable reload allowing only the existing enumerated attempt,
   rejected-payload, and failure diagnostics. A later valid settlement atomically clears the
   existing terminal failure.
-- Exact prompt tests cover census consolidation, correction, and final; plan and branch modes;
+- Exact initial-prompt tests cover census consolidation, correction, and final; plan and branch modes;
   open/closed and mechanized/unmechanized classes; required and absent outcomes; all severities;
   correction gates; and branch-contract ordering. At the existing 100-active-class maximum, render
   the most verbose legal metadata, all gates, and a branch contract; prove the exact initial and
