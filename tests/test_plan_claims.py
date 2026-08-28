@@ -3767,14 +3767,18 @@ def test_outer_claim_verification_persists_binding_failure_channels(
         model="m", effort="high", plan_repo_path=None, on_progress=None,
     )
 
-    assert status == "failed"
+    assert status == "binding-failed"
     debt = state["debt"]
+    assert debt["failure_phase"] == "binding"
     assert debt["returncode"] == returncode
     assert debt["rejected_excerpt"] == ""
     assert debt["failure_detail"] == diagnostic
     assert debt["stderr"] == diagnostic
     assert debt["failure_detail_sha256"] != debt["raw_sha256"]
     assert debt["stderr_sha256"] != debt["raw_sha256"]
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: BINDING-FAILED" in trailer
+    assert "retry captured-text binding" in trailer
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:

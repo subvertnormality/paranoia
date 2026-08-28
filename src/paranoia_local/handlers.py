@@ -3904,7 +3904,7 @@ class _CapturedClaimEngine:
         ]
         attestation_batches = ordinary + expanded
         if len(attestation_batches) > MAX_PLAN_ATTESTATION_BATCHES:
-            return Review(
+            return _EvidencePhaseReview(
                 text=(
                     "[paranoia-local error] evidence attestation requires "
                     f"{len(attestation_batches)} batches; aggregate ceiling is "
