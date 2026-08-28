@@ -928,6 +928,7 @@ def render_trailer(
         [
             f"ARBITRATION: {outcome.outcome}",
             f"SELECTED: {outcome.selected or 'none'}",
+            f"PROVISIONAL-SELECTED: {outcome.provisional_selected or 'none'}",
             f"ADVISORY: {advisory}",
             "AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; "
             "this tool does not",
@@ -970,6 +971,7 @@ def render_record_block(
         f"DECISION: {subject or '(no subject given)'}",
         f"OUTCOME: {outcome.outcome}",
         f"SELECTED: {outcome.selected or 'none'}",
+        f"PROVISIONAL-SELECTED: {outcome.provisional_selected or 'none'}",
         f"ADVISORY: {advisory}",
         f"ROUNDS RUN: {rounds}",
     ]
@@ -1538,6 +1540,7 @@ def _arbitrate(
         "cleaned": _cleaned_packet_record(packet),
         "outcome": outcome.outcome,
         "selected": outcome.selected,
+        "provisional_selected": outcome.provisional_selected,
         "reason": outcome.reason,
         "refs_before": refs_before,
         "refs_after": refs_after,

@@ -655,6 +655,8 @@ def test_unsubstantiated_agreement_is_unresolved():
     votes = [vote("codex", "opt-a"), vote("claude", "opt-a")]
     got = arb.compute_outcome(votes, substantiated={"codex": True, "claude": False})
     assert got.outcome == arb.UNRESOLVED
+    assert got.selected is None
+    assert got.provisional_selected == "opt-a"
     assert "not substantiated" in got.reason
 
 

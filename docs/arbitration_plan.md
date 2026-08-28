@@ -765,7 +765,7 @@ Unanimity across all registered engines; currently two.
 | `CONVERGED` | all deciders selected the same option, no `SELECTED-RISK` is `[MAJOR]`/`[FATAL]`, **and every converging vote is substantiated** (below) |
 | `BLOCKED` | same option, but some decider tags it `[MAJOR]`/`[FATAL]` |
 | `REFRAME_REQUIRED` | any decider surfaced a `NEW-OPTION`, at any round (§2.8) |
-| `UNRESOLVED` | selections differ after round 2; divergence with no novel evidence to reconcile (§2.11); **or agreement that is not substantiated** |
+| `UNRESOLVED` | selections differ after round 2; divergence with no novel evidence to reconcile (§2.11); **or agreement that is not substantiated**. Unsubstantiated unanimity is diagnostic only: `SELECTED` is `none` and the common option appears as `PROVISIONAL-SELECTED`. |
 | `FAILED` | preflight, cleaner `INSUFFICIENT`, failed attestation, unparseable trailer, non-member `SELECTED`, ambiguous snapshot setup, or an engine error |
 
 **Substantiation: convergence must be *reached* on evidence, not merely *offered*
@@ -866,6 +866,7 @@ field is a pure token and always present**, so nothing is signalled by absence:
 ```
 ARBITRATION: CONVERGED | BLOCKED | REFRAME_REQUIRED | UNRESOLVED | FAILED
 SELECTED: <caller-stable-id> | none
+PROVISIONAL-SELECTED: <caller-stable-id> | none
 ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: claude) | human-owner (flagged by: both)
 AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not
 CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped

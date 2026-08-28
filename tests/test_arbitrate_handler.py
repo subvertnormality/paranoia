@@ -1178,8 +1178,9 @@ def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(
 def test_every_trailer_field_is_always_present(repo: Path, tmp_path: Path):
     """Nothing is signalled by absence, so a consumer never has to infer."""
     report = run(repo, Agent(lambda e, r: "opt-float"), tmp_path)
-    for field in ("ARBITRATION", "SELECTED", "ADVISORY", "AUTHORITY-POLICY",
-                  "CLEANING", "SNAPSHOT", "ORDER-SEED", "REFS-MOVED", "AUDIT", "ROUNDS"):
+    for field in ("ARBITRATION", "SELECTED", "PROVISIONAL-SELECTED", "ADVISORY", "AUTHORITY-POLICY",
+                  "CLEANING", "SNAPSHOT", "ORDER-SEED", "RESEARCH", "RESEARCH-DIGEST",
+                  "REFS-MOVED", "AUDIT", "ROUNDS"):
         assert trailer_field(report, field)
 
 
@@ -1426,6 +1427,8 @@ def test_unsubstantiated_agreement_is_unresolved(repo: Path, tmp_path: Path):
     agent = Agent(lambda e, r: "opt-float", extra={("codex", 1): {"decisive": "NONE"}})
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert trailer_field(report, "SELECTED") == "none"
+    assert trailer_field(report, "PROVISIONAL-SELECTED") == "opt-float"
     assert "not substantiated" in report
 
 

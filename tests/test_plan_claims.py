@@ -217,6 +217,7 @@ def test_authoritative_capture_acceptance_record() -> None:
         assert hashlib.sha256(recorded).hexdigest() == expected
         if relative not in {
             "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+            "src/paranoia_local/plan_claims.py",
         }:
             assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     allowed = snapshot["allowed_later_handlers_diff"]
@@ -234,6 +235,14 @@ def test_authoritative_capture_acceptance_record() -> None:
     ).stdout
     assert hashlib.sha256(census_diff).hexdigest() == census_allowed["sha256"]
     assert "does not alter capture, binding, cold-attestation" in census_allowed["scope"]
+    claims_allowed = snapshot["allowed_later_plan_claims_diff"]
+    claims_diff = subprocess.run(
+        ["git", "diff", "--no-ext-diff", source_commit, "--",
+         "src/paranoia_local/plan_claims.py"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    ).stdout
+    assert hashlib.sha256(claims_diff).hexdigest() == claims_allowed["sha256"]
+    assert "does not alter capture, binding, cold-attestation" in claims_allowed["scope"]
     production_diff = artifact["implementation_diff"]
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
@@ -335,6 +344,104 @@ class TestAuditValidation:
             proposition="Python 3.11 was released in October 2022.",
         )
         assert len(pc.parse_audit(_audit(claim), wrapped).claims) == 1
+
+    @pytest.mark.parametrize("form", pc.UNIVERSAL_FORMS)
+    def test_claim_cannot_introduce_a_universal_quantifier(self, form: str) -> None:
+        plan = "The two named JSON documents contain the required fields.\n"
+        claim = _claim(
+            anchor="The two named JSON documents contain the required fields.",
+            proposition=f"{form.title()} JSON documents contain the required fields.",
+        )
+        with pytest.raises(
+            pc.AuditError,
+            match=rf"introduces universal quantifier.*{form}",
+        ):
+            pc.parse_audit(_audit(claim), plan)
+
+    def test_plan_owned_universal_quantifier_is_preserved(self) -> None:
+        plan = "Every supported JSON document contains the required fields.\n"
+        claim = _claim(
+            anchor="Every supported JSON document contains the required fields.",
+            proposition="Every supported JSON document contains the required fields.",
+        )
+        assert len(pc.parse_audit(_audit(claim), plan).claims) == 1
+
+    def test_capture_failure_is_rendered_as_retrieval_not_author_defect(self) -> None:
+        source = _source(relation="context")
+        failed = _claim(
+            verdict="unverified",
+            evidence=[source],
+            capture_provenance=[{
+                "evidence_index": 0,
+                "requested_url": source["url"],
+                "final_url": source["url"],
+                "status": 503,
+                "content_type": "text/html",
+                "fallback_attempted": False,
+                "content_sha256": None,
+                "text_sha256": None,
+                "error": "server returned HTTP 503",
+            }],
+        )
+        state = pc.reconcile(
+            {}, pc.parse_audit(_audit(failed), PLAN),
+            lineage_id="capture-failed", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+        assert "retry capture or supply another authoritative public URL" in trailer
+        assert "remove, weaken, or research" not in trailer
+        record = next(iter(state["claims"].values()))
+        assert "capture failed before authority or entailment" in record["rationale"]
+
+    def test_mixed_partial_source_failures_preserve_every_server_phase(self) -> None:
+        evidence = [
+            _source(url=f"https://example.com/source-{index}", relation="context")
+            for index in range(4)
+        ]
+        provenance = [
+            {
+                "evidence_index": 0, "requested_url": evidence[0]["url"],
+                "final_url": evidence[0]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+                "error": None,
+            },
+            {
+                "evidence_index": 1, "requested_url": evidence[1]["url"],
+                "final_url": None, "status": 503, "content_type": "text/html",
+                "fallback_attempted": False, "content_sha256": None,
+                "text_sha256": None, "error": "server returned HTTP 503",
+            },
+            {
+                "evidence_index": 2, "requested_url": evidence[2]["url"],
+                "final_url": evidence[2]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "c" * 64, "text_sha256": "d" * 64,
+                "error": pc.ATTESTATION_FAILURE_PREFIX + "provider unavailable",
+            },
+            {
+                "evidence_index": 3, "requested_url": evidence[3]["url"],
+                "final_url": evidence[3]["url"], "status": 200,
+                "content_type": "text/html", "fallback_attempted": False,
+                "content_sha256": "e" * 64, "text_sha256": "f" * 64,
+                "error": "legacy unlabelled processing failure",
+            },
+        ]
+        failed = _claim(
+            verdict="unverified", evidence=evidence, capture_provenance=provenance,
+        )
+        state = pc.reconcile(
+            {}, pc.parse_audit(_audit(failed), PLAN),
+            lineage_id="mixed-source-failure", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+        assert "ATTESTATION-FAILED (blocking; bound passage not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
+        assert "capture, attestation phase(s)" in next(
+            iter(state["claims"].values())
+        )["rationale"]
 
     def test_reddit_is_never_upgraded_to_primary_by_model_output(self) -> None:
         reddit = _source(url="https://www.reddit.com/r/python/comments/x", kind="primary")
@@ -1403,6 +1510,7 @@ class TestHandlerFlow:
 class _RoleScript:
     name = "codex"
     default_model = "test"
+    native_web = True
 
     def __init__(
         self, outputs: dict[str, list[str | Review]],
@@ -1436,6 +1544,334 @@ class _RoleScript:
     def resume(self, *args, **kwargs):
         self.calls.append((self.role, args[1]))
         return self._next()
+
+
+@pytest.mark.parametrize(
+    "form", ["always", "invariably", "nothing", "nobody", "nowhere", "both", "neither"],
+)
+def test_public_claim_path_repairs_scope_expansion_before_capture(
+    tmp_path: Path, monkeypatch, form: str,
+) -> None:
+    plan = "The two named JSON documents contain the required fields.\n"
+    widened = _audit(_claim(
+        anchor="The two named JSON documents contain the required fields.",
+        proposition=f"{form.title()}, JSON documents contain the required fields.",
+    ))
+    engine = _RoleScript({"evidence-discovery": [widened, _audit()]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    state, status = handlers._verify_plan_claims(
+        plan, pc.empty_state(), lineage_id="scope-repair", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "parsed 0 new + 0 targeted retained + 0 frozen"
+    assert state["debt"] is None
+    assert state["claims"] == {}
+    assert [role for role, _ in engine.calls] == [
+        "evidence-discovery", "evidence-discovery",
+    ]
+    assert "introduces universal quantifier(s)" in engine.calls[1][1]
+
+
+@pytest.mark.parametrize("phase", ["binding", "attestation"])
+def test_public_claim_path_preserves_terminal_evidence_failure_phase(
+    tmp_path: Path, monkeypatch, phase: str,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    failure = Review(
+        text="provider failed", session_ref=None, raw=f"raw {phase}",
+        returncode=17, error=True, failure_detail=f"{phase} unavailable",
+        stderr=f"{phase} stderr",
+    )
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [discovery],
+        "evidence-binding": [failure if phase == "binding" else binding],
+    }
+    if phase == "attestation":
+        outputs["evidence-text"] = [failure]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, source["quote"],
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    ledger: list[dict] = []
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id=f"terminal-{phase}", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+        attempt_ledger=ledger,
+    )
+
+    assert status == f"{phase}-failed"
+    assert state["debt"]["failure_phase"] == phase
+    assert state["debt"]["returncode"] == 17
+    assert state["debt"]["failure_detail"] == f"{phase} unavailable"
+    trailer = pc.render_trailer(state)
+    label = "BINDING-FAILED" if phase == "binding" else "ATTESTATION-FAILED"
+    assert f"EVIDENCE status: {label}" in trailer
+    assert f"retry {'captured-text binding' if phase == 'binding' else 'cold authority-and-entailment attestation'}" in trailer
+    assert "remove or weaken the assertion solely" in trailer
+    assert ledger[-1]["outcome"] == "failed"
+
+
+@pytest.mark.parametrize("correction", [False, True])
+def test_public_claim_path_preserves_attestation_admission_failure_phase(
+    tmp_path: Path, monkeypatch, correction: bool,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [discovery],
+        "evidence-binding": [binding],
+    }
+    if correction:
+        outputs["evidence-text"] = ["invalid attestation"]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, source["quote"],
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    original_timeout = handlers._CapturedClaimEngine._next_model_timeout
+
+    def exhaust_at_attestation(self, *args, **kwargs):
+        threshold = 3 if correction else 2
+        if self.model_calls >= threshold:
+            raise pc.AuditError("attestation admission exhausted")
+        return original_timeout(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        handlers._CapturedClaimEngine, "_next_model_timeout", exhaust_at_attestation,
+    )
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id=f"attestation-admission-{correction}",
+        round_no=1, stakes="trusted local tool", engine=engine,
+        repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+        on_progress=None,
+    )
+
+    assert status == "attestation-failed"
+    assert state["debt"]["failure_phase"] == "attestation"
+    assert state["debt"]["returncode"] == 124
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: ATTESTATION-FAILED" in trailer
+    assert "retry cold authority-and-entailment attestation" in trailer
+
+
+def test_public_claim_path_renders_response_extraction_failure_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                None, None, error="capture contained no extracted text",
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="response-extraction-failure",
+        round_no=1, stakes="trusted local tool", engine=engine,
+        repo=_repo(tmp_path), model="m", effort="high", plan_repo_path=None,
+        on_progress=None,
+    )
+
+    assert status == "parsed 1 new + 0 targeted retained + 0 frozen"
+    record = next(iter(state["claims"].values()))
+    assert record["verdict"] == "unverified"
+    assert record["capture_provenance"][0]["status"] == 200
+    assert record["capture_provenance"][0]["content_sha256"] == "a" * 64
+    assert record["capture_provenance"][0]["text_sha256"] is None
+    trailer = pc.render_trailer(state)
+    assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+    assert "remove, weaken, or research" not in trailer
+
+
+def test_public_claim_path_persists_capture_deadline_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers, "PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC", -1)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, "captured text",
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="capture-deadline", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "capture-failed"
+    assert state["debt"]["failure_phase"] == "capture"
+    assert "capture and pre-binding processing exceeded" in (
+        state["debt"]["failure_detail"]
+    )
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+    assert "remove or weaken the assertion solely" in trailer
+    assert "BINDING-FAILED" not in trailer
+
+
+def test_public_claim_path_persists_capture_group_failure_as_retrieval(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    engine = _RoleScript({"evidence-discovery": [discovery]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    completed = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        source["quote"],
+    )
+
+    def capture_all(candidates, **kwargs):
+        raise external_sources.CaptureGroupError(
+            "RuntimeError: capture worker exploded", (completed,),
+        )
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="capture-group-failure", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "capture-failed"
+    debt = state["debt"]
+    assert debt["failure_phase"] == "capture"
+    assert debt["completed_captures"] == [{
+        "requested_url": source["url"],
+        "requested_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
+        "final_url": source["url"],
+        "final_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
+        "status": 200, "content_type": "text/html",
+        "content_type_sha256": hashlib.sha256(b"text/html").hexdigest(),
+        "fallback_attempted": False,
+        "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+        "error": None, "error_sha256": None,
+    }]
+    assert "RuntimeError: capture worker exploded" in debt["failure_detail"]
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
+    assert "retry capture or supply another authoritative public URL" in trailer
+
+
+@pytest.mark.parametrize("verdict", ["supported", "refuted"])
+def test_public_claim_path_renders_failed_sibling_without_demoting_verdict(
+    tmp_path: Path, monkeypatch, verdict: str,
+) -> None:
+    relation = "supports_claim" if verdict == "supported" else "refutes_claim"
+    good = _source(relation=relation)
+    failed = _source(url="https://example.com/unavailable-sibling")
+    discovery = _audit(_claim(verdict=verdict, evidence=[good, failed]))
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": good["location"], "passage": good["quote"],
+        }],
+    })
+    attestation = "=== EVIDENCE ATTESTATION JSON ===\n" + json.dumps({
+        "attestations": [{
+            "claim_index": 0, "evidence_index": 0,
+            "publisher_authority": True, "authority_reason": "official publisher",
+            "passage_entailment": True, "entailment_reason": "direct statement",
+        }],
+    })
+    engine = _RoleScript({
+        "evidence-discovery": [discovery],
+        "evidence-binding": [binding],
+        "evidence-text": [attestation],
+    })
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidates[0], candidates[0].url, 200, "text/html", "a" * 64,
+                "b" * 64, good["quote"],
+            ),
+            external_sources.Capture(
+                candidates[1], candidates[1].url, 503, "text/html", None, None,
+                None, error="server returned HTTP 503",
+            ),
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="failed-sibling", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+    )
+
+    assert status == "parsed 1 new + 0 targeted retained + 0 frozen"
+    record = next(iter(state["claims"].values()))
+    assert record["verdict"] == verdict
+    assert record["capture_provenance"][1]["error"] == "server returned HTTP 503"
+    trailer = pc.render_trailer(state)
+    assert f"1 {verdict}" in trailer
+    assert (
+        f"RETRIEVAL-FAILED (non-governing sibling; claim independently {verdict})"
+        in trailer
+    )
+    assert (
+        f"retain the {verdict} verdict from the independently adjudicated source"
+        in trailer
+    )
+    if verdict == "refuted":
+        assert "Replacement: none proven; remove, weaken, or research" in trailer
 
 
 def test_captured_claim_retry_cannot_bypass_capture_validation(
@@ -1482,7 +1918,21 @@ def test_captured_claim_retry_cannot_bypass_capture_validation(
         assert not first.error
         retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
         assert retry.error
+        assert isinstance(retry, handlers._EvidencePhaseReview)
+        assert retry.evidence_phase == "binding"
         assert "binding changed immutable source metadata" in retry.text
+        debt_state = pc.with_debt(
+            pc.empty_state(),
+            pc.AuditError(
+                "claim-binding reviewer failed (exit 0)", retry.raw,
+                returncode=retry.returncode, failure_phase=retry.evidence_phase,
+            ),
+            round_no=1, plan_text=PLAN,
+        )
+        assert debt_state["debt"]["failure_phase"] == "binding"
+        trailer = pc.render_trailer(debt_state)
+        assert "EVIDENCE status: BINDING-FAILED" in trailer
+        assert "retry captured-text binding" in trailer
         assert [row["role"] for row in ledger] == [
             "claim-discovery", "claim-binding", "claim-attestation",
             "claim-binding-outer-retry",
@@ -2170,7 +2620,9 @@ def test_long_capture_redirect_to_reviewed_plan_cannot_expand(
     try:
         assert adapter._binding_batches(audit, captures) == []
         assert (0, 0) not in adapter.expanded_captures
-        assert captures[(0, 0)].error == external_sources.BINDING_BUDGET_ERROR
+        assert captures[(0, 0)].error == (
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        )
     finally:
         adapter.close()
 
@@ -2186,16 +2638,28 @@ def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: 
         candidate, candidate.url, 200, "text/plain", "a" * 64, "b" * 64,
         "\n" * 100_000,
     )}
+    engine = _RoleScript({})
     adapter = handlers._CapturedClaimEngine(
-        _RoleScript({}), plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
     )
+    adapter.binding_engine = engine.for_role("evidence-binding")
     try:
-        batches = adapter._binding_batches(audit, captures)
+        bound, reviews = adapter._bind_indexed(
+            "session", audit, captures, "m", "high", {},
+        )
     finally:
         adapter.close()
-    assert batches == []
+    assert reviews == []
     assert not captures[(0, 0)].usable
-    assert captures[(0, 0)].error == external_sources.BINDING_BUDGET_ERROR
+    assert captures[(0, 0)].error == (
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    )
+    state = pc.reconcile(
+        {}, bound, lineage_id="binding-budget", round_no=1, plan_text=PLAN,
+    )
+    trailer = pc.render_trailer(state)
+    assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+    assert "remove, weaken, or research" not in trailer
 
 
 def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
@@ -2228,7 +2692,9 @@ def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
         adapter.close()
     assert len(batches) == 1
     assert len(batches[0]) == 3
-    assert captures[(3, 0)].error == external_sources.BINDING_BUDGET_ERROR
+    assert captures[(3, 0)].error == (
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    )
 
 
 def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
@@ -2266,7 +2732,9 @@ def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
     assert len(batches) == 1
     assert [row["claim_index"] for row in batches[0]] == [0, 2, 4, 6, 8, 10]
     assert all(
-        captures[(index, 0)].error == external_sources.BINDING_BUDGET_ERROR
+        captures[(index, 0)].error == (
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        )
         for index in range(1, 12, 2)
     )
 
@@ -3000,6 +3468,13 @@ def test_binding_omission_survives_capture_attestation_and_reconciliation(
         assert omitted["relation"] == "context"
         assert omitted["location"] == "No binding row returned for captured source"
         assert omitted["quote"] == "The model omitted this captured-source binding."
+        omitted_provenance = records[second_anchor]["capture_provenance"][0]
+        assert omitted_provenance["error"] == (
+            pc.BINDING_FAILURE_PREFIX + "expected binding row omitted by provider"
+        )
+        trailer = pc.render_trailer(state)
+        assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
         assert pc.is_blocked(state)
     finally:
         adapter.close()
@@ -3146,8 +3621,17 @@ def test_expanded_binding_rejection_is_source_local_with_durable_provenance(
             "fallback_attempted": False,
             "content_sha256": "a" * 64,
             "text_sha256": "b" * 64,
-            "error": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
+            "error": (
+                "binding failure: expected exactly one "
+                "=== PLAN EVIDENCE BINDING JSON === marker"
+            ),
         }
+        state = pc.reconcile(
+            {}, persisted, lineage_id="binding-failed", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "BINDING-FAILED (blocking; captured source not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
     finally:
         adapter.close()
 
@@ -3220,12 +3704,19 @@ def test_expanded_attestation_failure_is_source_local_and_preserves_sibling(
         assert [claim["verdict"] for claim in result.claims] == [
             "supported", "unverified",
         ]
-        assert "expanded attester failed" in result.claims[1][
+        assert "attestation failure: expanded attester failed" in result.claims[1][
             "capture_attestations"
         ][0]["capture_error"]
         assert result.claims[1]["capture_provenance"][0]["error"] == (
-            "expanded attester failed"
+            "attestation failure: expanded attester failed"
         )
+        state = pc.reconcile(
+            {}, result, lineage_id="attestation-failed", round_no=1,
+            plan_text=plan,
+        )
+        trailer = pc.render_trailer(state)
+        assert "ATTESTATION-FAILED (blocking; bound passage not adjudicated)" in trailer
+        assert "remove, weaken, or research" not in trailer
         assert ledger[-1]["outcome"] == "failed"
         assert ledger[-1]["raw_sha256"] and ledger[-1]["stderr_sha256"]
     finally:
@@ -3536,14 +4027,176 @@ def test_outer_claim_verification_persists_binding_failure_channels(
         model="m", effort="high", plan_repo_path=None, on_progress=None,
     )
 
-    assert status == "failed"
+    assert status == "binding-failed"
     debt = state["debt"]
+    assert debt["failure_phase"] == "binding"
     assert debt["returncode"] == returncode
     assert debt["rejected_excerpt"] == ""
     assert debt["failure_detail"] == diagnostic
     assert debt["stderr"] == diagnostic
     assert debt["failure_detail_sha256"] != debt["raw_sha256"]
     assert debt["stderr_sha256"] != debt["raw_sha256"]
+    trailer = pc.render_trailer(state)
+    assert "EVIDENCE status: BINDING-FAILED" in trailer
+    assert "retry captured-text binding" in trailer
+
+
+def test_outer_claim_verification_persists_both_invalid_binding_attempts(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    source = _source()
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    capture = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        source["quote"],
+    )
+    monkeypatch.setattr(
+        handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
+    )
+    engine = _RoleScript({
+        "evidence-discovery": [_audit(_claim())],
+        "evidence-binding": ["initial invalid", "correction invalid"],
+    })
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    ledger: list[dict] = []
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id="binding-invalid-retry", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+        attempt_ledger=ledger,
+    )
+
+    assert status == "binding-failed"
+    debt = state["debt"]
+    assert debt["failure_phase"] == "binding"
+    assert [row["role"] for row in debt["attempts"]] == [
+        "claim-binding", "claim-binding-validation-retry",
+    ]
+    assert [row["outcome"] for row in debt["attempts"]] == [
+        "validation-invalid", "validation-invalid",
+    ]
+    assert [row["rejected_reply_excerpt"] for row in debt["attempts"]] == [
+        "initial invalid", "correction invalid",
+    ]
+    assert all(row["raw_sha256"] for row in debt["attempts"])
+    assert all(row["failure_detail_sha256"] for row in debt["attempts"])
+    assert all(row["stderr_sha256"] for row in debt["attempts"])
+    assert "EVIDENCE status: BINDING-FAILED" in pc.render_trailer(state)
+
+
+@pytest.mark.parametrize("phase", ["capture", "binding", "attestation"])
+def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
+    repo: Path, tmp_path: Path, monkeypatch, phase: str,
+) -> None:
+    source = _source()
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [_audit(_claim())],
+    }
+    if phase == "binding":
+        outputs["evidence-binding"] = ["initial invalid", "correction invalid"]
+    elif phase == "attestation":
+        outputs["evidence-binding"] = [binding]
+        outputs["evidence-text"] = ["initial invalid", "correction invalid"]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+
+    requested_url = "https://example.com/" + "r" * 10_000
+    final_url = "https://example.com/" + "f" * 10_000
+    content_type = "text/plain;" + "c" * 10_000
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    completed_candidate = external_sources.CandidateSource(
+        requested_url, source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    completed_error = "sibling error: " + "y" * 10_000
+    completed = external_sources.Capture(
+        completed_candidate, final_url, 200, content_type, "a" * 64, "b" * 64,
+        None, error=completed_error,
+    )
+    group_error = "capture worker exploded: " + "x" * 10_000
+
+    def capture_all(candidates, **kwargs):
+        if phase == "capture":
+            raise external_sources.CaptureGroupError(group_error, (completed,))
+        return [external_sources.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            source["quote"],
+        )]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+
+    def stop_after_claims(**kwargs):
+        raise rc.CensusError("fixture stops after durable claim persistence")
+
+    monkeypatch.setattr(handlers, "_staged_structural_review", stop_after_claims)
+    lineage_id = f"public-terminal-{phase}"
+    result = handlers.critique_plan(
+        {
+            "plan_text": PLAN, "repo_path": str(repo),
+            "lineage": lineage_id, "round": 1,
+            "stakes": "trusted local tool; evidence correctness is high impact",
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+    debt = reloaded.claim_state["debt"]
+    assert debt["failure_phase"] == phase
+    assert f"EVIDENCE status: {phase.upper() if phase != 'capture' else 'RETRIEVAL'}-FAILED" in result
+    if phase == "capture":
+        assert len(debt["reason"]) <= pc.DIAGNOSTIC_CHARS + 30
+        assert len(debt["failure_detail"]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert debt["failure_detail_sha256"] == hashlib.sha256(
+            group_error.encode()
+        ).hexdigest()
+        row = debt["completed_captures"][0]
+        for key in ("requested_url", "final_url", "content_type", "error"):
+            assert len(row[key]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert row["requested_url_sha256"] == hashlib.sha256(
+            requested_url.encode()
+        ).hexdigest()
+        assert row["final_url_sha256"] == hashlib.sha256(final_url.encode()).hexdigest()
+        assert row["content_type_sha256"] == hashlib.sha256(
+            content_type.encode()
+        ).hexdigest()
+        assert len(row["error"]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert row["error_sha256"] == hashlib.sha256(completed_error.encode()).hexdigest()
+    else:
+        expected = [
+            f"claim-{phase}", f"claim-{phase}-validation-retry",
+        ]
+        assert [row["role"] for row in debt["attempts"]] == expected
+        assert [row["outcome"] for row in debt["attempts"]] == [
+            "validation-invalid", "validation-invalid",
+        ]
+        assert [row["rejected_reply_excerpt"] for row in debt["attempts"]] == [
+            "initial invalid", "correction invalid",
+        ]
+        for row in debt["attempts"]:
+            assert row["returncode"] is not None
+            for digest_key, excerpt_key in (
+                ("raw_sha256", "raw_excerpt"),
+                ("failure_detail_sha256", "failure_detail_excerpt"),
+                ("stderr_sha256", "stderr_excerpt"),
+            ):
+                assert row[digest_key] is not None
+                assert row[excerpt_key] is not None
+                assert len(row[excerpt_key]) <= rc.MAX_ENGINE_FAILURE_MESSAGE_CHARS + 64
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:

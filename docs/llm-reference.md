@@ -147,6 +147,14 @@ Rules:
 Eligible external claims are only load-bearing external facts, externally issued
 governing requirements/principles, and promised external-system behavior.
 Repository facts and local design choices belong to structural review.
+The server rejects a claim proposition that introduces an explicit universal
+quantifier absent from its verbatim plan wording. A source response-acquisition or
+text-extraction failure remains blocking, but is reported as retrieval failure rather than evidence that the plan's
+assertion should be weakened or removed. Captured-text binding and cold-attestation
+failures retain their own labels and retry instructions. Mixed or partial source failures
+render every affected server phase; processing failure alone never justifies editing the
+assertion. An ordinary terminal binding or attestation provider/admission failure persists
+the same server-owned phase in claim debt and renders the matching retry action.
 
 ## `query`
 
@@ -222,6 +230,8 @@ Rules:
   `git update-ref -d refs/paranoia/arbitrate/<stamp>`.
 
 Results: `CONVERGED`, `BLOCKED`, `REFRAME_REQUIRED`, `UNRESOLVED`, `FAILED`.
+Unsubstantiated unanimous agreement is `UNRESOLVED`, has `SELECTED: none`, and
+reports the agreed option only as `PROVISIONAL-SELECTED`.
 `ADVISORY: human-owner` is non-gating.
 
 ## Tracked state machine
@@ -265,7 +275,7 @@ Tracked fields can include `CLASS-REGISTER`, `CLASS-CLOSURE`,
 Failure rule: `# STAGED REVIEW FAILED` has no durable clean structural verdict.
 Never infer success from absent findings. `STATE-UNAVAILABLE` is blocking.
 
-Arbitration always reports `ARBITRATION`, `SELECTED`, `ADVISORY`,
+Arbitration always reports `ARBITRATION`, `SELECTED`, `PROVISIONAL-SELECTED`, `ADVISORY`,
 `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`,
 `ROUNDS`, `RESEARCH`, `RESEARCH-DIGEST`.
 
@@ -302,8 +312,10 @@ Recovery:
 - Persistence gate: close/replace the class or use the named class-bound rebut.
 - `STATE-UNAVAILABLE`: repair or intentionally abandon the diagnosed state path;
   never synthesize convergence from logs.
-- Claim evidence failure: remove, weaken, or replace wording only as supported by
-  the actionable evidence packet.
+- Claim evidence failure: follow the phase-specific packet. Retry retrieval,
+  captured-text binding, or cold attestation when that server phase failed; do not
+  weaken or remove an assertion solely because evidence processing failed. Change
+  wording only when authoritative evidence actually refutes or fails to entail it.
 
 ## Sources of truth
 

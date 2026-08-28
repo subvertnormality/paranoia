@@ -27,6 +27,8 @@ MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
+BINDING_FAILURE_PREFIX = "binding failure: "
+ATTESTATION_FAILURE_PREFIX = "attestation failure: "
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
 SCOPES = frozenset({"external"})
@@ -49,13 +51,22 @@ class AuditError(ValueError):
 
     def __init__(
         self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
-        returncode: int | None = None,
+        returncode: int | None = None, failure_phase: str | None = None,
+        attempts: Iterable[dict[str, Any]] = (),
+        completed_captures: Iterable[dict[str, Any]] = (),
     ) -> None:
         self.reason = reason
         self.raw = raw
         self.failure_detail_raw = failure_detail
         self.stderr_raw = stderr
         self.returncode = returncode
+        self.failure_phase = (
+            failure_phase
+            if failure_phase in {"capture", "binding", "attestation"}
+            else None
+        )
+        self.attempts = deepcopy(list(attempts))
+        self.completed_captures = deepcopy(list(completed_captures))
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
         self.excerpt = _excerpt(raw)
         self.failure_detail_sha256 = hashlib.sha256(
@@ -67,7 +78,7 @@ class AuditError(ValueError):
         super().__init__(reason)
 
     def debt(self, round_no: int) -> dict[str, Any]:
-        return {
+        debt = {
             "round": round_no,
             "reason": self.reason,
             "returncode": self.returncode,
@@ -77,7 +88,13 @@ class AuditError(ValueError):
             "failure_detail": self.failure_detail,
             "stderr_sha256": self.stderr_sha256,
             "stderr": self.stderr,
+            "failure_phase": self.failure_phase,
         }
+        if self.attempts:
+            debt["attempts"] = self.attempts
+        if self.completed_captures:
+            debt["completed_captures"] = self.completed_captures
+        return debt
 
 
 def bounded_diagnostic(text: str) -> str:
@@ -250,7 +267,7 @@ def frozen_supported_ids(
     return frozenset(frozen)
 
 
-def _captured_support(record: dict[str, Any]) -> bool:
+def _captured_relation(record: dict[str, Any], relation: str) -> bool:
     evidence = record.get("evidence", [])
     provenance = record.get("capture_provenance", [])
     for row in record.get("capture_attestations", []):
@@ -268,8 +285,8 @@ def _captured_support(record: dict[str, Any]) -> bool:
         if (
             isinstance(item, dict)
             and isinstance(capture_row, dict)
-            and item.get("relation") == "supports_claim"
-            and row.get("relation") == "supports_claim"
+            and item.get("relation") == relation
+            and row.get("relation") == relation
             and row.get("final_url") == item.get("url")
             and capture_row.get("final_url") == item.get("url")
             and isinstance(capture_row.get("requested_url"), str)
@@ -280,6 +297,10 @@ def _captured_support(record: dict[str, Any]) -> bool:
         ):
             return True
     return False
+
+
+def _captured_support(record: dict[str, Any]) -> bool:
+    return _captured_relation(record, "supports_claim")
 
 
 def changed_plan_text(state_raw: Any, plan_text: str) -> str:
@@ -453,6 +474,12 @@ def _validate_claim(
         raise ValueError(
             "anchor is not a verbatim substring of the current plan modulo whitespace"
         )
+    introduced = _introduced_universal_quantifiers(anchor, proposition)
+    if introduced:
+        raise ValueError(
+            "proposition introduces universal quantifier(s) absent from the verbatim "
+            f"plan wording: {', '.join(introduced)}"
+        )
     verdict = item["verdict"]
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
@@ -487,6 +514,7 @@ def _validate_claim(
         e for e in checked
         if _qualifying(e, scope, repo=repo, plan_repo_path=plan_repo_path)
     ]
+    failure_phases = _source_failure_phases(capture_provenance, checked)
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
         demotion = "claimed support lacked claim-entailing authoritative evidence"
@@ -498,7 +526,39 @@ def _validate_claim(
         # conservatively blocking instead of discarding every other valid packet.
         verdict = "unverified"
         replacement = None
-        rationale = f"{rationale} Server demotion: {demotion}.".strip()
+        if not failure_phases:
+            rationale = f"{rationale} Server demotion: {demotion}.".strip()
+    adjudicated_relation = {
+        "supported": "supports_claim", "refuted": "refutes_claim",
+    }.get(verdict)
+    viable_capture = bool(
+        adjudicated_relation and any(
+            item.get("relation") == adjudicated_relation
+            and any(
+                row.get("evidence_index") == index
+                and row.get("error") is None
+                and row.get("text_sha256") is not None
+                for row in capture_provenance
+            )
+            for index, item in enumerate(checked)
+        )
+    )
+    if failure_phases and (verdict == "unverified" or not viable_capture):
+        verdict = "unverified"
+        replacement = None
+        if failure_phases == ("capture",):
+            rationale = (
+                "Server capture failed before authority or entailment could be adjudicated; "
+                "provider-authored assessment is not evidence, and the proposition remains "
+                "unverified."
+            )
+        else:
+            named_phases = ", ".join(failure_phases)
+            rationale = (
+                f"Server evidence processing failed in the {named_phases} phase(s) before "
+                "authority and entailment could be fully adjudicated; the proposition "
+                "remains unverified."
+            )
     if replacement is not None:
         if verdict != "refuted" or not any(
             e["relation"] == "supports_replacement" for e in qualifying
@@ -587,6 +647,33 @@ def _validate_capture_provenance(
             "error": optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS),
         })
     return rows
+
+
+def _source_failure_phases(
+    provenance: list[dict[str, Any]], evidence: list[dict[str, str]],
+) -> tuple[str, ...]:
+    """Return every server-owned failed phase, including mixed/partial failures."""
+    if not evidence or len(provenance) != len(evidence):
+        return ()
+    phases: list[str] = []
+    for row in provenance:
+        raw_error = row.get("error")
+        if not raw_error:
+            continue
+        error = str(raw_error)
+        if error.startswith(BINDING_FAILURE_PREFIX):
+            phase = "binding"
+        elif error.startswith(ATTESTATION_FAILURE_PREFIX):
+            phase = "attestation"
+        elif row.get("text_sha256") is None:
+            phase = "capture"
+        else:
+            # Preserve other recognized rows even if one legacy/unlabelled row has no
+            # trustworthy server phase of its own.
+            continue
+        if phase not in phases:
+            phases.append(phase)
+    return tuple(phases)
 
 
 def _validate_capture_attestations(
@@ -1086,11 +1173,35 @@ def render_trailer(state_raw: Any) -> str:
         )
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
+        failure_phase = debt.get("failure_phase")
+        if failure_phase == "capture":
+            lines.extend([
+                "EVIDENCE status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+                "EVIDENCE next action: retry capture or supply another authoritative public "
+                "URL; do not remove or weaken the assertion solely because retrieval failed",
+            ])
+        elif failure_phase == "binding":
+            lines.extend([
+                "EVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)",
+                "EVIDENCE next action: retry captured-text binding; do not remove or weaken "
+                "the assertion solely because binding failed",
+            ])
+        elif failure_phase == "attestation":
+            lines.extend([
+                "EVIDENCE status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+                "EVIDENCE next action: retry cold authority-and-entailment attestation; do not "
+                "remove or weaken the assertion solely because attestation failed",
+            ])
 
-    unresolved = [c for c in claims if c.get("verdict") != "supported"]
-    if unresolved:
+    actionable = [
+        claim for claim in claims
+        if claim.get("verdict") != "supported" or _source_failure_phases(
+            claim.get("capture_provenance", []), claim.get("evidence", []),
+        )
+    ]
+    if actionable:
         lines.append("ACTIONABLE SOURCE PACKETS:")
-    for claim in unresolved:
+    for claim in actionable:
         lines.extend(_packet_lines(claim))
     return "\n".join(lines)
 
@@ -1101,9 +1212,78 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         f"  Plan wording: {claim.get('anchor')}",
         f"  Atomic proposition: {claim.get('proposition')}",
     ]
+    failure_phases = _source_failure_phases(
+        claim.get("capture_provenance", []), claim.get("evidence", []),
+    )
+    if failure_phases and claim.get("verdict") == "supported":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "retain the supported verdict from the independently adjudicated source",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry captured-text binding; retain the supported verdict "
+                    "from the independently adjudicated source",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry cold authority-and-entailment attestation; retain the "
+                    "supported verdict from the independently adjudicated source",
+                ])
+    elif failure_phases and claim.get("verdict") == "refuted":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "retain the refuted verdict from the independently adjudicated source",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry captured-text binding; retain the refuted verdict "
+                    "from the independently adjudicated source",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
+                    "independently refuted)",
+                    "  Next action: retry cold authority-and-entailment attestation; retain the "
+                    "refuted verdict from the independently adjudicated source",
+                ])
+    elif failure_phases and claim.get("verdict") == "unverified":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "do not remove or weaken the assertion solely because retrieval failed",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
+                    "  Next action: retry captured-text binding; do not remove or weaken the "
+                    "assertion solely because binding failed",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+                    "  Next action: retry cold authority-and-entailment attestation; do not remove "
+                    "or weaken the assertion solely because attestation failed",
+                ])
     if claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
-    else:
+    elif not failure_phases or claim.get("verdict") == "refuted":
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
     if claim.get("rationale"):
         lines.append(f"  Assessment: {claim['rationale']}")
@@ -1172,6 +1352,7 @@ Preserve the original event, actor, date, modality, scope, and chronology when f
 atomic proposition. An anchor saying that a dated audit/report occurred is not verified by
 evidence that contains only the underlying condition. The current plan/dossier is the
 assertion under review, not evidence for itself.
+{_universal_scope_instruction()}
 
 Prior packets below are candidate leads, never inherited verdicts. Re-open or search each
 retained URL and return every still-present retained proposition as a full current claim/evidence
@@ -1274,6 +1455,7 @@ condition does not prove that a dated external audit/report event occurred. Use 
 for new or edited eligible external propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
+{_universal_scope_instruction()}
 
 RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
 {full_packets}
@@ -1371,6 +1553,42 @@ def _collapse_whitespace(value: str) -> str:
 
 def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
+
+
+# This is an intentionally closed operational grammar, not a claim to recognize every
+# English sentence with universal force. Exhaustive tests bind every admitted form to
+# the same pre-capture comparison; broader semantic scope remains reviewer judgement.
+UNIVERSAL_FORMS = (
+    "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "both", "each",
+    "entire", "every", "everybody", "everyone", "everything", "everywhere",
+    "in all cases", "invariably", "neither", "never", "no", "none", "throughout",
+    "nobody", "nothing", "nowhere", "under all circumstances", "universally",
+    "whole", "wholly", "without exception",
+)
+_UNIVERSAL_QUANTIFIER = re.compile(
+    rf"\b(?:{'|'.join(map(re.escape, UNIVERSAL_FORMS))})\b", re.IGNORECASE,
+)
+
+
+def _universal_scope_instruction() -> str:
+    examples = ", ".join(f"`{term}`" for term in UNIVERSAL_FORMS)
+    return (
+        f"Do not introduce {examples} into a proposition unless that exact universal "
+        "form occurs in the verbatim anchor. The server rejects that scope expansion."
+    )
+
+
+def _introduced_universal_quantifiers(anchor: str, proposition: str) -> tuple[str, ...]:
+    """Reject an extractor widening bounded wording into a universal proposition."""
+    anchor_terms = {
+        match.group(0).casefold()
+        for match in _UNIVERSAL_QUANTIFIER.finditer(anchor)
+    }
+    proposition_terms = {
+        match.group(0).casefold()
+        for match in _UNIVERSAL_QUANTIFIER.finditer(proposition)
+    }
+    return tuple(sorted(proposition_terms - anchor_terms))
 
 
 def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bool:
