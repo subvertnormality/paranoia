@@ -1,100 +1,85 @@
-# Issue 78: make rejected class actions unrepresentable
+# Issue 78: make staged action validation repairable
 
 ## Goal
 
-Prevent the two deterministic action failures reported in issue 78 before semantic
-materialization: an explicit lifecycle action conflicting with a role-required outcome, and a
-severity downgrade. Preserve atomic settlement and every currently legal semantic outcome.
+Stop the issue-78 sequence in which the same correction gate first rejects a payload, then the
+single validation retry chooses a different illegal action and discards the round. Preserve the
+atomic settlement boundary: findings, debt, outcomes, and actions settle together or not at all.
 
 ## Operating boundary
 
 Paranoia is a trusted-single-operator local tool. Repository, plan, and provider payloads are
-untrusted data. Existing Codex and Claude structured-output routes remain in scope, including
-their one same-session validation correction; a capability failure remains visibly blocking.
-False settlement and inconsistent class/debt state are high
-impact; a recoverable rejected round is acceptable. Hostile local races, a compromised OS,
-multi-tenancy, corrupted-state recovery, and partial settlement are out of scope.
+untrusted data. Codex and Claude correction/final roles, one same-session validation correction,
+and tracked cross-round state are in scope. False settlement and inconsistent class/debt state are
+high impact; a recoverable blocked result is acceptable. Hostile local races, compromised OS,
+multi-tenancy, corrupted-state recovery, partial settlement, extra reviewer calls, schema changes,
+and new persistence mechanisms are excluded.
+
+## Evidence and disposition
+
+The issue's two terminal rounds shared one shape. Their initial correction payloads failed the
+persistent correction gate. The generic retry then failed on `close requires satisfied outcome`
+in round 20 and `cannot downgrade active class` in round 22. The retry prompt currently supplies
+only the bounded error plus “fix every violation”; its `retry_context` carries only an optional
+branch plan contract. The next round's staged task carries debt, classes, gates, and artifact, but
+not the preceding terminal validation issue.
+
+Do not implement the issue's suggested per-action partial settlement. An action is not independent
+of its class outcome, finding basis, debt result, correction gate, or successor identity. Keeping
+the surrounding rows after any one of those relations fails validation would weaken the existing
+single canonical dry-run and atomic transition.
 
 ## Design
 
-1. Keep the canonical action schema and semantic validator unchanged as the durable compatibility
-   and defense-in-depth boundary. Legacy/canonical arrays may still express every historically
-   legal action, and illegal combinations still reject atomically.
-2. Narrow only the fresh keyed provider schema, using the role's exact `outcome_class_ids` and
-   each active class's status, severity, and mechanization. Retain the existing required keyed
-   action map and `null` no-action representation; do not introduce a new union, scale, or
-   transport contract. A non-null action slot admits:
-   - no explicit lifecycle action when that class has a role-required outcome;
-   - otherwise `close` only for an open unmechanized class and `reopen` only for a closed
-     unmechanized class, preserving legal standalone correction actions;
-   - `reclassify`, with an enum containing only the class's current severity and stronger
-     severities;
-   - `replace`, with the same non-downgrading severity enum. A mechanized class remains mechanized;
-     an unmechanized branch class retains both currently legal procedural and mechanized
-     replacement shapes.
-3. Define the authoritative-outcome matrix explicitly. Census outcomes are server-projected from
-   every integrity assessment and census has no model-owned outcome map. Final requires a
-   model-owned outcome for every active class. Correction requires outcomes for debt-bound active
-   classes; it may additionally derive a violated outcome from a fresh existing-class finding and
-   its distinct `assessment_evidence`. For the schema-known census/final/debt-bound correction
-   cases, omit lifecycle choices because satisfied open unmechanized outcomes derive close and
-   violated closed unmechanized outcomes derive reopen; closed mechanized violation still requires
-   replacement. A correction class with no role-required outcome retains its status-compatible
-   standalone lifecycle action. If a fresh correction finding later creates an outcome that
-   conflicts with such an independently authored action, the unchanged canonical semantic
-   validator rejects it atomically. That residual cross-field family is explicitly outside this
-   targeted preclusion because it is not knowable when the schema is generated.
-4. Update every repository-owned statement of the model-facing contract: census consolidation,
-   correction, final, shared class-decision rendering, `AGENTS.md`, and
-   `docs/staged_review_protocol_v2_acceptance.md`. Advertise exactly the values generated for each
-   role: server-derived lifecycle when an outcome is required; otherwise status-compatible
-   standalone close/reopen; and only non-downgrading reclassify/replace severities. Check exact
-   prompt/schema value sets in both plan and branch modes.
-5. Send the exact same generated schema on fresh and same-session validation-correction Codex and
-   Claude routes. A schema/transport mismatch remains a visible capability failure.
-6. Do not retain valid subsets of invalid payloads, add a model call, add persistence state, or
-   weaken the one atomic transition.
+1. Keep the provider schema, canonical semantic validator, class-engine dry-run, correction-gate
+   semantics, one retry, and atomic state transition unchanged.
+2. Build one bounded server-owned action-repair contract from the exact active classes, required
+   outcome IDs, correction gates, role, and severity order already supplied to validation. It must
+   state, per relevant class: current status/severity/mechanization; whether an outcome is required;
+   `close` requires an authored/derived satisfied outcome and an open unmechanized class; `reopen`
+   requires a violated outcome and a closed unmechanized class; reclassification may retain or
+   strengthen severity but never downgrade; replacement must preserve mechanization and may not
+   downgrade; and a correction gate must actually leave the class nonblocking, so a violated gated
+   class needs a valid replacement rather than close or reclassification.
+3. Append that exact contract to the existing same-session validation retry for census
+   consolidation, correction, and final in plan and branch modes. Preserve the exact branch plan
+   contract after it. Do not maintain a second hand-written row-shape catalogue or parse provider
+   prose.
+4. When a validation retry terminates unsuccessfully, retain its already-bounded validation issue
+   in durable staged-failure state as today. On the next correction/final round, copy only that
+   bounded prior validation role/message into a clearly labelled `prior_validation_failure` field
+   of the server-owned staged task. This is reviewer context, never authority: it cannot settle,
+   reopen, close, classify, or satisfy anything. Non-validation provider failures are not presented
+   as model-repair instructions. A successful settlement clears the failure through the existing
+   state transition.
+5. Update `AGENTS.md`, the applicable `CLAUDE.md` summary, and staged Protocol v2 acceptance
+   documentation to describe the repair contract, cross-round validation context, one-retry bound,
+   and unchanged atomicity.
 
 ## Acceptance evidence
 
-- Schema tests cover every role, plan/branch mode, open/closed state,
-  mechanized/unmechanized form, outcome-required and outcome-free slot, and every severity.
-  Outcome-required schemas
-  reject explicit close/reopen and every downgrade before semantic materialization. Outcome-free
-  correction slots retain only status-compatible standalone lifecycle actions. Null,
-  same-severity/upgrade reclassification, and every currently legal replacement shape remain
-  admitted.
-- Existing canonical semantic tests continue to reject close-with-violation, invalid reopen, and
-  downgrade inputs, proving the backstop remains intact.
-- Cross-layer tests pass fresh keyed actions through wire decoding, canonical projection,
-  materialization, class-engine dry-run, and durable settlement. They prove satisfied open and
-  violated closed unmechanized outcomes still derive close/reopen, and mechanized violation still
-  requires a mechanized replacement. They also prove legal standalone correction close/reopen and
-  both branch replacement shapes for an unmechanized class remain reachable.
-- Prompt/schema consistency tests compare exact advertised/generated action sets for census
-  consolidation, correction, final, and shared composers in plan and branch modes, including open
-  and closed classes, both mechanization states, all severities, every replacement form, and
-  required versus absent outcomes.
-- Existing provider-route acceptance is rerun on the exact changed schema through fresh and
-  same-session correction routes for Codex and Claude. Retained artifacts name the executable,
-  engine/model, route and role, exact schema bytes/digest, raw and decoded response digests,
-  session identity, and call count, and are replayed through the production decoder. This is a
-  regression check of the repository's existing supported routes, not a new claim about a larger
-  class-count boundary; rejected, missing, or ignored structured output blocks visibly.
-- Production-handler atomicity tests submit a mixed payload containing valid findings/debt plus one
-  schema-invalid action. Invalid-then-invalid is inspected before retry, after terminal handling,
-  and after durable reload: class register, debt, phase, lineage binding, correction controls,
-  claims, plan-contract authority, and settlement fields remain identical, with only the existing
-  explicitly enumerated attempt/failure diagnostics changing. Invalid-then-valid applies the
-  complete corrected settlement exactly once and proves it after durable reload.
-- Residual semantic and dry-run tests enumerate the still-reachable families: debt/outcome and
-  finding/basis binding, correction-derived outcomes conflicting with independent lifecycle,
-  mechanized satisfaction/replacement, lifecycle composition, class-cap/definition errors,
-  classification assessment predicates, and anchor admission. Each rejects before substantive
-  settlement with a provider-addressable pointer.
-- The full test suite passes. A CODE convergence review checks correctness and reachable bugs under
-  the frozen boundary. The acceptance claim is limited to schema-conforming structured providers;
-  an unsupported or ignored schema remains a visible provider/capability failure, not a clear. The
-  claim is limited to schema-known role-required lifecycle conflicts and severity downgrades;
-  correction outcomes derived from a same-response fresh finding and other cross-field
-  incompatibilities remain fail-closed in semantic validation and the class-engine dry-run.
+- Replay the two issue-78 payload shapes using production parsing: a correction-gate rejection
+  followed by (a) close with a violated outcome and (b) a severity downgrade. Assert that the retry
+  prompt contains the exact class-specific legal alternatives and expressly says that neither
+  attempted action satisfies the gate.
+- Run invalid-then-valid production-handler cases for plan and branch correction. The valid retry
+  uses replacement for a violated gated class and settles findings, debt, outcome, action, and
+  successor exactly once through durable reload. Include mechanized and unmechanized replacement
+  shapes and every blocking severity floor.
+- Run invalid-then-invalid cases. Before retry, after terminal handling, and after durable reload,
+  class register, debt, phase, lineage binding, correction controls, claims, plan-contract
+  authority, and settlement fields remain unchanged except for the existing enumerated diagnostic
+  ledger/failure fields.
+- Start the next correction from that durable terminal validation failure. Assert its bounded role
+  and message appear once in `prior_validation_failure`, while provider/capacity/timeout failures
+  do not. A later valid settlement clears the prior failure and does not replay it again.
+- Exact prompt tests cover census consolidation, correction, and final; plan and branch modes;
+  open/closed and mechanized/unmechanized classes; required and absent outcomes; all severities;
+  correction gates; and branch-contract ordering. Prompt preflight and size bounds remain enforced.
+- Existing canonical semantic and dry-run tests continue to reject lifecycle/outcome conflicts,
+  downgrades, invalid replacement, finding/basis/debt mismatches, and incompatible action
+  composition before substantive settlement.
+- Run the focused suites and full suite. Then perform one bounded CODE convergence lineage under
+  the frozen stakes. No live provider capability acceptance is required because provider schemas,
+  routes, call counts, and transport are unchanged; the CODE review itself exercises the external
+  Codex route.
