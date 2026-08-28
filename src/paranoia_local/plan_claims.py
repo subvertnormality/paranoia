@@ -1184,10 +1184,15 @@ def render_trailer(state_raw: Any) -> str:
                 "remove or weaken the assertion solely because attestation failed",
             ])
 
-    unresolved = [c for c in claims if c.get("verdict") != "supported"]
-    if unresolved:
+    actionable = [
+        claim for claim in claims
+        if claim.get("verdict") != "supported" or _source_failure_phases(
+            claim.get("capture_provenance", []), claim.get("evidence", []),
+        )
+    ]
+    if actionable:
         lines.append("ACTIONABLE SOURCE PACKETS:")
-    for claim in unresolved:
+    for claim in actionable:
         lines.extend(_packet_lines(claim))
     return "\n".join(lines)
 
@@ -1201,7 +1206,30 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
     failure_phases = _source_failure_phases(
         claim.get("capture_provenance", []), claim.get("evidence", []),
     )
-    if failure_phases and claim.get("verdict") == "unverified":
+    if failure_phases and claim.get("verdict") == "supported":
+        for failure_phase in failure_phases:
+            if failure_phase == "capture":
+                lines.extend([
+                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry capture or supply another authoritative public URL; "
+                    "retain the supported verdict from the independently adjudicated source",
+                ])
+            elif failure_phase == "binding":
+                lines.extend([
+                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry captured-text binding; retain the supported verdict "
+                    "from the independently adjudicated source",
+                ])
+            else:
+                lines.extend([
+                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
+                    "independently supported)",
+                    "  Next action: retry cold authority-and-entailment attestation; retain the "
+                    "supported verdict from the independently adjudicated source",
+                ])
+    elif failure_phases and claim.get("verdict") == "unverified":
         for failure_phase in failure_phases:
             if failure_phase == "capture":
                 lines.extend([

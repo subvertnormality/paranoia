@@ -275,7 +275,9 @@ Retrieval (including response acquisition, text extraction, and the aggregate ca
 processing deadline), captured-text binding, and
 cold-attestation failures remain distinct server-owned
 phases through reconciliation and rendering, including when only some source rows fail or one
-claim contains failures from multiple phases. Each affected phase names its own retry. None of
+claim contains failures from multiple phases. A failed sibling remains visible with its own retry
+even when another independently adjudicated source keeps the claim supported; that diagnostic does
+not demote the supported verdict. Each affected phase names its own retry. None of
 these processing failures alone is evidence to remove, weaken, or otherwise edit the proposition;
 wording changes require authoritative evidence that refutes or fails to entail it. Ordinary
 terminal provider failures and role-admission failures retain the binding or attestation phase

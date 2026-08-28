@@ -364,7 +364,9 @@ of the resulting code and tests.
   Preserve server-owned binding and attestation failure phases distinctly and render
   phase-specific retry guidance rather than relabeling either as retrieval failure. Preserve
   every affected phase for mixed and partial source failures; processing failure alone never
-  warrants editing the proposition. Ordinary terminal provider or role-admission failure must
+  warrants editing the proposition. Render a failed sibling's phase and retry even when another
+  independently adjudicated source keeps the claim supported, without demoting that verdict.
+  Ordinary terminal provider or role-admission failure must
   carry that same server-owned phase through durable claim debt and rendered recovery guidance.
   The plan under review is context, not evidence for its own assertions; require authoritative
   external sources.
