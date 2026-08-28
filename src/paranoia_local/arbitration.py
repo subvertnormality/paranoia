@@ -877,6 +877,7 @@ class Outcome:
     outcome: str
     selected: str | None
     reason: str
+    provisional_selected: str | None = None
 
 
 def compute_outcome(
@@ -927,9 +928,10 @@ def compute_outcome(
     if unsubstantiated:
         return Outcome(
             UNRESOLVED,
-            selected,
+            None,
             "agreement not substantiated by resolved evidence: "
             + ", ".join(sorted(unsubstantiated)),
+            selected,
         )
     return Outcome(CONVERGED, selected, "unanimous, unblocked, substantiated")
 

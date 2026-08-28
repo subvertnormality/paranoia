@@ -354,6 +354,10 @@ of the resulting code and tests.
   force one exhaustive audit, never normalize to an empty verified register.
 - Return exact passage, canonical location, publisher/authority, relation, and a replacement
   only when qualifying evidence entails the replacement itself. Refutation alone is not a fix.
+  Reject an extracted claim proposition that introduces an explicit universal quantifier
+  absent from its verbatim plan wording before capture. A failed source capture remains
+  blocking, but durable/rendered diagnostics must identify retrieval failure and must not
+  tell the author to weaken or remove the proposition solely because retrieval failed.
   The plan under review is context, not evidence for its own assertions; require authoritative
   external sources.
 - Round 1 is the exhaustive external inventory across facts, design principles, and behaviors.

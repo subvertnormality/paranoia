@@ -336,6 +336,54 @@ class TestAuditValidation:
         )
         assert len(pc.parse_audit(_audit(claim), wrapped).claims) == 1
 
+    def test_claim_cannot_introduce_a_universal_quantifier(self) -> None:
+        plan = "The two named JSON documents contain the required fields.\n"
+        claim = _claim(
+            anchor="The two named JSON documents contain the required fields.",
+            proposition="Every JSON document contains the required fields.",
+        )
+        with pytest.raises(
+            pc.AuditError,
+            match="introduces universal quantifier.*every",
+        ):
+            pc.parse_audit(_audit(claim), plan)
+
+    def test_plan_owned_universal_quantifier_is_preserved(self) -> None:
+        plan = "Every supported JSON document contains the required fields.\n"
+        claim = _claim(
+            anchor="Every supported JSON document contains the required fields.",
+            proposition="Every supported JSON document contains the required fields.",
+        )
+        assert len(pc.parse_audit(_audit(claim), plan).claims) == 1
+
+    def test_capture_failure_is_rendered_as_retrieval_not_author_defect(self) -> None:
+        source = _source(relation="context")
+        failed = _claim(
+            verdict="unverified",
+            evidence=[source],
+            capture_provenance=[{
+                "evidence_index": 0,
+                "requested_url": source["url"],
+                "final_url": source["url"],
+                "status": 503,
+                "content_type": "text/html",
+                "fallback_attempted": False,
+                "content_sha256": None,
+                "text_sha256": None,
+                "error": "server returned HTTP 503",
+            }],
+        )
+        state = pc.reconcile(
+            {}, pc.parse_audit(_audit(failed), PLAN),
+            lineage_id="capture-failed", round_no=1, plan_text=PLAN,
+        )
+        trailer = pc.render_trailer(state)
+        assert "RETRIEVAL-FAILED (blocking; proposition not adjudicated)" in trailer
+        assert "retry capture or supply another authoritative public URL" in trailer
+        assert "remove, weaken, or research" not in trailer
+        record = next(iter(state["claims"].values()))
+        assert "capture failed before authority or entailment" in record["rationale"]
+
     def test_reddit_is_never_upgraded_to_primary_by_model_output(self) -> None:
         reddit = _source(url="https://www.reddit.com/r/python/comments/x", kind="primary")
         claim = pc.parse_audit(_audit(_claim(evidence=[reddit])), PLAN).claims[0]

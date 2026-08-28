@@ -1426,6 +1426,8 @@ def test_unsubstantiated_agreement_is_unresolved(repo: Path, tmp_path: Path):
     agent = Agent(lambda e, r: "opt-float", extra={("codex", 1): {"decisive": "NONE"}})
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
+    assert trailer_field(report, "SELECTED") == "none"
+    assert trailer_field(report, "PROVISIONAL-SELECTED") == "opt-float"
     assert "not substantiated" in report
 
 

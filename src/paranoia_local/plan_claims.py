@@ -453,6 +453,12 @@ def _validate_claim(
         raise ValueError(
             "anchor is not a verbatim substring of the current plan modulo whitespace"
         )
+    introduced = _introduced_universal_quantifiers(anchor, proposition)
+    if introduced:
+        raise ValueError(
+            "proposition introduces universal quantifier(s) absent from the verbatim "
+            f"plan wording: {', '.join(introduced)}"
+        )
     verdict = item["verdict"]
     if verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
@@ -498,7 +504,13 @@ def _validate_claim(
         # conservatively blocking instead of discarding every other valid packet.
         verdict = "unverified"
         replacement = None
-        rationale = f"{rationale} Server demotion: {demotion}.".strip()
+        if _all_captures_failed(capture_provenance, checked):
+            rationale = (
+                f"{rationale} Server capture failed before authority or entailment could "
+                "be adjudicated; the proposition remains unverified."
+            ).strip()
+        else:
+            rationale = f"{rationale} Server demotion: {demotion}.".strip()
     if replacement is not None:
         if verdict != "refuted" or not any(
             e["relation"] == "supports_replacement" for e in qualifying
@@ -587,6 +599,15 @@ def _validate_capture_provenance(
             "error": optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS),
         })
     return rows
+
+
+def _all_captures_failed(
+    provenance: list[dict[str, Any]], evidence: list[dict[str, str]],
+) -> bool:
+    """Whether every proposed source failed before evidence adjudication."""
+    return bool(evidence) and len(provenance) == len(evidence) and all(
+        row.get("error") for row in provenance
+    )
 
 
 def _validate_capture_attestations(
@@ -1101,7 +1122,16 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         f"  Plan wording: {claim.get('anchor')}",
         f"  Atomic proposition: {claim.get('proposition')}",
     ]
-    if claim.get("replacement"):
+    capture_failed = _all_captures_failed(
+        claim.get("capture_provenance", []), claim.get("evidence", []),
+    )
+    if capture_failed and claim.get("verdict") == "unverified":
+        lines.extend([
+            "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+            "  Next action: retry capture or supply another authoritative public URL; "
+            "do not remove or weaken the assertion solely because retrieval failed",
+        ])
+    elif claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     else:
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
@@ -1172,6 +1202,8 @@ Preserve the original event, actor, date, modality, scope, and chronology when f
 atomic proposition. An anchor saying that a dated audit/report occurred is not verified by
 evidence that contains only the underlying condition. The current plan/dossier is the
 assertion under review, not evidence for itself.
+Do not introduce `all`, `any`, `each`, `every`, or `no` into a proposition unless that exact
+universal quantifier occurs in the verbatim anchor. The server rejects that scope expansion.
 
 Prior packets below are candidate leads, never inherited verdicts. Re-open or search each
 retained URL and return every still-present retained proposition as a full current claim/evidence
@@ -1274,6 +1306,8 @@ condition does not prove that a dated external audit/report event occurred. Use 
 for new or edited eligible external propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
+Do not introduce `all`, `any`, `each`, `every`, or `no` into a proposition unless that exact
+universal quantifier occurs in the verbatim anchor. The server rejects that scope expansion.
 
 RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
 {full_packets}
@@ -1371,6 +1405,22 @@ def _collapse_whitespace(value: str) -> str:
 
 def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
     return _collapse_whitespace(anchor) in _collapse_whitespace(plan_text)
+
+
+_UNIVERSAL_QUANTIFIER = re.compile(r"\b(?:all|any|each|every|no)\b", re.IGNORECASE)
+
+
+def _introduced_universal_quantifiers(anchor: str, proposition: str) -> tuple[str, ...]:
+    """Reject an extractor widening bounded wording into a universal proposition."""
+    anchor_terms = {
+        match.group(0).casefold()
+        for match in _UNIVERSAL_QUANTIFIER.finditer(anchor)
+    }
+    proposition_terms = {
+        match.group(0).casefold()
+        for match in _UNIVERSAL_QUANTIFIER.finditer(proposition)
+    }
+    return tuple(sorted(proposition_terms - anchor_terms))
 
 
 def _assertion_binding_unchanged(anchor: str, previous: str, current: str) -> bool:

@@ -147,6 +147,10 @@ Rules:
 Eligible external claims are only load-bearing external facts, externally issued
 governing requirements/principles, and promised external-system behavior.
 Repository facts and local design choices belong to structural review.
+The server rejects a claim proposition that introduces an explicit universal
+quantifier absent from its verbatim plan wording. A source-capture failure remains
+blocking, but is reported as retrieval failure rather than evidence that the plan's
+assertion should be weakened or removed.
 
 ## `query`
 
@@ -222,6 +226,8 @@ Rules:
   `git update-ref -d refs/paranoia/arbitrate/<stamp>`.
 
 Results: `CONVERGED`, `BLOCKED`, `REFRAME_REQUIRED`, `UNRESOLVED`, `FAILED`.
+Unsubstantiated unanimous agreement is `UNRESOLVED`, has `SELECTED: none`, and
+reports the agreed option only as `PROVISIONAL-SELECTED`.
 `ADVISORY: human-owner` is non-gating.
 
 ## Tracked state machine
@@ -265,7 +271,7 @@ Tracked fields can include `CLASS-REGISTER`, `CLASS-CLOSURE`,
 Failure rule: `# STAGED REVIEW FAILED` has no durable clean structural verdict.
 Never infer success from absent findings. `STATE-UNAVAILABLE` is blocking.
 
-Arbitration always reports `ARBITRATION`, `SELECTED`, `ADVISORY`,
+Arbitration always reports `ARBITRATION`, `SELECTED`, `PROVISIONAL-SELECTED`, `ADVISORY`,
 `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`,
 `ROUNDS`, `RESEARCH`, `RESEARCH-DIGEST`.
 
