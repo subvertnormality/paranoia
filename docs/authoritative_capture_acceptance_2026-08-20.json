@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "ab7619faf8fecf2fb808f1ce241bed627b0adbf90176aec76f70b2910f6576a1",
-      "additions": 1515,
-      "deletions": 154,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, server-owned labels on every source-local binding/attestation failure, and retrieval classification for the aggregate capture/pre-binding deadline through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "5db0c0db77ff71077f8514c352709e49f2f73e7be95aa56aab19c81808707f31",
+      "additions": 1557,
+      "deletions": 158,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, capture-group retrieval debt, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
       "sha256": "3ba4d261a47ef13a724a66497fa3ef6f266ecba7c6edfb52c86f6ec6263fe1e6",
@@ -115,10 +115,10 @@
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "allowed_later_plan_claims_diff": {
-      "sha256": "f9519d2479d88b3653d4add0ae92faa703e80c62443d835c2e402d80c7e6f2d6",
-      "additions": 218,
-      "deletions": 9,
-      "scope": "Rejects provider-introduced forms in the closed universal grammar before capture and preserves response acquisition/text extraction/deadline, binding, and attestation phases for all-source, mixed, partial, terminal, and non-governing sibling failures in durable diagnostics without demoting an independently supported or refuted claim; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
+      "sha256": "945560719743262f9a6f235b0e6ffd3f08d981ecb38b2c26c4135ac828f93bcc",
+      "additions": 228,
+      "deletions": 10,
+      "scope": "Rejects provider-introduced forms in the closed universal grammar before capture and preserves response acquisition/text extraction/deadline, binding, and attestation phases plus ordered terminal attempts and completed capture siblings in durable diagnostics without demoting an independently supported or refuted claim; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",

@@ -2,8 +2,8 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification and terminal claim-debt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
-      "sha256": "2bba4b43044305864e5784c0932470f22917699d486683eb0035c95d32cdec0b"
+      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
+      "sha256": "2aaf38cc179a5ad05a7d7f21554c077d082322191c29ac57a5b6245778acfe80"
     }
   },
   "attempt_ledger": [
