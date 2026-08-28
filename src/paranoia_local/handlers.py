@@ -3385,22 +3385,38 @@ class _CapturedClaimEngine:
                 clock=self.clock,
             )
         except external_sources.CaptureGroupError as exc:
-            completed = tuple({
-                "requested_url": item.candidate.url,
-                "final_url": item.final_url,
+            def bounded_value(value: str | None) -> tuple[str | None, str | None]:
+                if value is None:
+                    return None, None
+                return (
+                    pc.bounded_diagnostic(value),
+                    hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest(),
+                )
+
+            completed_rows = []
+            for item in exc.completed:
+                requested_url, requested_url_sha256 = bounded_value(item.candidate.url)
+                final_url, final_url_sha256 = bounded_value(item.final_url)
+                content_type, _ = bounded_value(item.content_type)
+                capture_error, capture_error_sha256 = bounded_value(item.error)
+                completed_rows.append({
+                "requested_url": requested_url,
+                "requested_url_sha256": requested_url_sha256,
+                "final_url": final_url,
+                "final_url_sha256": final_url_sha256,
                 "status": item.status,
-                "content_type": item.content_type,
+                "content_type": content_type,
                 "fallback_attempted": item.fallback_attempted,
                 "content_sha256": item.content_sha256,
                 "text_sha256": item.text_sha256,
-                "error": (
-                    external_sources._bounded_error(item.error)
-                    if item.error else None
-                ),
-            } for item in exc.completed)
+                "error": capture_error,
+                "error_sha256": capture_error_sha256,
+                })
+            completed = tuple(completed_rows)
+            group_error = str(exc)
             error = pc.AuditError(
-                f"source capture worker failed: {exc}",
-                failure_detail=str(exc), completed_captures=completed,
+                "source capture worker failed: " + pc.bounded_diagnostic(group_error),
+                failure_detail=group_error, completed_captures=completed,
             )
             raise error from exc
         self._check_non_model_deadline()

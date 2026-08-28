@@ -1510,6 +1510,7 @@ class TestHandlerFlow:
 class _RoleScript:
     name = "codex"
     default_model = "test"
+    native_web = True
 
     def __init__(
         self, outputs: dict[str, list[str | Review]],
@@ -1792,9 +1793,13 @@ def test_public_claim_path_persists_capture_group_failure_as_retrieval(
     debt = state["debt"]
     assert debt["failure_phase"] == "capture"
     assert debt["completed_captures"] == [{
-        "requested_url": source["url"], "final_url": source["url"],
+        "requested_url": source["url"],
+        "requested_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
+        "final_url": source["url"],
+        "final_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
         "status": 200, "content_type": "text/html", "fallback_attempted": False,
-        "content_sha256": "a" * 64, "text_sha256": "b" * 64, "error": None,
+        "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+        "error": None, "error_sha256": None,
     }]
     assert "RuntimeError: capture worker exploded" in debt["failure_detail"]
     trailer = pc.render_trailer(state)
@@ -4078,6 +4083,92 @@ def test_outer_claim_verification_persists_both_invalid_binding_attempts(
     assert all(row["failure_detail_sha256"] for row in debt["attempts"])
     assert all(row["stderr_sha256"] for row in debt["attempts"])
     assert "EVIDENCE status: BINDING-FAILED" in pc.render_trailer(state)
+
+
+@pytest.mark.parametrize("phase", ["capture", "binding", "attestation"])
+def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
+    repo: Path, tmp_path: Path, monkeypatch, phase: str,
+) -> None:
+    source = _source()
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [_audit(_claim())],
+    }
+    if phase == "binding":
+        outputs["evidence-binding"] = ["initial invalid", "correction invalid"]
+    elif phase == "attestation":
+        outputs["evidence-binding"] = [binding]
+        outputs["evidence-text"] = ["initial invalid", "correction invalid"]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+
+    candidate = external_sources.CandidateSource(
+        source["url"], source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
+    completed_error = "sibling error: " + "y" * 10_000
+    completed = external_sources.Capture(
+        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        None, error=completed_error,
+    )
+    group_error = "capture worker exploded: " + "x" * 10_000
+
+    def capture_all(candidates, **kwargs):
+        if phase == "capture":
+            raise external_sources.CaptureGroupError(group_error, (completed,))
+        return [external_sources.Capture(
+            candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+            source["quote"],
+        )]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+
+    def stop_after_claims(**kwargs):
+        raise rc.CensusError("fixture stops after durable claim persistence")
+
+    monkeypatch.setattr(handlers, "_staged_structural_review", stop_after_claims)
+    lineage_id = f"public-terminal-{phase}"
+    result = handlers.critique_plan(
+        {
+            "plan_text": PLAN, "repo_path": str(repo),
+            "lineage": lineage_id, "round": 1,
+            "stakes": "trusted local tool; evidence correctness is high impact",
+        },
+        engine=engine, log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+    debt = reloaded.claim_state["debt"]
+    assert debt["failure_phase"] == phase
+    assert f"EVIDENCE status: {phase.upper() if phase != 'capture' else 'RETRIEVAL'}-FAILED" in result
+    if phase == "capture":
+        assert len(debt["reason"]) <= pc.DIAGNOSTIC_CHARS + 30
+        assert len(debt["failure_detail"]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert debt["failure_detail_sha256"] == hashlib.sha256(
+            group_error.encode()
+        ).hexdigest()
+        row = debt["completed_captures"][0]
+        assert len(row["error"]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert row["error_sha256"] == hashlib.sha256(completed_error.encode()).hexdigest()
+    else:
+        expected = [
+            f"claim-{phase}", f"claim-{phase}-validation-retry",
+        ]
+        assert [row["role"] for row in debt["attempts"]] == expected
+        assert [row["outcome"] for row in debt["attempts"]] == [
+            "validation-invalid", "validation-invalid",
+        ]
+        assert [row["rejected_reply_excerpt"] for row in debt["attempts"]] == [
+            "initial invalid", "correction invalid",
+        ]
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:
