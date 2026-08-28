@@ -153,7 +153,8 @@ blocking, but is reported as retrieval failure rather than evidence that the pla
 assertion should be weakened or removed. Captured-text binding and cold-attestation
 failures retain their own labels and retry instructions. Mixed or partial source failures
 render every affected server phase; processing failure alone never justifies editing the
-assertion.
+assertion. An ordinary terminal binding or attestation provider failure persists the same
+server-owned phase in claim debt and renders the matching retry action.
 
 ## `query`
 

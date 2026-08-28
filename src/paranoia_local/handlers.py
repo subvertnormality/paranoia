@@ -281,6 +281,23 @@ class _ValidationReview(Review):
     validation_detail: str = ""
 
 
+@dataclass(frozen=True)
+class _EvidencePhaseReview(Review):
+    """A terminal evidence-provider failure with a server-owned processing phase."""
+
+    evidence_phase: str = ""
+
+
+def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
+    return _EvidencePhaseReview(
+        text=review.text, session_ref=review.session_ref, raw=review.raw,
+        returncode=review.returncode, error=True, usage=review.usage,
+        duration_ms=review.duration_ms, failure_detail=review.failure_detail,
+        stderr=review.stderr, provider_duration_ms=review.provider_duration_ms,
+        evidence_phase=phase,
+    )
+
+
 def _staged_prompt_issue(
     prompt: str, label: str, *, maximum: int | None = None,
 ) -> str | None:
@@ -2916,17 +2933,24 @@ def _verify_plan_claims(
         ).json())
     if review.error:
         validation_invalid = isinstance(review, _ValidationReview)
+        evidence_phase = (
+            review.evidence_phase if isinstance(review, _EvidencePhaseReview) else None
+        )
         error = pc.AuditError(
             review.validation_detail if validation_invalid else (
-                f"claim-audit reviewer failed (exit {review.returncode})"
+                f"claim-{evidence_phase or 'audit'} reviewer failed "
+                f"(exit {review.returncode})"
             ),
             review.raw,
             failure_detail=review.failure_detail or "", stderr=review.stderr or "",
-            returncode=review.returncode,
+            returncode=review.returncode, failure_phase=evidence_phase,
         )
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
-        ), "validation-invalid" if validation_invalid else "failed"
+        ), (
+            "validation-invalid" if validation_invalid else
+            f"{evidence_phase}-failed" if evidence_phase else "failed"
+        )
     allow_missing = bool(captured_engine and captured_engine.allow_missing)
     try:
         audit = pc.parse_audit(
@@ -3153,11 +3177,12 @@ class _CapturedClaimEngine:
                 session_ref, discovery, captures, model, effort, binding_kwargs,
             )
         except pc.AuditError as error:
-            return Review(
+            return _EvidencePhaseReview(
                 text=f"[paranoia-local error] binding audit invalid: {error}",
                 session_ref=session_ref, raw=error.raw, error=True,
                 failure_detail=error.failure_detail_raw, stderr=error.stderr_raw,
                 returncode=error.returncode if error.returncode is not None else 1,
+                evidence_phase="binding",
             )
         raw_parts.extend(item.raw for item in binding_reviews)
 
@@ -3286,7 +3311,7 @@ class _CapturedClaimEngine:
         try:
             audit = self._parse_bound(corrected.text, self.discovery, self.captures)
         except pc.AuditError as error:
-            return Review(
+            return _EvidencePhaseReview(
                 text=f"[paranoia-local error] corrected binding audit invalid: {error}",
                 session_ref=corrected.session_ref, raw=corrected.raw, error=True,
             )
@@ -3889,6 +3914,7 @@ class _CapturedClaimEngine:
                 raw="",
                 returncode=1,
                 error=True,
+                evidence_phase="attestation",
             )
         decisions: dict[tuple[int, int], dict[str, Any]] = {}
         attestation_raw: list[str] = []
@@ -3989,7 +4015,7 @@ class _CapturedClaimEngine:
                         or "dedicated expanded attestation call failed"
                     )
                     continue
-                return review
+                return _evidence_phase_review(review, "attestation")
             try:
                 parsed = parse_attestation(review, attestation_batch)
             except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
@@ -4008,10 +4034,10 @@ class _CapturedClaimEngine:
                         )
                         local_failures[key] = pc.bounded_diagnostic(str(exc))
                         continue
-                    return Review(
+                    return _EvidencePhaseReview(
                         text="[paranoia-local error] evidence attestation invalid and "
                         f"cannot be corrected without a provider session: {exc}",
-                        raw=review.raw, error=True,
+                        raw=review.raw, error=True, evidence_phase="attestation",
                     )
                 rendered = json.dumps(
                     attestation_batch, ensure_ascii=False, separators=(",", ":"),
@@ -4045,7 +4071,7 @@ class _CapturedClaimEngine:
                             or "dedicated expanded attestation correction failed"
                         )
                         continue
-                    return correction
+                    return _evidence_phase_review(correction, "attestation")
                 try:
                     parsed = parse_attestation(correction, attestation_batch)
                 except (
@@ -4064,9 +4090,10 @@ class _CapturedClaimEngine:
                         )
                         local_failures[key] = pc.bounded_diagnostic(str(second))
                         continue
-                    return Review(
+                    return _EvidencePhaseReview(
                         text=f"[paranoia-local error] evidence attestation invalid: {second}",
                         session_ref=correction.session_ref, raw=correction.raw, error=True,
+                        evidence_phase="attestation",
                     )
             decisions.update(parsed)
         self.attestation_raw = "\n--- attestation ---\n".join(attestation_raw)
@@ -4074,7 +4101,10 @@ class _CapturedClaimEngine:
             if len(decisions) + len(local_failures) != len(items):
                 raise ValueError("attestation inventory differs from the requested inventory")
         except ValueError as exc:
-            return Review(text=f"[paranoia-local error] {exc}", error=True)
+            return _EvidencePhaseReview(
+                text=f"[paranoia-local error] {exc}", error=True,
+                evidence_phase="attestation",
+            )
         claims = [dict(claim) for claim in audit.claims]
         for index, claim in enumerate(claims):
             claim["capture_attestations"] = []

@@ -51,13 +51,16 @@ class AuditError(ValueError):
 
     def __init__(
         self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
-        returncode: int | None = None,
+        returncode: int | None = None, failure_phase: str | None = None,
     ) -> None:
         self.reason = reason
         self.raw = raw
         self.failure_detail_raw = failure_detail
         self.stderr_raw = stderr
         self.returncode = returncode
+        self.failure_phase = (
+            failure_phase if failure_phase in {"binding", "attestation"} else None
+        )
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
         self.excerpt = _excerpt(raw)
         self.failure_detail_sha256 = hashlib.sha256(
@@ -79,6 +82,7 @@ class AuditError(ValueError):
             "failure_detail": self.failure_detail,
             "stderr_sha256": self.stderr_sha256,
             "stderr": self.stderr,
+            "failure_phase": self.failure_phase,
         }
 
 
@@ -1158,6 +1162,19 @@ def render_trailer(state_raw: Any) -> str:
         )
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
+        failure_phase = debt.get("failure_phase")
+        if failure_phase == "binding":
+            lines.extend([
+                "EVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)",
+                "EVIDENCE next action: retry captured-text binding; do not remove or weaken "
+                "the assertion solely because binding failed",
+            ])
+        elif failure_phase == "attestation":
+            lines.extend([
+                "EVIDENCE status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+                "EVIDENCE next action: retry cold authority-and-entailment attestation; do not "
+                "remove or weaken the assertion solely because attestation failed",
+            ])
 
     unresolved = [c for c in claims if c.get("verdict") != "supported"]
     if unresolved:
@@ -1471,9 +1488,9 @@ def _anchor_in_plan(anchor: str, plan_text: str) -> bool:
 
 
 UNIVERSAL_FORMS = (
-    "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "each",
+    "all", "always", "any", "anybody", "anyone", "anything", "anywhere", "both", "each",
     "entire", "every", "everybody", "everyone", "everything", "everywhere",
-    "in all cases", "invariably", "never", "no", "none", "throughout",
+    "in all cases", "invariably", "neither", "never", "no", "none", "throughout",
     "nobody", "nothing", "nowhere", "under all circumstances", "universally",
     "whole", "wholly", "without exception",
 )

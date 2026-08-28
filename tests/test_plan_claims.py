@@ -1572,6 +1572,62 @@ def test_public_claim_path_repairs_scope_expansion_before_capture(
     assert "introduces universal quantifier(s)" in engine.calls[1][1]
 
 
+@pytest.mark.parametrize("phase", ["binding", "attestation"])
+def test_public_claim_path_preserves_terminal_evidence_failure_phase(
+    tmp_path: Path, monkeypatch, phase: str,
+) -> None:
+    source = _source()
+    discovery = _audit(_claim())
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+        "bindings": [{
+            "claim_index": 0, "evidence_index": 0, "usable": True,
+            "location": source["location"], "passage": source["quote"],
+        }],
+    })
+    failure = Review(
+        text="provider failed", session_ref=None, raw=f"raw {phase}",
+        returncode=17, error=True, failure_detail=f"{phase} unavailable",
+        stderr=f"{phase} stderr",
+    )
+    outputs: dict[str, list[str | Review]] = {
+        "evidence-discovery": [discovery],
+        "evidence-binding": [failure if phase == "binding" else binding],
+    }
+    if phase == "attestation":
+        outputs["evidence-text"] = [failure]
+    engine = _RoleScript(outputs)
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, source["quote"],
+            )
+            for candidate in candidates
+        ]
+
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+    ledger: list[dict] = []
+    state, status = handlers._verify_plan_claims(
+        PLAN, pc.empty_state(), lineage_id=f"terminal-{phase}", round_no=1,
+        stakes="trusted local tool", engine=engine, repo=_repo(tmp_path),
+        model="m", effort="high", plan_repo_path=None, on_progress=None,
+        attempt_ledger=ledger,
+    )
+
+    assert status == f"{phase}-failed"
+    assert state["debt"]["failure_phase"] == phase
+    assert state["debt"]["returncode"] == 17
+    assert state["debt"]["failure_detail"] == f"{phase} unavailable"
+    trailer = pc.render_trailer(state)
+    label = "BINDING-FAILED" if phase == "binding" else "ATTESTATION-FAILED"
+    assert f"EVIDENCE status: {label}" in trailer
+    assert f"retry {'captured-text binding' if phase == 'binding' else 'cold authority-and-entailment attestation'}" in trailer
+    assert "remove or weaken the assertion solely" in trailer
+    assert ledger[-1]["outcome"] == "failed"
+
+
 def test_captured_claim_retry_cannot_bypass_capture_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:
