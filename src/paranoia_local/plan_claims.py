@@ -516,15 +516,19 @@ def _validate_claim(
     adjudicated_relation = {
         "supported": "supports_claim", "refuted": "refutes_claim",
     }.get(verdict)
-    captured_adjudication = bool(
-        adjudicated_relation
-        and _captured_relation({
-            "evidence": checked,
-            "capture_provenance": capture_provenance,
-            "capture_attestations": capture_attestations,
-        }, adjudicated_relation)
+    viable_capture = bool(
+        adjudicated_relation and any(
+            item.get("relation") == adjudicated_relation
+            and any(
+                row.get("evidence_index") == index
+                and row.get("error") is None
+                and row.get("text_sha256") is not None
+                for row in capture_provenance
+            )
+            for index, item in enumerate(checked)
+        )
     )
-    if failure_phases and not captured_adjudication:
+    if failure_phases and (verdict == "unverified" or not viable_capture):
         verdict = "unverified"
         replacement = None
         if failure_phases == ("capture",):
