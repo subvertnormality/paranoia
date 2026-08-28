@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Claim-evidence failure-phase prefixes, source-local binding omission classification, and terminal claim-debt projection only; this does not alter staged schema validation, mechanized predicate matching, correction routing, class settlement, or durable reload.",
-      "sha256": "0ba39100af1c1efcd8139b1eea665f89b2a64ae13fc8c4cdca87f8ade682b372"
+      "sha256": "9629a512e4ca3062649fbe7cec5741b9d0ead1f0f105b02c217c10e247b7f53f"
     }
   },
   "attempt_ledger": [
