@@ -2966,13 +2966,27 @@ def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
         "src/paranoia_local/review_census.py",
         "scripts/run_mechanized_predicate_acceptance.py",
     }
+    allowed_later = artifact.get("allowed_later_source_diffs", {})
+    changed = set()
     for relative, expected in artifact["source_sha256"].items():
         accepted = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
             stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(accepted).hexdigest() == expected
-        assert accepted == (root / relative).read_bytes()
+        current = (root / relative).read_bytes()
+        if accepted == current:
+            continue
+        changed.add(relative)
+        allowance = allowed_later.get(relative)
+        assert isinstance(allowance, dict)
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", revision, "--", relative],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(diff).hexdigest() == allowance.get("sha256")
+        assert "does not alter staged schema validation" in allowance.get("scope", "")
+    assert set(allowed_later) == changed
     assert artifact["provider"]["engine"] == "codex"
     assert artifact["provider"]["web_search"] is False
     outcomes = [row["outcome"] for row in artifact["attempt_ledger"]]
