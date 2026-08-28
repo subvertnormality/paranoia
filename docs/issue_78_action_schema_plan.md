@@ -91,8 +91,10 @@ and asserts the shared normative sentences/identifiers are present; publication 
 - Start the next correction from that durable terminal validation failure. Assert its bounded role
   and message appear once in `prior_validation_failure`, while provider/capacity/timeout failures
   do not. A later valid settlement clears the prior failure and does not replay it again.
-- Exercise the same `_staged_call` retry consumer for census consolidation, correction, and final
-  in both modes. For each, cover invalid-then-valid and invalid-then-invalid. Durable carry-forward
+- Exercise the same `_staged_call` retry consumer through the actual top-level `critique_plan` and
+  `critique_branch` production handlers for census consolidation, correction, and final. Use one
+  durable plan lineage and one durable branch lineage across save/reload boundaries. For each role
+  and mode, cover invalid-then-valid and invalid-then-invalid. Durable carry-forward
   has one positive family only: the terminal attempt exists, has outcome `validation-invalid`, its
   role exactly equals the current state's immediately preceding staged role plus
   `-validation-retry`, durable failure kind is `validation`, and its bounded message is nonempty.
