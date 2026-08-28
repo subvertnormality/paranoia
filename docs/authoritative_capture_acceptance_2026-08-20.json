@@ -115,10 +115,10 @@
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "allowed_later_plan_claims_diff": {
-      "sha256": "bf0d9c26b20e2ba2c8f21457efffdbca1ec5e465d7e00f08754b75764cb4acd4",
+      "sha256": "7c768521c43febec74483fb1304503daa339a2164d4d886c48864b84ba25cf07",
       "additions": 153,
       "deletions": 6,
-      "scope": "Rejects provider-introduced universal forms before capture and preserves retrieval, binding, and attestation phases for all-source, mixed, and partial failures in durable diagnostics without demoting an independently attested sibling source; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
+      "scope": "Rejects provider-introduced universal forms before capture and preserves response acquisition/text extraction, binding, and attestation phases for all-source, mixed, and partial failures in durable diagnostics without demoting an independently attested sibling source; does not alter capture, binding, cold-attestation success, prompt-size, or source-admission semantics proved by this record."
     },
     "production_source_sha256": {
       "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
