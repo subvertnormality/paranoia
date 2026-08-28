@@ -60,6 +60,12 @@ FIXED_PLAN = PLAN.replace(
     "exact coordinate plan:7, its debt and finding IDs, and the provider evidence unchanged."
     "\nValidate the exact coordinate independently from provider-range containment, and reject "
     "a mutation of either channel before Path.write_text."
+    "\nThe retained artifact source inventory is exactly handlers.py, review_census.py, "
+    "prompts.py, this generator, server.py, how-it-works.md, AGENTS.md, and the four named "
+    "test modules enforced by validate_artifact. Commit every bound source before generation "
+    "so source_revision and current bytes agree, validate the completed artifact, then publish "
+    "it in a separate commit. Before publication, require removed, added, or replaced inventory "
+    "members, changed source digests, and dirty bound-source bytes all to reject."
 )
 SIBLING_LINE = 7
 STAKES = (
