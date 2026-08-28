@@ -493,6 +493,7 @@ def _validate_claim(
         e for e in checked
         if _qualifying(e, scope, repo=repo, plan_repo_path=plan_repo_path)
     ]
+    capture_failed = _all_captures_failed(capture_provenance, checked)
     demotion = None
     if verdict == "supported" and not any(e["relation"] == "supports_claim" for e in qualifying):
         demotion = "claimed support lacked claim-entailing authoritative evidence"
@@ -504,13 +505,16 @@ def _validate_claim(
         # conservatively blocking instead of discarding every other valid packet.
         verdict = "unverified"
         replacement = None
-        if _all_captures_failed(capture_provenance, checked):
-            rationale = (
-                f"{rationale} Server capture failed before authority or entailment could "
-                "be adjudicated; the proposition remains unverified."
-            ).strip()
-        else:
+        if not capture_failed:
             rationale = f"{rationale} Server demotion: {demotion}.".strip()
+    if capture_failed:
+        verdict = "unverified"
+        replacement = None
+        rationale = (
+            "Server capture failed before authority or entailment could be adjudicated; "
+            "provider-authored assessment is not evidence, and the proposition remains "
+            "unverified."
+        )
     if replacement is not None:
         if verdict != "refuted" or not any(
             e["relation"] == "supports_replacement" for e in qualifying
