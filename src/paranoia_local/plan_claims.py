@@ -252,7 +252,7 @@ def frozen_supported_ids(
     return frozenset(frozen)
 
 
-def _captured_support(record: dict[str, Any]) -> bool:
+def _captured_relation(record: dict[str, Any], relation: str) -> bool:
     evidence = record.get("evidence", [])
     provenance = record.get("capture_provenance", [])
     for row in record.get("capture_attestations", []):
@@ -270,8 +270,8 @@ def _captured_support(record: dict[str, Any]) -> bool:
         if (
             isinstance(item, dict)
             and isinstance(capture_row, dict)
-            and item.get("relation") == "supports_claim"
-            and row.get("relation") == "supports_claim"
+            and item.get("relation") == relation
+            and row.get("relation") == relation
             and row.get("final_url") == item.get("url")
             and capture_row.get("final_url") == item.get("url")
             and isinstance(capture_row.get("requested_url"), str)
@@ -282,6 +282,10 @@ def _captured_support(record: dict[str, Any]) -> bool:
         ):
             return True
     return False
+
+
+def _captured_support(record: dict[str, Any]) -> bool:
+    return _captured_relation(record, "supports_claim")
 
 
 def changed_plan_text(state_raw: Any, plan_text: str) -> str:
@@ -509,7 +513,18 @@ def _validate_claim(
         replacement = None
         if not failure_phases:
             rationale = f"{rationale} Server demotion: {demotion}.".strip()
-    if failure_phases:
+    adjudicated_relation = {
+        "supported": "supports_claim", "refuted": "refutes_claim",
+    }.get(verdict)
+    captured_adjudication = bool(
+        adjudicated_relation
+        and _captured_relation({
+            "evidence": checked,
+            "capture_provenance": capture_provenance,
+            "capture_attestations": capture_attestations,
+        }, adjudicated_relation)
+    )
+    if failure_phases and not captured_adjudication:
         verdict = "unverified"
         replacement = None
         if failure_phases == ("capture",):
