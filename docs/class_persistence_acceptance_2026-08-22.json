@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
-      "sha256": "afb5c261b1beeb2228c59ec87ce5e44b87708fabf41b371f8c312c235d7a3001"
+      "sha256": "8d05b915d1edb2c48072a5d71bc7b1364cc43c2468fae60e741c51dc6beb08cf"
     }
   },
   "attempt_ledger": [
