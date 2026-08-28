@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Claim-evidence failure-phase classification and terminal claim-debt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
-      "sha256": "aba76391ec36caf04e00462b81f74f578bc2f335e780e41d55d2f52cdf9d782b"
+      "sha256": "37306d88398222a90e9397534f77ac4ece34a394e731b6f318cf2dc2f09d6a6a"
     }
   },
   "attempt_ledger": [
