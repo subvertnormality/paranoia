@@ -64,6 +64,16 @@ single canonical dry-run and atomic transition.
    documentation to describe the repair contract, cross-round validation context, one-retry bound,
    and unchanged atomicity.
 
+The documentation edits are closed: amend `AGENTS.md` under “For the staged Protocol v2 cutover”,
+`CLAUDE.md` under its staged Protocol v2 summary, and
+`docs/staged_review_protocol_v2_acceptance.md` under “Keyed class decisions”. Each must state the
+four outcome-authority paths above, outcome-free standalone lifecycle legality, non-downgrading
+severity, both procedural and mechanized replacements for an unmechanized branch class,
+mechanization-preserving replacement for a mechanized class, the unchanged 100-active-class
+boundary and schema identifiers, the single retry and provider-failure behavior, bounded matching
+prior-validation context, and all-or-nothing settlement. A named test reads those three sections
+and asserts the shared normative sentences/identifiers are present; publication blocks if it fails.
+
 ## Acceptance evidence
 
 - Replay the two issue-78 payload shapes using production parsing: a correction-gate rejection
@@ -81,6 +91,17 @@ single canonical dry-run and atomic transition.
 - Start the next correction from that durable terminal validation failure. Assert its bounded role
   and message appear once in `prior_validation_failure`, while provider/capacity/timeout failures
   do not. A later valid settlement clears the prior failure and does not replay it again.
+- Exercise the same `_staged_call` retry consumer for census consolidation, correction, and final
+  in both modes. For each, cover invalid-then-valid and invalid-then-invalid. Durable carry-forward
+  has one positive family only: the terminal attempt exists, has outcome `validation-invalid`, its
+  role exactly equals the current state's immediately preceding staged role plus
+  `-validation-retry`, durable failure kind is `validation`, and its bounded message is nonempty.
+  Prove final-to-final reload carries that row once. Negatively cover initial invalid with no
+  session, prompt/preflight and consolidation-preflight validation, response-capacity rejection,
+  provider error, timeout, cancellation, generic execution failure, non-resumable failure, and a
+  role mismatch; none enters `prior_validation_failure`. In every exhausted case, compare the
+  pre-round substantive state with durable reload allowing only the enumerated attempt/rejected-
+  payload/failure diagnostics. A later valid settlement atomically clears the context.
 - Exact prompt tests cover census consolidation, correction, and final; plan and branch modes;
   open/closed and mechanized/unmechanized classes; required and absent outcomes; all severities;
   correction gates; and branch-contract ordering. At the existing 100-active-class maximum, render
@@ -90,6 +111,14 @@ single canonical dry-run and atomic transition.
 - Existing canonical semantic and dry-run tests continue to reject lifecycle/outcome conflicts,
   downgrades, invalid replacement, finding/basis/debt mismatches, and incompatible action
   composition before substantive settlement.
+- Positive transition coverage enumerates outcome-free standalone close/reopen, derived close for
+  open unmechanized satisfaction, derived reopen for closed unmechanized violation, required
+  mechanized replacement, same-severity and stronger reclassification, both legal unmechanized
+  branch replacement definitions, and mechanization-preserving replacement. Negative coverage
+  enumerates close/reopen against incompatible authored, census-derived, debt-bound correction,
+  debt-bound fresh-finding, and non-debt-bound fresh-finding outcomes, plus downgrade and
+  mechanization loss. All run through guidance rendering, canonical semantic validation, dry-run,
+  and atomic settlement or rejection as applicable.
 - Run the focused suites and full suite. Then perform one bounded CODE convergence lineage under
   the frozen stakes. No live provider capability acceptance is required because provider schemas,
   routes, call counts, and transport are unchanged; the CODE review itself exercises the external
