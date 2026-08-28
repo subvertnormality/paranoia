@@ -3397,7 +3397,7 @@ class _CapturedClaimEngine:
             for item in exc.completed:
                 requested_url, requested_url_sha256 = bounded_value(item.candidate.url)
                 final_url, final_url_sha256 = bounded_value(item.final_url)
-                content_type, _ = bounded_value(item.content_type)
+                content_type, content_type_sha256 = bounded_value(item.content_type)
                 capture_error, capture_error_sha256 = bounded_value(item.error)
                 completed_rows.append({
                 "requested_url": requested_url,
@@ -3406,6 +3406,7 @@ class _CapturedClaimEngine:
                 "final_url_sha256": final_url_sha256,
                 "status": item.status,
                 "content_type": content_type,
+                "content_type_sha256": content_type_sha256,
                 "fallback_attempted": item.fallback_attempted,
                 "content_sha256": item.content_sha256,
                 "text_sha256": item.text_sha256,

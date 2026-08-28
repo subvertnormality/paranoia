@@ -1797,7 +1797,9 @@ def test_public_claim_path_persists_capture_group_failure_as_retrieval(
         "requested_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
         "final_url": source["url"],
         "final_url_sha256": hashlib.sha256(source["url"].encode()).hexdigest(),
-        "status": 200, "content_type": "text/html", "fallback_attempted": False,
+        "status": 200, "content_type": "text/html",
+        "content_type_sha256": hashlib.sha256(b"text/html").hexdigest(),
+        "fallback_attempted": False,
         "content_sha256": "a" * 64, "text_sha256": "b" * 64,
         "error": None, "error_sha256": None,
     }]
@@ -4109,13 +4111,20 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
 
+    requested_url = "https://example.com/" + "r" * 10_000
+    final_url = "https://example.com/" + "f" * 10_000
+    content_type = "text/plain;" + "c" * 10_000
     candidate = external_sources.CandidateSource(
         source["url"], source["title"], source["publisher"], source["source_kind"],
         source["authority_basis"], source["relation"],
     )
+    completed_candidate = external_sources.CandidateSource(
+        requested_url, source["title"], source["publisher"], source["source_kind"],
+        source["authority_basis"], source["relation"],
+    )
     completed_error = "sibling error: " + "y" * 10_000
     completed = external_sources.Capture(
-        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+        completed_candidate, final_url, 200, content_type, "a" * 64, "b" * 64,
         None, error=completed_error,
     )
     group_error = "capture worker exploded: " + "x" * 10_000
@@ -4156,6 +4165,15 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
             group_error.encode()
         ).hexdigest()
         row = debt["completed_captures"][0]
+        for key in ("requested_url", "final_url", "content_type", "error"):
+            assert len(row[key]) <= pc.DIAGNOSTIC_CHARS + 64
+        assert row["requested_url_sha256"] == hashlib.sha256(
+            requested_url.encode()
+        ).hexdigest()
+        assert row["final_url_sha256"] == hashlib.sha256(final_url.encode()).hexdigest()
+        assert row["content_type_sha256"] == hashlib.sha256(
+            content_type.encode()
+        ).hexdigest()
         assert len(row["error"]) <= pc.DIAGNOSTIC_CHARS + 64
         assert row["error_sha256"] == hashlib.sha256(completed_error.encode()).hexdigest()
     else:
@@ -4169,6 +4187,16 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
         assert [row["rejected_reply_excerpt"] for row in debt["attempts"]] == [
             "initial invalid", "correction invalid",
         ]
+        for row in debt["attempts"]:
+            assert row["returncode"] is not None
+            for digest_key, excerpt_key in (
+                ("raw_sha256", "raw_excerpt"),
+                ("failure_detail_sha256", "failure_detail_excerpt"),
+                ("stderr_sha256", "stderr_excerpt"),
+            ):
+                assert row[digest_key] is not None
+                assert row[excerpt_key] is not None
+                assert len(row[excerpt_key]) <= rc.MAX_ENGINE_FAILURE_MESSAGE_CHARS + 64
 
 
 def test_plan_binding_demotes_a_redirect_to_ugc(tmp_path: Path) -> None:
