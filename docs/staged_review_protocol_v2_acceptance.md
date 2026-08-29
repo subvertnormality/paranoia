@@ -91,7 +91,8 @@ retains both procedural and mechanized replacement for an unmechanized branch cl
 mechanization-preserving replacement for a mechanized class; and tells a violated correction-gated
 class to replace rather than close or retain a blocking severity. The existing 100-class boundary,
 schema identifiers, provider routes, one-retry bound, durable terminal diagnostics, and
-all-or-nothing settlement are unchanged. No cross-round repair state was added.
+all-or-nothing settlement are unchanged. Provider failure behavior remains unchanged and
+visible through the existing durable diagnostics. No cross-round repair state was added.
 
 Correction findings for a non-debt-bound existing class carry independent
 `classification.assessment_evidence`; the server derives that one violated outcome with a

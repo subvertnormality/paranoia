@@ -517,8 +517,10 @@ def validate_artifact(
     revision = artifact["source_revision"]
     expected_sources = {
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+        "src/paranoia_local/staged_protocol.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
+        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md", "CLAUDE.md",
+        "docs/staged_review_protocol_v2_acceptance.md",
         "tests/test_review_census.py", "tests/test_handlers.py",
         "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     }
@@ -1114,8 +1116,10 @@ def main() -> int:
     revision = _run("git", "rev-parse", "HEAD")
     source_paths = [
         "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
+        "src/paranoia_local/staged_protocol.py",
         "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
+        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md", "CLAUDE.md",
+        "docs/staged_review_protocol_v2_acceptance.md",
         "tests/test_review_census.py", "tests/test_handlers.py",
         "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
     ]

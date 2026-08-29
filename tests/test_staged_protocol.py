@@ -358,6 +358,17 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
         ROOT / "CLAUDE.md",
         ROOT / "docs/staged_review_protocol_v2_acceptance.md",
     ]
+    def designated(path, text):
+        if path.name == "issue_78_action_schema_plan.md":
+            return text.split("## Design", 1)[1].split("## Acceptance evidence", 1)[0]
+        if path.name == "CLAUDE.md":
+            return text.split(
+                "- include the exact server-rendered class decision surface", 1,
+            )[1].split("\n- derive", 1)[0]
+        return text.split(
+            "The initial staged prompt retained by that same-session corrective retry", 1,
+        )[1].split("No cross-round repair state was added.", 1)[0]
+
     def contract(text):
         lowered = text.lower().replace("-", " ")
         return {
@@ -381,7 +392,10 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
             "durable_diagnostics":"durable" in lowered and "diagnostic" in lowered,
             "atomic":"all or nothing settlement" in lowered,
         }
-    compared = [contract(path.read_text(encoding="utf-8")) for path in surfaces]
+    compared = [
+        contract(designated(path, path.read_text(encoding="utf-8")))
+        for path in surfaces
+    ]
     assert compared[0] == compared[1] == compared[2]
     assert all(compared[0].values())
 

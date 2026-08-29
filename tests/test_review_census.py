@@ -3639,11 +3639,19 @@ def test_unknown_legacy_calibration_preserves_disabled_claims_and_reverifies_on_
     assert refreshed.claim_reverify_required is False
 
 
-def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_handlers_run_census_correction_and_cold_final_with_retries(
+    repo_with_branch, tmp_path, monkeypatch, mode,
+):
     calls = []
+    retry_responses = {}
+    exhaust_retry = False
+    anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/README.md:1"
+    finding_lane = "domain" if mode == cc.PLAN_MODE else "behaviour"
 
     def run(self, prompt, *args, **kwargs):
         calls.append(prompt)
+        session_ref = f"s{len(calls)}"
         if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
             lane_name = next(
                 row.split()[-1] for row in prompt.splitlines()
@@ -3651,16 +3659,19 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
             )
             findings = ([{
                 "id":"F1", "severity":"MAJOR", "summary":"repair the plan",
-                "evidence":["plan:1"], "remedy":"edit the plan",
-            }] if lane_name == "domain" else [])
-            text = lane(lane_name, findings=findings)
+                "evidence":[anchor], "remedy":"edit the plan",
+            }] if lane_name == finding_lane else [])
+            value = payload(lane(lane_name, findings=findings))
+            for row in value["coverage"]:
+                row["evidence"] = [anchor]
+            text = wire(value)
         elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
             text = wire({
                 "role":"census",
                 "governing_findings":[{
                     "id":"G1", "severity":"MAJOR", "summary":"repair the plan",
-                    "evidence":["plan:1"], "remedy":"edit the plan",
-                    "source_ids":["domain:F1"],
+                    "evidence":[anchor], "remedy":"edit the plan",
+                    "source_ids":[f"{finding_lane}:F1"],
                     "classification":{
                         "kind":"one_off", "reason":"unique plan edit",
                     },
@@ -3671,42 +3682,96 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
             text = wire({
                 "role":"correction", "governing_findings":[],
                 "debt_outcomes":[{
-                    "debt_id":"D1", "status":"closed", "evidence":["plan:1"],
+                    "debt_id":"D1", "status":"closed", "evidence":[anchor],
                 }],
                 "class_outcomes":[], "class_actions":[],
             })
+            retry_responses[session_ref] = text
+            text = "{}"
         else:
             assert '"role": "final"' in prompt
             final_finding = {
                 "id":"G1", "severity":"OUT-OF-SCOPE",
-                "summary":"advisory final observation", "evidence":["plan:1"],
+                "summary":"advisory final observation", "evidence":[anchor],
                 "remedy":"retain as context",
                 "classification":{"kind":"one_off", "reason":"final-only context"},
             }
+            final_coverage = payload(lane(findings=[final_finding]))["coverage"]
+            for row in final_coverage:
+                row["evidence"] = [anchor]
             text = wire({
                 "role":"final", "governing_findings":[final_finding],
                 "debt_outcomes":[], "class_outcomes":[], "class_actions":[],
-                "coverage": payload(lane(findings=[final_finding]))["coverage"],
+                "coverage":final_coverage,
             })
-        return Review(text=text, session_ref=f"s{len(calls)}", raw=text)
+            retry_responses[session_ref] = text
+            text = "{}"
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref.startswith("s")
+        text = "{}" if exhaust_retry else retry_responses[session_ref]
+        return Review(text=text, session_ref=session_ref, raw=text)
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    lineage_id = f"three-phase-{mode}"
     args = {
-        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo),
-        "lineage":"three-phase-plan", "claim_verification":False,
+        "repo_path":str(repo_with_branch), "lineage":lineage_id,
         "stakes":"trusted local tool",
     }
-    first = handlers.critique_plan(
+    invoke = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
+    if mode == cc.PLAN_MODE:
+        args.update(plan_text="# Plan\n\nDo it.", claim_verification=False)
+    else:
+        args.update(base_ref="main", head_ref="feature")
+    first = invoke(
         {**args, "round":1}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda: "T1",
+        log_dir=tmp_path / "logs", now=lambda:"T1",
     )
-    second = handlers.critique_plan(
+    before_correction = cc._to_json(cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="before-correction", mode=mode,
+    ))
+    exhaust_retry = True
+    failed_correction = invoke(
         {**args, "round":2}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda: "T2",
+        log_dir=tmp_path / "logs", now=lambda:"T2F",
     )
-    third = handlers.critique_plan(
+    after_failed_correction = cc._to_json(cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after-failed-correction", mode=mode,
+    ))
+    assert "validation failure did not settle" in failed_correction
+    assert "validation-invalid=2" in failed_correction
+    for key in ("classes", "claim_state", "claim_reverify_required"):
+        assert after_failed_correction[key] == before_correction[key]
+    for key in ("phase", "debt", "snapshot_digest"):
+        assert after_failed_correction["review_state"][key] == before_correction["review_state"][key]
+    exhaust_retry = False
+    second = invoke(
+        {**args, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"T2",
+    )
+    before_final = cc._to_json(cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="before-final", mode=mode,
+    ))
+    exhaust_retry = True
+    failed_final = invoke(
         {**args, "round":3}, engine=handlers.eng.CodexEngine(),
-        log_dir=tmp_path / "logs", now=lambda: "T3",
+        log_dir=tmp_path / "logs", now=lambda:"T3F",
+    )
+    after_failed_final = cc._to_json(cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after-failed-final", mode=mode,
+    ))
+    assert "validation failure did not settle" in failed_final
+    assert "validation-invalid=2" in failed_final
+    for key in ("classes", "claim_state", "claim_reverify_required"):
+        assert after_failed_final[key] == before_final[key]
+    for key in ("phase", "debt", "snapshot_digest"):
+        assert after_failed_final["review_state"][key] == before_final["review_state"][key]
+    exhaust_retry = False
+    third = invoke(
+        {**args, "round":3}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"T3",
     )
 
     assert "STRUCTURAL-PHASE: correction" in first
@@ -3715,37 +3780,49 @@ def test_plan_handler_runs_census_correction_and_cold_final(repo, tmp_path, monk
     assert "STRUCTURAL-PHASE: final" in second
     assert "STRUCTURAL-PHASE: clear" in third
     assert "CONVERGENCE: NOT-BLOCKED" in third
-    assert len(calls) == 6
-    assert all(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in prompt for prompt in calls)
-    correction_task = _task_from_prompt(calls[4])
-    assert correction_task["review_scope"] == "closure_candidate"
-    assert correction_task["checklist"] == list(sp.CHECKLIST)
-    assert calls[4].count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
-    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in calls[5]
-    assert '"existing_debt": []' in calls[5]
-    assert all(key in calls[5] for key in sp.CHECKLIST)
+    assert len(calls) == 8
+    if mode == cc.PLAN_MODE:
+        assert all(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in prompt for prompt in calls)
+    correction_task = _task_from_prompt(calls[5])
+    if mode == cc.PLAN_MODE:
+        assert correction_task["review_scope"] == "closure_candidate"
+        assert correction_task["checklist"] == list(sp.CHECKLIST)
+        assert calls[5].count(handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS) == 1
+    else:
+        assert "review_scope" not in correction_task
+        assert correction_task["checklist"] == []
+    assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in calls[7]
+    assert '"existing_debt": []' in calls[7]
+    assert all(key in calls[7] for key in sp.CHECKLIST)
     assert third.count("## What works") == 1
-    audit = json.loads(next((tmp_path / "logs").glob("T1-critique_plan-*.json")).read_text())
+    tool = "critique_plan" if mode == cc.PLAN_MODE else "critique_branch"
+    audit = json.loads(next((tmp_path / "logs").glob(f"T1-{tool}-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
     assert audit["staged_settlement"]["source_dispositions"] == [
-        {"source_id":"domain:F1", "governing_id":"G1"},
+        {"source_id":f"{finding_lane}:F1", "governing_id":"G1"},
     ]
-    domain = next(row for row in audit["staged_manifests"] if row["lane"] == "domain")
-    assert domain["coverage"][0]["finding_ids"] == ["domain:F1"]
+    finding_manifest = next(
+        row for row in audit["staged_manifests"] if row["lane"] == finding_lane
+    )
+    assert finding_manifest["coverage"][0]["finding_ids"] == [f"{finding_lane}:F1"]
     rows = audit["attempt_ledger"]
     assert {row["role"] for row in rows[:3]} == {
-        "census-domain", "census-execution", "census-integrity",
+        f"census-{lane_name}" for lane_name in sp.LANES[mode]
     }
     assert rows[3]["role"] == "consolidation"
     assert [row["sequence"] for row in rows] == [1, 2, 3, 4]
     lineage = cc.load_lineage(
-        cc.default_state_root(), "three-phase-plan", stamp="T4", mode=cc.PLAN_MODE,
+        cc.default_state_root(), lineage_id, stamp="T4", mode=mode,
     )
-    assert lineage.review_state["debt"][0]["source_ids"] == ["domain:F1"]
-    second_audit = json.loads(next((tmp_path / "logs").glob("T2-critique_plan-*.json")).read_text())
-    third_audit = json.loads(next((tmp_path / "logs").glob("T3-critique_plan-*.json")).read_text())
-    assert [row["role"] for row in second_audit["attempt_ledger"]] == ["correction"]
-    assert [row["role"] for row in third_audit["attempt_ledger"]] == ["final"]
+    assert lineage.review_state["debt"][0]["source_ids"] == [f"{finding_lane}:F1"]
+    second_audit = json.loads(next((tmp_path / "logs").glob(f"T2-{tool}-*.json")).read_text())
+    third_audit = json.loads(next((tmp_path / "logs").glob(f"T3-{tool}-*.json")).read_text())
+    assert [row["role"] for row in second_audit["attempt_ledger"]] == [
+        "correction", "correction-validation-retry",
+    ]
+    assert [row["role"] for row in third_audit["attempt_ledger"]] == [
+        "final", "final-validation-retry",
+    ]
     assert third_audit["staged_settlement"]["_finding_id_renames"] == {"G1":"F1"}
     assert third_audit["staged_settlement"]["findings"][0]["id"] == "F1"
 
