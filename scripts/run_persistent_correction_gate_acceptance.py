@@ -28,6 +28,16 @@ LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
 SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
+ACCEPTANCE_SOURCES = tuple(sorted(
+    str(path.relative_to(ROOT))
+    for path in (ROOT / "src" / "paranoia_local").glob("*.py")
+)) + (
+    "scripts/run_persistent_correction_gate_acceptance.py",
+    "docs/how-it-works.md", "AGENTS.md", "CLAUDE.md",
+    "docs/staged_review_protocol_v2_acceptance.md",
+    "tests/test_review_census.py", "tests/test_handlers.py",
+    "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
+)
 PLAN = (
     "# Change\n\n"
     "Update only scripts/run_persistent_correction_gate_acceptance.py, "
@@ -60,6 +70,13 @@ FIXED_PLAN = PLAN.replace(
     "exact coordinate plan:7, its debt and finding IDs, and the provider evidence unchanged."
     "\nValidate the exact coordinate independently from provider-range containment, and reject "
     "a mutation of either channel before Path.write_text."
+    "\nThe retained artifact source inventory is the deterministic complete set of every "
+    "Python module under src/paranoia_local, plus this generator, how-it-works.md, AGENTS.md, "
+    "CLAUDE.md, staged_review_protocol_v2_acceptance.md, and the four named test modules "
+    "enforced by the shared ACCEPTANCE_SOURCES constant. Commit every bound source before generation "
+    "so source_revision and current bytes agree, validate the completed artifact, then publish "
+    "it in a separate commit. Before publication, require removed, added, or replaced inventory "
+    "members, changed source digests, and dirty bound-source bytes all to reject."
 )
 SIBLING_LINE = 7
 STAKES = (
@@ -509,13 +526,7 @@ def validate_artifact(
         if missing:
             raise ValueError(f"{relative} omits public contract tokens {missing!r}")
     revision = artifact["source_revision"]
-    expected_sources = {
-        "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
-        "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
-        "tests/test_review_census.py", "tests/test_handlers.py",
-        "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
-    }
+    expected_sources = set(ACCEPTANCE_SOURCES)
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
     if set(artifact["source_sha256"]) != expected_sources:
@@ -1106,13 +1117,7 @@ def main() -> int:
         )
     elapsed = time.monotonic() - started
     revision = _run("git", "rev-parse", "HEAD")
-    source_paths = [
-        "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
-        "src/paranoia_local/prompts.py", "scripts/run_persistent_correction_gate_acceptance.py",
-        "src/paranoia_local/server.py", "docs/how-it-works.md", "AGENTS.md",
-        "tests/test_review_census.py", "tests/test_handlers.py",
-        "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
-    ]
+    source_paths = list(ACCEPTANCE_SOURCES)
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
         "version":2, "date":"2026-08-24", "source_revision":revision,

@@ -48,6 +48,12 @@
   disposition fan out to one distinct governing finding per affected class; do not split the
   observation merely to satisfy the settlement schema. Require every repeated-source target to be
   an existing-class finding backed by its own distinct violated assessment citing that source.
+- include the exact server-rendered class decision surface in the initial staged prompt retained by
+  the one same-session validation retry: preserve outcome-free standalone lifecycle actions, non-downgrading severity, both legal
+  unmechanized branch replacement forms (procedural replacement and mechanized replacement), mechanization-preserving replacement, and the distinct
+  census/final/debt-bound correction/fresh-finding outcome-authority paths. A violated gated class requires
+  replacement. Keep the 100-class/schema/provider boundary, durable failure diagnostics, and atomic
+  settlement unchanged; this remains all-or-nothing settlement, with no cross-round repair state.
 - derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
   post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,
   active-class state, engine settings, plan context, exact composed lane prompts, and cache schema

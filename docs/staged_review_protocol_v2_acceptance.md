@@ -83,6 +83,17 @@ Claude `structured_output`, then projects the maps to the unchanged canonical ar
 order. Canonical semantic validation, class-engine dry-run, atomic settlement, durable state, and
 the single corrective retry are unchanged. No invalid row is collapsed or partially settled.
 
+The initial staged prompt retained by that same-session corrective retry now carries an exact
+server-rendered class decision surface. It
+distinguishes census-derived, final-authored, debt-bound correction, and fresh-finding-derived
+outcomes; preserves outcome-free standalone close/reopen; lists only same-or-stronger severity;
+retains both procedural and mechanized replacement for an unmechanized branch class and
+mechanization-preserving replacement for a mechanized class; and tells a violated correction-gated
+class to replace rather than close or retain a blocking severity. The existing 100-class boundary,
+schema identifiers, provider routes, one-retry bound, durable terminal diagnostics, and
+all-or-nothing settlement are unchanged. Provider failure behavior remains unchanged and
+visible through the existing durable diagnostics. No cross-round repair state was added.
+
 Correction findings for a non-debt-bound existing class carry independent
 `classification.assessment_evidence`; the server derives that one violated outcome with a
 `new_finding` basis. A fresh finding for a debt-bound class instead requires the authored outcome to

@@ -1569,7 +1569,7 @@ def _staged_structural_review(
             prompt = prompts.compose(
                 f"{prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)}\n"
                 f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
-                f"{sp.class_decision_instructions('census', active_classes=active_classes)}",
+                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes)}",
                 consolidation_body,
             )
             prompt_issue = _staged_prompt_issue(
@@ -1655,10 +1655,15 @@ def _staged_structural_review(
             followup_instructions += (
                 "\n\n" + PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
             )
+        decision_instructions = sp.class_decision_instructions(
+            mode, role, active_classes=active_classes,
+            outcome_class_ids=outcome_class_ids,
+            correction_gates=correction_gates if role == "correction" else (),
+        )
         prompt = prompts.compose(
             f"{followup_instructions}\n"
             f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
-            f"{sp.class_decision_instructions(role, active_classes=active_classes, outcome_class_ids=outcome_class_ids)}",
+            f"{decision_instructions}",
             stage_body,
         )
         prompt_issue = _staged_prompt_issue(prompt, f"{role} prompt")

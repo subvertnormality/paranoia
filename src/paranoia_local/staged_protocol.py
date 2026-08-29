@@ -71,24 +71,72 @@ def citation_instructions(mode: str, *, plan_contract: bool = False) -> str:
 
 
 def class_decision_instructions(
-    role: str, *, active_classes: Sequence[dict[str, Any]],
+    mode: str, role: str, *, active_classes: Sequence[dict[str, Any]],
     outcome_class_ids: Sequence[str] = (),
+    correction_gates: Sequence[dict[str, Any]] = (),
 ) -> str:
-    """Render the exact keyed decision surface beside the executable schema."""
-    actions = {}
+    """Render the keyed surface and canonical action rules beside the schema."""
+    if mode not in {cc.PLAN_MODE, cc.BRANCH_MODE}:
+        raise ValueError(f"invalid staged mode {mode!r}")
+    outcome_ids = set(outcome_class_ids)
+    gated_ids = {
+        row.get("class_id") for row in correction_gates
+        if isinstance(row, dict) and isinstance(row.get("class_id"), str)
+    }
+    actions: dict[str, dict[str, Any]] = {}
     for cls in active_classes:
-        kinds = ["reclassify", "replace"]
+        class_id = cls["class_id"]
+        severity = cls["severity"]
+        lifecycle: list[str] = []
         if not cls.get("mechanized", False):
-            kinds[:0] = ["close", "reopen"]
-        actions[cls["class_id"]] = kinds
+            lifecycle = ["close"]
+            if cls.get("status") == cc.CLOSED:
+                lifecycle.append("reopen")
+        actions[class_id] = {
+            "status":cls.get("status"),
+            "severity":severity,
+            "mechanized":bool(cls.get("mechanized", False)),
+            "required_outcome":class_id in outcome_ids,
+            "lifecycle":lifecycle,
+            "reclassify_severities":list(cc.SEVERITIES[:cc.SEVERITIES.index(severity) + 1]),
+            "replacement_forms":(
+                ["mechanized-pattern"] if cls.get("mechanized", False)
+                else ["procedure"] if mode == cc.PLAN_MODE
+                else ["procedure", "mechanized-pattern"]
+            ),
+        }
+    authority = {
+        "census":"server derives outcomes from integrity assessments",
+        "correction":(
+            "author outcomes for debt-bound classes; a fresh finding for a debt-bound "
+            "class uses its exact new_finding basis, while a distinct non-debt-bound "
+            "fresh finding supplies assessment_evidence and the server derives violation"
+        ),
+        "final":"author one outcome for every active class",
+    }[role]
+    gate_guidance = ""
+    if role == "correction" and gated_ids:
+        gate_guidance = (
+            " Correction-gated class IDs are exactly: "
+            f"{json.dumps(sorted(gated_ids), ensure_ascii=False, separators=(',', ':'))}. "
+            "Each listed class must become nonblocking: a violated gated class needs a "
+            "valid replacement, while satisfied open unmechanized state closes by "
+            "derivation; retaining a blocking severity does not satisfy the gate."
+        )
     return (
         "class_outcomes is a closed object keyed by exactly these required class IDs: "
         f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
         "class_actions is a closed object with one independent-action slot per active "
         "class. Every listed key is required; use null when no "
-        "independent action is needed. Allowed non-null action kinds by active class are: "
+        "independent action is needed. The exact current decision surface is: "
         f"{json.dumps(actions, ensure_ascii=False, separators=(',', ':'))}. "
-        "Never put class_id inside an outcome or action value."
+        f"Outcome authority for this role: {authority}. "
+        "When an authoritative outcome exists, close requires satisfied and reopen requires "
+        "violated; outcome-free standalone lifecycle actions remain legal only as listed. "
+        "Reclassify and replace may retain or strengthen severity but never downgrade. "
+        "Replacement preserves a mechanized class; use only a listed replacement form. "
+        f"{gate_guidance} Never put class_id inside "
+        "an outcome or action value."
     )
 
 
