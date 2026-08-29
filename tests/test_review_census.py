@@ -438,7 +438,7 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "aaf19f3d87ea814501d7a326f643ba1853a34eeb1252a4aefc9a0e72fca6c64a",
+        "85c605171daf68958f839e35c315783b41ed033424d5ff6215f08c5802fc4a96",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
@@ -450,7 +450,7 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
     ),
     (
         cc.BRANCH_MODE, "final",
-        "0e9bf853f4aa92e0777962e90fa7318c4a46345028c8d5bfc48925fcf6624e57",
+        "7ec0dc4b10d03c2916ead77516933079860f58c6ded8fef8f060220ea97335ff",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),
@@ -2021,6 +2021,55 @@ def test_staged_validation_retry_timeout_is_not_validation_debt(tmp_path):
     assert caught.value.stage_role == "consolidation-validation-retry"
     assert caught.value.failure_kind == "timeout"
     assert not handlers._cacheable_consolidation_error(caught.value)
+
+
+@pytest.mark.parametrize("role", ["consolidation", "correction", "final"])
+@pytest.mark.parametrize("exhausted", [False, True])
+def test_all_staged_decision_roles_share_the_bounded_validation_retry(
+    tmp_path, role, exhausted,
+):
+    invalid = '{"invalid":true}'
+    valid = '{"valid":true}'
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="same-session", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "same-session"
+            assert "/payload: repair this role-specific decision" in prompt
+            text = invalid if exhausted else valid
+            return Review(text=text, session_ref=session_ref, raw=text)
+
+    def parser(text):
+        if text != valid:
+            raise rc.CensusError("/payload: repair this role-specific decision")
+        return {"accepted": True}
+
+    if exhausted:
+        with pytest.raises(rc.CensusError) as caught:
+            handlers._staged_call(
+                role=role, engine=Engine(), prompt=f"initial {role}", cwd=tmp_path,
+                model="m", effort="high", timeout=1200, on_progress=None,
+                parser=parser,
+            )
+        attempts = caught.value.attempts
+        assert len(caught.value.rejected_payloads) == 2
+    else:
+        _, parsed, attempts, rejected = handlers._staged_call(
+            role=role, engine=Engine(), prompt=f"initial {role}", cwd=tmp_path,
+            model="m", effort="high", timeout=1200, on_progress=None,
+            parser=parser,
+        )
+        assert parsed == {"accepted": True}
+        assert len(rejected) == 1
+    assert [row.role for row in attempts] == [role, f"{role}-validation-retry"]
+    assert [row.outcome for row in attempts] == [
+        "validation-invalid",
+        "validation-invalid" if exhausted else "completed",
+    ]
 
 
 def test_removed_census_outcome_field_receives_schema_retry(tmp_path):

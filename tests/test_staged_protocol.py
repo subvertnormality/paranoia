@@ -308,7 +308,7 @@ def test_class_decision_instructions_are_state_severity_and_gate_specific():
         "reclassify_severities":["FATAL", "BLOCKER", "MAJOR"],
         "replacement_forms":["procedure", "mechanized-pattern"],
     }
-    assert surface["closed-manual"]["lifecycle"] == ["reopen"]
+    assert surface["closed-manual"]["lifecycle"] == ["close", "reopen"]
     assert surface["closed-manual"]["reclassify_severities"] == [
         "FATAL", "BLOCKER", "MAJOR", "MINOR",
     ]
@@ -384,6 +384,57 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
     compared = [contract(path.read_text(encoding="utf-8")) for path in surfaces]
     assert compared[0] == compared[1] == compared[2]
     assert all(compared[0].values())
+
+    prefix = "The exact current decision surface is: "
+    branch_surface = json.loads(
+        rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0]
+    )
+    plan_rendered = sp.class_decision_instructions(
+        cc.PLAN_MODE, "final",
+        active_classes=[active_class("manual", severity="MINOR")],
+        outcome_class_ids=["manual"],
+    )
+    plan_surface = json.loads(
+        plan_rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0]
+    )
+    census_rendered = sp.class_decision_instructions(
+        cc.BRANCH_MODE, "census", active_classes=[], outcome_class_ids=[],
+    )
+    final_rendered = sp.class_decision_instructions(
+        cc.BRANCH_MODE, "final", active_classes=[], outcome_class_ids=[],
+    )
+    implemented = {
+        "outcome_paths":all(token in " ".join((
+            census_rendered, rendered, final_rendered,
+        )) for token in (
+            "server derives outcomes", "debt-bound", "fresh finding",
+            "author one outcome for every active class",
+        )),
+        "standalone_lifecycle":all(
+            "close" in row["lifecycle"]
+            and ("reopen" in row["lifecycle"]) == (row["status"] == cc.CLOSED)
+            for row in branch_surface.values() if not row["mechanized"]
+        ) and "outcome-free standalone lifecycle" in rendered,
+        "severity_floor":all(
+            row["reclassify_severities"]
+            == list(cc.SEVERITIES[:cc.SEVERITIES.index(row["severity"]) + 1])
+            for row in branch_surface.values()
+        ) and "never downgrade" in rendered,
+        "replacement_forms":(
+            plan_surface["manual"]["replacement_forms"] == ["procedure"]
+            and any(
+                row["replacement_forms"] == ["procedure", "mechanized-pattern"]
+                for row in branch_surface.values() if not row["mechanized"]
+            )
+            and all(
+                row["replacement_forms"] == ["mechanized-pattern"]
+                for row in branch_surface.values() if row["mechanized"]
+            )
+        ),
+    }
+    assert implemented == {
+        key:compared[0][key] for key in implemented
+    }
 
 
 
@@ -1452,12 +1503,22 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
 
 @pytest.mark.parametrize(("status", "kind", "expected"), [
     (cc.OPEN, "close", cc.CLOSED),
+    (cc.CLOSED, "close", cc.CLOSED),
     (cc.CLOSED, "reopen", cc.OPEN),
 ])
 def test_correction_preserves_outcome_independent_standalone_lifecycle(
     status, kind, expected,
 ):
     active = active_class(status=status)
+    rendered = sp.class_decision_instructions(
+        cc.BRANCH_MODE, "correction", active_classes=[active],
+        outcome_class_ids=[],
+    )
+    prefix = "The exact current decision surface is: "
+    surface = json.loads(
+        rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0]
+    )
+    assert kind in surface["class-a"]["lifecycle"]
     parsed = materialize(
         decision("correction", class_actions=[{
             "kind":kind, "class_id":"class-a",

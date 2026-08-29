@@ -89,10 +89,9 @@ def class_decision_instructions(
         severity = cls["severity"]
         lifecycle: list[str] = []
         if not cls.get("mechanized", False):
-            if cls.get("status") == cc.OPEN:
-                lifecycle = ["close"]
-            elif cls.get("status") == cc.CLOSED:
-                lifecycle = ["reopen"]
+            lifecycle = ["close"]
+            if cls.get("status") == cc.CLOSED:
+                lifecycle.append("reopen")
         actions[class_id] = {
             "status":cls.get("status"),
             "severity":severity,
