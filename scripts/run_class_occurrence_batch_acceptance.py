@@ -42,6 +42,10 @@ HEAD_FILES = {
     name:"MODE = unsafe  # independently violates the shared safe-mode contract\n"
     for name in BASE_FILES
 }
+ATTEMPT_FIELDS = {
+    "sequence", "role", "engine", "session_ref", "outcome", "response_sha256",
+    "returncode", "requested_timeout_sec",
+}
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -118,8 +122,17 @@ def validate_artifact(
         if (root / relative).read_bytes() != historical:
             raise ValueError(f"current source differs from acceptance for {relative}")
     provider = artifact["provider"]
-    if provider.get("engine") != "codex" or provider.get("model") != "gpt-5.6-sol":
+    if set(provider) != {"engine", "model", "effort", "web_search", "cli_version"}:
+        raise ValueError("provider record is not closed and exact")
+    if provider != {
+        "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
+        "web_search":False, "cli_version":provider["cli_version"],
+    }:
         raise ValueError("acceptance did not use the required Codex route")
+    import re
+    match = re.fullmatch(r"codex-cli (\d+)\.(\d+)\.(\d+)(?:\+[0-9A-Za-z.-]+)?", provider["cli_version"])
+    if not match or tuple(map(int, match.groups()[:3])) < engines.MIN_CODEX_VERSION:
+        raise ValueError("provider CLI identity is absent or incompatible")
     calls = artifact["calls"]
     if not isinstance(calls, list) or len(calls) not in {1, 2}:
         raise ValueError("acceptance must retain one call and at most one validation retry")
@@ -138,17 +151,21 @@ def validate_artifact(
             raise ValueError("provider response digest mismatch")
         expected_role = "correction" if index == 1 else "correction-validation-retry"
         expected_outcome = "completed" if index == len(calls) else "validation-invalid"
+        if set(attempt) != ATTEMPT_FIELDS:
+            raise ValueError("attempt record is not closed and exact")
         if (
             attempt.get("sequence") != index or attempt.get("role") != expected_role
+            or attempt.get("engine") != provider["engine"]
             or attempt.get("session_ref") != row["session_ref"]
             or attempt.get("response_sha256") != row["response_sha256"]
             or attempt.get("outcome") != expected_outcome
+            or attempt.get("returncode") != 0
+            or attempt.get("requested_timeout_sec") != (2400 if index == 1 else 600)
         ):
             raise ValueError("provider call and attempt ledger are not route-bound")
-    if len(calls) == 2 and (
-        calls[0]["route"] != "fresh" or calls[1]["route"] != "resumed"
-        or calls[0]["session_ref"] != calls[1]["session_ref"]
-    ):
+    if calls[0]["route"] != "fresh" or (len(calls) == 2 and (
+        calls[1]["route"] != "resumed" or calls[0]["session_ref"] != calls[1]["session_ref"]
+    )):
         raise ValueError("validation retry did not preserve one provider session")
     before = artifact["before_lineage"]
     active = before["classes"]
@@ -228,6 +245,17 @@ def validate_artifact(
     fixture = artifact["fixture"]
     if set(fixture) != {"base_id", "head_id", "base_files", "head_files", "expected_anchors"}:
         raise ValueError("fixture record is not closed and exact")
+    if (
+        fixture["base_files"] != BASE_FILES or fixture["head_files"] != HEAD_FILES
+        or fixture["expected_anchors"] != [
+            "repository/app.conf:1", "repository/worker.conf:1",
+        ]
+        or any(
+            not isinstance(fixture[key], str) or len(fixture[key]) != 40
+            for key in ("base_id", "head_id")
+        )
+    ):
+        raise ValueError("fixture inputs or anchors are not exact")
     with tempfile.TemporaryDirectory(prefix="paranoia-occurrence-replay-") as raw:
         temp = Path(raw)
         repo = _fixture_repo(
@@ -401,7 +429,9 @@ def main() -> int:
             },
             "lineage_id":LINEAGE, "stakes":STAKES,
             "elapsed_seconds":round(elapsed, 3), "calls":artifact_calls,
-            "attempt_ledger":audit["attempt_ledger"],
+            "attempt_ledger":[{
+                key:row[key] for key in ATTEMPT_FIELDS
+            } for row in audit["attempt_ledger"]],
             "settlement":audit["staged_settlement"],
             "before_lineage":before_lineage,
             "after_lineage":{
