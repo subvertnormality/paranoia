@@ -34,18 +34,22 @@ SOURCES = PRODUCTION_SOURCES + (
 STAKES = (
     "One trusted operator and OS; repository, diff, and provider output are untrusted "
     "data only; no repository execution, hostile local race, compromised OS, or "
-    "multitenancy; two text files and one active class; false clearance or incomplete "
+    "multitenancy; one small repository and one active class; false clearance or incomplete "
     "class evidence is high impact; recoverable blocking is acceptable."
 )
 BASE_FILES = {"app.conf":"MODE = safe\n", "worker.conf":"MODE = safe\n"}
 HEAD_FILES = {
-    name:"MODE = unsafe  # independently violates the shared safe-mode contract\n"
+    name:"MODE = unsafe\n"
     for name in BASE_FILES
 }
 ATTEMPT_FIELDS = {
     "sequence", "role", "engine", "session_ref", "outcome", "response_sha256",
     "returncode", "requested_timeout_sec",
 }
+FORBIDDEN_ANSWER_KEYS = (
+    "independent active sites", "aggregate both exact anchors",
+    "two active configuration files", "independently violates",
+)
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -147,6 +151,8 @@ def validate_artifact(
             raise ValueError("acceptance call schema or signed-in session is invalid")
         if _sha_text(row["prompt_text"]) != row["prompt_sha256"]:
             raise ValueError("provider prompt digest mismatch")
+        if any(token in row["prompt_text"] for token in FORBIDDEN_ANSWER_KEYS):
+            raise ValueError("provider-visible prompt contains a fixture answer key")
         if _sha_text(row["response_text"]) != row["response_sha256"]:
             raise ValueError("provider response digest mismatch")
         expected_role = "correction" if index == 1 else "correction-validation-retry"
@@ -329,13 +335,9 @@ def _arguments(repo: Path) -> dict:
         "repo_path":str(repo), "base_ref":"main", "head_ref":"feature",
         "lineage":LINEAGE, "round":2, "model":"gpt-5.6-sol",
         "effort":"high", "web_search":False, "stakes":STAKES,
-        "project_summary":"The fixture has two active configuration files.",
-        "diff_intent":"Keep every active configuration in safe mode.",
-        "focus":(
-            "Assess the supplied active class against the complete diff. app.conf and "
-            "worker.conf are independent active sites; if violated, aggregate both exact "
-            "anchors into its one governing finding and make the remedy cover both sites."
-        ),
+        "project_summary":"A small application with runtime configuration files.",
+        "diff_intent":"Change runtime mode settings.",
+        "focus":"Assess the complete diff and supplied active class using normal branch-review instructions.",
     }
 
 
@@ -404,6 +406,8 @@ def main() -> int:
             "response_text":row["review"].text,
             "response_sha256":_sha_text(row["review"].text),
         } for row in calls]
+        if any(token in artifact_calls[0]["prompt_text"] for token in FORBIDDEN_ANSWER_KEYS):
+            raise RuntimeError("provider-visible acceptance prompt contains an answer key")
         before_lineage = {
             "rounds":1, "next_seq":2, "classes":[vars(tracked)],
             "review_state":state,
