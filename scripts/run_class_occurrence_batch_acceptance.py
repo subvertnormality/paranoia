@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, review_census as rc, staged_protocol as sp
+from paranoia_local.engines import Review
 
 OUTPUT = ROOT / "docs" / "class_occurrence_batch_acceptance_2026-08-30.json"
 LINEAGE = "class-occurrence-batch-acceptance-20260830"
@@ -36,6 +37,11 @@ STAKES = (
     "multitenancy; two text files and one active class; false clearance or incomplete "
     "class evidence is high impact; recoverable blocking is acceptable."
 )
+BASE_FILES = {"app.conf":"MODE = safe\n", "worker.conf":"MODE = safe\n"}
+HEAD_FILES = {
+    name:"MODE = unsafe  # independently violates the shared safe-mode contract\n"
+    for name in BASE_FILES
+}
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -53,7 +59,10 @@ def _git(*args: str, cwd: Path = ROOT, env: dict[str, str] | None = None) -> str
     ).stdout.strip()
 
 
-def _fixture_repo(parent: Path) -> Path:
+def _fixture_repo(
+    parent: Path, *, base_files: dict[str, str] = BASE_FILES,
+    head_files: dict[str, str] = HEAD_FILES,
+) -> Path:
     repo = parent / "repository"
     repo.mkdir()
     env = {
@@ -61,18 +70,17 @@ def _fixture_repo(parent: Path) -> Path:
         "GIT_AUTHOR_NAME":"acceptance", "GIT_AUTHOR_EMAIL":"acceptance@example.test",
         "GIT_COMMITTER_NAME":"acceptance", "GIT_COMMITTER_EMAIL":"acceptance@example.test",
         "GIT_CONFIG_GLOBAL":"/dev/null", "GIT_CONFIG_SYSTEM":"/dev/null",
+        "GIT_AUTHOR_DATE":"2026-08-30T12:00:00+00:00",
+        "GIT_COMMITTER_DATE":"2026-08-30T12:00:00+00:00",
     }
     _git("init", "-q", "-b", "main", cwd=repo, env=env)
-    for name in ("app.conf", "worker.conf"):
-        (repo / name).write_text("MODE = safe\n", encoding="utf-8")
+    for name, text in base_files.items():
+        (repo / name).write_text(text, encoding="utf-8")
     _git("add", "-A", cwd=repo, env=env)
     _git("commit", "-q", "-m", "safe baseline", cwd=repo, env=env)
     _git("checkout", "-q", "-b", "feature", cwd=repo, env=env)
-    for name in ("app.conf", "worker.conf"):
-        (repo / name).write_text(
-            "MODE = unsafe  # independently violates the shared safe-mode contract\n",
-            encoding="utf-8",
-        )
+    for name, text in head_files.items():
+        (repo / name).write_text(text, encoding="utf-8")
     _git("add", "-A", cwd=repo, env=env)
     _git("commit", "-q", "-m", "introduce both occurrences", cwd=repo, env=env)
     return repo
@@ -120,19 +128,28 @@ def validate_artifact(
         raise ValueError("attempt ledger does not match provider call count")
     for index, (row, attempt) in enumerate(zip(calls, ledger), 1):
         if set(row) != {
-            "route", "prompt_sha256", "session_ref", "response_text", "response_sha256",
+            "route", "prompt_text", "prompt_sha256", "session_ref",
+            "response_text", "response_sha256",
         } or not row["session_ref"]:
             raise ValueError("acceptance call schema or signed-in session is invalid")
+        if _sha_text(row["prompt_text"]) != row["prompt_sha256"]:
+            raise ValueError("provider prompt digest mismatch")
         if _sha_text(row["response_text"]) != row["response_sha256"]:
             raise ValueError("provider response digest mismatch")
         expected_role = "correction" if index == 1 else "correction-validation-retry"
+        expected_outcome = "completed" if index == len(calls) else "validation-invalid"
         if (
             attempt.get("sequence") != index or attempt.get("role") != expected_role
             or attempt.get("session_ref") != row["session_ref"]
             or attempt.get("response_sha256") != row["response_sha256"]
-            or attempt.get("outcome") != "completed"
+            or attempt.get("outcome") != expected_outcome
         ):
             raise ValueError("provider call and attempt ledger are not route-bound")
+    if len(calls) == 2 and (
+        calls[0]["route"] != "fresh" or calls[1]["route"] != "resumed"
+        or calls[0]["session_ref"] != calls[1]["session_ref"]
+    ):
+        raise ValueError("validation retry did not preserve one provider session")
     before = artifact["before_lineage"]
     active = before["classes"]
     durable_debt = before["review_state"]["debt"]
@@ -208,6 +225,94 @@ def validate_artifact(
     )
     if rerendered != artifact["result_text"]:
         raise ValueError("settlement and durable state do not rerender the retained result")
+    fixture = artifact["fixture"]
+    if set(fixture) != {"base_id", "head_id", "base_files", "head_files", "expected_anchors"}:
+        raise ValueError("fixture record is not closed and exact")
+    with tempfile.TemporaryDirectory(prefix="paranoia-occurrence-replay-") as raw:
+        temp = Path(raw)
+        repo = _fixture_repo(
+            temp, base_files=fixture["base_files"], head_files=fixture["head_files"],
+        )
+        if (
+            _git("rev-parse", "main^{commit}", cwd=repo) != fixture["base_id"]
+            or _git("rev-parse", "feature^{commit}", cwd=repo) != fixture["head_id"]
+        ):
+            raise ValueError("retained fixture does not reconstruct recorded Git identities")
+        for anchor in fixture["expected_anchors"]:
+            path, raw_line = anchor.removeprefix("repository/").rsplit(":", 1)
+            lines = (repo / path).read_text(encoding="utf-8").splitlines()
+            if not raw_line.isdigit() or int(raw_line) > len(lines):
+                raise ValueError("retained fixture does not resolve an occurrence anchor")
+        state_root = temp / "state"
+        prior_root = os.environ.get(cc.STATE_ROOT_ENV)
+        os.environ[cc.STATE_ROOT_ENV] = str(state_root)
+        before_classes = [cc.TrackedClass(**row) for row in before["classes"]]
+        cc.save_lineage(state_root, cc.Lineage(
+            artifact["lineage_id"], rounds=before["rounds"], next_seq=before["next_seq"],
+            classes={row.class_id:row for row in before_classes}, mode=cc.BRANCH_MODE,
+            review_state=before["review_state"],
+        ))
+
+        class ReplayEngine:
+            name = "codex"
+            native_web = True
+            role = "default"
+
+            def __init__(self) -> None:
+                self.index = 0
+                self.prompts: list[str] = []
+
+            def for_role(self, role: str):
+                self.role = role
+                return self
+
+            def run(self, prompt, *args, **kwargs):
+                return self._reply(prompt)
+
+            def resume(self, session_ref, prompt, *args, **kwargs):
+                if session_ref != calls[0]["session_ref"]:
+                    raise ValueError("validation retry did not resume the original session")
+                return self._reply(prompt)
+
+            def _reply(self, prompt: str) -> Review:
+                self.prompts.append(prompt)
+                row = calls[self.index]
+                self.index += 1
+                return Review(
+                    text=row["response_text"], session_ref=row["session_ref"],
+                    raw=row["response_text"],
+                )
+
+        replay_engine = ReplayEngine()
+        try:
+            replay_result = handlers.critique_branch(
+                _arguments(repo), engine=replay_engine, log_dir=temp / "logs",
+                now=lambda:"REPLAY",
+            )
+        finally:
+            if prior_root is None:
+                os.environ.pop(cc.STATE_ROOT_ENV, None)
+            else:
+                os.environ[cc.STATE_ROOT_ENV] = prior_root
+        if replay_engine.prompts != [row["prompt_text"] for row in calls]:
+            raise ValueError("retained inputs do not reproduce the exact provider prompts")
+        if replay_result != artifact["result_text"]:
+            raise ValueError("public-handler replay does not reproduce retained result")
+
+
+def _arguments(repo: Path) -> dict:
+    return {
+        "repo_path":str(repo), "base_ref":"main", "head_ref":"feature",
+        "lineage":LINEAGE, "round":2, "model":"gpt-5.6-sol",
+        "effort":"high", "web_search":False, "stakes":STAKES,
+        "project_summary":"The fixture has two active configuration files.",
+        "diff_intent":"Keep every active configuration in safe mode.",
+        "focus":(
+            "Assess the supplied active class against the complete diff. app.conf and "
+            "worker.conf are independent active sites; if violated, aggregate both exact "
+            "anchors into its one governing finding and make the remedy cover both sites."
+        ),
+    }
 
 
 def main() -> int:
@@ -243,36 +348,34 @@ def main() -> int:
 
         def record_run(prompt, *args, response_schema=None, **kwargs):
             review = original_run(prompt, *args, response_schema=response_schema, **kwargs)
-            calls.append({"route":"fresh", "prompt_sha256":_sha_text(prompt), "review":review})
+            calls.append({
+                "route":"fresh", "prompt_text":prompt,
+                "prompt_sha256":_sha_text(prompt), "review":review,
+            })
             return review
 
         def record_resume(session_ref, prompt, *args, response_schema=None, **kwargs):
             review = original_resume(
                 session_ref, prompt, *args, response_schema=response_schema, **kwargs,
             )
-            calls.append({"route":"resumed", "prompt_sha256":_sha_text(prompt), "review":review})
+            calls.append({
+                "route":"resumed", "prompt_text":prompt,
+                "prompt_sha256":_sha_text(prompt), "review":review,
+            })
             return review
 
         engine.run = record_run  # type: ignore[method-assign]
         engine.resume = record_resume  # type: ignore[method-assign]
         started = time.monotonic()
-        result = handlers.critique_branch({
-            "repo_path":str(repo), "base_ref":"main", "head_ref":"feature",
-            "lineage":LINEAGE, "round":2, "model":"gpt-5.6-sol",
-            "effort":"high", "web_search":False, "stakes":STAKES,
-            "project_summary":"The fixture has two active configuration files.",
-            "diff_intent":"Keep every active configuration in safe mode.",
-            "focus":(
-                "Assess the supplied active class against the complete diff. app.conf and "
-                "worker.conf are independent active sites; if violated, aggregate both exact "
-                "anchors into its one governing finding and make the remedy cover both sites."
-            ),
-        }, engine=engine, log_dir=log_root)
+        result = handlers.critique_branch(
+            _arguments(repo), engine=engine, log_dir=log_root,
+        )
         elapsed = time.monotonic() - started
         audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
         lineage = cc.load_lineage(state_root, LINEAGE, stamp="acceptance", mode=cc.BRANCH_MODE)
         artifact_calls = [{
-            "route":row["route"], "prompt_sha256":row["prompt_sha256"],
+            "route":row["route"], "prompt_text":row["prompt_text"],
+            "prompt_sha256":row["prompt_sha256"],
             "session_ref":row["review"].session_ref,
             "response_text":row["review"].text,
             "response_sha256":_sha_text(row["review"].text),
@@ -297,6 +400,7 @@ def main() -> int:
             "fixture":{
                 "base_id":_git("rev-parse", "main^{commit}", cwd=repo),
                 "head_id":_git("rev-parse", "feature^{commit}", cwd=repo),
+                "base_files":BASE_FILES, "head_files":HEAD_FILES,
                 "expected_anchors":["repository/app.conf:1", "repository/worker.conf:1"],
             },
             "lineage_id":LINEAGE, "stakes":STAKES,

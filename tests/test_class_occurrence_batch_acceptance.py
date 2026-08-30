@@ -22,7 +22,8 @@ def test_class_occurrence_batch_acceptance_is_source_and_route_bound() -> None:
 
 
 @pytest.mark.parametrize("field", [
-    "provider", "response", "ledger", "settlement", "lineage", "result", "engine_source",
+    "provider", "prompt", "response", "ledger", "outcome", "role", "retry",
+    "fixture", "settlement", "lineage", "result", "engine_source",
 ])
 def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
     root = Path(__file__).resolve().parents[1]
@@ -37,10 +38,20 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
     artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
     if field == "provider":
         artifact["provider"]["model"] = "different-model"
+    elif field == "prompt":
+        artifact["calls"][-1]["prompt_text"] += " changed"
     elif field == "response":
         artifact["calls"][-1]["response_text"] += " "
     elif field == "ledger":
         artifact["attempt_ledger"][-1]["session_ref"] = "different-session"
+    elif field == "outcome":
+        artifact["attempt_ledger"][-1]["outcome"] = "validation-invalid"
+    elif field == "role":
+        artifact["attempt_ledger"][-1]["role"] = "final"
+    elif field == "retry":
+        artifact["calls"].append(deepcopy(artifact["calls"][-1]))
+    elif field == "fixture":
+        artifact["fixture"]["head_files"]["worker.conf"] = "MODE = safe\n"
     elif field == "settlement":
         artifact["settlement"]["findings"][0]["summary"] += " changed"
     elif field == "lineage":
