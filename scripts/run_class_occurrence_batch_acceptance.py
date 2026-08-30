@@ -414,12 +414,12 @@ def main() -> int:
         }
         candidate_path = Path("/tmp/paranoia-class-occurrence-batch-candidate.json")
         candidate_path.write_text(
-            json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            json.dumps(artifact, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         validate_artifact(artifact, require_committed=False)
         OUTPUT.write_text(
-            json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            json.dumps(artifact, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
     print(f"wrote {OUTPUT} from {len(calls)} signed-in provider call(s)")
