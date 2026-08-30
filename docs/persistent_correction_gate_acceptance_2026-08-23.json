@@ -11,7 +11,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "2c0c3191e18db42392bbec3d86a315d0224e25d5d8d5061ee2b5856055444479"
+      "sha256": "0a61ab9fa35e83d64b004352ce1f28c8e7697376842f8aa776ad60be0fa07255"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
