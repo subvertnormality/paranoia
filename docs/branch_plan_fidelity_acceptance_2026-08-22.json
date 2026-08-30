@@ -11,7 +11,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Plan-only co-asserting-site completeness guidance; this does not alter branch plan-contract binding, authority, capture, propagation, or branch review instructions.",
-      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+      "sha256": "9141a4e18432dc9c2ba87a04ebf70dacf88474364c683be23087b9c4607e6f06"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance now renders current lifecycle and non-downgrading severity choices; this does not alter branch plan-contract binding, authority, capture, propagation, provider schema, canonical validation, or atomic settlement.",

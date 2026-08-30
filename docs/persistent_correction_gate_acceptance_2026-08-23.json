@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents exact-plan claim-history authority, correction-control recovery, and co-asserting evidence completeness without changing the retained correction-gate run.",
-      "sha256": "5e8fb9a0452500f2152d9138eea1ddb72fe4b7d4ed463871607f96eed2d5cdda"
+      "sha256": "1bef1d5c863166851056633a82d97c12373d93fff094236d47b90c9078dc63dc"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds plan-only co-asserting-site completeness guidance; correction-gate lifecycle instructions remain unchanged.",
-      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+      "sha256": "9141a4e18432dc9c2ba87a04ebf70dacf88474364c683be23087b9c4607e6f06"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",
@@ -35,7 +35,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds missing-row, stale-row, and claim-history public-preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "568954cbf220e134a7ebc56e9e38c7c1947c0ca910a032925fc17bc3318cc9ec"
+      "sha256": "dbb92a494b52dde49cd34cad309fae3ec5a9e56e1c0ae2e89b4d75fd9b1d6eaa"
     }
   },
   "after_lineage": {
