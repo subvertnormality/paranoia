@@ -1264,6 +1264,18 @@ def materialize_decision_value(
                             "non-debt-bound class occurrence"
                         )
                         continue
+                    finding_evidence = findings[finding_index]["evidence"]
+                    missing = [
+                        anchor for anchor in evidence
+                        if anchor not in finding_evidence
+                    ]
+                    if missing:
+                        issues.append(
+                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
+                            f"finding for class {cid!r} must include every "
+                            "current-occurrence anchor authored in "
+                            f"{pointer}/assessment_evidence; missing {missing}"
+                        )
                     outcomes[cid] = {
                         "class_id": cid, "verdict": "violated",
                         "evidence": list(evidence),
@@ -1282,6 +1294,31 @@ def materialize_decision_value(
                         f"existing-class finding requires violated new_finding basis "
                         f"naming {finding_id!r}"
                     )
+                else:
+                    finding_evidence = findings[finding_index]["evidence"]
+                    missing = [
+                        anchor for anchor in outcome["evidence"]
+                        if anchor not in finding_evidence
+                    ]
+                    if missing:
+                        issues.append(
+                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
+                            f"finding for class {cid!r} must include every "
+                            "current-occurrence anchor authored in "
+                            f"{outcome_pointers.get(cid, '/class_outcomes')}/evidence; "
+                            f"missing {missing}"
+                        )
+                for debt_id, debt in open_debt.items():
+                    if cid not in debt.get("class_ids", []):
+                        continue
+                    debt_outcome = debt_outcomes.get(debt_id)
+                    if debt_outcome is not None and debt_outcome["status"] != "closed":
+                        issues.append(
+                            f"{debt_outcome_pointers[debt_id]}/status: a fresh aggregate "
+                            f"finding for class {cid!r} must close its prior open debt "
+                            f"{debt_id!r}; include every still-reachable predecessor "
+                            "occurrence in the aggregate finding"
+                        )
         expected_model_classes = authored_classes | set(existing_findings)
         if set(outcomes) != expected_model_classes:
             issues.append(
@@ -1371,6 +1408,22 @@ def materialize_decision_value(
             issues.append(
                 f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
+
+    if role == "correction":
+        for cid in classes:
+            retained = [
+                debt_id for debt_id, debt in open_debt.items()
+                if cid in debt.get("class_ids", [])
+                and debt_outcomes.get(debt_id, {}).get("status") == "open"
+            ]
+            prospective = len(retained) + (1 if cid in existing_findings else 0)
+            if prospective > 1:
+                pointers = [debt_outcome_pointers[item] for item in retained]
+                issues.append(
+                    f"/debt_outcomes: correction would retain {prospective} open debts "
+                    f"for active class {cid!r}; keep at most one aggregate blocker "
+                    f"(retained pointers={pointers})"
+                )
 
     action_pointers = _class_row_pointers(value, "class_actions")
     actions = _unique(

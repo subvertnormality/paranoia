@@ -2,8 +2,8 @@
   "acceptance_kind": "arbitration-context-steering-rejected",
   "allowed_later_source_diffs": {
     "src/paranoia_local/prompts.py": {
-      "scope": "Plan-only co-asserting-site completeness guidance; arbitration prompts and context-steering rejection are unchanged.",
-      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+      "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and context-steering rejection are unchanged.",
+      "sha256": "11a70da28bb040cda5e77f182bb0e0e43e24f82c8a72e33ebed2875d3979cc31"
     }
   },
   "audit": {

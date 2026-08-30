@@ -37,7 +37,8 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     )
     assert prompt_diff.returncode == 0
     assert hashlib.sha256(prompt_diff.stdout).hexdigest() == allowance["sha256"]
-    assert "Plan-only" in allowance["scope"]
+    assert "Shared staged-review" in allowance["scope"]
+    assert "Plan-only" not in allowance["scope"]
     assert artifact["input"]["stakes"] == (
         "Review effort spent on this naming decision is effort not spent on its "
         "implementation. A wrong choice causes rework, not corrupted state."

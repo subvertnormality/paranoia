@@ -229,6 +229,20 @@ debt advances to the independent `final` phase, never directly to `clear`.
 Tracked branch correction and all final prompts retain their existing scope.
 This is a convergence-efficiency heuristic, not a fixed-round guarantee.
 
+In both plan and branch correction, independently anchored occurrences of one active class are
+reported together as one governing finding whose evidence and remedy cover every site. The server
+still permits only one finding and outcome per class in a settlement. A fresh occurrence may mint
+a fresh debt ID; correction gates prevent rewording the same site from satisfying a blocking class.
+A fresh aggregate finding must close the class's prior open debt after incorporating every
+still-reachable predecessor occurrence, so one class does not accumulate duplicate blockers.
+Before that transition, the correction materializer requires the finding to contain every
+current-occurrence anchor independently authored in its matching violated class outcome and reports
+an omission at the governing finding's evidence pointer through the bounded validation retry.
+Non-debt-bound correction findings pass the same check against their authored
+`classification.assessment_evidence` before the server derives a violated class outcome.
+The canonical correction validator also rejects any resulting state with multiple open debts bound
+to one active class.
+
 | Trailer field | Meaning |
 |---|---|
 | `CLASS-REGISTER` | Class operations applied in this settlement |

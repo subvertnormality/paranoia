@@ -1433,7 +1433,7 @@ def test_carried_debt_preserves_one_identity_without_minting():
         "correction",
         debt_outcomes=[
             {"debt_id": "D7", "status": "open", "evidence": ["plan:1"], "reason": "still reachable"},
-            {"debt_id": "D8", "status": "open", "evidence": ["plan:1"], "reason": "also reachable"},
+            {"debt_id": "D8", "status": "closed", "evidence": ["plan:1"]},
         ],
         class_outcomes=[{
             "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
@@ -1444,6 +1444,7 @@ def test_carried_debt_preserves_one_identity_without_minting():
     assert parsed["debt"] == []
     assert parsed["class_assessments"][0]["finding_id"] == "old-7"
     assert {row["id"] for row in parsed["debt_updates"]} == {"D7", "D8"}
+    assert [row["status"] for row in parsed["debt_updates"]] == ["open", "closed"]
 
 
 def test_carried_debt_must_remain_open_and_bind_the_class():
@@ -2470,6 +2471,10 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
         "G4", "MAJOR",
         classification={"kind": "existing_class", "class_id": "class-a"},
     )
+    new.update(
+        evidence=["plan:1", "plan:2"],
+        remedy="repair both independently anchored plan sites",
+    )
     raw = decision(
         "correction", governing_findings=[new],
         debt_outcomes=[
@@ -2477,7 +2482,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
             {"debt_id": "D8", "status": "closed", "evidence": ["plan:1"]},
         ],
         class_outcomes=[{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "class_id": "class-a", "verdict": "violated",
+            "evidence": ["plan:1", "plan:2"],
             "basis": {"kind": "new_finding", "finding_id": "G4"},
         }],
         class_actions=[{
@@ -2495,8 +2501,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
         }],
         "debt": [{
             "finding_id": "G4", "status": "open", "severity": "MAJOR",
-            "summary": "reachable defect", "evidence": ["plan:1"],
-            "remedy": "repair the reachable path",
+            "summary": "reachable defect", "evidence": ["plan:1", "plan:2"],
+            "remedy": "repair both independently anchored plan sites",
         }],
         "debt_updates": [
             {"id": "D7", "status": "closed", "evidence": ["plan:1"]},
@@ -2509,7 +2515,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
             {"op": "reclassify", "class_id": "class-a", "severity": "BLOCKER"},
         ],
         "class_assessments": [{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "class_id": "class-a", "verdict": "violated",
+            "evidence": ["plan:1", "plan:2"],
             "finding_id": "G4",
         }],
     }
@@ -2526,6 +2533,16 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
     ) == durable_projection(
         legacy, active=[active_class()], prior_debt=debts, phase="correction",
     )
+    state = rc.normalize_state({}, stakes="s", snapshot="before")
+    state.update(phase="correction", debt=deepcopy(debts))
+    settled = rc.settle_state(
+        state, parsed, phase="correction", snapshot="after", round_no=2,
+    )
+    fresh = next(row for row in settled["debt"] if row["id"] not in {"D7", "D8"})
+    assert fresh["evidence"] == ["plan:1", "plan:2"]
+    assert fresh["remedy"] == "repair both independently anchored plan sites"
+    assert fresh["class_ids"] == ["class-a"]
+    assert settled["phase"] == "correction"
 
 
 def test_frozen_historical_v1_final_projection_is_preserved():
@@ -2634,18 +2651,31 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
     )
 
 
-def test_correction_derives_non_debt_class_outcome_with_distinct_evidence():
+def test_correction_rejects_non_debt_assessment_evidence_missing_from_finding():
     current = finding(
         "G5", "MINOR", classification={
             "kind":"existing_class", "class_id":"class-a",
             "assessment_evidence":["plan:2"],
         },
     )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=(
+            r"/governing_findings/0/evidence: fresh aggregate finding.*"
+            r"/classification/assessment_evidence; missing \['plan:2'\]"
+        ),
+    ):
+        materialize(
+            decision("correction", governing_findings=[current]),
+            active_classes=[active_class(severity="MINOR")],
+        )
+
+    current["evidence"] = ["plan:1", "plan:2"]
     parsed = materialize(
         decision("correction", governing_findings=[current]),
         active_classes=[active_class(severity="MINOR")],
     )
-    assert parsed["findings"][0]["evidence"] == ["plan:1"]
+    assert parsed["findings"][0]["evidence"] == ["plan:1", "plan:2"]
     assert parsed["class_assessments"] == [{
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "finding_id":"G5",
@@ -2662,6 +2692,7 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
     current = finding(
         "G5", classification={"kind":"existing_class", "class_id":"class-a"},
     )
+    current["evidence"] = ["plan:1", "plan:2"]
     debt = durable_debt()
     base = decision(
         "correction", governing_findings=[current],
@@ -2681,6 +2712,9 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
         )
 
     valid = deepcopy(base)
+    valid["debt_outcomes"][0] = {
+        "debt_id":"D7", "status":"closed", "evidence":["plan:1"],
+    }
     valid["class_outcomes"] = [{
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "basis":{"kind":"new_finding", "finding_id":"G5"},
@@ -2692,6 +2726,78 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "finding_id":"G5",
     }
+
+
+def test_fresh_existing_class_finding_cannot_drop_authored_occurrence_anchor():
+    current = finding(
+        "G5", classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[current],
+        debt_outcomes=[{
+            "debt_id":"D7", "status":"closed", "evidence":["plan:1"],
+        }],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated",
+            "evidence":["plan:1", "plan:2"],
+            "basis":{"kind":"new_finding", "finding_id":"G5"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=(
+            r"/governing_findings/0/evidence: fresh aggregate finding.*"
+            r"/class_outcomes/class-a/evidence; missing \['plan:2'\]"
+        ),
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
+
+
+def test_fresh_aggregate_finding_must_supersede_prior_class_debt():
+    current = finding(
+        "G5", classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[current],
+        debt_outcomes=[{
+            "debt_id":"D7", "status":"open", "evidence":["plan:1"],
+            "reason":"the narrower predecessor remains open",
+        }],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G5"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"/debt_outcomes/0/status: a fresh aggregate finding.*must close",
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
+
+
+def test_correction_cannot_carry_two_open_debts_for_one_class():
+    debts = [durable_debt("D7"), durable_debt("D8", finding_id="older-8")]
+    raw = decision(
+        "correction",
+        debt_outcomes=[{
+            "debt_id":debt["id"], "status":"open", "evidence":["plan:1"],
+            "reason":"the occurrence remains reachable",
+        } for debt in debts],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"carried_debt", "debt_id":"D7"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError, match="would retain 2 open debts.*keep at most one",
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=debts)
+
+    raw["debt_outcomes"][1] = {
+        "debt_id":"D8", "status":"closed", "evidence":["plan:1"],
+    }
+    parsed = materialize(raw, active_classes=[active_class()], durable_debt=debts)
+    assert [row["status"] for row in parsed["debt_updates"]] == ["open", "closed"]
 
 
 def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():

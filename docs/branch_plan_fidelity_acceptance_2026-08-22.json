@@ -10,12 +10,12 @@
       "sha256": "595616b7a2a8b99c79758b8227ae8d3af4e9509d241fa57d02843e0d0c9e7d83"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Plan-only co-asserting-site completeness guidance; this does not alter branch plan-contract binding, authority, capture, propagation, or branch review instructions.",
-      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+      "scope": "Shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "11a70da28bb040cda5e77f182bb0e0e43e24f82c8a72e33ebed2875d3979cc31"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Server-authored class-action guidance now renders current lifecycle and non-downgrading severity choices; this does not alter branch plan-contract binding, authority, capture, propagation, provider schema, canonical validation, or atomic settlement.",
-      "sha256": "4fcce611a8fe12ae38703b3a307bc0487de9aa4e647cd53a05960ee6a10ebf31"
+      "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",
+      "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
     }
   },
   "claims": {

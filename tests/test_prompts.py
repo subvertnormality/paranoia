@@ -123,14 +123,27 @@ class TestRebutInstructions:
 
 class TestStagedReviewInstructions:
     def test_review_roles_require_complete_co_asserting_site_repairs(self) -> None:
-        for text in (
-            prompts.staged_census_instructions("plan", "domain"),
-            prompts.staged_followup_instructions("plan"),
-        ):
+        for mode in ("plan", "branch"):
+            text = prompts.staged_census_instructions(mode, "domain")
             assert "trace every site" in text
             assert "co-asserting site" in text
             assert "one-site repair" in text
-        assert prompts.PLAN_COASSERTION_INSTRUCTIONS not in (
+            followup = prompts.staged_followup_instructions(mode)
+            assert "trace every site" in followup
+            assert "co-asserting site" in followup
+            assert "one-site repair" in followup
+            assert "exhaustively consolidate every" in followup
+            assert "cite every distinct" in followup
+            assert "one representative defect" in followup
+            assert "close every supplied" in followup
+            assert "narrower predecessor" in followup
+            assert "Consolidate one existing class to at most one new finding" not in followup
+
+    def test_phase_class_rule_remains_plan_only(self) -> None:
+        assert prompts.PLAN_PHASE_CLASS_INSTRUCTIONS in (
+            prompts.staged_followup_instructions("plan")
+        )
+        assert prompts.PLAN_PHASE_CLASS_INSTRUCTIONS not in (
             prompts.staged_followup_instructions("branch")
         )
 
