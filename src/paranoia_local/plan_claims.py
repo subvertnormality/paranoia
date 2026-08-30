@@ -1072,9 +1072,13 @@ def with_debt(
     frozen_ids: Iterable[str] = (),
 ) -> dict[str, Any]:
     state = normalize_state(prior_raw)
+    prior_debt = state.get("debt")
     prior_claim_rows = (
-        state["debt"].get("claim_rows")
-        if isinstance(state.get("debt"), dict) else None
+        prior_debt.get("claim_rows")
+        if isinstance(prior_debt, dict) else None
+    )
+    same_plan_adjudication = state.get("plan_snapshot") == plan_text and (
+        prior_debt is None or prior_claim_rows == "last-accepted"
     )
     state["rounds"] += 1
     state["plan_digest"] = hashlib.sha256(
@@ -1085,7 +1089,8 @@ def with_debt(
     state["debt"]["claim_rows"] = (
         "predecessor-unadjudicated"
         if prior_claim_rows == "predecessor-unadjudicated"
-        else "last-accepted"
+        else "last-accepted" if same_plan_adjudication
+        else "nonadjudicated-history"
     )
     # Preserve last accepted semantic verdicts as diagnostic history. Audit debt is the
     # governing blocker; rewriting every row to ``unverified`` would falsely report a
@@ -1141,16 +1146,26 @@ def review_context(state_raw: Any) -> str:
         and state["debt"].get("audit_failed") is True
     )
     if audit_failed:
-        history_label = (
-            "Last-accepted packets remain durable history"
-            if state["debt"].get("claim_rows") == "last-accepted"
-            else "Predecessor claim rows remain non-adjudicated history"
-        )
-        lines.append(
-            f"The current claim audit failed. {history_label} but are omitted here: none is a "
-            "current-plan authority verdict, and structural review must not reinterpret the "
-            "audit failure as unsupported plan claims."
-        )
+        if state["debt"].get("claim_rows") == "last-accepted":
+            history_label = "Last-accepted packets remain durable history"
+        elif state["debt"].get("claim_rows") == "predecessor-unadjudicated":
+            history_label = "Predecessor claim rows remain non-adjudicated history"
+        elif state["claims"]:
+            history_label = "Preserved claim rows remain non-adjudicated history"
+        else:
+            history_label = None
+        if history_label is None:
+            lines.append(
+                "The current claim audit failed. There is no previously adjudicated claim "
+                "inventory, and structural review must not reinterpret the audit failure as "
+                "unsupported plan claims."
+            )
+        else:
+            lines.append(
+                f"The current claim audit failed. {history_label} but are omitted here: none is "
+                "a current-plan authority verdict, and structural review must not reinterpret "
+                "the audit failure as unsupported plan claims."
+            )
         return "\n".join(lines)
     for claim_id, claim in state["claims"].items():
         lines.extend([
@@ -1209,10 +1224,20 @@ def render_trailer(state_raw: Any) -> str:
                 f"last accepted inventory was {counts['supported']} supported, "
                 f"{counts['refuted']} refuted, {counts['unverified']} unverified"
             )
-        else:
+        elif state["debt"].get("claim_rows") == "predecessor-unadjudicated":
             lines.append(
                 "CLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; "
                 "predecessor claim rows are non-adjudicated history"
+            )
+        elif claims:
+            lines.append(
+                "CLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; "
+                "preserved claim rows are non-adjudicated history"
+            )
+        else:
+            lines.append(
+                "CLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; "
+                "no previously adjudicated inventory is available"
             )
     else:
         lines.append(

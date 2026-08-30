@@ -1092,6 +1092,73 @@ def test_plan_preflight_renders_predecessor_claim_rows_as_nonadjudicated(
     assert audit["claim_status"] == "blocked-by-structural-preflight"
 
 
+def test_changed_plan_preflight_does_not_promote_prior_claim_rows(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    claim_state = pc.empty_state()
+    claim_state.update(
+        rounds=1, plan_snapshot="# Old plan\n", plan_digest="old",
+        claims={
+            "old-supported": {
+                "claim_id":"old-supported", "kind":"fact", "scope":"external",
+                "anchor":"old assertion", "proposition":"old proposition",
+                "verdict":"supported", "replacement":None,
+                "rationale":"old accepted rationale", "evidence":[],
+            },
+        },
+    )
+    review_state = rc.normalize_state(None, stakes="s", snapshot="old")
+    review_state.update(
+        phase="correction", last_round=1,
+        debt=[{
+            "id":"D1", "status":"open", "severity":cc.MAJOR,
+            "class_ids":["class-a"],
+        }],
+        correction_control={
+            "version":1,
+            "classes":{"class-a":{"reset_round":"not-an-integer"}},
+        },
+    )
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "changed-plan-claim-preflight"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=review_state,
+        claim_state=claim_state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    logs = tmp_path / "changed-plan-claim-preflight-logs"
+    result = handlers.critique_plan({
+        "repo_path":str(repo_with_branch), "plan_text":"# Changed plan\n",
+        "lineage":lineage_id, "round":2, "stakes":"s",
+    }, engine=handlers.eng.CodexEngine(), log_dir=logs, now=lambda: "CHANGED")
+
+    assert calls == []
+    assert "preserved claim rows are non-adjudicated history" in result
+    assert "last accepted inventory" not in result
+    assert "old accepted rationale" not in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert reloaded.claim_state["debt"]["audit_failed"] is True
+    assert reloaded.claim_state["debt"]["claim_rows"] == "nonadjudicated-history"
+    audit = json.loads(next(logs.glob("*.json")).read_text())
+    assert audit["claim_counts"] is None
+    assert audit["claim_last_accepted_counts"] is None
+    assert audit["claim_nonadjudicated_count"] == 1
+    assert audit["claim_status"] == "blocked-by-structural-preflight"
+
+
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"

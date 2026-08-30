@@ -2624,6 +2624,18 @@ def critique_plan(
                     else "structural-preflight"
                 )
                 error = _staged_error(str(exc), role=role, kind="validation")
+                claim_state = pc.with_debt(
+                    claim_state,
+                    pc.AuditError(
+                        "claim verification did not run because structural preflight failed",
+                        failure_phase="structural-preflight",
+                    ),
+                    round_no=arguments.get("round") or 1,
+                    plan_text=plan_text,
+                )
+                closure.lineage.claim_state = claim_state
+                closure.claim_state = claim_state
+                claim_status = "not-started-structural-preflight"
                 preflight_review, preflight_trailer, structural_attempts = (
                     _settle_staged_failure(
                         closure, stakes=stakes or "", snapshot=structural_snapshot,
@@ -2858,7 +2870,8 @@ def critique_plan(
         ),
         "claim_nonadjudicated_count": (
             len(normalized_claim_log_state["claims"])
-            if claim_audit_failed and not claim_rows_are_last_accepted else None
+            if claim_audit_failed and not claim_rows_are_last_accepted
+            and normalized_claim_log_state["claims"] else None
         ),
         "claim_audit_failed": claim_audit_failed if claim_verification else None,
         # The retry's register is what actually changed durable state, so the original

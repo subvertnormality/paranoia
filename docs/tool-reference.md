@@ -239,7 +239,7 @@ This is a convergence-efficiency heuristic, not a fixed-round guarantee.
 | `REOPEN-WAVE` | Previously closed classes reopened |
 | `STAGED-ATTEMPTS` | Provider and validation attempt counts |
 | `REVIEW-ATTEMPTS` | All claim and structural attempts, including recovered validation retries |
-| `CLAIM-REGISTER` | Active and retired external claims |
+| `CLAIM-REGISTER` | Active and retired external claims, or retained non-adjudicated history after audit failure |
 | `CLAIM-CLOSURE` | Supported/refuted/unverified claims, or `AUDIT-FAILED` when no current adjudication completed |
 | `CONVERGENCE` | Governing tracked result |
 | `STATE-UNAVAILABLE` | Lineage state could not be trusted or persisted |

@@ -1357,6 +1357,29 @@ class TestHandlerFlow:
         }
         assert pc.normalize_state(partial)["debt"].get("audit_failed") is None
 
+    def test_failure_only_labels_history_last_accepted_for_the_same_plan(self) -> None:
+        first_failure = pc.with_debt(
+            pc.empty_state(), pc.AuditError("discovery invalid"),
+            round_no=1, plan_text=PLAN,
+        )
+        assert first_failure["debt"]["claim_rows"] == "nonadjudicated-history"
+        assert "last accepted inventory" not in pc.render_trailer(first_failure)
+        assert "no previously adjudicated inventory" in pc.render_trailer(first_failure)
+
+        accepted = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="changed-plan-failure", round_no=1, plan_text=PLAN,
+        )
+        changed = pc.with_debt(
+            accepted, pc.AuditError("edited successor invalid"),
+            round_no=2, plan_text=PLAN + "\nNew assertion.\n",
+        )
+        assert changed["debt"]["claim_rows"] == "nonadjudicated-history"
+        assert "last accepted inventory" not in pc.render_trailer(changed)
+        assert "preserved claim rows are non-adjudicated history" in pc.render_trailer(
+            changed
+        )
+
     def test_terminal_audit_failure_preserves_prior_verdicts_as_history(self) -> None:
         accepted = pc.reconcile(
             {}, pc.parse_audit(_audit(_claim()), PLAN),
@@ -3273,9 +3296,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
     assert audit["claim_audit_failed"] is True
     assert audit["claim_counts"] is None
-    assert audit["claim_last_accepted_counts"] == {
-        "refuted": 0, "supported": 0, "unverified": 0,
-    }
+    assert audit["claim_last_accepted_counts"] is None
     assert audit["claim_nonadjudicated_count"] is None
 
 

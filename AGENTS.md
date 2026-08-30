@@ -421,8 +421,10 @@ of the resulting code and tests.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
 - A terminal claim-role failure is audit failure, not a semantic verdict on every claim. Preserve
-  last accepted packets as non-governing history, omit their prior semantic remedies from current
-  actionable output, render `CLAIM-CLOSURE: AUDIT-FAILED`, and expose aggregate
+  packets as non-governing history, but call them last accepted only when a successful claim audit
+  is bound to the exact same plan snapshot. On a first-audit failure or a changed-plan structural
+  preflight, omit prior semantic remedies and counts from current actionable output and label any
+  retained rows non-adjudicated. Render `CLAIM-CLOSURE: AUDIT-FAILED`, and expose aggregate
   claim-plus-structural attempt telemetry so recovered validation retries remain visible.
   Predecessor terminal-debt rows already rewritten by the old failure path are non-adjudicated,
   never last-accepted verdicts or counts.
