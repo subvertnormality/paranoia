@@ -31,8 +31,14 @@ SOURCES = (
     "scripts/run_plan_review_reliability_acceptance.py",
 )
 VALIDATION_SOURCES = (
+    "AGENTS.md",
+    "README.md",
+    "docs/tool-reference.md",
+    "src/paranoia_local/handlers.py",
+    "src/paranoia_local/plan_claims.py",
     "scripts/run_plan_review_reliability_acceptance.py",
     "tests/test_plan_claims.py",
+    "tests/test_review_census.py",
 )
 PLAN = """# Plan-review reliability acceptance
 
@@ -71,6 +77,16 @@ def _sha_text(value: str) -> str:
 
 
 def _deterministic_checks(root: Path = ROOT) -> dict:
+    first_failure = pc.with_debt(
+        pc.empty_state(), pc.AuditError("discovery invalid"),
+        round_no=1, plan_text="# First plan\n",
+    )
+    if (
+        first_failure["debt"].get("claim_rows") != "nonadjudicated-history"
+        or "last accepted inventory" in pc.render_trailer(first_failure)
+        or "no previously adjudicated inventory" not in pc.render_trailer(first_failure)
+    ):
+        raise ValueError("first claim-audit failure invented prior adjudication")
     first = cc.TrackedClass(
         "class-a", "first invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
     )
@@ -109,9 +125,15 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
     old_default = cc.default_state_root
     old_profile = engines.require_evidence_profile
     old_git_profile = handlers.inert_git.require_supported_version
+    old_run = engines.CodexEngine.run
+    old_resume = engines.CodexEngine.resume
     cc.default_state_root = lambda: state_root
     engines.require_evidence_profile = lambda engine: None
     handlers.inert_git.require_supported_version = lambda: None
+    def forbidden_provider_call(*args, **kwargs):
+        raise ValueError("deterministic preflight unexpectedly admitted a provider call")
+    engines.CodexEngine.run = forbidden_provider_call
+    engines.CodexEngine.resume = forbidden_provider_call
     try:
         claim_state = pc.empty_state()
         claim_state.update(
@@ -155,10 +177,51 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             "lineage":"predecessor-preflight-acceptance", "round":2, "stakes":"s",
         }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "PREFLIGHT")
         audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
+
+        changed_claim_state = pc.empty_state()
+        changed_claim_state.update(
+            rounds=1, plan_snapshot="# Old plan\n", plan_digest="old",
+            claims={
+                "old-supported":{
+                    "claim_id":"old-supported", "kind":"fact", "scope":"external",
+                    "anchor":"old assertion", "proposition":"old proposition",
+                    "verdict":"supported", "replacement":None,
+                    "rationale":"old accepted rationale", "evidence":[],
+                },
+            },
+        )
+        changed_review_state = rc.normalize_state(None, stakes="s", snapshot="old")
+        changed_review_state.update(
+            phase="correction", last_round=1,
+            debt=[{
+                "id":"D1", "finding_id":"F1", "status":"open",
+                "severity":cc.MAJOR, "summary":"historic occurrence",
+                "evidence":[], "remedy":"repair it", "source_ids":[],
+                "class_ids":["class-a"], "first_round":1, "last_round":1,
+            }],
+            correction_control={
+                "version":1,
+                "classes":{"class-a":{"reset_round":"not-an-integer"}},
+            },
+        )
+        cc.save_lineage(state_root, cc.Lineage(
+            "changed-plan-preflight-acceptance", mode=cc.PLAN_MODE, rounds=1,
+            classes={first.class_id:first}, review_state=changed_review_state,
+            claim_state=changed_claim_state,
+        ))
+        changed_result = handlers.critique_plan({
+            "repo_path":str(root), "plan_text":"# Changed plan\n",
+            "lineage":"changed-plan-preflight-acceptance", "round":2, "stakes":"s",
+        }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "CHANGED")
+        changed_audit = json.loads(
+            next(log_root.glob("CHANGED-*.json")).read_text(encoding="utf-8")
+        )
     finally:
         cc.default_state_root = old_default
         engines.require_evidence_profile = old_profile
         handlers.inert_git.require_supported_version = old_git_profile
+        engines.CodexEngine.run = old_run
+        engines.CodexEngine.resume = old_resume
     if (
         "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows" not in result
         or "predecessor claim rows are non-adjudicated history" not in result
@@ -170,7 +233,23 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
         or audit.get("claim_nonadjudicated_count") != 2
     ):
         raise ValueError("public predecessor preflight is not non-adjudicated and zero-call")
+    changed_lineage = cc.load_lineage(
+        state_root, "changed-plan-preflight-acceptance", stamp="VERIFY",
+        mode=cc.PLAN_MODE,
+    )
+    if (
+        "preserved claim rows are non-adjudicated history" not in changed_result
+        or "last accepted inventory" in changed_result
+        or "old accepted rationale" in changed_result
+        or changed_lineage.claim_state["debt"].get("claim_rows")
+            != "nonadjudicated-history"
+        or changed_audit.get("attempt_ledger") != []
+        or changed_audit.get("claim_last_accepted_counts") is not None
+        or changed_audit.get("claim_nonadjudicated_count") != 1
+    ):
+        raise ValueError("changed-plan preflight promoted stale claim authority")
     return {
+        "first_failure_claim_rows":first_failure["debt"]["claim_rows"],
         "correction_control":control,
         "evidence_union":materialized["findings"][0]["evidence"],
         "debt_evidence_union":materialized["debt"][0]["evidence"],
@@ -181,6 +260,13 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             "claim_last_accepted_counts":audit["claim_last_accepted_counts"],
             "claim_nonadjudicated_count":audit["claim_nonadjudicated_count"],
             "provider_attempts":len(audit["attempt_ledger"]),
+        },
+        "changed_plan_preflight":{
+            "result_sha256":_sha_text(changed_result),
+            "rendered_trailer":changed_audit["rendered_trailer"],
+            "claim_last_accepted_counts":changed_audit["claim_last_accepted_counts"],
+            "claim_nonadjudicated_count":changed_audit["claim_nonadjudicated_count"],
+            "provider_attempts":len(changed_audit["attempt_ledger"]),
         },
     }
 
