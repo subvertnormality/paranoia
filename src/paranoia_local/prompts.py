@@ -479,6 +479,9 @@ class severity, or existing_class. For each existing class, exhaustively consoli
 independently evidenced current occurrence into its one governing finding: cite every distinct
 anchor and make the bounded remedy cover each site rather than choosing one representative defect.
 Rephrasing or rotating the same anchor is not another occurrence and does not satisfy a gate.
+When a fresh existing-class finding aggregates a class's current occurrences, close every supplied
+open debt already bound to that class; do not leave a narrower predecessor open beside the new
+aggregate debt. If a predecessor occurrence is still reachable, include it in the aggregate first.
 Every supplied open debt receives exactly one outcome; open needs current evidence and a concrete
 remaining condition, closed needs current evidence. A violated class uses new_finding for a new
 occurrence, or carried_debt naming exactly one representative open debt; other historical debts

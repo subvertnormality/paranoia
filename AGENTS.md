@@ -399,6 +399,8 @@ of the resulting code and tests.
   complete artifact, including definitions, call sites, tests, and fixtures in branch review.
   For each existing class, aggregate every independently anchored current occurrence into its one
   governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
+  A fresh aggregate finding must close every prior open debt bound to that class after including
+  every still-reachable predecessor occurrence; never retain narrower and aggregate blockers side by side.
   The server-owned correction gate, not reuse of a historical debt ID, rejects a rephrased finding
   that leaves the class blocking. Do not add prior-plan persistence or textual
   duplicate heuristics for this semantic task. Tracked branch review uses the same broad cold census, targeted correction,

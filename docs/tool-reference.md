@@ -233,6 +233,8 @@ In both plan and branch correction, independently anchored occurrences of one ac
 reported together as one governing finding whose evidence and remedy cover every site. The server
 still permits only one finding and outcome per class in a settlement. A fresh occurrence may mint
 a fresh debt ID; correction gates prevent rewording the same site from satisfying a blocking class.
+A fresh aggregate finding must close the class's prior open debt after incorporating every
+still-reachable predecessor occurrence, so one class does not accumulate duplicate blockers.
 
 | Trailer field | Meaning |
 |---|---|

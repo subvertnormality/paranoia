@@ -135,6 +135,8 @@ class TestStagedReviewInstructions:
             assert "exhaustively consolidate every" in followup
             assert "cite every distinct" in followup
             assert "one representative defect" in followup
+            assert "close every supplied" in followup
+            assert "narrower predecessor" in followup
             assert "Consolidate one existing class to at most one new finding" not in followup
 
     def test_phase_class_rule_remains_plan_only(self) -> None:

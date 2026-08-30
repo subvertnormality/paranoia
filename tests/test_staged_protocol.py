@@ -2697,6 +2697,9 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
         )
 
     valid = deepcopy(base)
+    valid["debt_outcomes"][0] = {
+        "debt_id":"D7", "status":"closed", "evidence":["plan:1"],
+    }
     valid["class_outcomes"] = [{
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "basis":{"kind":"new_finding", "finding_id":"G5"},
@@ -2708,6 +2711,28 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "finding_id":"G5",
     }
+
+
+def test_fresh_aggregate_finding_must_supersede_prior_class_debt():
+    current = finding(
+        "G5", classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[current],
+        debt_outcomes=[{
+            "debt_id":"D7", "status":"open", "evidence":["plan:1"],
+            "reason":"the narrower predecessor remains open",
+        }],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G5"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=r"/debt_outcomes/0/status: a fresh aggregate finding.*must close",
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
 
 
 def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():

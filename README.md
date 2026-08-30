@@ -286,6 +286,8 @@ co-asserting sites, so definitions, call sites, tests, fixtures, and contract se
 together. Each settlement retains one finding and outcome per class; historical debt IDs may close
 and a fresh occurrence may receive a new ID, while the server-owned correction gate still rejects
 rephrasing that leaves the class blocking.
+A fresh aggregate finding closes the class's narrower prior open debt after incorporating every
+still-reachable predecessor occurrence, preventing duplicate blockers for one class.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).

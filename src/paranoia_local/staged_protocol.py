@@ -1282,6 +1282,17 @@ def materialize_decision_value(
                         f"existing-class finding requires violated new_finding basis "
                         f"naming {finding_id!r}"
                     )
+                for debt_id, debt in open_debt.items():
+                    if cid not in debt.get("class_ids", []):
+                        continue
+                    debt_outcome = debt_outcomes.get(debt_id)
+                    if debt_outcome is not None and debt_outcome["status"] != "closed":
+                        issues.append(
+                            f"{debt_outcome_pointers[debt_id]}/status: a fresh aggregate "
+                            f"finding for class {cid!r} must close its prior open debt "
+                            f"{debt_id!r}; include every still-reachable predecessor "
+                            "occurrence in the aggregate finding"
+                        )
         expected_model_classes = authored_classes | set(existing_findings)
         if set(outcomes) != expected_model_classes:
             issues.append(
