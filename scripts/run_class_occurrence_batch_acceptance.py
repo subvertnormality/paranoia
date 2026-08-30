@@ -106,9 +106,9 @@ def _before_lineage_record() -> dict:
         CLASS_ID, "Every active configuration sets MODE = safe.", "MAJOR", 1,
         cc.OPEN, procedure="inspect every active configuration file",
     )
-    return {
+    return json.loads(json.dumps({
         "rounds":1, "next_seq":2, "classes":[vars(tracked)], "review_state":state,
-    }
+    }))
 
 
 def validate_artifact(
