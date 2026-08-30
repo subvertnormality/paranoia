@@ -386,6 +386,50 @@ class TestRebut:
         assert audit["debt_settled"] is False
         assert audit["class_closed"] is False
 
+    def test_bound_branch_rebut_uses_authoritative_terminal_lf_line_count(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=2, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"wrong contract finding", "evidence":["plan:2"],
+            "remedy":"withdraw", "source_ids":[], "class_ids":["class-a"],
+            "first_round":1, "last_round":2, "reason":"open",
+        }])
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
+        }}}
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+        )
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "branch-lf-rebut", mode=cc.BRANCH_MODE,
+            classes={"class-a":tracked}, review_state=state,
+            branch_contract={
+                "version":handlers.BRANCH_CONTRACT_VERSION, "present":True,
+                "digest":handlers._branch_contract_view("one\n").digest,
+                "text":"one\n",
+            },
+        ))
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"The second contract line is valid.",
+            "evidence":[{"anchor":"plan:2", "rationale":"terminal LF line"}],
+        }))
+
+        result = handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"line two",
+            "lineage":"branch-lf-rebut", "class_id":"class-a", "debt_id":"D1",
+            "lineage_mode":"branch",
+        }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+
+        assert result.startswith("CONCEDE:")
+        durable = cc.load_lineage(
+            cc.default_state_root(), "branch-lf-rebut", stamp="T", mode=cc.BRANCH_MODE,
+        )
+        assert durable.review_state["debt"][0]["evidence"] == ["plan:2"]
+        assert durable.classes["class-a"].status == cc.CLOSED
+
     @pytest.mark.parametrize(("mechanized", "prior_evidence", "evidence", "error"), [
         (True, ["repository/app.py:1"], [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),
         (False, ["repository/app.py:1"], [{"anchor":"repository/missing.py:1", "rationale":"current"}], "unresolvable"),

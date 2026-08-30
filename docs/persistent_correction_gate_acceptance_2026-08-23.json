@@ -15,7 +15,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
-      "sha256": "09dc65ccc49ae2fa3861c53816ee21203c57372bfd2c6f56442a8723824d7180"
+      "sha256": "d92a8460d3fcfa8e6751900b24e889c7eb5ad53d4e4b7b5bcdbdf36ccec58c31"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -43,7 +43,7 @@
     },
     "tests/test_handlers.py": {
       "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage.",
-      "sha256": "be8e64ee7d946b4e7e3eb3afc652a463d6699c09503eeceb87b9b85da3402854"
+      "sha256": "5d025d3287ecd1d48f20c9ebeaf881eea1d17d475aa48ea81c95e520a785ecef"
     },
     "tests/test_review_census.py": {
       "scope": "Adds public plan-and-branch aggregate-occurrence correction and bounded-retry coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",

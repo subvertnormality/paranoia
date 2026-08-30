@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.",
-      "sha256": "16335820999d98376915f2513c2b5bf0a7b89cc3566045c54660f246c37c11ec"
+      "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.",
@@ -1762,6 +1762,10 @@
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
   "validation": {
     "allowed_later_source_diffs": {
+      "src/paranoia_local/handlers.py": {
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior.",
+        "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"
+      },
       "tests/test_review_census.py": {
         "scope": "Adds the closed-predecessor/current-successor rebut debt-id regression without changing deterministic replay behavior.",
         "sha256": "0c52f35f51002315707bc263a736d0fcd1f3a636ed2d095e6a20c43ea079193c"

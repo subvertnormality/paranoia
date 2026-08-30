@@ -4616,7 +4616,7 @@ def rebut(
                 if lineage_mode == cc.BRANCH_MODE and lineage.branch_contract:
                     contract_text = lineage.branch_contract.get("text")
                     if isinstance(contract_text, str):
-                        plan_lines = len(contract_text.splitlines())
+                        plan_lines = _branch_contract_view(contract_text).line_count
                 rc.resolve_anchors(
                     {"evidence":rebut_evidence}, root=repo, plan_lines=plan_lines,
                     trusted_roots={"repository":repo},
