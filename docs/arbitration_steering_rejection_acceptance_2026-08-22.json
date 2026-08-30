@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and stakes-steering rejection are unchanged.",
-      "sha256": "9141a4e18432dc9c2ba87a04ebf70dacf88474364c683be23087b9c4607e6f06"
+      "sha256": "11a70da28bb040cda5e77f182bb0e0e43e24f82c8a72e33ebed2875d3979cc31"
     }
   },
   "audit": {
