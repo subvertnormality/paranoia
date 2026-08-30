@@ -1298,6 +1298,25 @@ def test_census_materializes_one_off_and_canonical_debt_id():
     assert parsed["class_dispositions"][0]["kind"] == "one_off"
 
 
+def test_census_derives_complete_ordered_evidence_union_from_mapped_sources():
+    first = finding(source_ids=["domain:F1", "execution:F2"])
+    first["evidence"] = ["plan:3"]
+    value = decision("census", governing_findings=[first])
+
+    parsed = materialize(
+        value,
+        source_ids=["domain:F1", "execution:F2"],
+        source_severities={"domain:F1":"MAJOR", "execution:F2":"MAJOR"},
+        source_evidence={
+            "domain:F1":["plan:1", "plan:2"],
+            "execution:F2":["plan:2", "plan:3"],
+        },
+    )
+
+    assert parsed["findings"][0]["evidence"] == ["plan:1", "plan:2", "plan:3"]
+    assert parsed["debt"][0]["evidence"] == ["plan:1", "plan:2", "plan:3"]
+
+
 def test_source_severity_cannot_be_downgraded():
     value = decision("census", governing_findings=[
         finding(severity="MINOR", source_ids=["domain:F1"]),

@@ -1,5 +1,11 @@
 {
   "acceptance_kind": "arbitration-consequence-not-advocacy",
+  "allowed_later_source_diffs": {
+    "src/paranoia_local/prompts.py": {
+      "scope": "Plan-only co-asserting-site completeness guidance; arbitration prompts and consequence framing are unchanged.",
+      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+    }
+  },
   "audit": {
     "attestation": "FIDELITY: decision CHANGED; hints PRESERVED; opt-paranoia PRESERVED; opt-paranoia-review PRESERVED\nFIDELITY-DETAIL: {\"decision\":{\"original\":\"repository's displayed project name for a diagnostic banner\",\"cleaned\":\"project name displayed in a diagnostic banner\",\"change\":\"altered-qualification\",\"reason\":\"decision: altered-qualification\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE",
     "carried_evidence": [],

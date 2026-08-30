@@ -1,5 +1,43 @@
 {
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
+  "allowed_later_source_diffs": {
+    "AGENTS.md": {
+      "scope": "Documents exact-plan claim-history authority, correction-control recovery, and co-asserting evidence completeness without changing the retained correction-gate run.",
+      "sha256": "5e8fb9a0452500f2152d9138eea1ddb72fe4b7d4ed463871607f96eed2d5cdda"
+    },
+    "scripts/run_persistent_correction_gate_acceptance.py": {
+      "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
+      "sha256": "40e06ad9fa4d2c8b34e04b4bc00d7d99ec75707ca824c69d869992a61660f602"
+    },
+    "src/paranoia_local/handlers.py": {
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
+      "sha256": "e3a5d0aa1abc27462811af6aba4d412a3dec40f77ac792fffb87b0b00bb83253"
+    },
+    "src/paranoia_local/plan_claims.py": {
+      "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
+      "sha256": "e18452b6891a5b1a9027977f544893809f43110d13b1de3b0665e131c796573d"
+    },
+    "src/paranoia_local/prompts.py": {
+      "scope": "Adds plan-only co-asserting-site completeness guidance; correction-gate lifecycle instructions remain unchanged.",
+      "sha256": "554cf90e963764f735b9774141e629ca08db88e3cc486511a1512ce5a7aa32fb"
+    },
+    "src/paranoia_local/review_census.py": {
+      "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",
+      "sha256": "bdab0d7e063da37ec5a3a3f7e7d3e42b6db8b6be5602197e2881954c0f1bc67e"
+    },
+    "src/paranoia_local/staged_protocol.py": {
+      "scope": "Preserves the complete census source-evidence union; correction-gate lifecycle settlement is unchanged.",
+      "sha256": "cf82c4a15db1d942d16859664b74beb025e8993cda40349742a449b642cbe530"
+    },
+    "tests/test_plan_claims.py": {
+      "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
+      "sha256": "f222868ab3c4b49bc27c12366e5d01aa6d67de9ca29da429756b41ef6cce6be7"
+    },
+    "tests/test_review_census.py": {
+      "scope": "Adds missing-row, stale-row, and claim-history public-preflight regressions while retaining the historical correction-gate assertions.",
+      "sha256": "568954cbf220e134a7ebc56e9e38c7c1947c0ca910a032925fc17bc3318cc9ec"
+    }
+  },
   "after_lineage": {
     "claim_reverify_required": false,
     "claim_state": {},

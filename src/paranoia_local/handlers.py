@@ -2624,6 +2624,18 @@ def critique_plan(
                     else "structural-preflight"
                 )
                 error = _staged_error(str(exc), role=role, kind="validation")
+                claim_state = pc.with_debt(
+                    claim_state,
+                    pc.AuditError(
+                        "claim verification did not run because structural preflight failed",
+                        failure_phase="structural-preflight",
+                    ),
+                    round_no=arguments.get("round") or 1,
+                    plan_text=plan_text,
+                )
+                closure.lineage.claim_state = claim_state
+                closure.claim_state = claim_state
+                claim_status = "not-started-structural-preflight"
                 preflight_review, preflight_trailer, structural_attempts = (
                     _settle_staged_failure(
                         closure, stakes=stakes or "", snapshot=structural_snapshot,
@@ -2815,6 +2827,26 @@ def critique_plan(
         if closure:
             closure.release()
 
+    normalized_claim_log_state = pc.normalize_state(claim_state)
+    last_claim_counts = {
+        verdict: sum(
+            1 for claim in normalized_claim_log_state["claims"].values()
+            if claim.get("verdict") == verdict
+        ) for verdict in sorted(pc.VERDICTS)
+    } if claim_verification else None
+    claim_audit_failed = bool(
+        claim_verification
+        and isinstance(normalized_claim_log_state.get("debt"), dict)
+        and normalized_claim_log_state["debt"].get("audit_failed") is True
+    )
+    claim_rows_are_last_accepted = bool(
+        claim_audit_failed
+        and normalized_claim_log_state["debt"].get("claim_rows") == "last-accepted"
+    )
+    if trailer and claim_verification:
+        trailer += "\n" + rc.attempt_trailer(attempt_ledger).replace(
+            "STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1,
+        )
     _log(log_dir, "critique_plan", engine, review, now, {
         "grounded": bool(repo), "model": model,
         # None of this was recorded before, so a plan seam was not reconstructible at
@@ -2832,12 +2864,16 @@ def critique_plan(
         "claim_model_calls": sum(
             1 for item in attempt_ledger if str(item.get("role", "")).startswith("claim-")
         ),
-        "claim_counts": {
-            verdict: sum(
-                1 for claim in pc.normalize_state(claim_state)["claims"].values()
-                if claim.get("verdict") == verdict
-            ) for verdict in sorted(pc.VERDICTS)
-        } if claim_verification else None,
+        "claim_counts": None if claim_audit_failed else last_claim_counts,
+        "claim_last_accepted_counts": (
+            last_claim_counts if claim_rows_are_last_accepted else None
+        ),
+        "claim_nonadjudicated_count": (
+            len(normalized_claim_log_state["claims"])
+            if claim_audit_failed and not claim_rows_are_last_accepted
+            and normalized_claim_log_state["claims"] else None
+        ),
+        "claim_audit_failed": claim_audit_failed if claim_verification else None,
         # The retry's register is what actually changed durable state, so the original
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,

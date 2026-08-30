@@ -74,7 +74,7 @@ def _negative_claims(field: str) -> dict[str, list[str]]:
 COMMON_TOP_LEVEL = {
     "acceptance_kind", "audit", "audit_sha256", "claims", "date", "input",
     "model_call_count", "report", "report_sha256", "snapshot_binding",
-    "source_revision", "source_sha256", "version",
+    "source_revision", "source_sha256", "allowed_later_source_diffs", "version",
 }
 INPUT_FIELDS = {
     "clean", "context", "decision", "files", "options", "order_seed", "research",
@@ -110,12 +110,28 @@ def _common(
     source_hashes = artifact.get("source_sha256")
     if not isinstance(source_hashes, dict) or set(source_hashes) != expected_sources:
         raise ValueError("acceptance source manifest is not exact for its route")
+    allowed_later = artifact.get("allowed_later_source_diffs")
+    if not isinstance(allowed_later, dict):
+        raise ValueError("later-source allowance inventory is absent")
+    changed: set[str] = set()
     for path, expected in source_hashes.items():
         historical = _source_blob(repo, source, path)
         if hashlib.sha256(historical).hexdigest() != expected:
             raise ValueError(f"acceptance source hash mismatch: {path}")
         if path in REPLAYED_PRODUCTION_SOURCES and (repo / path).read_bytes() != historical:
-            raise ValueError(f"replayed production source differs from acceptance source: {path}")
+            changed.add(path)
+            allowance = allowed_later.get(path)
+            if not isinstance(allowance, dict) or set(allowance) != {"sha256", "scope"}:
+                raise ValueError(f"later-source allowance is absent for {path}")
+            diff = inert_git.invoke(
+                repo, ["diff", "--no-ext-diff", source, "--", path],
+            )
+            if diff.returncode != 0 or hashlib.sha256(diff.stdout).hexdigest() != allowance["sha256"]:
+                raise ValueError(f"later-source allowance mismatch for {path}")
+            if not isinstance(allowance["scope"], str) or not allowance["scope"].strip():
+                raise ValueError(f"later-source allowance scope is empty for {path}")
+    if set(allowed_later) != changed:
+        raise ValueError("later-source allowance inventory is not exact")
     audit = artifact.get("audit")
     if not isinstance(audit, dict) or _canonical_digest(audit) != artifact.get("audit_sha256"):
         raise ValueError("acceptance audit digest mismatch")

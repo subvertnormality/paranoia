@@ -238,8 +238,9 @@ This is a convergence-efficiency heuristic, not a fixed-round guarantee.
 | `PERSISTENCE` | A class has remained blocking long enough to need special handling |
 | `REOPEN-WAVE` | Previously closed classes reopened |
 | `STAGED-ATTEMPTS` | Provider and validation attempt counts |
-| `CLAIM-REGISTER` | Active and retired external claims |
-| `CLAIM-CLOSURE` | Supported, refuted, and unverified claims |
+| `REVIEW-ATTEMPTS` | All claim and structural attempts, including recovered validation retries |
+| `CLAIM-REGISTER` | Active and retired external claims, or retained non-adjudicated history after audit failure |
+| `CLAIM-CLOSURE` | Supported/refuted/unverified claims, or `AUDIT-FAILED` when no current adjudication completed |
 | `CONVERGENCE` | Governing tracked result |
 | `STATE-UNAVAILABLE` | Lineage state could not be trusted or persisted |
 

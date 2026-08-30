@@ -29,7 +29,15 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     )
     assert accepted.returncode == 0
     accepted_prompt = accepted.stdout
-    assert accepted_prompt == (ROOT / "src/paranoia_local/prompts.py").read_bytes()
+    current_prompt = (ROOT / "src/paranoia_local/prompts.py").read_bytes()
+    assert accepted_prompt != current_prompt
+    allowance = artifact["allowed_later_source_diffs"]["src/paranoia_local/prompts.py"]
+    prompt_diff = inert_git.invoke(
+        ROOT, ["diff", "--no-ext-diff", source_revision, "--", "src/paranoia_local/prompts.py"],
+    )
+    assert prompt_diff.returncode == 0
+    assert hashlib.sha256(prompt_diff.stdout).hexdigest() == allowance["sha256"]
+    assert "Plan-only" in allowance["scope"]
     assert artifact["input"]["stakes"] == (
         "Review effort spent on this naming decision is effort not spent on its "
         "implementation. A wrong choice causes rework, not corrupted state."

@@ -151,6 +151,14 @@ do not recur solely because the future artifact does not exist, and do not claim
 passed. A later branch review independently judges the resulting code and tests."""
 
 
+PLAN_COASSERTION_INSTRUCTIONS = """## Complete semantic repair sites
+
+When a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in
+the reviewed plan that independently asserts or depends on that same contract. Include every
+material co-asserting site in evidence and make the remedy cover them together; do not propose or
+accept a one-site repair that would leave the old rule asserted elsewhere."""
+
+
 PLAN_REVIEW_CORE_INSTRUCTIONS = PLAN_REVIEW_INSTRUCTIONS
 PLAN_REVIEW_INSTRUCTIONS += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
 
@@ -388,6 +396,7 @@ def staged_census_instructions(
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     return (
         instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        + "\n\n" + PLAN_COASSERTION_INSTRUCTIONS
         if mode == "plan" else instructions
     )
 
@@ -403,6 +412,7 @@ def staged_followup_instructions(mode: str, *, plan_contract: bool = False) -> s
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     return (
         instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        + "\n\n" + PLAN_COASSERTION_INSTRUCTIONS
         if mode == "plan" else instructions
     )
 
@@ -424,7 +434,9 @@ review. The provider-supplied JSON Schema is the sole structural contract; retur
 without a marker, fence, or prose.
 
 Map every source through governing_findings.source_ids, preserve the highest merged severity, and
-cite only evidence present on at least one mapped source.
+cite only evidence present on at least one mapped source. Include the complete union of evidence
+from every mapped source; the server deterministically projects that union so consolidation cannot
+discard a co-asserting site already found by a lane.
 Classify each governing finding once: one_off only when its reasoning cannot recur; new_class with a
 complete reusable definition and explicit class severity; or existing_class naming the active
 class. One source may fan out only to distinct existing-class findings for distinct violated

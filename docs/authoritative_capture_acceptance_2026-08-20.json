@@ -103,21 +103,21 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "930287a6e997299dc55b3cf92c3e624f545cb757635d02c74513f973ad32d3d1",
-      "additions": 1581,
-      "deletions": 160,
+      "sha256": "a72e7d73cd1500231f82b5ee4cbed2ac03ef0d4d44545b44969fb92e5d08a4b2",
+      "additions": 1623,
+      "deletions": 166,
       "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
-      "sha256": "3ba4d261a47ef13a724a66497fa3ef6f266ecba7c6edfb52c86f6ec6263fe1e6",
-      "additions": 472,
+      "sha256": "165fcba5baa53a2ce84c1f5f566cd289bb7d72b261a1b183b1cd0ec5598b2821",
+      "additions": 482,
       "deletions": 12,
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },
     "allowed_later_plan_claims_diff": {
-      "sha256": "945560719743262f9a6f235b0e6ffd3f08d981ecb38b2c26c4135ac828f93bcc",
-      "additions": 228,
-      "deletions": 10,
+      "sha256": "e229f54b228f8b88d2a06ca6dead1160d5216f1237ebccb34ae92e6b6635ee77",
+      "additions": 332,
+      "deletions": 32,
       "scope": "Rejects provider-introduced forms in the closed universal grammar before capture and preserves response acquisition/text extraction/deadline, binding, and attestation phases plus ordered terminal attempts and completed capture siblings in durable diagnostics without demoting an independently supported or refuted claim; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "production_source_sha256": {

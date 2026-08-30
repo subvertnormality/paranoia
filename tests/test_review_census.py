@@ -438,7 +438,7 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "85c605171daf68958f839e35c315783b41ed033424d5ff6215f08c5802fc4a96",
+        "0d8aa067dac560d8a4784ef8f14a8c3b89b0c267dbe08d383f8b69aead8b38ef",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
@@ -1017,6 +1017,148 @@ def test_public_staged_handlers_settle_malformed_correction_control_without_spen
         assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
+def test_plan_preflight_renders_predecessor_claim_rows_as_nonadjudicated(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    claim_state = pc.empty_state()
+    claim_state.update(
+        rounds=1, plan_snapshot="# Plan\n", plan_digest="old",
+        claims={
+            "old-refuted": {
+                "claim_id":"old-refuted", "kind":"fact", "scope":"external",
+                "anchor":"old removed wording", "proposition":"old proposition",
+                "verdict":"unverified", "replacement":None,
+                "rationale":"The current-plan audit failed; old refutation candidate.",
+                "evidence":[],
+            },
+            "old-unverified": {
+                "claim_id":"old-unverified", "kind":"behavior", "scope":"external",
+                "anchor":"old changed wording", "proposition":"another old proposition",
+                "verdict":"unverified", "replacement":None,
+                "rationale":"stale old-writer remediation",
+                "evidence":[],
+            },
+        },
+        debt=pc.AuditError(
+            "indexed binding passage is not in captured text",
+            failure_phase="binding",
+        ).debt(1),
+    )
+    review_state = rc.normalize_state(None, stakes="s", snapshot="old")
+    review_state.update(
+        phase="correction", last_round=1,
+        debt=[{
+            "id":"D1", "status":"open", "severity":cc.MAJOR,
+            "class_ids":["class-a"],
+        }],
+        correction_control={"version":1, "classes":{"class-a":{}}},
+    )
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "predecessor-claim-preflight"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=review_state,
+        claim_state=claim_state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    logs = tmp_path / "predecessor-claim-preflight-logs"
+    result = handlers.critique_plan({
+        "repo_path":str(repo_with_branch), "plan_text":"# Plan\n",
+        "lineage":lineage_id, "round":2, "stakes":"s",
+    }, engine=handlers.eng.CodexEngine(), log_dir=logs, now=lambda: "PREDECESSOR")
+
+    assert calls == []
+    assert "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows" in result
+    assert "CLAIM-CLOSURE: AUDIT-FAILED" in result
+    assert "predecessor claim rows are non-adjudicated history" in result
+    assert "last accepted inventory" not in result
+    assert "stale old-writer remediation" not in result
+    assert "old refutation candidate" not in result
+    audit = json.loads(next(logs.glob("*.json")).read_text())
+    assert audit["claim_audit_failed"] is True
+    assert audit["claim_counts"] is None
+    assert audit["claim_last_accepted_counts"] is None
+    assert audit["claim_nonadjudicated_count"] == 2
+    assert audit["claim_status"] == "blocked-by-structural-preflight"
+
+
+def test_changed_plan_preflight_does_not_promote_prior_claim_rows(
+    repo_with_branch, tmp_path, monkeypatch,
+):
+    claim_state = pc.empty_state()
+    claim_state.update(
+        rounds=1, plan_snapshot="# Old plan\n", plan_digest="old",
+        claims={
+            "old-supported": {
+                "claim_id":"old-supported", "kind":"fact", "scope":"external",
+                "anchor":"old assertion", "proposition":"old proposition",
+                "verdict":"supported", "replacement":None,
+                "rationale":"old accepted rationale", "evidence":[],
+            },
+        },
+    )
+    review_state = rc.normalize_state(None, stakes="s", snapshot="old")
+    review_state.update(
+        phase="correction", last_round=1,
+        debt=[{
+            "id":"D1", "status":"open", "severity":cc.MAJOR,
+            "class_ids":["class-a"],
+        }],
+        correction_control={
+            "version":1,
+            "classes":{"class-a":{"reset_round":"not-an-integer"}},
+        },
+    )
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect it",
+    )
+    lineage_id = "changed-plan-claim-preflight"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=review_state,
+        claim_state=claim_state,
+    ))
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    logs = tmp_path / "changed-plan-claim-preflight-logs"
+    result = handlers.critique_plan({
+        "repo_path":str(repo_with_branch), "plan_text":"# Changed plan\n",
+        "lineage":lineage_id, "round":2, "stakes":"s",
+    }, engine=handlers.eng.CodexEngine(), log_dir=logs, now=lambda: "CHANGED")
+
+    assert calls == []
+    assert "preserved claim rows are non-adjudicated history" in result
+    assert "last accepted inventory" not in result
+    assert "old accepted rationale" not in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert reloaded.claim_state["debt"]["audit_failed"] is True
+    assert reloaded.claim_state["debt"]["claim_rows"] == "nonadjudicated-history"
+    audit = json.loads(next(logs.glob("*.json")).read_text())
+    assert audit["claim_counts"] is None
+    assert audit["claim_last_accepted_counts"] is None
+    assert audit["claim_nonadjudicated_count"] == 1
+    assert audit["claim_status"] == "blocked-by-structural-preflight"
+
+
 def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/persistent_correction_gate_acceptance_2026-08-23.json"
@@ -1035,13 +1177,25 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         "persistent-correction-gate-public-plan-handler"
     )
     revision = artifact["source_revision"]
+    changed = set()
+    allowed_later = artifact["allowed_later_source_diffs"]
     for relative, expected in artifact["source_sha256"].items():
         recorded = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
             stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(recorded).hexdigest() == expected
-        assert (root / relative).read_bytes() == recorded
+        if (root / relative).read_bytes() == recorded:
+            continue
+        changed.add(relative)
+        allowance = allowed_later[relative]
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", revision, "--", relative],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(diff).hexdigest() == allowance["sha256"]
+        assert allowance["scope"]
+    assert set(allowed_later) == changed
     assert artifact["provider"] | {
         "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
         "web_search":False,
@@ -2699,6 +2853,45 @@ def test_correction_control_rejects_non_version_one_and_scalar_aliases(bad) -> N
         }}},
     }
     with pytest.raises(rc.CensusError, match="invalid persisted correction_control"):
+        rc.normalize_correction_control(state, [tracked])
+
+
+def test_correction_control_fills_only_missing_active_rows() -> None:
+    first = cc.TrackedClass(
+        "class-a", "first invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    second = cc.TrackedClass(
+        "class-b", "second invariant", cc.MAJOR, 2, cc.OPEN, procedure="inspect",
+    )
+    state = {
+        "last_round": 7,
+        "correction_control": {"version":1, "classes":{"class-a":{
+            "reset_round":6, "reopen_count":2, "last_session_ref":"session-a",
+        }}},
+    }
+
+    control = rc.normalize_correction_control(state, [first, second])
+
+    assert control["classes"]["class-a"] == {
+        "reset_round":6, "reopen_count":2, "last_session_ref":"session-a",
+    }
+    assert control["classes"]["class-b"] == {
+        "reset_round":None, "reopen_count":0, "last_session_ref":None,
+    }
+
+
+def test_correction_control_rejects_inactive_rows_with_class_id() -> None:
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    state = {"last_round":2, "correction_control":{"version":1, "classes":{
+        "class-a":{"reset_round":None, "reopen_count":0, "last_session_ref":None},
+        "stale-class":{"reset_round":None, "reopen_count":0, "last_session_ref":None},
+    }}}
+
+    with pytest.raises(
+        rc.CensusError, match="inactive class row\\(s\\): stale-class",
+    ):
         rc.normalize_correction_control(state, [tracked])
 
 
