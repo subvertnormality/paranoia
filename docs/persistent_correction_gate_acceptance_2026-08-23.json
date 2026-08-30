@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents shared plan-and-branch class-occurrence aggregation while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "3ef959fabbd63dafd743b71f391250aee3f077e53f44c713bab1573129213c9c"
+      "sha256": "4c68643bdbb8275c200bb646400b9a7b4a0606dcb3da2b63ed74f906a66c5117"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union; correction-gate lifecycle settlement is unchanged.",
-      "sha256": "04644a89a1851cf880ab1c676d917eae1e72e149d5a5ca4aa63548dde3edf160"
+      "sha256": "02b2a35415fe94a822c9cf8ae6c0e0ac14dc06ac80030e0d6062cb37cd28d0a8"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
