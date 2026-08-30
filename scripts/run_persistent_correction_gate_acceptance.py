@@ -487,6 +487,7 @@ def validate_artifact(
             raise ValueError("retained acceptance differs from its committed Git envelope")
     expected_keys = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "allowed_later_source_diffs",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
         "result_sha256", "rendered_trailer", "correction_gates",
@@ -531,6 +532,10 @@ def validate_artifact(
         raise ValueError("source revision is not a full commit")
     if set(artifact["source_sha256"]) != expected_sources:
         raise ValueError("source inventory is not exact")
+    allowed_later = artifact["allowed_later_source_diffs"]
+    if not isinstance(allowed_later, dict):
+        raise ValueError("later-source allowance inventory is absent")
+    changed: set[str] = set()
     for relative, expected in artifact["source_sha256"].items():
         historical = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
@@ -539,7 +544,20 @@ def validate_artifact(
         if hashlib.sha256(historical).hexdigest() != expected:
             raise ValueError(f"historical source digest mismatch for {relative}")
         if (root / relative).read_bytes() != historical:
-            raise ValueError(f"current source differs from acceptance for {relative}")
+            changed.add(relative)
+            allowance = allowed_later.get(relative)
+            if not isinstance(allowance, dict) or set(allowance) != {"sha256", "scope"}:
+                raise ValueError(f"later-source allowance is absent for {relative}")
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if hashlib.sha256(diff).hexdigest() != allowance["sha256"]:
+                raise ValueError(f"later-source allowance mismatch for {relative}")
+            if not isinstance(allowance["scope"], str) or not allowance["scope"].strip():
+                raise ValueError(f"later-source allowance scope is empty for {relative}")
+    if set(allowed_later) != changed:
+        raise ValueError("later-source allowance inventory is not exact")
     provider = artifact["provider"]
     if not (
         set(provider) == {
@@ -1125,6 +1143,7 @@ def main() -> int:
             path:hashlib.sha256(_git_bytes("show", f"{revision}:{path}")).hexdigest()
             for path in source_paths
         },
+        "allowed_later_source_diffs":{},
         "provider":{
             "engine":"codex", "executable":args.codex,
             "cli_version":_run(args.codex, "--version"),
