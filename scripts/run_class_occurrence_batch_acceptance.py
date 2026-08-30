@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,12 +93,30 @@ def _fixture_repo(
     return repo
 
 
+def _before_lineage_record() -> dict:
+    state = rc.normalize_state(None, stakes=STAKES, snapshot="seed")
+    state.update(phase="correction", last_round=1, debt=[{
+        "id":"D1", "finding_id":"known-app-occurrence", "status":"open",
+        "severity":"MAJOR", "summary":"app.conf violates the safe-mode contract",
+        "evidence":["repository/app.conf:1"],
+        "remedy":"repair every occurrence of the shared contract", "source_ids":[],
+        "class_ids":[CLASS_ID], "first_round":1, "last_round":1,
+    }])
+    tracked = cc.TrackedClass(
+        CLASS_ID, "Every active configuration sets MODE = safe.", "MAJOR", 1,
+        cc.OPEN, procedure="inspect every active configuration file",
+    )
+    return {
+        "rounds":1, "next_seq":2, "classes":[vars(tracked)], "review_state":state,
+    }
+
+
 def validate_artifact(
     artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
 ) -> None:
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
-        "provider", "fixture", "lineage_id", "stakes", "elapsed_seconds", "calls",
+        "provider", "fixture", "lineage_id", "stakes", "calls",
         "attempt_ledger", "settlement", "before_lineage", "after_lineage",
         "rendered_trailer", "result_text", "result_sha256",
     }
@@ -107,6 +124,11 @@ def validate_artifact(
         raise ValueError("acceptance fields are not closed and exact")
     if artifact["acceptance_kind"] != "class-occurrence-batch-public-branch-handler-v1":
         raise ValueError("wrong acceptance kind")
+    if (
+        artifact["version"] != 1 or artifact["date"] != "2026-08-30"
+        or artifact["lineage_id"] != LINEAGE or artifact["stakes"] != STAKES
+    ):
+        raise ValueError("acceptance identity metadata is not exact")
     if require_committed:
         committed = json.loads(_git("show", f"HEAD:{OUTPUT.relative_to(root)}", cwd=root))
         if committed != artifact:
@@ -174,6 +196,8 @@ def validate_artifact(
     )):
         raise ValueError("validation retry did not preserve one provider session")
     before = artifact["before_lineage"]
+    if before != _before_lineage_record():
+        raise ValueError("before-lineage envelope is not closed and exact")
     active = before["classes"]
     durable_debt = before["review_state"]["debt"]
     decoded = sp.decode_decision(
@@ -200,6 +224,8 @@ def validate_artifact(
     if len(assessments) != 1 or assessments[0].get("class_id") != CLASS_ID:
         raise ValueError("class outcome is not singular and correctly bound")
     after = artifact["after_lineage"]
+    if set(after) != {"rounds", "next_seq", "classes", "review_state"}:
+        raise ValueError("after-lineage envelope is not closed and exact")
     replayed_state = rc.settle_state(
         before["review_state"], settlement, phase="correction",
         snapshot=after["review_state"]["snapshot_digest"], round_no=2,
@@ -217,15 +243,19 @@ def validate_artifact(
         rc.register_from_records(settlement["class_records"], mechanized=None),
         round_no=2,
     )
+    replayed_lineage.rounds += 1
     replayed_state["correction_control"] = rc.advance_correction_control(
         rc.normalize_correction_control(before["review_state"], tracked),
         after=replayed_lineage, round_no=2, phase="correction",
         session_ref=calls[-1]["session_ref"],
     )
-    if replayed_state != after["review_state"]:
-        raise ValueError("settlement does not replay to durable review state")
-    if [vars(row) for row in replayed_lineage.classes.values()] != after["classes"]:
-        raise ValueError("settlement does not replay to durable class state")
+    replayed_after = {
+        "rounds":replayed_lineage.rounds, "next_seq":replayed_lineage.next_seq,
+        "classes":[vars(row) for row in replayed_lineage.classes.values()],
+        "review_state":replayed_state,
+    }
+    if replayed_after != after:
+        raise ValueError("settlement does not replay to complete durable lineage")
     debts = after["review_state"]["debt"]
     historic = next(row for row in debts if row["id"] == "D1")
     fresh = next(row for row in debts if row["id"] != "D1")
@@ -237,6 +267,8 @@ def validate_artifact(
         raise ValueError("violated class did not remain in correction")
     if _sha_text(artifact["result_text"]) != artifact["result_sha256"]:
         raise ValueError("result digest mismatch")
+    if not isinstance(artifact["rendered_trailer"], str) or not artifact["rendered_trailer"]:
+        raise ValueError("rendered trailer is absent")
     footer = (
         "\n\n---\n_paranoia-local · engine=codex · "
         f"session_ref=`{calls[-1]['session_ref']}` — to dispute a finding, call `rebut` "
@@ -352,18 +384,9 @@ def main() -> int:
         state_root = temp / "state"
         log_root = temp / "logs"
         os.environ[cc.STATE_ROOT_ENV] = str(state_root)
-        state = rc.normalize_state(None, stakes=STAKES, snapshot="seed")
-        state.update(phase="correction", last_round=1, debt=[{
-            "id":"D1", "finding_id":"known-app-occurrence", "status":"open",
-            "severity":"MAJOR", "summary":"app.conf violates the safe-mode contract",
-            "evidence":["repository/app.conf:1"],
-            "remedy":"repair every occurrence of the shared contract", "source_ids":[],
-            "class_ids":[CLASS_ID], "first_round":1, "last_round":1,
-        }])
-        tracked = cc.TrackedClass(
-            CLASS_ID, "Every active configuration sets MODE = safe.", "MAJOR", 1,
-            cc.OPEN, procedure="inspect every active configuration file",
-        )
+        before_lineage = _before_lineage_record()
+        state = before_lineage["review_state"]
+        tracked = cc.TrackedClass(**before_lineage["classes"][0])
         cc.save_lineage(state_root, cc.Lineage(
             LINEAGE, rounds=1, next_seq=2, classes={CLASS_ID:tracked},
             mode=cc.BRANCH_MODE, review_state=state,
@@ -392,11 +415,9 @@ def main() -> int:
 
         engine.run = record_run  # type: ignore[method-assign]
         engine.resume = record_resume  # type: ignore[method-assign]
-        started = time.monotonic()
         result = handlers.critique_branch(
             _arguments(repo), engine=engine, log_dir=log_root,
         )
-        elapsed = time.monotonic() - started
         audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
         lineage = cc.load_lineage(state_root, LINEAGE, stamp="acceptance", mode=cc.BRANCH_MODE)
         artifact_calls = [{
@@ -408,10 +429,6 @@ def main() -> int:
         } for row in calls]
         if any(token in artifact_calls[0]["prompt_text"] for token in FORBIDDEN_ANSWER_KEYS):
             raise RuntimeError("provider-visible acceptance prompt contains an answer key")
-        before_lineage = {
-            "rounds":1, "next_seq":2, "classes":[vars(tracked)],
-            "review_state":state,
-        }
         artifact = {
             "acceptance_kind":"class-occurrence-batch-public-branch-handler-v1",
             "version":1, "date":"2026-08-30", "source_revision":revision,
@@ -431,15 +448,14 @@ def main() -> int:
                 "base_files":BASE_FILES, "head_files":HEAD_FILES,
                 "expected_anchors":["repository/app.conf:1", "repository/worker.conf:1"],
             },
-            "lineage_id":LINEAGE, "stakes":STAKES,
-            "elapsed_seconds":round(elapsed, 3), "calls":artifact_calls,
+            "lineage_id":LINEAGE, "stakes":STAKES, "calls":artifact_calls,
             "attempt_ledger":[{
                 key:row[key] for key in ATTEMPT_FIELDS
             } for row in audit["attempt_ledger"]],
             "settlement":audit["staged_settlement"],
             "before_lineage":before_lineage,
             "after_lineage":{
-                "rounds":lineage.rounds,
+                "rounds":lineage.rounds, "next_seq":lineage.next_seq,
                 "classes":[vars(row) for row in lineage.classes.values()],
                 "review_state":lineage.review_state,
             },

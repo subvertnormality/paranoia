@@ -26,7 +26,10 @@ def test_class_occurrence_batch_acceptance_is_source_and_route_bound() -> None:
     "prompt_digest", "response", "response_digest", "call_route", "call_session",
     "ledger", "outcome", "role", "attempt_engine", "attempt_sequence",
     "attempt_timeout", "attempt_returncode", "retry", "fixture", "fixture_anchor",
-    "fixture_base", "settlement", "lineage", "result", "engine_source",
+    "fixture_base", "version", "date", "lineage_id", "stakes", "before_rounds",
+    "before_next_seq", "before_class", "before_state", "settlement", "lineage",
+    "after_rounds", "after_next_seq", "after_class", "after_state", "trailer",
+    "result", "engine_source",
 ])
 def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
     root = Path(__file__).resolve().parents[1]
@@ -81,10 +84,36 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
         artifact["fixture"]["expected_anchors"][1] = "repository/worker.conf:2"
     elif field == "fixture_base":
         artifact["fixture"]["base_id"] = "0" * 40
+    elif field == "version":
+        artifact["version"] = 2
+    elif field == "date":
+        artifact["date"] = "2026-08-29"
+    elif field == "lineage_id":
+        artifact["lineage_id"] = "different-lineage"
+    elif field == "stakes":
+        artifact["stakes"] += " changed"
+    elif field == "before_rounds":
+        artifact["before_lineage"]["rounds"] = 0
+    elif field == "before_next_seq":
+        artifact["before_lineage"]["next_seq"] = 3
+    elif field == "before_class":
+        artifact["before_lineage"]["classes"][0]["invariant"] += " changed"
+    elif field == "before_state":
+        artifact["before_lineage"]["review_state"]["phase"] = "final"
     elif field == "settlement":
         artifact["settlement"]["findings"][0]["summary"] += " changed"
     elif field == "lineage":
         artifact["after_lineage"]["review_state"]["phase"] = "clear"
+    elif field == "after_rounds":
+        artifact["after_lineage"]["rounds"] = 1
+    elif field == "after_next_seq":
+        artifact["after_lineage"]["next_seq"] = 3
+    elif field == "after_class":
+        artifact["after_lineage"]["classes"][0]["status"] = "closed"
+    elif field == "after_state":
+        artifact["after_lineage"]["review_state"]["last_round"] = 1
+    elif field == "trailer":
+        artifact["rendered_trailer"] += " changed"
     elif field == "result":
         artifact["result_text"] += " changed"
     else:
