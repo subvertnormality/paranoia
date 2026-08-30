@@ -343,17 +343,21 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
     if changed != set(allowed):
         raise ValueError("later-source allowance inventory is not exact")
     validation = value["validation"]
-    if set(validation) != {"revision", "source_sha256", "checks"}:
+    if set(validation) != {
+        "revision", "source_sha256", "allowed_later_source_diffs", "checks",
+    }:
         raise ValueError("validation binding is not closed")
     validation_revision = validation["revision"]
     if not isinstance(validation_revision, str) or len(validation_revision) != 40:
         raise ValueError("validation revision is not a full commit")
-    if validation_revision != revision:
-        raise ValueError("validation revision differs from the accepted source snapshot")
     if not set(VALIDATION_SOURCES).issubset(SOURCES):
         raise ValueError("validation sources are not covered by the accepted source inventory")
     if set(validation["source_sha256"]) != set(VALIDATION_SOURCES):
         raise ValueError("validation source inventory is not exact")
+    validation_allowed = validation["allowed_later_source_diffs"]
+    if not isinstance(validation_allowed, dict):
+        raise ValueError("validation later-source allowance must be an object")
+    changed_validation = set()
     for relative, digest in validation["source_sha256"].items():
         committed = subprocess.run(
             ["git", "show", f"{validation_revision}:{relative}"], cwd=root,
@@ -361,10 +365,23 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
         ).stdout
         if _sha_bytes(committed) != digest:
             raise ValueError(f"validation source binding mismatch for {relative}")
-        if value["source_sha256"].get(relative) != digest:
-            raise ValueError(
-                f"validation source is not bound to the accepted source snapshot: {relative}"
-            )
+        if (root / relative).read_bytes() != committed:
+            changed_validation.add(relative)
+            row = validation_allowed.get(relative)
+            if not isinstance(row, dict) or set(row) != {"sha256", "scope"}:
+                raise ValueError(
+                    f"validation later-source allowance is absent for {relative}"
+                )
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", validation_revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha_bytes(diff) != row["sha256"]:
+                raise ValueError(
+                    f"validation later-source allowance mismatch for {relative}"
+                )
+    if changed_validation != set(validation_allowed):
+        raise ValueError("validation later-source allowance inventory is not exact")
     if validation["checks"] != _recorded_deterministic_checks(
         root, validation_revision,
     ):
@@ -440,6 +457,7 @@ def main() -> int:
                 relative:_sha_bytes((ROOT / relative).read_bytes())
                 for relative in VALIDATION_SOURCES
             },
+            "allowed_later_source_diffs":{},
             "checks":_deterministic_checks(ROOT),
         }
         validate_artifact(value, ROOT)
@@ -496,6 +514,7 @@ def main() -> int:
                 relative:_sha_bytes((ROOT / relative).read_bytes())
                 for relative in VALIDATION_SOURCES
             },
+            "allowed_later_source_diffs":{},
             "checks":_deterministic_checks(ROOT),
         },
         "assertions":[
