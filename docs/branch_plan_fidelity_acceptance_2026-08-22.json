@@ -10,7 +10,7 @@
       "sha256": "595616b7a2a8b99c79758b8227ae8d3af4e9509d241fa57d02843e0d0c9e7d83"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Plan-only co-asserting-site completeness guidance; this does not alter branch plan-contract binding, authority, capture, propagation, or branch review instructions.",
+      "scope": "Shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; this does not alter branch plan-contract binding, authority, capture, or propagation.",
       "sha256": "9141a4e18432dc9c2ba87a04ebf70dacf88474364c683be23087b9c4607e6f06"
     },
     "src/paranoia_local/staged_protocol.py": {

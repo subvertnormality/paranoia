@@ -2,7 +2,7 @@
   "acceptance_kind": "arbitration-stakes-steering-rejected",
   "allowed_later_source_diffs": {
     "src/paranoia_local/prompts.py": {
-      "scope": "Plan-only co-asserting-site completeness guidance; arbitration prompts and stakes-steering rejection are unchanged.",
+      "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and stakes-steering rejection are unchanged.",
       "sha256": "9141a4e18432dc9c2ba87a04ebf70dacf88474364c683be23087b9c4607e6f06"
     }
   },
