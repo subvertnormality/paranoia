@@ -16,17 +16,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
-from paranoia_local import engines, handlers, review_census as rc
+from paranoia_local import engines, handlers, review_census as rc, staged_protocol as sp
 
 OUTPUT = ROOT / "docs" / "class_occurrence_batch_acceptance_2026-08-30.json"
 LINEAGE = "class-occurrence-batch-acceptance-20260830"
 CLASS_ID = "duplicate-mode-contract"
-SOURCES = (
-    "src/paranoia_local/class_closure.py",
-    "src/paranoia_local/handlers.py",
-    "src/paranoia_local/prompts.py",
-    "src/paranoia_local/review_census.py",
-    "src/paranoia_local/staged_protocol.py",
+PRODUCTION_SOURCES = tuple(sorted(
+    str(path.relative_to(ROOT))
+    for path in (ROOT / "src" / "paranoia_local").glob("*.py")
+))
+SOURCES = PRODUCTION_SOURCES + (
     "scripts/run_class_occurrence_batch_acceptance.py",
     "tests/test_class_occurrence_batch_acceptance.py",
     "tests/test_review_census.py",
@@ -85,7 +84,8 @@ def validate_artifact(
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
         "provider", "fixture", "lineage_id", "stakes", "elapsed_seconds", "calls",
-        "attempt_ledger", "settlement", "after_lineage", "result_text", "result_sha256",
+        "attempt_ledger", "settlement", "before_lineage", "after_lineage",
+        "rendered_trailer", "result_text", "result_sha256",
     }
     if set(artifact) != expected:
         raise ValueError("acceptance fields are not closed and exact")
@@ -115,11 +115,37 @@ def validate_artifact(
     calls = artifact["calls"]
     if not isinstance(calls, list) or len(calls) not in {1, 2}:
         raise ValueError("acceptance must retain one call and at most one validation retry")
-    if any(not row.get("session_ref") for row in calls):
-        raise ValueError("acceptance lacks signed-in provider sessions")
-    for row in calls:
+    ledger = artifact["attempt_ledger"]
+    if not isinstance(ledger, list) or len(ledger) != len(calls):
+        raise ValueError("attempt ledger does not match provider call count")
+    for index, (row, attempt) in enumerate(zip(calls, ledger), 1):
+        if set(row) != {
+            "route", "prompt_sha256", "session_ref", "response_text", "response_sha256",
+        } or not row["session_ref"]:
+            raise ValueError("acceptance call schema or signed-in session is invalid")
         if _sha_text(row["response_text"]) != row["response_sha256"]:
             raise ValueError("provider response digest mismatch")
+        expected_role = "correction" if index == 1 else "correction-validation-retry"
+        if (
+            attempt.get("sequence") != index or attempt.get("role") != expected_role
+            or attempt.get("session_ref") != row["session_ref"]
+            or attempt.get("response_sha256") != row["response_sha256"]
+            or attempt.get("outcome") != "completed"
+        ):
+            raise ValueError("provider call and attempt ledger are not route-bound")
+    before = artifact["before_lineage"]
+    active = before["classes"]
+    durable_debt = before["review_state"]["debt"]
+    decoded = sp.decode_decision(
+        calls[-1]["response_text"], mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=durable_debt,
+    )
+    replayed_settlement = sp.materialize_decision_value(
+        decoded, mode=cc.BRANCH_MODE, role="correction",
+        active_classes=active, durable_debt=durable_debt,
+    )
+    if replayed_settlement != artifact["settlement"]:
+        raise ValueError("retained provider response does not materialize to settlement")
     settlement = artifact["settlement"]
     findings = settlement.get("findings") or []
     if len(findings) != 1:
@@ -134,6 +160,30 @@ def validate_artifact(
     if len(assessments) != 1 or assessments[0].get("class_id") != CLASS_ID:
         raise ValueError("class outcome is not singular and correctly bound")
     after = artifact["after_lineage"]
+    replayed_state = rc.settle_state(
+        before["review_state"], settlement, phase="correction",
+        snapshot=after["review_state"]["snapshot_digest"], round_no=2,
+    )
+    tracked = [cc.TrackedClass(**row) for row in active]
+    replayed_lineage = cc.Lineage(
+        artifact["lineage_id"], rounds=before["rounds"],
+        next_seq=before["next_seq"], classes={row.class_id:row for row in tracked},
+        mode=cc.BRANCH_MODE, review_state=replayed_state,
+    )
+    cc.apply_register(
+        replayed_lineage,
+        rc.register_from_records(settlement["class_records"], mechanized=None),
+        round_no=2,
+    )
+    replayed_state["correction_control"] = rc.advance_correction_control(
+        rc.normalize_correction_control(before["review_state"], tracked),
+        after=replayed_lineage, round_no=2, phase="correction",
+        session_ref=calls[-1]["session_ref"],
+    )
+    if replayed_state != after["review_state"]:
+        raise ValueError("settlement does not replay to durable review state")
+    if [vars(row) for row in replayed_lineage.classes.values()] != after["classes"]:
+        raise ValueError("settlement does not replay to durable class state")
     debts = after["review_state"]["debt"]
     historic = next(row for row in debts if row["id"] == "D1")
     fresh = next(row for row in debts if row["id"] != "D1")
@@ -145,6 +195,17 @@ def validate_artifact(
         raise ValueError("violated class did not remain in correction")
     if _sha_text(artifact["result_text"]) != artifact["result_sha256"]:
         raise ValueError("result digest mismatch")
+    footer = (
+        "\n\n---\n_paranoia-local · engine=codex · "
+        f"session_ref=`{calls[-1]['session_ref']}` — to dispute a finding, call `rebut` "
+        "with this session_ref and your counter-evidence._"
+    )
+    rerendered = (
+        rc.render_review(settlement, replayed_state) + footer + "\n\n"
+        + artifact["rendered_trailer"]
+    )
+    if rerendered != artifact["result_text"]:
+        raise ValueError("settlement and durable state do not rerender the retained result")
 
 
 def main() -> int:
@@ -214,6 +275,10 @@ def main() -> int:
             "response_text":row["review"].text,
             "response_sha256":_sha_text(row["review"].text),
         } for row in calls]
+        before_lineage = {
+            "rounds":1, "next_seq":2, "classes":[vars(tracked)],
+            "review_state":state,
+        }
         artifact = {
             "acceptance_kind":"class-occurrence-batch-public-branch-handler-v1",
             "version":1, "date":"2026-08-30", "source_revision":revision,
@@ -236,11 +301,13 @@ def main() -> int:
             "elapsed_seconds":round(elapsed, 3), "calls":artifact_calls,
             "attempt_ledger":audit["attempt_ledger"],
             "settlement":audit["staged_settlement"],
+            "before_lineage":before_lineage,
             "after_lineage":{
                 "rounds":lineage.rounds,
                 "classes":[vars(row) for row in lineage.classes.values()],
                 "review_state":lineage.review_state,
             },
+            "rendered_trailer":audit["rendered_trailer"],
             "result_text":result, "result_sha256":_sha_text(result),
         }
         candidate_path = Path("/tmp/paranoia-class-occurrence-batch-candidate.json")

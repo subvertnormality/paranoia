@@ -2735,6 +2735,31 @@ def test_fresh_aggregate_finding_must_supersede_prior_class_debt():
         materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
 
 
+def test_correction_cannot_carry_two_open_debts_for_one_class():
+    debts = [durable_debt("D7"), durable_debt("D8", finding_id="older-8")]
+    raw = decision(
+        "correction",
+        debt_outcomes=[{
+            "debt_id":debt["id"], "status":"open", "evidence":["plan:1"],
+            "reason":"the occurrence remains reachable",
+        } for debt in debts],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"carried_debt", "debt_id":"D7"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError, match="would retain 2 open debts.*keep at most one",
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=debts)
+
+    raw["debt_outcomes"][1] = {
+        "debt_id":"D8", "status":"closed", "evidence":["plan:1"],
+    }
+    parsed = materialize(raw, active_classes=[active_class()], durable_debt=debts)
+    assert [row["status"] for row in parsed["debt_updates"]] == ["open", "closed"]
+
+
 def test_historical_v1_v2_open_unbound_debt_shape_is_equivalent():
     debts = [durable_debt("D9", cid=None)]
     parsed = materialize(

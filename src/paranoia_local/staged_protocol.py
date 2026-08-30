@@ -1383,6 +1383,22 @@ def materialize_decision_value(
                 f"{debt_outcome_pointers[debt_id]}: open class-bound debt needs a violated class"
             )
 
+    if role == "correction":
+        for cid in classes:
+            retained = [
+                debt_id for debt_id, debt in open_debt.items()
+                if cid in debt.get("class_ids", [])
+                and debt_outcomes.get(debt_id, {}).get("status") == "open"
+            ]
+            prospective = len(retained) + (1 if cid in existing_findings else 0)
+            if prospective > 1:
+                pointers = [debt_outcome_pointers[item] for item in retained]
+                issues.append(
+                    f"/debt_outcomes: correction would retain {prospective} open debts "
+                    f"for active class {cid!r}; keep at most one aggregate blocker "
+                    f"(retained pointers={pointers})"
+                )
+
     action_pointers = _class_row_pointers(value, "class_actions")
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
