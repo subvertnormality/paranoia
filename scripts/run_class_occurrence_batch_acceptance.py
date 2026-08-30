@@ -253,51 +253,44 @@ def validate_artifact(
             review_state=before["review_state"],
         ))
 
-        class ReplayEngine:
-            name = "codex"
-            default_model = "gpt-5.6-sol"
-            binary = "codex"
-            native_web = True
-            text_only = False
-            role = "default"
+        replay_prompts: list[str] = []
+        replay_index = 0
+        original_run = engines.CodexEngine.run
+        original_resume = engines.CodexEngine.resume
 
-            def __init__(self) -> None:
-                self.index = 0
-                self.prompts: list[str] = []
+        def replay_reply(prompt: str) -> Review:
+            nonlocal replay_index
+            replay_prompts.append(prompt)
+            row = calls[replay_index]
+            replay_index += 1
+            return Review(
+                text=row["response_text"], session_ref=row["session_ref"],
+                raw=row["response_text"],
+            )
 
-            def for_role(self, role: str):
-                self.role = role
-                return self
+        def replay_run(self, prompt, *args, **kwargs):
+            return replay_reply(prompt)
 
-            def run(self, prompt, *args, **kwargs):
-                return self._reply(prompt)
+        def replay_resume(self, session_ref, prompt, *args, **kwargs):
+            if session_ref != calls[0]["session_ref"]:
+                raise ValueError("validation retry did not resume the original session")
+            return replay_reply(prompt)
 
-            def resume(self, session_ref, prompt, *args, **kwargs):
-                if session_ref != calls[0]["session_ref"]:
-                    raise ValueError("validation retry did not resume the original session")
-                return self._reply(prompt)
-
-            def _reply(self, prompt: str) -> Review:
-                self.prompts.append(prompt)
-                row = calls[self.index]
-                self.index += 1
-                return Review(
-                    text=row["response_text"], session_ref=row["session_ref"],
-                    raw=row["response_text"],
-                )
-
-        replay_engine = ReplayEngine()
+        engines.CodexEngine.run = replay_run
+        engines.CodexEngine.resume = replay_resume
         try:
             replay_result = handlers.critique_branch(
-                _arguments(repo), engine=replay_engine, log_dir=temp / "logs",
+                _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
                 now=lambda:"REPLAY",
             )
         finally:
+            engines.CodexEngine.run = original_run
+            engines.CodexEngine.resume = original_resume
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
                 os.environ[cc.STATE_ROOT_ENV] = prior_root
-        if replay_engine.prompts != [row["prompt_text"] for row in calls]:
+        if replay_prompts != [row["prompt_text"] for row in calls]:
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")
