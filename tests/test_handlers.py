@@ -279,7 +279,7 @@ class TestRebut:
             "source_ids":[], "class_ids":["class-a"], "first_round":1,
             "last_round":7, "reason":"still present",
         }
-        state.update(phase="correction", last_round=7, debt=[debt])
+        state.update(phase="correction", last_round=7, debt=[debt], plan_line_count=1)
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
         )
@@ -295,7 +295,7 @@ class TestRebut:
         ))
         eng = FakeEngine(json.dumps({
             "disposition":"CONCEDE", "reason":"The finding used the wrong path.",
-            "evidence":[{"anchor":"repository/app.py:1", "rationale":"current guard"}],
+            "evidence":[{"anchor":"plan:1", "rationale":"current plan obligation"}],
         }))
         result = handlers.rebut({
             "repo_path":str(repo), "session_ref":"sess-1",
@@ -311,7 +311,7 @@ class TestRebut:
         assert reloaded.review_state["phase"] == "final"
         assert reloaded.review_state["last_round"] == 7
         assert reloaded.review_state["debt"][0]["status"] == "closed"
-        assert reloaded.review_state["debt"][0]["evidence"] == ["repository/app.py:1"]
+        assert reloaded.review_state["debt"][0]["evidence"] == ["plan:1"]
         assert "reason" not in reloaded.review_state["debt"][0]
         assert reloaded.classes["class-a"].status == cc.CLOSED
         assert reloaded.review_state["correction_control"]["classes"]["class-a"] == {
@@ -335,7 +335,7 @@ class TestRebut:
         successful = [row for row in audits if not row.get("error")][0]
         assert successful["disposition"] == "CONCEDE"
         assert successful["prior_target_debt"] == debt
-        assert successful["rebut_evidence"] == ["repository/app.py:1"]
+        assert successful["rebut_evidence"] == ["plan:1"]
         assert successful["debt_settled"] is True
         assert successful["class_closed"] is True
 
@@ -386,22 +386,25 @@ class TestRebut:
         assert audit["debt_settled"] is False
         assert audit["class_closed"] is False
 
-    @pytest.mark.parametrize(("mechanized", "evidence", "error"), [
-        (True, [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),
-        (False, [{"anchor":"repository/missing.py:1", "rationale":"current"}], "unresolvable"),
-        (False, [{"anchor":"app.py:1", "rationale":"current"}], "requires repository/ prefix"),
+    @pytest.mark.parametrize(("mechanized", "prior_evidence", "evidence", "error"), [
+        (True, ["repository/app.py:1"], [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),
+        (False, ["repository/app.py:1"], [{"anchor":"repository/missing.py:1", "rationale":"current"}], "unresolvable"),
+        (False, ["repository/app.py:1"], [{"anchor":"app.py:1", "rationale":"current"}], "requires repository/ prefix"),
+        (False, ["plan:2"], [{"anchor":"plan:2", "rationale":"current"}], "unresolvable plan anchor"),
     ])
     def test_bound_rebut_refuses_unsupported_or_unresolved_closure(
-        self, repo: Path, tmp_path: Path, monkeypatch, mechanized, evidence, error,
+        self, repo: Path, tmp_path: Path, monkeypatch, mechanized,
+        prior_evidence, evidence, error,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
         state = rc.normalize_state(None, stakes="s", snapshot="p")
         state.update(phase="correction", last_round=2, debt=[{
             "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
-            "summary":"finding", "evidence":["repository/app.py:1"],
+            "summary":"finding", "evidence":prior_evidence,
             "remedy":"repair", "source_ids":[], "class_ids":["class-a"],
             "first_round":1, "last_round":2, "reason":"open",
         }])
+        state["plan_line_count"] = 1
         state["correction_control"] = {"version":1, "classes":{"class-a":{
             "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
         }}}

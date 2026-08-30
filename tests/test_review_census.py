@@ -201,6 +201,9 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     current_unbound = deepcopy(base)
     current_unbound["unbound_class_ids"] = ["class-a"]
     accepted.append(current_unbound)
+    plan_bounded = deepcopy(base)
+    plan_bounded["plan_line_count"] = 7
+    accepted.append(plan_bounded)
 
     for state in accepted:
         validated = rc.validate_persisted_state(state, [tracked])
@@ -221,6 +224,8 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     (("snapshot_digest",), {}, "snapshot_digest"),
     (("debt",), {}, "review_state debt"),
     (("last_round",), False, "last_round"),
+    (("plan_line_count",), False, "plan line count"),
+    (("plan_line_count",), 0, "plan line count"),
     (("debt", 0, "id"), [], "debt id"),
     (("debt", 0, "finding_id"), None, "finding_id"),
     (("debt", 0, "status"), [], "debt status"),
@@ -4218,6 +4223,10 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         if row["status"] == "open" and row["class_ids"] == ["fresh-class"]
     )
     assert fresh["evidence"] == anchors
+    if mode == cc.PLAN_MODE:
+        assert durable.review_state["plan_line_count"] == 3
+    else:
+        assert "plan_line_count" not in durable.review_state
 
 
 def test_plan_active_class_view_is_phase_correct_and_branch_view_is_unchanged():

@@ -190,7 +190,9 @@ Optional durable settlement requires all four: `lineage`, `class_id`, `debt_id`,
 and `lineage_mode` (`branch|plan`). The session must be current for the active
 blocking class and the open debt must bind only that class. `HOLD` is audit-only;
 `CONCEDE` closes that debt and closes the class only when no sibling blocker
-remains. The unbound form remains prose-returning and non-mutating.
+remains. Its citation objects must resolve under the staged anchor grammar before
+settlement; plan citations require the retained reviewed-plan line bound. The
+unbound form remains prose-returning and non-mutating.
 
 ## `arbitrate`
 

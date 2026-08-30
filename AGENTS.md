@@ -538,6 +538,8 @@ jumps count and failed labels may retry. Provider/validation failure does not ad
 state, and ambiguous lineage or rebut saves retain the pending latch. The rebut audit retains the
 complete prior target debt row separately while current closed-debt evidence records the concession
 citations.
+Persist the reviewed plan line count in staged plan state and resolve repeated plan rebut anchors
+against that bound; absence of a trustworthy bound refuses plan-anchor settlement.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.
 Bind bounded attempt-channel digests and exact retained response evidence to the acceptance

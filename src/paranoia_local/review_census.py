@@ -32,7 +32,7 @@ STATE_KEYS = frozenset({
     "version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt",
     "last_round", "format_debt", "validation_debt", "staged_failure",
     "census_cache", "unbound_classes", "unbound_class_ids",
-    "correction_control",
+    "correction_control", "plan_line_count",
 })
 DEBT_KEYS = frozenset({
     "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
@@ -381,6 +381,10 @@ def validate_persisted_state(
         type(state["last_round"]) is not int or state["last_round"] < 1
     ):
         raise CensusError("/last_round: invalid persisted round")
+    if "plan_line_count" in state and (
+        type(state["plan_line_count"]) is not int or state["plan_line_count"] < 1
+    ):
+        raise CensusError("/plan_line_count: invalid persisted plan line count")
     validate_persisted_debt(state.get("debt"))
     failure_keys = [
         key for key in ("format_debt", "validation_debt", "staged_failure")

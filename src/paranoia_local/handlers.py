@@ -1166,6 +1166,8 @@ def _staged_structural_review(
         state = rc.validate_persisted_state(
             state, lineage.active(), correction_control_source=control_source,
         )
+        if mode == cc.PLAN_MODE and plan_lines is not None:
+            state["plan_line_count"] = plan_lines
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -4599,17 +4601,16 @@ def rebut(
                         "/evidence: plan-mode rebut may reuse only plan anchors already "
                         "resolved for the target debt"
                     )
-                plan_lines = None
+                plan_lines = (
+                    review_state.get("plan_line_count")
+                    if lineage_mode == cc.PLAN_MODE else None
+                )
                 if lineage_mode == cc.BRANCH_MODE and lineage.branch_contract:
                     contract_text = lineage.branch_contract.get("text")
                     if isinstance(contract_text, str):
                         plan_lines = len(contract_text.splitlines())
-                resolvable = [
-                    item for item in rebut_evidence
-                    if not (lineage_mode == cc.PLAN_MODE and item.startswith("plan:"))
-                ]
                 rc.resolve_anchors(
-                    {"evidence":resolvable}, root=repo, plan_lines=plan_lines,
+                    {"evidence":rebut_evidence}, root=repo, plan_lines=plan_lines,
                     trusted_roots={"repository":repo},
                 )
                 rendered = (

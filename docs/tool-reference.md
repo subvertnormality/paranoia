@@ -146,7 +146,9 @@ bound response is closed structured output: `HOLD` is audit-only; `CONCEDE`
 closes only the named debt and closes the class only when no sibling blocker
 remains. It never grants convergence. The session must be the durable current
 session for the active blocking class, and ambiguous or invalid state refuses
-settlement. Mechanized branch classes are refused before provider spend because
+settlement. Bound citations use the staged anchor grammar and resolve before any
+write; plan anchors also require the retained reviewed-plan line bound. Mechanized
+branch classes are refused before provider spend because
 their canonical predicate sweep, not a model concession, owns closure.
 
 ## `arbitrate`
