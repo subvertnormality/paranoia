@@ -164,6 +164,8 @@ def validate_artifact(
         before["review_state"], settlement, phase="correction",
         snapshot=after["review_state"]["snapshot_digest"], round_no=2,
     )
+    for debt in replayed_state["debt"]:
+        debt.pop("class_record_indexes", None)
     tracked = [cc.TrackedClass(**row) for row in active]
     replayed_lineage = cc.Lineage(
         artifact["lineage_id"], rounds=before["rounds"],
