@@ -1,0 +1,219 @@
+{
+  "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
+  "after_lineage": {
+    "classes": [
+      {
+        "class_id": "duplicate-mode-contract",
+        "detail": null,
+        "first_round": 1,
+        "invariant": "Every active configuration sets MODE = safe.",
+        "matches": [],
+        "pathspec": null,
+        "pattern": null,
+        "procedure": "inspect every active configuration file",
+        "severity": "MAJOR",
+        "status": "open",
+        "superseded_by": null
+      }
+    ],
+    "review_state": {
+      "correction_control": {
+        "classes": {
+          "duplicate-mode-contract": {
+            "last_session_ref": "01a052c4-97d2-7a63-836a-3953ea6b5bc6",
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt": [
+        {
+          "class_ids": [
+            "duplicate-mode-contract"
+          ],
+          "evidence": [
+            "repository/app.conf:1",
+            "repository/worker.conf:1"
+          ],
+          "finding_id": "known-app-occurrence",
+          "first_round": 1,
+          "id": "D1",
+          "last_round": 2,
+          "remedy": "repair every occurrence of the shared contract",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "closed",
+          "summary": "app.conf violates the safe-mode contract"
+        },
+        {
+          "class_ids": [
+            "duplicate-mode-contract"
+          ],
+          "evidence": [
+            "repository/app.conf:1",
+            "repository/worker.conf:1"
+          ],
+          "finding_id": "unsafe-mode-active-configurations",
+          "first_round": 2,
+          "id": "D2",
+          "last_round": 2,
+          "remedy": "Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "open",
+          "summary": "Both independent active configurations violate the safe-mode contract."
+        }
+      ],
+      "last_round": 2,
+      "phase": "correction",
+      "snapshot_digest": "0e0fee1ba91320b09771932ec8a7ac749f39aca613fe216f765cedb2b5eebb7a",
+      "stakes": "One trusted operator and OS; repository, diff, and provider output are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; two text files and one active class; false clearance or incomplete class evidence is high impact; recoverable blocking is acceptable.",
+      "stakes_digest": "6836769b1cc1f9bba0dfbcc002210abc257a19b0f9a7a808e2e902fd2820b127",
+      "version": 1
+    },
+    "rounds": 2
+  },
+  "attempt_ledger": [
+    {
+      "duration_ms": 18898,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a052c4-97d2-7a63-836a-3953ea6b5bc6\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"duplicate-mode-contract\\\":null},\\\"class_outcomes\\\":{\\\"duplicate-mode-contract\\\":{\\\"basis\\\":{\\\"finding_id\\\":\\\"unsafe-mode-active-configurations\\\",\\\"kind\\\":\\\"new_finding\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/app.conf:1\\\",\\\"rationale\\\":\\\"The active application configuration explicitly sets MODE to unsafe, violating the requirement that every active configuration set MODE to safe.\\\"},{\\\"anchor\\\":\\\"repository/worker.conf:1\\\",\\\"rationale\\\":\\\"The independent active worker configuration explicitly sets MODE to unsafe, establishing a second current occurrence of the same class.\\\"}],\\\"verdict\\\":\\\"violated\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/app.conf:1\\\",\\\"rationale\\\":\\\"The predecessor occurrence remains present and is now exhaustively consolidated into the fresh governing finding covering every current occurrence of this class.\\\"},{\\\"anchor\\\":\\\"repository/worker.conf:1\\\",\\\"rationale\\\":\\\"This second independent occurrence makes the fresh aggregate finding the authoritative current debt for the shared contract.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"class_id\\\":\\\"duplicate-mode-contract\\\",\\\"kind\\\":\\\"existing_class\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/app.conf:1\\\",\\\"rationale\\\":\\\"app.conf independently sets MODE to unsafe instead of the contractually required safe value.\\\"},{\\\"anchor\\\":\\\"repository/worker.conf:1\\\",\\\"rationale\\\":\\\"worker.conf independently sets MODE to unsafe instead of the contractually required safe value.\\\"}],\\\"id\\\":\\\"unsafe-mode-active-configurations\\\",\\\"remedy\\\":\\\"Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.\\\",\\\"severity\\\":\\\"MAJOR\\\",\\\"summary\\\":\\\"Both independent active configurations violate the safe-mode contract.\\\"}],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":18465,\"cached_input_tokens\":0,\"output_tokens\":540,\"reasoning_output_tokens\":172}}\n",
+      "raw_sha256": "e147b9a04ba0c3dd71ca7033e9c97015b3aa1cd395264bdd1cb7815927a918e8",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 2400,
+      "response_excerpt": "{\"class_actions\":{\"duplicate-mode-contract\":null},\"class_outcomes\":{\"duplicate-mode-contract\":{\"basis\":{\"finding_id\":\"unsafe-mode-active-configurations\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"The active application configuration explicitly sets MODE to unsafe, violating the requirement that every active configuration set MODE to safe.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"The independent active worker configuration explicitly sets MODE to unsafe, establishing a second current occurrence of the same class.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"The predecessor occurrence remains present and is now exhaustively consolidated into the fresh governing finding covering every current occurrence of this class.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"This second independent occurrence makes the fresh aggregate finding the authoritative current debt for the shared contract.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"class_id\":\"duplicate-mode-contract\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"app.conf independently sets MODE to unsafe instead of the contractually required safe value.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"worker.conf independently sets MODE to unsafe instead of the contractually required safe value.\"}],\"id\":\"unsafe-mode-active-configurations\",\"remedy\":\"Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.\",\"severity\":\"MAJOR\",\"summary\":\"Both independent active configurations violate the safe-mode contract.\"}],\"role\":\"correction\"}",
+      "response_sha256": "d54f6093c110d20cb7a02688dbe51da8176ff928c8de5053048d18d11ca5875d",
+      "returncode": 0,
+      "role": "correction",
+      "sequence": 1,
+      "session_ref": "01a052c4-97d2-7a63-836a-3953ea6b5bc6",
+      "stderr_excerpt": "2026-08-30T13:03:30.207027Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-30T13:03:47.870174Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "416ded71edda43da67f5ecae949ad127271e8f6fa80d321e993ebe1d2f0d76aa",
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 18465,
+        "output_tokens": 540,
+        "reasoning_output_tokens": 172
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "calls": [
+    {
+      "prompt_sha256": "dfeef6f73f00a677491866f4aabd8dfd37e3cb8ebfe6d0998a42de48957eea36",
+      "response_sha256": "d54f6093c110d20cb7a02688dbe51da8176ff928c8de5053048d18d11ca5875d",
+      "response_text": "{\"class_actions\":{\"duplicate-mode-contract\":null},\"class_outcomes\":{\"duplicate-mode-contract\":{\"basis\":{\"finding_id\":\"unsafe-mode-active-configurations\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"The active application configuration explicitly sets MODE to unsafe, violating the requirement that every active configuration set MODE to safe.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"The independent active worker configuration explicitly sets MODE to unsafe, establishing a second current occurrence of the same class.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"The predecessor occurrence remains present and is now exhaustively consolidated into the fresh governing finding covering every current occurrence of this class.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"This second independent occurrence makes the fresh aggregate finding the authoritative current debt for the shared contract.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"class_id\":\"duplicate-mode-contract\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/app.conf:1\",\"rationale\":\"app.conf independently sets MODE to unsafe instead of the contractually required safe value.\"},{\"anchor\":\"repository/worker.conf:1\",\"rationale\":\"worker.conf independently sets MODE to unsafe instead of the contractually required safe value.\"}],\"id\":\"unsafe-mode-active-configurations\",\"remedy\":\"Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.\",\"severity\":\"MAJOR\",\"summary\":\"Both independent active configurations violate the safe-mode contract.\"}],\"role\":\"correction\"}",
+      "route": "fresh",
+      "session_ref": "01a052c4-97d2-7a63-836a-3953ea6b5bc6"
+    }
+  ],
+  "date": "2026-08-30",
+  "elapsed_seconds": 18.953,
+  "fixture": {
+    "base_id": "cc1fee55360a5c2ef675e3c87597233ba5a9d6ff",
+    "expected_anchors": [
+      "repository/app.conf:1",
+      "repository/worker.conf:1"
+    ],
+    "head_id": "e19b30a7c0cbecd24fca367180eec71e77b613c9"
+  },
+  "lineage_id": "class-occurrence-batch-acceptance-20260830",
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "model": "gpt-5.6-sol",
+    "web_search": false
+  },
+  "result_sha256": "170851bd15a31e10834931af181259f33840d380efec03028ca3ebae42be3e9b",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] Both independent active configurations violate the safe-mode contract. [classes: duplicate-mode-contract] (repository/app.conf:1, repository/worker.conf:1)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a052c4-97d2-7a63-836a-3953ea6b5bc6` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: class-occurrence-batch-acceptance-20260830 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — NONE\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  duplicate-mode-contract Every active configuration sets MODE = safe. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "settlement": {
+    "_class_record_pointers": [],
+    "_finding_class_refs": {
+      "unsafe-mode-active-configurations": "duplicate-mode-contract"
+    },
+    "assessment_dispositions": [
+      {
+        "assessment_id": "duplicate-mode-contract",
+        "governing_id": "unsafe-mode-active-configurations"
+      }
+    ],
+    "class_assessments": [
+      {
+        "class_id": "duplicate-mode-contract",
+        "evidence": [
+          "repository/app.conf:1",
+          "repository/worker.conf:1"
+        ],
+        "finding_id": "unsafe-mode-active-configurations",
+        "verdict": "violated"
+      }
+    ],
+    "class_dispositions": [
+      {
+        "class_id": "duplicate-mode-contract",
+        "finding_id": "unsafe-mode-active-configurations",
+        "kind": "existing_class"
+      }
+    ],
+    "class_records": [],
+    "debt": [
+      {
+        "evidence": [
+          "repository/app.conf:1",
+          "repository/worker.conf:1"
+        ],
+        "finding_id": "unsafe-mode-active-configurations",
+        "id": "D2",
+        "remedy": "Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.",
+        "severity": "MAJOR",
+        "status": "open",
+        "summary": "Both independent active configurations violate the safe-mode contract."
+      }
+    ],
+    "debt_updates": [
+      {
+        "evidence": [
+          "repository/app.conf:1",
+          "repository/worker.conf:1"
+        ],
+        "id": "D1",
+        "status": "closed"
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "repository/app.conf:1",
+          "repository/worker.conf:1"
+        ],
+        "id": "unsafe-mode-active-configurations",
+        "remedy": "Change MODE to safe in both app.conf and worker.conf, then inspect every active configuration file to verify that no other occurrence of the shared contract remains violated.",
+        "severity": "MAJOR",
+        "summary": "Both independent active configurations violate the safe-mode contract."
+      }
+    ],
+    "role": "correction",
+    "source_dispositions": []
+  },
+  "source_revision": "96db43eeaa60fe8bd2fc67df2fa8f6ec2160e3df",
+  "source_sha256": {
+    "scripts/run_class_occurrence_batch_acceptance.py": "d5a24363bb615f9d4ca262b596f1b8b7eba763c1dc2ca737e7594acd0877a827",
+    "src/paranoia_local/class_closure.py": "ef657392205ef181956227a8b98d2c7421a8af5cf9d6dca54cc563b52bf340eb",
+    "src/paranoia_local/handlers.py": "4de0172ce6e7654c53d9d22f2e28608af00f01754c44dc3b45c4677e68702147",
+    "src/paranoia_local/prompts.py": "7a942c5ea5533e89584ecaac33f62f9ba01c5f95e7d907c2924d6121963ea05d",
+    "src/paranoia_local/review_census.py": "7ba85fe84e8d3daeb4a1359169e6925812a780ad01bb371de853356cf3ef5b84",
+    "src/paranoia_local/staged_protocol.py": "9d07136df1438474756e5f2d3a83f63c198831db046ae9d9e37789e2ed7b5743",
+    "tests/test_class_occurrence_batch_acceptance.py": "f715f3708002d7ee3f970a307e35f12113ed350e7146a5b08d7f15efcc741f26",
+    "tests/test_review_census.py": "bcc602124fbbb028aa2f6d28a01acc35a1adf7afc136cf89d83392a2a98719be"
+  },
+  "stakes": "One trusted operator and OS; repository, diff, and provider output are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; two text files and one active class; false clearance or incomplete class evidence is high impact; recoverable blocking is acceptable.",
+  "version": 1
+}
