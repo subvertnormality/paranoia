@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Claim-evidence failure-phase prefixes, source-local binding omission, aggregate capture-deadline/group classification, and ordered terminal claim-debt attempt projection only; this does not alter staged schema validation, mechanized predicate matching, correction routing, class settlement, or durable reload.",
-      "sha256": "a199d0c2e41eed49667addf41e320d032b9721825ac0e0e1b2c9a16b0c7af2b2"
+      "sha256": "db7846357d3482304fa6db289b17f838ae198fb982419a77ef7b6076f563004a"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged schema validation, mechanized predicate evidence, matching, or replacement semantics.",
-      "sha256": "bdab0d7e063da37ec5a3a3f7e7d3e42b6db8b6be5602197e2881954c0f1bc67e"
+      "sha256": "17a9d1ca13a8684f5a6f472c72096dc30d182cf961ce42863d4ae81554559946"
     }
   },
   "attempt_ledger": [

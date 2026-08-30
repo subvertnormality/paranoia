@@ -201,6 +201,9 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     current_unbound = deepcopy(base)
     current_unbound["unbound_class_ids"] = ["class-a"]
     accepted.append(current_unbound)
+    plan_bounded = deepcopy(base)
+    plan_bounded["plan_line_count"] = 7
+    accepted.append(plan_bounded)
 
     for state in accepted:
         validated = rc.validate_persisted_state(state, [tracked])
@@ -221,6 +224,8 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     (("snapshot_digest",), {}, "snapshot_digest"),
     (("debt",), {}, "review_state debt"),
     (("last_round",), False, "last_round"),
+    (("plan_line_count",), False, "plan line count"),
+    (("plan_line_count",), 0, "plan line count"),
     (("debt", 0, "id"), [], "debt id"),
     (("debt", 0, "finding_id"), None, "finding_id"),
     (("debt", 0, "status"), [], "debt status"),
@@ -436,9 +441,9 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 
 
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
-    (
-        cc.PLAN_MODE, "final",
-        "7051432dcbc9a3f5f2677056c48037b559a65e2f1f424327a9831ebebb496a3d",
+        (
+            cc.PLAN_MODE, "final",
+            "e0f6e28736a5bbe7aa1cbb43edfd8a00e4415ce81a0e84e70fe899a28e83f9bf",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
@@ -2731,10 +2736,17 @@ def test_primary_staged_failure_surface_preserves_failure_kind(kind, headline, b
 def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
     state = {
         "phase": "correction", "last_round": 57,
-        "debt": [{
-            "id": "debt-a", "status": "open", "severity": cc.MINOR,
-            "first_round": 34, "class_ids": ["6cf3f68b"],
-        }],
+        "debt": [
+            {
+                "id": "closed-predecessor", "status": "closed",
+                "severity": cc.MAJOR, "first_round": 3,
+                "class_ids": ["6cf3f68b"],
+            },
+            {
+                "id": "debt-a", "status": "open", "severity": cc.MAJOR,
+                "first_round": 34, "class_ids": ["6cf3f68b"],
+            },
+        ],
     }
 
     rendered = rc.trailer(
@@ -2746,7 +2758,8 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
         "PERSISTENCE: 6cf3f68b currently open; round-label span 57 "
         "(first raised 1, now 57), current debt open since 34"
     ) in rendered
-    assert "rebut with session_ref=session-57" in rendered
+    assert "rebut with session_ref=session-57 debt_id=debt-a" in rendered
+    assert "debt_id=closed-predecessor" not in rendered
 
 
 def test_trailer_omits_persistence_until_third_tracked_round() -> None:
@@ -4218,6 +4231,77 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         if row["status"] == "open" and row["class_ids"] == ["fresh-class"]
     )
     assert fresh["evidence"] == anchors
+    if mode == cc.PLAN_MODE:
+        assert durable.review_state["plan_line_count"] == 3
+    else:
+        assert "plan_line_count" not in durable.review_state
+
+
+def test_plan_active_class_view_is_phase_correct_and_branch_view_is_unchanged():
+    tracked = cc.TrackedClass(
+        "class-a", "runtime output is correct", cc.MAJOR, 1, cc.CLOSED,
+        procedure="execute the future verifier",
+    )
+    lineage = cc.Lineage(
+        "phase-view", mode=cc.PLAN_MODE, classes={"class-a":tracked},
+    )
+    plan_rows = handlers._active_class_rows(lineage, cc.PLAN_MODE)
+    assert plan_rows == handlers._active_class_rows(lineage, cc.PLAN_MODE)
+    assert "PLAN-PHASE INTERPRETATION" in plan_rows[0]["invariant"]
+    assert "runtime output is correct" in plan_rows[0]["invariant"]
+    procedure = plan_rows[0]["procedure"]
+    for required in (
+        "exact implementation scope", "executable acceptance evidence",
+        "fail-closed behavior", "named durable residual", "owner",
+        "acceptance boundary", "MINOR", "OUT-OF-SCOPE",
+        "expected pre-implementation code",
+    ):
+        assert required in procedure
+    branch_rows = handlers._active_class_rows(lineage, cc.BRANCH_MODE)
+    assert branch_rows[0]["invariant"] == "runtime output is correct"
+    assert branch_rows[0]["procedure"] == "execute the future verifier"
+
+
+def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
+    target = {
+        "id":"D1", "finding_id":"F1", "status":"open", "severity":"MAJOR",
+        "summary":"target", "evidence":["plan:1"], "remedy":"withdraw",
+        "source_ids":[], "class_ids":["class-a"], "first_round":1,
+        "last_round":4, "reason":"open",
+    }
+    sibling = {
+        "id":"D2", "finding_id":"F2", "status":"open", "severity":"MAJOR",
+        "summary":"sibling", "evidence":["plan:2"], "remedy":"repair",
+        "source_ids":[], "class_ids":["class-b"], "first_round":2,
+        "last_round":4, "reason":"open",
+    }
+    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state.update(phase="correction", last_round=4, debt=[target, sibling])
+    before = json.loads(json.dumps(state))
+    settled = rc.settle_rebut_concession(
+        state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+        blocking_class_ids=["class-a", "class-b"],
+    )
+    assert state == before
+    assert settled["phase"] == "correction"
+    assert settled["debt"][0]["status"] == "closed"
+    assert settled["debt"][0]["evidence"] == ["plan:3"]
+    assert "reason" not in settled["debt"][0]
+    assert settled["debt"][1] == sibling
+
+    for key in rc.REBUT_FAILURE_FIELDS:
+        invalid = json.loads(json.dumps(state))
+        invalid[key] = ["blocked"] if key.endswith("classes") else {"blocked":True}
+        with pytest.raises(rc.CensusError, match="unresolved structural state"):
+            rc.settle_rebut_concession(
+                invalid, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+                blocking_class_ids=["class-a", "class-b"],
+            )
+    with pytest.raises(rc.CensusError, match="unbound blocking classes"):
+        rc.settle_rebut_concession(
+            state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+            blocking_class_ids=["class-a", "class-b", "class-c"],
+        )
 
 
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(

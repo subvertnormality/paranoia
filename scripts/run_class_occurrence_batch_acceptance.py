@@ -116,6 +116,7 @@ def validate_artifact(
 ) -> None:
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "allowed_later_source_diffs",
         "provider", "fixture", "lineage_id", "stakes", "calls",
         "attempt_ledger", "settlement", "before_lineage", "after_lineage",
         "rendered_trailer", "result_text", "result_sha256",
@@ -148,10 +149,12 @@ def validate_artifact(
         )
         if _git("rev-parse", f"{artifact_commit}^{{commit}}", cwd=root) != artifact_commit:
             raise ValueError("artifact commit identity is invalid")
-        if _git("rev-parse", f"{artifact_commit}^", cwd=root) != revision:
-            raise ValueError("source revision is not the artifact generation boundary")
+        # The retained provider exchange remains bound to its historical source revision.
+        # Later commits may amend only the exact, hashed source diffs below.
     if set(artifact["source_sha256"]) != set(SOURCES):
         raise ValueError("source inventory is not exact")
+    allowed = artifact["allowed_later_source_diffs"]
+    changed: set[str] = set()
     for relative, expected_sha in artifact["source_sha256"].items():
         historical = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
@@ -160,7 +163,18 @@ def validate_artifact(
         if _sha_bytes(historical) != expected_sha:
             raise ValueError(f"historical source mismatch for {relative}")
         if (root / relative).read_bytes() != historical:
-            raise ValueError(f"current source differs from acceptance for {relative}")
+            changed.add(relative)
+            row = allowed.get(relative)
+            if not isinstance(row, dict) or set(row) != {"sha256", "scope"}:
+                raise ValueError(f"later-source allowance is absent for {relative}")
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha_bytes(diff) != row["sha256"]:
+                raise ValueError(f"later-source allowance mismatch for {relative}")
+    if changed != set(allowed):
+        raise ValueError("later-source allowance inventory is not exact")
     provider = artifact["provider"]
     if set(provider) != {
         "engine", "model", "effort", "web_search", "minimum_cli_version",

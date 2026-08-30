@@ -82,8 +82,10 @@ class TestToolListing:
         req = tool.inputSchema["required"]
         assert "session_ref" in req and "rebuttal" in req
         deps = tool.inputSchema["dependentRequired"]
-        assert deps["lineage"] == ["class_id", "lineage_mode"]
-        assert deps["class_id"] == ["lineage", "lineage_mode"]
+        assert deps["lineage"] == ["class_id", "debt_id", "lineage_mode"]
+        assert deps["class_id"] == ["lineage", "debt_id", "lineage_mode"]
+        assert deps["debt_id"] == ["lineage", "class_id", "lineage_mode"]
+        assert deps["lineage_mode"] == ["lineage", "class_id", "debt_id"]
 
 
 class TestDispatch:

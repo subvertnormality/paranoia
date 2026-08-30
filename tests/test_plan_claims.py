@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -46,6 +48,35 @@ def test_plan_review_reliability_acceptance_is_source_and_route_bound(
         capture_output=True,
         text=True,
     )
+
+
+def test_plan_review_reliability_rejects_changed_validation_source(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "plan_review_reliability_acceptance",
+        root / "scripts/run_plan_review_reliability_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    clone = tmp_path / "validation-replay"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", str(root), str(clone)],
+        check=True,
+    )
+    for relative in acceptance.SOURCES:
+        destination = clone / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / relative, destination)
+    target = clone / "src/paranoia_local/handlers.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    artifact = json.loads(
+        (root / "docs/plan_review_reliability_acceptance_2026-08-30.json").read_text()
+    )
+    with pytest.raises(ValueError, match="later-source allowance mismatch"):
+        acceptance.validate_artifact(artifact, clone)
 
 
 def test_large_page_capture_acceptance_record() -> None:

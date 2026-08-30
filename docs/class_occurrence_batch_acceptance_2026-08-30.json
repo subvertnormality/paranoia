@@ -1,5 +1,13 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
+  "allowed_later_source_diffs": {
+    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation for this retained route.", "sha256": "d07453bc04f33ceb34ff0acc62533a5557f642add3dac7350db6862d48d0b36c"},
+    "src/paranoia_local/handlers.py": {"scope": "Plan-only phase projection and debt-targeted rebut settlement; branch occurrence aggregation is unchanged.", "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"},
+    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut structured instructions; branch occurrence aggregation instructions are unchanged.", "sha256": "118db0aed85c4bfe20f8313cae0cfec20a3814b55b5bd83af3555c9513f1f487"},
+    "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and trailer guidance; branch occurrence materialization is unchanged.", "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"},
+    "src/paranoia_local/server.py": {"scope": "Public bound-rebut debt identity; branch occurrence handling is unchanged.", "sha256": "4ef7156291fcf5ad0f4ef8b3948e0742e2d48eb7d85d7726929f726b79672ac1"},
+    "tests/test_review_census.py": {"scope": "Phase projection and rebut settlement regressions plus updated prompt digest.", "sha256": "8e2e2fc54a1fcb69e2eb8463510fa03fd06bf791d3be7030a03d4837e344fde6"}
+  },
   "version": 1,
   "date": "2026-08-30",
   "source_revision": "60fd22a9f78b01763d487b5898300143e9a92899",

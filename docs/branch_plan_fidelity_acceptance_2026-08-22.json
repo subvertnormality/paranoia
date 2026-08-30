@@ -7,11 +7,15 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "595616b7a2a8b99c79758b8227ae8d3af4e9509d241fa57d02843e0d0c9e7d83"
+      "sha256": "cee67efafed4d844792b7ab24e8fa4b497f89d26daf0eeb861f4e89d2f322f3a"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "11a70da28bb040cda5e77f182bb0e0e43e24f82c8a72e33ebed2875d3979cc31"
+      "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"
+    },
+    "src/paranoia_local/server.py": {
+      "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "4ef7156291fcf5ad0f4ef8b3948e0742e2d48eb7d85d7726929f726b79672ac1"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",

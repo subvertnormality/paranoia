@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -31,16 +32,76 @@ STATE_KEYS = frozenset({
     "version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt",
     "last_round", "format_debt", "validation_debt", "staged_failure",
     "census_cache", "unbound_classes", "unbound_class_ids",
-    "correction_control",
+    "correction_control", "plan_line_count",
 })
 DEBT_KEYS = frozenset({
     "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
     "source_ids", "class_ids", "first_round", "last_round", "reason",
 })
+REBUT_FAILURE_FIELDS = (
+    "format_debt", "validation_debt", "staged_failure", "unbound_classes",
+    "unbound_class_ids",
+)
 
 
 class CensusError(ValueError):
     pass
+
+
+def settle_rebut_concession(
+    state: Mapping[str, Any], *, debt_id: str, class_id: str,
+    evidence: Sequence[str], blocking_class_ids: Sequence[str],
+) -> dict[str, Any]:
+    """Close one exactly bound debt without applying round-settlement cleanup."""
+    if state.get("phase") != "correction":
+        raise CensusError("bound rebut concession requires correction phase")
+    present_failures = [key for key in REBUT_FAILURE_FIELDS if state.get(key)]
+    if present_failures:
+        raise CensusError(
+            "bound rebut concession refuses unresolved structural state: "
+            + ", ".join(present_failures)
+        )
+    rows = state.get("debt")
+    if not isinstance(rows, list):
+        raise CensusError("bound rebut concession requires a valid debt register")
+    matches = [row for row in rows if isinstance(row, dict) and row.get("id") == debt_id]
+    if len(matches) != 1:
+        raise CensusError("bound rebut debt_id must name exactly one durable debt")
+    target = matches[0]
+    if target.get("status") != "open":
+        raise CensusError("bound rebut debt_id must name open debt")
+    if target.get("class_ids") != [class_id]:
+        raise CensusError("bound rebut debt must bind only the supplied class_id")
+    closure_evidence = list(evidence)
+    if not closure_evidence or any(
+        not isinstance(item, str) or not item.strip() or len(item) > 2_000
+        for item in closure_evidence
+    ) or len(closure_evidence) > 20:
+        raise CensusError("bound rebut concession requires bounded nonempty evidence")
+    open_bound = {
+        cid for row in rows if isinstance(row, dict) and row.get("status") == "open"
+        and row.get("severity") in BLOCKING
+        for cid in row.get("class_ids", []) if isinstance(cid, str)
+    }
+    unbound = set(blocking_class_ids) - open_bound
+    if unbound:
+        raise CensusError(
+            "bound rebut concession refuses unbound blocking classes: "
+            + ", ".join(sorted(unbound))
+        )
+    out = deepcopy(dict(state))
+    for row in out["debt"]:
+        if row.get("id") == debt_id:
+            row["status"] = "closed"
+            row["evidence"] = closure_evidence
+            row.pop("reason", None)
+            break
+    blocking = [
+        row for row in out["debt"]
+        if row.get("status") == "open" and row.get("severity") in BLOCKING
+    ]
+    out["phase"] = "correction" if blocking else "final"
+    return out
 
 
 @dataclass(frozen=True)
@@ -320,6 +381,10 @@ def validate_persisted_state(
         type(state["last_round"]) is not int or state["last_round"] < 1
     ):
         raise CensusError("/last_round: invalid persisted round")
+    if "plan_line_count" in state and (
+        type(state["plan_line_count"]) is not int or state["plan_line_count"] < 1
+    ):
+        raise CensusError("/plan_line_count: invalid persisted plan line count")
     validate_persisted_debt(state.get("debt"))
     failure_keys = [
         key for key in ("format_debt", "validation_debt", "staged_failure")
@@ -718,9 +783,16 @@ def trailer(
     phase = state.get("phase", "census")
     lines = [f"STRUCTURAL-PHASE: {phase}", f"STRUCTURAL-DEBT: {len(debt)} blocking open"]
     for gate in correction_gates:
+        class_id = gate.get("class_id")
+        target_debt = [
+            row.get("id") for row in debt
+            if class_id in row.get("class_ids", [])
+        ]
         rebut = (
-            f"; rebut with session_ref={trailer_diagnostic(session_ref)}"
-            if session_ref and gate.get("class_id") in (class_first_rounds or {})
+            f"; rebut with session_ref={trailer_diagnostic(session_ref)} "
+            f"debt_id={trailer_diagnostic(target_debt[0])}"
+            if session_ref and class_id in (class_first_rounds or {})
+            and len(target_debt) == 1
             else ""
         )
         lines.append(
@@ -749,9 +821,14 @@ def trailer(
             if age < PERSISTENCE_REBUT_ROUNDS:
                 continue
             debt_first = debt_first_by_class.get(class_id)
+            target_debt = [
+                row.get("id") for row in debt
+                if class_id in row.get("class_ids", [])
+            ]
             rebut = (
-                f"; rebut with session_ref={trailer_diagnostic(session_ref)}"
-                if session_ref else ""
+                f"; rebut with session_ref={trailer_diagnostic(session_ref)} "
+                f"debt_id={trailer_diagnostic(target_debt[0])}"
+                if session_ref and len(target_debt) == 1 else ""
             )
             lines.append(
                 f"PERSISTENCE: {trailer_diagnostic(class_id)} currently open; "

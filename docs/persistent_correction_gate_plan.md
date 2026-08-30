@@ -120,16 +120,18 @@ representation and causes the next call/restart to repeat recalibration. A succe
 atomically resets every surviving active class to that census round with zero reopen count;
 reopens caused only by stakes transition do not consume a reopen wave.
 
-## Class-bound rebut reset
+## Class-bound rebut settlement
 
-Keep ordinary `rebut` backward compatible. Add an optional all-or-none trio:
-`lineage`, `class_id`, and `lineage_mode` (`plan` or `branch`). When present, `rebut` opens
-the existing lineage latch before provider work, validates that the class is active and its
-stored `last_session_ref` exactly equals the supplied session, and then resumes that session.
-A successful provider response records `reset_round = review_state.last_round`, clears the
-reopen count, and saves atomically. Provider failure, mismatched class/session/mode, malformed
-state, or save ambiguity records no reset and blocks or reports failure through existing
-semantics. The counter-evidence text is never parsed for identity.
+Keep ordinary unbound `rebut` backward compatible and non-mutating. Durable settlement uses an
+optional all-or-none quartet: `lineage`, `class_id`, `debt_id`, and `lineage_mode` (`plan` or
+`branch`). When present, `rebut` opens the existing lineage latch before provider work, validates
+that the class is active and blocking, the named debt is its exact current open debt, and the
+stored `last_session_ref` exactly equals the supplied session. It then requests a closed structured
+`CONCEDE` or `HOLD` disposition with resolvable evidence. `HOLD` is audit-only. `CONCEDE` closes
+only the named debt and closes the class only when no sibling blocker remains; it never grants
+clearance, so the normal cold final still governs. Provider failure, mismatched identity/session,
+malformed state, unresolvable evidence, or save ambiguity performs no confirmed settlement. The
+counter-evidence text is never parsed for identity.
 
 Legacy exhausted classes initially have no stored session. Their first gated correction still
 runs the bounded provider attempt and retry but cannot settle another canonically unresolved result. On terminal
@@ -139,9 +141,9 @@ unchanged. The returned trailer then advertises that usable session. If provider
 produced no session, do not advertise rebut and retain disposition as the only exit. This is a
 one-time bootstrap, not an extra model call or clearance path.
 
-The next correction then receives a new six-label window. A successful rebut is a process
-reset, not a class verdict: it cannot close debt, lower severity, or produce clearance by
-itself.
+The legacy sessionless gate bootstrap remains only a way to establish current reviewer authority;
+it does not settle debt or grant clearance. Once authority exists, the exact debt-bound structured
+disposition above is the sole rebut settlement path.
 
 ## Auditability
 
@@ -150,8 +152,9 @@ record. It is the exact string returned to the caller for every tracked success,
 rejection, execution failure, pending, and state-unavailable outcome; one-shot calls store null.
 It includes `PERSISTENCE`,
 `REOPEN-WAVE`, structural failure, attempt counts, and computed convergence. Do not rebuild
-it from state during logging. Rebut audit records include the optional lineage/class/mode
-binding and whether the durable reset was recorded.
+it from state during logging. Rebut audit records include the optional lineage/class/debt/mode
+binding, the disposition, the complete prior target debt, validated evidence, and whether debt or
+class settlement was confirmed.
 Tracked review audits also store closed server-owned `correction_gates` as the exact pre-call
 ordered rows rendered into the correction prompt (`class_id`, `reason`, `span`, and
 `reopen_count`); non-correction and ungated calls store an empty list.
@@ -182,9 +185,9 @@ Tests through production handlers and pure helpers prove:
    artifact, reopens that same class, and reaches the new three-wave boundary across restarts;
 5. the existing validation retry can repair a gated payload by disposing the class, while
    two invalid replies preserve substantive lineage bytes and exact diagnostics;
-6. class-bound rebut accepts only the stored current session and all-or-none identity trio,
-   resets only after a successful provider response and durable save, and leaves class/debt
-   verdicts unchanged; mismatched, failed, or ambiguous cases do not reset;
+6. class-bound rebut accepts only the stored current session and all-or-none identity quartet,
+   keeps `HOLD` audit-only, and lets validated `CONCEDE` close only the exact named debt and then
+   its class only without a sibling blocker; mismatched, failed, or ambiguous cases do not settle;
 7. gates and reset state survive process restart, correction cache behavior, and ordinary
    sequential branch and plan use; schema cases cover whole-object absence with zero/multiple
    active classes, complete present rows, missing/extra/orphan rows, every scalar boundary,
@@ -203,7 +206,7 @@ Tests through production handlers and pure helpers prove:
    returned trailer suffix, and one-shot audit records store null;
 11. README, both critique tools' `round` argument rows, its public `rebut` argument table and
     state/audit operator section, AGENTS.md operator guidance, and the server schema document the
-    all-or-none lineage/class/mode binding, reset-only semantics, current-session validation,
+    all-or-none lineage/class/debt/mode binding, structured settlement semantics, current-session validation,
     strict-greater/forward-jump/failed-retry/restart round semantics, failure outcomes, sessionless
     bootstrap, gated recovery, and exact `rendered_trailer`/`correction_gates` presence and meaning.
     One acceptance comparison checks all surfaces against behavior and rejects diagnostic-only wording;

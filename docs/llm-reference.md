@@ -186,10 +186,13 @@ Required: `repo_path`, `session_ref`, `rebuttal`.
 
 Expected: `CONCEDE` or `HOLD` with fresh citations.
 
-Optional class-gate reset requires all three: `lineage`, `class_id`,
-`lineage_mode` (`branch|plan`). The session must be current for the active
-blocking class. Success resets a correction window only; it does not close or
-reclassify debt.
+Optional durable settlement requires all four: `lineage`, `class_id`, `debt_id`,
+and `lineage_mode` (`branch|plan`). The session must be current for the active
+blocking class and the open debt must bind only that class. `HOLD` is audit-only;
+`CONCEDE` closes that debt and closes the class only when no sibling blocker
+remains. Its citation objects must resolve under the staged anchor grammar before
+settlement; plan citations require the retained reviewed-plan line bound. The
+unbound form remains prose-returning and non-mutating.
 
 ## `arbitrate`
 

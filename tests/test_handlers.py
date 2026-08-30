@@ -25,11 +25,16 @@ class FakeEngine:
         )
         return Review(text=self._text, session_ref=self._session, raw="")
 
-    def resume(self, session_ref, prompt, cwd, model, effort, web_search, runner=None, timeout=None):
+    def resume(
+        self, session_ref, prompt, cwd, model, effort, web_search, runner=None,
+        timeout=None, response_schema=None,
+    ):
         self.calls.append(
-            {"kind": "resume", "session_ref": session_ref, "prompt": prompt, "cwd": cwd}
+            {"kind": "resume", "session_ref": session_ref, "prompt": prompt,
+             "cwd": cwd, "response_schema": response_schema}
         )
-        return Review(text="REBUTTAL VERDICT", session_ref=session_ref, raw="")
+        text = self._text if response_schema is not None else "REBUTTAL VERDICT"
+        return Review(text=text, session_ref=session_ref, raw=text)
 
 
 def fixed_clock() -> str:
@@ -263,12 +268,18 @@ class TestRebut:
                 engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock,
             )
 
-    def test_bound_rebut_resets_only_matching_durable_class_session(
+    def test_bound_rebut_concede_settles_exact_debt_and_closes_class(
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
         state = rc.normalize_state(None, stakes="s", snapshot="p")
-        state.update(phase="correction", last_round=7, debt=[])
+        debt = {
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"wrong finding", "evidence":["plan:1"], "remedy":"withdraw",
+            "source_ids":[], "class_ids":["class-a"], "first_round":1,
+            "last_round":7, "reason":"still present",
+        }
+        state.update(phase="correction", last_round=7, debt=[debt], plan_line_count=1)
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
         )
@@ -282,61 +293,203 @@ class TestRebut:
             "bound-rebut", mode=cc.PLAN_MODE,
             classes={tracked.class_id:tracked}, review_state=state,
         ))
-        eng = FakeEngine()
-        handlers.rebut({
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"The finding used the wrong path.",
+            "evidence":[{"anchor":"plan:1", "rationale":"current plan obligation"}],
+        }))
+        result = handlers.rebut({
             "repo_path":str(repo), "session_ref":"sess-1",
             "rebuttal":"The scope disposition is explicit.",
-            "lineage":"bound-rebut", "class_id":"class-a",
+            "lineage":"bound-rebut", "class_id":"class-a", "debt_id":"D1",
             "lineage_mode":"plan",
         }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
         reloaded = cc.load_lineage(
             cc.default_state_root(), "bound-rebut", stamp="T", mode=cc.PLAN_MODE,
         )
-        row = reloaded.review_state["correction_control"]["classes"]["class-a"]
-        assert row == {
-            "reset_round":7, "reopen_count":0, "last_session_ref":"sess-1",
+        assert result.startswith("CONCEDE: The finding used the wrong path.")
+        assert "literal `repository/` prefix" in eng.calls[0]["prompt"]
+        assert reloaded.review_state["phase"] == "final"
+        assert reloaded.review_state["last_round"] == 7
+        assert reloaded.review_state["debt"][0]["status"] == "closed"
+        assert reloaded.review_state["debt"][0]["evidence"] == ["plan:1"]
+        assert "reason" not in reloaded.review_state["debt"][0]
+        assert reloaded.classes["class-a"].status == cc.CLOSED
+        assert reloaded.review_state["correction_control"]["classes"]["class-a"] == {
+            "reset_round":None, "reopen_count":0, "last_session_ref":None,
         }
-        assert reloaded.classes["class-a"].status == cc.OPEN
 
-        with pytest.raises(ValueError, match="current durable session"):
+        with pytest.raises(ValueError, match="not currently blocking"):
             handlers.rebut({
                 "repo_path":str(repo), "session_ref":"stale",
                 "rebuttal":"again", "lineage":"bound-rebut",
-                "class_id":"class-a", "lineage_mode":"plan",
+                "class_id":"class-a", "debt_id":"D1", "lineage_mode":"plan",
             }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
         assert len(eng.calls) == 1
         audits = [json.loads(path.read_text()) for path in (tmp_path / "logs").glob("*.json")]
         rejected = [row for row in audits if row.get("error")]
         assert len(rejected) == 1
         assert rejected[0]["lineage_binding"] == {
-            "lineage":"bound-rebut", "class_id":"class-a", "lineage_mode":"plan",
+            "lineage":"bound-rebut", "class_id":"class-a", "debt_id":"D1",
+            "lineage_mode":"plan",
         }
-        assert rejected[0]["correction_control_reset"] is False
-        reloaded.classes["class-a"] = replace(
-            reloaded.classes["class-a"], status=cc.CLOSED,
-        )
-        cc.save_lineage(cc.default_state_root(), reloaded)
-        with pytest.raises(ValueError, match="not currently blocking"):
-            handlers.rebut({
-                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"closed",
-                "lineage":"bound-rebut", "class_id":"class-a",
-                "lineage_mode":"plan",
-            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
-        assert len(eng.calls) == 1
+        successful = [row for row in audits if not row.get("error")][0]
+        assert successful["disposition"] == "CONCEDE"
+        assert successful["prior_target_debt"] == debt
+        assert successful["rebut_evidence"] == ["plan:1"]
+        assert successful["debt_settled"] is True
+        assert successful["class_closed"] is True
 
     def test_bound_rebut_identity_is_all_or_none(self, repo: Path, tmp_path: Path) -> None:
-        with pytest.raises(ValueError, match="requires lineage, class_id, and lineage_mode"):
+        with pytest.raises(ValueError, match="requires lineage, class_id, debt_id, and lineage_mode"):
             handlers.rebut({
                 "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"x",
                 "lineage":"only-lineage",
             }, engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock)
+
+    def test_bound_rebut_hold_is_audit_only(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        debt = {
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"finding", "evidence":["plan:1"], "remedy":"repair",
+            "source_ids":[], "class_ids":["class-a"], "first_round":1,
+            "last_round":7, "reason":"still present",
+        }
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=7, debt=[debt])
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":3, "last_session_ref":"sess-1",
+        }}}
+        lineage = cc.Lineage(
+            "hold-rebut", mode=cc.PLAN_MODE,
+            classes={"class-a":cc.TrackedClass(
+                "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+            )}, review_state=state,
+        )
+        cc.save_lineage(cc.default_state_root(), lineage)
+        before = json.loads(json.dumps((tmp_path / "state" / "lineages" / "hold-rebut.json").read_text()))
+        eng = FakeEngine(json.dumps({
+            "disposition":"HOLD", "reason":"The counter-evidence misses the path.",
+            "evidence":[{"anchor":"repository/app.py:1", "rationale":"current path"}],
+        }))
+        result = handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+            "lineage":"hold-rebut", "class_id":"class-a", "debt_id":"D1",
+            "lineage_mode":"plan",
+        }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        after = json.loads(json.dumps((tmp_path / "state" / "lineages" / "hold-rebut.json").read_text()))
+        assert result.startswith("HOLD: The counter-evidence misses the path.")
+        assert after == before
+        audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+        assert audit["disposition"] == "HOLD"
+        assert audit["debt_settled"] is False
+        assert audit["class_closed"] is False
+
+    def test_bound_branch_rebut_uses_authoritative_terminal_lf_line_count(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=2, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"wrong contract finding", "evidence":["plan:2"],
+            "remedy":"withdraw", "source_ids":[], "class_ids":["class-a"],
+            "first_round":1, "last_round":2, "reason":"open",
+        }])
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
+        }}}
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+        )
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "branch-lf-rebut", mode=cc.BRANCH_MODE,
+            classes={"class-a":tracked}, review_state=state,
+            branch_contract={
+                "version":handlers.BRANCH_CONTRACT_VERSION, "present":True,
+                "digest":handlers._branch_contract_view("one\n").digest,
+                "text":"one\n",
+            },
+        ))
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"The second contract line is valid.",
+            "evidence":[{"anchor":"plan:2", "rationale":"terminal LF line"}],
+        }))
+
+        result = handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"line two",
+            "lineage":"branch-lf-rebut", "class_id":"class-a", "debt_id":"D1",
+            "lineage_mode":"branch",
+        }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+
+        assert result.startswith("CONCEDE:")
+        durable = cc.load_lineage(
+            cc.default_state_root(), "branch-lf-rebut", stamp="T", mode=cc.BRANCH_MODE,
+        )
+        assert durable.review_state["debt"][0]["evidence"] == ["plan:2"]
+        assert durable.classes["class-a"].status == cc.CLOSED
+
+    @pytest.mark.parametrize(("mechanized", "prior_evidence", "evidence", "error"), [
+        (True, ["repository/app.py:1"], [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),
+        (False, ["repository/app.py:1"], [{"anchor":"repository/missing.py:1", "rationale":"current"}], "unresolvable"),
+        (False, ["repository/app.py:1"], [{"anchor":"app.py:1", "rationale":"current"}], "requires repository/ prefix"),
+        (False, ["plan:2"], [{"anchor":"plan:2", "rationale":"current"}], "unresolvable plan anchor"),
+    ])
+    def test_bound_rebut_refuses_unsupported_or_unresolved_closure(
+        self, repo: Path, tmp_path: Path, monkeypatch, mechanized,
+        prior_evidence, evidence, error,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=2, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"finding", "evidence":prior_evidence,
+            "remedy":"repair", "source_ids":[], "class_ids":["class-a"],
+            "first_round":1, "last_round":2, "reason":"open",
+        }])
+        state["plan_line_count"] = 1
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
+        }}}
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN,
+            pattern="unsafe" if mechanized else None,
+            pathspec="*.py" if mechanized else None,
+            procedure=None if mechanized else "inspect",
+        )
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "refused-rebut", mode=cc.BRANCH_MODE if mechanized else cc.PLAN_MODE,
+            classes={"class-a":tracked}, review_state=state,
+        ))
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"wrong", "evidence":evidence,
+        }))
+        with pytest.raises(ValueError, match=error):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+                "lineage":"refused-rebut", "class_id":"class-a", "debt_id":"D1",
+                "lineage_mode":"branch" if mechanized else "plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        if mechanized:
+            assert eng.calls == []
+        persisted = cc.load_lineage(
+            cc.default_state_root(), "refused-rebut", stamp="T",
+            mode=cc.BRANCH_MODE if mechanized else cc.PLAN_MODE,
+        )
+        assert persisted.review_state["debt"][0]["status"] == "open"
 
     def test_bound_rebut_ambiguous_save_is_audited_and_retains_latch(
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
         state = rc.normalize_state(None, stakes="s", snapshot="p")
-        state.update(phase="correction", last_round=7, debt=[])
+        state.update(phase="correction", last_round=7, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"wrong finding", "evidence":["plan:1"], "remedy":"withdraw",
+            "source_ids":[], "class_ids":["class-a"], "first_round":1,
+            "last_round":7, "reason":"still present",
+        }])
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
         )
@@ -356,12 +509,15 @@ class TestRebut:
         with pytest.raises(cc.StateUnavailable, match="ambiguous rebut write"):
             handlers.rebut({
                 "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"scope",
-                "lineage":"ambiguous-rebut", "class_id":"class-a",
+                "lineage":"ambiguous-rebut", "class_id":"class-a", "debt_id":"D1",
                 "lineage_mode":"plan",
-            }, engine=FakeEngine(), log_dir=tmp_path / "logs", now=fixed_clock)
+            }, engine=FakeEngine(json.dumps({
+                "disposition":"CONCEDE", "reason":"wrong",
+                "evidence":[{"anchor":"repository/app.py:1", "rationale":"current path"}],
+            })), log_dir=tmp_path / "logs", now=fixed_clock)
         pending = cc.lineage_dir(cc.default_state_root()) / "ambiguous-rebut.pending"
         assert pending.exists()
         audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
         assert audit["error"] is True
-        assert audit["correction_control_reset"] is False
+        assert audit["debt_settled"] is False
         cc.clear_latch(cc.default_state_root(), "ambiguous-rebut")

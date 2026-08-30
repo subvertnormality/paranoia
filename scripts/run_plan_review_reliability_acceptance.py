@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,30 @@ def _sha_text(value: str) -> str:
     return _sha_bytes(value.encode("utf-8", "surrogatepass"))
 
 
+def _recorded_deterministic_checks(root: Path, revision: str) -> dict:
+    """Execute the validation helper from the exact recorded Git snapshot."""
+    with tempfile.TemporaryDirectory(prefix="paranoia-recorded-validation-") as raw:
+        checkout = Path(raw) / "repository"
+        subprocess.run(
+            ["git", "clone", "-q", "--no-hardlinks", str(root), str(checkout)],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "-q", "--detach", revision], cwd=checkout,
+            check=True,
+        )
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(checkout / "scripts/run_plan_review_reliability_acceptance.py"),
+                "--deterministic-checks-only",
+            ],
+            cwd=checkout, check=True, capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH":str(checkout / "src")},
+        )
+        return json.loads(completed.stdout)
+
+
 def _deterministic_checks(root: Path = ROOT) -> dict:
     first_failure = pc.with_debt(
         pc.empty_state(), pc.AuditError("discovery invalid"),
@@ -120,6 +145,11 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
     )
 
     runtime = Path(tempfile.mkdtemp(prefix="paranoia-predecessor-preflight-"))
+    repo_copy = runtime / "repository"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", str(root), str(repo_copy)],
+        check=True,
+    )
     state_root = runtime / "state"
     log_root = runtime / "logs"
     old_default = cc.default_state_root
@@ -173,7 +203,7 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             claim_state=claim_state,
         ))
         result = handlers.critique_plan({
-            "repo_path":str(root), "plan_text":"# Plan\n",
+            "repo_path":str(repo_copy), "plan_text":"# Plan\n",
             "lineage":"predecessor-preflight-acceptance", "round":2, "stakes":"s",
         }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "PREFLIGHT")
         audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
@@ -210,7 +240,7 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             claim_state=changed_claim_state,
         ))
         changed_result = handlers.critique_plan({
-            "repo_path":str(root), "plan_text":"# Changed plan\n",
+            "repo_path":str(repo_copy), "plan_text":"# Changed plan\n",
             "lineage":"changed-plan-preflight-acceptance", "round":2, "stakes":"s",
         }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "CHANGED")
         changed_audit = json.loads(
@@ -274,6 +304,7 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
 def validate_artifact(value: dict, root: Path = ROOT) -> None:
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "allowed_later_source_diffs",
         "provider", "plan", "stakes", "result_text", "result_sha256", "audit",
         "durable_lineage", "assertions", "validation",
     }
@@ -289,6 +320,8 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
         raise ValueError("source revision is not a full commit")
     if set(value["source_sha256"]) != set(SOURCES):
         raise ValueError("source inventory is not exact")
+    allowed = value["allowed_later_source_diffs"]
+    changed: set[str] = set()
     for relative, digest in value["source_sha256"].items():
         committed = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
@@ -296,24 +329,62 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
         ).stdout
         if _sha_bytes(committed) != digest:
             raise ValueError(f"source binding mismatch for {relative}")
-        if relative not in VALIDATION_SOURCES and (root / relative).read_bytes() != committed:
-            raise ValueError(f"current production source differs from real-route snapshot: {relative}")
+        if (root / relative).read_bytes() != committed:
+            changed.add(relative)
+            row = allowed.get(relative)
+            if not isinstance(row, dict) or set(row) != {"sha256", "scope"}:
+                raise ValueError(f"later-source allowance is absent for {relative}")
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha_bytes(diff) != row["sha256"]:
+                raise ValueError(f"later-source allowance mismatch for {relative}")
+    if changed != set(allowed):
+        raise ValueError("later-source allowance inventory is not exact")
     validation = value["validation"]
-    if set(validation) != {"revision", "source_sha256", "checks"}:
+    if set(validation) != {
+        "revision", "source_sha256", "allowed_later_source_diffs", "checks",
+    }:
         raise ValueError("validation binding is not closed")
     validation_revision = validation["revision"]
     if not isinstance(validation_revision, str) or len(validation_revision) != 40:
         raise ValueError("validation revision is not a full commit")
+    if not set(VALIDATION_SOURCES).issubset(SOURCES):
+        raise ValueError("validation sources are not covered by the accepted source inventory")
     if set(validation["source_sha256"]) != set(VALIDATION_SOURCES):
         raise ValueError("validation source inventory is not exact")
+    validation_allowed = validation["allowed_later_source_diffs"]
+    if not isinstance(validation_allowed, dict):
+        raise ValueError("validation later-source allowance must be an object")
+    changed_validation = set()
     for relative, digest in validation["source_sha256"].items():
         committed = subprocess.run(
             ["git", "show", f"{validation_revision}:{relative}"], cwd=root,
             check=True, stdout=subprocess.PIPE,
         ).stdout
-        if _sha_bytes(committed) != digest or (root / relative).read_bytes() != committed:
+        if _sha_bytes(committed) != digest:
             raise ValueError(f"validation source binding mismatch for {relative}")
-    if validation["checks"] != _deterministic_checks(root):
+        if (root / relative).read_bytes() != committed:
+            changed_validation.add(relative)
+            row = validation_allowed.get(relative)
+            if not isinstance(row, dict) or set(row) != {"sha256", "scope"}:
+                raise ValueError(
+                    f"validation later-source allowance is absent for {relative}"
+                )
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", validation_revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha_bytes(diff) != row["sha256"]:
+                raise ValueError(
+                    f"validation later-source allowance mismatch for {relative}"
+                )
+    if changed_validation != set(validation_allowed):
+        raise ValueError("validation later-source allowance inventory is not exact")
+    if validation["checks"] != _recorded_deterministic_checks(
+        root, validation_revision,
+    ):
         raise ValueError("deterministic lifecycle checks differ from the retained acceptance")
     if value["plan"] != PLAN or value["stakes"] != STAKES:
         raise ValueError("acceptance input changed")
@@ -365,7 +436,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=ARTIFACT)
     parser.add_argument("--augment-existing", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--deterministic-checks-only", action="store_true")
     args = parser.parse_args()
+    if args.deterministic_checks_only:
+        print(json.dumps(_deterministic_checks(ROOT), sort_keys=True))
+        return 0
     if args.validate_only:
         validate_artifact(
             json.loads(args.output.read_text(encoding="utf-8")), ROOT
@@ -382,6 +457,7 @@ def main() -> int:
                 relative:_sha_bytes((ROOT / relative).read_bytes())
                 for relative in VALIDATION_SOURCES
             },
+            "allowed_later_source_diffs":{},
             "checks":_deterministic_checks(ROOT),
         }
         validate_artifact(value, ROOT)
@@ -438,6 +514,7 @@ def main() -> int:
                 relative:_sha_bytes((ROOT / relative).read_bytes())
                 for relative in VALIDATION_SOURCES
             },
+            "allowed_later_source_diffs":{},
             "checks":_deterministic_checks(ROOT),
         },
         "assertions":[

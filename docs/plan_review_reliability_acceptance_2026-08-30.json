@@ -1,5 +1,43 @@
 {
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
+  "allowed_later_source_diffs": {
+    "AGENTS.md": {
+      "scope": "Debt-targeted bound-rebut settlement contract.",
+      "sha256": "35cf64f2c25e91d8877304733321a033459fe9f1a0ca596f6665cc02f76ec810"
+    },
+    "README.md": {
+      "scope": "Public bound-rebut settlement documentation.",
+      "sha256": "a927eb554f8388218e028677dd7e742e58b5775a15626d4f1cc2f69754d7b128"
+    },
+    "docs/tool-reference.md": {
+      "scope": "Public bound-rebut debt identity and settlement semantics.",
+      "sha256": "07a25ca89bb4b83507cde6c5a8f08efd4eb1a433d2cbcdf0838138301dd74787"
+    },
+    "scripts/run_plan_review_reliability_acceptance.py": {
+      "scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.",
+      "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
+    },
+    "src/paranoia_local/handlers.py": {
+      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.",
+      "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"
+    },
+    "src/paranoia_local/prompts.py": {
+      "scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.",
+      "sha256": "118db0aed85c4bfe20f8313cae0cfec20a3814b55b5bd83af3555c9513f1f487"
+    },
+    "src/paranoia_local/review_census.py": {
+      "scope": "Debt-targeted rebut settlement and exact trailer debt guidance.",
+      "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"
+    },
+    "tests/test_plan_claims.py": {
+      "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
+      "sha256": "a24889f41352cdcee62ea3a86b13111479321586baf277fe68121e691837d8a8"
+    },
+    "tests/test_review_census.py": {
+      "scope": "Phase projection and rebut settlement regressions plus updated prompt digest.",
+      "sha256": "8e2e2fc54a1fcb69e2eb8463510fa03fd06bf791d3be7030a03d4837e344fde6"
+    }
+  },
   "assertions": [
     "The public critique_plan handler completed through the real Codex provider route.",
     "The durable lineage, rendered trailer, and audit attempt ledger were retained exactly.",
@@ -1723,6 +1761,16 @@
   },
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
   "validation": {
+    "allowed_later_source_diffs": {
+      "src/paranoia_local/handlers.py": {
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior.",
+        "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"
+      },
+      "tests/test_review_census.py": {
+        "scope": "Adds the closed-predecessor/current-successor rebut debt-id regression without changing deterministic replay behavior.",
+        "sha256": "0c52f35f51002315707bc263a736d0fcd1f3a636ed2d095e6a20c43ea079193c"
+      }
+    },
     "checks": {
       "changed_plan_preflight": {
         "claim_last_accepted_counts": null,
@@ -1766,16 +1814,16 @@
         "result_sha256": "d7cd39ba9c41a92b23aa86d8bf6157b2fc8b97575421bd4fab40f6664ca00625"
       }
     },
-    "revision": "60fd22a9f78b01763d487b5898300143e9a92899",
+    "revision": "02c32874e95388fd370b28823227bc5cea1b583f",
     "source_sha256": {
-      "AGENTS.md": "7b529393ccc28bdde1e9266165144c1b892a2f3f5e740a529dbabbef7940f473",
-      "README.md": "c957e0b5286c9ddf00c9377a3517d59a1e09a53483c3454f4e1173eece66082c",
-      "docs/tool-reference.md": "35cec1294025b5577e153de97b6d325ad1a22f47f00ebae630bd825aa67d13b2",
-      "scripts/run_plan_review_reliability_acceptance.py": "1bfd05fda7004ed526a96d332868e646869a590dd130cf8e31d24ec43be7a4fd",
-      "src/paranoia_local/handlers.py": "4de0172ce6e7654c53d9d22f2e28608af00f01754c44dc3b45c4677e68702147",
+      "AGENTS.md": "f89ba4a6aa63c7618e7b070e7b9475ec38625a08f7b4d898f8ee115e2c4a4e31",
+      "README.md": "83cc0d2e345b998f13c617308abb52df53052d74b9d9ba332f2460bb1566df5d",
+      "docs/tool-reference.md": "1ae7076c5fd567d963a5a37c633c3ef8caf203bb3e928f069d49d2082d0b9a8d",
+      "scripts/run_plan_review_reliability_acceptance.py": "fcc5eda271eca168bbfb4e85a5317dfd7256f882db50026726af42e756ab7008",
+      "src/paranoia_local/handlers.py": "68d90cc74674a32ba0f909e99b1d0b04e2fbb32cabe6d60532eb22932de732b8",
       "src/paranoia_local/plan_claims.py": "9547e36aae26b25d9e78456dec226b078dd5db0965b17b1e830eac82b995291d",
-      "tests/test_plan_claims.py": "36fa53a7d38d47f10664d016388abf37a50aac842e4f9e64a49918b665cf10d0",
-      "tests/test_review_census.py": "107bcc4515321be7712ba91290d4c9935dd6531db4ed7aeddad33ee7c254b88c"
+      "tests/test_plan_claims.py": "904819ec4ac6d64f2b1bbafb983eed24beed23baab1513afcf9a08dc6938ea10",
+      "tests/test_review_census.py": "25a33b4ed1c4dfa602c113bff1493a481df46f5dec6f4304c8f4ae05d7893ee2"
     }
   },
   "version": 2

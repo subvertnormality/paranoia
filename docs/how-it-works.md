@@ -93,8 +93,12 @@ implemented result.
 When a blocking class persists across enough round-label span or repeatedly
 reopens, Paranoia stops accepting another ordinary correction. The class must
 close, be replaced with a more accurate invariant, or receive a class-bound
-`rebut` using the reported current session. A successful rebuttal opens another
-bounded correction window; it does not close debt or grant clearance.
+`rebut` using the reported current session and exact debt ID. `HOLD` is
+audit-only. A validated `CONCEDE` withdraws only that debt and closes the class
+only when no sibling blocker remains. It does not grant clearance; the normal
+cold-final lifecycle still decides convergence. Its citations use the staged
+anchor grammar and must resolve against the repository or retained plan line bound
+before settlement.
 
 ## Plan contracts in branch review
 

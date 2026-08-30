@@ -516,9 +516,21 @@ def validate_artifact(
             "reset_round", "reopen_count", "last_session_ref",
             "exact validation-invalid terminal retry",
         ),
+        "README.md": (
+            "lineage", "class_id", "debt_id", "lineage_mode",
+            "HOLD", "CONCEDE", "never grants clearance",
+        ),
+        "docs/tool-reference.md": (
+            "lineage", "class_id", "debt_id", "lineage_mode",
+            "HOLD", "CONCEDE", "never grants convergence",
+        ),
+        "docs/llm-reference.md": (
+            "lineage", "class_id", "debt_id", "lineage_mode",
+            "HOLD", "CONCEDE", "non-mutating",
+        ),
         "src/paranoia_local/server.py": (
-            "all-or-none", "never closes debt", "Sessionless gate recovery",
-            "never falls back to an earlier attempt",
+            "all-or-none", "debt_id", "HOLD", "CONCEDE",
+            "never grants clearance",
         ),
     }
     for relative, required in surfaces.items():
