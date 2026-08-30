@@ -1586,5 +1586,47 @@
     "tests/test_staged_protocol.py": "f2680d229bc21009bfd91554e173c62a9dd652ec32bfcd02f043fa0166cef6ce"
   },
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
-  "version": 1
+  "validation": {
+    "checks": {
+      "correction_control": {
+        "classes": {
+          "class-a": {
+            "last_session_ref": "session-a",
+            "reopen_count": 2,
+            "reset_round": 6
+          },
+          "class-b": {
+            "last_session_ref": null,
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt_evidence_union": [
+        "plan:1",
+        "plan:2",
+        "plan:3"
+      ],
+      "evidence_union": [
+        "plan:1",
+        "plan:2",
+        "plan:3"
+      ],
+      "predecessor_preflight": {
+        "claim_audit_failed": true,
+        "claim_last_accepted_counts": null,
+        "claim_nonadjudicated_count": 2,
+        "provider_attempts": 0,
+        "rendered_trailer": "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows; 0 previously retired rows\nCLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; predecessor claim rows are non-adjudicated history\nCLAIM-AUDIT-DEBT: round 1: indexed binding passage is not in captured text (rejected sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)\nEVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)\nEVIDENCE next action: retry captured-text binding; do not remove or weaken the assertion solely because binding failed\nLINEAGE: predecessor-preflight-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged rejected (validation): invalid correction_control row for 'class-a'\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  class-a first invariant (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 0 blocking open\nSTRUCTURAL-ERROR: invalid correction_control row for 'class-a'\nSTRUCTURAL-FAILURE: role=correction-preflight kind=validation\nCONVERGENCE: BLOCKED — staged validation failure did not settle.\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nREVIEW-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
+        "result_sha256": "1209b77ee3be679634ca16ba4ff8f29e3e2a6144bbb5c6dd3d4d40e2728ff543"
+      }
+    },
+    "revision": "836f3ed4b244c2f64aaf852dc8ea73b475620eb2",
+    "source_sha256": {
+      "scripts/run_plan_review_reliability_acceptance.py": "eb408ae1d73ee5266e80244fb6ec494da440aa3aacdcaa59382ac90125f6ff71",
+      "tests/test_plan_claims.py": "3b631210e0082a4b439e260cc419a6405ab2a5ccf6d8fcaab8f1195f661f6ad1"
+    }
+  },
+  "version": 2
 }
