@@ -35,7 +35,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds missing-row, stale-row, and claim-history public-preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "b3fc2e817158836db718f8c7784d6ab41a2b00dab6656a629a5da8c1e6862429"
+      "sha256": "568954cbf220e134a7ebc56e9e38c7c1947c0ca910a032925fc17bc3318cc9ec"
     }
   },
   "after_lineage": {
