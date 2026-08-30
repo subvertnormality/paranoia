@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
+import os
 import subprocess
+import sys
 from collections.abc import Callable
 from email.message import Message
 from pathlib import Path
@@ -24,19 +25,27 @@ from paranoia_local.engines import Review
 PLAN = "# Rollout\n\nPython 3.11 was released in October 2022.\n"
 
 
-def test_plan_review_reliability_acceptance_is_source_and_route_bound() -> None:
+def test_plan_review_reliability_acceptance_is_source_and_route_bound(
+    tmp_path: Path,
+) -> None:
     root = Path(__file__).resolve().parents[1]
     path = root / "docs/plan_review_reliability_acceptance_2026-08-30.json"
     if not path.exists():
         pytest.skip("acceptance artifact is generated after its source commit")
-    spec = importlib.util.spec_from_file_location(
-        "plan_review_reliability_acceptance",
-        root / "scripts/run_plan_review_reliability_acceptance.py",
+    env = os.environ.copy()
+    env.update(TMPDIR=str(tmp_path), TMP=str(tmp_path), TEMP=str(tmp_path))
+    subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts/run_plan_review_reliability_acceptance.py"),
+            "--validate-only",
+        ],
+        cwd=root,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.validate_artifact(json.loads(path.read_text(encoding="utf-8")), root)
 
 
 def test_large_page_capture_acceptance_record() -> None:

@@ -30,7 +30,10 @@ SOURCES = (
     "tests/test_review_census.py", "tests/test_staged_protocol.py",
     "scripts/run_plan_review_reliability_acceptance.py",
 )
-VALIDATION_SOURCES = ("scripts/run_plan_review_reliability_acceptance.py",)
+VALIDATION_SOURCES = (
+    "scripts/run_plan_review_reliability_acceptance.py",
+    "tests/test_plan_claims.py",
+)
 PLAN = """# Plan-review reliability acceptance
 
 ## Scope
@@ -275,7 +278,14 @@ def main() -> int:
     parser.add_argument("--codex", default="codex")
     parser.add_argument("--output", type=Path, default=ARTIFACT)
     parser.add_argument("--augment-existing", action="store_true")
+    parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
+    if args.validate_only:
+        validate_artifact(
+            json.loads(args.output.read_text(encoding="utf-8")), ROOT
+        )
+        print(f"validated {args.output}")
+        return 0
     revision = _run("git", "rev-parse", "HEAD")
     if args.augment_existing:
         value = json.loads(args.output.read_text(encoding="utf-8"))
