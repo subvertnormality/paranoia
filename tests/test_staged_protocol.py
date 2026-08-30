@@ -1433,7 +1433,7 @@ def test_carried_debt_preserves_one_identity_without_minting():
         "correction",
         debt_outcomes=[
             {"debt_id": "D7", "status": "open", "evidence": ["plan:1"], "reason": "still reachable"},
-            {"debt_id": "D8", "status": "open", "evidence": ["plan:1"], "reason": "also reachable"},
+            {"debt_id": "D8", "status": "closed", "evidence": ["plan:1"]},
         ],
         class_outcomes=[{
             "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
@@ -1444,6 +1444,7 @@ def test_carried_debt_preserves_one_identity_without_minting():
     assert parsed["debt"] == []
     assert parsed["class_assessments"][0]["finding_id"] == "old-7"
     assert {row["id"] for row in parsed["debt_updates"]} == {"D7", "D8"}
+    assert [row["status"] for row in parsed["debt_updates"]] == ["open", "closed"]
 
 
 def test_carried_debt_must_remain_open_and_bind_the_class():
