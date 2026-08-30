@@ -241,8 +241,15 @@ def validate_artifact(
     if set(after) != {"rounds", "next_seq", "classes", "review_state"}:
         raise ValueError("after-lineage envelope is not closed and exact")
     debts = after["review_state"]["debt"]
-    historic = next(row for row in debts if row["id"] == "D1")
-    fresh = next(row for row in debts if row["id"] != "D1")
+    if not isinstance(debts, list) or len(debts) != 2 or any(
+        not isinstance(row, dict) or not isinstance(row.get("id"), str) for row in debts
+    ):
+        raise ValueError("durable debt envelope is not closed and exact")
+    by_debt_id = {row["id"]:row for row in debts}
+    if set(by_debt_id) != {"D1", "D2"}:
+        raise ValueError("durable debt identities are not exact")
+    historic = by_debt_id["D1"]
+    fresh = by_debt_id["D2"]
     if historic["status"] != "closed" or fresh["status"] != "open":
         raise ValueError("durable debt lifecycle is wrong")
     if set(fresh["evidence"]) != set(anchors) or fresh["class_ids"] != [CLASS_ID]:
