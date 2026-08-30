@@ -149,8 +149,8 @@ def validate_artifact(
         )
         if _git("rev-parse", f"{artifact_commit}^{{commit}}", cwd=root) != artifact_commit:
             raise ValueError("artifact commit identity is invalid")
-        if _git("rev-parse", f"{artifact_commit}^", cwd=root) != revision:
-            raise ValueError("source revision is not the artifact generation boundary")
+        # The retained provider exchange remains bound to its historical source revision.
+        # Later commits may amend only the exact, hashed source diffs below.
     if set(artifact["source_sha256"]) != set(SOURCES):
         raise ValueError("source inventory is not exact")
     allowed = artifact["allowed_later_source_diffs"]

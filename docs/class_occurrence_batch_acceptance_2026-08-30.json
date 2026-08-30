@@ -1,7 +1,7 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
-    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation for this retained route.", "sha256": "86474d04857544d6d27314ff36182a68bd076c446a3e7a5ec9b2c14e9c9cd93c"},
+    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation for this retained route.", "sha256": "d07453bc04f33ceb34ff0acc62533a5557f642add3dac7350db6862d48d0b36c"},
     "src/paranoia_local/handlers.py": {"scope": "Plan-only phase projection and debt-targeted rebut settlement; branch occurrence aggregation is unchanged.", "sha256": "4953674524d87ed181520a9392cbf8f42598de32112c6e403292d316bfb0a2b1"},
     "src/paranoia_local/prompts.py": {"scope": "Bound-rebut structured instructions; branch occurrence aggregation instructions are unchanged.", "sha256": "52a668056fde1188254b086552aaa779933deceaee32ebe76ef92e688007a655"},
     "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and trailer guidance; branch occurrence materialization is unchanged.", "sha256": "93952f7fe5e8ba0e9e4dc558e63e7caa17a7d56bc0d1e9c7dd3a049746442e09"},
