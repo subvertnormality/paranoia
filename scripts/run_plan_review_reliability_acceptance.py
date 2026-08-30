@@ -323,6 +323,10 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
     validation_revision = validation["revision"]
     if not isinstance(validation_revision, str) or len(validation_revision) != 40:
         raise ValueError("validation revision is not a full commit")
+    if validation_revision != revision:
+        raise ValueError("validation revision differs from the accepted source snapshot")
+    if not set(VALIDATION_SOURCES).issubset(SOURCES):
+        raise ValueError("validation sources are not covered by the accepted source inventory")
     if set(validation["source_sha256"]) != set(VALIDATION_SOURCES):
         raise ValueError("validation source inventory is not exact")
     for relative, digest in validation["source_sha256"].items():
@@ -332,6 +336,10 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
         ).stdout
         if _sha_bytes(committed) != digest:
             raise ValueError(f"validation source binding mismatch for {relative}")
+        if value["source_sha256"].get(relative) != digest:
+            raise ValueError(
+                f"validation source is not bound to the accepted source snapshot: {relative}"
+            )
     if validation["checks"] != _deterministic_checks(root):
         raise ValueError("deterministic lifecycle checks differ from the retained acceptance")
     if value["plan"] != PLAN or value["stakes"] != STAKES:

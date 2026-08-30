@@ -39,7 +39,7 @@
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
-      "sha256": "f222868ab3c4b49bc27c12366e5d01aa6d67de9ca29da429756b41ef6cce6be7"
+      "sha256": "16048ab7b566e59f4325b932899fa463b0190ff2f42e62165db2a995a9c49908"
     },
     "tests/test_handlers.py": {
       "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage.",
