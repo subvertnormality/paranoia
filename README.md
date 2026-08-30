@@ -280,6 +280,13 @@ from current actionable packets and labeled non-adjudicated history rather than 
 same conservative treatment. A missing correction-control row for an active class is initialized without
 discarding the other classes' counters; stale rows for inactive classes still fail closed.
 
+Correction batches independent occurrences of one reusable class into one governing finding with
+all distinct evidence anchors and an all-site remedy. Both plan and branch reviewers trace
+co-asserting sites, so definitions, call sites, tests, fixtures, and contract sections are repaired
+together. Each settlement retains one finding and outcome per class; historical debt IDs may close
+and a fresh occurrence may receive a new ID, while the server-owned correction gate still rejects
+rephrasing that leaves the class blocking.
+
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
 

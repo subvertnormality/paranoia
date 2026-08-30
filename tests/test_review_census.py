@@ -438,19 +438,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
     (
         cc.PLAN_MODE, "final",
-        "0d8aa067dac560d8a4784ef8f14a8c3b89b0c267dbe08d383f8b69aead8b38ef",
+        "1f72f9e015d2052fc5b057261ba5e1d3b7b5483d27881ca072184e5433fee1e0",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "8c620e52d12a3dbe764872c7607d78dd7e811d0c02a53e42b2f8ebb53964a39c",
+        "cf5d8283e4736e27baec4674a1519a186a4236f54ab0917b4a391d0ea17fc964",
         "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "7ec0dc4b10d03c2916ead77516933079860f58c6ded8fef8f060220ea97335ff",
+        "dbb9c7e4671cd57b85f427ba31eecd283cff3c90d434c5399e342aa421905b54",
         "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
         "clear",
     ),
@@ -4018,6 +4018,100 @@ def test_public_handlers_run_census_correction_and_cold_final_with_retries(
     ]
     assert third_audit["staged_settlement"]["_finding_id_renames"] == {"G1":"F1"}
     assert third_audit["staged_settlement"]["findings"][0]["id"] == "F1"
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_correction_batches_all_current_occurrences_for_one_class(
+    repo_with_branch, tmp_path, monkeypatch, mode,
+):
+    lineage_id = f"aggregate-correction-{mode}"
+    anchors = (
+        ["plan:1", "plan:2"] if mode == cc.PLAN_MODE else
+        ["repository/app.py:1", "repository/extra.py:1"]
+    )
+    tracked = cc.TrackedClass(
+        "class-0", "every duplicate contract site agrees", cc.MAJOR, 1,
+        cc.OPEN, procedure="inspect every independently anchored site",
+    )
+    state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":cc.MAJOR,
+        "summary":"one known occurrence", "evidence":[anchors[0]],
+        "remedy":"repair every occurrence", "source_ids":[],
+        "class_ids":["class-0"], "first_round":1, "last_round":1,
+    }], last_round=1)
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=mode, rounds=1, next_seq=2,
+            classes={"class-0":tracked}, review_state=state,
+        ),
+    )
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        value = {
+            "role":"correction",
+            "governing_findings":[{
+                "id":"aggregate", "severity":"MAJOR",
+                "summary":"the duplicated contract still disagrees",
+                "evidence":anchors,
+                "remedy":"repair both independently anchored sites together",
+                "classification":{
+                    "kind":"existing_class", "class_id":"class-0",
+                },
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D1", "status":"closed", "evidence":anchors,
+            }],
+            "class_outcomes":[{
+                "class_id":"class-0", "verdict":"violated", "evidence":anchors,
+                "basis":{"kind":"new_finding", "finding_id":"aggregate"},
+            }],
+            "class_actions":{"class-0":None},
+        }
+        text = wire(value)
+        return Review(text=text, session_ref="aggregate-session", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "resume",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("valid aggregate correction must not retry")
+        ),
+    )
+    args = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id, "round":2,
+        "stakes":"trusted local tool",
+    }
+    invoke = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
+    if mode == cc.PLAN_MODE:
+        args.update(plan_text="# Contract\n\nDuplicate contract.", claim_verification=False)
+    else:
+        args.update(base_ref="main", head_ref="feature")
+    result = invoke(
+        args, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda:"AGG",
+    )
+
+    assert len(calls) == 1
+    assert "exhaustively consolidate every" in calls[0]
+    assert "trace every site" in calls[0]
+    assert "STRUCTURAL-PHASE: correction" in result
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert durable.classes["class-0"].status == cc.OPEN
+    historic = next(row for row in durable.review_state["debt"] if row["id"] == "D1")
+    fresh = next(row for row in durable.review_state["debt"] if row["id"] != "D1")
+    assert historic["status"] == "closed"
+    assert fresh["status"] == "open"
+    assert fresh["class_ids"] == ["class-0"]
+    assert fresh["evidence"] == anchors
+    assert fresh["remedy"] == "repair both independently anchored sites together"
+    audit = json.loads(next((tmp_path / "logs").glob("AGG-critique_*-*.json")).read_text())
+    assert audit["staged_settlement"]["findings"][0]["evidence"] == anchors
 
 
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(

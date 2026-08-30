@@ -396,8 +396,12 @@ of the resulting code and tests.
   repair-created defects. It still advances only to an independent cold final and does not promise
   a fixed round count. When a finding changes a rule, value, schema, lifecycle, or ordering
   contract, require its evidence and remedy to cover every material co-asserting site in the
-  complete artifact; do not add prior-plan persistence or textual duplicate heuristics for this
-  semantic task. Tracked branch review uses the same broad cold census, targeted correction,
+  complete artifact, including definitions, call sites, tests, and fixtures in branch review.
+  For each existing class, aggregate every independently anchored current occurrence into its one
+  governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
+  The server-owned correction gate, not reuse of a historical debt ID, rejects a rephrased finding
+  that leaves the class blocking. Do not add prior-plan persistence or textual
+  duplicate heuristics for this semantic task. Tracked branch review uses the same broad cold census, targeted correction,
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.

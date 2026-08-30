@@ -151,12 +151,14 @@ do not recur solely because the future artifact does not exist, and do not claim
 passed. A later branch review independently judges the resulting code and tests."""
 
 
-PLAN_COASSERTION_INSTRUCTIONS = """## Complete semantic repair sites
+COASSERTION_INSTRUCTIONS = """## Complete semantic repair sites
 
 When a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in
-the reviewed plan that independently asserts or depends on that same contract. Include every
-material co-asserting site in evidence and make the remedy cover them together; do not propose or
-accept a one-site repair that would leave the old rule asserted elsewhere."""
+the reviewed artifact that independently asserts or depends on that same contract. In code, sites
+include definitions, call sites, tests, fixtures, and documentation; in plans, they include every
+independent contract section. Include every material co-asserting site in evidence and make the
+remedy cover them together; do not propose or accept a one-site repair that would leave the old
+rule asserted elsewhere."""
 
 
 PLAN_REVIEW_CORE_INSTRUCTIONS = PLAN_REVIEW_INSTRUCTIONS
@@ -394,11 +396,9 @@ def staged_census_instructions(
     )
     if mode == "branch" and plan_contract:
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
-    return (
-        instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
-        + "\n\n" + PLAN_COASSERTION_INSTRUCTIONS
-        if mode == "plan" else instructions
-    )
+    if mode == "plan":
+        instructions += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+    return instructions + "\n\n" + COASSERTION_INSTRUCTIONS
 
 
 def staged_followup_instructions(mode: str, *, plan_contract: bool = False) -> str:
@@ -410,11 +410,9 @@ def staged_followup_instructions(mode: str, *, plan_contract: bool = False) -> s
     )
     if mode == "branch" and plan_contract:
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
-    return (
-        instructions + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
-        + "\n\n" + PLAN_COASSERTION_INSTRUCTIONS
-        if mode == "plan" else instructions
-    )
+    if mode == "plan":
+        instructions += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+    return instructions + "\n\n" + COASSERTION_INSTRUCTIONS
 
 
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
@@ -477,7 +475,10 @@ longer blocking. Rotating debt, changing evidence, or retaining another blocking
 not satisfy that server-owned gate.
 
 Classify every new governing finding once as one_off, new_class with an explicit definition and
-class severity, or existing_class. Consolidate one existing class to at most one new finding.
+class severity, or existing_class. For each existing class, exhaustively consolidate every
+independently evidenced current occurrence into its one governing finding: cite every distinct
+anchor and make the bounded remedy cover each site rather than choosing one representative defect.
+Rephrasing or rotating the same anchor is not another occurrence and does not satisfy a gate.
 Every supplied open debt receives exactly one outcome; open needs current evidence and a concrete
 remaining condition, closed needs current evidence. A violated class uses new_finding for a new
 occurrence, or carried_debt naming exactly one representative open debt; other historical debts

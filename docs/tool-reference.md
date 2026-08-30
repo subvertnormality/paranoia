@@ -229,6 +229,11 @@ debt advances to the independent `final` phase, never directly to `clear`.
 Tracked branch correction and all final prompts retain their existing scope.
 This is a convergence-efficiency heuristic, not a fixed-round guarantee.
 
+In both plan and branch correction, independently anchored occurrences of one active class are
+reported together as one governing finding whose evidence and remedy cover every site. The server
+still permits only one finding and outcome per class in a settlement. A fresh occurrence may mint
+a fresh debt ID; correction gates prevent rewording the same site from satisfying a blocking class.
+
 | Trailer field | Meaning |
 |---|---|
 | `CLASS-REGISTER` | Class operations applied in this settlement |

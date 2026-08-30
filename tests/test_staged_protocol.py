@@ -2470,6 +2470,10 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
         "G4", "MAJOR",
         classification={"kind": "existing_class", "class_id": "class-a"},
     )
+    new.update(
+        evidence=["plan:1", "plan:2"],
+        remedy="repair both independently anchored plan sites",
+    )
     raw = decision(
         "correction", governing_findings=[new],
         debt_outcomes=[
@@ -2477,7 +2481,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
             {"debt_id": "D8", "status": "closed", "evidence": ["plan:1"]},
         ],
         class_outcomes=[{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "class_id": "class-a", "verdict": "violated",
+            "evidence": ["plan:1", "plan:2"],
             "basis": {"kind": "new_finding", "finding_id": "G4"},
         }],
         class_actions=[{
@@ -2495,8 +2500,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
         }],
         "debt": [{
             "finding_id": "G4", "status": "open", "severity": "MAJOR",
-            "summary": "reachable defect", "evidence": ["plan:1"],
-            "remedy": "repair the reachable path",
+            "summary": "reachable defect", "evidence": ["plan:1", "plan:2"],
+            "remedy": "repair both independently anchored plan sites",
         }],
         "debt_updates": [
             {"id": "D7", "status": "closed", "evidence": ["plan:1"]},
@@ -2509,7 +2514,8 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
             {"op": "reclassify", "class_id": "class-a", "severity": "BLOCKER"},
         ],
         "class_assessments": [{
-            "class_id": "class-a", "verdict": "violated", "evidence": ["plan:1"],
+            "class_id": "class-a", "verdict": "violated",
+            "evidence": ["plan:1", "plan:2"],
             "finding_id": "G4",
         }],
     }
@@ -2526,6 +2532,16 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
     ) == durable_projection(
         legacy, active=[active_class()], prior_debt=debts, phase="correction",
     )
+    state = rc.normalize_state({}, stakes="s", snapshot="before")
+    state.update(phase="correction", debt=deepcopy(debts))
+    settled = rc.settle_state(
+        state, parsed, phase="correction", snapshot="after", round_no=2,
+    )
+    fresh = next(row for row in settled["debt"] if row["id"] not in {"D7", "D8"})
+    assert fresh["evidence"] == ["plan:1", "plan:2"]
+    assert fresh["remedy"] == "repair both independently anchored plan sites"
+    assert fresh["class_ids"] == ["class-a"]
+    assert settled["phase"] == "correction"
 
 
 def test_frozen_historical_v1_final_projection_is_preserved():
