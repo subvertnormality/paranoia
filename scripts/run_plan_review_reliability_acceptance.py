@@ -157,9 +157,12 @@ def main() -> int:
     if len(logs) != 1:
         raise RuntimeError("public handler did not emit exactly one audit")
     audit = json.loads(logs[0].read_text(encoding="utf-8"))
-    durable = cc._to_json(cc.load_lineage(
-        state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE,
-    ))
+    durable = {
+        "lineage_id":LINEAGE,
+        **cc._to_json(cc.load_lineage(
+            state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE,
+        )),
+    }
     audit["durable_claim_state"] = durable["claim_state"]
     value = {
         "acceptance_kind":"plan-review-reliability-real-provider-v1",
