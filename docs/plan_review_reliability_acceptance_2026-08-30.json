@@ -1,0 +1,1590 @@
+{
+  "acceptance_kind": "plan-review-reliability-real-provider-v1",
+  "assertions": [
+    "The public critique_plan handler completed through the real Codex provider route.",
+    "The durable lineage, rendered trailer, and audit attempt ledger were retained exactly.",
+    "This probe does not claim that every future provider response will validate or converge."
+  ],
+  "audit": {
+    "already_raised": [],
+    "attempt_ledger": [
+      {
+        "duration_ms": 14741,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05206-0447-7100-b17d-c634b6b61b2f\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[],\\\"coverage\\\":{\\\"sections_scanned\\\":3,\\\"omitted_nonfacts\\\":9,\\\"prior_assessments\\\":[],\\\"prior_dispositions\\\":[],\\\"notes\\\":\\\"The plan contains only repository-scoped instructions, acceptance requirements, authorization limits, and a disclaimer about what the probe proves. It asserts no eligible external fact, externally issued design principle, or promised external behavior.\\\"}}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13071,\"cached_input_tokens\":0,\"output_tokens\":450,\"reasoning_output_tokens\":363}}\n",
+        "raw_sha256": "ce5251f6773e919148277691a175a96e057b8e6aa7be92a0fa3617906c5574fd",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 900,
+        "response_excerpt": "=== CLAIM AUDIT JSON ===\n{\"claims\":[],\"coverage\":{\"sections_scanned\":3,\"omitted_nonfacts\":9,\"prior_assessments\":[],\"prior_dispositions\":[],\"notes\":\"The plan contains only repository-scoped instructions, acceptance requirements, authorization limits, and a disclaimer about what the probe proves. It asserts no eligible external fact, externally issued design principle, or promised external behavior.\"}}",
+        "response_sha256": "34ac5a56dcc2183bf3b9dea1d171cd3a6fa831abebee6bfdd391fa6e9d8ad393",
+        "returncode": 0,
+        "role": "claim-discovery",
+        "sequence": null,
+        "session_ref": "01a05206-0447-7100-b17d-c634b6b61b2f",
+        "stderr_excerpt": "2026-08-30T09:35:20.813304Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:35:34.289667Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "a1bf0aa85b64c173766b6ae848a761650ca396e0ea4f3bee063d145e85b2497f",
+        "usage": {
+          "cached_input_tokens": 0,
+          "input_tokens": 13071,
+          "output_tokens": 450,
+          "reasoning_output_tokens": 363
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      },
+      {
+        "duration_ms": 365384,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05206-4bbe-7913-9fa9-e4d289b116ce\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_assessments\\\":[],\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"Reviewing the full acceptance contract against the pinned repository, including its handler scope, provider round, persistence, trailer, audit, and per-attempt retention requirements.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Inspecting the complete supplied plan and repository artifact.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"The plan's claims about the current public handler and durable evidence require verification against repository behavior.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Checking the stated current-behavior premises in repository code.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"The acceptance contract includes transformations from provider outcomes into persisted structural state, audit records, digests, and a rendered trailer.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Tracing each promised evidence transformation and representation.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"The handler output and durable audit log are distinct consumers whose equality and completeness must be bound.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Tracing public-output and audit-log consumers.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"Provider attempts and outcomes imply timeout and error paths that must remain durable and fail closed.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Checking failure, timeout, and partial-evidence behavior.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:9-13\\\",\\\"rationale\\\":\\\"The Acceptance section is being evaluated for executable evidence and explicit failure criteria.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Assessing whether acceptance is executable, discriminating, and fail closed.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-13\\\",\\\"rationale\\\":\\\"The plan is an operator-facing acceptance probe and must bind invocation and durable diagnostic locations sufficiently for operation.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Checking operator procedure and diagnostic observability.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"The same durable trailer, claim/state persistence, and attempt fields are co-asserted and must agree across all repository sites.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Checking cross-site contract consistency.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-7\\\",\\\"rationale\\\":\\\"The plan explicitly bounds itself to one acceptance probe and disclaims repository edits and future-provider proof.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Evaluating rigor relative to the stated high-impact clearance risk and bounded probe.\\\"}],\\\"findings\\\":[],\\\"lane\\\":\\\"domain\\\"}\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"{\\\"class_assessments\\\":[],\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"I am now resolving the plan's acceptance promises against every repository file and will replace this provisional census with the evidence-backed final object.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Repository inspection is in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"Current-handler premises are being traced in code.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Repository premise inspection is in pro",
+        "raw_sha256": "a6a5c0c25e49b00ae8049ab6fc941905991e958d0ba39781fb4ca4289da7b945",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 1800,
+        "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:1-13\",\"rationale\":\"The complete supplied plan consists only of scope and acceptance prose; it does not identify the executable publication workflow needed to finish the acceptance artifact.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:21-45\",\"rationale\":\"The repository contains a runner embedding the exact supplied plan and choosing a repository acceptance-artifact path, making this the material implementation seam.\"},{\"anchor\":\"repository/tests/test_plan_claims.py:27-39\",\"rationale\":\"The sole artifact consumer skips when the expected artifact is absent, so artifact production is not enforced by the existing suite.\"}],\"finding_ids\":[\"domain-001\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan does not bind an authorized, executable acceptance-publication contract.\"},{\"evidence\":[{\"anchor\":\"plan:5-7\",\"rationale\":\"The probe is required to exercise the current handler against this repository snapshot.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:17-31\",\"rationale\":\"The runner imports class_closure and engines directly, but neither file appears in its purportedly exact source inventory; handlers also has additional transitive runtime dependencies.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:81-89\",\"rationale\":\"Replay validates only the partial SOURCES inventory against the named revision.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:139-155\",\"rationale\":\"Generation checks dirtiness only for SOURCES and then executes working-tree modules, allowing unbound runtime code to influence an artifact attributed to source_revision.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:68-131\",\"rationale\":\"The validator requires a provider field but never validates its contents or binds it to the audit and per-attempt engine identities.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:150-177\",\"rationale\":\"Generation intends a CodexEngine route and records executable, CLI version, model, effort, and web settings, but those values are self-asserted and unchecked during replay.\"}],\"finding_ids\":[\"domain-002\",\"domain-004\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The proposed evidence does not securely establish either the reviewed repository snapshot or the real Codex route.\"},{\"evidence\":[{\"anchor\":\"plan:11-13\",\"rationale\":\"The required transformation is from a real handler round into persisted claim and structural state, an audited trailer, and complete attempt telemetry.\"},{\"anchor\":\"repository/src/paranoia_local/class_closure.py:327-329\",\"rationale\":\"review_state is the dedicated durable structural phase and debt field.\"},{\"anchor\":\"repository/src/paranoia_local/class_closure.py:446-460\",\"rationale\":\"Both claim_state and review_state are independently serialized into the lineage.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:121-125\",\"rationale\":\"Validation checks lineage identity and claim_state equality but never validates review_state or its correspondence to the structural settlement and trailer.\"}],\"finding_ids\":[\"domain-003\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The artifact transformation leaves the promised structural persistence unproved.\"},{\"evidence\":[{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:21-31\",\"rationale\":\"The runner selects a repository-local acceptance artifact and source inventory.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:134-192\",\"rationale\":\"The runner validates and writes that artifact through its --output destination.\"},{\"anchor\":\"repository/tests/test_plan_claims.py:27-39\",\"rationale\":\"The replay test consumes the repository-local artifact but explicitly skips when it is absent.\"}],\"finding_ids\":[\"domain-001\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\"",
+        "response_sha256": "d197cf76e9b530fe3ae283a97ed950178b521523f13aa2ef67f2a2eb88cbc209",
+        "returncode": 0,
+        "role": "census-domain",
+        "sequence": 1,
+        "session_ref": "01a05206-4bbe-7913-9fa9-e4d289b116ce",
+        "stderr_excerpt": "2026-08-30T09:37:39.585985Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:37:44.137007Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:38:20.131566Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:40:19.689285Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:40:37.759356Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:41:44.188518Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "38198c2588e03afadbbd900ad731541ea0500b4c077a544dfbc68047b13c0b8a",
+        "usage": {
+          "cached_input_tokens": 1220608,
+          "input_tokens": 1332570,
+          "output_tokens": 16079,
+          "reasoning_output_tokens": 8463
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      },
+      {
+        "duration_ms": 417554,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05206-4bbe-73b1-939d-182701e2ca92\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_assessments\\\":[],\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-13\\\",\\\"rationale\\\":\\\"Beginning the cold structural review by tracing the complete acceptance-plan contract against every repository file and current handler behavior.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-7\\\",\\\"rationale\\\":\\\"Repository premises will be checked against the pinned repository snapshot.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"Persistence and rendering transformations are being traced end to end.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"All consumers of durable state and audit output are being inspected.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"Provider failure, timeout, and persistence recovery paths are being evaluated.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:9-13\\\",\\\"rationale\\\":\\\"Acceptance evidence is being checked for executable and fail-closed criteria.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-7\\\",\\\"rationale\\\":\\\"Operational scope and diagnostics obligations are being checked.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"Co-asserting contract sites will be cross-checked for semantic consistency.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-7\\\",\\\"rationale\\\":\\\"Review depth is calibrated to the stated single-run acceptance probe.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress; final census will replace this update.\\\"}],\\\"findings\\\":[],\\\"lane\\\":\\\"execution\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -uu repository | sort && find repository -type f -printf '%p %s bytes\\\\\\\\n' | sort\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files -uu repository | sort && find repository -type f -printf '%p %s bytes\\\\\\\\n' | sort\\\"\",\"aggregated_output\":\"repository/.gitignore\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/LICENSE\\nrepository/README.md\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_fallback_evidence/ordinary-audit.json\\nrepository/docs/arbitration_fallback_evidence/ordinary-timing.json\\nrepository/docs/arbitration_fallback_evidence/original-attested-audit.json\\nrepository/docs/arbitration_fallback_evidence/snapshot-commit",
+        "raw_sha256": "87cefacd40eeeec3dc8410b20021c99d3eba58f3ec54a7838d7a2c1c3a32d86f",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 1800,
+        "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:9-13\",\"rationale\":\"The complete acceptance section states desired outcomes but does not identify the executable driver, retained artifact, replay gate, or failure semantics required to make those outcomes reviewable.\"},{\"anchor\":\"repository/AGENTS.md:234-238\",\"rationale\":\"Repository policy requires every in-card plan obligation to bind named scope, executable acceptance evidence, and fail-closed behavior.\"}],\"finding_ids\":[\"F1\",\"F7\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan omits the executable and durable lifecycle needed to make this acceptance probe complete.\"},{\"evidence\":[{\"anchor\":\"plan:5-7\",\"rationale\":\"The plan claims to exercise the current handler against this repository snapshot without repository edits.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:23-31\",\"rationale\":\"The apparent driver binds only a selected source inventory.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:139-155\",\"rationale\":\"Generation checks only the selected files for dirtiness, then executes the handler against the live repository root.\"}],\"finding_ids\":[\"F2\",\"F3\",\"F6\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The current driver contradicts the no-edit boundary and does not prove that the executed repository equals the claimed snapshot or provider identity.\"},{\"evidence\":[{\"anchor\":\"plan:11-13\",\"rationale\":\"The plan requires persisted claim and structural state plus correspondence with the returned trailer.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:118-125\",\"rationale\":\"Validation checks the returned suffix and claim state but does not validate structural review state, classes, debt, phase, or settlement.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:160-166\",\"rationale\":\"The full lineage is reloaded, but only its claim_state is copied into the audit projection for comparison.\"}],\"finding_ids\":[\"F4\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The durable-lineage transformation is captured but its structural half is never validated.\"},{\"evidence\":[{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:68-125\",\"rationale\":\"The replay validator accepts weak provider, attempt, and structural projections rather than reconstructing their complete contracts.\"},{\"anchor\":\"repository/tests/test_plan_claims.py:27-39\",\"rationale\":\"The sole replay consumer skips when the artifact is absent and otherwise validates working-tree JSON without requiring the artifact's committed blob.\"},{\"anchor\":\"repository/README.md:385-393\",\"rationale\":\"Repository operations documentation permits signed-in acceptance artifacts but explicitly warns against publishing a complete private audit log.\"}],\"finding_ids\":[\"F4\",\"F5\",\"F6\",\"F7\",\"F8\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Replay consumers can accept incomplete or mutable evidence and the retained projection is broader than the documented publication boundary.\"},{\"evidence\":[{\"anchor\":\"plan:9-13\",\"rationale\":\"No behavior is stated for provider failure, validation failure, audit failure, stale output, or interrupted artifact writes.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:134-145\",\"rationale\":\"The driver has preflight failure checks, but the plan does not bind them or define the resulting artifact state.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:187-191\",\"rationale\":\"The output is written directly after validation, without an atomic replacement or stale-output rule.\"}],\"finding_ids\":[\"F1\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"The plan has no fail-closed artifact lifecycle for unsuccessful or interrupted probes.\"},{\"evidence\":[{\"anchor\":\"repository/AGENTS.md:318-324\",\"rationale\":\"Repository policy requires acceptance to validate actual execution telemetry and non-null, bounded, hashed channe",
+        "response_sha256": "e2b5e4a5a4bff04bcc6ebc05a11e472fa2f70316c665f3bb1cab5f3ca1102986",
+        "returncode": 0,
+        "role": "census-execution",
+        "sequence": 2,
+        "session_ref": "01a05206-4bbe-73b1-939d-182701e2ca92",
+        "stderr_excerpt": "2026-08-30T09:37:33.501411Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:37:43.189690Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:38:35.736646Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:40:36.251264Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:40:41.046511Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:42:36.350182Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "9e848efdd91cfc713bfa56d28decaa4d13c11ac951b7f64f68e5651e1b7bfdae",
+        "usage": {
+          "cached_input_tokens": 1304832,
+          "input_tokens": 1427272,
+          "output_tokens": 17358,
+          "reasoning_output_tokens": 9322
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      },
+      {
+        "duration_ms": 293582,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05206-4bbe-70b3-a2c9-bb64bf147874\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_assessments\\\":[],\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"I’m tracing the stated probe and acceptance contract through the pinned repository, including all persistence, rendering, attempt-retention, and failure paths.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress against the complete supplied plan and repository.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5\\\",\\\"rationale\\\":\\\"The plan expressly predicates acceptance on the current public critique_plan handler and the repository snapshot.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Repository premises are being checked directly.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"The acceptance sentence identifies provider-round output transformations into persisted state, audit log data, and a rendered trailer.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Transformation contracts are being traced.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"The plan names persistent and rendered consumers whose shared durable trailer and attempt fields must be examined.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Consumer dependencies are being traced.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:11-13\\\",\\\"rationale\\\":\\\"Provider completion and attempt outcomes require checking timeout, provider error, persistence failure, and diagnostic retention behavior.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Failure and recovery paths are being checked.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:9-13\\\",\\\"rationale\\\":\\\"The stated acceptance criteria are being evaluated for executable evidence and fail-closed clearance.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Acceptance executability is being assessed.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-7\\\",\\\"rationale\\\":\\\"Scope and operating constraints are being compared with repository-facing operational behavior.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Operational documentation implications are being checked.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"All co-assertions of the handler, provider round, persistence, trailer, and attempt schema are being compared for consistency.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Cross-contract consistency is being checked.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-7\\\",\\\"rationale\\\":\\\"The explicitly bounded single acceptance probe is being judged against the stated stakes and ordinary provider latency.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Scope proportionality is being assessed.\\\"}],\\\"findings\\\":[],\\\"lane\\\":\\\"integrity\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files repository | sed -n '1,240p' && find repository -name AGENTS.md -print\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files repository | sed -n '1,240p' && find repository -name AGENTS.md -print\\\"\",\"aggregated_output\":\"repository/llms.txt\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/pyproject.toml\\nrepository/README.md\\nrepository/scripts/run_cleaning_acceptance_checks.py\\nrepository/scripts/run_class_persistence_acceptance.py\\nrepository/scripts/run_claim_discovery_timeout_acceptance.py\\nrepository/scripts/run_authoritative_capture_entrypoint_acceptance.py\\nrepository/scripts/run_autho",
+        "raw_sha256": "a0f71b7208696abe3cfe9df54eab4a369b1efaac90ec7260e31640014ed9009e",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 1800,
+        "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:5-13\",\"rationale\":\"The entire card consists of a generic probe description and outcome list; it does not bind the existing executable, command, artifact, validator, or failure contract.\"},{\"anchor\":\"repository/AGENTS.md:233-241\",\"rationale\":\"Repository policy requires named scope, executable acceptance evidence, and fail-closed behavior for every in-card obligation.\"}],\"finding_ids\":[\"INT-001\",\"INT-002\",\"INT-003\",\"INT-004\",\"INT-005\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan neither completely binds the acceptance execution nor describes evidence capable of proving all promised outcomes.\"},{\"evidence\":[{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:23-30\",\"rationale\":\"The harness declares only a selective source inventory.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:139-155\",\"rationale\":\"Only that inventory is checked for dirtiness before the live repository root is passed to critique_plan.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:28-34\",\"rationale\":\"The exercised handler imports several runtime modules absent from the acceptance inventory.\"}],\"finding_ids\":[\"INT-002\",\"INT-003\",\"INT-004\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The intended harness does not establish that its claimed source revision is the complete repository snapshot or that its validator proves current handler behavior.\"},{\"evidence\":[{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:118-125\",\"rationale\":\"Trailer and lineage checks compare only the returned suffix and a claim-state field later added by the harness; structural state is not transformed into independently checked evidence.\"},{\"anchor\":\"repository/src/paranoia_local/class_closure.py:446-460\",\"rationale\":\"The durable representation contains distinct claim_state and review_state fields, both material to the promised persistence contract.\"}],\"finding_ids\":[\"INT-002\",\"INT-004\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"Durable state and attempt channels are not transformed into independently validated acceptance evidence.\"},{\"evidence\":[{\"anchor\":\"repository/src/paranoia_local/handlers.py:2838-2875\",\"rationale\":\"The handler's audit consumer records the attempt ledger and rendered trailer but no durable claim_state or review_state projection.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:160-180\",\"rationale\":\"The harness reloads lineage, mutates the audit with claim state, and packages both without independently reconciling structural state or rerendering from reloaded state.\"}],\"finding_ids\":[\"INT-002\",\"INT-004\",\"INT-005\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"The result, audit, durable-lineage, test, and repository-output consumers are not governed by one coherent verification contract.\"},{\"evidence\":[{\"anchor\":\"plan:11-13\",\"rationale\":\"The acceptance clause states only successful outcomes and gives no blocked result for provider, persistence, audit, or validation failure.\"},{\"anchor\":\"repository/AGENTS.md:233-238\",\"rationale\":\"Repository policy expressly requires fail-closed behavior as part of the plan contract.\"}],\"finding_ids\":[\"INT-001\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"The plan does not state how any failed or ambiguous acceptance step blocks clearance and artifact publication.\"},{\"evidence\":[{\"anchor\":\"repository/tests/test_plan_claims.py:27-39\",\"rationale\":\"The sole harness-facing test skips while the artifact is absent and otherwise only invokes the harness validator.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:94-125\",\"rationale\":\"That validator incompletely checks telemetry and durable state, so the test cannot establish the plan's full acceptance sentence.\"}],\"finding_ids\":[\"INT-001\",\"INT-002\",\"INT-003\",\"INT-004\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"No plan-bound executable test b",
+        "response_sha256": "b0f53f56b9545d79f68861ec6674f7f28f8b0fe4471ad214d3299f0525939e97",
+        "returncode": 0,
+        "role": "census-integrity",
+        "sequence": 3,
+        "session_ref": "01a05206-4bbe-70b3-a2c9-bb64bf147874",
+        "stderr_excerpt": "2026-08-30T09:37:31.039685Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:37:39.763412Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:38:11.796122Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:38:34.690339Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-08-30T09:40:32.401206Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "aa14d602ce9d3fea122b78b49fd3d6cf0de5a352020341ec406b9f92a870906f",
+        "usage": {
+          "cached_input_tokens": 941824,
+          "input_tokens": 1043419,
+          "output_tokens": 12365,
+          "reasoning_output_tokens": 6633
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      },
+      {
+        "duration_ms": 103397,
+        "engine": "codex",
+        "failure_detail_excerpt": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "outcome": "completed",
+        "provider_duration_ms": null,
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0520c-af0f-72b0-91f9-f2755e555117\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"definition\\\":{\\\"invariant\\\":\\\"The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes.\\\",\\\"procedure\\\":\\\"During plan review, trace the proposed acceptance command through generation, validation, replay, and publication. Verify that every input and output is named, success requires zero-exit executable checks, the permitted-write boundary matches the commands, and every preflight, provider, persistence, audit, validation, test, or write failure blocks publication without accepting a stale or partial artifact.\\\",\\\"severity\\\":\\\"BLOCKER\\\"},\\\"kind\\\":\\\"new_class\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:5-7\\\",\\\"rationale\\\":\\\"These lines declare a no-repository-edits boundary while the intended acceptance workflow requires a repository artifact.\\\"},{\\\"anchor\\\":\\\"plan:9-13\\\",\\\"rationale\\\":\\\"These lines promise a real round and retained evidence without binding an exact executable workflow or complete failure behavior.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:21-31\\\",\\\"rationale\\\":\\\"These lines identify the artifact path and source assumptions that the plan does not expressly authorize or bind.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:134-192\\\",\\\"rationale\\\":\\\"These lines implement generation, validation, testing, and artifact writing beyond the plan's stated operational contract.\\\"},{\\\"anchor\\\":\\\"repository/tests/test_plan_claims.py:27-39\\\",\\\"rationale\\\":\\\"These lines allow the artifact-dependent replay path to be skipped when the required artifact is absent.\\\"},{\\\"anchor\\\":\\\"repository/AGENTS.md:234-238\\\",\\\"rationale\\\":\\\"These lines require concrete retained acceptance evidence and expose the plan's missing executable and failure lifecycle.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:21-21\\\",\\\"rationale\\\":\\\"This line sets an in-repository default output that contradicts the plan's no-edit boundary.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:136-138\\\",\\\"rationale\\\":\\\"These lines prepare the in-repository artifact-generation path despite the unamended scope.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:187-191\\\",\\\"rationale\\\":\\\"These lines write and report the repository artifact that the plan does not authorize.\\\"},{\\\"anchor\\\":\\\"plan:5-13\\\",\\\"rationale\\\":\\\"Taken together, these lines do not name the exact command, validator, output lifecycle, and fail-closed acceptance boundary.\\\"},{\\\"anchor\\\":\\\"repository/AGENTS.md:233-238\\\",\\\"rationale\\\":\\\"These lines establish that the in-card probe requires executable evidence rather than an aspirational promise.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:134-193\\\",\\\"rationale\\\":\\\"These lines show the actual driver lifecycle whose inputs, assertions, writes, and failure semantics must be bound by the plan.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:21-22\\\",\\\"rationale\\\":\\\"These lines define a dated repository output that conflicts with the plan's stated write prohibition.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_review_reliability_acceptance.py:187-190\\\",\\\"rationale\\\":\\\"These lines perform the artifact publication that is absent from the authorized plan scope.\\\"}],\\\"id\\\":\\\"governing:acceptance-contract\\\",\\\"remedy\\\":\\\"Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prer",
+        "raw_sha256": "8feafb935be14cebb7c4471bf76a458960acdaedabb5dd35ae301d4eff004b3d",
+        "rejected_reply_excerpt": null,
+        "rejected_reply_sha256": null,
+        "requested_timeout_sec": 1200,
+        "response_excerpt": "{\"class_actions\":{},\"debt_outcomes\":[],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes.\",\"procedure\":\"During plan review, trace the proposed acceptance command through generation, validation, replay, and publication. Verify that every input and output is named, success requires zero-exit executable checks, the permitted-write boundary matches the commands, and every preflight, provider, persistence, audit, validation, test, or write failure blocks publication without accepting a stale or partial artifact.\",\"severity\":\"BLOCKER\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:5-7\",\"rationale\":\"These lines declare a no-repository-edits boundary while the intended acceptance workflow requires a repository artifact.\"},{\"anchor\":\"plan:9-13\",\"rationale\":\"These lines promise a real round and retained evidence without binding an exact executable workflow or complete failure behavior.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:21-31\",\"rationale\":\"These lines identify the artifact path and source assumptions that the plan does not expressly authorize or bind.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:134-192\",\"rationale\":\"These lines implement generation, validation, testing, and artifact writing beyond the plan's stated operational contract.\"},{\"anchor\":\"repository/tests/test_plan_claims.py:27-39\",\"rationale\":\"These lines allow the artifact-dependent replay path to be skipped when the required artifact is absent.\"},{\"anchor\":\"repository/AGENTS.md:234-238\",\"rationale\":\"These lines require concrete retained acceptance evidence and expose the plan's missing executable and failure lifecycle.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:21-21\",\"rationale\":\"This line sets an in-repository default output that contradicts the plan's no-edit boundary.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:136-138\",\"rationale\":\"These lines prepare the in-repository artifact-generation path despite the unamended scope.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:187-191\",\"rationale\":\"These lines write and report the repository artifact that the plan does not authorize.\"},{\"anchor\":\"plan:5-13\",\"rationale\":\"Taken together, these lines do not name the exact command, validator, output lifecycle, and fail-closed acceptance boundary.\"},{\"anchor\":\"repository/AGENTS.md:233-238\",\"rationale\":\"These lines establish that the in-card probe requires executable evidence rather than an aspirational promise.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:134-193\",\"rationale\":\"These lines show the actual driver lifecycle whose inputs, assertions, writes, and failure semantics must be bound by the plan.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:21-22\",\"rationale\":\"These lines define a dated repository output that conflicts with the plan's stated write prohibition.\"},{\"anchor\":\"repository/scripts/run_plan_review_reliability_acceptance.py:187-190\",\"rationale\":\"These lines perform the artifact publication that is absent from the authorized plan scope.\"}],\"id\":\"governing:acceptance-contract\",\"remedy\":\"Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains",
+        "response_sha256": "8ee2c5afd67ce1e397fbf5ff0084abb96dd19e3c87fab0171f3059ffea4881b4",
+        "returncode": 0,
+        "role": "consolidation",
+        "sequence": 4,
+        "session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+        "stderr_excerpt": "2026-08-30T09:44:20.858220Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+        "stderr_sha256": "90953167daa4188e531fbdcbd840d5f7381b4e0820f4b6ee6e036036b7738126",
+        "usage": {
+          "cached_input_tokens": 0,
+          "input_tokens": 15748,
+          "output_tokens": 5512,
+          "reasoning_output_tokens": 1356
+        },
+        "validation_issue": null,
+        "validation_pointer": null
+      }
+    ],
+    "claim_audit_failed": false,
+    "claim_counts": {
+      "refuted": 0,
+      "supported": 0,
+      "unverified": 0
+    },
+    "claim_duration_ms": 14760,
+    "claim_last_accepted_counts": null,
+    "claim_model_calls": 1,
+    "claim_nonadjudicated_count": null,
+    "claim_status": "parsed 0 new + 0 targeted retained + 0 frozen",
+    "claim_verification": true,
+    "class_closure": true,
+    "correction_gates": [],
+    "durable_claim_state": {
+      "claims": {},
+      "coverage": {
+        "notes": "The plan contains only repository-scoped instructions, acceptance requirements, authorization limits, and a disclaimer about what the probe proves. It asserts no eligible external fact, externally issued design principle, or promised external behavior.",
+        "omitted_nonfacts": 9,
+        "prior_assessments": [],
+        "prior_dispositions": [],
+        "sections_scanned": 3
+      },
+      "debt": null,
+      "next_seq": 1,
+      "plan_digest": "1f5315f9831af5c3",
+      "plan_snapshot": "# Plan-review reliability acceptance\n\n## Scope\n\nExercise the current public `critique_plan` handler against this repository snapshot. The run is\nan acceptance probe only: it does not authorize repository edits or claim that a single review\nproves future provider behavior.\n\n## Acceptance\n\nThe handler must complete a real Codex provider round, persist its claim and structural state,\nrender the same durable trailer recorded in its audit log, and retain every provider attempt with\nits role, outcome, requested timeout, duration, return code, and bounded channel digests.\n",
+      "retired": [],
+      "rounds": 1,
+      "version": 1
+    },
+    "engine": "codex",
+    "error": false,
+    "grounded": true,
+    "lineage": "issues-81-83-real-plan-acceptance",
+    "model": "gpt-5.6-sol",
+    "plan_digest": "1f5315f9831af5c3",
+    "plan_path": null,
+    "register_status": "staged census parsed — NEW 56a415b6, NEW 940b7e9c, NEW 71dcba3e, NEW 66034e39, NEW 080cd8c2, NEW 58f1282e, NEW 1d0fb9f7",
+    "rejected_payloads": [],
+    "rendered_trailer": "CLAIM-REGISTER: 0 active external claims; 0 retired and excluded from active inventory\nCLAIM-CLOSURE: 0 supported, 0 refuted, 0 unverified\nLINEAGE: issues-81-83-real-plan-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed — NEW 56a415b6, NEW 940b7e9c, NEW 71dcba3e, NEW 66034e39, NEW 080cd8c2, NEW 58f1282e, NEW 1d0fb9f7\nCLASS-CLOSURE: 7 open, 0 closed, 0 surviving matches, 0 exempt, 7 unmechanized\n  080cd8c2 The plan defines the exact provider-role graph and a closed per-attempt ledger contract that accounts for every admitted provider call and validation retry once, in order, with complete bounded telemetry. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  56a415b6 The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  58f1282e When a plan relies on a retained repository artifact as acceptance evidence, it binds the final replay to the exact committed artifact blob and committed executable sources, and absence or byte divergence is a hard failure rather than a skip. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  66034e39 The plan requires a closed, independently verifiable provider-route record that binds the real Codex engine, executable, CLI version, model, effort, web setting, audit identity, and every attempt identity to the immutable accepted artifact. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  71dcba3e The plan specifies an independent, schema-valid acceptance projection for all promised durable claim and structural review state and requires canonical output to be rederived from reloaded persistence rather than trusted from the original response or an augmented audit. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  940b7e9c The plan requires the reviewed and executed repository snapshot to be completely identified and equal to the recorded revision or immutable materialization, including every tracked byte and runtime-loaded project dependency relevant to the acceptance run. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 6 blocking open\nSTRUCTURAL-CONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — structural closure remains open.\nREVIEW-ATTEMPTS: total=5 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "retry_register": null,
+    "returncode": 0,
+    "round": 1,
+    "session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+    "staged_manifests": [
+      {
+        "class_assessments": [],
+        "coverage": [
+          {
+            "evidence": [
+              "plan:1-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-45",
+              "repository/tests/test_plan_claims.py:27-39"
+            ],
+            "finding_ids": [
+              "domain:domain-001"
+            ],
+            "id": "artifact-complete",
+            "status": "finding",
+            "summary": "The plan does not bind an authorized, executable acceptance-publication contract."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:17-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:150-177"
+            ],
+            "finding_ids": [
+              "domain:domain-002",
+              "domain:domain-004"
+            ],
+            "id": "repository-premises",
+            "status": "finding",
+            "summary": "The proposed evidence does not securely establish either the reviewed repository snapshot or the real Codex route."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/src/paranoia_local/class_closure.py:327-329",
+              "repository/src/paranoia_local/class_closure.py:446-460",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:121-125"
+            ],
+            "finding_ids": [
+              "domain:domain-003"
+            ],
+            "id": "transformations",
+            "status": "finding",
+            "summary": "The artifact transformation leaves the promised structural persistence unproved."
+          },
+          {
+            "evidence": [
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-192",
+              "repository/tests/test_plan_claims.py:27-39"
+            ],
+            "finding_ids": [
+              "domain:domain-001"
+            ],
+            "id": "consumers",
+            "status": "finding",
+            "summary": "Generation and replay consumers disagree with the plan's no-edit scope and do not require artifact presence."
+          },
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-192"
+            ],
+            "finding_ids": [
+              "domain:domain-001"
+            ],
+            "id": "failure-recovery",
+            "status": "finding",
+            "summary": "Fail-closed acceptance and publication behavior is not part of the plan contract."
+          },
+          {
+            "evidence": [
+              "plan:9-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+              "repository/src/paranoia_local/staged_protocol.py:26-29",
+              "repository/src/paranoia_local/handlers.py:1428-1476",
+              "repository/src/paranoia_local/handlers.py:1563-1605"
+            ],
+            "finding_ids": [
+              "domain:domain-003",
+              "domain:domain-004",
+              "domain:domain-005"
+            ],
+            "id": "tests-acceptance",
+            "status": "finding",
+            "summary": "The acceptance oracle admits fabricated provider identity, missing structural state, and incomplete attempt ledgers."
+          },
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/README.md:319-327",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-192"
+            ],
+            "finding_ids": [
+              "domain:domain-001"
+            ],
+            "id": "docs-operations",
+            "status": "finding",
+            "summary": "An operator cannot execute and publish the probe solely from the plan's instructions."
+          },
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:97-125",
+              "repository/AGENTS.md:507-525"
+            ],
+            "finding_ids": [
+              "domain:domain-001",
+              "domain:domain-002",
+              "domain:domain-003",
+              "domain:domain-004",
+              "domain:domain-005"
+            ],
+            "id": "consistency",
+            "status": "finding",
+            "summary": "The plan, runner, validator, tests, and repository instructions do not express one coherent acceptance contract."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:126-131"
+            ],
+            "finding_ids": [],
+            "id": "proportionality",
+            "status": "covered",
+            "summary": "The intended single-run scope is proportionate; the defects concern evidentiary rigor and executability, not excessive scope."
+          }
+        ],
+        "findings": [
+          {
+            "evidence": [
+              "plan:5-7",
+              "plan:9-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-192",
+              "repository/tests/test_plan_claims.py:27-39"
+            ],
+            "id": "domain:domain-001",
+            "remedy": "Name `scripts/run_plan_review_reliability_acceptance.py` as the production acceptance entry point; narrowly authorize generation of only `docs/plan_review_reliability_acceptance_2026-08-30.json`; require its validator and the focused replay test to pass with a zero exit; make absence of the artifact, provider failure, missing audit/lineage, validation failure, or test skip/nonzero exit block publication and leave no replacement artifact.",
+            "severity": "BLOCKER",
+            "summary": "The plan neither authorizes nor executable-binds the repository artifact required to complete the probe."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:17-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155"
+            ],
+            "id": "domain:domain-002",
+            "remedy": "Run generation from a clean materialization of the recorded commit and bind the complete Git tree identity, or equivalently reject any tracked worktree difference across the whole repository and validate every runtime-loaded project module against that commit. Replace the partial SOURCES claim with that complete snapshot boundary in both generation and replay.",
+            "severity": "BLOCKER",
+            "summary": "The runner can attribute results from unbound working-tree code to the recorded repository revision."
+          },
+          {
+            "evidence": [
+              "plan:11-12",
+              "repository/src/paranoia_local/class_closure.py:327-329",
+              "repository/src/paranoia_local/class_closure.py:446-460",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:121-125",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:160-180"
+            ],
+            "id": "domain:domain-003",
+            "remedy": "Require the reloaded lineage to contain a schema-valid nonempty `review_state` for the recorded stakes and structural snapshot, validate its round/phase/debt and persistence status, and mechanically compare it with the audit's staged settlement and the exact rendered trailer. Keep the existing independent claim-state comparison.",
+            "severity": "BLOCKER",
+            "summary": "The acceptance oracle can pass when the promised structural state was not persisted correctly."
+          },
+          {
+            "evidence": [
+              "plan:11",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:150-177",
+              "repository/src/paranoia_local/handlers.py:1990-2010"
+            ],
+            "id": "domain:domain-004",
+            "remedy": "Define and validate a closed provider record requiring `engine: codex`, the intended model/effort/web settings, and nonempty executable and CLI-version evidence; require `audit.engine` and every provider attempt's engine/route identity to agree with it. Bind replay to the committed artifact bytes so an edited self-asserted provider block cannot pass.",
+            "severity": "BLOCKER",
+            "summary": "The replay validator does not prove that the recorded round used the real Codex provider route."
+          },
+          {
+            "evidence": [
+              "plan:12-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+              "repository/src/paranoia_local/staged_protocol.py:26-29",
+              "repository/src/paranoia_local/handlers.py:1428-1476",
+              "repository/src/paranoia_local/handlers.py:1563-1605",
+              "repository/src/paranoia_local/handlers.py:316-350"
+            ],
+            "id": "domain:domain-005",
+            "remedy": "For this fresh round, validate the exact required role graph—claim-discovery, census-domain, census-execution, census-integrity, and consolidation—with only properly paired same-session validation retries; require unique ordered sequences, completed terminal attempts, positive integer requested timeouts, nonnegative durations, integer return codes, 64-character lowercase hexadecimal channel digests, and bounded excerpts. Reject missing, duplicate, impossible, or orphaned rows.",
+            "severity": "BLOCKER",
+            "summary": "The ledger oracle can clear an incomplete or malformed subset of the provider attempts."
+          }
+        ],
+        "lane": "domain"
+      },
+      {
+        "class_assessments": [],
+        "coverage": [
+          {
+            "evidence": [
+              "plan:9-13",
+              "repository/AGENTS.md:234-238"
+            ],
+            "finding_ids": [
+              "execution:F1",
+              "execution:F7"
+            ],
+            "id": "artifact-complete",
+            "status": "finding",
+            "summary": "The plan omits the executable and durable lifecycle needed to make this acceptance probe complete."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:23-31",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155"
+            ],
+            "finding_ids": [
+              "execution:F2",
+              "execution:F3",
+              "execution:F6"
+            ],
+            "id": "repository-premises",
+            "status": "finding",
+            "summary": "The current driver contradicts the no-edit boundary and does not prove that the executed repository equals the claimed snapshot or provider identity."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:160-166"
+            ],
+            "finding_ids": [
+              "execution:F4"
+            ],
+            "id": "transformations",
+            "status": "finding",
+            "summary": "The durable-lineage transformation is captured but its structural half is never validated."
+          },
+          {
+            "evidence": [
+              "repository/scripts/run_plan_review_reliability_acceptance.py:68-125",
+              "repository/tests/test_plan_claims.py:27-39",
+              "repository/README.md:385-393"
+            ],
+            "finding_ids": [
+              "execution:F4",
+              "execution:F5",
+              "execution:F6",
+              "execution:F7",
+              "execution:F8"
+            ],
+            "id": "consumers",
+            "status": "finding",
+            "summary": "Replay consumers can accept incomplete or mutable evidence and the retained projection is broader than the documented publication boundary."
+          },
+          {
+            "evidence": [
+              "plan:9-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-145",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:187-191"
+            ],
+            "finding_ids": [
+              "execution:F1"
+            ],
+            "id": "failure-recovery",
+            "status": "finding",
+            "summary": "The plan has no fail-closed artifact lifecycle for unsuccessful or interrupted probes."
+          },
+          {
+            "evidence": [
+              "repository/AGENTS.md:318-324",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+              "repository/AGENTS.md:523-525",
+              "repository/tests/test_plan_claims.py:27-39"
+            ],
+            "finding_ids": [
+              "execution:F1",
+              "execution:F4",
+              "execution:F5",
+              "execution:F6",
+              "execution:F7"
+            ],
+            "id": "tests-acceptance",
+            "status": "finding",
+            "summary": "The proposed evidence lacks complete telemetry, structural-state, provider-route, and immutable-artifact acceptance gates."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-21",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:188-191",
+              "repository/README.md:385-393"
+            ],
+            "finding_ids": [
+              "execution:F2",
+              "execution:F8"
+            ],
+            "id": "docs-operations",
+            "status": "finding",
+            "summary": "The operational output contradicts the plan's edit boundary and retains the complete audit instead of a bounded publication projection."
+          },
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:159-180"
+            ],
+            "finding_ids": [
+              "execution:F2",
+              "execution:F4",
+              "execution:F8"
+            ],
+            "id": "consistency",
+            "status": "finding",
+            "summary": "Scope, persistence, audit, and publication assertions are not mutually consistent across the plan and driver."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:146-155"
+            ],
+            "finding_ids": [],
+            "id": "proportionality",
+            "status": "covered",
+            "summary": "The intended single real-provider probe is proportionate; the findings concern evidence correctness rather than excessive scope."
+          }
+        ],
+        "findings": [
+          {
+            "evidence": [
+              "plan:9-13",
+              "repository/AGENTS.md:234-238",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-192"
+            ],
+            "id": "execution:F1",
+            "remedy": "Amend the plan to name the exact trusted driver invocation, Codex/version/auth prerequisites, fixed plan/stakes/lineage inputs, output and validator, required replay command, and success criteria. State that every preflight, provider, validation, persistence, audit, or write failure exits nonzero without leaving an accepted stale or partial artifact; implement atomic output replacement and stale-output handling in the named driver.",
+            "severity": "MAJOR",
+            "summary": "The acceptance obligation is aspirational rather than executable and fail-closed."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-21",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:136-138",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:187-191"
+            ],
+            "id": "execution:F2",
+            "remedy": "Choose and state one consistent boundary: either explicitly authorize only the named generated acceptance artifact as the sole repository write, or require an external output path and remove the in-repository default and repository replay expectation. Update the plan, driver default, and test together.",
+            "severity": "MAJOR",
+            "summary": "The no-repository-edits scope contradicts the driver's default repository artifact write."
+          },
+          {
+            "evidence": [
+              "plan:5-5",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:23-31",
+              "repository/src/paranoia_local/handlers.py:28-34",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155"
+            ],
+            "id": "execution:F3",
+            "remedy": "Run the handler from an inert materialization of the recorded full revision, or require the entire relevant tree to be clean and record the exact snapshot identity used by critique_plan. Bind every executing/imported production dependency and reviewed repository byte to that identity, with the generated output path explicitly excluded from pre-run cleanliness only where necessary.",
+            "severity": "MAJOR",
+            "summary": "The claimed repository snapshot is not the complete snapshot actually executed and reviewed."
+          },
+          {
+            "evidence": [
+              "plan:11-12",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:160-166",
+              "repository/docs/how-it-works.md:216-228"
+            ],
+            "id": "execution:F4",
+            "remedy": "Define and implement a closed structural-state acceptance projection. Validate the reloaded lineage with the production persisted-state validators, compare its review_state/classes/debt/round to the audit settlement, deterministically derive the expected trailer from that durable state, and require exact equality with both audit.rendered_trailer and the returned suffix. Keep post-run augmentation outside the object represented as the original audit log.",
+            "severity": "MAJOR",
+            "summary": "The probe can pass without proving that structural state persisted correctly."
+          },
+          {
+            "evidence": [
+              "plan:12-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+              "repository/docs/how-it-works.md:28-36",
+              "repository/AGENTS.md:318-324"
+            ],
+            "id": "execution:F5",
+            "remedy": "Instrument and reconcile the fresh-lineage invocation ledger so the artifact proves claim discovery, all three census lanes, consolidation, and every actual validation retry in sequence, with no unexplained rows or omissions. Validate exact integer timeouts, durations and return codes; 64-hex digests; response evidence; channel excerpt bounds; retry-role correspondence; and trailer attempt counts. Add removal, mutation, oversize, and reordering tests.",
+            "severity": "MAJOR",
+            "summary": "The attempt validator cannot establish that every provider attempt and its telemetry were retained."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:68-96",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:150-176"
+            ],
+            "id": "execution:F6",
+            "remedy": "Close and validate the provider record: require engine codex, the exact executable used, a nonempty compatible CLI version, expected model/effort/web settings, and matching audit and attempt engine identities. Bind route evidence to actual invocation telemetry and add mutations proving that altered provider, model, executable, version, or audit-engine fields fail replay.",
+            "severity": "MAJOR",
+            "summary": "The replay validator does not prove the asserted real Codex provider route."
+          },
+          {
+            "evidence": [
+              "repository/AGENTS.md:523-525",
+              "repository/tests/test_plan_claims.py:27-39",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-145",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:167-191"
+            ],
+            "id": "execution:F7",
+            "remedy": "Specify a two-stage acceptance lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, then run a required replay that reads the exact committed blob and compares it with the working bytes. The shipping gate must fail, not skip, when the required dated artifact or its committed binding is absent.",
+            "severity": "MAJOR",
+            "summary": "The retained acceptance evidence is not bound to its committed artifact blob."
+          },
+          {
+            "evidence": [
+              "repository/README.md:385-393",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:156-180",
+              "plan:12-13"
+            ],
+            "id": "execution:F8",
+            "remedy": "Replace the embedded complete audit and lineage with a closed, bounded acceptance projection containing only the fields needed by the stated assertions, exact digests, and bounded excerpts. Retain the private full audit only in the temporary/local audit location and document the projection's privacy and size boundary.",
+            "severity": "MINOR",
+            "summary": "The planned repository artifact publishes a complete augmented audit despite the documented bounded-publication policy."
+          }
+        ],
+        "lane": "execution"
+      },
+      {
+        "class_assessments": [],
+        "coverage": [
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/AGENTS.md:233-241"
+            ],
+            "finding_ids": [
+              "integrity:INT-001",
+              "integrity:INT-002",
+              "integrity:INT-003",
+              "integrity:INT-004",
+              "integrity:INT-005"
+            ],
+            "id": "artifact-complete",
+            "status": "finding",
+            "summary": "The plan neither completely binds the acceptance execution nor describes evidence capable of proving all promised outcomes."
+          },
+          {
+            "evidence": [
+              "repository/scripts/run_plan_review_reliability_acceptance.py:23-30",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+              "repository/src/paranoia_local/handlers.py:28-34"
+            ],
+            "finding_ids": [
+              "integrity:INT-002",
+              "integrity:INT-003",
+              "integrity:INT-004"
+            ],
+            "id": "repository-premises",
+            "status": "finding",
+            "summary": "The intended harness does not establish that its claimed source revision is the complete repository snapshot or that its validator proves current handler behavior."
+          },
+          {
+            "evidence": [
+              "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+              "repository/src/paranoia_local/class_closure.py:446-460"
+            ],
+            "finding_ids": [
+              "integrity:INT-002",
+              "integrity:INT-004"
+            ],
+            "id": "transformations",
+            "status": "finding",
+            "summary": "Durable state and attempt channels are not transformed into independently validated acceptance evidence."
+          },
+          {
+            "evidence": [
+              "repository/src/paranoia_local/handlers.py:2838-2875",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:160-180"
+            ],
+            "finding_ids": [
+              "integrity:INT-002",
+              "integrity:INT-004",
+              "integrity:INT-005"
+            ],
+            "id": "consumers",
+            "status": "finding",
+            "summary": "The result, audit, durable-lineage, test, and repository-output consumers are not governed by one coherent verification contract."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/AGENTS.md:233-238"
+            ],
+            "finding_ids": [
+              "integrity:INT-001"
+            ],
+            "id": "failure-recovery",
+            "status": "finding",
+            "summary": "The plan does not state how any failed or ambiguous acceptance step blocks clearance and artifact publication."
+          },
+          {
+            "evidence": [
+              "repository/tests/test_plan_claims.py:27-39",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:94-125"
+            ],
+            "finding_ids": [
+              "integrity:INT-001",
+              "integrity:INT-002",
+              "integrity:INT-003",
+              "integrity:INT-004"
+            ],
+            "id": "tests-acceptance",
+            "status": "finding",
+            "summary": "No plan-bound executable test boundary proves the repository snapshot, durable structural state, trailer derivation, and complete attempt telemetry."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-22",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:187-192"
+            ],
+            "finding_ids": [
+              "integrity:INT-001",
+              "integrity:INT-005"
+            ],
+            "id": "docs-operations",
+            "status": "finding",
+            "summary": "The operational command and retained artifact are unnamed, and the intended documentation write conflicts with the plan's no-edit scope."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-155",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:166-190"
+            ],
+            "finding_ids": [
+              "integrity:INT-002",
+              "integrity:INT-003",
+              "integrity:INT-005"
+            ],
+            "id": "consistency",
+            "status": "finding",
+            "summary": "The plan's scope, snapshot claim, audit semantics, and intended artifact lifecycle contradict one another."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/src/paranoia_local/handlers.py:40-52"
+            ],
+            "finding_ids": [],
+            "id": "proportionality",
+            "status": "covered",
+            "summary": "A single bounded real-provider round is proportionate to the high-impact false-clearance and diagnostic-retention stakes."
+          }
+        ],
+        "findings": [
+          {
+            "evidence": [
+              "plan:5-13",
+              "repository/AGENTS.md:233-238",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:134-193"
+            ],
+            "id": "integrity:INT-001",
+            "remedy": "Name `scripts/run_plan_review_reliability_acceptance.py` and its exact command, inputs, output, validator, required assertions, and test command. State that any provider, validation, persistence, audit, reload, or artifact-write failure exits nonzero, publishes no accepted artifact, and remains blocking; keep the duplicated PLAN constant synchronized.",
+            "severity": "BLOCKER",
+            "summary": "The in-card acceptance run lacks exact executable evidence and fail-closed scope."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:160-166",
+              "repository/src/paranoia_local/class_closure.py:446-460",
+              "repository/src/paranoia_local/handlers.py:2867-2874"
+            ],
+            "id": "integrity:INT-002",
+            "remedy": "Define and implement independent post-run verification of both reloaded `claim_state` and `review_state`. Preserve an unmodified original audit, compare it with a server-owned persisted-state projection, rerender the canonical trailer from the reloaded lineage, and require exact equality with both the audit trailer and returned suffix. Add negative tests mutating either durable state independently.",
+            "severity": "BLOCKER",
+            "summary": "The intended validator cannot prove durable claim or structural state and uses a tautological audit comparison."
+          },
+          {
+            "evidence": [
+              "plan:5",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:23-30",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+              "repository/src/paranoia_local/orientation.py:72-103"
+            ],
+            "id": "integrity:INT-003",
+            "remedy": "Bind the artifact to the exact tree/commit snapshot actually supplied to the handler and reviewer. Either require the complete repository working tree to equal the recorded revision or record and validate the generated full snapshot identity; include every executed runtime dependency and reject any source/snapshot mismatch before provider spend and publication.",
+            "severity": "BLOCKER",
+            "summary": "Selective cleanliness and source hashes do not bind the exercised repository snapshot."
+          },
+          {
+            "evidence": [
+              "plan:11-13",
+              "repository/AGENTS.md:318-324",
+              "repository/AGENTS.md:523-524",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+              "repository/tests/test_plan_claims.py:153-169"
+            ],
+            "id": "integrity:INT-004",
+            "remedy": "Specify and validate a closed per-attempt schema: nonempty role, admitted outcome, integer timeout/duration/return code, 64-hex digests, bounded string excerpts for response/raw/failure-detail/stderr, and exact attempt ordering. Independently count admitted provider calls and require one ledger row per call; add mutation tests for missing rows, malformed digests, null/non-integer telemetry, and oversized or missing excerpts.",
+            "severity": "BLOCKER",
+            "summary": "The telemetry validator accepts malformed or unretained attempt evidence and cannot establish ledger completeness."
+          },
+          {
+            "evidence": [
+              "plan:5-7",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:21-22",
+              "repository/scripts/run_plan_review_reliability_acceptance.py:187-190",
+              "repository/tests/test_plan_claims.py:27-39"
+            ],
+            "id": "integrity:INT-005",
+            "remedy": "Resolve the scope contradiction explicitly: either authorize exactly `docs/plan_review_reliability_acceptance_2026-08-30.json` as the sole repository write and forbid all others, or require `--output` outside the repository and change the consumer test/retention contract accordingly.",
+            "severity": "BLOCKER",
+            "summary": "The intended acceptance run writes a repository artifact that the plan expressly does not authorize."
+          }
+        ],
+        "lane": "integrity"
+      }
+    ],
+    "staged_settlement": {
+      "_class_record_pointers": [
+        "/governing_findings/0/classification/definition",
+        "/governing_findings/1/classification/definition",
+        "/governing_findings/2/classification/definition",
+        "/governing_findings/3/classification/definition",
+        "/governing_findings/4/classification/definition",
+        "/governing_findings/5/classification/definition",
+        "/governing_findings/6/classification/definition"
+      ],
+      "_finding_class_refs": {
+        "governing:acceptance-contract": "record:0",
+        "governing:attempt-ledger-completeness": "record:4",
+        "governing:bounded-publication": "record:6",
+        "governing:committed-artifact-binding": "record:5",
+        "governing:durable-state-oracle": "record:2",
+        "governing:provider-route-proof": "record:3",
+        "governing:snapshot-binding": "record:1"
+      },
+      "assessment_dispositions": [],
+      "class_assessments": [],
+      "class_dispositions": [
+        {
+          "finding_id": "governing:acceptance-contract",
+          "kind": "new_class",
+          "record_index": 0
+        },
+        {
+          "finding_id": "governing:snapshot-binding",
+          "kind": "new_class",
+          "record_index": 1
+        },
+        {
+          "finding_id": "governing:durable-state-oracle",
+          "kind": "new_class",
+          "record_index": 2
+        },
+        {
+          "finding_id": "governing:provider-route-proof",
+          "kind": "new_class",
+          "record_index": 3
+        },
+        {
+          "finding_id": "governing:attempt-ledger-completeness",
+          "kind": "new_class",
+          "record_index": 4
+        },
+        {
+          "finding_id": "governing:committed-artifact-binding",
+          "kind": "new_class",
+          "record_index": 5
+        },
+        {
+          "finding_id": "governing:bounded-publication",
+          "kind": "new_class",
+          "record_index": 6
+        }
+      ],
+      "class_records": [
+        {
+          "invariant": "The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes.",
+          "op": "new",
+          "procedure": "During plan review, trace the proposed acceptance command through generation, validation, replay, and publication. Verify that every input and output is named, success requires zero-exit executable checks, the permitted-write boundary matches the commands, and every preflight, provider, persistence, audit, validation, test, or write failure blocks publication without accepting a stale or partial artifact.",
+          "severity": "BLOCKER"
+        },
+        {
+          "invariant": "The plan requires the reviewed and executed repository snapshot to be completely identified and equal to the recorded revision or immutable materialization, including every tracked byte and runtime-loaded project dependency relevant to the acceptance run.",
+          "op": "new",
+          "procedure": "During plan review, require either execution from a clean immutable materialization of the recorded full tree or an executable preflight that rejects every relevant tracked difference and validates all runtime-loaded project modules. The plan must define the snapshot identity, generated-output exception if any, pre-spend rejection behavior, and evidence used by both generation and replay.",
+          "severity": "BLOCKER"
+        },
+        {
+          "invariant": "The plan specifies an independent, schema-valid acceptance projection for all promised durable claim and structural review state and requires canonical output to be rederived from reloaded persistence rather than trusted from the original response or an augmented audit.",
+          "op": "new",
+          "procedure": "During plan review, verify that the named validator reloads lineage, applies production persisted-state validation, checks nonempty claim and review state for the recorded stakes and snapshot, reconciles round, phase, classes, debt, and settlement with an unmodified original audit, rerenders the canonical trailer, and requires exact equality with both audit and returned suffix. Require independent negative mutations of each durable-state component and fail-closed handling.",
+          "severity": "BLOCKER"
+        },
+        {
+          "invariant": "The plan requires a closed, independently verifiable provider-route record that binds the real Codex engine, executable, CLI version, model, effort, web setting, audit identity, and every attempt identity to the immutable accepted artifact.",
+          "op": "new",
+          "procedure": "During plan review, require generation-time telemetry for the actual provider invocation and a replay validator that rejects missing, empty, inconsistent, or edited route fields. The validator must compare the provider record with audit and per-attempt identities and bind replay to immutable artifact bytes; provider-route ambiguity must fail closed.",
+          "severity": "BLOCKER"
+        },
+        {
+          "invariant": "The plan defines the exact provider-role graph and a closed per-attempt ledger contract that accounts for every admitted provider call and validation retry once, in order, with complete bounded telemetry.",
+          "op": "new",
+          "procedure": "During plan review, enumerate required roles and permitted same-session retry pairings; require unique ordered sequences, completed outcomes, positive integer requested timeouts, nonnegative durations, integer return codes, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Require independent call counting, reconciliation with trailer totals, mutation tests, and fail-closed rejection of missing, duplicate, malformed, reordered, impossible, oversized, or orphaned rows.",
+          "severity": "BLOCKER"
+        },
+        {
+          "invariant": "When a plan relies on a retained repository artifact as acceptance evidence, it binds the final replay to the exact committed artifact blob and committed executable sources, and absence or byte divergence is a hard failure rather than a skip.",
+          "op": "new",
+          "procedure": "During plan review, require a two-stage lifecycle: commit and identify executable sources, generate and semantically validate the artifact, commit the artifact, then replay the exact committed blob while comparing it with working bytes. Verify that the shipping gate fails closed on an absent artifact, absent commit binding, byte mismatch, skipped replay, or nonzero replay.",
+          "severity": "MAJOR"
+        },
+        {
+          "invariant": "A plan that publishes acceptance evidence defines a closed, bounded public projection containing only fields necessary for its assertions, while full private audit and lineage data remain outside the published artifact.",
+          "op": "new",
+          "procedure": "During plan review, enumerate the permitted public fields, digest and excerpt representations, explicit size and privacy bounds, and the private retention location. Require the named validator to reject additional full audit or lineage payloads, unbounded excerpts, or fields outside the projection.",
+          "severity": "MINOR"
+        }
+      ],
+      "debt": [
+        {
+          "evidence": [
+            "plan:5-7",
+            "plan:9-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-192",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/AGENTS.md:234-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-21",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:136-138",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-191",
+            "plan:5-13",
+            "repository/AGENTS.md:233-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-193",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-22",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-190"
+          ],
+          "finding_id": "governing:acceptance-contract",
+          "id": "D1",
+          "remedy": "Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains blocking and publishes no accepted stale or partial replacement; require atomic replacement and synchronize the duplicated plan constant.",
+          "severity": "BLOCKER",
+          "status": "open",
+          "summary": "The plan does not bind a consistent, executable, authorized, and fail-closed acceptance-artifact lifecycle."
+        },
+        {
+          "evidence": [
+            "plan:5-7",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:17-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+            "plan:5-5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-31",
+            "repository/src/paranoia_local/handlers.py:28-34",
+            "plan:5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-30",
+            "repository/src/paranoia_local/orientation.py:72-103"
+          ],
+          "finding_id": "governing:snapshot-binding",
+          "id": "D2",
+          "remedy": "Require generation from an inert clean materialization of the recorded commit, or define an executable full-tree preflight that rejects every tracked difference except a narrowly specified generated-output exception and validates every runtime-loaded project module. Record and replay-check the complete snapshot identity, and reject any source or snapshot mismatch before provider spend or publication.",
+          "severity": "BLOCKER",
+          "status": "open",
+          "summary": "The proposed probe can attribute results from unbound working-tree and runtime bytes to the recorded repository revision."
+        },
+        {
+          "evidence": [
+            "plan:11-12",
+            "repository/src/paranoia_local/class_closure.py:327-329",
+            "repository/src/paranoia_local/class_closure.py:446-460",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:121-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-180",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-166",
+            "repository/docs/how-it-works.md:216-228",
+            "plan:11-13",
+            "repository/src/paranoia_local/handlers.py:2867-2874"
+          ],
+          "finding_id": "governing:durable-state-oracle",
+          "id": "D3",
+          "remedy": "Define a closed validator projection for both reloaded `claim_state` and nonempty schema-valid `review_state`, including stakes, snapshot, round, phase, classes, debt, and persistence status. Preserve the original audit unchanged, compare it with a server-owned persisted-state projection, rerender the canonical trailer from reloaded lineage, and require exact equality with the audit trailer and returned suffix. Retain the independent claim-state comparison and add mutations that independently corrupt each durable-state component.",
+          "severity": "BLOCKER",
+          "status": "open",
+          "summary": "The acceptance oracle can pass without independently proving the promised durable claim and structural state or its rendered trailer."
+        },
+        {
+          "evidence": [
+            "plan:11",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-177",
+            "repository/src/paranoia_local/handlers.py:1990-2010",
+            "plan:11-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-96",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-176"
+          ],
+          "finding_id": "governing:provider-route-proof",
+          "id": "D4",
+          "remedy": "Require a closed provider record with `engine: codex`, the exact executable, a nonempty compatible CLI version, and the intended model, effort, and web settings. Require `audit.engine` and every provider attempt's engine and route identity to agree with it, retain actual invocation telemetry, bind replay to immutable artifact bytes, and add mutations proving that altered or missing provider, executable, version, model, effort, web, audit-engine, or attempt-route fields fail.",
+          "severity": "BLOCKER",
+          "status": "open",
+          "summary": "The retained evidence does not prove that the recorded round used the intended real Codex provider route."
+        },
+        {
+          "evidence": [
+            "plan:12-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+            "repository/src/paranoia_local/staged_protocol.py:26-29",
+            "repository/src/paranoia_local/handlers.py:1428-1476",
+            "repository/src/paranoia_local/handlers.py:1563-1605",
+            "repository/src/paranoia_local/handlers.py:316-350",
+            "repository/docs/how-it-works.md:28-36",
+            "repository/AGENTS.md:318-324",
+            "plan:11-13",
+            "repository/AGENTS.md:523-524",
+            "repository/tests/test_plan_claims.py:153-169"
+          ],
+          "finding_id": "governing:attempt-ledger-completeness",
+          "id": "D5",
+          "remedy": "Define the exact fresh-round role graph—claim discovery, all three census lanes, consolidation, and only properly paired same-session validation retries—and a closed per-attempt schema. Independently count admitted provider calls and require one unique ordered completed row per call, with positive integer timeout, nonnegative duration, integer return code, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Reconcile trailer counts and add removal, duplication, mutation, oversize, orphaning, and reordering tests.",
+          "severity": "BLOCKER",
+          "status": "open",
+          "summary": "The acceptance oracle can clear an incomplete, malformed, reordered, or unreconciled provider-attempt ledger."
+        },
+        {
+          "evidence": [
+            "repository/AGENTS.md:523-525",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-145",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:167-191"
+          ],
+          "finding_id": "governing:committed-artifact-binding",
+          "id": "D6",
+          "remedy": "Specify a two-stage lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, and then run a mandatory replay against the exact committed blob while comparing it with working bytes. Make the shipping gate fail on an absent dated artifact, absent committed binding, byte mismatch, skipped replay, or nonzero result.",
+          "severity": "MAJOR",
+          "status": "open",
+          "summary": "The retained acceptance evidence is not bound to the exact committed artifact blob consumed by the shipping replay."
+        }
+      ],
+      "debt_updates": [],
+      "findings": [
+        {
+          "evidence": [
+            "plan:5-7",
+            "plan:9-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-192",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/AGENTS.md:234-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-21",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:136-138",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-191",
+            "plan:5-13",
+            "repository/AGENTS.md:233-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-193",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-22",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-190"
+          ],
+          "id": "governing:acceptance-contract",
+          "remedy": "Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains blocking and publishes no accepted stale or partial replacement; require atomic replacement and synchronize the duplicated plan constant.",
+          "severity": "BLOCKER",
+          "summary": "The plan does not bind a consistent, executable, authorized, and fail-closed acceptance-artifact lifecycle."
+        },
+        {
+          "evidence": [
+            "plan:5-7",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:17-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+            "plan:5-5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-31",
+            "repository/src/paranoia_local/handlers.py:28-34",
+            "plan:5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-30",
+            "repository/src/paranoia_local/orientation.py:72-103"
+          ],
+          "id": "governing:snapshot-binding",
+          "remedy": "Require generation from an inert clean materialization of the recorded commit, or define an executable full-tree preflight that rejects every tracked difference except a narrowly specified generated-output exception and validates every runtime-loaded project module. Record and replay-check the complete snapshot identity, and reject any source or snapshot mismatch before provider spend or publication.",
+          "severity": "BLOCKER",
+          "summary": "The proposed probe can attribute results from unbound working-tree and runtime bytes to the recorded repository revision."
+        },
+        {
+          "evidence": [
+            "plan:11-12",
+            "repository/src/paranoia_local/class_closure.py:327-329",
+            "repository/src/paranoia_local/class_closure.py:446-460",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:121-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-180",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-166",
+            "repository/docs/how-it-works.md:216-228",
+            "plan:11-13",
+            "repository/src/paranoia_local/handlers.py:2867-2874"
+          ],
+          "id": "governing:durable-state-oracle",
+          "remedy": "Define a closed validator projection for both reloaded `claim_state` and nonempty schema-valid `review_state`, including stakes, snapshot, round, phase, classes, debt, and persistence status. Preserve the original audit unchanged, compare it with a server-owned persisted-state projection, rerender the canonical trailer from reloaded lineage, and require exact equality with the audit trailer and returned suffix. Retain the independent claim-state comparison and add mutations that independently corrupt each durable-state component.",
+          "severity": "BLOCKER",
+          "summary": "The acceptance oracle can pass without independently proving the promised durable claim and structural state or its rendered trailer."
+        },
+        {
+          "evidence": [
+            "plan:11",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-177",
+            "repository/src/paranoia_local/handlers.py:1990-2010",
+            "plan:11-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-96",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-176"
+          ],
+          "id": "governing:provider-route-proof",
+          "remedy": "Require a closed provider record with `engine: codex`, the exact executable, a nonempty compatible CLI version, and the intended model, effort, and web settings. Require `audit.engine` and every provider attempt's engine and route identity to agree with it, retain actual invocation telemetry, bind replay to immutable artifact bytes, and add mutations proving that altered or missing provider, executable, version, model, effort, web, audit-engine, or attempt-route fields fail.",
+          "severity": "BLOCKER",
+          "summary": "The retained evidence does not prove that the recorded round used the intended real Codex provider route."
+        },
+        {
+          "evidence": [
+            "plan:12-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+            "repository/src/paranoia_local/staged_protocol.py:26-29",
+            "repository/src/paranoia_local/handlers.py:1428-1476",
+            "repository/src/paranoia_local/handlers.py:1563-1605",
+            "repository/src/paranoia_local/handlers.py:316-350",
+            "repository/docs/how-it-works.md:28-36",
+            "repository/AGENTS.md:318-324",
+            "plan:11-13",
+            "repository/AGENTS.md:523-524",
+            "repository/tests/test_plan_claims.py:153-169"
+          ],
+          "id": "governing:attempt-ledger-completeness",
+          "remedy": "Define the exact fresh-round role graph—claim discovery, all three census lanes, consolidation, and only properly paired same-session validation retries—and a closed per-attempt schema. Independently count admitted provider calls and require one unique ordered completed row per call, with positive integer timeout, nonnegative duration, integer return code, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Reconcile trailer counts and add removal, duplication, mutation, oversize, orphaning, and reordering tests.",
+          "severity": "BLOCKER",
+          "summary": "The acceptance oracle can clear an incomplete, malformed, reordered, or unreconciled provider-attempt ledger."
+        },
+        {
+          "evidence": [
+            "repository/AGENTS.md:523-525",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-145",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:167-191"
+          ],
+          "id": "governing:committed-artifact-binding",
+          "remedy": "Specify a two-stage lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, and then run a mandatory replay against the exact committed blob while comparing it with working bytes. Make the shipping gate fail on an absent dated artifact, absent committed binding, byte mismatch, skipped replay, or nonzero result.",
+          "severity": "MAJOR",
+          "summary": "The retained acceptance evidence is not bound to the exact committed artifact blob consumed by the shipping replay."
+        },
+        {
+          "evidence": [
+            "repository/README.md:385-393",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:156-180",
+            "plan:12-13"
+          ],
+          "id": "governing:bounded-publication",
+          "remedy": "Define and validate a closed, bounded repository projection containing only fields required by the acceptance assertions, exact digests, and bounded excerpts. Keep the complete audit and lineage only in the private temporary or local audit location, document the privacy and size boundary, and reject extra or unbounded published fields.",
+          "severity": "MINOR",
+          "summary": "The proposed repository artifact publishes a complete augmented audit instead of a closed, bounded acceptance projection."
+        }
+      ],
+      "role": "census",
+      "source_dispositions": [
+        {
+          "governing_id": "governing:acceptance-contract",
+          "source_id": "domain:domain-001"
+        },
+        {
+          "governing_id": "governing:acceptance-contract",
+          "source_id": "execution:F1"
+        },
+        {
+          "governing_id": "governing:acceptance-contract",
+          "source_id": "execution:F2"
+        },
+        {
+          "governing_id": "governing:acceptance-contract",
+          "source_id": "integrity:INT-001"
+        },
+        {
+          "governing_id": "governing:acceptance-contract",
+          "source_id": "integrity:INT-005"
+        },
+        {
+          "governing_id": "governing:snapshot-binding",
+          "source_id": "domain:domain-002"
+        },
+        {
+          "governing_id": "governing:snapshot-binding",
+          "source_id": "execution:F3"
+        },
+        {
+          "governing_id": "governing:snapshot-binding",
+          "source_id": "integrity:INT-003"
+        },
+        {
+          "governing_id": "governing:durable-state-oracle",
+          "source_id": "domain:domain-003"
+        },
+        {
+          "governing_id": "governing:durable-state-oracle",
+          "source_id": "execution:F4"
+        },
+        {
+          "governing_id": "governing:durable-state-oracle",
+          "source_id": "integrity:INT-002"
+        },
+        {
+          "governing_id": "governing:provider-route-proof",
+          "source_id": "domain:domain-004"
+        },
+        {
+          "governing_id": "governing:provider-route-proof",
+          "source_id": "execution:F6"
+        },
+        {
+          "governing_id": "governing:attempt-ledger-completeness",
+          "source_id": "domain:domain-005"
+        },
+        {
+          "governing_id": "governing:attempt-ledger-completeness",
+          "source_id": "execution:F5"
+        },
+        {
+          "governing_id": "governing:attempt-ledger-completeness",
+          "source_id": "integrity:INT-004"
+        },
+        {
+          "governing_id": "governing:committed-artifact-binding",
+          "source_id": "execution:F7"
+        },
+        {
+          "governing_id": "governing:bounded-publication",
+          "source_id": "execution:F8"
+        }
+      ]
+    },
+    "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [BLOCKER] The plan does not bind a consistent, executable, authorized, and fail-closed acceptance-artifact lifecycle. [classes: 56a415b6] (plan:5-7, plan:9-13, repository/scripts/run_plan_review_reliability_acceptance.py:21-31, repository/scripts/run_plan_review_reliability_acceptance.py:134-192, repository/tests/test_plan_claims.py:27-39, repository/AGENTS.md:234-238, repository/scripts/run_plan_review_reliability_acceptance.py:21-21, repository/scripts/run_plan_review_reliability_acceptance.py:136-138, repository/scripts/run_plan_review_reliability_acceptance.py:187-191, plan:5-13, repository/AGENTS.md:233-238, repository/scripts/run_plan_review_reliability_acceptance.py:134-193, repository/scripts/run_plan_review_reliability_acceptance.py:21-22, repository/scripts/run_plan_review_reliability_acceptance.py:187-190)\n- [BLOCKER] The proposed probe can attribute results from unbound working-tree and runtime bytes to the recorded repository revision. [classes: 940b7e9c] (plan:5-7, repository/scripts/run_plan_review_reliability_acceptance.py:17-31, repository/scripts/run_plan_review_reliability_acceptance.py:81-89, repository/scripts/run_plan_review_reliability_acceptance.py:139-155, plan:5-5, repository/scripts/run_plan_review_reliability_acceptance.py:23-31, repository/src/paranoia_local/handlers.py:28-34, plan:5, repository/scripts/run_plan_review_reliability_acceptance.py:23-30, repository/src/paranoia_local/orientation.py:72-103)\n- [BLOCKER] The acceptance oracle can pass without independently proving the promised durable claim and structural state or its rendered trailer. [classes: 71dcba3e] (plan:11-12, repository/src/paranoia_local/class_closure.py:327-329, repository/src/paranoia_local/class_closure.py:446-460, repository/scripts/run_plan_review_reliability_acceptance.py:121-125, repository/scripts/run_plan_review_reliability_acceptance.py:160-180, repository/scripts/run_plan_review_reliability_acceptance.py:118-125, repository/scripts/run_plan_review_reliability_acceptance.py:160-166, repository/docs/how-it-works.md:216-228, plan:11-13, repository/src/paranoia_local/handlers.py:2867-2874)\n- [BLOCKER] The retained evidence does not prove that the recorded round used the intended real Codex provider route. [classes: 66034e39] (plan:11, repository/scripts/run_plan_review_reliability_acceptance.py:68-131, repository/scripts/run_plan_review_reliability_acceptance.py:150-177, repository/src/paranoia_local/handlers.py:1990-2010, plan:11-13, repository/scripts/run_plan_review_reliability_acceptance.py:68-96, repository/scripts/run_plan_review_reliability_acceptance.py:150-176)\n- [BLOCKER] The acceptance oracle can clear an incomplete, malformed, reordered, or unreconciled provider-attempt ledger. [classes: 080cd8c2] (plan:12-13, repository/scripts/run_plan_review_reliability_acceptance.py:97-117, repository/src/paranoia_local/staged_protocol.py:26-29, repository/src/paranoia_local/handlers.py:1428-1476, repository/src/paranoia_local/handlers.py:1563-1605, repository/src/paranoia_local/handlers.py:316-350, repository/docs/how-it-works.md:28-36, repository/AGENTS.md:318-324, plan:11-13, repository/AGENTS.md:523-524, repository/tests/test_plan_claims.py:153-169)\n- [MAJOR] The retained acceptance evidence is not bound to the exact committed artifact blob consumed by the shipping replay. [classes: 58f1282e] (repository/AGENTS.md:523-525, repository/tests/test_plan_claims.py:27-39, repository/scripts/run_plan_review_reliability_acceptance.py:139-145, repository/scripts/run_plan_review_reliability_acceptance.py:167-191)\n- [MINOR] The proposed repository artifact publishes a complete augmented audit instead of a closed, bounded acceptance projection. (repository/README.md:385-393, repository/scripts/run_plan_review_reliability_acceptance.py:156-180, plan:12-13)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [BLOCKER] Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains blocking and publishes no accepted stale or partial replacement; require atomic replacement and synchronize the duplicated plan constant.\n- [BLOCKER] Require generation from an inert clean materialization of the recorded commit, or define an executable full-tree preflight that rejects every tracked difference except a narrowly specified generated-output exception and validates every runtime-loaded project module. Record and replay-check the complete snapshot identity, and reject any source or snapshot mismatch before provider spend or publication.\n- [BLOCKER] Define a closed validator projection for both reloaded `claim_state` and nonempty schema-valid `review_state`, including stakes, snapshot, round, phase, classes, debt, and persistence status. Preserve the original audit unchanged, compare it with a server-owned persisted-state projection, rerender the canonical trailer from reloaded lineage, and require exact equality with the audit trailer and returned suffix. Retain the independent claim-state comparison and add mutations that independently corrupt each durable-state component.\n- [BLOCKER] Require a closed provider record with `engine: codex`, the exact executable, a nonempty compatible CLI version, and the intended model, effort, and web settings. Require `audit.engine` and every provider attempt's engine and route identity to agree with it, retain actual invocation telemetry, bind replay to immutable artifact bytes, and add mutations proving that altered or missing provider, executable, version, model, effort, web, audit-engine, or attempt-route fields fail.\n- [BLOCKER] Define the exact fresh-round role graph—claim discovery, all three census lanes, consolidation, and only properly paired same-session validation retries—and a closed per-attempt schema. Independently count admitted provider calls and require one unique ordered completed row per call, with positive integer timeout, nonnegative duration, integer return code, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Reconcile trailer counts and add removal, duplication, mutation, oversize, orphaning, and reordering tests.\n- [MAJOR] Specify a two-stage lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, and then run a mandatory replay against the exact committed blob while comparing it with working bytes. Make the shipping gate fail on an absent dated artifact, absent committed binding, byte mismatch, skipped replay, or nonzero result.\n- [MINOR] Define and validate a closed, bounded repository projection containing only fields required by the acceptance assertions, exact digests, and bounded excerpts. Keep the complete audit and lineage only in the private temporary or local audit location, document the privacy and size boundary, and reject extra or unbounded published fields.",
+    "timestamp": "20260830TACCEPTANCE",
+    "tool": "critique_plan"
+  },
+  "date": "2026-08-30",
+  "durable_lineage": {
+    "claim_reverify_required": false,
+    "claim_state": {
+      "claims": {},
+      "coverage": {
+        "notes": "The plan contains only repository-scoped instructions, acceptance requirements, authorization limits, and a disclaimer about what the probe proves. It asserts no eligible external fact, externally issued design principle, or promised external behavior.",
+        "omitted_nonfacts": 9,
+        "prior_assessments": [],
+        "prior_dispositions": [],
+        "sections_scanned": 3
+      },
+      "debt": null,
+      "next_seq": 1,
+      "plan_digest": "1f5315f9831af5c3",
+      "plan_snapshot": "# Plan-review reliability acceptance\n\n## Scope\n\nExercise the current public `critique_plan` handler against this repository snapshot. The run is\nan acceptance probe only: it does not authorize repository edits or claim that a single review\nproves future provider behavior.\n\n## Acceptance\n\nThe handler must complete a real Codex provider round, persist its claim and structural state,\nrender the same durable trailer recorded in its audit log, and retain every provider attempt with\nits role, outcome, requested timeout, duration, return code, and bounded channel digests.\n",
+      "retired": [],
+      "rounds": 1,
+      "version": 1
+    },
+    "classes": [
+      {
+        "class_id": "56a415b6",
+        "first_round": 1,
+        "invariant": "The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes.",
+        "matches": [],
+        "procedure": "During plan review, trace the proposed acceptance command through generation, validation, replay, and publication. Verify that every input and output is named, success requires zero-exit executable checks, the permitted-write boundary matches the commands, and every preflight, provider, persistence, audit, validation, test, or write failure blocks publication without accepting a stale or partial artifact.",
+        "severity": "BLOCKER",
+        "status": "open"
+      },
+      {
+        "class_id": "940b7e9c",
+        "first_round": 1,
+        "invariant": "The plan requires the reviewed and executed repository snapshot to be completely identified and equal to the recorded revision or immutable materialization, including every tracked byte and runtime-loaded project dependency relevant to the acceptance run.",
+        "matches": [],
+        "procedure": "During plan review, require either execution from a clean immutable materialization of the recorded full tree or an executable preflight that rejects every relevant tracked difference and validates all runtime-loaded project modules. The plan must define the snapshot identity, generated-output exception if any, pre-spend rejection behavior, and evidence used by both generation and replay.",
+        "severity": "BLOCKER",
+        "status": "open"
+      },
+      {
+        "class_id": "71dcba3e",
+        "first_round": 1,
+        "invariant": "The plan specifies an independent, schema-valid acceptance projection for all promised durable claim and structural review state and requires canonical output to be rederived from reloaded persistence rather than trusted from the original response or an augmented audit.",
+        "matches": [],
+        "procedure": "During plan review, verify that the named validator reloads lineage, applies production persisted-state validation, checks nonempty claim and review state for the recorded stakes and snapshot, reconciles round, phase, classes, debt, and settlement with an unmodified original audit, rerenders the canonical trailer, and requires exact equality with both audit and returned suffix. Require independent negative mutations of each durable-state component and fail-closed handling.",
+        "severity": "BLOCKER",
+        "status": "open"
+      },
+      {
+        "class_id": "66034e39",
+        "first_round": 1,
+        "invariant": "The plan requires a closed, independently verifiable provider-route record that binds the real Codex engine, executable, CLI version, model, effort, web setting, audit identity, and every attempt identity to the immutable accepted artifact.",
+        "matches": [],
+        "procedure": "During plan review, require generation-time telemetry for the actual provider invocation and a replay validator that rejects missing, empty, inconsistent, or edited route fields. The validator must compare the provider record with audit and per-attempt identities and bind replay to immutable artifact bytes; provider-route ambiguity must fail closed.",
+        "severity": "BLOCKER",
+        "status": "open"
+      },
+      {
+        "class_id": "080cd8c2",
+        "first_round": 1,
+        "invariant": "The plan defines the exact provider-role graph and a closed per-attempt ledger contract that accounts for every admitted provider call and validation retry once, in order, with complete bounded telemetry.",
+        "matches": [],
+        "procedure": "During plan review, enumerate required roles and permitted same-session retry pairings; require unique ordered sequences, completed outcomes, positive integer requested timeouts, nonnegative durations, integer return codes, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Require independent call counting, reconciliation with trailer totals, mutation tests, and fail-closed rejection of missing, duplicate, malformed, reordered, impossible, oversized, or orphaned rows.",
+        "severity": "BLOCKER",
+        "status": "open"
+      },
+      {
+        "class_id": "58f1282e",
+        "first_round": 1,
+        "invariant": "When a plan relies on a retained repository artifact as acceptance evidence, it binds the final replay to the exact committed artifact blob and committed executable sources, and absence or byte divergence is a hard failure rather than a skip.",
+        "matches": [],
+        "procedure": "During plan review, require a two-stage lifecycle: commit and identify executable sources, generate and semantically validate the artifact, commit the artifact, then replay the exact committed blob while comparing it with working bytes. Verify that the shipping gate fails closed on an absent artifact, absent commit binding, byte mismatch, skipped replay, or nonzero replay.",
+        "severity": "MAJOR",
+        "status": "open"
+      },
+      {
+        "class_id": "1d0fb9f7",
+        "first_round": 1,
+        "invariant": "A plan that publishes acceptance evidence defines a closed, bounded public projection containing only fields necessary for its assertions, while full private audit and lineage data remain outside the published artifact.",
+        "matches": [],
+        "procedure": "During plan review, enumerate the permitted public fields, digest and excerpt representations, explicit size and privacy bounds, and the private retention location. Require the named validator to reject additional full audit or lineage payloads, unbounded excerpts, or fields outside the projection.",
+        "severity": "MINOR",
+        "status": "open"
+      }
+    ],
+    "debt": null,
+    "exemptions": [],
+    "lineage_id": "issues-81-83-real-plan-acceptance",
+    "mode": "plan",
+    "next_seq": 8,
+    "review_state": {
+      "correction_control": {
+        "classes": {
+          "080cd8c2": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "1d0fb9f7": {
+            "last_session_ref": null,
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "56a415b6": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "58f1282e": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "66034e39": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "71dcba3e": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          },
+          "940b7e9c": {
+            "last_session_ref": "01a0520c-af0f-72b0-91f9-f2755e555117",
+            "reopen_count": 0,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
+      "debt": [
+        {
+          "class_ids": [
+            "56a415b6"
+          ],
+          "evidence": [
+            "plan:5-7",
+            "plan:9-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-192",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/AGENTS.md:234-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-21",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:136-138",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-191",
+            "plan:5-13",
+            "repository/AGENTS.md:233-238",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:134-193",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:21-22",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:187-190"
+          ],
+          "finding_id": "governing:acceptance-contract",
+          "first_round": 1,
+          "id": "D1",
+          "last_round": 1,
+          "remedy": "Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains blocking and publishes no accepted stale or partial replacement; require atomic replacement and synchronize the duplicated plan constant.",
+          "severity": "BLOCKER",
+          "source_ids": [
+            "domain:domain-001",
+            "execution:F1",
+            "execution:F2",
+            "integrity:INT-001",
+            "integrity:INT-005"
+          ],
+          "status": "open",
+          "summary": "The plan does not bind a consistent, executable, authorized, and fail-closed acceptance-artifact lifecycle."
+        },
+        {
+          "class_ids": [
+            "940b7e9c"
+          ],
+          "evidence": [
+            "plan:5-7",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:17-31",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:81-89",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-155",
+            "plan:5-5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-31",
+            "repository/src/paranoia_local/handlers.py:28-34",
+            "plan:5",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:23-30",
+            "repository/src/paranoia_local/orientation.py:72-103"
+          ],
+          "finding_id": "governing:snapshot-binding",
+          "first_round": 1,
+          "id": "D2",
+          "last_round": 1,
+          "remedy": "Require generation from an inert clean materialization of the recorded commit, or define an executable full-tree preflight that rejects every tracked difference except a narrowly specified generated-output exception and validates every runtime-loaded project module. Record and replay-check the complete snapshot identity, and reject any source or snapshot mismatch before provider spend or publication.",
+          "severity": "BLOCKER",
+          "source_ids": [
+            "domain:domain-002",
+            "execution:F3",
+            "integrity:INT-003"
+          ],
+          "status": "open",
+          "summary": "The proposed probe can attribute results from unbound working-tree and runtime bytes to the recorded repository revision."
+        },
+        {
+          "class_ids": [
+            "71dcba3e"
+          ],
+          "evidence": [
+            "plan:11-12",
+            "repository/src/paranoia_local/class_closure.py:327-329",
+            "repository/src/paranoia_local/class_closure.py:446-460",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:121-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-180",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:118-125",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:160-166",
+            "repository/docs/how-it-works.md:216-228",
+            "plan:11-13",
+            "repository/src/paranoia_local/handlers.py:2867-2874"
+          ],
+          "finding_id": "governing:durable-state-oracle",
+          "first_round": 1,
+          "id": "D3",
+          "last_round": 1,
+          "remedy": "Define a closed validator projection for both reloaded `claim_state` and nonempty schema-valid `review_state`, including stakes, snapshot, round, phase, classes, debt, and persistence status. Preserve the original audit unchanged, compare it with a server-owned persisted-state projection, rerender the canonical trailer from reloaded lineage, and require exact equality with the audit trailer and returned suffix. Retain the independent claim-state comparison and add mutations that independently corrupt each durable-state component.",
+          "severity": "BLOCKER",
+          "source_ids": [
+            "domain:domain-003",
+            "execution:F4",
+            "integrity:INT-002"
+          ],
+          "status": "open",
+          "summary": "The acceptance oracle can pass without independently proving the promised durable claim and structural state or its rendered trailer."
+        },
+        {
+          "class_ids": [
+            "66034e39"
+          ],
+          "evidence": [
+            "plan:11",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-131",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-177",
+            "repository/src/paranoia_local/handlers.py:1990-2010",
+            "plan:11-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:68-96",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:150-176"
+          ],
+          "finding_id": "governing:provider-route-proof",
+          "first_round": 1,
+          "id": "D4",
+          "last_round": 1,
+          "remedy": "Require a closed provider record with `engine: codex`, the exact executable, a nonempty compatible CLI version, and the intended model, effort, and web settings. Require `audit.engine` and every provider attempt's engine and route identity to agree with it, retain actual invocation telemetry, bind replay to immutable artifact bytes, and add mutations proving that altered or missing provider, executable, version, model, effort, web, audit-engine, or attempt-route fields fail.",
+          "severity": "BLOCKER",
+          "source_ids": [
+            "domain:domain-004",
+            "execution:F6"
+          ],
+          "status": "open",
+          "summary": "The retained evidence does not prove that the recorded round used the intended real Codex provider route."
+        },
+        {
+          "class_ids": [
+            "080cd8c2"
+          ],
+          "evidence": [
+            "plan:12-13",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:97-117",
+            "repository/src/paranoia_local/staged_protocol.py:26-29",
+            "repository/src/paranoia_local/handlers.py:1428-1476",
+            "repository/src/paranoia_local/handlers.py:1563-1605",
+            "repository/src/paranoia_local/handlers.py:316-350",
+            "repository/docs/how-it-works.md:28-36",
+            "repository/AGENTS.md:318-324",
+            "plan:11-13",
+            "repository/AGENTS.md:523-524",
+            "repository/tests/test_plan_claims.py:153-169"
+          ],
+          "finding_id": "governing:attempt-ledger-completeness",
+          "first_round": 1,
+          "id": "D5",
+          "last_round": 1,
+          "remedy": "Define the exact fresh-round role graph—claim discovery, all three census lanes, consolidation, and only properly paired same-session validation retries—and a closed per-attempt schema. Independently count admitted provider calls and require one unique ordered completed row per call, with positive integer timeout, nonnegative duration, integer return code, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Reconcile trailer counts and add removal, duplication, mutation, oversize, orphaning, and reordering tests.",
+          "severity": "BLOCKER",
+          "source_ids": [
+            "domain:domain-005",
+            "execution:F5",
+            "integrity:INT-004"
+          ],
+          "status": "open",
+          "summary": "The acceptance oracle can clear an incomplete, malformed, reordered, or unreconciled provider-attempt ledger."
+        },
+        {
+          "class_ids": [
+            "58f1282e"
+          ],
+          "evidence": [
+            "repository/AGENTS.md:523-525",
+            "repository/tests/test_plan_claims.py:27-39",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:139-145",
+            "repository/scripts/run_plan_review_reliability_acceptance.py:167-191"
+          ],
+          "finding_id": "governing:committed-artifact-binding",
+          "first_round": 1,
+          "id": "D6",
+          "last_round": 1,
+          "remedy": "Specify a two-stage lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, and then run a mandatory replay against the exact committed blob while comparing it with working bytes. Make the shipping gate fail on an absent dated artifact, absent committed binding, byte mismatch, skipped replay, or nonzero result.",
+          "severity": "MAJOR",
+          "source_ids": [
+            "execution:F7"
+          ],
+          "status": "open",
+          "summary": "The retained acceptance evidence is not bound to the exact committed artifact blob consumed by the shipping replay."
+        }
+      ],
+      "last_round": 1,
+      "phase": "correction",
+      "snapshot_digest": "c6e0b5c3dab0a5f465f27c541a549a1318b5d75981b96f87d072f8c779a59e20",
+      "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
+      "stakes_digest": "7b1ddeab10333f8defc18c76cfb7901864ec34808d15832956a0e52db0ccd5fa",
+      "version": 1
+    },
+    "rounds": 1
+  },
+  "plan": "# Plan-review reliability acceptance\n\n## Scope\n\nExercise the current public `critique_plan` handler against this repository snapshot. The run is\nan acceptance probe only: it does not authorize repository edits or claim that a single review\nproves future provider behavior.\n\n## Acceptance\n\nThe handler must complete a real Codex provider round, persist its claim and structural state,\nrender the same durable trailer recorded in its audit log, and retain every provider attempt with\nits role, outcome, requested timeout, duration, return code, and bounded channel digests.\n",
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "executable": "/home/andy/.local/bin/codex",
+    "model": "gpt-5.6-sol",
+    "web_search": true
+  },
+  "result_sha256": "ed3fdf4693f2b0efbd02572ac7aa3ff93af3d9478d12397b12cc21034be6db68",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [BLOCKER] The plan does not bind a consistent, executable, authorized, and fail-closed acceptance-artifact lifecycle. [classes: 56a415b6] (plan:5-7, plan:9-13, repository/scripts/run_plan_review_reliability_acceptance.py:21-31, repository/scripts/run_plan_review_reliability_acceptance.py:134-192, repository/tests/test_plan_claims.py:27-39, repository/AGENTS.md:234-238, repository/scripts/run_plan_review_reliability_acceptance.py:21-21, repository/scripts/run_plan_review_reliability_acceptance.py:136-138, repository/scripts/run_plan_review_reliability_acceptance.py:187-191, plan:5-13, repository/AGENTS.md:233-238, repository/scripts/run_plan_review_reliability_acceptance.py:134-193, repository/scripts/run_plan_review_reliability_acceptance.py:21-22, repository/scripts/run_plan_review_reliability_acceptance.py:187-190)\n- [BLOCKER] The proposed probe can attribute results from unbound working-tree and runtime bytes to the recorded repository revision. [classes: 940b7e9c] (plan:5-7, repository/scripts/run_plan_review_reliability_acceptance.py:17-31, repository/scripts/run_plan_review_reliability_acceptance.py:81-89, repository/scripts/run_plan_review_reliability_acceptance.py:139-155, plan:5-5, repository/scripts/run_plan_review_reliability_acceptance.py:23-31, repository/src/paranoia_local/handlers.py:28-34, plan:5, repository/scripts/run_plan_review_reliability_acceptance.py:23-30, repository/src/paranoia_local/orientation.py:72-103)\n- [BLOCKER] The acceptance oracle can pass without independently proving the promised durable claim and structural state or its rendered trailer. [classes: 71dcba3e] (plan:11-12, repository/src/paranoia_local/class_closure.py:327-329, repository/src/paranoia_local/class_closure.py:446-460, repository/scripts/run_plan_review_reliability_acceptance.py:121-125, repository/scripts/run_plan_review_reliability_acceptance.py:160-180, repository/scripts/run_plan_review_reliability_acceptance.py:118-125, repository/scripts/run_plan_review_reliability_acceptance.py:160-166, repository/docs/how-it-works.md:216-228, plan:11-13, repository/src/paranoia_local/handlers.py:2867-2874)\n- [BLOCKER] The retained evidence does not prove that the recorded round used the intended real Codex provider route. [classes: 66034e39] (plan:11, repository/scripts/run_plan_review_reliability_acceptance.py:68-131, repository/scripts/run_plan_review_reliability_acceptance.py:150-177, repository/src/paranoia_local/handlers.py:1990-2010, plan:11-13, repository/scripts/run_plan_review_reliability_acceptance.py:68-96, repository/scripts/run_plan_review_reliability_acceptance.py:150-176)\n- [BLOCKER] The acceptance oracle can clear an incomplete, malformed, reordered, or unreconciled provider-attempt ledger. [classes: 080cd8c2] (plan:12-13, repository/scripts/run_plan_review_reliability_acceptance.py:97-117, repository/src/paranoia_local/staged_protocol.py:26-29, repository/src/paranoia_local/handlers.py:1428-1476, repository/src/paranoia_local/handlers.py:1563-1605, repository/src/paranoia_local/handlers.py:316-350, repository/docs/how-it-works.md:28-36, repository/AGENTS.md:318-324, plan:11-13, repository/AGENTS.md:523-524, repository/tests/test_plan_claims.py:153-169)\n- [MAJOR] The retained acceptance evidence is not bound to the exact committed artifact blob consumed by the shipping replay. [classes: 58f1282e] (repository/AGENTS.md:523-525, repository/tests/test_plan_claims.py:27-39, repository/scripts/run_plan_review_reliability_acceptance.py:139-145, repository/scripts/run_plan_review_reliability_acceptance.py:167-191)\n- [MINOR] The proposed repository artifact publishes a complete augmented audit instead of a closed, bounded acceptance projection. (repository/README.md:385-393, repository/scripts/run_plan_review_reliability_acceptance.py:156-180, plan:12-13)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [BLOCKER] Amend the plan to name `scripts/run_plan_review_reliability_acceptance.py`, its exact invocation and fixed plan/stakes/lineage inputs, Codex prerequisites, the sole permitted output `docs/plan_review_reliability_acceptance_2026-08-30.json`, its validator, and the mandatory focused replay command. Require zero exits and artifact presence for success. State that any preflight, provider, persistence, audit, reload, validation, test skip/failure, or write failure remains blocking and publishes no accepted stale or partial replacement; require atomic replacement and synchronize the duplicated plan constant.\n- [BLOCKER] Require generation from an inert clean materialization of the recorded commit, or define an executable full-tree preflight that rejects every tracked difference except a narrowly specified generated-output exception and validates every runtime-loaded project module. Record and replay-check the complete snapshot identity, and reject any source or snapshot mismatch before provider spend or publication.\n- [BLOCKER] Define a closed validator projection for both reloaded `claim_state` and nonempty schema-valid `review_state`, including stakes, snapshot, round, phase, classes, debt, and persistence status. Preserve the original audit unchanged, compare it with a server-owned persisted-state projection, rerender the canonical trailer from reloaded lineage, and require exact equality with the audit trailer and returned suffix. Retain the independent claim-state comparison and add mutations that independently corrupt each durable-state component.\n- [BLOCKER] Require a closed provider record with `engine: codex`, the exact executable, a nonempty compatible CLI version, and the intended model, effort, and web settings. Require `audit.engine` and every provider attempt's engine and route identity to agree with it, retain actual invocation telemetry, bind replay to immutable artifact bytes, and add mutations proving that altered or missing provider, executable, version, model, effort, web, audit-engine, or attempt-route fields fail.\n- [BLOCKER] Define the exact fresh-round role graph—claim discovery, all three census lanes, consolidation, and only properly paired same-session validation retries—and a closed per-attempt schema. Independently count admitted provider calls and require one unique ordered completed row per call, with positive integer timeout, nonnegative duration, integer return code, lowercase 64-hex digests, and bounded response, raw, failure-detail, and stderr excerpts. Reconcile trailer counts and add removal, duplication, mutation, oversize, orphaning, and reordering tests.\n- [MAJOR] Specify a two-stage lifecycle: commit and bind the executable sources, generate and semantically validate the artifact, commit the artifact, and then run a mandatory replay against the exact committed blob while comparing it with working bytes. Make the shipping gate fail on an absent dated artifact, absent committed binding, byte mismatch, skipped replay, or nonzero result.\n- [MINOR] Define and validate a closed, bounded repository projection containing only fields required by the acceptance assertions, exact digests, and bounded excerpts. Keep the complete audit and lineage only in the private temporary or local audit location, document the privacy and size boundary, and reject extra or unbounded published fields.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a0520c-af0f-72b0-91f9-f2755e555117` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nCLAIM-REGISTER: 0 active external claims; 0 retired and excluded from active inventory\nCLAIM-CLOSURE: 0 supported, 0 refuted, 0 unverified\nLINEAGE: issues-81-83-real-plan-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed — NEW 56a415b6, NEW 940b7e9c, NEW 71dcba3e, NEW 66034e39, NEW 080cd8c2, NEW 58f1282e, NEW 1d0fb9f7\nCLASS-CLOSURE: 7 open, 0 closed, 0 surviving matches, 0 exempt, 7 unmechanized\n  080cd8c2 The plan defines the exact provider-role graph and a closed per-attempt ledger contract that accounts for every admitted provider call and validation retry once, in order, with complete bounded telemetry. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  56a415b6 The plan names the exact acceptance entry point, fixed inputs, permitted output, validator, replay command, executable success evidence, and fail-closed publication behavior; its write boundary is internally consistent and authorizes every required artifact and no unintended repository changes. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  58f1282e When a plan relies on a retained repository artifact as acceptance evidence, it binds the final replay to the exact committed artifact blob and committed executable sources, and absence or byte divergence is a hard failure rather than a skip. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  66034e39 The plan requires a closed, independently verifiable provider-route record that binds the real Codex engine, executable, CLI version, model, effort, web setting, audit identity, and every attempt identity to the immutable accepted artifact. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  71dcba3e The plan specifies an independent, schema-valid acceptance projection for all promised durable claim and structural review state and requires canonical output to be rederived from reloaded persistence rather than trusted from the original response or an augmented audit. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  940b7e9c The plan requires the reviewed and executed repository snapshot to be completely identified and equal to the recorded revision or immutable materialization, including every tracked byte and runtime-loaded project dependency relevant to the acceptance run. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 6 blocking open\nSTRUCTURAL-CONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0\nCONVERGENCE: BLOCKED — structural closure remains open.\nREVIEW-ATTEMPTS: total=5 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "source_revision": "3cab970e55f5a730598113500d0a07581eeb4f35",
+  "source_sha256": {
+    "AGENTS.md": "efeda253acf58440dced97b3884be64d37fcd5ddde566ef8fb0ef7e85ecd09eb",
+    "README.md": "a7f3cbcfd9b5030e1722dad79ea26d733f54958536a5edb327b5c1811554c417",
+    "docs/tool-reference.md": "74e3a38306839716472b2f684f3dc0972d62a2ea75b77560b9dc88fcb4f0c59a",
+    "scripts/run_plan_review_reliability_acceptance.py": "01084c340f986a8cad2e6606d3f8b40957c845baaad69ad189f330e097d7139d",
+    "src/paranoia_local/handlers.py": "42f96c77effc160ba5fa70073368a00e4ffdd4e68b693e25500762b516aae361",
+    "src/paranoia_local/plan_claims.py": "42400d34e5bb3a6c99ba0f2a2eb0aae246dc72e5a8913b12202205483c90feea",
+    "src/paranoia_local/prompts.py": "d33a7c3c1089fc6d599975c7e1f9d2b9064b5577313e7b066d69f22ce318a030",
+    "src/paranoia_local/review_census.py": "7ba85fe84e8d3daeb4a1359169e6925812a780ad01bb371de853356cf3ef5b84",
+    "src/paranoia_local/staged_protocol.py": "25ba178c42241e9f20f5e069a6a25ee3297a020e627f97364492029b87e5a38a",
+    "tests/test_plan_claims.py": "faaedac8e061ed3cc268b9ab909f5861538560e081e588a663907f221885b127",
+    "tests/test_prompts.py": "5e0b9138178f92e2287d16e01401c745f4d9f369aae120ce6833e12705331f9a",
+    "tests/test_review_census.py": "519cbc5a462b5cb74df770d74fb03d8c3900639383495d34c08a70659af556a5",
+    "tests/test_staged_protocol.py": "f2680d229bc21009bfd91554e173c62a9dd652ec32bfcd02f043fa0166cef6ce"
+  },
+  "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
+  "version": 1
+}
