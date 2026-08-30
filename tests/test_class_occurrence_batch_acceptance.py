@@ -26,7 +26,7 @@ def test_class_occurrence_batch_acceptance_is_source_and_route_bound() -> None:
     "prompt_digest", "response", "response_digest", "call_route", "call_session",
     "ledger", "outcome", "role", "attempt_engine", "attempt_sequence",
     "attempt_timeout", "attempt_returncode", "retry", "fixture", "fixture_anchor",
-    "fixture_base", "version", "date", "lineage_id", "stakes", "before_rounds",
+    "fixture_base", "version", "date", "source_revision", "lineage_id", "stakes", "before_rounds",
     "before_next_seq", "before_class", "before_state", "settlement", "lineage",
     "after_rounds", "after_next_seq", "after_class", "after_state", "trailer",
     "result", "engine_source",
@@ -88,6 +88,8 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
         artifact["version"] = 2
     elif field == "date":
         artifact["date"] = "2026-08-29"
+    elif field == "source_revision":
+        artifact["source_revision"] = "f" * 40
     elif field == "lineage_id":
         artifact["lineage_id"] = "different-lineage"
     elif field == "stakes":
@@ -121,3 +123,54 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
         artifact["source_sha256"]["src/paranoia_local/engines.py"] = "0" * 64
     with pytest.raises(ValueError):
         acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+def test_every_retained_lineage_leaf_is_independently_reconciled() -> None:
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "class_occurrence_batch_acceptance_lineage_leaves",
+        root / "scripts/run_class_occurrence_batch_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    original = json.loads(
+        (root / "docs/class_occurrence_batch_acceptance_2026-08-30.json").read_text(
+            encoding="utf-8",
+        )
+    )
+
+    def leaves(value, path=()):
+        if isinstance(value, dict) and value:
+            for key, child in value.items():
+                yield from leaves(child, (*path, key))
+        elif isinstance(value, list) and value:
+            for index, child in enumerate(value):
+                yield from leaves(child, (*path, index))
+        else:
+            yield path
+
+    def mutate(value):
+        if isinstance(value, bool):
+            return not value
+        if isinstance(value, int):
+            return value + 1
+        if isinstance(value, str):
+            return value + " changed"
+        if value is None:
+            return "changed"
+        if isinstance(value, list):
+            return ["changed"]
+        if isinstance(value, dict):
+            return {"changed":True}
+        raise AssertionError(f"unsupported leaf {value!r}")
+
+    for envelope in ("before_lineage", "after_lineage"):
+        for path in leaves(original[envelope]):
+            artifact = deepcopy(original)
+            target = artifact[envelope]
+            for item in path[:-1]:
+                target = target[item]
+            target[path[-1]] = mutate(target[path[-1]])
+            with pytest.raises(ValueError, match="lineage|before-lineage"):
+                acceptance.validate_artifact(artifact, root, require_committed=False)

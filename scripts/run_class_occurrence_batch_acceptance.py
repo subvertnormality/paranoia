@@ -136,6 +136,20 @@ def validate_artifact(
     revision = artifact["source_revision"]
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
+    try:
+        resolved_revision = _git("rev-parse", f"{revision}^{{commit}}", cwd=root)
+    except subprocess.CalledProcessError as exc:
+        raise ValueError("source revision does not resolve to a commit") from exc
+    if resolved_revision != revision:
+        raise ValueError("source revision is not canonical")
+    if require_committed:
+        artifact_commit = _git(
+            "log", "-1", "--format=%H", "--", str(OUTPUT.relative_to(root)), cwd=root,
+        )
+        if _git("rev-parse", f"{artifact_commit}^{{commit}}", cwd=root) != artifact_commit:
+            raise ValueError("artifact commit identity is invalid")
+        if _git("rev-parse", f"{artifact_commit}^", cwd=root) != revision:
+            raise ValueError("source revision is not the artifact generation boundary")
     if set(artifact["source_sha256"]) != set(SOURCES):
         raise ValueError("source inventory is not exact")
     for relative, expected_sha in artifact["source_sha256"].items():
@@ -226,36 +240,6 @@ def validate_artifact(
     after = artifact["after_lineage"]
     if set(after) != {"rounds", "next_seq", "classes", "review_state"}:
         raise ValueError("after-lineage envelope is not closed and exact")
-    replayed_state = rc.settle_state(
-        before["review_state"], settlement, phase="correction",
-        snapshot=after["review_state"]["snapshot_digest"], round_no=2,
-    )
-    for debt in replayed_state["debt"]:
-        debt.pop("class_record_indexes", None)
-    tracked = [cc.TrackedClass(**row) for row in active]
-    replayed_lineage = cc.Lineage(
-        artifact["lineage_id"], rounds=before["rounds"],
-        next_seq=before["next_seq"], classes={row.class_id:row for row in tracked},
-        mode=cc.BRANCH_MODE, review_state=replayed_state,
-    )
-    cc.apply_register(
-        replayed_lineage,
-        rc.register_from_records(settlement["class_records"], mechanized=None),
-        round_no=2,
-    )
-    replayed_lineage.rounds += 1
-    replayed_state["correction_control"] = rc.advance_correction_control(
-        rc.normalize_correction_control(before["review_state"], tracked),
-        after=replayed_lineage, round_no=2, phase="correction",
-        session_ref=calls[-1]["session_ref"],
-    )
-    replayed_after = {
-        "rounds":replayed_lineage.rounds, "next_seq":replayed_lineage.next_seq,
-        "classes":[vars(row) for row in replayed_lineage.classes.values()],
-        "review_state":replayed_state,
-    }
-    if json.loads(json.dumps(replayed_after)) != json.loads(json.dumps(after)):
-        raise ValueError("settlement does not replay to complete durable lineage")
     debts = after["review_state"]["debt"]
     historic = next(row for row in debts if row["id"] == "D1")
     fresh = next(row for row in debts if row["id"] != "D1")
@@ -269,17 +253,6 @@ def validate_artifact(
         raise ValueError("result digest mismatch")
     if not isinstance(artifact["rendered_trailer"], str) or not artifact["rendered_trailer"]:
         raise ValueError("rendered trailer is absent")
-    footer = (
-        "\n\n---\n_paranoia-local · engine=codex · "
-        f"session_ref=`{calls[-1]['session_ref']}` — to dispute a finding, call `rebut` "
-        "with this session_ref and your counter-evidence._"
-    )
-    rerendered = (
-        rc.render_review(settlement, replayed_state) + footer + "\n\n"
-        + artifact["rendered_trailer"]
-    )
-    if rerendered != artifact["result_text"]:
-        raise ValueError("settlement and durable state do not rerender the retained result")
     fixture = artifact["fixture"]
     if set(fixture) != {"base_id", "head_id", "base_files", "head_files", "expected_anchors"}:
         raise ValueError("fixture record is not closed and exact")
@@ -349,6 +322,9 @@ def validate_artifact(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
                 now=lambda:"REPLAY",
             )
+            durable = cc.load_lineage(
+                state_root, artifact["lineage_id"], stamp="REPLAYED", mode=cc.BRANCH_MODE,
+            )
         finally:
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
@@ -360,6 +336,24 @@ def validate_artifact(
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")
+        replayed_after = json.loads(json.dumps({
+            "rounds":durable.rounds, "next_seq":durable.next_seq,
+            "classes":[vars(row) for row in durable.classes.values()],
+            "review_state":durable.review_state,
+        }))
+        if replayed_after != after:
+            raise ValueError("public handler does not reproduce complete durable lineage")
+        footer = (
+            "\n\n---\n_paranoia-local · engine=codex · "
+            f"session_ref=`{calls[-1]['session_ref']}` — to dispute a finding, call `rebut` "
+            "with this session_ref and your counter-evidence._"
+        )
+        rerendered = (
+            rc.render_review(settlement, durable.review_state) + footer + "\n\n"
+            + artifact["rendered_trailer"]
+        )
+        if rerendered != artifact["result_text"]:
+            raise ValueError("replayed durable lineage does not rerender retained result")
 
 
 def _arguments(repo: Path) -> dict:
