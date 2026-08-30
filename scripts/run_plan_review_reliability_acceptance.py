@@ -120,6 +120,11 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
     )
 
     runtime = Path(tempfile.mkdtemp(prefix="paranoia-predecessor-preflight-"))
+    repo_copy = runtime / "repository"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", str(root), str(repo_copy)],
+        check=True,
+    )
     state_root = runtime / "state"
     log_root = runtime / "logs"
     old_default = cc.default_state_root
@@ -173,7 +178,7 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             claim_state=claim_state,
         ))
         result = handlers.critique_plan({
-            "repo_path":str(root), "plan_text":"# Plan\n",
+            "repo_path":str(repo_copy), "plan_text":"# Plan\n",
             "lineage":"predecessor-preflight-acceptance", "round":2, "stakes":"s",
         }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "PREFLIGHT")
         audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
@@ -210,7 +215,7 @@ def _deterministic_checks(root: Path = ROOT) -> dict:
             claim_state=changed_claim_state,
         ))
         changed_result = handlers.critique_plan({
-            "repo_path":str(root), "plan_text":"# Changed plan\n",
+            "repo_path":str(repo_copy), "plan_text":"# Changed plan\n",
             "lineage":"changed-plan-preflight-acceptance", "round":2, "stakes":"s",
         }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "CHANGED")
         changed_audit = json.loads(
