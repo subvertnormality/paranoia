@@ -22,7 +22,8 @@ def test_class_occurrence_batch_acceptance_is_source_and_route_bound() -> None:
 
 
 @pytest.mark.parametrize("field", [
-    "provider", "provider_effort", "provider_web", "provider_cli", "prompt",
+    "provider", "provider_effort", "provider_web", "provider_cli",
+    "provider_compatible_cli", "prompt",
     "prompt_digest", "response", "response_digest", "call_route", "call_session",
     "ledger", "outcome", "role", "attempt_engine", "attempt_sequence",
     "attempt_timeout", "attempt_returncode", "retry", "fixture", "fixture_anchor",
@@ -49,7 +50,9 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
     elif field == "provider_web":
         artifact["provider"]["web_search"] = True
     elif field == "provider_cli":
-        artifact["provider"]["cli_version"] = "codex-cli 0.1.0"
+        artifact["provider"]["minimum_cli_version"] = "0.1.0"
+    elif field == "provider_compatible_cli":
+        artifact["provider"]["minimum_cli_version"] = "0.144.7"
     elif field == "prompt":
         artifact["calls"][-1]["prompt_text"] += " changed"
     elif field == "prompt_digest":

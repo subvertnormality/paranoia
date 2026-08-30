@@ -162,17 +162,16 @@ def validate_artifact(
         if (root / relative).read_bytes() != historical:
             raise ValueError(f"current source differs from acceptance for {relative}")
     provider = artifact["provider"]
-    if set(provider) != {"engine", "model", "effort", "web_search", "cli_version"}:
+    if set(provider) != {
+        "engine", "model", "effort", "web_search", "minimum_cli_version",
+    }:
         raise ValueError("provider record is not closed and exact")
+    minimum_cli_version = ".".join(str(part) for part in engines.MIN_CODEX_VERSION)
     if provider != {
         "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
-        "web_search":False, "cli_version":provider["cli_version"],
+        "web_search":False, "minimum_cli_version":minimum_cli_version,
     }:
         raise ValueError("acceptance did not use the required Codex route")
-    import re
-    match = re.fullmatch(r"codex-cli (\d+)\.(\d+)\.(\d+)(?:\+[0-9A-Za-z.-]+)?", provider["cli_version"])
-    if not match or tuple(map(int, match.groups()[:3])) < engines.MIN_CODEX_VERSION:
-        raise ValueError("provider CLI identity is absent or incompatible")
     calls = artifact["calls"]
     if not isinstance(calls, list) or len(calls) not in {1, 2}:
         raise ValueError("acceptance must retain one call and at most one validation retry")
@@ -439,9 +438,9 @@ def main() -> int:
             "provider":{
                 "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
                 "web_search":False,
-                "cli_version":subprocess.run(
-                    ["codex", "--version"], check=True, capture_output=True, text=True,
-                ).stdout.strip(),
+                "minimum_cli_version":".".join(
+                    str(part) for part in engines.MIN_CODEX_VERSION
+                ),
             },
             "fixture":{
                 "base_id":_git("rev-parse", "main^{commit}", cwd=repo),
