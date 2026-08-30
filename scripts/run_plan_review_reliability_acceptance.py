@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,30 @@ def _sha_bytes(value: bytes) -> str:
 
 def _sha_text(value: str) -> str:
     return _sha_bytes(value.encode("utf-8", "surrogatepass"))
+
+
+def _recorded_deterministic_checks(root: Path, revision: str) -> dict:
+    """Execute the validation helper from the exact recorded Git snapshot."""
+    with tempfile.TemporaryDirectory(prefix="paranoia-recorded-validation-") as raw:
+        checkout = Path(raw) / "repository"
+        subprocess.run(
+            ["git", "clone", "-q", "--no-hardlinks", str(root), str(checkout)],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "-q", "--detach", revision], cwd=checkout,
+            check=True,
+        )
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(checkout / "scripts/run_plan_review_reliability_acceptance.py"),
+                "--deterministic-checks-only",
+            ],
+            cwd=checkout, check=True, capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH":str(checkout / "src")},
+        )
+        return json.loads(completed.stdout)
 
 
 def _deterministic_checks(root: Path = ROOT) -> dict:
@@ -340,7 +365,9 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
             raise ValueError(
                 f"validation source is not bound to the accepted source snapshot: {relative}"
             )
-    if validation["checks"] != _deterministic_checks(root):
+    if validation["checks"] != _recorded_deterministic_checks(
+        root, validation_revision,
+    ):
         raise ValueError("deterministic lifecycle checks differ from the retained acceptance")
     if value["plan"] != PLAN or value["stakes"] != STAKES:
         raise ValueError("acceptance input changed")
@@ -392,7 +419,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=ARTIFACT)
     parser.add_argument("--augment-existing", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--deterministic-checks-only", action="store_true")
     args = parser.parse_args()
+    if args.deterministic_checks_only:
+        print(json.dumps(_deterministic_checks(ROOT), sort_keys=True))
+        return 0
     if args.validate_only:
         validate_artifact(
             json.loads(args.output.read_text(encoding="utf-8")), ROOT
