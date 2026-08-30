@@ -254,7 +254,7 @@ def validate_artifact(
         "classes":[vars(row) for row in replayed_lineage.classes.values()],
         "review_state":replayed_state,
     }
-    if replayed_after != after:
+    if json.loads(json.dumps(replayed_after)) != json.loads(json.dumps(after)):
         raise ValueError("settlement does not replay to complete durable lineage")
     debts = after["review_state"]["debt"]
     historic = next(row for row in debts if row["id"] == "D1")
