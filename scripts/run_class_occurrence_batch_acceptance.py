@@ -341,7 +341,7 @@ def validate_artifact(
             "classes":[vars(row) for row in durable.classes.values()],
             "review_state":durable.review_state,
         }))
-        if replayed_after != after:
+        if replayed_after != json.loads(json.dumps(after)):
             raise ValueError("public handler does not reproduce complete durable lineage")
         footer = (
             "\n\n---\n_paranoia-local · engine=codex · "
