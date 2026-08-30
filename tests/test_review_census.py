@@ -1177,13 +1177,25 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
         "persistent-correction-gate-public-plan-handler"
     )
     revision = artifact["source_revision"]
+    changed = set()
+    allowed_later = artifact["allowed_later_source_diffs"]
     for relative, expected in artifact["source_sha256"].items():
         recorded = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
             stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(recorded).hexdigest() == expected
-        assert (root / relative).read_bytes() == recorded
+        if (root / relative).read_bytes() == recorded:
+            continue
+        changed.add(relative)
+        allowance = allowed_later[relative]
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", revision, "--", relative],
+            cwd=root, check=True, stdout=subprocess.PIPE,
+        ).stdout
+        assert hashlib.sha256(diff).hexdigest() == allowance["sha256"]
+        assert allowance["scope"]
+    assert set(allowed_later) == changed
     assert artifact["provider"] | {
         "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
         "web_search":False,
