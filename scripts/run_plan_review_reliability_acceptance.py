@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
-from paranoia_local import engines, handlers
+from paranoia_local import engines, handlers, plan_claims as pc, review_census as rc
+from paranoia_local import staged_protocol as sp
 
 
 ARTIFACT = ROOT / "docs/plan_review_reliability_acceptance_2026-08-30.json"
@@ -29,6 +30,7 @@ SOURCES = (
     "tests/test_review_census.py", "tests/test_staged_protocol.py",
     "scripts/run_plan_review_reliability_acceptance.py",
 )
+VALIDATION_SOURCES = ("scripts/run_plan_review_reliability_acceptance.py",)
 PLAN = """# Plan-review reliability acceptance
 
 ## Scope
@@ -65,15 +67,133 @@ def _sha_text(value: str) -> str:
     return _sha_bytes(value.encode("utf-8", "surrogatepass"))
 
 
+def _deterministic_checks(root: Path = ROOT) -> dict:
+    first = cc.TrackedClass(
+        "class-a", "first invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+    )
+    second = cc.TrackedClass(
+        "class-b", "second invariant", cc.MAJOR, 2, cc.OPEN, procedure="inspect",
+    )
+    control = rc.normalize_correction_control({
+        "last_round":7,
+        "correction_control":{"version":1, "classes":{"class-a":{
+            "reset_round":6, "reopen_count":2, "last_session_ref":"session-a",
+        }}},
+    }, [first, second])
+    decision = {
+        "role":"census",
+        "governing_findings":[{
+            "id":"G1", "severity":"MAJOR", "summary":"co-asserting defect",
+            "evidence":["plan:3"], "remedy":"repair every site",
+            "source_ids":["domain:F1", "execution:F2"],
+            "classification":{"kind":"one_off", "reason":"acceptance fixture"},
+        }],
+        "debt_outcomes":[], "class_actions":[],
+    }
+    materialized = sp.materialize_decision_value(
+        decision, mode=cc.PLAN_MODE, role="census",
+        source_ids=["domain:F1", "execution:F2"],
+        source_severities={"domain:F1":"MAJOR", "execution:F2":"MAJOR"},
+        source_evidence={
+            "domain:F1":["plan:1", "plan:2"],
+            "execution:F2":["plan:2", "plan:3"],
+        },
+    )
+
+    runtime = Path(tempfile.mkdtemp(prefix="paranoia-predecessor-preflight-"))
+    state_root = runtime / "state"
+    log_root = runtime / "logs"
+    old_default = cc.default_state_root
+    old_profile = engines.require_evidence_profile
+    old_git_profile = handlers.inert_git.require_supported_version
+    cc.default_state_root = lambda: state_root
+    engines.require_evidence_profile = lambda engine: None
+    handlers.inert_git.require_supported_version = lambda: None
+    try:
+        claim_state = pc.empty_state()
+        claim_state.update(
+            rounds=1, plan_snapshot="# Plan\n", plan_digest="old",
+            claims={
+                "old-refuted":{
+                    "claim_id":"old-refuted", "kind":"fact", "scope":"external",
+                    "anchor":"removed wording", "proposition":"old proposition",
+                    "verdict":"unverified", "replacement":None,
+                    "rationale":"stale old-writer remediation", "evidence":[],
+                },
+                "old-unverified":{
+                    "claim_id":"old-unverified", "kind":"behavior", "scope":"external",
+                    "anchor":"changed wording", "proposition":"another old proposition",
+                    "verdict":"unverified", "replacement":None,
+                    "rationale":"another stale remediation", "evidence":[],
+                },
+            },
+            debt=pc.AuditError(
+                "indexed binding passage is not in captured text", failure_phase="binding",
+            ).debt(1),
+        )
+        review_state = rc.normalize_state(None, stakes="s", snapshot="old")
+        review_state.update(
+            phase="correction", last_round=1,
+            debt=[{
+                "id":"D1", "finding_id":"F1", "status":"open",
+                "severity":cc.MAJOR, "summary":"historic occurrence",
+                "evidence":[], "remedy":"repair it", "source_ids":[],
+                "class_ids":["class-a"], "first_round":1, "last_round":1,
+            }],
+            correction_control={"version":1, "classes":{"class-a":{}}},
+        )
+        cc.save_lineage(state_root, cc.Lineage(
+            "predecessor-preflight-acceptance", mode=cc.PLAN_MODE, rounds=1,
+            classes={first.class_id:first}, review_state=review_state,
+            claim_state=claim_state,
+        ))
+        result = handlers.critique_plan({
+            "repo_path":str(root), "plan_text":"# Plan\n",
+            "lineage":"predecessor-preflight-acceptance", "round":2, "stakes":"s",
+        }, engine=engines.CodexEngine(), log_dir=log_root, now=lambda: "PREFLIGHT")
+        audit = json.loads(next(log_root.glob("*.json")).read_text(encoding="utf-8"))
+    finally:
+        cc.default_state_root = old_default
+        engines.require_evidence_profile = old_profile
+        handlers.inert_git.require_supported_version = old_git_profile
+    if (
+        "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows" not in result
+        or "predecessor claim rows are non-adjudicated history" not in result
+        or "last accepted inventory" in result
+        or "old-writer remediation" in result
+        or "another stale remediation" in result
+        or audit.get("attempt_ledger") != []
+        or audit.get("claim_last_accepted_counts") is not None
+        or audit.get("claim_nonadjudicated_count") != 2
+    ):
+        raise ValueError("public predecessor preflight is not non-adjudicated and zero-call")
+    return {
+        "correction_control":control,
+        "evidence_union":materialized["findings"][0]["evidence"],
+        "debt_evidence_union":materialized["debt"][0]["evidence"],
+        "predecessor_preflight":{
+            "result_sha256":_sha_text(result),
+            "rendered_trailer":audit["rendered_trailer"],
+            "claim_audit_failed":audit["claim_audit_failed"],
+            "claim_last_accepted_counts":audit["claim_last_accepted_counts"],
+            "claim_nonadjudicated_count":audit["claim_nonadjudicated_count"],
+            "provider_attempts":len(audit["attempt_ledger"]),
+        },
+    }
+
+
 def validate_artifact(value: dict, root: Path = ROOT) -> None:
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
         "provider", "plan", "stakes", "result_text", "result_sha256", "audit",
-        "durable_lineage", "assertions",
+        "durable_lineage", "assertions", "validation",
     }
     if set(value) != expected:
         raise ValueError("acceptance fields are not closed and exact")
-    if value["acceptance_kind"] != "plan-review-reliability-real-provider-v1":
+    if (
+        value["acceptance_kind"] != "plan-review-reliability-real-provider-v1"
+        or value["version"] != 2
+    ):
         raise ValueError("wrong acceptance kind")
     revision = value["source_revision"]
     if not isinstance(revision, str) or len(revision) != 40:
@@ -85,8 +205,27 @@ def validate_artifact(value: dict, root: Path = ROOT) -> None:
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
             stdout=subprocess.PIPE,
         ).stdout
-        if _sha_bytes(committed) != digest or (root / relative).read_bytes() != committed:
+        if _sha_bytes(committed) != digest:
             raise ValueError(f"source binding mismatch for {relative}")
+        if relative not in VALIDATION_SOURCES and (root / relative).read_bytes() != committed:
+            raise ValueError(f"current production source differs from real-route snapshot: {relative}")
+    validation = value["validation"]
+    if set(validation) != {"revision", "source_sha256", "checks"}:
+        raise ValueError("validation binding is not closed")
+    validation_revision = validation["revision"]
+    if not isinstance(validation_revision, str) or len(validation_revision) != 40:
+        raise ValueError("validation revision is not a full commit")
+    if set(validation["source_sha256"]) != set(VALIDATION_SOURCES):
+        raise ValueError("validation source inventory is not exact")
+    for relative, digest in validation["source_sha256"].items():
+        committed = subprocess.run(
+            ["git", "show", f"{validation_revision}:{relative}"], cwd=root,
+            check=True, stdout=subprocess.PIPE,
+        ).stdout
+        if _sha_bytes(committed) != digest or (root / relative).read_bytes() != committed:
+            raise ValueError(f"validation source binding mismatch for {relative}")
+    if validation["checks"] != _deterministic_checks(root):
+        raise ValueError("deterministic lifecycle checks differ from the retained acceptance")
     if value["plan"] != PLAN or value["stakes"] != STAKES:
         raise ValueError("acceptance input changed")
     if value["result_sha256"] != _sha_text(value["result_text"]):
@@ -135,8 +274,27 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--codex", default="codex")
     parser.add_argument("--output", type=Path, default=ARTIFACT)
+    parser.add_argument("--augment-existing", action="store_true")
     args = parser.parse_args()
     revision = _run("git", "rev-parse", "HEAD")
+    if args.augment_existing:
+        value = json.loads(args.output.read_text(encoding="utf-8"))
+        value["version"] = 2
+        value["validation"] = {
+            "revision":revision,
+            "source_sha256":{
+                relative:_sha_bytes((ROOT / relative).read_bytes())
+                for relative in VALIDATION_SOURCES
+            },
+            "checks":_deterministic_checks(ROOT),
+        }
+        validate_artifact(value, ROOT)
+        args.output.write_text(
+            json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(f"augmented {args.output} without a provider call")
+        return 0
     dirty = subprocess.run(
         ["git", "status", "--porcelain", "--", *SOURCES], cwd=ROOT,
         check=True, capture_output=True, text=True,
@@ -166,7 +324,7 @@ def main() -> int:
     audit["durable_claim_state"] = durable["claim_state"]
     value = {
         "acceptance_kind":"plan-review-reliability-real-provider-v1",
-        "version":1, "date":"2026-08-30", "source_revision":revision,
+        "version":2, "date":"2026-08-30", "source_revision":revision,
         "source_sha256":{
             relative:_sha_bytes((ROOT / relative).read_bytes()) for relative in SOURCES
         },
@@ -178,6 +336,14 @@ def main() -> int:
         "plan":PLAN, "stakes":STAKES, "result_text":result,
         "result_sha256":_sha_text(result), "audit":audit,
         "durable_lineage":durable,
+        "validation":{
+            "revision":revision,
+            "source_sha256":{
+                relative:_sha_bytes((ROOT / relative).read_bytes())
+                for relative in VALIDATION_SOURCES
+            },
+            "checks":_deterministic_checks(ROOT),
+        },
         "assertions":[
             "The public critique_plan handler completed through the real Codex provider route.",
             "The durable lineage, rendered trailer, and audit attempt ledger were retained exactly.",
