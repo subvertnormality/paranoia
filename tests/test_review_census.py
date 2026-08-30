@@ -2736,10 +2736,17 @@ def test_primary_staged_failure_surface_preserves_failure_kind(kind, headline, b
 def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
     state = {
         "phase": "correction", "last_round": 57,
-        "debt": [{
-            "id": "debt-a", "status": "open", "severity": cc.MAJOR,
-            "first_round": 34, "class_ids": ["6cf3f68b"],
-        }],
+        "debt": [
+            {
+                "id": "closed-predecessor", "status": "closed",
+                "severity": cc.MAJOR, "first_round": 3,
+                "class_ids": ["6cf3f68b"],
+            },
+            {
+                "id": "debt-a", "status": "open", "severity": cc.MAJOR,
+                "first_round": 34, "class_ids": ["6cf3f68b"],
+            },
+        ],
     }
 
     rendered = rc.trailer(
@@ -2752,6 +2759,7 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
         "(first raised 1, now 57), current debt open since 34"
     ) in rendered
     assert "rebut with session_ref=session-57 debt_id=debt-a" in rendered
+    assert "debt_id=closed-predecessor" not in rendered
 
 
 def test_trailer_omits_persistence_until_third_tracked_round() -> None:

@@ -47,7 +47,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds public plan-and-branch aggregate-occurrence correction and bounded-retry coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "dff749854f7c73aa517b80f4573c26803a94f858f5e3baf82313a617b2b61fc0"
+      "sha256": "4f47f639404ad23ebf0e0b983f74579a661318528d32ebd2ecbd7de09e00ddd8"
     }
   },
   "after_lineage": {

@@ -35,7 +35,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Phase projection and rebut settlement regressions plus updated prompt digest.",
-      "sha256": "54370b26e586796a752af1af4dbd34d2729ffb506d0e55b135e11b84ab3fd913"
+      "sha256": "8e2e2fc54a1fcb69e2eb8463510fa03fd06bf791d3be7030a03d4837e344fde6"
     }
   },
   "assertions": [
@@ -1761,7 +1761,12 @@
   },
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
   "validation": {
-    "allowed_later_source_diffs": {},
+    "allowed_later_source_diffs": {
+      "tests/test_review_census.py": {
+        "scope": "Adds the closed-predecessor/current-successor rebut debt-id regression without changing deterministic replay behavior.",
+        "sha256": "0c52f35f51002315707bc263a736d0fcd1f3a636ed2d095e6a20c43ea079193c"
+      }
+    },
     "checks": {
       "changed_plan_preflight": {
         "claim_last_accepted_counts": null,
