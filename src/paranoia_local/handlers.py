@@ -4478,6 +4478,11 @@ def rebut(
                 raise ValueError(
                     "bound rebut class_id is not currently blocking and eligible for settlement"
                 )
+            if tracked.mechanized:
+                raise ValueError(
+                    "bound rebut settlement does not support mechanized branch classes; "
+                    "run critique_branch so the canonical predicate sweep decides closure"
+                )
             if lineage.review_state.get("phase") != "correction":
                 raise ValueError("bound rebut requires correction phase")
             present_failures = [
@@ -4534,7 +4539,14 @@ def rebut(
             "reason":{"type":"string", "minLength":1, "maxLength":4_000},
             "evidence":{
                 "type":"array", "minItems":1, "maxItems":20,
-                "items":{"type":"string", "minLength":1, "maxLength":2_000},
+                "items":{
+                    "type":"object", "additionalProperties":False,
+                    "properties":{
+                        "anchor":{"type":"string", "minLength":1, "maxLength":1_000},
+                        "rationale":{"type":"string", "minLength":1, "maxLength":2_000},
+                    },
+                    "required":["anchor", "rationale"],
+                },
             },
         },
         "required":["disposition", "reason", "evidence"],
@@ -4564,16 +4576,48 @@ def rebut(
             try:
                 parsed = sp.decode(review.text, rebut_schema, max_chars=12_000)
                 if not parsed["reason"].strip() or any(
-                    not item.strip() for item in parsed["evidence"]
+                    not item["anchor"].strip() or not item["rationale"].strip()
+                    for item in parsed["evidence"]
                 ):
                     raise sp.ProtocolError(
                         "/: rebut reason and evidence must contain non-whitespace text"
                     )
                 disposition = parsed["disposition"]
-                rebut_evidence = list(parsed["evidence"])
+                citation_rows = list(parsed["evidence"])
+                rebut_evidence = [item["anchor"] for item in citation_rows]
+                prior_plan_anchors = {
+                    item for item in (prior_target_debt or {}).get("evidence", [])
+                    if isinstance(item, str) and item.startswith("plan:")
+                }
+                plan_anchors = [
+                    item for item in rebut_evidence if item.startswith("plan:")
+                ]
+                if lineage_mode == cc.PLAN_MODE and any(
+                    item not in prior_plan_anchors for item in plan_anchors
+                ):
+                    raise sp.ProtocolError(
+                        "/evidence: plan-mode rebut may reuse only plan anchors already "
+                        "resolved for the target debt"
+                    )
+                plan_lines = None
+                if lineage_mode == cc.BRANCH_MODE and lineage.branch_contract:
+                    contract_text = lineage.branch_contract.get("text")
+                    if isinstance(contract_text, str):
+                        plan_lines = len(contract_text.splitlines())
+                resolvable = [
+                    item for item in rebut_evidence
+                    if not (lineage_mode == cc.PLAN_MODE and item.startswith("plan:"))
+                ]
+                rc.resolve_anchors(
+                    {"evidence":resolvable}, root=repo, plan_lines=plan_lines,
+                    trusted_roots={"repository":repo},
+                )
                 rendered = (
                     f"{disposition}: {parsed['reason']}\n\n"
-                    + "\n".join(f"- {item}" for item in rebut_evidence)
+                    + "\n".join(
+                        f"- {item['anchor']} — {item['rationale']}"
+                        for item in citation_rows
+                    )
                 )
                 review = replace(review, text=rendered)
                 if disposition == "CONCEDE":

@@ -295,7 +295,7 @@ class TestRebut:
         ))
         eng = FakeEngine(json.dumps({
             "disposition":"CONCEDE", "reason":"The finding used the wrong path.",
-            "evidence":["repository/app.py:1"],
+            "evidence":[{"anchor":"repository/app.py:1", "rationale":"current guard"}],
         }))
         result = handlers.rebut({
             "repo_path":str(repo), "session_ref":"sess-1",
@@ -370,7 +370,7 @@ class TestRebut:
         before = json.loads(json.dumps((tmp_path / "state" / "lineages" / "hold-rebut.json").read_text()))
         eng = FakeEngine(json.dumps({
             "disposition":"HOLD", "reason":"The counter-evidence misses the path.",
-            "evidence":["repository/app.py:1"],
+            "evidence":[{"anchor":"repository/app.py:1", "rationale":"current path"}],
         }))
         result = handlers.rebut({
             "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
@@ -384,6 +384,52 @@ class TestRebut:
         assert audit["disposition"] == "HOLD"
         assert audit["debt_settled"] is False
         assert audit["class_closed"] is False
+
+    @pytest.mark.parametrize(("mechanized", "evidence", "error"), [
+        (True, [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),
+        (False, [{"anchor":"repository/missing.py:1", "rationale":"current"}], "unresolvable"),
+        (False, [{"anchor":"app.py:1", "rationale":"current"}], "requires repository/ prefix"),
+    ])
+    def test_bound_rebut_refuses_unsupported_or_unresolved_closure(
+        self, repo: Path, tmp_path: Path, monkeypatch, mechanized, evidence, error,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state.update(phase="correction", last_round=2, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"finding", "evidence":["repository/app.py:1"],
+            "remedy":"repair", "source_ids":[], "class_ids":["class-a"],
+            "first_round":1, "last_round":2, "reason":"open",
+        }])
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
+        }}}
+        tracked = cc.TrackedClass(
+            "class-a", "invariant", cc.MAJOR, 1, cc.OPEN,
+            pattern="unsafe" if mechanized else None,
+            pathspec="*.py" if mechanized else None,
+            procedure=None if mechanized else "inspect",
+        )
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "refused-rebut", mode=cc.BRANCH_MODE if mechanized else cc.PLAN_MODE,
+            classes={"class-a":tracked}, review_state=state,
+        ))
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"wrong", "evidence":evidence,
+        }))
+        with pytest.raises(ValueError, match=error):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+                "lineage":"refused-rebut", "class_id":"class-a", "debt_id":"D1",
+                "lineage_mode":"branch" if mechanized else "plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        if mechanized:
+            assert eng.calls == []
+        persisted = cc.load_lineage(
+            cc.default_state_root(), "refused-rebut", stamp="T",
+            mode=cc.BRANCH_MODE if mechanized else cc.PLAN_MODE,
+        )
+        assert persisted.review_state["debt"][0]["status"] == "open"
 
     def test_bound_rebut_ambiguous_save_is_audited_and_retains_latch(
         self, repo: Path, tmp_path: Path, monkeypatch,
@@ -418,7 +464,8 @@ class TestRebut:
                 "lineage":"ambiguous-rebut", "class_id":"class-a", "debt_id":"D1",
                 "lineage_mode":"plan",
             }, engine=FakeEngine(json.dumps({
-                "disposition":"CONCEDE", "reason":"wrong", "evidence":["app.py:1"],
+                "disposition":"CONCEDE", "reason":"wrong",
+                "evidence":[{"anchor":"repository/app.py:1", "rationale":"current path"}],
             })), log_dir=tmp_path / "logs", now=fixed_clock)
         pending = cc.lineage_dir(cc.default_state_root()) / "ambiguous-rebut.pending"
         assert pending.exists()

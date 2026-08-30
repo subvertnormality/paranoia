@@ -2732,7 +2732,7 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
     state = {
         "phase": "correction", "last_round": 57,
         "debt": [{
-            "id": "debt-a", "status": "open", "severity": cc.MINOR,
+            "id": "debt-a", "status": "open", "severity": cc.MAJOR,
             "first_round": 34, "class_ids": ["6cf3f68b"],
         }],
     }
@@ -2746,7 +2746,7 @@ def test_trailer_surfaces_persistent_class_and_rebut_session() -> None:
         "PERSISTENCE: 6cf3f68b currently open; round-label span 57 "
         "(first raised 1, now 57), current debt open since 34"
     ) in rendered
-    assert "rebut with session_ref=session-57" in rendered
+    assert "rebut with session_ref=session-57 debt_id=debt-a" in rendered
 
 
 def test_trailer_omits_persistence_until_third_tracked_round() -> None:

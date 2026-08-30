@@ -817,9 +817,14 @@ def trailer(
             if age < PERSISTENCE_REBUT_ROUNDS:
                 continue
             debt_first = debt_first_by_class.get(class_id)
+            target_debt = [
+                row.get("id") for row in debt
+                if class_id in row.get("class_ids", [])
+            ]
             rebut = (
-                f"; rebut with session_ref={trailer_diagnostic(session_ref)}"
-                if session_ref else ""
+                f"; rebut with session_ref={trailer_diagnostic(session_ref)} "
+                f"debt_id={trailer_diagnostic(target_debt[0])}"
+                if session_ref and len(target_debt) == 1 else ""
             )
             lines.append(
                 f"PERSISTENCE: {trailer_diagnostic(class_id)} currently open; "

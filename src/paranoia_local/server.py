@@ -444,6 +444,7 @@ TOOLS: list[Tool] = [
             "higher-resolution than a cold re-round) with your counter-evidence; it concedes or holds with fresh citations. "
             "The optional lineage/class/debt/mode quartet is all-or-none. A validated HOLD is audit-only; a validated CONCEDE "
             "closes only that exact open debt and closes its class only when no sibling blocker remains. It never grants clearance. "
+            "Mechanized branch classes are refused before provider spend because their canonical predicate sweep owns closure. "
             "The target must still be blocking and match the class's current durable session. Provider, validation, or ambiguous "
             "persistence failure performs no confirmed settlement and retains the latch when outcome is ambiguous."
         ),

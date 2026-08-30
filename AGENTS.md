@@ -525,6 +525,8 @@ class-bound rebut against the stored current session and exact open debt. Bound 
 closed CONCEDE/HOLD disposition: HOLD is audit-only; CONCEDE closes only the named debt and closes
 the class only when no sibling blocker remains. It never grants clearance. Preserve this state
 atomically with the lineage and store the exact returned trailer in plan and branch audit records.
+Mechanized branch classes remain owned by the canonical predicate sweep: refuse their bound rebut
+before provider spend and require `critique_branch` to decide closure.
 The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
 session authority replaces stale authority even when it is null; a terminal gate bootstrap may
 use only the exact validation-invalid terminal retry and only for a previously sessionless row.

@@ -1,14 +1,14 @@
 {
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
-    "AGENTS.md": {"scope": "Debt-targeted bound-rebut settlement contract.", "sha256": "cc1c000cd240c1031e6da064345827a360492d655822ced078f3420b8b437228"},
-    "README.md": {"scope": "Public bound-rebut settlement documentation.", "sha256": "96ea6240fa6d993c9895f3c7b39fa42fc290cf4200693ca4ab3a5925c16bd0c7"},
-    "docs/tool-reference.md": {"scope": "Public bound-rebut debt identity and settlement semantics.", "sha256": "cd5d371fa59a88cb1da86b4a4a5a2fd77da6c043af33fd2978e923da7ef39220"},
+    "AGENTS.md": {"scope": "Debt-targeted bound-rebut settlement contract.", "sha256": "7942c9bf190d718f82603d2c461aff1007d38db388052fcf40d8c0f4cb4fd97f"},
+    "README.md": {"scope": "Public bound-rebut settlement documentation.", "sha256": "585239e57f14eace499c75e6c85359698524ad08fb7130e728f24d835e428a23"},
+    "docs/tool-reference.md": {"scope": "Public bound-rebut debt identity and settlement semantics.", "sha256": "6f4e34e5445e287ffaf8c6ab5d57012ec7d78e98cf8a7cadbbb383b0450ca14b"},
     "scripts/run_plan_review_reliability_acceptance.py": {"scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.", "sha256": "25709e948e636f6df670e7126844289117801f0a6dfaa7e97fa6409d577470d6"},
-    "src/paranoia_local/handlers.py": {"scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.", "sha256": "4953674524d87ed181520a9392cbf8f42598de32112c6e403292d316bfb0a2b1"},
-    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.", "sha256": "52a668056fde1188254b086552aaa779933deceaee32ebe76ef92e688007a655"},
-    "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and exact trailer debt guidance.", "sha256": "93952f7fe5e8ba0e9e4dc558e63e7caa17a7d56bc0d1e9c7dd3a049746442e09"},
-    "tests/test_review_census.py": {"scope": "Phase projection and rebut settlement regressions plus updated prompt digest.", "sha256": "aa41739ced35a2926f493a2039ed28bc2f27814b61aee3f729a9a8586dfdef33"}
+    "src/paranoia_local/handlers.py": {"scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.", "sha256": "b9698ad2a3da680ccf4a627787512db025660bcb01a4e65287d736c1c036c6ae"},
+    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.", "sha256": "a5898079e1ca3c06839d2765685d70b1055210a9c53bc9691b4e4d772fc1112a"},
+    "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and exact trailer debt guidance.", "sha256": "7cee4bb390c72cc966a673db7c0c550d51ef8357a14b40f75af31d17e82629c5"},
+    "tests/test_review_census.py": {"scope": "Phase projection and rebut settlement regressions plus updated prompt digest.", "sha256": "61b6268742905c22693297a18579a7ea75da177841d46c6034d87136445b0a48"}
   },
   "assertions": [
     "The public critique_plan handler completed through the real Codex provider route.",

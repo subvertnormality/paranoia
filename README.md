@@ -209,6 +209,8 @@ The unbound form is non-mutating. For a persistently gated class, optional
 to one current durable target. `HOLD` is audit-only. A validated `CONCEDE`
 closes that debt and closes its class only when no sibling blocker remains; it
 never grants clearance, and the next critique still performs the normal final.
+Mechanized branch classes remain predicate-owned and must be closed by a normal
+`critique_branch` sweep rather than a bound rebut.
 
 ### Arbitrate a decision
 
