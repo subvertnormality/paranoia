@@ -1588,6 +1588,13 @@
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
   "validation": {
     "checks": {
+      "changed_plan_preflight": {
+        "claim_last_accepted_counts": null,
+        "claim_nonadjudicated_count": 1,
+        "provider_attempts": 0,
+        "rendered_trailer": "CLAIM-REGISTER: AUDIT-FAILED — 1 retained historical claim rows; 0 previously retired rows\nCLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; preserved claim rows are non-adjudicated history\nCLAIM-AUDIT-DEBT: round 2: claim verification did not run because structural preflight failed (rejected sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)\nLINEAGE: changed-plan-preflight-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged rejected (validation): invalid correction_control row for 'class-a'\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  class-a first invariant (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 0 blocking open\nSTRUCTURAL-ERROR: invalid correction_control row for 'class-a'\nSTRUCTURAL-FAILURE: role=correction-preflight kind=validation\nCONVERGENCE: BLOCKED — staged validation failure did not settle.\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nREVIEW-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
+        "result_sha256": "b7f2953e04bbe5099ed2520b16eb4d29417dfa74035f30faa17c727545939893"
+      },
       "correction_control": {
         "classes": {
           "class-a": {
@@ -1613,19 +1620,26 @@
         "plan:2",
         "plan:3"
       ],
+      "first_failure_claim_rows": "nonadjudicated-history",
       "predecessor_preflight": {
         "claim_audit_failed": true,
         "claim_last_accepted_counts": null,
         "claim_nonadjudicated_count": 2,
         "provider_attempts": 0,
-        "rendered_trailer": "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows; 0 previously retired rows\nCLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; predecessor claim rows are non-adjudicated history\nCLAIM-AUDIT-DEBT: round 1: indexed binding passage is not in captured text (rejected sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)\nEVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)\nEVIDENCE next action: retry captured-text binding; do not remove or weaken the assertion solely because binding failed\nLINEAGE: predecessor-preflight-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged rejected (validation): invalid correction_control row for 'class-a'\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  class-a first invariant (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 0 blocking open\nSTRUCTURAL-ERROR: invalid correction_control row for 'class-a'\nSTRUCTURAL-FAILURE: role=correction-preflight kind=validation\nCONVERGENCE: BLOCKED — staged validation failure did not settle.\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nREVIEW-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
-        "result_sha256": "1209b77ee3be679634ca16ba4ff8f29e3e2a6144bbb5c6dd3d4d40e2728ff543"
+        "rendered_trailer": "CLAIM-REGISTER: AUDIT-FAILED — 2 retained historical claim rows; 0 previously retired rows\nCLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; predecessor claim rows are non-adjudicated history\nCLAIM-AUDIT-DEBT: round 2: claim verification did not run because structural preflight failed (rejected sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)\nLINEAGE: predecessor-preflight-acceptance (rounds recorded: 1)\nCLASS-REGISTER: staged rejected (validation): invalid correction_control row for 'class-a'\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  class-a first invariant (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 0 blocking open\nSTRUCTURAL-ERROR: invalid correction_control row for 'class-a'\nSTRUCTURAL-FAILURE: role=correction-preflight kind=validation\nCONVERGENCE: BLOCKED — staged validation failure did not settle.\nSTAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0\nREVIEW-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
+        "result_sha256": "d7cd39ba9c41a92b23aa86d8bf6157b2fc8b97575421bd4fab40f6664ca00625"
       }
     },
-    "revision": "836f3ed4b244c2f64aaf852dc8ea73b475620eb2",
+    "revision": "3d8bb90a4496dabcd1f55b07ede37f20883b8bb5",
     "source_sha256": {
-      "scripts/run_plan_review_reliability_acceptance.py": "eb408ae1d73ee5266e80244fb6ec494da440aa3aacdcaa59382ac90125f6ff71",
-      "tests/test_plan_claims.py": "3b631210e0082a4b439e260cc419a6405ab2a5ccf6d8fcaab8f1195f661f6ad1"
+      "AGENTS.md": "625b7799e7c956b200bd3ed08154a9a80cd0f086bf590a8c3c19107ca3f559ee",
+      "README.md": "3adaf8aa566a31da4179a0c32fa48a853a8d1c7e6b4bbfa7041010d736b464ce",
+      "docs/tool-reference.md": "f3d4995e5d761df06252728ebc5ab4fd3258e2ac0d025b160560d950f48c4c4e",
+      "scripts/run_plan_review_reliability_acceptance.py": "1bfd05fda7004ed526a96d332868e646869a590dd130cf8e31d24ec43be7a4fd",
+      "src/paranoia_local/handlers.py": "4de0172ce6e7654c53d9d22f2e28608af00f01754c44dc3b45c4677e68702147",
+      "src/paranoia_local/plan_claims.py": "9547e36aae26b25d9e78456dec226b078dd5db0965b17b1e830eac82b995291d",
+      "tests/test_plan_claims.py": "36fa53a7d38d47f10664d016388abf37a50aac842e4f9e64a49918b665cf10d0",
+      "tests/test_review_census.py": "d4416a01690cc3dd67c053ff26c08cb08c5f46854d29727cf6ca29d249e00056"
     }
   },
   "version": 2
