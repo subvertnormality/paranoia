@@ -91,7 +91,7 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
     elif field == "attempt_engine":
         artifact["attempt_ledger"][-1]["engine"] = "claude"
     elif field == "attempt_sequence":
-        artifact["attempt_ledger"][-1]["sequence"] = 2
+        artifact["attempt_ledger"][-1]["sequence"] = 99
     elif field == "attempt_timeout":
         artifact["attempt_ledger"][-1]["requested_timeout_sec"] = 1
     elif field == "attempt_returncode":

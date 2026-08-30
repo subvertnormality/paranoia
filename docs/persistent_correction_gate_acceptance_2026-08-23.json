@@ -2,8 +2,8 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents shared plan-and-branch class-occurrence aggregation while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "4c68643bdbb8275c200bb646400b9a7b4a0606dcb3da2b63ed74f906a66c5117"
+      "scope": "Documents shared plan-and-branch class-occurrence aggregation and its authored-evidence reconciliation while leaving the retained correction-gate run, control state, and source binding unchanged.",
+      "sha256": "c6dddf3ca83eb3397ce6b86f542e803e74ed193e73ad79f006b07bd5897c93cf"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
@@ -26,16 +26,16 @@
       "sha256": "bdab0d7e063da37ec5a3a3f7e7d3e42b6db8b6be5602197e2881954c0f1bc67e"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Preserves the complete census source-evidence union; correction-gate lifecycle settlement is unchanged.",
-      "sha256": "02b2a35415fe94a822c9cf8ae6c0e0ac14dc06ac80030e0d6062cb37cd28d0a8"
+      "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
+      "sha256": "3694dc5bde425bb70cfaaf4255e854a9d1ec50e5067ae5c0d416e9671035eb6b"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
       "sha256": "f222868ab3c4b49bc27c12366e5d01aa6d67de9ca29da429756b41ef6cce6be7"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds public plan-and-branch aggregate-occurrence correction coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "8a9082a8ea50391560c0dab0da17d7985554b1a43beb078e98cd66c8400f347e"
+      "scope": "Adds public plan-and-branch aggregate-occurrence correction and bounded-retry coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
+      "sha256": "d354b422890373e2029aec209bfc097167e0794acfe6a527756a54276a113e11"
     }
   },
   "after_lineage": {
