@@ -1282,6 +1282,20 @@ def materialize_decision_value(
                         f"existing-class finding requires violated new_finding basis "
                         f"naming {finding_id!r}"
                     )
+                else:
+                    finding_evidence = findings[finding_index]["evidence"]
+                    missing = [
+                        anchor for anchor in outcome["evidence"]
+                        if anchor not in finding_evidence
+                    ]
+                    if missing:
+                        issues.append(
+                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
+                            f"finding for class {cid!r} must include every "
+                            "current-occurrence anchor authored in "
+                            f"{outcome_pointers.get(cid, '/class_outcomes')}/evidence; "
+                            f"missing {missing}"
+                        )
                 for debt_id, debt in open_debt.items():
                     if cid not in debt.get("class_ids", []):
                         continue

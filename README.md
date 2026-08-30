@@ -288,6 +288,9 @@ and a fresh occurrence may receive a new ID, while the server-owned correction g
 rephrasing that leaves the class blocking.
 A fresh aggregate finding closes the class's narrower prior open debt after incorporating every
 still-reachable predecessor occurrence, preventing duplicate blockers for one class.
+The correction materializer cross-checks the fresh finding against its matching violated class
+outcome and rejects it if any independently authored current-occurrence anchor is missing from the
+aggregate finding; the retry identifies the provider-owned evidence pointer.
 Correction settlement rejects any prospective state with more than one open debt for an active class.
 
 For lifecycle details, persistence controls, false-positive exemptions, and

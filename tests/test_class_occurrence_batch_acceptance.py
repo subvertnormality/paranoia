@@ -24,7 +24,9 @@ def test_class_occurrence_batch_acceptance_is_source_and_route_bound() -> None:
 @pytest.mark.parametrize("field", [
     "provider", "provider_effort", "provider_web", "provider_cli",
     "provider_compatible_cli", "prompt",
-    "prompt_digest", "response", "response_digest", "call_route", "call_session",
+    "prompt_digest", "response", "response_digest",
+    "response_drop_app_occurrence", "response_drop_worker_occurrence",
+    "call_route", "call_session",
     "ledger", "outcome", "role", "attempt_engine", "attempt_sequence",
     "attempt_timeout", "attempt_returncode", "retry", "fixture", "fixture_anchor",
     "fixture_base", "version", "date", "source_revision", "lineage_id", "stakes", "before_rounds",
@@ -61,6 +63,21 @@ def test_class_occurrence_batch_acceptance_rejects_mutation(field: str) -> None:
         artifact["calls"][-1]["response_text"] += " "
     elif field == "response_digest":
         artifact["calls"][-1]["response_sha256"] = "0" * 64
+    elif field in {"response_drop_app_occurrence", "response_drop_worker_occurrence"}:
+        dropped = (
+            "repository/app.conf:1" if field == "response_drop_app_occurrence"
+            else "repository/worker.conf:1"
+        )
+        payload = json.loads(artifact["calls"][-1]["response_text"])
+        finding = payload["governing_findings"][0]
+        finding["evidence"] = [
+            row for row in finding["evidence"] if row["anchor"] != dropped
+        ]
+        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        digest = acceptance._sha_text(text)
+        artifact["calls"][-1]["response_text"] = text
+        artifact["calls"][-1]["response_sha256"] = digest
+        artifact["attempt_ledger"][-1]["response_sha256"] = digest
     elif field == "call_route":
         artifact["calls"][0]["route"] = "resumed"
     elif field == "call_session":

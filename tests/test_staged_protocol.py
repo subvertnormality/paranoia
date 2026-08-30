@@ -2679,6 +2679,7 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
     current = finding(
         "G5", classification={"kind":"existing_class", "class_id":"class-a"},
     )
+    current["evidence"] = ["plan:1", "plan:2"]
     debt = durable_debt()
     base = decision(
         "correction", governing_findings=[current],
@@ -2712,6 +2713,31 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "finding_id":"G5",
     }
+
+
+def test_fresh_existing_class_finding_cannot_drop_authored_occurrence_anchor():
+    current = finding(
+        "G5", classification={"kind":"existing_class", "class_id":"class-a"},
+    )
+    raw = decision(
+        "correction", governing_findings=[current],
+        debt_outcomes=[{
+            "debt_id":"D7", "status":"closed", "evidence":["plan:1"],
+        }],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated",
+            "evidence":["plan:1", "plan:2"],
+            "basis":{"kind":"new_finding", "finding_id":"G5"},
+        }],
+    )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=(
+            r"/governing_findings/0/evidence: fresh aggregate finding.*"
+            r"/class_outcomes/class-a/evidence; missing \['plan:2'\]"
+        ),
+    ):
+        materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
 
 
 def test_fresh_aggregate_finding_must_supersede_prior_class_debt():

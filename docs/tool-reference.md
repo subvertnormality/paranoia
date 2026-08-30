@@ -235,6 +235,9 @@ still permits only one finding and outcome per class in a settlement. A fresh oc
 a fresh debt ID; correction gates prevent rewording the same site from satisfying a blocking class.
 A fresh aggregate finding must close the class's prior open debt after incorporating every
 still-reachable predecessor occurrence, so one class does not accumulate duplicate blockers.
+Before that transition, the correction materializer requires the finding to contain every
+current-occurrence anchor independently authored in its matching violated class outcome and reports
+an omission at the governing finding's evidence pointer through the bounded validation retry.
 The canonical correction validator also rejects any resulting state with multiple open debts bound
 to one active class.
 

@@ -236,6 +236,8 @@ def validate_artifact(
     assessments = settlement.get("class_assessments") or []
     if len(assessments) != 1 or assessments[0].get("class_id") != CLASS_ID:
         raise ValueError("class outcome is not singular and correctly bound")
+    if set(assessments[0].get("evidence") or ()) != set(anchors):
+        raise ValueError("class outcome and governing finding occurrences diverge")
     after = artifact["after_lineage"]
     if set(after) != {"rounds", "next_seq", "classes", "review_state"}:
         raise ValueError("after-lineage envelope is not closed and exact")

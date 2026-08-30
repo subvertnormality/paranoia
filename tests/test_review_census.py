@@ -4049,14 +4049,13 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
     )
     calls = []
 
-    def run(self, prompt, *args, **kwargs):
-        calls.append(prompt)
+    def response_value(*, complete):
         value = {
             "role":"correction",
             "governing_findings":[{
                 "id":"aggregate", "severity":"MAJOR",
                 "summary":"the duplicated contract still disagrees",
-                "evidence":anchors,
+                "evidence":anchors if complete else anchors[:1],
                 "remedy":"repair both independently anchored sites together",
                 "classification":{
                     "kind":"existing_class", "class_id":"class-0",
@@ -4071,16 +4070,24 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
             }],
             "class_actions":{"class-0":None},
         }
+        return value
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        value = response_value(complete=False)
         text = wire(value)
         return Review(text=text, session_ref="aggregate-session", raw=text)
 
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "aggregate-session"
+        calls.append(prompt)
+        assert "/governing_findings/0/evidence" in prompt
+        assert anchors[1] in prompt
+        text = wire(response_value(complete=True))
+        return Review(text=text, session_ref=session_ref, raw=text)
+
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
-    monkeypatch.setattr(
-        handlers.eng.CodexEngine, "resume",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("valid aggregate correction must not retry")
-        ),
-    )
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
     args = {
         "repo_path":str(repo_with_branch), "lineage":lineage_id, "round":2,
         "stakes":"trusted local tool",
@@ -4095,7 +4102,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         now=lambda:"AGG",
     )
 
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert "exhaustively consolidate every" in calls[0]
     assert "trace every site" in calls[0]
     assert "STRUCTURAL-PHASE: correction" in result
