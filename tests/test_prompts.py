@@ -122,6 +122,18 @@ class TestRebutInstructions:
 
 
 class TestStagedReviewInstructions:
+    def test_review_roles_require_complete_co_asserting_site_repairs(self) -> None:
+        for text in (
+            prompts.staged_census_instructions("plan", "domain"),
+            prompts.staged_followup_instructions("plan"),
+        ):
+            assert "trace every site" in text
+            assert "co-asserting site" in text
+            assert "one-site repair" in text
+        assert prompts.PLAN_COASSERTION_INSTRUCTIONS not in (
+            prompts.staged_followup_instructions("branch")
+        )
+
     def test_plan_anchors_have_one_unambiguous_spelling(self) -> None:
         for text in (
             prompts.staged_census_instructions("plan", "domain"),

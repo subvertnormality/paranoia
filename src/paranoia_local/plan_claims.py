@@ -166,6 +166,10 @@ def normalize_state(raw: Any) -> dict[str, Any]:
                     "retired_round": max(0, int(raw.get("rounds", 0))),
                 })
                 retired_ids.add(claim_id)
+    debt = deepcopy(raw.get("debt"))
+    if _predecessor_terminal_audit_debt(debt):
+        debt["audit_failed"] = True
+        debt["claim_rows"] = "predecessor-unadjudicated"
     state.update({
         "rounds": max(0, int(raw.get("rounds", 0))),
         "next_seq": max(1, int(raw.get("next_seq", 1))),
@@ -176,9 +180,20 @@ def normalize_state(raw: Any) -> dict[str, Any]:
         ),
         "claims": claims,
         "retired": retired[-MAX_ACTIVE_CLAIMS:],
-        "debt": deepcopy(raw.get("debt")),
+        "debt": debt,
     })
     return state
+
+
+def _predecessor_terminal_audit_debt(value: Any) -> bool:
+    """Recognize the closed terminal-debt shape written before ``audit_failed``."""
+    if not isinstance(value, dict) or value.get("audit_failed") is not None:
+        return False
+    return {
+        "round", "reason", "returncode", "raw_sha256", "rejected_excerpt",
+        "failure_detail_sha256", "failure_detail", "stderr_sha256", "stderr",
+        "failure_phase",
+    } <= set(value)
 
 
 def _migration_blocked_state(raw: dict[str, Any]) -> dict[str, Any]:
@@ -1057,26 +1072,24 @@ def with_debt(
     frozen_ids: Iterable[str] = (),
 ) -> dict[str, Any]:
     state = normalize_state(prior_raw)
+    prior_claim_rows = (
+        state["debt"].get("claim_rows")
+        if isinstance(state.get("debt"), dict) else None
+    )
     state["rounds"] += 1
     state["plan_digest"] = hashlib.sha256(
         plan_text.encode("utf-8", "surrogateescape")
     ).hexdigest()[:16]
     state["debt"] = error.debt(round_no)
-    # Old verdicts are retained as evidence candidates, but cannot govern the changed
-    # plan after a failed audit.
-    frozen = frozenset(frozen_ids)
-    for claim_id, record in state["claims"].items():
-        if isinstance(record, dict):
-            if claim_id in frozen and record.get("verdict") == "supported":
-                record["retained_round"] = round_no
-                continue
-            record["verdict"] = "unverified"
-            record["verified_round"] = round_no
-            record["replacement"] = None
-            record["rationale"] = (
-                "The current-plan audit failed; retained sources are candidates only and "
-                "must have entailment rechecked before correction."
-            )
+    state["debt"]["audit_failed"] = True
+    state["debt"]["claim_rows"] = (
+        "predecessor-unadjudicated"
+        if prior_claim_rows == "predecessor-unadjudicated"
+        else "last-accepted"
+    )
+    # Preserve last accepted semantic verdicts as diagnostic history. Audit debt is the
+    # governing blocker; rewriting every row to ``unverified`` would falsely report a
+    # provider or validation failure as independent judgements about the plan.
     return state
 
 
@@ -1123,6 +1136,22 @@ def review_context(state_raw: Any) -> str:
             "eligible external proposition that authoritative web evidence can adjudicate."
         ),
     ]
+    audit_failed = bool(
+        isinstance(state.get("debt"), dict)
+        and state["debt"].get("audit_failed") is True
+    )
+    if audit_failed:
+        history_label = (
+            "Last-accepted packets remain durable history"
+            if state["debt"].get("claim_rows") == "last-accepted"
+            else "Predecessor claim rows remain non-adjudicated history"
+        )
+        lines.append(
+            f"The current claim audit failed. {history_label} but are omitted here: none is a "
+            "current-plan authority verdict, and structural review must not reinterpret the "
+            "audit failure as unsupported plan claims."
+        )
+        return "\n".join(lines)
     for claim_id, claim in state["claims"].items():
         lines.extend([
             f"- CLAIM {claim_id} [{claim.get('kind')}/{claim.get('verdict')}]",
@@ -1159,12 +1188,37 @@ def render_trailer(state_raw: Any) -> str:
     state = normalize_state(state_raw)
     claims = list(state["claims"].values())
     counts = {verdict: sum(1 for c in claims if c.get("verdict") == verdict) for verdict in VERDICTS}
-    lines = [
-        f"CLAIM-REGISTER: {len(claims)} active external claims; "
-        f"{len(state.get('retired', []))} retired and excluded from active inventory",
-        f"CLAIM-CLOSURE: {counts['supported']} supported, {counts['refuted']} refuted, "
-        f"{counts['unverified']} unverified",
-    ]
+    audit_failed = bool(
+        isinstance(state.get("debt"), dict)
+        and state["debt"].get("audit_failed") is True
+    )
+    if audit_failed:
+        lines = [
+            f"CLAIM-REGISTER: AUDIT-FAILED — {len(claims)} retained historical claim rows; "
+            f"{len(state.get('retired', []))} previously retired rows",
+        ]
+    else:
+        lines = [
+            f"CLAIM-REGISTER: {len(claims)} active external claims; "
+            f"{len(state.get('retired', []))} retired and excluded from active inventory",
+        ]
+    if audit_failed:
+        if state["debt"].get("claim_rows") == "last-accepted":
+            lines.append(
+                "CLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; "
+                f"last accepted inventory was {counts['supported']} supported, "
+                f"{counts['refuted']} refuted, {counts['unverified']} unverified"
+            )
+        else:
+            lines.append(
+                "CLAIM-CLOSURE: AUDIT-FAILED — current external claims were not adjudicated; "
+                "predecessor claim rows are non-adjudicated history"
+            )
+    else:
+        lines.append(
+            f"CLAIM-CLOSURE: {counts['supported']} supported, {counts['refuted']} refuted, "
+            f"{counts['unverified']} unverified"
+        )
     if state.get("debt"):
         debt = state["debt"]
         lines.append(
@@ -1192,6 +1246,9 @@ def render_trailer(state_raw: Any) -> str:
                 "EVIDENCE next action: retry cold authority-and-entailment attestation; do not "
                 "remove or weaken the assertion solely because attestation failed",
             ])
+
+    if audit_failed:
+        return "\n".join(lines)
 
     actionable = [
         claim for claim in claims

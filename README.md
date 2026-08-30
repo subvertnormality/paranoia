@@ -266,10 +266,18 @@ The key trailer fields are:
 | `STRUCTURAL-PHASE` | The next tracked phase: `census`, `correction`, `final`, or `clear` |
 | `STRUCTURAL-DEBT` | Remaining blocking findings |
 | `CLAIM-CLOSURE` | External-plan-claim status, when verification is enabled |
+| `REVIEW-ATTEMPTS` | Claim and structural attempts, including recovered validation retries |
 | `CONVERGENCE` | The single governing `BLOCKED` or `NOT-BLOCKED` result |
 
 `NOT-BLOCKED` means the tracked gates are clear under the stated stakes. It is a
 review result, not proof that the artifact is correct.
+
+A terminal claim-role failure renders `CLAIM-CLOSURE: AUDIT-FAILED`; last accepted
+claim counts remain durable diagnostic history but are omitted from current actionable
+packets rather than rewritten as `unverified` verdicts. Predecessor rows already rewritten by
+the old failure path are retained as non-adjudicated history and never described as active or
+last accepted. A missing correction-control row for an active class is initialized without
+discarding the other classes' counters; stale rows for inactive classes still fail closed.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).

@@ -1061,6 +1061,7 @@ def materialize_decision_value(
     durable_debt: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Validate a decoded semantic decision and project it to durable V1 shape."""
+    value = deepcopy(value)
     issues: list[str] = []
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
@@ -1122,6 +1123,12 @@ def materialize_decision_value(
                     f"{finding_pointer}/evidence: citations must come from mapped "
                     f"source evidence; foreign={foreign_evidence}"
                 )
+            if source_evidence is not None:
+                finding["evidence"] = list(dict.fromkeys(
+                    anchor
+                    for source in finding["source_ids"]
+                    for anchor in source_evidence.get(source, ())
+                ))
         if set(governing_by_source) != expected_sources:
             missing = sorted(expected_sources - set(governing_by_source))
             issues.append(

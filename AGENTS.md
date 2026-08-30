@@ -394,7 +394,10 @@ of the resulting code and tests.
   with one or two blocking units; that closure-candidate correction uses the same single call but
   also scans the complete plan against the full checklist and all active classes for sibling and
   repair-created defects. It still advances only to an independent cold final and does not promise
-  a fixed round count. Tracked branch review uses the same broad cold census, targeted correction,
+  a fixed round count. When a finding changes a rule, value, schema, lifecycle, or ordering
+  contract, require its evidence and remedy to cover every material co-asserting site in the
+  complete artifact; do not add prior-plan persistence or textual duplicate heuristics for this
+  semantic task. Tracked branch review uses the same broad cold census, targeted correction,
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
@@ -417,6 +420,12 @@ of the resulting code and tests.
   computed convergence verdict.
 - Malformed model output and required-role failure produce visible blocking debt with bounded
   diagnostics; they never become an empty register or false clear.
+- A terminal claim-role failure is audit failure, not a semantic verdict on every claim. Preserve
+  last accepted packets as non-governing history, omit their prior semantic remedies from current
+  actionable output, render `CLAIM-CLOSURE: AUDIT-FAILED`, and expose aggregate
+  claim-plus-structural attempt telemetry so recovered validation retries remain visible.
+  Predecessor terminal-debt rows already rewritten by the old failure path are non-adjudicated,
+  never last-accepted verdicts or counts.
 - Claim debt blocks combined plan convergence but never rewrites the independently settled staged
   structural phase or masquerades as staged structural debt. Render claim and structural closure
   separately before the single governing combined convergence verdict.

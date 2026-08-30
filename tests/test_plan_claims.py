@@ -1291,6 +1291,79 @@ def _repo(tmp_path: Path) -> Path:
 
 
 class TestHandlerFlow:
+    def test_predecessor_terminal_debt_migrates_without_conflating_partial_debt(
+        self,
+    ) -> None:
+        accepted = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="predecessor-audit-failure", round_no=1, plan_text=PLAN,
+        )
+        terminal = pc.with_debt(
+            accepted, pc.AuditError("binding invalid", failure_phase="binding"),
+            round_no=2, plan_text=PLAN,
+        )
+        terminal["debt"].pop("audit_failed")
+
+        migrated = pc.normalize_state(terminal)
+
+        assert migrated["debt"]["audit_failed"] is True
+        assert migrated["debt"]["claim_rows"] == "predecessor-unadjudicated"
+        assert "CLAIM-CLOSURE: AUDIT-FAILED" in pc.render_trailer(terminal)
+        assert "predecessor claim rows are non-adjudicated history" in pc.render_trailer(
+            terminal
+        )
+        assert "last accepted inventory" not in pc.render_trailer(terminal)
+
+        repeated = pc.with_debt(
+            terminal, pc.AuditError("binding invalid again", failure_phase="binding"),
+            round_no=3, plan_text=PLAN,
+        )
+        assert repeated["debt"]["claim_rows"] == "predecessor-unadjudicated"
+        assert "last accepted inventory" not in pc.render_trailer(repeated)
+        assert "predecessor claim rows are non-adjudicated history" in pc.render_trailer(
+            repeated
+        )
+        assert "ACTIONABLE SOURCE PACKETS" not in pc.render_trailer(terminal)
+
+        partial = dict(terminal)
+        partial["debt"] = {
+            "round":2, "reason":"one localized invalid claim",
+            "raw_sha256":"a" * 64, "rejected_excerpt":"invalid row",
+        }
+        assert pc.normalize_state(partial)["debt"].get("audit_failed") is None
+
+    def test_terminal_audit_failure_preserves_prior_verdicts_as_history(self) -> None:
+        accepted = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id="audit-failure", round_no=1, plan_text=PLAN,
+        )
+
+        failed = pc.with_debt(
+            accepted, pc.AuditError(
+                "indexed binding passage is not in captured text",
+                failure_phase="binding",
+            ),
+            round_no=2, plan_text=PLAN,
+        )
+
+        claim = next(iter(failed["claims"].values()))
+        assert claim["verdict"] == "supported"
+        claim["replacement"] = "stale replacement"
+        claim["rationale"] = "stale semantic rationale"
+        assert failed["debt"]["audit_failed"] is True
+        assert failed["debt"]["claim_rows"] == "last-accepted"
+        trailer = pc.render_trailer(failed)
+        assert "CLAIM-REGISTER: AUDIT-FAILED — 1 retained historical claim rows" in trailer
+        assert "CLAIM-CLOSURE: AUDIT-FAILED" in trailer
+        assert "last accepted inventory was 1 supported" in trailer
+        assert "ACTIONABLE SOURCE PACKETS" not in trailer
+        assert "stale replacement" not in trailer
+        assert "stale semantic rationale" not in trailer
+        context = pc.review_context(failed)
+        assert "none is a current-plan authority verdict" in context
+        assert claim["claim_id"] not in context
+        assert "stale replacement" not in context
+
     def test_exhausted_discovery_validation_preserves_both_reasons_and_raw(
         self, tmp_path: Path, monkeypatch,
     ) -> None:
@@ -1319,6 +1392,7 @@ class TestHandlerFlow:
         assert debt["returncode"] == 0
         assert debt["raw_sha256"] == hashlib.sha256(expected_raw.encode()).hexdigest()
         assert debt["rejected_excerpt"] == expected_raw
+        assert debt["audit_failed"] is True
 
     def test_returncode_zero_provider_error_keeps_execution_wording(
         self, tmp_path: Path,
@@ -3163,11 +3237,21 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert observed["structural_timeout"] in {1800, 1200}
     assert lineage.claim_state["debt"]["reason"] == "evidence deadline exhausted"
     assert "CLAIM-AUDIT-DEBT" in result
+    assert "CLAIM-REGISTER: AUDIT-FAILED" in result
+    assert "CLAIM-CLOSURE: AUDIT-FAILED" in result
+    assert "REVIEW-ATTEMPTS:" in result
     assert lineage.review_state["phase"] == "clear"
     assert "STRUCTURAL-PHASE: clear" in result
     assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
     assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
     assert "staged structural debt remains open" not in result
+    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    assert audit["claim_audit_failed"] is True
+    assert audit["claim_counts"] is None
+    assert audit["claim_last_accepted_counts"] == {
+        "refuted": 0, "supported": 0, "unverified": 0,
+    }
+    assert audit["claim_nonadjudicated_count"] is None
 
 
 def test_same_snapshot_claim_only_correction_migrates_without_structural_call(

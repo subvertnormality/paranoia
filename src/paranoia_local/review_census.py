@@ -434,7 +434,7 @@ def validated_session_ref(value: Any) -> str | None:
 def normalize_correction_control(
     review_state: Mapping[str, Any], active: Sequence[cc.TrackedClass],
 ) -> dict[str, Any]:
-    """Validate the durable correction gate, or synthesize its sole legacy shape."""
+    """Validate the durable correction gate and fill missing active-class rows."""
     expected = {item.class_id for item in active}
     raw = review_state.get("correction_control")
     if raw is None:
@@ -452,9 +452,15 @@ def normalize_correction_control(
         not isinstance(raw, dict) or set(raw) != {"version", "classes"}
         or type(raw.get("version")) is not int or raw["version"] != 1
         or not isinstance(raw.get("classes"), dict)
-        or set(raw["classes"]) != expected
     ):
         raise CensusError("invalid persisted correction_control")
+    actual = set(raw["classes"])
+    extra = actual - expected
+    if extra:
+        raise CensusError(
+            "invalid persisted correction_control: inactive class row(s): "
+            + ", ".join(sorted(extra))
+        )
     rows: dict[str, dict[str, Any]] = {}
     for class_id, row in raw["classes"].items():
         if not isinstance(row, dict) or set(row) != {
@@ -474,6 +480,10 @@ def normalize_correction_control(
         if not _valid_session_ref(row["last_session_ref"]):
             raise CensusError(f"invalid correction_control last_session_ref for {class_id!r}")
         rows[class_id] = dict(row)
+    for class_id in sorted(expected - actual):
+        rows[class_id] = {
+            "reset_round": None, "reopen_count": 0, "last_session_ref": None,
+        }
     return {"version": 1, "classes": rows}
 
 
