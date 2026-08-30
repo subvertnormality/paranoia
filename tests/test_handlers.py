@@ -307,6 +307,7 @@ class TestRebut:
             cc.default_state_root(), "bound-rebut", stamp="T", mode=cc.PLAN_MODE,
         )
         assert result.startswith("CONCEDE: The finding used the wrong path.")
+        assert "literal `repository/` prefix" in eng.calls[0]["prompt"]
         assert reloaded.review_state["phase"] == "final"
         assert reloaded.review_state["last_round"] == 7
         assert reloaded.review_state["debt"][0]["status"] == "closed"

@@ -192,7 +192,7 @@ Re-examine ONLY the bound finding against the counter-evidence and the actual ar
 - CONCEDE only when the finding was wrong, overstated, or already handled. State what you missed and cite the current evidence that justifies withdrawing it.
 - HOLD when the finding stands. State why and cite fresh evidence that directly addresses the counter-evidence.
 
-Each evidence item is the provider-schema citation object with a bare resolvable `anchor` and a separate `rationale`; never put prose in `anchor`.
+Each evidence item is the provider-schema citation object with a bare resolvable `anchor` and a separate `rationale`; never put prose in `anchor`. Repository citations MUST use `repository/<path>:<line-or-range>` with the literal `repository/` prefix. A plan citation MUST use `plan:<line-or-range>` and may only repeat a plan anchor already present in the bound finding.
 
 Do not introduce unrelated findings. The server, not you, decides any durable transition after validating this disposition and its exact debt/class/session binding."""
 
