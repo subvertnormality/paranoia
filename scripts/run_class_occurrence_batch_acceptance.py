@@ -255,7 +255,10 @@ def validate_artifact(
 
         class ReplayEngine:
             name = "codex"
+            default_model = "gpt-5.6-sol"
+            binary = "codex"
             native_web = True
+            text_only = False
             role = "default"
 
             def __init__(self) -> None:
