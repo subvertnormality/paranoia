@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents shared plan-and-branch class-occurrence aggregation and its authored-evidence reconciliation while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "c6dddf3ca83eb3397ce6b86f542e803e74ed193e73ad79f006b07bd5897c93cf"
+      "sha256": "204ead1cf1ff421c29184d90ff3c4245f87174ce77c5337728e70d83985ff832"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
-      "sha256": "3694dc5bde425bb70cfaaf4255e854a9d1ec50e5067ae5c0d416e9671035eb6b"
+      "sha256": "480a3e178a6bda25b4f6c9f9f4f027404c8c404c4c4e30cdc1cc91e899969ab5"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
@@ -35,7 +35,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds public plan-and-branch aggregate-occurrence correction and bounded-retry coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "d354b422890373e2029aec209bfc097167e0794acfe6a527756a54276a113e11"
+      "sha256": "b0742a224a5d7966eb642215241311f74c195c3042ebafa6c9c4636ac5503c19"
     }
   },
   "after_lineage": {
