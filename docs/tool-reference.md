@@ -135,15 +135,18 @@ Resumes the reviewer session that produced a disputed finding.
 | `repo_path` | string | Required | Same repository used for the review |
 | `session_ref` | string | Required | Session reference from the review footer |
 | `rebuttal` | string | Required | Concrete counter-evidence |
-| `lineage` | string | — | Optional gated lineage; requires `class_id` and `lineage_mode` |
-| `class_id` | string | — | Optional active blocking class; requires both other binding values |
-| `lineage_mode` | `plan` or `branch` | — | Optional lineage mode; requires both other binding values |
+| `lineage` | string | — | Optional gated lineage; requires all other binding values |
+| `class_id` | string | — | Optional active blocking class |
+| `debt_id` | string | — | Optional exact open debt bound only to `class_id` |
+| `lineage_mode` | `plan` or `branch` | — | Optional lineage mode |
 
-The unbound form returns `CONCEDE` or `HOLD` with fresh citations. The three
-class-binding arguments are all-or-none. A successful bound rebut resets only
-that class's correction window. It does not close the class, remove debt, change
-severity, or grant convergence. The session must be the durable current session
-for an active blocking class.
+The unbound form returns prose `CONCEDE` or `HOLD` with fresh citations and does
+not mutate lineage state. The four class-binding arguments are all-or-none. A
+bound response is closed structured output: `HOLD` is audit-only; `CONCEDE`
+closes only the named debt and closes the class only when no sibling blocker
+remains. It never grants convergence. The session must be the durable current
+session for the active blocking class, and ambiguous or invalid state refuses
+settlement.
 
 ## `arbitrate`
 

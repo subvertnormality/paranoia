@@ -204,9 +204,11 @@ counter-evidence:
 ```
 
 The same reviewer session responds `CONCEDE` or `HOLD` with fresh citations.
-For a persistently gated class, optional `lineage`, `class_id`, and
-`lineage_mode` arguments can reset its bounded correction window after a
-successful rebuttal. They do not close debt or grant clearance.
+The unbound form is non-mutating. For a persistently gated class, optional
+`lineage`, `class_id`, `debt_id`, and `lineage_mode` arguments bind the result
+to one current durable target. `HOLD` is audit-only. A validated `CONCEDE`
+closes that debt and closes its class only when no sibling blocker remains; it
+never grants clearance, and the next critique still performs the normal final.
 
 ### Arbitrate a decision
 

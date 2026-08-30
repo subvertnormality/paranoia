@@ -103,14 +103,14 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "a72e7d73cd1500231f82b5ee4cbed2ac03ef0d4d44545b44969fb92e5d08a4b2",
-      "additions": 1623,
-      "deletions": 166,
+      "sha256": "32b77f94bda37ff893ad0229ac4b70c845944c13abd7c820fc6439c19dbadc82",
+      "additions": 1760,
+      "deletions": 175,
       "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
-      "sha256": "165fcba5baa53a2ce84c1f5f566cd289bb7d72b261a1b183b1cd0ec5598b2821",
-      "additions": 482,
+      "sha256": "8db97530d9c015d3e2ffe337ba86a57ed83cb928c88e092fef6e6ede80c06b48",
+      "additions": 550,
       "deletions": 12,
       "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
     },

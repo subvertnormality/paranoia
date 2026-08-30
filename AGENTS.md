@@ -521,17 +521,21 @@ real acceptance, tests, implementation convergence, or documented stakes remain 
 Persistent staged correction is a gate, not merely a trailer warning. After six unresolved
 caller-supplied round labels or three undisposed reopen waves, reject another correction that
 leaves the same class canonically blocking. Admit only a canonical close/replacement or a durable
-class-bound rebut reset against the stored current session. Rebut resets never change verdict,
-debt, or severity. Preserve this control state atomically with the lineage and store the exact
-returned trailer in plan and branch audit records.
+class-bound rebut against the stored current session and exact open debt. Bound rebut output is a
+closed CONCEDE/HOLD disposition: HOLD is audit-only; CONCEDE closes only the named debt and closes
+the class only when no sibling blocker remains. It never grants clearance. Preserve this state
+atomically with the lineage and store the exact returned trailer in plan and branch audit records.
 The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
 session authority replaces stale authority even when it is null; a terminal gate bootstrap may
 use only the exact validation-invalid terminal retry and only for a previously sessionless row.
 Clear session authority when a class becomes closed or advisory, and accept a bound rebut only for
-a currently blocking class. Repeated/backward caller labels refuse before provider, cache, snapshot,
+a currently blocking class in correction phase whose named open debt binds only that class. Refuse
+settlement while staged/format/validation failure or an unbound blocker exists. Repeated/backward caller labels refuse before provider, cache, snapshot,
 or worktree work, returning a zero-attempt blocked review whose exact trailer is audited; forward
-jumps count and failed labels may retry. Provider/validation failure does
-not advance substantive state, and ambiguous lineage or rebut saves retain the pending latch.
+jumps count and failed labels may retry. Provider/validation failure does not advance substantive
+state, and ambiguous lineage or rebut saves retain the pending latch. The rebut audit retains the
+complete prior target debt row separately while current closed-debt evidence records the concession
+citations.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.
 Bind bounded attempt-channel digests and exact retained response evidence to the acceptance

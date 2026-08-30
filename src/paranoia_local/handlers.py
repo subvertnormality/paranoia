@@ -526,6 +526,37 @@ def _staged_class_context(blocks: list[str]) -> str:
         ) from exc
 
 
+def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
+    rows = [
+        {
+            "class_id": c.class_id, "invariant": c.invariant,
+            "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
+            "pattern": c.pattern, "pathspec": c.pathspec, "procedure": c.procedure,
+        }
+        for c in lineage.active()
+    ]
+    if mode != cc.PLAN_MODE:
+        return rows
+    for row in rows:
+        durable_invariant = row["invariant"]
+        durable_procedure = row["procedure"] or "inspect the relevant plan obligations"
+        row["invariant"] = (
+            "PLAN-PHASE INTERPRETATION: the current plan completely and correctly binds "
+            "the future implementation needed to satisfy this durable invariant: "
+            f"{durable_invariant}"
+        )
+        row["procedure"] = (
+            "Judge the plan contract, not whether expected pre-implementation code already "
+            "passes. Require exact implementation scope, executable acceptance evidence, and "
+            "fail-closed behavior. An in-scope blocking deferral also requires a named durable "
+            "residual, owner, and acceptance boundary. Never promote MINOR, OUT-OF-SCOPE, "
+            "stakes-excluded, or declared non-goal work. Repository reads may challenge current "
+            "premises, feasibility, named interfaces, and completeness. Durable procedure "
+            f"context: {durable_procedure}"
+        )
+    return rows
+
+
 def _staged_lane_prompt(
     *, mode: str, lane: str, active_classes: list[dict[str, Any]], body: str,
     plan_contract: bool = False,
@@ -1171,14 +1202,7 @@ def _staged_structural_review(
             lineage.debt, ensure_ascii=False,
         )
     phase = state["phase"]
-    active_classes = [
-        {
-            "class_id": c.class_id, "invariant": c.invariant,
-            "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
-            "pattern": c.pattern, "pathspec": c.pathspec, "procedure": c.procedure,
-        }
-        for c in lineage.active()
-    ]
+    active_classes = _active_class_rows(lineage, mode)
     plan_correction_units: tuple[str, ...] | None = None
     if phase == "correction":
         try:
@@ -4391,22 +4415,30 @@ def rebut(
     effort = resolve("effort", arguments.get("effort"), cfg, "high")
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
-    binding_keys = ("lineage", "class_id", "lineage_mode")
+    binding_keys = ("lineage", "class_id", "debt_id", "lineage_mode")
     supplied = [key for key in binding_keys if arguments.get(key) is not None]
     if supplied and len(supplied) != len(binding_keys):
         raise ValueError(
-            "bound rebut requires lineage, class_id, and lineage_mode together"
+            "bound rebut requires lineage, class_id, debt_id, and lineage_mode together"
         )
     bound = bool(supplied)
     lineage: cc.Lineage | None = None
     state_root = cc.default_state_root()
     latch_owned = False
-    reset_recorded = False
+    debt_settled = False
+    class_closed = False
+    disposition: str | None = None
+    prior_target_debt: dict[str, Any] | None = None
+    rebut_evidence: list[str] = []
     class_id = arguments.get("class_id")
+    debt_id = arguments.get("debt_id")
     lineage_id = arguments.get("lineage")
     lineage_mode = arguments.get("lineage_mode")
     binding = (
-        {"lineage": lineage_id, "class_id": class_id, "lineage_mode": lineage_mode}
+        {
+            "lineage": lineage_id, "class_id": class_id,
+            "debt_id": debt_id, "lineage_mode": lineage_mode,
+        }
         if bound else None
     )
 
@@ -4418,10 +4450,15 @@ def rebut(
             failure_detail=detail,
         )
 
-    def log_rebut(review: Review, reset: bool) -> None:
+    def log_rebut(review: Review) -> None:
         _log(log_dir, "rebut", engine, review, now, {
             "session_ref": session_ref, "model": model,
-            "lineage_binding": binding, "correction_control_reset": reset,
+            "lineage_binding": binding,
+            "disposition": disposition,
+            "debt_settled": debt_settled,
+            "class_closed": class_closed,
+            "prior_target_debt": prior_target_debt,
+            "rebut_evidence": rebut_evidence,
         })
 
     if bound:
@@ -4439,8 +4476,40 @@ def rebut(
                 raise ValueError("bound rebut class_id is not an active tracked class")
             if not tracked.blocking:
                 raise ValueError(
-                    "bound rebut class_id is not currently blocking and eligible for reset"
+                    "bound rebut class_id is not currently blocking and eligible for settlement"
                 )
+            if lineage.review_state.get("phase") != "correction":
+                raise ValueError("bound rebut requires correction phase")
+            present_failures = [
+                key for key in rc.REBUT_FAILURE_FIELDS
+                if lineage.review_state.get(key)
+            ]
+            if present_failures:
+                raise ValueError(
+                    "bound rebut refuses unresolved structural state: "
+                    + ", ".join(present_failures)
+                )
+            target_debt = [
+                row for row in lineage.review_state.get("debt", [])
+                if isinstance(row, dict) and row.get("id") == debt_id
+            ]
+            if len(target_debt) != 1 or target_debt[0].get("status") != "open":
+                raise ValueError("bound rebut debt_id must name exactly one open debt")
+            if target_debt[0].get("class_ids") != [class_id]:
+                raise ValueError("bound rebut debt must bind only the supplied class_id")
+            open_bound = {
+                cid for row in lineage.review_state.get("debt", [])
+                if isinstance(row, dict) and row.get("status") == "open"
+                and row.get("severity") in rc.BLOCKING
+                for cid in row.get("class_ids", []) if isinstance(cid, str)
+            }
+            unbound = {item.class_id for item in lineage.blocking()} - open_bound
+            if unbound:
+                raise ValueError(
+                    "bound rebut refuses unbound blocking classes: "
+                    + ", ".join(sorted(unbound))
+                )
+            prior_target_debt = deepcopy(target_debt[0])
             control = rc.normalize_correction_control(
                 lineage.review_state, lineage.active(),
             )
@@ -4450,7 +4519,7 @@ def rebut(
                 )
         except BaseException as exc:
             try:
-                log_rebut(failure_review(exc), False)
+                log_rebut(failure_review(exc))
             except BaseException:
                 # An ambiguous audit deliberately leaves the latch for operator repair.
                 raise
@@ -4458,44 +4527,103 @@ def rebut(
             raise
 
     body = f"=== AUTHOR'S COUNTER-EVIDENCE ===\n{rebuttal}"
-    prompt = prompts.compose(prompts.REBUT_INSTRUCTIONS, body)
+    rebut_schema = {
+        "type":"object", "additionalProperties":False,
+        "properties":{
+            "disposition":{"type":"string", "enum":["CONCEDE", "HOLD"]},
+            "reason":{"type":"string", "minLength":1, "maxLength":4_000},
+            "evidence":{
+                "type":"array", "minItems":1, "maxItems":20,
+                "items":{"type":"string", "minLength":1, "maxLength":2_000},
+            },
+        },
+        "required":["disposition", "reason", "evidence"],
+    }
+    prompt = prompts.compose(
+        prompts.BOUND_REBUT_INSTRUCTIONS if bound else prompts.REBUT_INSTRUCTIONS,
+        body,
+    )
     save_ambiguous = False
     audit_ambiguous = False
     try:
         try:
             review = engine.resume(session_ref, prompt, repo, model, effort, web_search,
-                                   **_progress_kwargs(on_progress))
+                                   response_schema=(
+                                       sp.provider_schema(rebut_schema) if bound else None
+                                   ), **_progress_kwargs(on_progress))
         except BaseException as exc:
             failed = failure_review(exc)
             try:
-                log_rebut(failed, False)
+                log_rebut(failed)
             except BaseException:
                 audit_ambiguous = True
                 raise
             raise
         if bound and not review.error:
             assert lineage is not None
-            control = rc.normalize_correction_control(
-                lineage.review_state, lineage.active(),
-            )
-            row = control["classes"][class_id]
-            row.update(
-                reset_round=lineage.review_state.get("last_round"),
-                reopen_count=0, last_session_ref=session_ref,
-            )
-            lineage.review_state["correction_control"] = control
             try:
-                cc.save_lineage(state_root, lineage)
+                parsed = sp.decode(review.text, rebut_schema, max_chars=12_000)
+                if not parsed["reason"].strip() or any(
+                    not item.strip() for item in parsed["evidence"]
+                ):
+                    raise sp.ProtocolError(
+                        "/: rebut reason and evidence must contain non-whitespace text"
+                    )
+                disposition = parsed["disposition"]
+                rebut_evidence = list(parsed["evidence"])
+                rendered = (
+                    f"{disposition}: {parsed['reason']}\n\n"
+                    + "\n".join(f"- {item}" for item in rebut_evidence)
+                )
+                review = replace(review, text=rendered)
+                if disposition == "CONCEDE":
+                    draft = cc.copy_lineage(lineage)
+                    draft.review_state = rc.settle_rebut_concession(
+                        draft.review_state, debt_id=debt_id, class_id=class_id,
+                        evidence=rebut_evidence,
+                        blocking_class_ids=[item.class_id for item in draft.blocking()],
+                    )
+                    still_bound = any(
+                        row.get("status") == "open"
+                        and row.get("severity") in rc.BLOCKING
+                        and class_id in row.get("class_ids", [])
+                        for row in draft.review_state.get("debt", [])
+                    )
+                    if not still_bound:
+                        cc.apply_register(
+                            draft,
+                            cc.Register(transitions=(cc.Transition("CLOSED", class_id),)),
+                            round_no=draft.rounds or draft.review_state.get("last_round") or 1,
+                        )
+                        class_closed = True
+                        control = rc.normalize_correction_control(
+                            draft.review_state, draft.active(),
+                        )
+                        control["classes"][class_id] = {
+                            "reset_round":None, "reopen_count":0,
+                            "last_session_ref":None,
+                        }
+                        draft.review_state["correction_control"] = control
+                    cc.save_lineage(state_root, draft)
+                    lineage = draft
+                    debt_settled = True
             except cc.StateUnavailable as exc:
                 save_ambiguous = True
                 try:
-                    log_rebut(failure_review(exc), False)
+                    log_rebut(failure_review(exc))
                 except BaseException:
                     audit_ambiguous = True
                 raise
-            reset_recorded = True
+            except (sp.ProtocolError, rc.CensusError, cc.RegisterError) as exc:
+                failed = failure_review(exc)
+                try:
+                    log_rebut(failed)
+                except BaseException:
+                    audit_ambiguous = True
+                    raise
+                raise ValueError(str(exc)) from exc
         try:
-            log_rebut(review, reset_recorded)
+            log_rebut(review)
         except BaseException:
             audit_ambiguous = True
             raise

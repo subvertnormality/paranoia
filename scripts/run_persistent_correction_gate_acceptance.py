@@ -516,10 +516,10 @@ def validate_artifact(
             "reset_round", "reopen_count", "last_session_ref",
             "exact validation-invalid terminal retry",
         ),
-        "src/paranoia_local/server.py": (
-            "all-or-none", "never closes debt", "Sessionless gate recovery",
-            "never falls back to an earlier attempt",
-        ),
+            "src/paranoia_local/server.py": (
+                "all-or-none", "debt_id", "HOLD", "CONCEDE",
+                "never grants clearance",
+            ),
     }
     for relative, required in surfaces.items():
         text = (root / relative).read_text(encoding="utf-8")
