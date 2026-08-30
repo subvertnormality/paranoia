@@ -4425,6 +4425,7 @@ def rebut(
         )
     bound = bool(supplied)
     lineage: cc.Lineage | None = None
+    review_state: dict[str, Any] | None = None
     state_root = cc.default_state_root()
     latch_owned = False
     debt_settled = False
@@ -4472,6 +4473,10 @@ def rebut(
             lineage = cc.load_lineage(
                 state_root, lineage_id, stamp=now(), mode=lineage_mode,
                 pending_owned=True,
+            )
+            review_state = rc.validate_persisted_state(
+                lineage.review_state, lineage.active(),
+                correction_control_source=lineage.review_state,
             )
             tracked = lineage.classes.get(class_id)
             if tracked is None or tracked.status == cc.SUPERSEDED:
@@ -4602,7 +4607,10 @@ def rebut(
                         "resolved for the target debt"
                     )
                 plan_lines = (
-                    review_state.get("plan_line_count")
+                    (
+                        review_state.get("plan_line_count")
+                        if review_state is not None else None
+                    )
                     if lineage_mode == cc.PLAN_MODE else None
                 )
                 if lineage_mode == cc.BRANCH_MODE and lineage.branch_contract:
