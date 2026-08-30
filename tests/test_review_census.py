@@ -4121,6 +4121,105 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
     assert audit["staged_settlement"]["findings"][0]["evidence"] == anchors
 
 
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_correction_retries_non_debt_assessment_evidence_omission(
+    repo_with_branch, tmp_path, monkeypatch, mode,
+):
+    lineage_id = f"derived-occurrence-{mode}"
+    anchors = (
+        ["plan:1", "plan:2"] if mode == cc.PLAN_MODE else
+        ["repository/app.py:1", "repository/extra.py:1"]
+    )
+    classes = {
+        cid:cc.TrackedClass(
+            cid, invariant, cc.MAJOR, 1, cc.OPEN,
+            procedure="inspect every independently anchored site",
+        )
+        for cid, invariant in (
+            ("debt-class", "the known blocker is repaired"),
+            ("fresh-class", "every duplicate contract site agrees"),
+        )
+    }
+    state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":cc.MAJOR,
+        "summary":"known blocker", "evidence":[anchors[0]],
+        "remedy":"repair the known blocker", "source_ids":[],
+        "class_ids":["debt-class"], "first_round":1, "last_round":1,
+    }], last_round=1)
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=mode, rounds=1, next_seq=2,
+            classes=classes, review_state=state,
+        ),
+    )
+    calls = []
+
+    def response_value(*, complete):
+        return {
+            "role":"correction",
+            "governing_findings":[{
+                "id":"fresh", "severity":"MAJOR",
+                "summary":"duplicate contract sites disagree",
+                "evidence":anchors if complete else anchors[:1],
+                "remedy":"repair every independently anchored site",
+                "classification":{
+                    "kind":"existing_class", "class_id":"fresh-class",
+                    "assessment_evidence":anchors,
+                },
+            }],
+            "debt_outcomes":[{
+                "debt_id":"D1", "status":"closed", "evidence":[anchors[0]],
+            }],
+            "class_outcomes":[{
+                "class_id":"debt-class", "verdict":"satisfied",
+                "evidence":[anchors[0]],
+            }],
+            "class_actions":{"debt-class":None, "fresh-class":None},
+        }
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        text = wire(response_value(complete=False))
+        return Review(text=text, session_ref="derived-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "derived-session"
+        calls.append(prompt)
+        assert "/governing_findings/0/evidence" in prompt
+        assert "/classification/assessment_evidence" in prompt
+        text = wire(response_value(complete=True))
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    args = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id, "round":2,
+        "stakes":"trusted local tool",
+    }
+    invoke = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
+    if mode == cc.PLAN_MODE:
+        args.update(plan_text="# Contract\n\nDuplicate contract.", claim_verification=False)
+    else:
+        args.update(base_ref="main", head_ref="feature")
+    result = invoke(
+        args, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda:"DERIVED",
+    )
+
+    assert len(calls) == 2
+    assert "STRUCTURAL-PHASE: correction" in result
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    fresh = next(
+        row for row in durable.review_state["debt"]
+        if row["status"] == "open" and row["class_ids"] == ["fresh-class"]
+    )
+    assert fresh["evidence"] == anchors
+
+
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
     repo, tmp_path, monkeypatch,
 ):

@@ -2651,18 +2651,31 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
     )
 
 
-def test_correction_derives_non_debt_class_outcome_with_distinct_evidence():
+def test_correction_rejects_non_debt_assessment_evidence_missing_from_finding():
     current = finding(
         "G5", "MINOR", classification={
             "kind":"existing_class", "class_id":"class-a",
             "assessment_evidence":["plan:2"],
         },
     )
+    with pytest.raises(
+        sp.ProtocolError,
+        match=(
+            r"/governing_findings/0/evidence: fresh aggregate finding.*"
+            r"/classification/assessment_evidence; missing \['plan:2'\]"
+        ),
+    ):
+        materialize(
+            decision("correction", governing_findings=[current]),
+            active_classes=[active_class(severity="MINOR")],
+        )
+
+    current["evidence"] = ["plan:1", "plan:2"]
     parsed = materialize(
         decision("correction", governing_findings=[current]),
         active_classes=[active_class(severity="MINOR")],
     )
-    assert parsed["findings"][0]["evidence"] == ["plan:1"]
+    assert parsed["findings"][0]["evidence"] == ["plan:1", "plan:2"]
     assert parsed["class_assessments"] == [{
         "class_id":"class-a", "verdict":"violated", "evidence":["plan:2"],
         "finding_id":"G5",

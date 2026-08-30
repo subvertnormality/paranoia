@@ -1264,6 +1264,18 @@ def materialize_decision_value(
                             "non-debt-bound class occurrence"
                         )
                         continue
+                    finding_evidence = findings[finding_index]["evidence"]
+                    missing = [
+                        anchor for anchor in evidence
+                        if anchor not in finding_evidence
+                    ]
+                    if missing:
+                        issues.append(
+                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
+                            f"finding for class {cid!r} must include every "
+                            "current-occurrence anchor authored in "
+                            f"{pointer}/assessment_evidence; missing {missing}"
+                        )
                     outcomes[cid] = {
                         "class_id": cid, "verdict": "violated",
                         "evidence": list(evidence),

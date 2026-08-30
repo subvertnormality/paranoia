@@ -291,6 +291,8 @@ still-reachable predecessor occurrence, preventing duplicate blockers for one cl
 The correction materializer cross-checks the fresh finding against its matching violated class
 outcome and rejects it if any independently authored current-occurrence anchor is missing from the
 aggregate finding; the retry identifies the provider-owned evidence pointer.
+The same check runs before a non-debt-bound correction finding can derive its violated outcome from
+`classification.assessment_evidence`.
 Correction settlement rejects any prospective state with more than one open debt for an active class.
 
 For lifecycle details, persistence controls, false-positive exemptions, and

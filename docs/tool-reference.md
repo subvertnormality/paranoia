@@ -238,6 +238,8 @@ still-reachable predecessor occurrence, so one class does not accumulate duplica
 Before that transition, the correction materializer requires the finding to contain every
 current-occurrence anchor independently authored in its matching violated class outcome and reports
 an omission at the governing finding's evidence pointer through the bounded validation retry.
+Non-debt-bound correction findings pass the same check against their authored
+`classification.assessment_evidence` before the server derives a violated class outcome.
 The canonical correction validator also rejects any resulting state with multiple open debts bound
 to one active class.
 

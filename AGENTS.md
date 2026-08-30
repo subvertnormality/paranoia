@@ -402,6 +402,8 @@ of the resulting code and tests.
   Before predecessor debt can close, require the fresh governing finding to contain every
   current-occurrence anchor independently authored in its matching violated class outcome; report
   omissions at provider-owned JSON Pointers through the bounded retry.
+  Apply the same containment rule to a non-debt-bound correction occurrence before deriving its
+  violated outcome from `classification.assessment_evidence`.
   A fresh aggregate finding must close every prior open debt bound to that class after including
   every still-reachable predecessor occurrence; never retain narrower and aggregate blockers side by side.
   After any correction settlement, at most one open debt may remain bound to an active class.
