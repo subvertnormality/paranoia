@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -76,6 +77,7 @@ COMMON_TOP_LEVEL = {
     "model_call_count", "report", "report_sha256", "snapshot_binding",
     "source_revision", "source_sha256", "allowed_later_source_diffs", "version",
 }
+NEGATIVE_TOP_LEVEL = COMMON_TOP_LEVEL | {"audit_path"}
 INPUT_FIELDS = {
     "clean", "context", "decision", "files", "options", "order_seed", "research",
     "stakes", "web_search",
@@ -87,6 +89,37 @@ def _canonical_digest(value: object) -> str:
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8", "surrogatepass")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_negative_report_projection(
+    report: str, audit: dict, audit_path: str,
+) -> None:
+    """Bind the rendered failure report back to its validated audit projection."""
+    reason = audit.get("reason")
+    if not isinstance(report, str) or not isinstance(reason, str) or not reason:
+        raise ValueError("negative acceptance report inputs are malformed")
+    if report[: len(f"# Arbitration: FAILED\n\n{reason}\n\n")] != (
+        f"# Arbitration: FAILED\n\n{reason}\n\n"
+    ):
+        raise ValueError("negative acceptance report headline or reason mismatch")
+
+    def field(name: str) -> str:
+        values = re.findall(rf"^{re.escape(name)}: (.*)$", report, re.MULTILINE)
+        if len(values) != 1:
+            raise ValueError(f"negative acceptance report has {len(values)} {name} fields")
+        return values[0]
+
+    expected = {
+        "ARBITRATION": audit.get("outcome"),
+        "CLEANING": audit.get("cleaning"),
+        "ROUNDS": str(len(audit.get("rounds", []))),
+        "AUDIT": audit_path,
+    }
+    if not isinstance(audit_path, str) or not audit_path:
+        raise ValueError("negative acceptance audit path is absent")
+    for name, value in expected.items():
+        if not isinstance(value, str) or field(name) != value:
+            raise ValueError(f"negative acceptance report {name} mismatch")
 
 
 def _source_blob(repo: Path, commit: str, path: str) -> bytes:
@@ -179,7 +212,7 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
     )
     files_closed = (
         isinstance(files, list)
-        and len(files) == 1
+        and len(files) <= 1
         and all(
             isinstance(row, dict)
             and set(row) == {"path", "reason"}
@@ -258,7 +291,7 @@ def _positive(artifact: dict, repo: Path) -> None:
 def _negative(
     artifact: dict, repo: Path, *, field: str, expected_sources: frozenset[str],
 ) -> None:
-    if set(artifact) != COMMON_TOP_LEVEL:
+    if set(artifact) != NEGATIVE_TOP_LEVEL:
         raise ValueError("negative acceptance top-level schema mismatch")
     audit, instructions, _ = _common(
         artifact, repo, expected_sources=expected_sources,
@@ -278,7 +311,7 @@ def _negative(
         or artifact["model_call_count"] != 2
         or [row.get("role") for row in attempts] != ["cleaner", "attester"]
         or audit.get("outcome") != arb.FAILED
-        or audit.get("cleaning") != "attestation-rejected"
+        or audit.get("cleaning") != "caller-framing-rejected"
         or audit.get("rounds") != []
         or not shared._cleaned_digest_bound(cleaned)
     ):
@@ -319,7 +352,10 @@ def _negative(
         "hints": (ah._render_hints(raw["files"]), ah._render_hints(cleaned_hints)),
     }
     try:
-        attestation = ah.parse_attestation(audit["attestation"], expected)
+        attestation = ah.parse_attestation(
+            audit["attestation"], expected,
+            stakes=raw["stakes"], context=raw["context"],
+        )
     except arb.ArbitrationError as exc:
         raise ValueError("negative acceptance attestation is invalid") from exc
     if (
@@ -328,6 +364,9 @@ def _negative(
         or not attestation.original_neutrality_pass
     ):
         raise ValueError(f"negative acceptance did not isolate {field} steering")
+    diagnostic = getattr(attestation, f"{field}_advocacy")
+    if audit.get("caller_framing_diagnostic") != diagnostic:
+        raise ValueError("negative acceptance did not persist its bound caller diagnostic")
     attester_body = ah._attest_body(
         raw["decision"], raw["stakes"], raw["context"], raw["files"],
         cleaned_hints, raw["options"], parsed,
@@ -335,7 +374,7 @@ def _negative(
     attester_prompt = prompts.compose(instructions["ATTEST_INSTRUCTIONS"], attester_body)
     if not shared._attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
-        rejection=getattr(attestation, f"{field}_advocacy"),
+        rejection=ah._caller_advocacy_rejection(diagnostic),
         execution=shared._external_execution(
             engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL,
         ),
@@ -346,11 +385,15 @@ def _negative(
         if field == "stakes" else "context is preserved verbatim"
     )
     expected_reason = (
-        f"the {field} text advocates for an option, and {reason_bridge} — fix it and "
-        f"re-run: {getattr(attestation, f'{field}_advocacy')}"
+        f"caller framing rejected: the {field} text advocates for an option, and "
+        f"{reason_bridge} — fix it and re-run: "
+        f"{ah._caller_advocacy_rejection(getattr(attestation, f'{field}_advocacy'))}"
     )
     if audit.get("reason") != expected_reason:
         raise ValueError("negative acceptance failure reason mismatch")
+    validate_negative_report_projection(
+        artifact["report"], audit, artifact["audit_path"],
+    )
 
 
 def validate_artifacts(

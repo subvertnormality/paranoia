@@ -11,11 +11,11 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"
+      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "4ef7156291fcf5ad0f4ef8b3948e0742e2d48eb7d85d7726929f726b79672ac1"
+      "sha256": "6805f8e6078ef710081f518978bf3a5707aed935689fc69a4e682c1843dfaa15"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",

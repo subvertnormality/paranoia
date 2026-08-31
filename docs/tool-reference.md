@@ -208,6 +208,17 @@ The trailer always includes `ARBITRATION`, `SELECTED`, `PROVISIONAL-SELECTED`, `
 `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`,
 `ROUNDS`, `RESEARCH`, and `RESEARCH-DIGEST`.
 
+`CLEANING: caller-framing-rejected` means the terminal verdict found advocacy in
+unchanged caller-owned context or stakes; a closed `{field, passage}` diagnostic
+is validated against the exact caller text and the failure names what the caller
+must restate. Original-neutrality evidence from cleaner-owned decision, option,
+or hint fields only disables fallback and is retained separately. A terminal
+fidelity, cleaned-neutrality, or candidate-shape rejection is `cleaner-rejected`;
+malformed or oversized attester output is `attestation-rejected`.
+Paranoia may discard a meaning-changing cleaner candidate and safely use an
+independently attested neutral original, but never sends the changed candidate to
+the deciders.
+
 When the final votes are unanimous but not substantiated, the result remains
 `UNRESOLVED`: `SELECTED` is `none`, while `PROVISIONAL-SELECTED` reports the
 common option as non-binding diagnostic information.

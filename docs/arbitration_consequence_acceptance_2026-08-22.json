@@ -1,9 +1,17 @@
 {
   "acceptance_kind": "arbitration-consequence-not-advocacy",
   "allowed_later_source_diffs": {
+    "src/paranoia_local/arbitrate_handler.py": {
+      "scope": "Classifies and field-binds terminal caller-owned advocacy while preserving original fallback, cleaner fidelity rejection, and the retained successful provider exchange.",
+      "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"
+    },
+    "src/paranoia_local/arbitration.py": {
+      "scope": "Adds the symmetric attester reply-size circuit breaker; the retained consequence-only successful exchange stays below both reply limits.",
+      "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"
+    },
     "src/paranoia_local/prompts.py": {
-      "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and consequence framing are unchanged.",
-      "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"
+      "scope": "Shared staged-review guidance plus field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",
+      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
     }
   },
   "audit": {

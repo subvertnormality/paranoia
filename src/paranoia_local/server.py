@@ -384,7 +384,7 @@ TOOLS: list[Tool] = [
                     "description": "2-4 mutually exclusive options, each with a caller-stable id. Array order is irrelevant — canonical order is derived by sorting ids.",
                 },
                 "stakes": {**_STAKES_REQUIRED, "maxLength": 20000},
-                "context": {"type": "string", "maxLength": 20000, "description": "Background shared by every option: common facts and common specification only. Option-specific mechanisms and consequences stay in their option statements. Preserved byte-for-byte rather than cleaned; the cross-vendor attester independently rejects context that advocates for an option.",},
+                "context": {"type": "string", "maxLength": 20000, "description": "Background shared by every option: common facts and common specification only. Option-specific mechanisms and consequences stay in their option statements. Preserved byte-for-byte rather than cleaned; the cross-vendor attester rejects context advocacy only with an exact server-validated field passage.",},
                 "files": {
                     "type": "array",
                     "maxItems": 32,

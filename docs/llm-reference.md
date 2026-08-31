@@ -231,6 +231,11 @@ Rules:
 - There is no `engine` or singular `model`.
 - `retain_snapshot:true` creates a Git ref. Remove it with
   `git update-ref -d refs/paranoia/arbitrate/<stamp>`.
+- On failure, `CLEANING: caller-framing-rejected` means caller-owned advocacy was
+  identified by a server-validated `{field, passage}` whose passage is an exact
+  substring of that caller field, and it must be restated. `cleaner-rejected`
+  and `attestation-rejected` instead identify cleaner or attester/protocol failure.
+  A rejected cleaner rewrite is never sent to deciders.
 
 Results: `CONVERGED`, `BLOCKED`, `REFRAME_REQUIRED`, `UNRESOLVED`, `FAILED`.
 Unsubstantiated unanimous agreement is `UNRESOLVED`, has `SELECTED: none`, and

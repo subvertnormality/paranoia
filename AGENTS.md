@@ -495,6 +495,24 @@ names every changed field, binds exact original and cleaned substrings to that f
 classifies the semantic delta with the closed change enum, and repeats that classification in the
 deterministic `<field>: <change>` reason label. Do not use a free-text heuristic as a semantic gate. Keep valid
 `raw_input.options` as the same ID-to-statement mapping on every success and failure path.
+Classify terminal cleaning failures by the actor who can repair them. Caller-owned advocacy in the
+original decision/options/hints, context, or stakes is `caller-framing-rejected` and must retain the
+exact field/passage diagnostic across the bounded retry. Cleaner output/protocol failure remains
+`cleaner-rejected`; attester output/protocol failure remains `attestation-rejected`. Never add a
+keyword lint that claims to replace semantic cross-vendor attestation.
+Treat an option's ordinary proposal as content, but require original-neutrality failure for embedded
+meta-selection language that calls the option correct, directs its selection, or tells deciders to
+disregard contrary evidence or tradeoffs.
+Require every stakes/context advocacy verdict to be a closed field-and-passage object whose nonempty
+passage occurs verbatim in that exact caller field. Keep fallback-ineligibility evidence separate
+from the terminal attempt owner so a later cleaner or attester protocol failure cannot be relabeled
+as caller fault; persist it as `fallback_ineligibility_diagnostic` without letting it override the
+terminal status or terminal `caller_framing_diagnostic`. A valid fidelity, cleaned-neutrality, or
+cleaned-candidate rejection is cleaner-owned; malformed or oversized attester output is
+attestation-owned. Bound attester replies independently as strictly as cleaner replies.
+Real-provider failure acceptance must parse the retained report and require its headline, exact
+reason/diagnostic, `ARBITRATION`, `CLEANING`, `ROUNDS`, and `AUDIT` projection to agree with the
+validated audit; a report digest alone is not semantic agreement.
 When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
 the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
 never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and

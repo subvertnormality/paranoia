@@ -660,6 +660,9 @@ stamped a biased packet `attested` — sending that same bias to both deciders.
 `ORIGINAL-NEUTRALITY` is independent of cleaned fidelity and neutrality and covers
 complete hints, including every path and reason. Its FAIL
 form is a closed two-key JSON object bound to an exact original field and passage.
+An alternative's ordinary proposal (such as `Use X`) is option content, but embedded
+meta-selection language that calls itself correct, directs selection, or tells deciders
+to disregard contrary evidence or tradeoffs is advocacy and must fail this verdict.
 When the cleaned candidate is complete and bounded but cannot be used, PASS permits
 one atomic fallback to the canonical original decision, option mapping, and validated
 hints. Context and stakes remain byte-identical and keep their independent advocacy
@@ -869,7 +872,7 @@ SELECTED: <caller-stable-id> | none
 PROVISIONAL-SELECTED: <caller-stable-id> | none
 ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: claude) | human-owner (flagged by: both)
 AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not
-CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped
+CLEANING: not reached | cleaning | caller-framing-rejected | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped
 SNAPSHOT: <commit-id> | none
 REFS-MOVED: no | yes | unavailable
 ORDER-SEED: <seed>
@@ -878,6 +881,17 @@ ROUNDS: 0 | 1 | 2
 RESEARCH: not reached | running | failed | complete <N> packets | repository-only
 RESEARCH-DIGEST: <sha256> | none
 ```
+
+`caller-framing-rejected` is reserved for a closed `{field, passage}` diagnostic
+whose nonempty passage is verified against that exact caller field. A later
+cleaner or attester protocol failure retains any earlier fallback-ineligibility
+diagnostic in the audit's separate `fallback_ineligibility_diagnostic` field but
+reports the terminal model/protocol owner instead. A valid fidelity, cleaned-
+neutrality, or cleaned-candidate rejection is cleaner-owned; malformed or
+oversized attester output is attestation-owned.
+Retained real-provider failure acceptance parses the report as well as hashing it:
+the failure headline, exact reason and diagnostic, `ARBITRATION`, `CLEANING`,
+`ROUNDS`, and `AUDIT` fields must agree with the validated audit projection.
 
 `AUDIT` exists because `logs.write_log` swallows every failure and returns `None`
 (`logs.py:23`), so revision 1 could return `CONVERGED` with no local audit record

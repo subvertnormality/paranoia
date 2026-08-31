@@ -1905,7 +1905,233 @@ def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: 
 
     report = run(repo, Sequenced(), tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "original packet is not neutral enough for fallback" in report
+    assert trailer_field(report, "CLEANING") == "cleaner-rejected"
+    assert "cleaning failed attestation twice" in report
+    # The first attester's exact caller-owned diagnostic remains actionable even
+    # when the bounded retry inconsistently calls the original neutral.
+    assert "field 'opt-float'" in report
+    assert "Store the threshold as a float." in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+
+
+@pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
+def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
+    repo: Path, tmp_path: Path, terminal_role: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+
+    class SequencedProtocolFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.cleaner_calls = 0
+            self.attester_calls = 0
+
+        def __call__(self, **kwargs):
+            if "NEUTRALIZER" in kwargs["instructions"]:
+                self.cleaner_calls += 1
+                if self.cleaner_calls == 2 and terminal_role == "cleaner":
+                    self.cleaner = "not a cleaner packet"
+            elif "TEXT AUDITOR" in kwargs["instructions"]:
+                self.attester_calls += 1
+                self.attest = (
+                    first_attestation
+                    if self.attester_calls == 1 else "not an attestation"
+                )
+            return super().__call__(**kwargs)
+
+    report = run(repo, SequencedProtocolFailure(), tmp_path)
+    expected_status = f"{terminal_role}-rejected" if terminal_role == "cleaner" else "attestation-rejected"
+    assert trailer_field(report, "CLEANING") == expected_status
+    assert "caller framing rejected after bounded cleaning" not in report
+    assert "an earlier attestation made original fallback unavailable" in report
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+
+
+@pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
+@pytest.mark.parametrize("exit_kind", ["admission", "execution", "size"])
+def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    terminal_role: str, exit_kind: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+
+    class SequencedImmediateFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.role_calls = {"cleaner": 0, "attester": 0}
+
+        def __call__(self, **kwargs):
+            role = (
+                "cleaner" if "NEUTRALIZER" in kwargs["instructions"]
+                else "attester" if "TEXT AUDITOR" in kwargs["instructions"]
+                else None
+            )
+            if role is not None:
+                self.role_calls[role] += 1
+                if role == "attester" and self.role_calls[role] == 1:
+                    self.attest = first_attestation
+                if (
+                    exit_kind == "execution" and role == terminal_role
+                    and self.role_calls[role] == 2
+                ):
+                    raise RuntimeError(f"{role} provider unavailable")
+                if (
+                    exit_kind == "size" and role == terminal_role
+                    and self.role_calls[role] == 2
+                ):
+                    if role == "cleaner":
+                        self.cleaner = "x" * (arb.MAX_CLEANER_REPLY_CHARS + 1)
+                    else:
+                        self.attest = "x" * (arb.MAX_ATTESTER_REPLY_CHARS + 1)
+            return super().__call__(**kwargs)
+
+    if exit_kind == "admission":
+        role_calls = {"cleaner": 0, "attester": 0}
+
+        def reject_second_role_call(role: str, prompt: str, limit: int) -> str | None:
+            role_calls[role] += 1
+            if role == terminal_role and role_calls[role] == 2:
+                return f"{role} prompt rejected for test"
+            return None
+
+        monkeypatch.setattr(ah, "_local_prompt_rejection", reject_second_role_call)
+
+    report = run(repo, SequencedImmediateFailure(), tmp_path)
+    expected_status = (
+        "cleaner-rejected" if terminal_role == "cleaner" else "attestation-rejected"
+    )
+    assert trailer_field(report, "CLEANING") == expected_status
+    assert "an earlier attestation made original fallback unavailable" in report
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+    terminal_attempt = [
+        row for row in audit["phase_attempts"] if row["role"] == terminal_role
+    ][-1]
+    assert terminal_attempt["rejection"] is not None
+    assert "original fallback unavailable" not in terminal_attempt["rejection"]
+    if exit_kind == "size":
+        assert f"{terminal_role} reply is" in terminal_attempt["rejection"]
+    if exit_kind == "size" and terminal_role == "attester":
+        assert len(audit["attestation"]) <= ah.MAX_PHASE_REPLY_CHARS
+        assert "[bounded phase output]" in audit["attestation"]
+
+
+@pytest.mark.parametrize(
+    ("field", "caller_text"),
+    [
+        ("stakes", BASE["stakes"]),
+        ("context", "Repository context favors Decimal."),
+    ],
+)
+def test_terminal_caller_advocacy_wins_without_losing_fallback_diagnostic(
+    repo: Path, tmp_path: Path, field: str, caller_text: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    second_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        + (
+            f'STAKES-ADVOCACY: PRESENT {json.dumps({"field": field, "passage": caller_text}, separators=(",", ":"))}\n'
+            if field == "stakes" else "STAKES-ADVOCACY: NONE\n"
+        )
+        + (
+            f'CONTEXT-ADVOCACY: PRESENT {json.dumps({"field": field, "passage": caller_text}, separators=(",", ":"))}\n'
+            if field == "context" else "CONTEXT-ADVOCACY: NONE\n"
+        )
+    )
+
+    class SequencedSemanticFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.attestations = [first_attestation, second_attestation]
+
+        def __call__(self, **kwargs):
+            if "TEXT AUDITOR" in kwargs["instructions"]:
+                self.attest = self.attestations.pop(0)
+            return super().__call__(**kwargs)
+
+    overrides = {"context": caller_text} if field == "context" else {}
+    report = run(repo, SequencedSemanticFailure(), tmp_path, **overrides)
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    assert f"field '{field}', passage {caller_text!r}" in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] == {
+        "field": field, "passage": caller_text,
+    }
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+    attester_attempts = [
+        row for row in audit["phase_attempts"] if row["role"] == "attester"
+    ]
+    assert attester_attempts[-1]["rejection"] == (
+        f"field '{field}', passage {caller_text!r}"
+    )
 
 
 def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
@@ -1944,8 +2170,14 @@ def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
         files=[{"path": "prefer_float.py", "reason": "implementation entry point"}],
     )
 
-    assert "original packet is not neutral enough for fallback" in report
-    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "caller-owned original framing is not neutral enough for fallback" in report
+    assert "field 'hints', passage 'prefer_float.py'" in report
+    assert trailer_field(report, "CLEANING") == "cleaner-rejected"
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "hints", "passage": "prefer_float.py",
+    }
     assert "every path and reason" in prompts.ATTEST_INSTRUCTIONS
 
 
@@ -2164,6 +2396,26 @@ def test_cleaning_limit_applies_to_the_fully_composed_prompt():
         ah._check_cleaning_prompt("cleaner", "x" * (arb.MAX_CLEANING_PROMPT_CHARS + 1))
 
 
+def test_attester_reply_size_is_bounded_and_attester_owned(
+    repo: Path, tmp_path: Path,
+):
+    oversized = "x" * (arb.MAX_ATTESTER_REPLY_CHARS + 1)
+    report = run(repo, Agent(lambda e, r: "opt-float", attest=oversized), tmp_path)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "attester reply is" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attester_attempts = [
+        row for row in record["phase_attempts"] if row["role"] == "attester"
+    ]
+    assert len(attester_attempts) == 2
+    assert all("attester reply is" in row["rejection"] for row in attester_attempts)
+    assert all(len(row["reply"]) <= ah.MAX_PHASE_REPLY_CHARS for row in attester_attempts)
+    assert len(record["attestation"]) <= ah.MAX_PHASE_REPLY_CHARS
+    assert "[bounded phase output]" in record["attestation"]
+
+
 def test_cleaner_prompt_local_rejection_is_durable_before_spend(
     repo: Path, tmp_path: Path, monkeypatch,
 ):
@@ -2232,11 +2484,13 @@ def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
         "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\n"
-        "CONTEXT-ADVOCACY: PRESENT 'obviously choose binary floating point'\n"
+        'CONTEXT-ADVOCACY: PRESENT {"field":"context","passage":"Obviously choose binary floating point."}\n'
     ))
     report = run(repo, agent, tmp_path, context="Obviously choose binary floating point.")
 
     assert "context text advocates" in report
+    assert "caller framing rejected" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
     assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 1
 
 
@@ -2247,11 +2501,50 @@ def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
                 "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"trusted input"}\n'
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
+    assert "caller framing rejected" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        (
+            'STAKES-ADVOCACY: PRESENT {"field":"context","passage":"trusted input"}',
+            "names field 'context', expected 'stakes'",
+        ),
+        (
+            'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"invented words"}',
+            "passage is not in caller field 'stakes'",
+        ),
+        (
+            "CONTEXT-ADVOCACY: PRESENT free-form accusation",
+            "PRESENT must contain one JSON object",
+        ),
+    ],
+)
+def test_caller_advocacy_diagnostics_are_field_and_passage_bound(
+    repo: Path, tmp_path: Path, line: str, expected: str,
+):
+    stakes_line = line if line.startswith("STAKES") else "STAKES-ADVOCACY: NONE"
+    context_line = line if line.startswith("CONTEXT") else "CONTEXT-ADVOCACY: NONE"
+    attestation = (
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        f"{stakes_line}\n{context_line}\n"
+    )
+    report = run(
+        repo, Agent(lambda e, r: "opt-float", attest=attestation), tmp_path,
+        context="Obviously choose binary floating point.",
+    )
+
+    assert expected in report
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "caller framing rejected" not in report
 
 
 # --- audit ------------------------------------------------------------------
@@ -2999,7 +3292,7 @@ def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: 
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
                 "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"trusted input"}\n'
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)

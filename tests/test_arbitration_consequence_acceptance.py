@@ -46,7 +46,6 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     assert artifact["input"]["research"] is False
     assert artifact["input"]["web_search"] is False
     assert artifact["model_call_count"] == 4
-
     audit = artifact["audit"]
     assert audit["outcome"] == "CONVERGED"
     assert audit["reason"] == "unanimous, unblocked, substantiated"
@@ -89,6 +88,7 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
         "top-level-delete", "input-decision", "input-stakes", "input-context",
         "input-files", "input-options", "input-clean", "input-research", "input-web",
         "input-order-seed", "version", "date",
+        "negative-report-status", "negative-report-diagnostic",
         "option-extra", "option-duplicate", "option-empty", "file-extra",
         "file-empty", "file-duplicate",
         "version-bool", "version-float", "version-string", "version-null",
@@ -135,6 +135,23 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
     elif mutation == "negative-rounds":
         target = negative
         negative["audit"]["rounds"] = [{"codex": {}}]
+    elif mutation == "negative-report-status":
+        target = negative
+        negative["report"] = negative["report"].replace(
+            "ARBITRATION: FAILED", "ARBITRATION: CONVERGED", 1,
+        )
+        negative["report_sha256"] = hashlib.sha256(
+            negative["report"].encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        sync = False
+    elif mutation == "negative-report-diagnostic":
+        target = negative
+        passage = negative["audit"]["caller_framing_diagnostic"]["passage"]
+        negative["report"] = negative["report"].replace(passage, "different passage", 1)
+        negative["report_sha256"] = hashlib.sha256(
+            negative["report"].encode("utf-8", "surrogatepass")
+        ).hexdigest()
+        sync = False
     elif mutation == "context-rounds":
         target = context_negative
         context_negative["audit"]["rounds"] = [{"codex": {}}]

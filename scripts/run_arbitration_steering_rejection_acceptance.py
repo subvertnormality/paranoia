@@ -56,21 +56,52 @@ def _audit_path(report: str) -> Path:
 
 def run_acceptance(
     arguments: dict, *, field: str, output: Path, source_paths: tuple[str, ...],
+    diagnostic_field: str | None = None,
+    expected_roles: tuple[str, ...] = ("cleaner", "attester"),
 ) -> int:
     log_dir = Path(tempfile.mkdtemp(prefix="paranoia-steering-acceptance-"))
     started = time.monotonic()
     report = ah.arbitrate(arguments, log_dir=log_dir)
     elapsed = time.monotonic() - started
-    audit = json.loads(_audit_path(report).read_text(encoding="utf-8"))
-    if audit.get("outcome") != "FAILED" or f"{field} text advocates" not in audit.get("reason", ""):
+    audit_path = _audit_path(report)
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    reason = audit.get("reason", "")
+    expected_reason = (
+        f"{field} text advocates" if field in {"stakes", "context"}
+        else "caller framing rejected"
+    )
+    if audit.get("outcome") != "FAILED" or expected_reason not in reason:
         raise RuntimeError(f"steering acceptance did not fail closed: {audit.get('reason')}")
+    if audit.get("cleaning") != "caller-framing-rejected":
+        raise RuntimeError("caller steering was not classified as caller-framing-rejected")
     if audit.get("rounds"):
         raise RuntimeError("a decider ran after the steering verdict")
     attempts = audit.get("phase_attempts", [])
-    if [row.get("role") for row in attempts] != ["cleaner", "attester"]:
-        raise RuntimeError("negative acceptance did not stop after cleaner and attester")
-    if f"{field.upper()}-ADVOCACY: PRESENT" not in audit.get("attestation", ""):
-        raise RuntimeError("attester did not identify the genuine steering")
+    if tuple(row.get("role") for row in attempts) != expected_roles:
+        raise RuntimeError("negative acceptance did not stop at the expected cleaning boundary")
+    if field in {"stakes", "context"}:
+        if f"{field.upper()}-ADVOCACY: PRESENT" not in audit.get("attestation", ""):
+            raise RuntimeError("attester did not identify the genuine steering")
+    elif "ORIGINAL-NEUTRALITY: FAIL" not in audit.get("attestation", ""):
+        raise RuntimeError("attester did not identify the original caller steering")
+    diagnostic = audit.get("caller_framing_diagnostic")
+    bound_field = diagnostic_field or field
+    if bound_field in arguments:
+        source_text = arguments[bound_field]
+    else:
+        source_text = next(
+            row["statement"] for row in arguments["options"] if row["id"] == bound_field
+        )
+    if (
+        not isinstance(diagnostic, dict)
+        or diagnostic.get("field") != bound_field
+        or not isinstance(diagnostic.get("passage"), str)
+        or diagnostic["passage"] not in source_text
+        or diagnostic["passage"] not in reason
+    ):
+        raise RuntimeError("caller steering diagnostic is not field-and-passage bound")
+    from scripts import validate_arbitration_consequence_acceptance as validator
+    validator.validate_negative_report_projection(report, audit, str(audit_path))
 
     source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
     snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
@@ -83,6 +114,7 @@ def run_acceptance(
             path: hashlib.sha256(_git_bytes("show", f"{source_revision}:{path}")).hexdigest()
             for path in source_paths
         },
+        "allowed_later_source_diffs": {},
         "snapshot_binding": {
             "commit_object": snapshot_object.decode("utf-8"),
             "sha256": hashlib.sha256(snapshot_object).hexdigest(),
@@ -95,6 +127,7 @@ def run_acceptance(
         },
         "model_call_count": len(attempts),
         "report": report,
+        "audit_path": str(audit_path),
         "report_sha256": hashlib.sha256(
             report.encode("utf-8", "surrogatepass")
         ).hexdigest(),

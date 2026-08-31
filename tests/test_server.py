@@ -57,7 +57,8 @@ class TestToolListing:
         tool = next(t for t in server.TOOLS if t.name == "arbitrate")
         description = tool.inputSchema["properties"]["context"]["description"]
         assert "Preserved byte-for-byte" in description
-        assert "attester independently rejects" in description
+        assert "attester rejects context advocacy" in description
+        assert "exact server-validated field passage" in description
         assert "Neutralized" not in description
 
     def test_arbitrate_schema_allows_substantive_option_detail_asymmetry(self) -> None:

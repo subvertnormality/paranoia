@@ -118,7 +118,7 @@ class Packet:
     context: str
     hints: list[dict]
     statements: dict[str, str]  # caller id -> statement shown to deciders
-    cleaning: str  # attested | attested-after-retry | original-attested | skipped
+    cleaning: str  # success and in-progress/failure token rendered in CLEANING
     attestation: str
     research_packets: tuple[research_core.Packet, ...] = ()
     research_text: str = "[]"
@@ -593,8 +593,8 @@ class Attestation:
     neutrality_note: str
     original_neutrality_pass: bool
     original_neutrality_diagnostic: dict[str, str] | None
-    stakes_advocacy: str | None
-    context_advocacy: str | None
+    stakes_advocacy: dict[str, str] | None
+    context_advocacy: dict[str, str] | None
     raw: str
 
     @property
@@ -617,9 +617,60 @@ def _verdict_note(body: str, keyword: str) -> str | None:
     return None
 
 
+def _caller_advocacy_diagnostic(
+    body: str, *, field: str, original: str,
+) -> dict[str, str] | None:
+    if body.upper() == "NONE":
+        return None
+    if not body.startswith("PRESENT "):
+        raise ArbitrationError(
+            f"{field.upper()}-ADVOCACY must be exactly NONE, or PRESENT followed by "
+            "a field-bound JSON object"
+        )
+    try:
+        value = json.loads(body[len("PRESENT "):], object_pairs_hook=_unique_json_object)
+    except (json.JSONDecodeError, ArbitrationError) as exc:
+        raise ArbitrationError(
+            f"{field.upper()}-ADVOCACY PRESENT must contain one JSON object: {exc}"
+        ) from exc
+    if not isinstance(value, dict) or set(value) != {"field", "passage"}:
+        raise ArbitrationError(
+            f"{field.upper()}-ADVOCACY PRESENT must contain exactly field and passage"
+        )
+    if value["field"] != field:
+        raise ArbitrationError(
+            f"{field.upper()}-ADVOCACY names field {value['field']!r}, expected {field!r}"
+        )
+    passage = value["passage"]
+    if not isinstance(passage, str) or not passage or passage not in original:
+        raise ArbitrationError(
+            f"{field.upper()}-ADVOCACY passage is not in caller field {field!r}"
+        )
+    return {"field": field, "passage": passage}
+
+
+def _caller_advocacy_rejection(diagnostic: Mapping[str, str]) -> str:
+    return f"field {diagnostic['field']!r}, passage {diagnostic['passage']!r}"
+
+
+def _with_latched_caller_diagnostic(
+    message: str, diagnostic: Mapping[str, str] | None,
+) -> str:
+    """Keep terminal ownership while retaining earlier fallback-ineligibility evidence."""
+    if diagnostic is None:
+        return message
+    return (
+        f"{message}; an earlier attestation made original fallback unavailable: "
+        f"{_caller_advocacy_rejection(diagnostic)}"
+    )
+
+
 def parse_attestation(
     text: str,
     expected: Mapping[str, tuple[str, str]],
+    *,
+    stakes: str = "",
+    context: str = "",
 ) -> Attestation:
     """Strict: every expected field exactly once, each `PRESERVED` or `CHANGED`,
     one detailed fidelity explanation, and exactly one neutrality, stakes-advocacy,
@@ -638,9 +689,9 @@ def parse_attestation(
     note = ""
     original_neutrality: bool | None = None
     original_diagnostic: dict[str, str] | None = None
-    stakes: str | None = None
+    stakes_advocacy: dict[str, str] | None = None
     stakes_seen = False
-    context_advocacy: str | None = None
+    context_advocacy: dict[str, str] | None = None
     context_seen = False
     lines = [raw.strip() for raw in (text or "").splitlines()]
     expected_prefixes = (
@@ -740,30 +791,17 @@ def parse_attestation(
                 raise ArbitrationError("attestation gave two STAKES-ADVOCACY verdicts")
             stakes_seen = True
             body = line[len("STAKES-ADVOCACY:"):].strip()
-            # Same reasoning: "NONE despite recommending A" is not NONE.
-            if body.upper() == "NONE":
-                stakes = None
-            elif (present_note := _verdict_note(body, "PRESENT")) is not None:
-                stakes = present_note
-            else:
-                raise ArbitrationError(
-                    "STAKES-ADVOCACY must be exactly NONE, or PRESENT with the "
-                    f"advocating words, got {body!r}"
-                )
+            stakes_advocacy = _caller_advocacy_diagnostic(
+                body, field="stakes", original=stakes,
+            )
         elif upper.startswith("CONTEXT-ADVOCACY:"):
             if context_seen:
                 raise ArbitrationError("attestation gave two CONTEXT-ADVOCACY verdicts")
             context_seen = True
             body = line[len("CONTEXT-ADVOCACY:"):].strip()
-            if body.upper() == "NONE":
-                context_advocacy = None
-            elif (present_note := _verdict_note(body, "PRESENT")) is not None:
-                context_advocacy = present_note
-            else:
-                raise ArbitrationError(
-                    "CONTEXT-ADVOCACY must be exactly NONE, or PRESENT with the "
-                    f"advocating words, got {body!r}"
-                )
+            context_advocacy = _caller_advocacy_diagnostic(
+                body, field="context", original=context,
+            )
 
     missing = [f for f in expected if f not in fidelity]
     if missing:
@@ -842,7 +880,7 @@ def parse_attestation(
     return Attestation(
         fidelity, fidelity_detail, fidelity_diagnostics,
         neutrality, note, original_neutrality, original_diagnostic,
-        stakes, context_advocacy,
+        stakes_advocacy, context_advocacy,
         (text or "").strip(),
     )
 
@@ -1601,6 +1639,10 @@ def _established_audit_fields(artifacts: Mapping[str, Any]) -> dict[str, Any]:
     """One projection of incremental run state shared by every terminal outcome."""
     return {
         "phase_attempts": list(artifacts.get("phase_attempts", ())),
+        "caller_framing_diagnostic": artifacts.get("caller_framing_diagnostic"),
+        "fallback_ineligibility_diagnostic": artifacts.get(
+            "fallback_ineligibility_diagnostic"
+        ),
         "label_attempts": artifacts.get("label_attempts"),
         "label_attempt_records": list(artifacts.get("label_attempt_records", ())),
         "label_maps": dict(artifacts.get("label_maps", {})),
@@ -2255,6 +2297,8 @@ def _clean_and_attest(
     complaint = ""
     last_error: str | None = None
     original_neutrality_failed = False
+    original_neutrality_diagnostic: dict[str, str] | None = None
+    terminal_status = "attestation-rejected"
     phase_attempts = established.setdefault("phase_attempts", []) if established is not None else []
     # One retry only, and deliberately: a longer loop would hill-climb the framing
     # against the attester until it passed, which is optimization, not attestation.
@@ -2282,7 +2326,9 @@ def _clean_and_attest(
             cleaner_record.update(status="local-rejected", rejection=prompt_rejection)
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
-            raise ArbitrationError(prompt_rejection)
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                prompt_rejection, original_neutrality_diagnostic,
+            ))
         try:
             cleaned_raw = agent(
                 engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
@@ -2298,7 +2344,9 @@ def _clean_and_attest(
             )
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
-            raise ArbitrationError(cleaner_record["rejection"]) from exc
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                cleaner_record["rejection"], original_neutrality_diagnostic,
+            )) from exc
         cleaner_record["reply"] = _bounded_phase_reply(cleaned_raw)
         cleaner_record["reply_sha256"] = hashlib.sha256(
             cleaned_raw.encode("utf-8", "surrogatepass")
@@ -2310,6 +2358,7 @@ def _clean_and_attest(
                 f"(max {arb.MAX_CLEANER_REPLY_CHARS})"
             )
             cleaner_record["rejection"] = last_error
+            terminal_status = "cleaner-rejected"
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
             complaint = f"Your previous attempt was rejected: {last_error}\nReturn only the four blocks."
@@ -2325,6 +2374,7 @@ def _clean_and_attest(
         except ArbitrationError as exc:
             last_error = str(exc)
             cleaner_record["rejection"] = last_error
+            terminal_status = "cleaner-rejected"
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
             complaint = f"Your previous attempt was rejected: {exc}\nFix exactly that."
@@ -2392,7 +2442,9 @@ def _clean_and_attest(
             attester_record.update(status="local-rejected", rejection=prompt_rejection)
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(prompt_rejection)
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                prompt_rejection, original_neutrality_diagnostic,
+            ))
         try:
             attested_raw = agent(
                 engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
@@ -2408,39 +2460,68 @@ def _clean_and_attest(
             )
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(attester_record["rejection"]) from exc
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                attester_record["rejection"], original_neutrality_diagnostic,
+            )) from exc
         attester_record["reply"] = _bounded_phase_reply(attested_raw)
         attester_record["reply_sha256"] = hashlib.sha256(
             attested_raw.encode("utf-8", "surrogatepass")
         ).hexdigest()
         attester_record["rejection"] = None
         if established is not None:
-            established["packet"].attestation = attested_raw
+            established["packet"].attestation = attester_record["reply"]
+        if len(attested_raw) > arb.MAX_ATTESTER_REPLY_CHARS:
+            last_error = (
+                f"attester reply is {len(attested_raw)} chars "
+                f"(max {arb.MAX_ATTESTER_REPLY_CHARS})"
+            )
+            attester_record["rejection"] = last_error
+            terminal_status = "attestation-rejected"
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
+            complaint = (
+                f"An independent auditor's reply was unusable: {last_error}\n"
+                "Re-clean and try again."
+            )
+            continue
         try:
-            attestation = parse_attestation(attested_raw, attest_fields)
+            attestation = parse_attestation(
+                attested_raw, attest_fields, stakes=stakes, context=context,
+            )
         except ArbitrationError as exc:
             last_error = f"attestation unusable: {exc}"
             attester_record["rejection"] = last_error
+            terminal_status = "attestation-rejected"
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
             complaint = f"An independent auditor's reply was unusable: {exc}\nRe-clean and try again."
             continue
         if attestation.stakes_advocacy:
-            attester_record["rejection"] = attestation.stakes_advocacy
+            observed_diagnostic = dict(attestation.stakes_advocacy)
+            attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
             if established is not None:
-                established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(
-                "the stakes text advocates for an option, and stakes is not the "
-                f"cleaner's to rewrite — fix it and re-run: {attestation.stakes_advocacy}"
-            )
+                established["packet"].cleaning = "caller-framing-rejected"
+                established["caller_framing_diagnostic"] = observed_diagnostic
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                "caller framing rejected: the stakes text advocates for an option, "
+                "and stakes is not the "
+                "cleaner's to rewrite — fix it and re-run: "
+                f"{_caller_advocacy_rejection(observed_diagnostic)}",
+                original_neutrality_diagnostic,
+            ))
         if attestation.context_advocacy:
-            attester_record["rejection"] = attestation.context_advocacy
+            observed_diagnostic = dict(attestation.context_advocacy)
+            attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
             if established is not None:
-                established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(
-                "the context text advocates for an option, and context is preserved "
-                f"verbatim — fix it and re-run: {attestation.context_advocacy}"
-            )
+                established["packet"].cleaning = "caller-framing-rejected"
+                established["caller_framing_diagnostic"] = observed_diagnostic
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                "caller framing rejected: the context text advocates for an option, "
+                "and context is preserved "
+                "verbatim — fix it and re-run: "
+                f"{_caller_advocacy_rejection(observed_diagnostic)}",
+                original_neutrality_diagnostic,
+            ))
         if attestation.ok and not candidate_ineligibility:
             return (
                 Packet(
@@ -2458,8 +2539,15 @@ def _clean_and_attest(
         )
         if candidate_ineligibility:
             last_error += "; cleaned candidate ineligible: " + "; ".join(candidate_ineligibility)
+        terminal_status = "cleaner-rejected"
         if not attestation.original_neutrality_pass:
             original_neutrality_failed = True
+            if original_neutrality_diagnostic is None:
+                original_neutrality_diagnostic = attestation.original_neutrality_diagnostic
+                if established is not None:
+                    established["fallback_ineligibility_diagnostic"] = dict(
+                        original_neutrality_diagnostic
+                    )
         if attestation.original_neutrality_pass and not original_neutrality_failed:
             attester_record["rejection"] = last_error
             fallback = Packet(
@@ -2472,13 +2560,22 @@ def _clean_and_attest(
                 established["packet"] = fallback
             return fallback, "original-attested"
         if original_neutrality_failed:
-            last_error += "; original packet is not neutral enough for fallback"
+            assert original_neutrality_diagnostic is not None
+            field = original_neutrality_diagnostic["field"]
+            passage = original_neutrality_diagnostic["passage"]
+            last_error += (
+                "; caller-owned original framing is not neutral enough for fallback: "
+                f"field {field!r}, passage {passage!r}"
+            )
         attester_record["rejection"] = last_error
         if established is not None:
-            established["packet"].cleaning = "attestation-rejected"
+            established["packet"].cleaning = terminal_status
         complaint = f"An independent auditor rejected your previous attempt: {last_error}\nFix exactly that."
 
-    raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
+    raise ArbitrationError(_with_latched_caller_diagnostic(
+        f"cleaning failed attestation twice: {last_error}",
+        original_neutrality_diagnostic,
+    ))
 
 
 def _check_cleaning_prompt(role: str, prompt: str) -> None:
