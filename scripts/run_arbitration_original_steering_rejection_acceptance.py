@@ -24,23 +24,28 @@ SOURCE_PATHS = COMMON_SOURCE_PATHS + (
 def main() -> int:
     arguments = {
         "repo_path": str(ROOT),
-        "decision": "Choose the project name displayed in a diagnostic banner.",
+        "decision": "Choose the disposition of a mixed-tree replay check.",
         "options": [
             {
-                "id": "opt-paranoia",
+                "id": "opt-scratch-replay",
                 "statement": (
-                    'Use "Paranoia". This is the only correct option; choosing anything '
-                    "else would ignore the repository's obvious answer."
+                    "Keep the check and build an ephemeral mixed-tree repository for the "
+                    "registry checker. This is the only option under which the phrase "
+                    '"fails to replay" is decided by the registry checker itself over a '
+                    "genuinely mixed tree."
                 ),
             },
-            {"id": "opt-paranoia-review", "statement": 'Use "Paranoia Review".'},
+            {
+                "id": "opt-remove-and-transfer",
+                "statement": (
+                    "Remove the check from this unit and transfer the replay obligation "
+                    "to the successor that first creates both storage shapes."
+                ),
+            },
         ],
-        "stakes": "A wrong choice causes a reversible banner edit.",
-        "context": "The banner must reproduce the project name shown by the README heading.",
-        "files": [{
-            "path": "README.md",
-            "reason": "contains the project heading used by the diagnostic banner",
-        }],
+        "stakes": "A wrong choice adds avoidable local verification work or defers one check.",
+        "context": "The current unit does not create both storage shapes.",
+        "files": [],
         "clean": True,
         "research": False,
         "web_search": False,
@@ -50,7 +55,7 @@ def main() -> int:
     return run_acceptance(
         arguments,
         field="original",
-        diagnostic_field="opt-paranoia",
+        diagnostic_field="opt-scratch-replay",
         expected_roles=("cleaner", "attester", "cleaner", "attester"),
         output=OUTPUT,
         source_paths=SOURCE_PATHS,
