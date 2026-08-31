@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement and arbitration-only failure taxonomy contract.",
-      "sha256": "c0af6837d4fffd5fe24296ddf7e4598e4f52c0fdd802632cd1cd17a19b8b244b"
+      "sha256": "976e4c280784279c9d6b30134aba8249b99da2698ff15aa2d5624e55d16dd363"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement documentation.",
@@ -11,7 +11,7 @@
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
-      "sha256": "0b52c12571d1a1208940223ed6491cc33f4f5890d898635859eda7d2d31f9473"
+      "sha256": "b255c87d7c28b0188f5244ce7c442456b631500e5e78443798288441a4a1a8a5"
     },
     "scripts/run_plan_review_reliability_acceptance.py": {
       "scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.",
@@ -1768,11 +1768,11 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
-        "sha256": "44d4082d42069fe7e2027440aa5a6192b94b0323dd973177f7a123d0fe72b952"
+        "sha256": "14f65f24eec31eb09e57af096cd3f890cdc076888889cba160021be927a387de"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
-        "sha256": "65c2cbe3d479113bf260c72ec06385fb97a5a1041df83170781b7ca2c6dfbc5c"
+        "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior.",
