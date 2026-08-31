@@ -111,6 +111,7 @@ def run_acceptance(
             path: hashlib.sha256(_git_bytes("show", f"{source_revision}:{path}")).hexdigest()
             for path in source_paths
         },
+        "allowed_later_source_diffs": {},
         "snapshot_binding": {
             "commit_object": snapshot_object.decode("utf-8"),
             "sha256": hashlib.sha256(snapshot_object).hexdigest(),
