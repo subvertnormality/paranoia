@@ -267,7 +267,9 @@ NEUTRALITY: FAIL <which option the packet favours, and the words that do it>
 ORIGINAL-NEUTRALITY: PASS
 ORIGINAL-NEUTRALITY: FAIL {"field":"<decision|hints|known option id>","passage":"<exact non-empty original substring>"}
 STAKES-ADVOCACY: NONE
+STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"<exact non-empty stakes substring>"}
 CONTEXT-ADVOCACY: NONE
+CONTEXT-ADVOCACY: PRESENT {"field":"context","passage":"<exact non-empty context substring>"}
 
 Emit ONE FIDELITY-DETAIL line, ONE of the two NEUTRALITY lines, and ONE of the two
 ORIGINAL-NEUTRALITY lines. ORIGINAL-NEUTRALITY FAIL JSON has exactly the two shown
@@ -276,10 +278,11 @@ FIDELITY-DETAIL
 reason is a deterministic label, exactly "<field>: <change>". The closed change token
 plus the two exact passages is the semantic explanation; do not add free-form reason prose.
 must be NONE only when no field is CHANGED. The JSON must stay on that one line;
-passages must be exact substrings of the named field. Use STAKES-ADVOCACY: PRESENT <the
-advocating words> when stakes steers the decision. Use CONTEXT-ADVOCACY: PRESENT
-<the advocating words> when unchanged context steers the decision; emit NONE when
-no context was supplied or it does not steer."""
+passages must be exact substrings of the named field. STAKES-ADVOCACY and
+CONTEXT-ADVOCACY PRESENT each require exactly the shown field-bound JSON object;
+the field is respectively `stakes` or `context`, and passage must be an exact
+non-empty substring of that caller field. Emit NONE when the field does not steer
+or when no context was supplied."""
 
 
 ARBITRATE_INSTRUCTIONS = """You are adjudicating a decision. Choose the best of the options given, on the evidence, and justify it from the repository.

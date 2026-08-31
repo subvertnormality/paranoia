@@ -1913,6 +1913,60 @@ def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: 
     assert "Store the threshold as a float." in report
 
 
+@pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
+def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
+    repo: Path, tmp_path: Path, terminal_role: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+
+    class SequencedProtocolFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.cleaner_calls = 0
+            self.attester_calls = 0
+
+        def __call__(self, **kwargs):
+            if "NEUTRALIZER" in kwargs["instructions"]:
+                self.cleaner_calls += 1
+                if self.cleaner_calls == 2 and terminal_role == "cleaner":
+                    self.cleaner = "not a cleaner packet"
+            elif "TEXT AUDITOR" in kwargs["instructions"]:
+                self.attester_calls += 1
+                self.attest = (
+                    first_attestation
+                    if self.attester_calls == 1 else "not an attestation"
+                )
+            return super().__call__(**kwargs)
+
+    report = run(repo, SequencedProtocolFailure(), tmp_path)
+    expected_status = f"{terminal_role}-rejected" if terminal_role == "cleaner" else "attestation-rejected"
+    assert trailer_field(report, "CLEANING") == expected_status
+    assert "caller framing rejected after bounded cleaning" not in report
+    assert "an earlier attestation made original fallback unavailable" in report
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+
+
 def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
     repo: Path, tmp_path: Path,
 ):
@@ -2238,7 +2292,7 @@ def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
         "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
         "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
         "STAKES-ADVOCACY: NONE\n"
-        "CONTEXT-ADVOCACY: PRESENT 'obviously choose binary floating point'\n"
+        'CONTEXT-ADVOCACY: PRESENT {"field":"context","passage":"Obviously choose binary floating point."}\n'
     ))
     report = run(repo, agent, tmp_path, context="Obviously choose binary floating point.")
 
@@ -2255,13 +2309,50 @@ def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
                 "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"trusted input"}\n'
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
     assert "caller framing rejected" in report
     assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        (
+            'STAKES-ADVOCACY: PRESENT {"field":"context","passage":"trusted input"}',
+            "names field 'context', expected 'stakes'",
+        ),
+        (
+            'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"invented words"}',
+            "passage is not in caller field 'stakes'",
+        ),
+        (
+            "CONTEXT-ADVOCACY: PRESENT free-form accusation",
+            "PRESENT must contain one JSON object",
+        ),
+    ],
+)
+def test_caller_advocacy_diagnostics_are_field_and_passage_bound(
+    repo: Path, tmp_path: Path, line: str, expected: str,
+):
+    stakes_line = line if line.startswith("STAKES") else "STAKES-ADVOCACY: NONE"
+    context_line = line if line.startswith("CONTEXT") else "CONTEXT-ADVOCACY: NONE"
+    attestation = (
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        f"{stakes_line}\n{context_line}\n"
+    )
+    report = run(
+        repo, Agent(lambda e, r: "opt-float", attest=attestation), tmp_path,
+        context="Obviously choose binary floating point.",
+    )
+
+    assert expected in report
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "caller framing rejected" not in report
 
 
 # --- audit ------------------------------------------------------------------
@@ -3009,7 +3100,7 @@ def test_stakes_advocacy_present_with_the_words_still_fails_to_the_caller(repo: 
         attest=("FIDELITY: decision PRESERVED; "
                 "opt-float PRESERVED; opt-decimal PRESERVED\nFIDELITY-DETAIL: NONE\n"
                 "NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
-                "STAKES-ADVOCACY: PRESENT 'just pick the fast one'\n"
+                'STAKES-ADVOCACY: PRESENT {"field":"stakes","passage":"trusted input"}\n'
                 "CONTEXT-ADVOCACY: NONE\n"),
     )
     report = run(repo, agent, tmp_path)

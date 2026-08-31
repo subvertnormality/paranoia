@@ -500,6 +500,10 @@ original decision/options/hints, context, or stakes is `caller-framing-rejected`
 exact field/passage diagnostic across the bounded retry. Cleaner output/protocol failure remains
 `cleaner-rejected`; attester output/protocol failure remains `attestation-rejected`. Never add a
 keyword lint that claims to replace semantic cross-vendor attestation.
+Require every stakes/context advocacy verdict to be a closed field-and-passage object whose nonempty
+passage occurs verbatim in that exact caller field. Keep fallback-ineligibility evidence separate
+from the terminal attempt owner so a later cleaner or attester protocol failure cannot be relabeled
+as caller fault; persist the latched diagnostic without letting it override the terminal status.
 When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
 the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
 never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and

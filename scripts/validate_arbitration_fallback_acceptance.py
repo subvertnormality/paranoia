@@ -244,7 +244,10 @@ def _cleaning_and_attestation_bound(
             ah._render_hints(raw["files"]), ah._render_hints(cleaned["hints"]),
         )
     try:
-        attestation = ah.parse_attestation(audit["attestation"], expected)
+        attestation = ah.parse_attestation(
+            audit["attestation"], expected,
+            stakes=raw["stakes"], context=raw["context"],
+        )
     except (KeyError, arb.ArbitrationError):
         return False
     if (

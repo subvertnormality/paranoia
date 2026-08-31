@@ -879,6 +879,11 @@ RESEARCH: not reached | running | failed | complete <N> packets | repository-onl
 RESEARCH-DIGEST: <sha256> | none
 ```
 
+`caller-framing-rejected` is reserved for a closed `{field, passage}` diagnostic
+whose nonempty passage is verified against that exact caller field. A later
+cleaner or attester protocol failure retains any earlier fallback-ineligibility
+diagnostic in the audit but reports the terminal model/protocol owner instead.
+
 `AUDIT` exists because `logs.write_log` swallows every failure and returns `None`
 (`logs.py:23`), so revision 1 could return `CONVERGED` with no local audit record
 at all. The verdict is still returned in-band on a log failure — it is valid — but

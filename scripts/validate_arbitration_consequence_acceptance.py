@@ -278,7 +278,7 @@ def _negative(
         or artifact["model_call_count"] != 2
         or [row.get("role") for row in attempts] != ["cleaner", "attester"]
         or audit.get("outcome") != arb.FAILED
-        or audit.get("cleaning") != "attestation-rejected"
+        or audit.get("cleaning") != "caller-framing-rejected"
         or audit.get("rounds") != []
         or not shared._cleaned_digest_bound(cleaned)
     ):
@@ -319,7 +319,10 @@ def _negative(
         "hints": (ah._render_hints(raw["files"]), ah._render_hints(cleaned_hints)),
     }
     try:
-        attestation = ah.parse_attestation(audit["attestation"], expected)
+        attestation = ah.parse_attestation(
+            audit["attestation"], expected,
+            stakes=raw["stakes"], context=raw["context"],
+        )
     except arb.ArbitrationError as exc:
         raise ValueError("negative acceptance attestation is invalid") from exc
     if (
@@ -328,6 +331,9 @@ def _negative(
         or not attestation.original_neutrality_pass
     ):
         raise ValueError(f"negative acceptance did not isolate {field} steering")
+    diagnostic = getattr(attestation, f"{field}_advocacy")
+    if audit.get("caller_framing_diagnostic") != diagnostic:
+        raise ValueError("negative acceptance did not persist its bound caller diagnostic")
     attester_body = ah._attest_body(
         raw["decision"], raw["stakes"], raw["context"], raw["files"],
         cleaned_hints, raw["options"], parsed,
@@ -335,7 +341,7 @@ def _negative(
     attester_prompt = prompts.compose(instructions["ATTEST_INSTRUCTIONS"], attester_body)
     if not shared._attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
-        rejection=getattr(attestation, f"{field}_advocacy"),
+        rejection=ah._caller_advocacy_rejection(diagnostic),
         execution=shared._external_execution(
             engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL,
         ),
@@ -346,8 +352,9 @@ def _negative(
         if field == "stakes" else "context is preserved verbatim"
     )
     expected_reason = (
-        f"the {field} text advocates for an option, and {reason_bridge} — fix it and "
-        f"re-run: {getattr(attestation, f'{field}_advocacy')}"
+        f"caller framing rejected: the {field} text advocates for an option, and "
+        f"{reason_bridge} — fix it and re-run: "
+        f"{ah._caller_advocacy_rejection(getattr(attestation, f'{field}_advocacy'))}"
     )
     if audit.get("reason") != expected_reason:
         raise ValueError("negative acceptance failure reason mismatch")

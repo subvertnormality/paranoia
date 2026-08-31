@@ -188,7 +188,9 @@ Codex attests that substantive meaning was preserved. Caller `context` and
 see opposite option order under opaque labels and are unaware of each other.
 If caller-owned decision, option, hint, context, or stakes prose advocates for an
 option and cannot be neutralized without changing meaning, the run fails with
-`CLEANING: caller-framing-rejected` and names the exact actionable passage. A
+`CLEANING: caller-framing-rejected` and names the exact actionable passage. The
+attester must return a closed `{field, passage}` diagnostic whose passage occurs
+verbatim in that caller field; unbound accusations are attestation failures. A
 cleaner/protocol defect remains `cleaner-rejected` or `attestation-rejected`;
 these statuses do not blame the caller. Semantic neutrality is model-attested,
 so Paranoia does not claim a zero-provider local lint can establish it reliably.
