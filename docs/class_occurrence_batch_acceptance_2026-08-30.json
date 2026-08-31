@@ -2,7 +2,7 @@
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
     "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation for this retained route.", "sha256": "d07453bc04f33ceb34ff0acc62533a5557f642add3dac7350db6862d48d0b36c"},
-    "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, and separate fallback diagnostics; branch class-occurrence aggregation is unchanged.", "sha256": "262b6f270c23620086f9e3a961e767d8fc20db3a4a22c904f670ee94eda001b2"},
+    "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
     "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
     "src/paranoia_local/handlers.py": {"scope": "Plan-only phase projection and debt-targeted rebut settlement; branch occurrence aggregation is unchanged.", "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"},
     "src/paranoia_local/prompts.py": {"scope": "Bound-rebut and arbitration field-bound diagnostic instructions, including original-option advocacy guidance; branch occurrence aggregation instructions are unchanged.", "sha256": "6d828676723ed3b6be6ac041317cad90c046924bd8c0d5b96b777e4b9716489d"},
