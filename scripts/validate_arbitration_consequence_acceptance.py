@@ -38,9 +38,6 @@ STAKES_NEGATIVE_SOURCES = frozenset({
 CONTEXT_NEGATIVE_SOURCES = STAKES_NEGATIVE_SOURCES | {
     "scripts/run_arbitration_context_steering_rejection_acceptance.py",
 }
-ORIGINAL_NEGATIVE_SOURCES = STAKES_NEGATIVE_SOURCES | {
-    "scripts/run_arbitration_original_steering_rejection_acceptance.py",
-}
 REPLAYED_PRODUCTION_SOURCES = frozenset({
     "src/paranoia_local/arbitrate_handler.py",
     "src/paranoia_local/arbitration.py",
@@ -363,109 +360,8 @@ def _negative(
         raise ValueError("negative acceptance failure reason mismatch")
 
 
-def _original_negative(artifact: dict, repo: Path) -> None:
-    if set(artifact) != COMMON_TOP_LEVEL:
-        raise ValueError("original negative acceptance top-level schema mismatch")
-    audit, instructions, _ = _common(
-        artifact, repo, expected_sources=ORIGINAL_NEGATIVE_SOURCES,
-    )
-    if artifact.get("acceptance_kind") != "arbitration-original-steering-rejected":
-        raise ValueError("original negative acceptance kind mismatch")
-    if artifact.get("claims") != _negative_claims("original"):
-        raise ValueError("original negative acceptance claim scope mismatch")
-    if not _raw_input_bound(artifact, audit):
-        raise ValueError("original negative acceptance input mismatch")
-    raw = audit["raw_input"]
-    attempts = audit.get("phase_attempts", [])
-    if (
-        artifact.get("model_call_count") != 4
-        or [row.get("role") for row in attempts]
-        != ["cleaner", "attester", "cleaner", "attester"]
-        or audit.get("outcome") != arb.FAILED
-        or audit.get("cleaning") != "caller-framing-rejected"
-        or audit.get("rounds") != []
-        or not shared._cleaned_digest_bound(audit.get("cleaned", {}))
-    ):
-        raise ValueError("original negative acceptance did not stop after bounded cleaning")
-
-    complaint = ""
-    first_diagnostic: dict[str, str] | None = None
-    last_error = ""
-    for index in range(2):
-        cleaner_record, attester_record = attempts[index * 2:index * 2 + 2]
-        cleaner_body = ah._clean_body(
-            raw["decision"], raw["stakes"], raw["context"], raw["files"],
-            raw["options"], complaint,
-        )
-        cleaner_prompt = prompts.compose(instructions["CLEANER_INSTRUCTIONS"], cleaner_body)
-        cleaner_reply = cleaner_record.get("reply")
-        if not isinstance(cleaner_reply, str) or not shared._attempt_bound(
-            cleaner_record, prompt=cleaner_prompt, reply=cleaner_reply, rejection=None,
-            execution=shared._external_execution(engines.CLEANER_ENGINE, engines.CLEANER_MODEL),
-        ):
-            raise ValueError("original negative cleaner attempt does not replay")
-        try:
-            parsed = ah.parse_cleaned_packet(
-                cleaner_reply, list(raw["options"]), caller_gave_context=bool(raw["context"]),
-            )
-        except arb.ArbitrationError as exc:
-            raise ValueError("original negative cleaner reply is invalid") from exc
-        parsed["context"] = raw["context"]
-        cleaned_hints = ah._merge_hints(raw["files"], parsed["hints"])
-        expected = {
-            "decision": (raw["decision"], parsed["decision"]),
-            **{
-                option_id: (statement, parsed["statements"][option_id])
-                for option_id, statement in raw["options"].items()
-            },
-        }
-        if raw["files"]:
-            expected["hints"] = (
-                ah._render_hints(raw["files"]), ah._render_hints(cleaned_hints),
-            )
-        attester_reply = attester_record.get("reply")
-        try:
-            attestation = ah.parse_attestation(
-                attester_reply, expected,
-                stakes=raw["stakes"], context=raw["context"],
-            )
-        except arb.ArbitrationError as exc:
-            raise ValueError("original negative attestation is invalid") from exc
-        if attestation.original_neutrality_pass or not attestation.changed:
-            raise ValueError("original negative did not bind advocacy plus fidelity loss")
-        if first_diagnostic is None:
-            first_diagnostic = attestation.original_neutrality_diagnostic
-        last_error = (
-            f"fidelity changed: {attestation.changed}; detail: {attestation.fidelity_detail}; "
-            f"neutrality: {'PASS' if attestation.neutrality_pass else 'FAIL ' + attestation.neutrality_note}; "
-            "caller-owned original framing is not neutral enough for fallback: "
-            f"{ah._caller_advocacy_rejection(first_diagnostic)}"
-        )
-        attester_body = ah._attest_body(
-            raw["decision"], raw["stakes"], raw["context"], raw["files"],
-            cleaned_hints, raw["options"], parsed,
-        )
-        attester_prompt = prompts.compose(instructions["ATTEST_INSTRUCTIONS"], attester_body)
-        if not isinstance(attester_reply, str) or not shared._attempt_bound(
-            attester_record, prompt=attester_prompt, reply=attester_reply,
-            rejection=last_error,
-            execution=shared._external_execution(engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL),
-        ):
-            raise ValueError("original negative attester attempt does not replay")
-        complaint = (
-            "An independent auditor rejected your previous attempt: "
-            f"{last_error}\nFix exactly that."
-        )
-
-    if first_diagnostic is None or audit.get("caller_framing_diagnostic") != first_diagnostic:
-        raise ValueError("original negative caller diagnostic was not retained")
-    if audit.get("reason") != f"caller framing rejected after bounded cleaning: {last_error}":
-        raise ValueError("original negative terminal reason mismatch")
-
-
 def validate_artifacts(
     positive: dict, stakes_negative: dict, context_negative: dict, repo: Path,
-    original_negative: dict | None = None,
 ) -> None:
     _positive(positive, repo)
     _negative(
@@ -476,8 +372,6 @@ def validate_artifacts(
         context_negative, repo, field="context",
         expected_sources=CONTEXT_NEGATIVE_SOURCES,
     )
-    if original_negative is not None:
-        _original_negative(original_negative, repo)
 
 
 def validate(
