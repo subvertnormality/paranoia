@@ -1,6 +1,11 @@
 {
   "acceptance_kind": "arbitration-original-steering-rejected",
-  "allowed_later_source_diffs": {},
+  "allowed_later_source_diffs": {
+    "src/paranoia_local/arbitrate_handler.py": {
+      "scope": "Preserves the first exact caller-framing diagnostic across a bounded retry; this retained original-option rejection and its provider exchange are unchanged.",
+      "sha256": "7ff1324e68c1fe2978ff548faf846cc3804a58d3a30d36cdeb71b173ed0ae93a"
+    }
+  },
   "audit": {
     "attestation": "FIDELITY: decision PRESERVED; opt-remove-and-transfer PRESERVED; opt-scratch-replay CHANGED\nFIDELITY-DETAIL: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"opt-scratch-replay\",\"passage\":\"genuinely mixed tree\"}\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE",
     "caller_framing_diagnostic": {

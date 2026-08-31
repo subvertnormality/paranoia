@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Classifies and field-binds terminal caller-owned advocacy while preserving original fallback, cleaner fidelity rejection, and the retained successful provider exchange.",
-      "sha256": "32c36a0df4b91b5ae3de7bf36f3d78ee848c35ca8cb81b97b3cbb0eb3f57f48e"
+      "sha256": "cd02bd89cf6dce193919e94c848a527a8b7f0f18edb543fd216b6a05fb58a21d"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review guidance plus field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",
