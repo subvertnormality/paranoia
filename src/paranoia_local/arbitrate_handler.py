@@ -1640,6 +1640,9 @@ def _established_audit_fields(artifacts: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "phase_attempts": list(artifacts.get("phase_attempts", ())),
         "caller_framing_diagnostic": artifacts.get("caller_framing_diagnostic"),
+        "fallback_ineligibility_diagnostic": artifacts.get(
+            "fallback_ineligibility_diagnostic"
+        ),
         "label_attempts": artifacts.get("label_attempts"),
         "label_attempt_records": list(artifacts.get("label_attempt_records", ())),
         "label_maps": dict(artifacts.get("label_maps", {})),
@@ -2467,6 +2470,20 @@ def _clean_and_attest(
         attester_record["rejection"] = None
         if established is not None:
             established["packet"].attestation = attested_raw
+        if len(attested_raw) > arb.MAX_ATTESTER_REPLY_CHARS:
+            last_error = (
+                f"attester reply is {len(attested_raw)} chars "
+                f"(max {arb.MAX_ATTESTER_REPLY_CHARS})"
+            )
+            attester_record["rejection"] = last_error
+            terminal_status = "attestation-rejected"
+            if established is not None:
+                established["packet"].cleaning = "attestation-rejected"
+            complaint = (
+                f"An independent auditor's reply was unusable: {last_error}\n"
+                "Re-clean and try again."
+            )
+            continue
         try:
             attestation = parse_attestation(
                 attested_raw, attest_fields, stakes=stakes, context=context,
@@ -2482,38 +2499,29 @@ def _clean_and_attest(
         if attestation.stakes_advocacy:
             observed_diagnostic = dict(attestation.stakes_advocacy)
             attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
-            diagnostic = original_neutrality_diagnostic or observed_diagnostic
             if established is not None:
                 established["packet"].cleaning = "caller-framing-rejected"
-                established.setdefault("caller_framing_diagnostic", dict(diagnostic))
-            if original_neutrality_diagnostic is not None:
-                raise ArbitrationError(
-                    "caller framing rejected after bounded cleaning: "
-                    f"{_caller_advocacy_rejection(diagnostic)}"
-                )
-            raise ArbitrationError(
+                established["caller_framing_diagnostic"] = observed_diagnostic
+            raise ArbitrationError(_with_latched_caller_diagnostic(
                 "caller framing rejected: the stakes text advocates for an option, "
                 "and stakes is not the "
                 "cleaner's to rewrite — fix it and re-run: "
-                f"{_caller_advocacy_rejection(diagnostic)}"
-            )
+                f"{_caller_advocacy_rejection(observed_diagnostic)}",
+                original_neutrality_diagnostic,
+            ))
         if attestation.context_advocacy:
             observed_diagnostic = dict(attestation.context_advocacy)
             attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
-            diagnostic = original_neutrality_diagnostic or observed_diagnostic
             if established is not None:
                 established["packet"].cleaning = "caller-framing-rejected"
-                established.setdefault("caller_framing_diagnostic", dict(diagnostic))
-            if original_neutrality_diagnostic is not None:
-                raise ArbitrationError(
-                    "caller framing rejected after bounded cleaning: "
-                    f"{_caller_advocacy_rejection(diagnostic)}"
-                )
-            raise ArbitrationError(
+                established["caller_framing_diagnostic"] = observed_diagnostic
+            raise ArbitrationError(_with_latched_caller_diagnostic(
                 "caller framing rejected: the context text advocates for an option, "
                 "and context is preserved "
-                f"verbatim — fix it and re-run: {_caller_advocacy_rejection(diagnostic)}"
-            )
+                "verbatim — fix it and re-run: "
+                f"{_caller_advocacy_rejection(observed_diagnostic)}",
+                original_neutrality_diagnostic,
+            ))
         if attestation.ok and not candidate_ineligibility:
             return (
                 Packet(
@@ -2531,12 +2539,13 @@ def _clean_and_attest(
         )
         if candidate_ineligibility:
             last_error += "; cleaned candidate ineligible: " + "; ".join(candidate_ineligibility)
+        terminal_status = "cleaner-rejected"
         if not attestation.original_neutrality_pass:
             original_neutrality_failed = True
             if original_neutrality_diagnostic is None:
                 original_neutrality_diagnostic = attestation.original_neutrality_diagnostic
                 if established is not None:
-                    established["caller_framing_diagnostic"] = dict(
+                    established["fallback_ineligibility_diagnostic"] = dict(
                         original_neutrality_diagnostic
                     )
         if attestation.original_neutrality_pass and not original_neutrality_failed:
@@ -2558,14 +2567,11 @@ def _clean_and_attest(
                 "; caller-owned original framing is not neutral enough for fallback: "
                 f"field {field!r}, passage {passage!r}"
             )
-            terminal_status = "caller-framing-rejected"
         attester_record["rejection"] = last_error
         if established is not None:
             established["packet"].cleaning = terminal_status
         complaint = f"An independent auditor rejected your previous attempt: {last_error}\nFix exactly that."
 
-    if terminal_status == "caller-framing-rejected":
-        raise ArbitrationError(f"caller framing rejected after bounded cleaning: {last_error}")
     raise ArbitrationError(_with_latched_caller_diagnostic(
         f"cleaning failed attestation twice: {last_error}",
         original_neutrality_diagnostic,

@@ -1905,12 +1905,17 @@ def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: 
 
     report = run(repo, Sequenced(), tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
-    assert "caller framing rejected after bounded cleaning" in report
+    assert trailer_field(report, "CLEANING") == "cleaner-rejected"
+    assert "cleaning failed attestation twice" in report
     # The first attester's exact caller-owned diagnostic remains actionable even
     # when the bounded retry inconsistently calls the original neutral.
     assert "field 'opt-float'" in report
     assert "Store the threshold as a float." in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
 
 
 @pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
@@ -1962,7 +1967,8 @@ def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
     assert "an earlier attestation made original fallback unavailable" in report
     assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
     audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
-    assert audit["caller_framing_diagnostic"] == {
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
         "field": "opt-float", "passage": "Store the threshold as a float.",
     }
 
@@ -2033,7 +2039,8 @@ def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
     assert "an earlier attestation made original fallback unavailable" in report
     assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
     audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
-    assert audit["caller_framing_diagnostic"] == {
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
         "field": "opt-float", "passage": "Store the threshold as a float.",
     }
     terminal_attempt = [
@@ -2050,7 +2057,7 @@ def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
         ("context", "Repository context favors Decimal."),
     ],
 )
-def test_latched_original_diagnostic_wins_over_later_caller_advocacy(
+def test_terminal_caller_advocacy_wins_without_losing_fallback_diagnostic(
     repo: Path, tmp_path: Path, field: str, caller_text: str,
 ):
     cleaner = cleaner_reply({
@@ -2098,9 +2105,12 @@ def test_latched_original_diagnostic_wins_over_later_caller_advocacy(
     report = run(repo, SequencedSemanticFailure(), tmp_path, **overrides)
     assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
     assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
-    assert f"field '{field}', passage {caller_text!r}" not in report
+    assert f"field '{field}', passage {caller_text!r}" in report
     audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     assert audit["caller_framing_diagnostic"] == {
+        "field": field, "passage": caller_text,
+    }
+    assert audit["fallback_ineligibility_diagnostic"] == {
         "field": "opt-float", "passage": "Store the threshold as a float.",
     }
     attester_attempts = [
@@ -2149,7 +2159,12 @@ def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
 
     assert "caller-owned original framing is not neutral enough for fallback" in report
     assert "field 'hints', passage 'prefer_float.py'" in report
-    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+    assert trailer_field(report, "CLEANING") == "cleaner-rejected"
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] is None
+    assert audit["fallback_ineligibility_diagnostic"] == {
+        "field": "hints", "passage": "prefer_float.py",
+    }
     assert "every path and reason" in prompts.ATTEST_INSTRUCTIONS
 
 
@@ -2366,6 +2381,24 @@ def test_cleaning_limit_applies_to_the_fully_composed_prompt():
     ah._check_cleaning_prompt("cleaner", "x" * arb.MAX_CLEANING_PROMPT_CHARS)
     with pytest.raises(ah.ArbitrationError, match="cleaner prompt"):
         ah._check_cleaning_prompt("cleaner", "x" * (arb.MAX_CLEANING_PROMPT_CHARS + 1))
+
+
+def test_attester_reply_size_is_bounded_and_attester_owned(
+    repo: Path, tmp_path: Path,
+):
+    oversized = "x" * (arb.MAX_ATTESTER_REPLY_CHARS + 1)
+    report = run(repo, Agent(lambda e, r: "opt-float", attest=oversized), tmp_path)
+
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "attester reply is" in report
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    attester_attempts = [
+        row for row in record["phase_attempts"] if row["role"] == "attester"
+    ]
+    assert len(attester_attempts) == 2
+    assert all("attester reply is" in row["rejection"] for row in attester_attempts)
+    assert all(len(row["reply"]) <= ah.MAX_PHASE_REPLY_CHARS for row in attester_attempts)
 
 
 def test_cleaner_prompt_local_rejection_is_durable_before_spend(

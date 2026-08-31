@@ -166,6 +166,7 @@ MAX_CLEANING_PROMPT_CHARS = 180000
 # block and every rendered packet field. This is an admission bound, not a quality budget.
 MAX_DECIDER_PROMPT_CHARS = 240000
 MAX_CLEANER_REPLY_CHARS = 50000
+MAX_ATTESTER_REPLY_CHARS = 50000
 
 _HOIST_REMEDY = (
     "Put only facts and specification shared by every option in `context`. Keep "
