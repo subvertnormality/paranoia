@@ -1967,6 +1967,74 @@ def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
     }
 
 
+@pytest.mark.parametrize(
+    ("field", "caller_text"),
+    [
+        ("stakes", BASE["stakes"]),
+        ("context", "Repository context favors Decimal."),
+    ],
+)
+def test_latched_original_diagnostic_wins_over_later_caller_advocacy(
+    repo: Path, tmp_path: Path, field: str, caller_text: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+    second_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float PRESERVED; opt-decimal PRESERVED\n"
+        "FIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\n"
+        + (
+            f'STAKES-ADVOCACY: PRESENT {json.dumps({"field": field, "passage": caller_text}, separators=(",", ":"))}\n'
+            if field == "stakes" else "STAKES-ADVOCACY: NONE\n"
+        )
+        + (
+            f'CONTEXT-ADVOCACY: PRESENT {json.dumps({"field": field, "passage": caller_text}, separators=(",", ":"))}\n'
+            if field == "context" else "CONTEXT-ADVOCACY: NONE\n"
+        )
+    )
+
+    class SequencedSemanticFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.attestations = [first_attestation, second_attestation]
+
+        def __call__(self, **kwargs):
+            if "TEXT AUDITOR" in kwargs["instructions"]:
+                self.attest = self.attestations.pop(0)
+            return super().__call__(**kwargs)
+
+    overrides = {"context": caller_text} if field == "context" else {}
+    report = run(repo, SequencedSemanticFailure(), tmp_path, **overrides)
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    assert f"field '{field}', passage {caller_text!r}" not in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+    attester_attempts = [
+        row for row in audit["phase_attempts"] if row["role"] == "attester"
+    ]
+    assert attester_attempts[-1]["rejection"] == (
+        f"field '{field}', passage {caller_text!r}"
+    )
+
+
 def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
     repo: Path, tmp_path: Path,
 ):

@@ -2460,11 +2460,17 @@ def _clean_and_attest(
             complaint = f"An independent auditor's reply was unusable: {exc}\nRe-clean and try again."
             continue
         if attestation.stakes_advocacy:
-            diagnostic = dict(attestation.stakes_advocacy)
-            attester_record["rejection"] = _caller_advocacy_rejection(diagnostic)
+            observed_diagnostic = dict(attestation.stakes_advocacy)
+            attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
+            diagnostic = original_neutrality_diagnostic or observed_diagnostic
             if established is not None:
                 established["packet"].cleaning = "caller-framing-rejected"
-                established["caller_framing_diagnostic"] = diagnostic
+                established.setdefault("caller_framing_diagnostic", dict(diagnostic))
+            if original_neutrality_diagnostic is not None:
+                raise ArbitrationError(
+                    "caller framing rejected after bounded cleaning: "
+                    f"{_caller_advocacy_rejection(diagnostic)}"
+                )
             raise ArbitrationError(
                 "caller framing rejected: the stakes text advocates for an option, "
                 "and stakes is not the "
@@ -2472,11 +2478,17 @@ def _clean_and_attest(
                 f"{_caller_advocacy_rejection(diagnostic)}"
             )
         if attestation.context_advocacy:
-            diagnostic = dict(attestation.context_advocacy)
-            attester_record["rejection"] = _caller_advocacy_rejection(diagnostic)
+            observed_diagnostic = dict(attestation.context_advocacy)
+            attester_record["rejection"] = _caller_advocacy_rejection(observed_diagnostic)
+            diagnostic = original_neutrality_diagnostic or observed_diagnostic
             if established is not None:
                 established["packet"].cleaning = "caller-framing-rejected"
-                established["caller_framing_diagnostic"] = diagnostic
+                established.setdefault("caller_framing_diagnostic", dict(diagnostic))
+            if original_neutrality_diagnostic is not None:
+                raise ArbitrationError(
+                    "caller framing rejected after bounded cleaning: "
+                    f"{_caller_advocacy_rejection(diagnostic)}"
+                )
             raise ArbitrationError(
                 "caller framing rejected: the context text advocates for an option, "
                 "and context is preserved "
