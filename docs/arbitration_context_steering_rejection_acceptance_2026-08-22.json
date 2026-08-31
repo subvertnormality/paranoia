@@ -1,6 +1,10 @@
 {
   "acceptance_kind": "arbitration-context-steering-rejected",
   "allowed_later_source_diffs": {
+    "src/paranoia_local/arbitrate_handler.py": {
+      "scope": "Renames caller-owned context advocacy to caller-framing-rejected without changing the retained attestation or no-decider rejection boundary.",
+      "sha256": "4fe8c0dcc5024f57302162f3155035b7d6f553578a08a2b9a5217a436be0a842"
+    },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and context-steering rejection are unchanged.",
       "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"

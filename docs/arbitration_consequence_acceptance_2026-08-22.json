@@ -1,6 +1,10 @@
 {
   "acceptance_kind": "arbitration-consequence-not-advocacy",
   "allowed_later_source_diffs": {
+    "src/paranoia_local/arbitrate_handler.py": {
+      "scope": "Classifies terminal caller-owned advocacy separately while preserving original fallback, cleaner fidelity rejection, and the retained successful provider exchange.",
+      "sha256": "4fe8c0dcc5024f57302162f3155035b7d6f553578a08a2b9a5217a436be0a842"
+    },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review co-asserting-site and class-occurrence aggregation guidance; arbitration prompts and consequence framing are unchanged.",
       "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"

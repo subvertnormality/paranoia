@@ -2,16 +2,16 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted bound-rebut settlement contract.",
-      "sha256": "35cf64f2c25e91d8877304733321a033459fe9f1a0ca596f6665cc02f76ec810"
+      "scope": "Debt-targeted rebut settlement and arbitration-only failure taxonomy contract.",
+      "sha256": "10813ff3c1319e3903125fce69613cca9f3389e25b75a53e7a63a7ccddce4824"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement documentation.",
       "sha256": "a927eb554f8388218e028677dd7e742e58b5775a15626d4f1cc2f69754d7b128"
     },
     "docs/tool-reference.md": {
-      "scope": "Public bound-rebut debt identity and settlement semantics.",
-      "sha256": "07a25ca89bb4b83507cde6c5a8f08efd4eb1a433d2cbcdf0838138301dd74787"
+      "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
+      "sha256": "bb71cc10ba06c0504ae190673cba6c31f344a6798f28900bb6072be3d157b932"
     },
     "scripts/run_plan_review_reliability_acceptance.py": {
       "scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.",
@@ -1762,6 +1762,14 @@
   "stakes": "One trusted operator and OS; plan and repository bytes are untrusted data; no hostile local race or repository execution; one small acceptance plan and ordinary provider latency; false clearance or missing durable diagnostics is high impact; recoverable blocking is acceptable; exclude multi-tenancy, corrupted-state recovery, and hostile local processes.",
   "validation": {
     "allowed_later_source_diffs": {
+      "AGENTS.md": {
+        "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
+        "sha256": "c2b17eb3ae252f181c8195a50b3045e67fdf630785ba457253285a866b333d35"
+      },
+      "docs/tool-reference.md": {
+        "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
+        "sha256": "2336660cab0b65c372ecd3a9405a21b88cc4a1b89523088750dc5070633e8570"
+      },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior.",
         "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"

@@ -2,16 +2,20 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents shared plan-and-branch class-occurrence aggregation and its authored-evidence reconciliation while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "f77c349388e41a80a495446ffe2a0a8e6c23b88bb7342e45bd8846d389ab0b1c"
+      "scope": "Documents class-occurrence, rebut settlement, and arbitration failure taxonomy while leaving the retained correction-gate run, control state, and source binding unchanged.",
+      "sha256": "a8f25b899a775eddc63f10b702ec36bfd8c95dc05535f27ae2c36f0360d6b42b"
     },
     "docs/how-it-works.md": {
-      "scope": "Documents debt-targeted bound-rebut settlement without changing the retained correction-gate provider exchange.",
-      "sha256": "df0876442e69a8f90515219cee50065159b529c7531ede75361bc9efdd6c9a23"
+      "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
+      "sha256": "c0b1d9643166432ef6b59b3dc902b0e12e2918c42b0b4cc831f3fe7e9b307607"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
       "sha256": "0a61ab9fa35e83d64b004352ce1f28c8e7697376842f8aa776ad60be0fa07255"
+    },
+    "src/paranoia_local/arbitrate_handler.py": {
+      "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
+      "sha256": "4fe8c0dcc5024f57302162f3155035b7d6f553578a08a2b9a5217a436be0a842"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
