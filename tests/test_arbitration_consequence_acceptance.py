@@ -11,13 +11,17 @@ ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "docs/arbitration_consequence_acceptance_2026-08-22.json"
 NEGATIVE = ROOT / "docs/arbitration_steering_rejection_acceptance_2026-08-22.json"
 CONTEXT_NEGATIVE = ROOT / "docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json"
+ORIGINAL_NEGATIVE = ROOT / "docs/arbitration_original_steering_rejection_acceptance_2026-08-31.json"
 
 
 def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None:
     artifact = json.loads(ARTIFACT.read_text())
     negative = json.loads(NEGATIVE.read_text())
     context_negative = json.loads(CONTEXT_NEGATIVE.read_text())
-    validator.validate_artifacts(artifact, negative, context_negative, ROOT)
+    original_negative = json.loads(ORIGINAL_NEGATIVE.read_text())
+    validator.validate_artifacts(
+        artifact, negative, context_negative, ROOT, original_negative,
+    )
     assert artifact["acceptance_kind"] == "arbitration-consequence-not-advocacy"
     source_revision = artifact["source_revision"]
     resolved = inert_git.text(
@@ -46,6 +50,16 @@ def test_real_consequence_framing_acceptance_is_source_and_route_bound() -> None
     assert artifact["input"]["research"] is False
     assert artifact["input"]["web_search"] is False
     assert artifact["model_call_count"] == 4
+    assert original_negative["model_call_count"] == 4
+    assert original_negative["audit"]["cleaning"] == "caller-framing-rejected"
+    assert original_negative["audit"]["rounds"] == []
+    diagnostic = original_negative["audit"]["caller_framing_diagnostic"]
+    assert diagnostic["field"] == "opt-scratch-replay"
+    original_statement = next(
+        row["statement"] for row in original_negative["input"]["options"]
+        if row["id"] == diagnostic["field"]
+    )
+    assert diagnostic["passage"] in original_statement
 
     audit = artifact["audit"]
     assert audit["outcome"] == "CONVERGED"

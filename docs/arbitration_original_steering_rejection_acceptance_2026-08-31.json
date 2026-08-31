@@ -1,0 +1,196 @@
+{
+  "acceptance_kind": "arbitration-original-steering-rejected",
+  "allowed_later_source_diffs": {},
+  "audit": {
+    "attestation": "FIDELITY: decision PRESERVED; opt-remove-and-transfer PRESERVED; opt-scratch-replay CHANGED\nFIDELITY-DETAIL: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"opt-scratch-replay\",\"passage\":\"genuinely mixed tree\"}\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE",
+    "caller_framing_diagnostic": {
+      "field": "opt-scratch-replay",
+      "passage": "genuinely mixed tree"
+    },
+    "carried_evidence": [],
+    "cleaned": {
+      "context": "The current unit does not create both storage shapes.",
+      "decision": "Choose the disposition of a mixed-tree replay check.",
+      "hints": [],
+      "sha256": "371c4d957003b6b36c8ffaa62e4eb6fb84004b7111b223784968428b4b56ae7c",
+      "statements": {
+        "opt-remove-and-transfer": "Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.",
+        "opt-scratch-replay": "Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a mixed tree."
+      }
+    },
+    "cleaning": "caller-framing-rejected",
+    "label_attempt_records": [],
+    "label_attempts": null,
+    "label_maps": {},
+    "order_seed": "issue-88-original-steering-rejection-20260831",
+    "outcome": "FAILED",
+    "phase_attempts": [
+      {
+        "admitted": true,
+        "attempt": 1,
+        "execution": {
+          "binary": "claude",
+          "cli_version": "2.1.197",
+          "engine": "claude",
+          "model": "claude-opus-5",
+          "route": "external-cli"
+        },
+        "invoked": true,
+        "prompt_excerpt": "You are a NEUTRALIZER. You are not deciding anything, and you must not form or express a view on which option is better. Your only job is to remove bias from how a decision is framed, so that two independent reviewers judge the options on their merits rather than on how they were written.\n\nYou MUST:\n- Strip advocacy, loaded adjectives, and rhetorical framing (\"the obvious choice\", \"the clean way\", \"unfortunately\").\n- Remove the requester's own recommendation and any attribution (\"I think\", \"we prefer\", \"X suggested\").\n- Normalize tense, voice, labels, and rhetorical padding only when doing so preserves meaning.\n- Preserve substantive differences in option detail for the deciders. Never copy facts, constraints,\n  caveats, or qualifications from one option into another merely to make their lengths or detail match.\n- Reproduce the CONTEXT byte-for-byte. It is shared specification/data, not cleaner-owned prose.\n- Neutralize argumentative text in file-hint reasons, keeping the factual content.\n- Emit every option under EXACTLY the id it was given.\n\nYou MUST NOT:\n- Add, remove, merge, split, or reorder options.\n- Change what any option MEANS. Neutralizing wording is your job; changing substance is a failure.\n- Add facts, caveats, or qualifications that were not in the input.\n- Hint at a preference, by wording, ordering, emphasis, or omission.\n- Rewrite or return the STAKES text. It is server-owned read-only input and is\n  passed directly to the attester and deciders.\n- Rewrite, summarize, reflow, or omit CONTEXT. Reproduce it byte-for-byte.\n- Investigate a repository. You have no repository access and need none.\n\nOutput EXACTLY these blocks, in this order, nothing before or after:\n\n=== DECISION ===\n<the neutral statement of what is being decided>\n\n=== OPTIONS ===\n<id>: <neutral statement>\n<id>: <neutral statement>\n\n=== CONTEXT ===\n<copy the supplied CONTEXT byte-for-byte, or \"None.\">\n\n=== HINTS ===\n- <path>: <neutral reason, or the path alone>\n(or \"None.\")\n\nIf the decision cannot be adjudicated as posed — the options overlap, are not mutually exclusive, or the question is too underspecified to answer — emit ONE line instead of the blocks:\n\nINSUFFICIENT: <the specific reason>\n\n===== TASK INPUT =====\n\n=== DECISION (neutralize) ===\nChoose the disposition of a mixed-tree replay check.\n\n=== OPTIONS (neutralize; emit each under EXACTLY this id) ===\nopt-remove-and-transfer: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nopt-scratch-replay: Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree.\n\n=== CONTEXT (COPY VERBATIM) ===\nThe current unit does not create both storage shapes.\n\n=== HINTS (neutralize the reasons, keep the paths EXACTLY) ===\nNone.\n\n=== STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return) ===\nA wrong choice adds avoidable local verification work or defers one check.",
+        "prompt_sha256": "5e6c53727a6fb9e2e6dbf805b3a9ae442683d22d4290ee38209f1be01d944215",
+        "rejection": null,
+        "reply": "=== DECISION ===\nChoose the disposition of a mixed-tree replay check.\n\n=== OPTIONS ===\nopt-remove-and-transfer: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nopt-scratch-replay: Keep the check and build an ephemeral mixed-tree repository for the registry checker. Under this option, the phrase \"fails to replay\" is decided by the registry checker itself over a mixed tree.\n\n=== CONTEXT ===\nThe current unit does not create both storage shapes.\n\n=== HINTS ===\nNone.",
+        "reply_sha256": "de44e2281fb85b1955e99f927609d5ac7d2d5af88a924f6bb911f542ce1a4103",
+        "role": "cleaner",
+        "status": "provider-completed"
+      },
+      {
+        "admitted": true,
+        "attempt": 1,
+        "execution": {
+          "binary": "codex",
+          "cli_version": "0.144.6",
+          "engine": "codex",
+          "model": "gpt-5.6-sol",
+          "route": "external-cli"
+        },
+        "invoked": true,
+        "prompt_excerpt": "You are a TEXT AUDITOR. Another model has rewritten a decision packet to remove bias. Your job is to check its work. You are NOT asked which option is better, you have no repository access, and you must not express a preference — a verdict on the merits would defeat the purpose of this check.\n\nYou are given, field by field, the ORIGINAL text and the CLEANED text. Judge three things:\n\n1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.\n2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option through loaded wording,\nrecommendation, rhetorical emphasis, or selective persuasive padding? Unequal substantive detail is\npart of the caller-owned alternatives and is not advocacy by itself. If the presentation favours an\noption, say which one and quote the words that do it.\n3. ORIGINAL NEUTRALITY — independently judge whether the complete ORIGINAL decision,\noptions, and hints (every path and reason) are neutral enough to show to both deciders without cleaning.\nIf not, name one exact original field and quote an exact non-empty passage from it.\n\nSeparately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision (\"this is low-stakes so just pick the fast one\")? Advocacy is a communicative act: a directive, endorsement, rhetorical preference, or conclusion that tells the deciders what to choose. A substantive fact, governing constraint, cost, risk, tradeoff, or consequence is merits context even when it affects the options unequally; asymmetry is not advocacy by itself. For example, saying that effort spent on one activity is unavailable for another, that a wrong choice causes rework, or that certified evidence may not be mutated states consequences or constraints. Saying \"do not treat this as blocking\", that an option \"should instead\" be chosen, or that a prior result was correct steers the answer and is advocacy. A neutral factual statement that a prior decision exists and governs the current bytes is shared context, not advocacy; praising that result or directing the deciders to follow it remains advocacy.\n\nOutput EXACTLY these six lines, nothing before or after. The FIDELITY line must\nname EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —\nfields absent from it were never supplied and are not yours to judge:\n\nFIDELITY: <one \"<field> PRESERVED\" or \"<field> CHANGED\" per field, semicolon-separated>\nFIDELITY-DETAIL: NONE\nFIDELITY-DETAIL: <one JSON object keyed by every CHANGED field and no others; each value is {\"original\":\"<exact non-empty ORIGINAL passage>\",\"cleaned\":\"<exact non-empty CLEANED passage>\",\"change\":\"<added|removed|narrowed|widened|altered-qualification>\",\"reason\":\"<field>: <repeat the exact change token>\"}>\nNEUTRALITY: PASS\nNEUTRALITY: FAIL <which option the packet favours, and the words that do it>\nORIGINAL-NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"<decision|hints|known option id>\",\"passage\":\"<exact non-empty original substring>\"}\nSTAKES-ADVOCACY: NONE\nSTAKES-ADVOCACY: PRESENT {\"field\":\"stakes\",\"passage\":\"<exact non-empty stakes substring>\"}\nCONTEXT-ADVOCACY: NONE\nCONTEXT-ADVOCACY: PRESENT {\"field\":\"context\",\"passage\":\"<exact non-empty context substring>\"}\n\nEmit ONE FIDELITY-DETAIL line, ONE of the two NEUTRALITY lines, and ONE of the two\nORIGINAL-NEUTRALITY lines. ORIGINAL-NEUTRALITY FAIL JSON has exactly the two shown\nkeys; the field must be present below and passage must occur verbatim in its ORIGINAL.\nFIDELITY-DETAIL\nreason is a deterministic label, exactly \"<field>: <change>\". The closed change token\nplus the two exact passages is the semantic explanation; do not add free-form reason prose.\nmust be NONE only when no field is CHANGED. The JSON must stay on that one line;\npassages must be exact substrings of the named field. STAKES-ADVOCACY and\nCONTEXT-ADVOCACY PRESENT each require exactly the shown field-bound JSON object;\nthe field is respectively `stakes` or `context`, and passage must be an exact\nnon-empty substring of that caller field. Emit NONE when the field does not steer\nor when no context was supplied.\n\n===== TASK INPUT =====\n\n=== FIELD BY FIELD ===\n[decision]\nORIGINAL: Choose the disposition of a mixed-tree replay check.\nCLEANED:  Choose the disposition of a mixed-tree replay check.\n\n[opt-remove-and-transfer]\nORIGINAL: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nCLEANED:  Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\n\n[opt-scratch-replay]\nORIGINAL: Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree.\nCLEANED:  Keep the check and build an ephemeral mixed-tree repository for the registry checker. Under this option, the phrase \"fails to replay\" is decided by the registry checker itself over a mixed tree.\n\n=== STAKES (NOT cleaned — judge only whether it advocates) ===\nA wrong choice adds avoidable local verification work or defers one check.\n\n=== CONTEXT (NOT cleaned — judge only whether it advocates) ===\nThe current unit does not create both storage shapes.",
+        "prompt_sha256": "d21e235ab15e6953743f7100cf6b9960624dda80e5adb8709dc200cc10e1a932",
+        "rejection": "fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"This is the only option under which the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a genuinely mixed tree.\",\"cleaned\":\"Under this option, the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a mixed tree.\",\"change\":\"removed\",\"reason\":\"opt-scratch-replay: removed\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'",
+        "reply": "FIDELITY: decision PRESERVED; opt-remove-and-transfer PRESERVED; opt-scratch-replay CHANGED\nFIDELITY-DETAIL: {\"opt-scratch-replay\":{\"original\":\"This is the only option under which the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a genuinely mixed tree.\",\"cleaned\":\"Under this option, the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a mixed tree.\",\"change\":\"removed\",\"reason\":\"opt-scratch-replay: removed\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"opt-scratch-replay\",\"passage\":\"genuinely mixed tree\"}\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE",
+        "reply_sha256": "18e71f138692cbd03bc49eefdd4935e091f81507f7a1bcf028605a0f6539257a",
+        "role": "attester",
+        "status": "provider-completed"
+      },
+      {
+        "admitted": true,
+        "attempt": 2,
+        "execution": {
+          "binary": "claude",
+          "cli_version": "2.1.197",
+          "engine": "claude",
+          "model": "claude-opus-5",
+          "route": "external-cli"
+        },
+        "invoked": true,
+        "prompt_excerpt": "You are a NEUTRALIZER. You are not deciding anything, and you must not form or express a view on which option is better. Your only job is to remove bias from how a decision is framed, so that two independent reviewers judge the options on their merits rather than on how they were written.\n\nYou MUST:\n- Strip advocacy, loaded adjectives, and rhetorical framing (\"the obvious choice\", \"the clean way\", \"unfortunately\").\n- Remove the requester's own recommendation and any attribution (\"I think\", \"we prefer\", \"X suggested\").\n- Normalize tense, voice, labels, and rhetorical padding only when doing so preserves meaning.\n- Preserve substantive differences in option detail for the deciders. Never copy facts, constraints,\n  caveats, or qualifications from one option into another merely to make their lengths or detail match.\n- Reproduce the CONTEXT byte-for-byte. It is shared specification/data, not cleaner-owned prose.\n- Neutralize argumentative text in file-hint reasons, keeping the factual content.\n- Emit every option under EXACTLY the id it was given.\n\nYou MUST NOT:\n- Add, remove, merge, split, or reorder options.\n- Change what any option MEANS. Neutralizing wording is your job; changing substance is a failure.\n- Add facts, caveats, or qualifications that were not in the input.\n- Hint at a preference, by wording, ordering, emphasis, or omission.\n- Rewrite or return the STAKES text. It is server-owned read-only input and is\n  passed directly to the attester and deciders.\n- Rewrite, summarize, reflow, or omit CONTEXT. Reproduce it byte-for-byte.\n- Investigate a repository. You have no repository access and need none.\n\nOutput EXACTLY these blocks, in this order, nothing before or after:\n\n=== DECISION ===\n<the neutral statement of what is being decided>\n\n=== OPTIONS ===\n<id>: <neutral statement>\n<id>: <neutral statement>\n\n=== CONTEXT ===\n<copy the supplied CONTEXT byte-for-byte, or \"None.\">\n\n=== HINTS ===\n- <path>: <neutral reason, or the path alone>\n(or \"None.\")\n\nIf the decision cannot be adjudicated as posed — the options overlap, are not mutually exclusive, or the question is too underspecified to answer — emit ONE line instead of the blocks:\n\nINSUFFICIENT: <the specific reason>\n\n===== TASK INPUT =====\n\n=== CORRECTION REQUIRED ===\nAn independent auditor rejected your previous attempt: fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"This is the only option under which the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a genuinely mixed tree.\",\"cleaned\":\"Under this option, the phrase \\\"fails to replay\\\" is decided by the registry checker itself over a mixed tree.\",\"change\":\"removed\",\"reason\":\"opt-scratch-replay: removed\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'\nFix exactly that.\n\n=== DECISION (neutralize) ===\nChoose the disposition of a mixed-tree replay check.\n\n=== OPTIONS (neutralize; emit each under EXACTLY this id) ===\nopt-remove-and-transfer: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nopt-scratch-replay: Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree.\n\n=== CONTEXT (COPY VERBATIM) ===\nThe current unit does not create both storage shapes.\n\n=== HINTS (neutralize the reasons, keep the paths EXACTLY) ===\nNone.\n\n=== STAKES (SERVER-OWNED READ-ONLY — use for calibration; do not return) ===\nA wrong choice adds avoidable local verification work or defers one check.",
+        "prompt_sha256": "808adaeaf4f98613294fbd84b5ce956254c810663ece9e4777f1da2ca930b71c",
+        "rejection": null,
+        "reply": "=== DECISION ===\nChoose the disposition of a mixed-tree replay check.\n\n=== OPTIONS ===\nopt-remove-and-transfer: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nopt-scratch-replay: Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a mixed tree.\n\n=== CONTEXT ===\nThe current unit does not create both storage shapes.\n\n=== HINTS ===\nNone.",
+        "reply_sha256": "c215a567836a0339ed7e07850b15f3d8f9e5b72fa43826fd4cd1f864ff0b4800",
+        "role": "cleaner",
+        "status": "provider-completed"
+      },
+      {
+        "admitted": true,
+        "attempt": 2,
+        "execution": {
+          "binary": "codex",
+          "cli_version": "0.144.6",
+          "engine": "codex",
+          "model": "gpt-5.6-sol",
+          "route": "external-cli"
+        },
+        "invoked": true,
+        "prompt_excerpt": "You are a TEXT AUDITOR. Another model has rewritten a decision packet to remove bias. Your job is to check its work. You are NOT asked which option is better, you have no repository access, and you must not express a preference — a verdict on the merits would defeat the purpose of this check.\n\nYou are given, field by field, the ORIGINAL text and the CLEANED text. Judge three things:\n\n1. FIDELITY — for each field, does the cleaned text still mean what the original meant? Neutralized wording is fine and expected. A changed constraint, an added or dropped qualification, a narrowed or widened claim is NOT fine: that is a different option, and reviewers would then be judging something the requester did not ask.\n2. NEUTRALITY — read the cleaned packet as a whole. Does it favour one option through loaded wording,\nrecommendation, rhetorical emphasis, or selective persuasive padding? Unequal substantive detail is\npart of the caller-owned alternatives and is not advocacy by itself. If the presentation favours an\noption, say which one and quote the words that do it.\n3. ORIGINAL NEUTRALITY — independently judge whether the complete ORIGINAL decision,\noptions, and hints (every path and reason) are neutral enough to show to both deciders without cleaning.\nIf not, name one exact original field and quote an exact non-empty passage from it.\n\nSeparately, read the STAKES and CONTEXT text, which were deliberately NOT cleaned. Does either advocate for an option or pre-empt the decision (\"this is low-stakes so just pick the fast one\")? Advocacy is a communicative act: a directive, endorsement, rhetorical preference, or conclusion that tells the deciders what to choose. A substantive fact, governing constraint, cost, risk, tradeoff, or consequence is merits context even when it affects the options unequally; asymmetry is not advocacy by itself. For example, saying that effort spent on one activity is unavailable for another, that a wrong choice causes rework, or that certified evidence may not be mutated states consequences or constraints. Saying \"do not treat this as blocking\", that an option \"should instead\" be chosen, or that a prior result was correct steers the answer and is advocacy. A neutral factual statement that a prior decision exists and governs the current bytes is shared context, not advocacy; praising that result or directing the deciders to follow it remains advocacy.\n\nOutput EXACTLY these six lines, nothing before or after. The FIDELITY line must\nname EVERY field that appears in the FIELD BY FIELD section below and NOTHING else —\nfields absent from it were never supplied and are not yours to judge:\n\nFIDELITY: <one \"<field> PRESERVED\" or \"<field> CHANGED\" per field, semicolon-separated>\nFIDELITY-DETAIL: NONE\nFIDELITY-DETAIL: <one JSON object keyed by every CHANGED field and no others; each value is {\"original\":\"<exact non-empty ORIGINAL passage>\",\"cleaned\":\"<exact non-empty CLEANED passage>\",\"change\":\"<added|removed|narrowed|widened|altered-qualification>\",\"reason\":\"<field>: <repeat the exact change token>\"}>\nNEUTRALITY: PASS\nNEUTRALITY: FAIL <which option the packet favours, and the words that do it>\nORIGINAL-NEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"<decision|hints|known option id>\",\"passage\":\"<exact non-empty original substring>\"}\nSTAKES-ADVOCACY: NONE\nSTAKES-ADVOCACY: PRESENT {\"field\":\"stakes\",\"passage\":\"<exact non-empty stakes substring>\"}\nCONTEXT-ADVOCACY: NONE\nCONTEXT-ADVOCACY: PRESENT {\"field\":\"context\",\"passage\":\"<exact non-empty context substring>\"}\n\nEmit ONE FIDELITY-DETAIL line, ONE of the two NEUTRALITY lines, and ONE of the two\nORIGINAL-NEUTRALITY lines. ORIGINAL-NEUTRALITY FAIL JSON has exactly the two shown\nkeys; the field must be present below and passage must occur verbatim in its ORIGINAL.\nFIDELITY-DETAIL\nreason is a deterministic label, exactly \"<field>: <change>\". The closed change token\nplus the two exact passages is the semantic explanation; do not add free-form reason prose.\nmust be NONE only when no field is CHANGED. The JSON must stay on that one line;\npassages must be exact substrings of the named field. STAKES-ADVOCACY and\nCONTEXT-ADVOCACY PRESENT each require exactly the shown field-bound JSON object;\nthe field is respectively `stakes` or `context`, and passage must be an exact\nnon-empty substring of that caller field. Emit NONE when the field does not steer\nor when no context was supplied.\n\n===== TASK INPUT =====\n\n=== FIELD BY FIELD ===\n[decision]\nORIGINAL: Choose the disposition of a mixed-tree replay check.\nCLEANED:  Choose the disposition of a mixed-tree replay check.\n\n[opt-remove-and-transfer]\nORIGINAL: Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\nCLEANED:  Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.\n\n[opt-scratch-replay]\nORIGINAL: Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree.\nCLEANED:  Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a mixed tree.\n\n=== STAKES (NOT cleaned — judge only whether it advocates) ===\nA wrong choice adds avoidable local verification work or defers one check.\n\n=== CONTEXT (NOT cleaned — judge only whether it advocates) ===\nThe current unit does not create both storage shapes.",
+        "prompt_sha256": "49eedd2451d818377368f8933616f7a43a579f99bbf4e94082cfb1b4d3231216",
+        "rejection": "fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'",
+        "reply": "FIDELITY: decision PRESERVED; opt-remove-and-transfer PRESERVED; opt-scratch-replay CHANGED\nFIDELITY-DETAIL: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: FAIL {\"field\":\"opt-scratch-replay\",\"passage\":\"genuinely mixed tree\"}\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE",
+        "reply_sha256": "3d5bd99e471f07241c5bcda0851f200701fd48336f9ecb7e94e82a4316faa4b2",
+        "role": "attester",
+        "status": "provider-completed"
+      }
+    ],
+    "raw_input": {
+      "context": "The current unit does not create both storage shapes.",
+      "decision": "Choose the disposition of a mixed-tree replay check.",
+      "files": [],
+      "options": {
+        "opt-remove-and-transfer": "Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes.",
+        "opt-scratch-replay": "Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree."
+      },
+      "stakes": "A wrong choice adds avoidable local verification work or defers one check."
+    },
+    "reason": "caller framing rejected after bounded cleaning: fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'",
+    "ref_provenance_error": null,
+    "refs_after": "d447e1972bc00a5f7aaee8850653327c0533231b8321452f7187a6ce4f4afac9",
+    "refs_before": "d447e1972bc00a5f7aaee8850653327c0533231b8321452f7187a6ce4f4afac9",
+    "refs_moved": false,
+    "repo": "/tmp/paranoia-local-issue-88",
+    "research": {
+      "digest": null,
+      "enabled": false,
+      "failures": [
+        {
+          "engine": "server",
+          "kind": "ArbitrationError",
+          "message": "caller framing rejected after bounded cleaning: fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'",
+          "phase": "established-run"
+        }
+      ],
+      "packets": null,
+      "runs": [],
+      "status": "not reached"
+    },
+    "rounds": [],
+    "selected": null,
+    "snapshot": "50bb976f1e9f53bde1766b5c36d55472d5b87da5",
+    "timestamp": "20260831T170651",
+    "tool": "arbitrate"
+  },
+  "audit_sha256": "6599ad185495d3aaf9d958cd81335c3a511af42399d266d5f681884c1e250779",
+  "claims": {
+    "does_not_prove": [
+      "Each phrase in the compound packet independently causes rejection.",
+      "Every future provider version will classify every framing correctly."
+    ],
+    "proves": [
+      "The real cleaner and cross-vendor attester rejected this explicit original-steering packet.",
+      "No decider ran after the attester's original-advocacy verdict."
+    ]
+  },
+  "date": "2026-08-22",
+  "input": {
+    "clean": true,
+    "context": "The current unit does not create both storage shapes.",
+    "decision": "Choose the disposition of a mixed-tree replay check.",
+    "files": [],
+    "options": [
+      {
+        "id": "opt-scratch-replay",
+        "statement": "Keep the check and build an ephemeral mixed-tree repository for the registry checker. This is the only option under which the phrase \"fails to replay\" is decided by the registry checker itself over a genuinely mixed tree."
+      },
+      {
+        "id": "opt-remove-and-transfer",
+        "statement": "Remove the check from this unit and transfer the replay obligation to the successor that first creates both storage shapes."
+      }
+    ],
+    "order_seed": "issue-88-original-steering-rejection-20260831",
+    "research": false,
+    "stakes": "A wrong choice adds avoidable local verification work or defers one check.",
+    "web_search": false
+  },
+  "model_call_count": 4,
+  "report": "# Arbitration: FAILED\n\ncaller framing rejected after bounded cleaning: fidelity changed: ['opt-scratch-replay']; detail: {\"opt-scratch-replay\":{\"original\":\"genuinely mixed tree\",\"cleaned\":\"mixed tree\",\"change\":\"altered-qualification\",\"reason\":\"opt-scratch-replay: altered-qualification\"}}; neutrality: PASS; caller-owned original framing is not neutral enough for fallback: field 'opt-scratch-replay', passage 'genuinely mixed tree'\n\nARBITRATION: FAILED\nSELECTED: none\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: caller-framing-rejected\nSNAPSHOT: 50bb976f1e9f53bde1766b5c36d55472d5b87da5\nORDER-SEED: issue-88-original-steering-rejection-20260831\nREFS-MOVED: no\nAUDIT: /mnt/c/Users/andy/AppData/Local/Temp/paranoia-steering-acceptance-bp0imd9d/20260831T170651-arbitrate-93cd6bd6.json\nROUNDS: 0\nRESEARCH: not reached\nRESEARCH-DIGEST: none",
+  "report_sha256": "8da636420a23c5ea5fdd286b5a1ea2b43683b3b8ca5b1ec73a69e8d393dc967c",
+  "snapshot_binding": {
+    "commit_object": "tree 98445cc7646401428ffda6e62a033e13c9b473c3\nparent c82fb8b8dd340a92b286e966b5fe9f8d5dce2830\nauthor paranoia <paranoia@localhost> 946684800 +0000\ncommitter paranoia <paranoia@localhost> 946684800 +0000\n\nparanoia-snapshot\n",
+    "sha256": "a3ac1a5821a21a5834e7e1b7da9ca35b76d0002dda68685d94db38544c1502d4",
+    "source_commit": "c82fb8b8dd340a92b286e966b5fe9f8d5dce2830",
+    "tree": "98445cc7646401428ffda6e62a033e13c9b473c3"
+  },
+  "source_revision": "c82fb8b8dd340a92b286e966b5fe9f8d5dce2830",
+  "source_sha256": {
+    "scripts/run_arbitration_original_steering_rejection_acceptance.py": "bc9f60dc22459f0478467d1f3e3a8021d5fa70f7aa8460c49454eb4701de7b1f",
+    "scripts/run_arbitration_steering_rejection_acceptance.py": "a463247236c37a3f72c6ed161816d5a0879138851a1331727363d8040f8e9787",
+    "scripts/validate_arbitration_consequence_acceptance.py": "ec3d802f8bc7572a0ac9dade184730baa8d6913e45f35ef0935c2937aa9840dd",
+    "scripts/validate_arbitration_fallback_acceptance.py": "e18c95e87a0b4db76a49e546223b4ffad89f2a4f0dd9c4338cf3d308e1e519ea",
+    "src/paranoia_local/arbitrate_handler.py": "cee0a3817a4bc26dc5709d3ecbacf12f9750cea82d447abfa0effe1fe0540967",
+    "src/paranoia_local/arbitration.py": "a5ad7c41f0828b2a3ee91a3a6e006c316afdae88581b6ddbf61b103c7be48361",
+    "src/paranoia_local/engines.py": "ab61f789bb153bc2e70219b2219477f9ce62239e535e2fa351582bee90ee1089",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/prompts.py": "550dd4cc8596b7e73ce5ced7d3536d1ea3a67b8a6f5b97e2b18e9007bf008aa3"
+  },
+  "version": 1
+}
