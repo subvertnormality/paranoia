@@ -63,7 +63,8 @@ def run_acceptance(
     started = time.monotonic()
     report = ah.arbitrate(arguments, log_dir=log_dir)
     elapsed = time.monotonic() - started
-    audit = json.loads(_audit_path(report).read_text(encoding="utf-8"))
+    audit_path = _audit_path(report)
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
     reason = audit.get("reason", "")
     expected_reason = (
         f"{field} text advocates" if field in {"stakes", "context"}
@@ -99,6 +100,8 @@ def run_acceptance(
         or diagnostic["passage"] not in reason
     ):
         raise RuntimeError("caller steering diagnostic is not field-and-passage bound")
+    from scripts import validate_arbitration_consequence_acceptance as validator
+    validator.validate_negative_report_projection(report, audit, str(audit_path))
 
     source_revision = _git("rev-parse", "--verify", "HEAD^{commit}")
     snapshot_object = _git_bytes("cat-file", "commit", audit["snapshot"])
@@ -124,6 +127,7 @@ def run_acceptance(
         },
         "model_call_count": len(attempts),
         "report": report,
+        "audit_path": str(audit_path),
         "report_sha256": hashlib.sha256(
             report.encode("utf-8", "surrogatepass")
         ).hexdigest(),

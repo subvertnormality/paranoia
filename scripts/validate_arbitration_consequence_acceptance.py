@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -76,6 +77,7 @@ COMMON_TOP_LEVEL = {
     "model_call_count", "report", "report_sha256", "snapshot_binding",
     "source_revision", "source_sha256", "allowed_later_source_diffs", "version",
 }
+NEGATIVE_TOP_LEVEL = COMMON_TOP_LEVEL | {"audit_path"}
 INPUT_FIELDS = {
     "clean", "context", "decision", "files", "options", "order_seed", "research",
     "stakes", "web_search",
@@ -87,6 +89,37 @@ def _canonical_digest(value: object) -> str:
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8", "surrogatepass")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_negative_report_projection(
+    report: str, audit: dict, audit_path: str,
+) -> None:
+    """Bind the rendered failure report back to its validated audit projection."""
+    reason = audit.get("reason")
+    if not isinstance(report, str) or not isinstance(reason, str) or not reason:
+        raise ValueError("negative acceptance report inputs are malformed")
+    if report[: len(f"# Arbitration: FAILED\n\n{reason}\n\n")] != (
+        f"# Arbitration: FAILED\n\n{reason}\n\n"
+    ):
+        raise ValueError("negative acceptance report headline or reason mismatch")
+
+    def field(name: str) -> str:
+        values = re.findall(rf"^{re.escape(name)}: (.*)$", report, re.MULTILINE)
+        if len(values) != 1:
+            raise ValueError(f"negative acceptance report has {len(values)} {name} fields")
+        return values[0]
+
+    expected = {
+        "ARBITRATION": audit.get("outcome"),
+        "CLEANING": audit.get("cleaning"),
+        "ROUNDS": str(len(audit.get("rounds", []))),
+        "AUDIT": audit_path,
+    }
+    if not isinstance(audit_path, str) or not audit_path:
+        raise ValueError("negative acceptance audit path is absent")
+    for name, value in expected.items():
+        if not isinstance(value, str) or field(name) != value:
+            raise ValueError(f"negative acceptance report {name} mismatch")
 
 
 def _source_blob(repo: Path, commit: str, path: str) -> bytes:
@@ -208,7 +241,7 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
 
 
 def _positive(artifact: dict, repo: Path) -> None:
-    if set(artifact) != COMMON_TOP_LEVEL:
+    if set(artifact) != NEGATIVE_TOP_LEVEL:
         raise ValueError("positive acceptance top-level schema mismatch")
     audit, instructions, source = _common(
         artifact, repo, expected_sources=POSITIVE_SOURCES,
@@ -358,6 +391,9 @@ def _negative(
     )
     if audit.get("reason") != expected_reason:
         raise ValueError("negative acceptance failure reason mismatch")
+    validate_negative_report_projection(
+        artifact["report"], audit, artifact["audit_path"],
+    )
 
 
 def validate_artifacts(

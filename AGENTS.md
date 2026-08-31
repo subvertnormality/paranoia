@@ -510,6 +510,9 @@ as caller fault; persist it as `fallback_ineligibility_diagnostic` without letti
 terminal status or terminal `caller_framing_diagnostic`. A valid fidelity, cleaned-neutrality, or
 cleaned-candidate rejection is cleaner-owned; malformed or oversized attester output is
 attestation-owned. Bound attester replies independently as strictly as cleaner replies.
+Real-provider failure acceptance must parse the retained report and require its headline, exact
+reason/diagnostic, `ARBITRATION`, `CLEANING`, `ROUNDS`, and `AUDIT` projection to agree with the
+validated audit; a report digest alone is not semantic agreement.
 When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
 the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
 never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and

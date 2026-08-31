@@ -889,6 +889,9 @@ diagnostic in the audit's separate `fallback_ineligibility_diagnostic` field but
 reports the terminal model/protocol owner instead. A valid fidelity, cleaned-
 neutrality, or cleaned-candidate rejection is cleaner-owned; malformed or
 oversized attester output is attestation-owned.
+Retained real-provider failure acceptance parses the report as well as hashing it:
+the failure headline, exact reason and diagnostic, `ARBITRATION`, `CLEANING`,
+`ROUNDS`, and `AUDIT` fields must agree with the validated audit projection.
 
 `AUDIT` exists because `logs.write_log` swallows every failure and returns `None`
 (`logs.py:23`), so revision 1 could return `CONVERGED` with no local audit record
