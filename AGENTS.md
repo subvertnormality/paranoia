@@ -495,6 +495,11 @@ names every changed field, binds exact original and cleaned substrings to that f
 classifies the semantic delta with the closed change enum, and repeats that classification in the
 deterministic `<field>: <change>` reason label. Do not use a free-text heuristic as a semantic gate. Keep valid
 `raw_input.options` as the same ID-to-statement mapping on every success and failure path.
+Classify terminal cleaning failures by the actor who can repair them. Caller-owned advocacy in the
+original decision/options/hints, context, or stakes is `caller-framing-rejected` and must retain the
+exact field/passage diagnostic across the bounded retry. Cleaner output/protocol failure remains
+`cleaner-rejected`; attester output/protocol failure remains `attestation-rejected`. Never add a
+keyword lint that claims to replace semantic cross-vendor attestation.
 When the cross-vendor attester finds a cleaned semantic change or cleaner-introduced bias but judges
 the original decision/options/hints neutral, use the exact original cleaner-owned packet atomically;
 never mix original and cleaned fields. Context and stakes remain independently advocacy-gated, and

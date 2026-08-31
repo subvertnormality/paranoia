@@ -1905,7 +1905,12 @@ def test_original_neutrality_failure_latches_across_retry(repo: Path, tmp_path: 
 
     report = run(repo, Sequenced(), tmp_path)
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert "original packet is not neutral enough for fallback" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
+    assert "caller framing rejected after bounded cleaning" in report
+    # The first attester's exact caller-owned diagnostic remains actionable even
+    # when the bounded retry inconsistently calls the original neutral.
+    assert "field 'opt-float'" in report
+    assert "Store the threshold as a float." in report
 
 
 def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
@@ -1944,8 +1949,9 @@ def test_original_neutrality_covers_hint_paths_and_blocks_fallback(
         files=[{"path": "prefer_float.py", "reason": "implementation entry point"}],
     )
 
-    assert "original packet is not neutral enough for fallback" in report
-    assert trailer_field(report, "CLEANING") == "attestation-rejected"
+    assert "caller-owned original framing is not neutral enough for fallback" in report
+    assert "field 'hints', passage 'prefer_float.py'" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
     assert "every path and reason" in prompts.ATTEST_INSTRUCTIONS
 
 
@@ -2237,6 +2243,8 @@ def test_context_advocacy_fails_without_asking_cleaner_to_rewrite(
     report = run(repo, agent, tmp_path, context="Obviously choose binary floating point.")
 
     assert "context text advocates" in report
+    assert "caller framing rejected" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
     assert len([c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]) == 1
 
 
@@ -2252,6 +2260,8 @@ def test_stakes_advocacy_fails_to_the_caller(repo: Path, tmp_path: Path):
     )
     report = run(repo, agent, tmp_path)
     assert "stakes text advocates" in report
+    assert "caller framing rejected" in report
+    assert trailer_field(report, "CLEANING") == "caller-framing-rejected"
 
 
 # --- audit ------------------------------------------------------------------

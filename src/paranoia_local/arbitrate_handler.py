@@ -118,7 +118,7 @@ class Packet:
     context: str
     hints: list[dict]
     statements: dict[str, str]  # caller id -> statement shown to deciders
-    cleaning: str  # attested | attested-after-retry | original-attested | skipped
+    cleaning: str  # success and in-progress/failure token rendered in CLEANING
     attestation: str
     research_packets: tuple[research_core.Packet, ...] = ()
     research_text: str = "[]"
@@ -2255,6 +2255,7 @@ def _clean_and_attest(
     complaint = ""
     last_error: str | None = None
     original_neutrality_failed = False
+    original_neutrality_diagnostic: dict[str, str] | None = None
     phase_attempts = established.setdefault("phase_attempts", []) if established is not None else []
     # One retry only, and deliberately: a longer loop would hill-climb the framing
     # against the attester until it passed, which is optimization, not attestation.
@@ -2428,17 +2429,19 @@ def _clean_and_attest(
         if attestation.stakes_advocacy:
             attester_record["rejection"] = attestation.stakes_advocacy
             if established is not None:
-                established["packet"].cleaning = "attestation-rejected"
+                established["packet"].cleaning = "caller-framing-rejected"
             raise ArbitrationError(
-                "the stakes text advocates for an option, and stakes is not the "
+                "caller framing rejected: the stakes text advocates for an option, "
+                "and stakes is not the "
                 f"cleaner's to rewrite — fix it and re-run: {attestation.stakes_advocacy}"
             )
         if attestation.context_advocacy:
             attester_record["rejection"] = attestation.context_advocacy
             if established is not None:
-                established["packet"].cleaning = "attestation-rejected"
+                established["packet"].cleaning = "caller-framing-rejected"
             raise ArbitrationError(
-                "the context text advocates for an option, and context is preserved "
+                "caller framing rejected: the context text advocates for an option, "
+                "and context is preserved "
                 f"verbatim — fix it and re-run: {attestation.context_advocacy}"
             )
         if attestation.ok and not candidate_ineligibility:
@@ -2460,6 +2463,8 @@ def _clean_and_attest(
             last_error += "; cleaned candidate ineligible: " + "; ".join(candidate_ineligibility)
         if not attestation.original_neutrality_pass:
             original_neutrality_failed = True
+            if original_neutrality_diagnostic is None:
+                original_neutrality_diagnostic = attestation.original_neutrality_diagnostic
         if attestation.original_neutrality_pass and not original_neutrality_failed:
             attester_record["rejection"] = last_error
             fallback = Packet(
@@ -2472,12 +2477,23 @@ def _clean_and_attest(
                 established["packet"] = fallback
             return fallback, "original-attested"
         if original_neutrality_failed:
-            last_error += "; original packet is not neutral enough for fallback"
+            assert original_neutrality_diagnostic is not None
+            field = original_neutrality_diagnostic["field"]
+            passage = original_neutrality_diagnostic["passage"]
+            last_error += (
+                "; caller-owned original framing is not neutral enough for fallback: "
+                f"field {field!r}, passage {passage!r}"
+            )
         attester_record["rejection"] = last_error
         if established is not None:
-            established["packet"].cleaning = "attestation-rejected"
+            established["packet"].cleaning = (
+                "caller-framing-rejected"
+                if original_neutrality_failed else "attestation-rejected"
+            )
         complaint = f"An independent auditor rejected your previous attempt: {last_error}\nFix exactly that."
 
+    if original_neutrality_failed:
+        raise ArbitrationError(f"caller framing rejected after bounded cleaning: {last_error}")
     raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
 
 

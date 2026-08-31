@@ -869,7 +869,7 @@ SELECTED: <caller-stable-id> | none
 PROVISIONAL-SELECTED: <caller-stable-id> | none
 ADVISORY: none | human-owner (flagged by: codex) | human-owner (flagged by: claude) | human-owner (flagged by: both)
 AUTHORITY-POLICY: advisory — a Parallax CLASSIFICATION:B would escalate; this tool does not
-CLEANING: not reached | cleaning | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped
+CLEANING: not reached | cleaning | caller-framing-rejected | cleaner-rejected | cleaned-awaiting-attestation | attestation-rejected | attested | attested-after-retry | original-attested | skipped
 SNAPSHOT: <commit-id> | none
 REFS-MOVED: no | yes | unavailable
 ORDER-SEED: <seed>

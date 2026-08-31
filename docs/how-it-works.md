@@ -186,6 +186,12 @@ With `clean: true`, Claude Opus removes advocacy and presentation asymmetry, and
 Codex attests that substantive meaning was preserved. Caller `context` and
 `stakes` remain byte-for-byte authoritative and are checked separately. Deciders
 see opposite option order under opaque labels and are unaware of each other.
+If caller-owned decision, option, hint, context, or stakes prose advocates for an
+option and cannot be neutralized without changing meaning, the run fails with
+`CLEANING: caller-framing-rejected` and names the exact actionable passage. A
+cleaner/protocol defect remains `cleaner-rejected` or `attestation-rejected`;
+these statuses do not blame the caller. Semantic neutrality is model-attested,
+so Paranoia does not claim a zero-provider local lint can establish it reliably.
 
 Research is on by default. Both vendors discover URLs; Paranoia downloads,
 extracts, deduplicates, and binds the sources, then sends identical captured

@@ -208,6 +208,14 @@ The trailer always includes `ARBITRATION`, `SELECTED`, `PROVISIONAL-SELECTED`, `
 `AUTHORITY-POLICY`, `CLEANING`, `SNAPSHOT`, `ORDER-SEED`, `REFS-MOVED`, `AUDIT`,
 `ROUNDS`, `RESEARCH`, and `RESEARCH-DIGEST`.
 
+`CLEANING: caller-framing-rejected` means the attester found advocacy in a
+caller-owned decision, option, hint, context, or stakes field; the failure text
+names what the caller must restate. `cleaner-rejected` and
+`attestation-rejected` mean the corresponding model/protocol path failed instead.
+Paranoia may discard a meaning-changing cleaner candidate and safely use an
+independently attested neutral original, but never sends the changed candidate to
+the deciders.
+
 When the final votes are unanimous but not substantiated, the result remains
 `UNRESOLVED`: `SELECTED` is `none`, while `PROVISIONAL-SELECTED` reports the
 common option as non-binding diagnostic information.
