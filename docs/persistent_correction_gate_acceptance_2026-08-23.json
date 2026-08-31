@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents class-occurrence, rebut settlement, and arbitration failure taxonomy while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "a8f25b899a775eddc63f10b702ec36bfd8c95dc05535f27ae2c36f0360d6b42b"
+      "sha256": "a43a3a55cd33201ae21348f457c8a0f269743017f10e6a31c9ca5bf606b0348f"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
-      "sha256": "c0b1d9643166432ef6b59b3dc902b0e12e2918c42b0b4cc831f3fe7e9b307607"
+      "sha256": "b42d68176ea23a180c3faaec409a6717b08f9e2da0c9ba8493703f7876c59ebc"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
@@ -15,7 +15,7 @@
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
-      "sha256": "4fe8c0dcc5024f57302162f3155035b7d6f553578a08a2b9a5217a436be0a842"
+      "sha256": "32c36a0df4b91b5ae3de7bf36f3d78ee848c35ca8cb81b97b3cbb0eb3f57f48e"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; correction-gate lifecycle instructions remain unchanged.",
-      "sha256": "f8af0227fa44727a774a5f413c51a013ffbde316641a5a08ee663cf61b0eee4a"
+      "sha256": "c50f526d11e84fa869e8bc2528addf3698370c43aee88e66b406e8cc933f42fc"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",
@@ -35,7 +35,7 @@
     },
     "src/paranoia_local/server.py": {
       "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",
-      "sha256": "4ef7156291fcf5ad0f4ef8b3948e0742e2d48eb7d85d7726929f726b79672ac1"
+      "sha256": "6805f8e6078ef710081f518978bf3a5707aed935689fc69a4e682c1843dfaa15"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
