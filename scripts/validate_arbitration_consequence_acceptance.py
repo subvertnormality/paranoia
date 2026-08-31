@@ -241,7 +241,7 @@ def _raw_input_bound(artifact: dict, audit: dict) -> bool:
 
 
 def _positive(artifact: dict, repo: Path) -> None:
-    if set(artifact) != NEGATIVE_TOP_LEVEL:
+    if set(artifact) != COMMON_TOP_LEVEL:
         raise ValueError("positive acceptance top-level schema mismatch")
     audit, instructions, source = _common(
         artifact, repo, expected_sources=POSITIVE_SOURCES,
@@ -291,7 +291,7 @@ def _positive(artifact: dict, repo: Path) -> None:
 def _negative(
     artifact: dict, repo: Path, *, field: str, expected_sources: frozenset[str],
 ) -> None:
-    if set(artifact) != COMMON_TOP_LEVEL:
+    if set(artifact) != NEGATIVE_TOP_LEVEL:
         raise ValueError("negative acceptance top-level schema mismatch")
     audit, instructions, _ = _common(
         artifact, repo, expected_sources=expected_sources,
