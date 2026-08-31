@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement and arbitration-only failure taxonomy contract.",
-      "sha256": "09fbca359907a3b62b28bb99d05668d48fc928fde5e17e809a0d30b29b2dc7cf"
+      "sha256": "c0af6837d4fffd5fe24296ddf7e4598e4f52c0fdd802632cd1cd17a19b8b244b"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement documentation.",
@@ -23,7 +23,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.",
-      "sha256": "0a2834b3d707c5015faafbee5ac0882ce45738cbfe3c54fc708f63dd84920f0e"
+      "sha256": "6d828676723ed3b6be6ac041317cad90c046924bd8c0d5b96b777e4b9716489d"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance.",
@@ -32,6 +32,10 @@
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
       "sha256": "a24889f41352cdcee62ea3a86b13111479321586baf277fe68121e691837d8a8"
+    },
+    "tests/test_prompts.py": {
+      "scope": "Arbitration-only original-option advocacy prompt regression; retained plan review behavior is unchanged.",
+      "sha256": "eda9d3ea4d55b9fadd9098e0a091dfafd266c55718f960be3efec63a258776d4"
     },
     "tests/test_review_census.py": {
       "scope": "Phase projection and rebut settlement regressions plus updated prompt digest.",
@@ -1764,7 +1768,7 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
-        "sha256": "5f15d71fe55aa7cf9c8aa0931e64026209a4f867ccdc51d3e19e1d8577e60c5b"
+        "sha256": "44d4082d42069fe7e2027440aa5a6192b94b0323dd973177f7a123d0fe72b952"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",

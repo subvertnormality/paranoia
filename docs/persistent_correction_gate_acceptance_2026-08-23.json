@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents class-occurrence, rebut settlement, and arbitration failure taxonomy while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "a43a3a55cd33201ae21348f457c8a0f269743017f10e6a31c9ca5bf606b0348f"
+      "sha256": "bcee910d43b58f78acab64c52d62fd36b3517a7ed8b1dd0d30e618aeb721b5f5"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
@@ -15,7 +15,7 @@
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
-      "sha256": "cd02bd89cf6dce193919e94c848a527a8b7f0f18edb543fd216b6a05fb58a21d"
+      "sha256": "f58bf3f0e706c002f8655aef0aa8eaaf1d7c36735932ce672e7cf9c4c2b3b233"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; correction-gate lifecycle instructions remain unchanged.",
-      "sha256": "c50f526d11e84fa869e8bc2528addf3698370c43aee88e66b406e8cc933f42fc"
+      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",

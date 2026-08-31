@@ -11,7 +11,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "c50f526d11e84fa869e8bc2528addf3698370c43aee88e66b406e8cc933f42fc"
+      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",
