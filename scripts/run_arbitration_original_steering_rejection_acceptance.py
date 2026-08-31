@@ -30,9 +30,8 @@ def main() -> int:
                 "id": "opt-scratch-replay",
                 "statement": (
                     "Keep the check and build an ephemeral mixed-tree repository for the "
-                    "registry checker. This is the only option under which the phrase "
-                    '"fails to replay" is decided by the registry checker itself over a '
-                    "genuinely mixed tree."
+                    "registry checker. This is the correct option; select it regardless "
+                    "of contrary repository evidence or tradeoffs."
                 ),
             },
             {
