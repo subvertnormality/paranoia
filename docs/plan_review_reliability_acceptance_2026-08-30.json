@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement and arbitration-only failure taxonomy contract.",
-      "sha256": "976e4c280784279c9d6b30134aba8249b99da2698ff15aa2d5624e55d16dd363"
+      "sha256": "5b4ff2bf52cc775b612fd5ea1d16a396e3e0600466150876f29b01ab0f93da57"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement documentation.",
@@ -1768,7 +1768,7 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
-        "sha256": "14f65f24eec31eb09e57af096cd3f890cdc076888889cba160021be927a387de"
+        "sha256": "7c74b6cd286f72118656186cff1e026f92260709bf66a86dbb62d8e394442c86"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",

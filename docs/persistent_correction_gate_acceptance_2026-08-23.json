@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents class-occurrence, rebut settlement, and arbitration failure taxonomy while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "68cbcd558c9f95526405b751d33f9e011e347d74365b673e14899ad90db4f260"
+      "sha256": "ee27e5151362068b5259d0a176b61b1ae650182e2676c1ec3680dbdaf0597efe"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
