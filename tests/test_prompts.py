@@ -171,6 +171,8 @@ class TestStagedReviewInstructions:
 def test_cleaning_preserves_substantive_asymmetry_and_binding_context():
     cleaner = prompts.CLEANER_INSTRUCTIONS
     attester = prompts.ATTEST_INSTRUCTIONS
+    assert "meta-selection language embedded in one option" in attester
+    assert "MUST make ORIGINAL-NEUTRALITY fail" in attester
     assert "EQUALIZE" not in cleaner
     assert "Never copy facts, constraints" in cleaner
     assert "Preserve substantive differences" in cleaner

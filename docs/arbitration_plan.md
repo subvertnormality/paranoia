@@ -660,6 +660,9 @@ stamped a biased packet `attested` — sending that same bias to both deciders.
 `ORIGINAL-NEUTRALITY` is independent of cleaned fidelity and neutrality and covers
 complete hints, including every path and reason. Its FAIL
 form is a closed two-key JSON object bound to an exact original field and passage.
+An alternative's ordinary proposal (such as `Use X`) is option content, but embedded
+meta-selection language that calls itself correct, directs selection, or tells deciders
+to disregard contrary evidence or tradeoffs is advocacy and must fail this verdict.
 When the cleaned candidate is complete and bounded but cannot be used, PASS permits
 one atomic fallback to the canonical original decision, option mapping, and validated
 hints. Context and stakes remain byte-identical and keep their independent advocacy

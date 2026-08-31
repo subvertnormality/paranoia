@@ -500,6 +500,9 @@ original decision/options/hints, context, or stakes is `caller-framing-rejected`
 exact field/passage diagnostic across the bounded retry. Cleaner output/protocol failure remains
 `cleaner-rejected`; attester output/protocol failure remains `attestation-rejected`. Never add a
 keyword lint that claims to replace semantic cross-vendor attestation.
+Treat an option's ordinary proposal as content, but require original-neutrality failure for embedded
+meta-selection language that calls the option correct, directs its selection, or tells deciders to
+disregard contrary evidence or tradeoffs.
 Require every stakes/context advocacy verdict to be a closed field-and-passage object whose nonempty
 passage occurs verbatim in that exact caller field. Keep fallback-ineligibility evidence separate
 from the terminal attempt owner so a later cleaner or attester protocol failure cannot be relabeled
