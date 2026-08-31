@@ -2469,7 +2469,7 @@ def _clean_and_attest(
         ).hexdigest()
         attester_record["rejection"] = None
         if established is not None:
-            established["packet"].attestation = attested_raw
+            established["packet"].attestation = attester_record["reply"]
         if len(attested_raw) > arb.MAX_ATTESTER_REPLY_CHARS:
             last_error = (
                 f"attester reply is {len(attested_raw)} chars "

@@ -1974,7 +1974,7 @@ def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
 
 
 @pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
-@pytest.mark.parametrize("exit_kind", ["admission", "execution"])
+@pytest.mark.parametrize("exit_kind", ["admission", "execution", "size"])
 def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     terminal_role: str, exit_kind: str,
@@ -2018,6 +2018,14 @@ def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
                     and self.role_calls[role] == 2
                 ):
                     raise RuntimeError(f"{role} provider unavailable")
+                if (
+                    exit_kind == "size" and role == terminal_role
+                    and self.role_calls[role] == 2
+                ):
+                    if role == "cleaner":
+                        self.cleaner = "x" * (arb.MAX_CLEANER_REPLY_CHARS + 1)
+                    else:
+                        self.attest = "x" * (arb.MAX_ATTESTER_REPLY_CHARS + 1)
             return super().__call__(**kwargs)
 
     if exit_kind == "admission":
@@ -2048,6 +2056,11 @@ def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
     ][-1]
     assert terminal_attempt["rejection"] is not None
     assert "original fallback unavailable" not in terminal_attempt["rejection"]
+    if exit_kind == "size":
+        assert f"{terminal_role} reply is" in terminal_attempt["rejection"]
+    if exit_kind == "size" and terminal_role == "attester":
+        assert len(audit["attestation"]) <= ah.MAX_PHASE_REPLY_CHARS
+        assert "[bounded phase output]" in audit["attestation"]
 
 
 @pytest.mark.parametrize(
@@ -2399,6 +2412,8 @@ def test_attester_reply_size_is_bounded_and_attester_owned(
     assert len(attester_attempts) == 2
     assert all("attester reply is" in row["rejection"] for row in attester_attempts)
     assert all(len(row["reply"]) <= ah.MAX_PHASE_REPLY_CHARS for row in attester_attempts)
+    assert len(record["attestation"]) <= ah.MAX_PHASE_REPLY_CHARS
+    assert "[bounded phase output]" in record["attestation"]
 
 
 def test_cleaner_prompt_local_rejection_is_durable_before_spend(
