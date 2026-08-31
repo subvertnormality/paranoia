@@ -653,6 +653,18 @@ def _caller_advocacy_rejection(diagnostic: Mapping[str, str]) -> str:
     return f"field {diagnostic['field']!r}, passage {diagnostic['passage']!r}"
 
 
+def _with_latched_caller_diagnostic(
+    message: str, diagnostic: Mapping[str, str] | None,
+) -> str:
+    """Keep terminal ownership while retaining earlier fallback-ineligibility evidence."""
+    if diagnostic is None:
+        return message
+    return (
+        f"{message}; an earlier attestation made original fallback unavailable: "
+        f"{_caller_advocacy_rejection(diagnostic)}"
+    )
+
+
 def parse_attestation(
     text: str,
     expected: Mapping[str, tuple[str, str]],
@@ -2311,7 +2323,9 @@ def _clean_and_attest(
             cleaner_record.update(status="local-rejected", rejection=prompt_rejection)
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
-            raise ArbitrationError(prompt_rejection)
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                prompt_rejection, original_neutrality_diagnostic,
+            ))
         try:
             cleaned_raw = agent(
                 engine_name=eng.CLEANER_ENGINE, model=cleaner_model,
@@ -2327,7 +2341,9 @@ def _clean_and_attest(
             )
             if established is not None:
                 established["packet"].cleaning = "cleaner-rejected"
-            raise ArbitrationError(cleaner_record["rejection"]) from exc
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                cleaner_record["rejection"], original_neutrality_diagnostic,
+            )) from exc
         cleaner_record["reply"] = _bounded_phase_reply(cleaned_raw)
         cleaner_record["reply_sha256"] = hashlib.sha256(
             cleaned_raw.encode("utf-8", "surrogatepass")
@@ -2423,7 +2439,9 @@ def _clean_and_attest(
             attester_record.update(status="local-rejected", rejection=prompt_rejection)
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(prompt_rejection)
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                prompt_rejection, original_neutrality_diagnostic,
+            ))
         try:
             attested_raw = agent(
                 engine_name=eng.ATTESTER_ENGINE, model=eng.ATTESTER_MODEL,
@@ -2439,7 +2457,9 @@ def _clean_and_attest(
             )
             if established is not None:
                 established["packet"].cleaning = "attestation-rejected"
-            raise ArbitrationError(attester_record["rejection"]) from exc
+            raise ArbitrationError(_with_latched_caller_diagnostic(
+                attester_record["rejection"], original_neutrality_diagnostic,
+            )) from exc
         attester_record["reply"] = _bounded_phase_reply(attested_raw)
         attester_record["reply_sha256"] = hashlib.sha256(
             attested_raw.encode("utf-8", "surrogatepass")
@@ -2546,12 +2566,10 @@ def _clean_and_attest(
 
     if terminal_status == "caller-framing-rejected":
         raise ArbitrationError(f"caller framing rejected after bounded cleaning: {last_error}")
-    if original_neutrality_diagnostic is not None:
-        last_error += (
-            "; an earlier attestation made original fallback unavailable: "
-            f"{_caller_advocacy_rejection(original_neutrality_diagnostic)}"
-        )
-    raise ArbitrationError(f"cleaning failed attestation twice: {last_error}")
+    raise ArbitrationError(_with_latched_caller_diagnostic(
+        f"cleaning failed attestation twice: {last_error}",
+        original_neutrality_diagnostic,
+    ))
 
 
 def _check_cleaning_prompt(role: str, prompt: str) -> None:

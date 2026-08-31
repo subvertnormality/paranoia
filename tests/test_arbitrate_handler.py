@@ -1967,6 +1967,82 @@ def test_terminal_protocol_owner_wins_without_losing_latched_caller_diagnostic(
     }
 
 
+@pytest.mark.parametrize("terminal_role", ["cleaner", "attester"])
+@pytest.mark.parametrize("exit_kind", ["admission", "execution"])
+def test_immediate_terminal_exit_retains_latched_caller_diagnostic(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    terminal_role: str, exit_kind: str,
+):
+    cleaner = cleaner_reply({
+        "opt-float": "Float.",
+        "opt-decimal": "Store the threshold as a Decimal.",
+    })
+    detail = json.dumps({
+        "opt-float": {
+            "original": "Store the threshold as a float.",
+            "cleaned": "Float.",
+            "change": "narrowed",
+            "reason": "opt-float: narrowed",
+        }
+    }, separators=(",", ":"))
+    first_attestation = (
+        "FIDELITY: decision PRESERVED; opt-float CHANGED; opt-decimal PRESERVED\n"
+        f"FIDELITY-DETAIL: {detail}\nNEUTRALITY: PASS\n"
+        'ORIGINAL-NEUTRALITY: FAIL {"field":"opt-float","passage":"Store the threshold as a float."}\n'
+        "STAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n"
+    )
+
+    class SequencedImmediateFailure(Agent):
+        def __init__(self):
+            super().__init__(lambda e, r: "opt-float", cleaner=cleaner)
+            self.role_calls = {"cleaner": 0, "attester": 0}
+
+        def __call__(self, **kwargs):
+            role = (
+                "cleaner" if "NEUTRALIZER" in kwargs["instructions"]
+                else "attester" if "TEXT AUDITOR" in kwargs["instructions"]
+                else None
+            )
+            if role is not None:
+                self.role_calls[role] += 1
+                if role == "attester" and self.role_calls[role] == 1:
+                    self.attest = first_attestation
+                if (
+                    exit_kind == "execution" and role == terminal_role
+                    and self.role_calls[role] == 2
+                ):
+                    raise RuntimeError(f"{role} provider unavailable")
+            return super().__call__(**kwargs)
+
+    if exit_kind == "admission":
+        role_calls = {"cleaner": 0, "attester": 0}
+
+        def reject_second_role_call(role: str, prompt: str, limit: int) -> str | None:
+            role_calls[role] += 1
+            if role == terminal_role and role_calls[role] == 2:
+                return f"{role} prompt rejected for test"
+            return None
+
+        monkeypatch.setattr(ah, "_local_prompt_rejection", reject_second_role_call)
+
+    report = run(repo, SequencedImmediateFailure(), tmp_path)
+    expected_status = (
+        "cleaner-rejected" if terminal_role == "cleaner" else "attestation-rejected"
+    )
+    assert trailer_field(report, "CLEANING") == expected_status
+    assert "an earlier attestation made original fallback unavailable" in report
+    assert "field 'opt-float', passage 'Store the threshold as a float.'" in report
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["caller_framing_diagnostic"] == {
+        "field": "opt-float", "passage": "Store the threshold as a float.",
+    }
+    terminal_attempt = [
+        row for row in audit["phase_attempts"] if row["role"] == terminal_role
+    ][-1]
+    assert terminal_attempt["rejection"] is not None
+    assert "original fallback unavailable" not in terminal_attempt["rejection"]
+
+
 @pytest.mark.parametrize(
     ("field", "caller_text"),
     [
