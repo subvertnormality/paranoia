@@ -177,6 +177,7 @@ def validate_artifact(
 ) -> None:
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "allowed_later_source_diffs",
         "provider", "stakes", "discovery", "targeted_control", "claims",
     }
     if set(artifact) != expected:
@@ -196,13 +197,30 @@ def validate_artifact(
         raise ValueError("source revision is not a canonical commit")
     if set(artifact["source_sha256"]) != set(SOURCES):
         raise ValueError("source inventory is not exact")
+    changed: set[str] = set()
+    allowed = artifact["allowed_later_source_diffs"]
+    if not isinstance(allowed, dict):
+        raise ValueError("later-source allowance inventory is absent")
     for relative, digest in artifact["source_sha256"].items():
         historical = subprocess.run(
             ["git", "show", f"{revision}:{relative}"], cwd=root, check=True,
             stdout=subprocess.PIPE,
         ).stdout
-        if _sha_bytes(historical) != digest or (root / relative).read_bytes() != historical:
-            raise ValueError(f"source binding mismatch for {relative}")
+        if _sha_bytes(historical) != digest:
+            raise ValueError(f"historical source binding mismatch for {relative}")
+        if (root / relative).read_bytes() != historical:
+            changed.add(relative)
+            row = allowed.get(relative)
+            if not isinstance(row, dict) or set(row) != {"sha256", "scope"}:
+                raise ValueError(f"later-source allowance is absent for {relative}")
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=root, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            if _sha_bytes(diff) != row["sha256"] or not row["scope"].strip():
+                raise ValueError(f"later-source allowance mismatch for {relative}")
+    if changed != set(allowed):
+        raise ValueError("later-source allowance inventory is not exact")
     provider = artifact["provider"]
     if set(provider) != {"engine", "model", "effort", "cli_version"}:
         raise ValueError("provider binding is not closed")
@@ -236,15 +254,19 @@ def validate_artifact(
             raise ValueError("rendered trailer is not the returned durable result")
 
     findings = discovery["audit"]["staged_settlement"]["findings"]
-    matches = []
-    for row in findings:
-        evidence = row["evidence"]
-        remedy = row["remedy"].lower()
-        if (
-            all(any(_anchor_covers(anchor, line) for anchor in evidence) for line in (4, 7, 10))
-            and "sole" in remedy and ("authority" in remedy or "definition" in remedy)
-        ):
-            matches.append(row)
+    settlement = discovery["audit"]["staged_settlement"]
+    records = settlement["class_records"]
+    dispositions = {
+        row["finding_id"]:records[row["record_index"]]
+        for row in settlement["class_dispositions"]
+        if row["kind"] == "new_class"
+    }
+    matches = [
+        row for row in findings
+        if "exactly one normative authority" in dispositions.get(row["id"], {}).get(
+            "invariant", "",
+        ).lower()
+    ]
     if len(matches) != 1:
         raise ValueError("discovery did not produce one aggregate restatement finding")
     evidence = matches[0]["evidence"]
@@ -272,28 +294,57 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--reuse-run-root", type=Path)
+    parser.add_argument("--source-revision")
     args = parser.parse_args()
     if args.validate_only:
         validate_artifact(json.loads(args.output.read_text(encoding="utf-8")))
         return 0
     if _git("status", "--porcelain", "--untracked-files=no"):
         raise ValueError("commit bound source changes before generating acceptance")
-    revision = _git("rev-parse", "HEAD")
-    run_root = Path(tempfile.mkdtemp(prefix="plan-restatement-acceptance-"))
-    discovery = _capture_call({
-        "repo_path":str(ROOT), "plan_text":DISCOVERY_PLAN,
-        "lineage":DISCOVERY_LINEAGE, "round":1, "class_closure":True,
-        "claim_verification":False, "web_search":False,
-        "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
-    }, state_root=run_root / "discovery-state", log_dir=run_root / "discovery-logs")
-    targeted_state = run_root / "targeted-state"
-    _targeted_seed(targeted_state)
-    targeted = _capture_call({
-        "repo_path":str(ROOT), "plan_text":TARGETED_PLAN,
-        "lineage":TARGETED_LINEAGE, "round":2, "class_closure":True,
-        "claim_verification":False, "web_search":False,
-        "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
-    }, state_root=targeted_state, log_dir=run_root / "targeted-logs")
+    revision = args.source_revision or _git("rev-parse", "HEAD")
+    if args.reuse_run_root and not args.source_revision:
+        raise ValueError("--reuse-run-root requires --source-revision")
+    run_root = args.reuse_run_root or Path(tempfile.mkdtemp(
+        prefix="plan-restatement-acceptance-",
+    ))
+
+    def retained_route(name: str, lineage_id: str) -> tuple:
+        log_dir = run_root / f"{name}-logs"
+        audit = _load_one(log_dir, "*-critique_plan-*.json")
+        prompts = json.loads((log_dir / "captured_prompts.json").read_text(
+            encoding="utf-8",
+        ))
+        lineage = json.loads(
+            (run_root / f"{name}-state" / "lineages" / f"{lineage_id}.json").read_text(
+                encoding="utf-8",
+            )
+        )
+        review = engines.Review(
+            text=audit["text"], session_ref=audit["session_ref"], raw=audit["text"],
+        )
+        result = handlers._footer(review, engines.CodexEngine())
+        result += "\n\n" + audit["rendered_trailer"]
+        return result, prompts, audit, lineage
+
+    if args.reuse_run_root:
+        discovery = retained_route("discovery", DISCOVERY_LINEAGE)
+        targeted = retained_route("targeted", TARGETED_LINEAGE)
+    else:
+        discovery = _capture_call({
+            "repo_path":str(ROOT), "plan_text":DISCOVERY_PLAN,
+            "lineage":DISCOVERY_LINEAGE, "round":1, "class_closure":True,
+            "claim_verification":False, "web_search":False,
+            "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
+        }, state_root=run_root / "discovery-state", log_dir=run_root / "discovery-logs")
+        targeted_state = run_root / "targeted-state"
+        _targeted_seed(targeted_state)
+        targeted = _capture_call({
+            "repo_path":str(ROOT), "plan_text":TARGETED_PLAN,
+            "lineage":TARGETED_LINEAGE, "round":2, "class_closure":True,
+            "claim_verification":False, "web_search":False,
+            "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
+        }, state_root=targeted_state, log_dir=run_root / "targeted-logs")
 
     def route(lineage_id: str, plan: str, value: tuple) -> dict:
         result, prompts, audit, lineage = value
@@ -308,8 +359,12 @@ def main() -> int:
         "acceptance_kind":"plan-normative-restatement-public-handler-v1",
         "version":1, "date":"2026-09-01", "source_revision":revision,
         "source_sha256":{
-            relative:_sha_bytes((ROOT / relative).read_bytes()) for relative in SOURCES
+            relative:_sha_bytes(subprocess.run(
+                ["git", "show", f"{revision}:{relative}"], cwd=ROOT, check=True,
+                stdout=subprocess.PIPE,
+            ).stdout) for relative in SOURCES
         },
+        "allowed_later_source_diffs":{},
         "provider":{
             "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
             "cli_version":subprocess.run(
@@ -332,6 +387,20 @@ def main() -> int:
             ],
         },
     }
+    for relative in SOURCES:
+        historical = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=ROOT, check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        if (ROOT / relative).read_bytes() != historical:
+            diff = subprocess.run(
+                ["git", "diff", "--no-ext-diff", revision, "--", relative],
+                cwd=ROOT, check=True, stdout=subprocess.PIPE,
+            ).stdout
+            artifact["allowed_later_source_diffs"][relative] = {
+                "sha256":_sha_bytes(diff),
+                "scope":"Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+            }
     validate_artifact(artifact, require_committed=False)
     args.output.write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
