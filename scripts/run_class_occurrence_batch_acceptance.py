@@ -328,6 +328,16 @@ def validate_artifact(
         replay_index = 0
         original_run = engines.CodexEngine.run
         original_resume = engines.CodexEngine.resume
+        original_decode = sp.decode_decision_with_issues
+
+        def replay_decode(text: str, *args, **kwargs):
+            wire = json.loads(text)
+            if "concession_challenges" in wire:
+                raise ValueError(
+                    "historical response unexpectedly owns a concession challenge"
+                )
+            wire["concession_challenges"] = {}
+            return original_decode(json.dumps(wire, separators=(",", ":")), *args, **kwargs)
 
         def replay_reply(prompt: str) -> Review:
             nonlocal replay_index
@@ -349,6 +359,7 @@ def validate_artifact(
 
         engines.CodexEngine.run = replay_run
         engines.CodexEngine.resume = replay_resume
+        sp.decode_decision_with_issues = replay_decode
         try:
             replay_result = handlers.critique_branch(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
@@ -360,6 +371,7 @@ def validate_artifact(
         finally:
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
+            sp.decode_decision_with_issues = original_decode
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
