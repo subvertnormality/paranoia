@@ -301,6 +301,13 @@ The same check runs before a non-debt-bound correction finding can derive its vi
 `classification.assessment_evidence`.
 Correction settlement rejects any prospective state with more than one open debt for an active class.
 
+Broad plan census and final roles also inspect proactively for one normative contract stated as
+authoritative in multiple operative locations, even before the copies visibly disagree. They ask
+for one authoritative definition with references or derived projections elsewhere. This is a
+semantic review duty, not a repeated-token lint: examples, faithful table explanations, generated
+projections, and summaries that explicitly defer to the governing definition remain valid.
+Targeted correction does not reopen unrelated plan material for this audit.
+
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
 

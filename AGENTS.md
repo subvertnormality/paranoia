@@ -413,6 +413,13 @@ of the resulting code and tests.
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
+  During broad plan census and final, proactively inspect for one normative contract asserted as
+  independently authoritative at multiple operative sites, even before the copies drift. Require
+  one authoritative definition and references or derived projections elsewhere, while exempting
+  worked examples, faithful table/prose explanations, generated projections, summaries that
+  explicitly defer to the authority, and coincidentally equal tokens. Keep this semantic and
+  reviewer-owned; do not add textual duplicate heuristics, a provider call, or unrelated discovery
+  during targeted correction.
   Surface every currently blocking class spanning at least three caller round labels with its
   round-label span, current-debt start label, and current reviewer session for `rebut`; do not infer a per-round
   presence count that durable state does not store. Mark any class reopen transition as a reopen
