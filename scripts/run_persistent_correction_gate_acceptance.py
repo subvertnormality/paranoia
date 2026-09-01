@@ -28,12 +28,25 @@ LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
 SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
+LEGACY_SOURCE_REVISION = "bb068a1c359765f12b9c2295a88f039424c7d4f9"
+LEGACY_ACCEPTANCE_SCOPE = {
+    "status":"historical",
+    "proves":"the correction-gate behavior recorded at the pinned source revision",
+    "does_not_claim":"current engine-owned final selection or clearance",
+}
+CURRENT_ACCEPTANCE_SCOPE = {
+    "status":"current",
+    "proves":"correction-gate behavior through an engine-owned final and clearance",
+    "does_not_claim":"behavior outside the retained public plan-handler fixture",
+}
+LEGACY_REPAIR_PLAN_SHA256 = "7060753ab927b4a4276a00693f6ff498d2315f9be77f131aa425f30fbfd8e2c5"
 ACCEPTANCE_SOURCES = tuple(sorted(
     str(path.relative_to(ROOT))
     for path in (ROOT / "src" / "paranoia_local").glob("*.py")
 )) + (
     "scripts/run_persistent_correction_gate_acceptance.py",
-    "docs/how-it-works.md", "AGENTS.md", "CLAUDE.md",
+    "README.md", "docs/how-it-works.md", "docs/tool-reference.md",
+    "docs/llm-reference.md", "AGENTS.md", "CLAUDE.md",
     "docs/staged_review_protocol_v2_acceptance.md",
     "tests/test_review_census.py", "tests/test_handlers.py",
     "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
@@ -67,12 +80,14 @@ FIXED_PLAN = PLAN.replace(
     "\nRequire correction, repair, and final to use three distinct provider sessions, and reject "
     "a coordinated mutation of any final prompt binding before Path.write_text."
     "\nRetain one closed server-owned sibling binding with class ID source-binding-class, the "
-    "exact coordinate plan:7, its debt and finding IDs, and the provider evidence unchanged."
-    "\nValidate the exact coordinate independently from provider-range containment, and reject "
+    "authoritative coordinate defined by the validator requirement above, its debt and finding "
+    "IDs, and the provider evidence unchanged."
+    "\nValidate that authoritative coordinate independently from provider-range containment, and reject "
     "a mutation of either channel before Path.write_text."
     "\nThe retained artifact source inventory is the deterministic complete set of every "
-    "Python module under src/paranoia_local, plus this generator, how-it-works.md, AGENTS.md, "
-    "CLAUDE.md, staged_review_protocol_v2_acceptance.md, and the four named test modules "
+    "Python module under src/paranoia_local, plus this generator, README.md, how-it-works.md, "
+    "tool-reference.md, llm-reference.md, AGENTS.md, CLAUDE.md, "
+    "staged_review_protocol_v2_acceptance.md, and the four named test modules "
     "enforced by the shared ACCEPTANCE_SOURCES constant. Commit every bound source before generation "
     "so source_revision and current bytes agree, validate the completed artifact, then publish "
     "it in a separate commit. Before publication, require removed, added, or replaced inventory "
@@ -190,6 +205,7 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
     state = rc.settle_state(
         state, settlement, phase="correction",
         snapshot=before["review_state"]["snapshot_digest"], round_no=7,
+        engine_name=audit["engine"],
     )
     replacements = {
         class_id: tracked.superseded_by
@@ -216,11 +232,11 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
         for debt in state.get("debt", [])
     )
     if unbound:
-        state["phase"] = "correction" if blocking_debt else "census"
+        rc.set_phase(state, "correction" if blocking_debt else "census")
         state["unbound_class_ids"] = unbound
         state.pop("unbound_classes", None)
     elif lineage.blocking():
-        state["phase"] = "correction"
+        rc.set_phase(state, "correction")
     replacement_successors = [
         minted_by_record[index]
         for index, row in enumerate(settlement["class_records"])
@@ -487,6 +503,7 @@ def validate_artifact(
             raise ValueError("retained acceptance differs from its committed Git envelope")
     expected_keys = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "legacy_unowned_final", "acceptance_scope",
         "allowed_later_source_diffs",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
@@ -507,6 +524,16 @@ def validate_artifact(
         raise ValueError("acceptance fields are not closed and exact")
     if artifact["acceptance_kind"] != "persistent-correction-gate-public-plan-handler":
         raise ValueError("wrong acceptance kind")
+    legacy_unowned_final = artifact["legacy_unowned_final"]
+    if type(legacy_unowned_final) is not bool:
+        raise ValueError("legacy final marker must be boolean")
+    if legacy_unowned_final and artifact["source_revision"] != LEGACY_SOURCE_REVISION:
+        raise ValueError("legacy final marker is permitted only for the pinned historical run")
+    expected_scope = (
+        LEGACY_ACCEPTANCE_SCOPE if legacy_unowned_final else CURRENT_ACCEPTANCE_SCOPE
+    )
+    if artifact["acceptance_scope"] != expected_scope:
+        raise ValueError("acceptance scope does not match the historical final marker")
     surfaces = {
         "docs/how-it-works.md": (
             "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
@@ -540,6 +567,8 @@ def validate_artifact(
             raise ValueError(f"{relative} omits public contract tokens {missing!r}")
     revision = artifact["source_revision"]
     expected_sources = set(ACCEPTANCE_SOURCES)
+    if revision == LEGACY_SOURCE_REVISION:
+        expected_sources -= {"README.md", "docs/tool-reference.md", "docs/llm-reference.md"}
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
     if set(artifact["source_sha256"]) != expected_sources:
@@ -642,8 +671,12 @@ def validate_artifact(
         raise ValueError("audit gate projection mismatch")
     if audit.get("attempt_ledger") != attempts:
         raise ValueError("attempt ledger is not exact")
-    if not isinstance(attempts, list) or len(attempts) != 1:
-        raise ValueError("closure-sweep acceptance requires exactly one provider attempt")
+    if (
+        not isinstance(attempts, list) or not 1 <= len(attempts) <= 2
+        or attempts[-1].get("outcome") != "completed"
+        or any(row.get("outcome") != "validation-invalid" for row in attempts[:-1])
+    ):
+        raise ValueError("closure-sweep acceptance exceeded its bounded retry topology")
     if artifact["provider_call_count"] != len(attempts):
         raise ValueError("provider call count mismatch")
     if any(
@@ -807,15 +840,22 @@ def validate_artifact(
     repair_audit = artifact["repair_audit"]
     repair_attempts = artifact["repair_attempt_ledger"]
     after_repair = artifact["after_repair_lineage"]
-    if not (
+    repair_plan_is_bound = (
         repair_plan == FIXED_PLAN
-        and artifact["repair_plan_sha256"] == _sha(FIXED_PLAN)
+        or (
+            artifact["source_revision"] == LEGACY_SOURCE_REVISION
+            and artifact["repair_plan_sha256"] == LEGACY_REPAIR_PLAN_SHA256
+        )
+    )
+    if not (
+        repair_plan_is_bound
+        and artifact["repair_plan_sha256"] == _sha(repair_plan)
         and isinstance(repair_result, str)
         and artifact["repair_result_sha256"] == _sha(repair_result)
         and isinstance(repair_prompts, list) and repair_prompts
         and artifact["repair_prompt_sha256"] == [_sha(row) for row in repair_prompts]
         and repair_audit.get("round") == 8
-        and repair_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and repair_audit.get("plan_digest") == _sha(repair_plan)[:16]
         and repair_audit.get("attempt_ledger") == repair_attempts
         and isinstance(repair_attempts, list) and 1 <= len(repair_attempts) <= 2
         and repair_attempts[-1].get("role") in {
@@ -825,6 +865,10 @@ def validate_artifact(
         and repair_result.endswith(repair_audit.get("rendered_trailer", ""))
         and artifact["repair_durable_reload_lineage"] == after_repair
         and after_repair["review_state"].get("phase") == "final"
+        and (
+            legacy_unowned_final
+            or after_repair["review_state"].get("final_engine") == "codex"
+        )
         and not any(
             row.get("status") == "open" and row.get("severity") in rc.BLOCKING
             for row in after_repair["review_state"].get("debt", [])
@@ -845,7 +889,7 @@ def validate_artifact(
         and repair_task.get("stakes") == STAKES
         and repair_task.get("review_scope") == "closure_candidate"
         and repair_task.get("checklist") == list(sp.CHECKLIST)
-        and FIXED_PLAN.splitlines()[SIBLING_LINE - 1]
+        and repair_plan.splitlines()[SIBLING_LINE - 1]
         in repair_task.get("artifact", "")
         and repair_prompts[0].count(
             handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
@@ -864,7 +908,7 @@ def validate_artifact(
         and isinstance(final_prompts, list) and final_prompts
         and artifact["final_prompt_sha256"] == [_sha(row) for row in final_prompts]
         and final_audit.get("round") == 9
-        and final_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and final_audit.get("plan_digest") == _sha(repair_plan)[:16]
         and final_audit.get("attempt_ledger") == final_attempts
         and isinstance(final_attempts, list) and 1 <= len(final_attempts) <= 2
         and final_attempts[-1].get("role") in {"final", "final-validation-retry"}
@@ -891,7 +935,7 @@ def validate_artifact(
         == [CLASS_ID, SIBLING_CLASS_ID]
         and all(
             line in final_task.get("artifact", "")
-            for line in FIXED_PLAN.splitlines() if line
+            for line in repair_plan.splitlines() if line
         )
         and handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in final_prompts[0]
         and len({
@@ -1021,8 +1065,8 @@ def main() -> int:
     attempts = audit.get("attempt_ledger")
     if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
         raise RuntimeError("acceptance exceeded the correction plus one retry topology")
-    if len(captured_prompts) != 1:
-        raise RuntimeError("acceptance did not use exactly one captured correction prompt")
+    if len(captured_prompts) != len(attempts):
+        raise RuntimeError("captured correction prompts do not match provider attempts")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
     closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
     sibling_classes = [durable.classes[SIBLING_CLASS_ID]]
@@ -1150,6 +1194,8 @@ def main() -> int:
     source_paths = list(ACCEPTANCE_SOURCES)
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
+        "legacy_unowned_final":False,
+        "acceptance_scope":CURRENT_ACCEPTANCE_SCOPE,
         "version":2, "date":"2026-08-24", "source_revision":revision,
         "source_sha256":{
             path:hashlib.sha256(_git_bytes("show", f"{revision}:{path}")).hexdigest()

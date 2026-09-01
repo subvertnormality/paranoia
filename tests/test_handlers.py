@@ -329,6 +329,7 @@ class TestRebut:
         assert result.startswith("CONCEDE: The finding used the wrong path.")
         assert "literal `repository/` prefix" in eng.calls[0]["prompt"]
         assert reloaded.review_state["phase"] == "final"
+        assert reloaded.review_state["final_engine"] == "fake"
         assert reloaded.review_state["last_round"] == 7
         assert reloaded.review_state["debt"][0]["status"] == "closed"
         assert reloaded.review_state["debt"][0]["evidence"] == ["plan:1"]
@@ -449,6 +450,8 @@ class TestRebut:
         )
         assert durable.review_state["debt"][0]["evidence"] == ["plan:2"]
         assert durable.classes["class-a"].status == cc.CLOSED
+        assert durable.review_state["phase"] == "final"
+        assert durable.review_state["final_engine"] == "fake"
 
     @pytest.mark.parametrize(("mechanized", "prior_evidence", "evidence", "error"), [
         (True, ["repository/app.py:1"], [{"anchor":"repository/app.py:1", "rationale":"current"}], "mechanized"),

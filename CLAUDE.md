@@ -10,6 +10,8 @@
 - treat recurring classes as an architecture checkpoint, not permission for another patch;
 - use broad cold structural coverage for tracked plan and branch census/final regression, while
   targeting intervening correction rounds to open debt and correction effects;
+- preserve the engine owner of a pending cold-final gate; another engine's clean review cannot
+  discharge it, while findings from that review still reopen correction;
 - prioritize accurate, fast, workable behavior and a small architecture over out-of-scope
   hardening;
 - keep operational timeouts generous enough for normal thorough reviews; control runaway cost

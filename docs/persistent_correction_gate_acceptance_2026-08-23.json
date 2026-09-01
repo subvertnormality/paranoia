@@ -1,9 +1,19 @@
 {
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
+  "acceptance_scope": {
+    "does_not_claim": "current engine-owned final selection or clearance",
+    "proves": "the correction-gate behavior recorded at the pinned source revision",
+    "status": "historical"
+  },
+  "legacy_unowned_final": true,
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-      "sha256": "7eb8bd7b2428d726c0b6c9fc7a1accaa668cc3a55e4a669bc1055488f1e4e325"
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
+      "sha256": "018ee9e9b7dbfabdec9253f19e80c9efafc80e9ccb4a60eb5598905926cb3054"
+    },
+    "CLAUDE.md": {
+      "scope": "Issue #95 mirrors the canonical engine-owned final-regression instruction; it does not change the retained correction-gate provider exchange or control counters.",
+      "sha256": "a486b99b0b62769970d9377624ae5198744d113040ae32fe4bd23daf73c4235e"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
@@ -11,7 +21,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "0a61ab9fa35e83d64b004352ce1f28c8e7697376842f8aa776ad60be0fa07255"
+      "sha256": "82601ece48e6fba44ae8b2bb02cc50b7cf3cda3c9f0694778bc97f89a2783270"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
@@ -26,8 +36,8 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged; the retained correction-gate transition is unchanged.",
-      "sha256": "4e4327ea47d544d98b4312d5e04fac02860c351d4ceb2ccafcb47a9f6c3c4faa"
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged.",
+      "sha256": "836457a3ea9505eb766262c01ffc9c7a240b988360325a0b5b71994b26055431"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -38,8 +48,8 @@
       "sha256": "2ace7d78eeda462e1b2eb00d9d9c6ac9b21008fc10adab962b3dbbda8138d2b8"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",
-      "sha256": "17a9d1ca13a8684f5a6f472c72096dc30d182cf961ce42863d4ae81554559946"
+      "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",
+      "sha256": "95c316762668773d96922f978c96ce65ba8a9f5d16aab0367c595d7ef47e0326"
     },
     "src/paranoia_local/server.py": {
       "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",
@@ -55,11 +65,11 @@
     },
     "tests/test_handlers.py": {
       "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, proves every server-authored plan citation example resolves at bounds 1, 3, and 5,260, and adds public empty-plan preflight coverage.",
-      "sha256": "77f046005d916687f566805d6c78e538dfe127503766c31dfdc9fe5798ccfecf"
+      "sha256": "8fb102f454c4e6dfd66bc72052abc4a9aa669b1821bf7a1a002f06e64a0cfa9b"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-      "sha256": "830000f6d6d969737996d0b697a5d5ec0f7eaded935b5452f0f5b66bf3dd321f"
+      "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
+      "sha256": "4aad9c78c6c984a1e6e611ad732f5d16eef33e943708f7f5eafbfbb5d34485e8"
     }
   },
   "after_lineage": {

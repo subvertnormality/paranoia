@@ -1154,8 +1154,9 @@ def _staged_structural_review(
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
     _staged_class_context(closure._blocks())
     try:
+        persisted_state = lineage.review_state
         state = rc.normalize_state(
-            lineage.review_state, stakes=stakes, snapshot=snapshot,
+            persisted_state, stakes=stakes, snapshot=snapshot,
         )
         control_source = (
             lineage.review_state
@@ -1168,6 +1169,19 @@ def _staged_structural_review(
         )
         if mode == cc.PLAN_MODE and plan_lines is not None:
             state["plan_line_count"] = plan_lines
+        # Migrating a legacy ownerless final is authoritative rather than
+        # speculative settlement. Preserve that one migration across failure
+        # rollback without durably projecting unrelated normalization defaults.
+        legacy_unowned_final = (
+            isinstance(persisted_state, dict)
+            and persisted_state.get("phase") == "final"
+            and "final_engine" not in persisted_state
+            and state.get("phase") == "census"
+        )
+        if legacy_unowned_final:
+            lineage.review_state = deepcopy(state)
+            if getattr(closure, "prepared_lineage", None) is not None:
+                closure.prepared_lineage.review_state = deepcopy(state)
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -1237,7 +1251,7 @@ def _staged_structural_review(
         # spending a correction/final call cannot add a structural judgement.  Migrate
         # only the mechanically unambiguous predecessor shape and keep claim debt as the
         # independent combined-verdict blocker.
-        state["phase"] = "clear"
+        rc.set_phase(state, "clear")
         lineage.review_state = state
         lineage.debt = None
         lineage.rounds += 1
@@ -1281,11 +1295,13 @@ def _staged_structural_review(
     ) and has_blocking_debt:
         # State written by the earlier over-broad gate already has actionable debt;
         # resume targeted correction rather than paying for a redundant census.
-        state["phase"] = phase = "correction"
+        rc.set_phase(state, "correction")
+        phase = "correction"
     if phase != "census" and unbound_blocking and not has_blocking_debt:
         # A reopened or migrated class without governing staged debt needs the broad
         # integrity lane, not an empty targeted correction that can never settle it.
-        state["phase"] = phase = "census"
+        rc.set_phase(state, "census")
+        phase = "census"
     correction_gates = (
         rc.correction_gates(
             lineage.active(), correction_control, round_no=round_no,
@@ -1744,7 +1760,10 @@ def _staged_structural_review(
     )
     if mode == cc.BRANCH_MODE:
         closure._sweep(only=minted)
-    state = rc.settle_state(state, settlement, phase=phase, snapshot=snapshot, round_no=round_no)
+    state = rc.settle_state(
+        state, settlement, phase=phase, snapshot=snapshot, round_no=round_no,
+        engine_name=engine.name,
+    )
     replacements = {
         cid: cls.superseded_by for cid, cls in lineage.classes.items()
         if cls.status == cc.SUPERSEDED and cls.superseded_by
@@ -1768,11 +1787,11 @@ def _staged_structural_review(
         for d in state.get("debt", [])
     )
     if unbound:
-        state["phase"] = "correction" if has_blocking_debt else "census"
+        rc.set_phase(state, "correction" if has_blocking_debt else "census")
         state["unbound_class_ids"] = [c.class_id for c in unbound]
         state.pop("unbound_classes", None)
     elif lineage.blocking():
-        state["phase"] = "correction"
+        rc.set_phase(state, "correction")
     explicit_reopened = tuple(
         row["class_id"] for row in settlement["class_records"]
         if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)
@@ -4666,6 +4685,7 @@ def rebut(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
                         evidence=rebut_evidence,
                         blocking_class_ids=[item.class_id for item in draft.blocking()],
+                        engine_name=engine.name,
                     )
                     still_bound = any(
                         row.get("status") == "open"

@@ -288,6 +288,254 @@ def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
         rc.validate_persisted_state(unbound_state, [])
 
 
+def test_legacy_unowned_final_reenters_census_without_dropping_history():
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="final", last_round=7, debt=[{
+        "id":"D1", "finding_id":"F1", "status":"closed", "severity":cc.MAJOR,
+        "summary":"historic defect", "evidence":["plan:1"], "remedy":"fixed",
+        "source_ids":[], "class_ids":[], "first_round":3, "last_round":6,
+    }])
+
+    normalized = rc.normalize_state(state, stakes="s", snapshot="snapshot")
+
+    assert normalized["phase"] == "census"
+    assert normalized["debt"] == state["debt"]
+    assert "final_engine" not in normalized
+
+
+def test_final_regression_is_discharged_only_by_its_owner():
+    empty = {
+        "debt_updates":[], "debt":[], "source_dispositions":[],
+        "assessment_dispositions":[],
+    }
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="correction", last_round=1)
+    owned = rc.settle_state(
+        state, empty, phase="correction", snapshot="snapshot", round_no=2,
+        engine_name="codex",
+    )
+    assert owned["phase"] == "final"
+    assert owned["final_engine"] == "codex"
+
+    foreign = rc.settle_state(
+        owned, empty, phase="final", snapshot="snapshot", round_no=3,
+        engine_name="claude",
+    )
+    assert foreign["phase"] == "final"
+    assert foreign["final_engine"] == "codex"
+    assert "FINAL-REGRESSION: required engine=codex" in rc.trailer(foreign)
+
+    cleared = rc.settle_state(
+        foreign, empty, phase="final", snapshot="snapshot", round_no=4,
+        engine_name="codex",
+    )
+    assert cleared["phase"] == "clear"
+    assert "final_engine" not in cleared
+
+
+def test_foreign_final_finding_reopens_correction_and_removes_owner():
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="final", final_engine="codex", last_round=2)
+    finding = {
+        "debt_updates":[], "source_dispositions":[], "assessment_dispositions":[],
+        "debt":[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"fresh defect", "evidence":["plan:1"], "remedy":"repair",
+        }],
+    }
+
+    reopened = rc.settle_state(
+        state, finding, phase="final", snapshot="snapshot", round_no=3,
+        engine_name="claude",
+    )
+
+    assert reopened["phase"] == "correction"
+    assert "final_engine" not in reopened
+    assert reopened["debt"][0]["status"] == "open"
+
+
+def test_persisted_final_owner_is_required_only_in_final_phase():
+    final = _closed_persisted_state()
+    final.update(phase="final", final_engine="codex")
+    assert rc.validate_persisted_state(final, [])["final_engine"] == "codex"
+
+    missing = dict(final)
+    missing.pop("final_engine")
+    with pytest.raises(rc.CensusError, match="final_engine"):
+        rc.validate_persisted_state(missing, [])
+
+    misplaced = _closed_persisted_state()
+    misplaced["final_engine"] = "codex"
+    with pytest.raises(rc.CensusError, match="permitted only"):
+        rc.validate_persisted_state(misplaced, [])
+
+
+def test_set_phase_owns_final_and_clears_owner_for_every_other_phase():
+    state = _closed_persisted_state()
+
+    rc.set_phase(state, "final", final_engine="codex")
+    assert state["phase"] == "final"
+    assert state["final_engine"] == "codex"
+
+    for phase in ("census", "correction", "clear"):
+        rc.set_phase(state, phase)
+        assert state["phase"] == phase
+        assert "final_engine" not in state
+        rc.set_phase(state, "final", final_engine="codex")
+
+    with pytest.raises(rc.CensusError, match="final_engine"):
+        rc.set_phase(state, "final")
+    with pytest.raises(rc.CensusError, match="invalid review phase"):
+        rc.set_phase(state, "unknown")
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("initial_phase, engine_name, expected_phase", [
+    ("correction", "codex", "final"),
+    ("final", "codex", "clear"),
+    ("final", "claude", "final"),
+])
+def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
+    repo, repo_with_branch, tmp_path, monkeypatch, mode, initial_phase,
+    engine_name, expected_phase,
+):
+    state_root = tmp_path / f"state-{mode}-{initial_phase}-{engine_name}"
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
+    lineage_id = f"public-final-owner-{mode}-{engine_name}"
+    anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/app.py:1"
+    state = rc.normalize_state(None, stakes="s", snapshot="prior")
+    debt = []
+    if initial_phase == "correction":
+        debt = [{
+            "id":"D1", "finding_id":"F1", "status":"open",
+            "severity":cc.MAJOR, "summary":"repair required",
+            "evidence":[anchor], "remedy":"repair it", "source_ids":[],
+            "class_ids":["class-a"], "first_round":1, "last_round":1,
+        }]
+        state.update(phase="correction", last_round=1, debt=debt)
+    else:
+        state.update(phase="final", final_engine="codex", last_round=1, debt=[])
+    tracked = cc.TrackedClass(
+        "class-a", "the reviewed artifact remains coherent", cc.MAJOR, 1,
+        cc.OPEN if initial_phase == "correction" else cc.CLOSED,
+        procedure="inspect the artifact",
+    )
+    cc.save_lineage(state_root, cc.Lineage(
+        lineage_id, rounds=1, mode=mode, classes={"class-a":tracked},
+        review_state=state,
+    ))
+    coverage = payload(lane())['coverage']
+    for row in coverage:
+        row["evidence"] = [anchor]
+    decision_value = {
+        "role":initial_phase, "governing_findings":[],
+        "debt_outcomes":([{
+            "debt_id":"D1", "status":"closed", "evidence":[anchor],
+        }] if initial_phase == "correction" else []),
+        "class_outcomes":{"class-a":{
+            "verdict":"satisfied", "evidence":[anchor],
+        }},
+        "class_actions":{"class-a":None},
+    }
+    if initial_phase == "final":
+        decision_value["coverage"] = coverage
+    decision = wire(decision_value)
+
+    calls = []
+    engine_class = (
+        handlers.eng.CodexEngine if engine_name == "codex"
+        else handlers.eng.ClaudeEngine
+    )
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        return Review(text=decision, session_ref="owner-session", raw=decision)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "owner-session"
+        return run(self, prompt, *args, **kwargs)
+
+    monkeypatch.setattr(engine_class, "run", run)
+    monkeypatch.setattr(engine_class, "resume", resume)
+    engine = engine_class()
+    arguments = {
+        "repo_path":str(repo if mode == cc.PLAN_MODE else repo_with_branch),
+        "lineage":lineage_id, "round":2, "stakes":"s",
+        "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments.update(plan_text="artifact", claim_verification=False)
+        result = handlers.critique_plan(
+            arguments, engine=engine, log_dir=tmp_path / f"logs-{mode}-{engine_name}",
+        )
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        result = handlers.critique_branch(
+            arguments, engine=engine, log_dir=tmp_path / f"logs-{mode}-{engine_name}",
+        )
+    durable = cc.load_lineage(state_root, lineage_id, stamp="reload", mode=mode)
+    assert len(calls) == 1
+    assert f'"role": "{initial_phase}"' in calls[0]
+    assert durable.review_state["phase"] == expected_phase
+    assert rc.validate_persisted_state(
+        durable.review_state, [tracked],
+    )["phase"] == expected_phase
+    if expected_phase == "final":
+        assert durable.review_state["final_engine"] == "codex"
+        assert "FINAL-REGRESSION: required engine=codex" in result
+    else:
+        assert "final_engine" not in durable.review_state
+        assert "CONVERGENCE: NOT-BLOCKED" in result
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_handlers_migrate_legacy_unowned_final_before_provider_spend(
+    repo, repo_with_branch, tmp_path, monkeypatch, mode,
+):
+    state_root = tmp_path / f"legacy-state-{mode}"
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
+    lineage_id = f"legacy-unowned-final-{mode}"
+    state = rc.normalize_state(None, stakes="s", snapshot="prior")
+    state.update(phase="final", last_round=1, debt=[])
+    cc.save_lineage(state_root, cc.Lineage(
+        lineage_id, rounds=1, mode=mode, review_state=state,
+    ))
+    calls = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        return Review(
+            text="provider unavailable", session_ref=None, raw="provider unavailable",
+            returncode=1, error=True,
+        )
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    arguments = {
+        "repo_path":str(repo if mode == cc.PLAN_MODE else repo_with_branch),
+        "lineage":lineage_id, "round":2, "stakes":"s",
+        "class_closure":True,
+    }
+    if mode == cc.PLAN_MODE:
+        arguments.update(plan_text="artifact", claim_verification=False)
+        result = handlers.critique_plan(
+            arguments, engine=handlers.eng.CodexEngine(),
+            log_dir=tmp_path / f"legacy-logs-{mode}",
+        )
+    else:
+        arguments.update(base_ref="main", head_ref="feature", converge=True)
+        result = handlers.critique_branch(
+            arguments, engine=handlers.eng.CodexEngine(),
+            log_dir=tmp_path / f"legacy-logs-{mode}",
+        )
+    durable = cc.load_lineage(state_root, lineage_id, stamp="reload", mode=mode)
+    assert len(calls) == len(sp.LANES[mode])
+    assert all("ROLE: census lane" in prompt for prompt in calls)
+    assert all('"role": "final"' not in prompt for prompt in calls)
+    assert durable.review_state["phase"] == "census"
+    assert "final_engine" not in durable.review_state
+    assert "CONVERGENCE: BLOCKED" in result
+
+
 def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
     anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
     (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
@@ -309,6 +557,8 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
             })
     state = rc.normalize_state(None, stakes="s", snapshot="p")
     state.update(phase=phase, debt=debt, last_round=1)
+    if phase == "final":
+        state["final_engine"] = "fake"
     lineage = cc.Lineage(
         "scope-fixture", mode=mode, classes=classes,
         next_seq=class_count + 1, review_state=state,
@@ -1242,6 +1492,14 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     )
     assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
     assert artifact["after_repair_lineage"]["review_state"]["phase"] == "final"
+    # This retained 2026-08-23 run predates engine-owned final state; current
+    # final-route artifacts below carry and assert their explicit owner.
+    assert artifact["legacy_unowned_final"] is True
+    assert artifact["acceptance_scope"] == acceptance.LEGACY_ACCEPTANCE_SCOPE
+    assert "current engine-owned final" in artifact["acceptance_scope"][
+        "does_not_claim"
+    ]
+    assert "final_engine" not in artifact["after_repair_lineage"]["review_state"]
     assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
     assert artifact["final_lineage"]["review_state"]["phase"] == "clear"
     assert "CONVERGENCE: NOT-BLOCKED" in artifact["final_result_text"]
@@ -3317,11 +3575,18 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert artifact["fixture"]["class_after"] == cc.OPEN
     assert artifact["fixture"]["class_first_round"] == 1
     assert artifact["fixture"]["round"] == 3
-    assert artifact["attempt_ledger"] == [{
-        **artifact["attempt_ledger"][0],
-        "role": "final", "outcome": "completed", "returncode": 0,
-    }]
-    assert artifact["attempt_ledger"][0]["session_ref"]
+    assert artifact["fixture"]["final_engine"] == "codex"
+    attempts = artifact["attempt_ledger"]
+    assert 1 <= len(attempts) <= 2
+    assert all(row["role"] == "final" for row in attempts[:1])
+    assert all(
+        row["role"] == "final-validation-retry"
+        and row["outcome"] == "completed" and row["returncode"] == 0
+        for row in attempts[1:]
+    )
+    assert attempts[-1]["outcome"] == "completed"
+    assert all(row["outcome"] == "validation-invalid" for row in attempts[:-1])
+    assert attempts[-1]["session_ref"]
     assert artifact["settlement"]["class_records"] == [{
         "op": "reopen", "class_id": artifact["fixture"]["class_id"],
     }]
@@ -3332,7 +3597,7 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert "PERSISTENCE: 60c1a55e currently open; round-label span 3" in result
     assert "REOPEN-WAVE: 1 previously closed class(es) reopened this round" in result
     assert result.count(
-        "rebut with session_ref=" + artifact["attempt_ledger"][0]["session_ref"]
+        "rebut with session_ref=" + attempts[-1]["session_ref"]
     ) == 1
     assert "CONVERGENCE: BLOCKED" in result
 
@@ -3377,6 +3642,7 @@ def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
     assert set(allowed_later) == changed
     assert artifact["provider"]["engine"] == "codex"
     assert artifact["provider"]["web_search"] is False
+    assert artifact["fixture"]["final_engine"] == "codex"
     outcomes = [row["outcome"] for row in artifact["attempt_ledger"]]
     assert outcomes == ["validation-invalid", "completed"]
     assert [row["role"] for row in artifact["attempt_ledger"]] == [
@@ -4399,7 +4665,7 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
     before = json.loads(json.dumps(state))
     settled = rc.settle_rebut_concession(
         state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
-        blocking_class_ids=["class-a", "class-b"],
+        blocking_class_ids=["class-a", "class-b"], engine_name="codex",
     )
     assert state == before
     assert settled["phase"] == "correction"
@@ -4414,12 +4680,13 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         with pytest.raises(rc.CensusError, match="unresolved structural state"):
             rc.settle_rebut_concession(
                 invalid, debt_id="D1", class_id="class-a", evidence=["plan:3"],
-                blocking_class_ids=["class-a", "class-b"],
+                blocking_class_ids=["class-a", "class-b"], engine_name="codex",
             )
     with pytest.raises(rc.CensusError, match="unbound blocking classes"):
         rc.settle_rebut_concession(
             state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
             blocking_class_ids=["class-a", "class-b", "class-c"],
+            engine_name="codex",
         )
 
 
@@ -4554,6 +4821,7 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
     )
     assert settled.classes[successor].status == cc.CLOSED
     assert settled.review_state["debt"][0]["status"] == "closed"
+    assert settled.review_state["final_engine"] == "codex"
     final = handlers.critique_plan(
         {**arguments, "round":4}, engine=handlers.eng.CodexEngine(),
         log_dir=tmp_path / "logs", now=lambda:"PB3",
@@ -4563,6 +4831,7 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
         cc.default_state_root(), "phase-bound-plan", stamp="PB4", mode=cc.PLAN_MODE,
     )
     assert durable.review_state["phase"] == "clear"
+    assert "final_engine" not in durable.review_state
     assert len(calls) == 3
     assert len(retry_prompts) == 3
     audits = [
@@ -4587,6 +4856,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
     stakes = "trusted local tool"
     state = rc.normalize_state({}, stakes=stakes, snapshot="prior")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     state["debt"] = [{
         "id":"D7", "finding_id":"G1", "status":"closed", "severity":"MAJOR",
         "summary":"historic occurrence", "evidence":["plan:1"],
@@ -4654,6 +4924,8 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
     assert (fresh["finding_id"], fresh["status"], fresh["class_ids"]) == (
         "F1", "open", ["class-a"],
     )
+    assert persisted.review_state["phase"] == "correction"
+    assert "final_engine" not in persisted.review_state
 
 
 def test_branch_reuses_complete_census_after_settlement_rejection(
@@ -5070,6 +5342,7 @@ def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
     (tmp_path / "src" / "a.py").write_text("BROKEN\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     state["debt"] = [{
         "id":"historic", "finding_id":"historic", "status":"closed",
         "severity":"MAJOR", "summary":"past occurrence", "evidence":["repository/src/a.py:1"],
@@ -5492,6 +5765,7 @@ def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
     (tmp_path / "app.py").write_text("value = next(iter(distinct))\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     lineage = cc.Lineage(
         "predicate-retry", mode=cc.BRANCH_MODE, review_state=state,
     )

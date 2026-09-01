@@ -423,6 +423,10 @@ of the resulting code and tests.
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
+  Bind a pending cold-final obligation to the engine whose settlement created it. A clean
+  final from another engine may not discharge that obligation, though any fresh debt it finds
+  still reopens correction. Migrate legacy unowned final state through one fresh census rather
+  than guessing an owner.
   During broad plan census and final, proactively inspect for one normative contract asserted as
   independently authoritative at multiple operative sites, even before the copies drift. Require
   one authoritative definition and references or derived projections elsewhere, while exempting
