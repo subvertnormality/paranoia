@@ -444,6 +444,68 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                 os.environ[cc.STATE_ROOT_ENV] = previous_root
 
 
+def _reconstruct_retained_successor(
+    *, initial: dict, row: dict, plan: str, round_no: int, revision: str,
+) -> dict:
+    """Recover an intermediate durable successor without another provider call."""
+    original_run = engines.CodexEngine.run
+    original_resume = engines.CodexEngine.resume
+    original_head = orientation.resolve_head
+    original_tree = orientation.snapshot_tree
+    previous_root = os.environ.get(cc.STATE_ROOT_ENV)
+    with tempfile.TemporaryDirectory(prefix="plan-restatement-successor-") as raw_root:
+        state_root = Path(raw_root) / "state"
+        log_dir = Path(raw_root) / "logs"
+        cc.save_lineage(state_root, cc._from_json(row["lineage"], initial))
+        os.environ[cc.STATE_ROOT_ENV] = str(state_root)
+        source_tree = _git("rev-parse", f"{revision}^{{tree}}")
+        orientation.resolve_head = lambda repo: revision
+        orientation.snapshot_tree = lambda repo, parent: source_tree
+        invocations = iter(row["exact_invocations"])
+        channels = iter(row["exact_attempt_channels"])
+
+        def playback(self, prompt, *args, **kwargs):
+            try:
+                invocation = next(invocations)
+                channel = next(channels)
+            except StopIteration as exc:
+                raise ValueError("retained successor replay admitted an extra call") from exc
+            if _invocation(prompt, kwargs) != invocation:
+                raise ValueError("retained successor replay invocation changed")
+            parsed = engines.CodexEngine().parse_output(channel["raw"])
+            return replace(
+                parsed, stderr=channel["stderr"],
+                failure_detail=channel["failure_detail"],
+                returncode=channel["returncode"],
+            )
+
+        engines.CodexEngine.run = playback
+        engines.CodexEngine.resume = playback
+        try:
+            handlers.critique_plan({
+                "repo_path":str(ROOT), "plan_text":plan,
+                "lineage":row["lineage"], "round":round_no,
+                "class_closure":True, "claim_verification":False,
+                "web_search":False, "model":"gpt-5.6-sol",
+                "effort":"high", "stakes":STAKES,
+            }, engine=engines.CodexEngine(), log_dir=log_dir,
+               now=lambda: row["audit"]["timestamp"])
+            return json.loads(
+                (cc.lineage_dir(state_root) / f"{row['lineage']}.json").read_text(
+                    encoding="utf-8",
+                )
+            )
+        finally:
+            engines.CodexEngine.run = original_run
+            engines.CodexEngine.resume = original_resume
+            orientation.resolve_head = original_head
+            orientation.snapshot_tree = original_tree
+            if previous_root is None:
+                os.environ.pop(cc.STATE_ROOT_ENV, None)
+            else:
+                os.environ[cc.STATE_ROOT_ENV] = previous_root
+
+
 def validate_artifact(
     artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
 ) -> None:
@@ -725,8 +787,9 @@ def main() -> int:
                 parsed = engines.CodexEngine().parse_output(channel["raw"])
                 channel["error"] = parsed.error
                 channel["usage"] = parsed.usage
+        state_name = "targeted" if name == "final" else name
         lineage = json.loads(
-            (run_root / f"{name}-state" / "lineages" / f"{lineage_id}.json").read_text(
+            (run_root / f"{state_name}-state" / "lineages" / f"{lineage_id}.json").read_text(
                 encoding="utf-8",
             )
         )
@@ -739,12 +802,22 @@ def main() -> int:
 
     if args.reuse_run_root:
         discovery = retained_route("discovery", DISCOVERY_LINEAGE)
-        targeted = retained_route("targeted", TARGETED_LINEAGE)
+        targeted = list(retained_route("targeted", TARGETED_LINEAGE))
         final = retained_route("final", FINAL_LINEAGE)
         targeted_initial = cc._from_json(
             TARGETED_LINEAGE,
             json.loads((run_root / "targeted-initial.json").read_text(encoding="utf-8")),
         )
+        targeted[3] = _reconstruct_retained_successor(
+            initial=cc._to_json(targeted_initial),
+            row={
+                "lineage":TARGETED_LINEAGE, "audit":targeted[2],
+                "exact_attempt_channels":targeted[4],
+                "exact_invocations":targeted[5],
+            },
+            plan=TARGETED_PLAN, round_no=2, revision=revision,
+        )
+        targeted = tuple(targeted)
     else:
         discovery = _capture_call({
             "repo_path":str(ROOT), "plan_text":DISCOVERY_PLAN,
