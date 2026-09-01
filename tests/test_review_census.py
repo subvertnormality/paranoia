@@ -2231,6 +2231,41 @@ def test_all_staged_decision_roles_share_the_bounded_validation_retry(
     ]
 
 
+def test_plan_anchor_retry_repairs_observed_line_column_concatenation(tmp_path):
+    invalid = 'plan:40011'
+    valid = 'plan:4001'
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="same-session", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "same-session"
+            assert "exactly 5260 lines" in prompt
+            assert "line 4001, column 1 is `plan:4001`" in prompt
+            assert "never `plan:40011`" in prompt
+            return Review(text=valid, session_ref=session_ref, raw=valid)
+
+    def parser(text):
+        if text != valid:
+            raise rc.CensusError(
+                "/class_outcomes/example/evidence/0: unresolvable plan anchor "
+                "'plan:40011'"
+            )
+        return {"anchor": text}
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="final", engine=Engine(), prompt="initial final", cwd=tmp_path,
+        model="m", effort="high", timeout=1200, on_progress=None, parser=parser,
+        retry_context=handlers._plan_anchor_retry_context(5260),
+    )
+    assert parsed == {"anchor": valid}
+    assert len(rejected) == 1
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+
+
 def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     active = [{
         "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",
