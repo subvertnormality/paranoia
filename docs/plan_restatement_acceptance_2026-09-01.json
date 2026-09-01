@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "503701c0f81f9cd52625010e1d6097fbf9f77a0119eb448f768e035878e72178"
+      "sha256": "feac7e235e56309d95a433402d486e641305fa69432e0debce3c8faf7e14df4b"
     }
   },
   "claims": {
