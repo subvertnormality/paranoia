@@ -15,7 +15,7 @@
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "7a5a455a4a9fb33026f89915c8413c224f33cd320eb43ae733f39026b8e9cce2"
+      "sha256": "f59b113d6de5c4fa37c5f064394ada1a315c7035ff6d8ec4302a95c63c9c2281"
     }
   },
   "claims": {
