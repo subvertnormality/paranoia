@@ -1173,7 +1173,10 @@ def _staged_structural_review(
     assert closure.lineage is not None
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
-    if closure.preflight_validation_error is not None:
+    preflight_validation_error = getattr(
+        closure, "preflight_validation_error", None,
+    )
+    if preflight_validation_error is not None:
         raw_phase = (
             lineage.review_state.get("phase")
             if isinstance(lineage.review_state, dict) else None
@@ -1184,7 +1187,7 @@ def _staged_structural_review(
             else "structural-preflight"
         )
         raise _staged_error(
-            str(closure.preflight_validation_error),
+            str(preflight_validation_error),
             role=role, kind="validation",
         )
     try:
@@ -4877,8 +4880,18 @@ class _ClosureRound:
                 if item.status != cc.SUPERSEDED
             ]
             try:
+                validation_state = raw_state
+                if (
+                    isinstance(raw_state, dict)
+                    and raw_state.get("phase") == "final"
+                    and "final_engine" not in raw_state
+                ):
+                    # Preserve the existing ownerless-final migration: validate the
+                    # exact server normalization that will re-enter cold census.
+                    validation_state = dict(raw_state)
+                    rc.set_phase(validation_state, "census")
                 rc.validate_persisted_state(
-                    raw_state, active, correction_control_source=raw_state,
+                    validation_state, active, correction_control_source=raw_state,
                 )
             except rc.CensusError as exc:
                 # The staged public preflight persists the bounded diagnostic. Do not
