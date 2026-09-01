@@ -132,11 +132,11 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged.",
-      "sha256": "997de4768ad13f3c861cb279a2765b0ced4a96e5e40a629fdd8a3789cc0d401a"
+      "sha256": "c9387a16acdf2908d0b06fd4932a5b389714683c07dbef6d267980fda9819e46"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange.",
-      "sha256": "d778cf3f528cba26515015d61b254b873a431786d401255e58cc7a70e8263eec"
+      "sha256": "4b40d708aa2a172dd1b53f2f75ba2806565c8f3951ce61a68dd3abbb955e77bc"
     }
   },
   "attempt_ledger": [
