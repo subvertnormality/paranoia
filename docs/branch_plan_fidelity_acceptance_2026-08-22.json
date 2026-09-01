@@ -23,7 +23,7 @@
     },
     "tests/test_branch_plan_fidelity.py": {
       "scope": "Extends the two-line captured-path public census-lane regression with invalid-anchor rejection, same-session repair without server-authored out-of-range examples, exact frozen contract and bound, snapshot/cache identity, rejected-payload telemetry, and audit retention. It also adds the 5,260-line public plan-backed branch manifest-only consolidation, correction, and final lifecycle for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload, plus an isolated malformed review-state fail-closed expectation; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "36e1024a707c82470870a1be68c50ac8e199976ed68572b399682eee4ff1c65f"
+      "sha256": "7a2963964e22c693fa7d0a4bcbde521d17862094f5613a41c87f6d3973d8b62d"
     }
   },
   "claims": {
