@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "fee41418a300bc6e9c81fd8a2007ddaa443a7fe13639b43aa0ce49ff9ba47ab6"
+      "sha256": "02615efd650e52d2a9b025e7d866ad3cd952d8b78539dfb31eb87bfecf92b242"
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
@@ -19,15 +19,15 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
-      "sha256": "aa29a4f4d828d63c5fb80b8019c139f7ce90260a0c3c55866f77c5fba3692ecd"
+      "sha256": "ccc12ac1b11986580ca73793a82203ef34c8749a85882539960c6479895b5a35"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",
-      "sha256": "fffca0adfc98589b8408829b056a4b9db6dc05b759d1d785b8ccf63890469735"
+      "sha256": "ee32bb86d1cf2d41adfaf4594ec68853c90cffd6e5b24acdcdca290382337e88"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "80df1a821e751e3ab9e8db948bd472411100a62e64ed7b3431dec6a3df805abf"
+      "sha256": "3807ffdd735e995eb4d355b1c764cb10aa6f608f01ec5431d36a41450adfeba8"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
