@@ -1504,7 +1504,7 @@ def _staged_structural_review(
                         branch_contract_section,
                         _plan_anchor_retry_context(plan_lines),
                     ))) if plan_lines is not None
-                    else sp.citation_instructions(mode, plan_contract=plan_contract)
+                    else branch_contract_section
                 ),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -1727,7 +1727,7 @@ def _staged_structural_review(
                     branch_contract_section,
                     _plan_anchor_retry_context(plan_lines),
                 ))) if plan_lines is not None
-                else sp.citation_instructions(mode, plan_contract=plan_contract)
+                else branch_contract_section
             ),
         )
         attempts.extend(call_attempts)
