@@ -193,6 +193,55 @@ def _anchor_covers(anchor: object, line: int) -> bool:
     return int(start) <= line <= int(end or start)
 
 
+def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
+    """Re-run retained raw stdout through the production extractor and protocol."""
+    responses: list[str] = []
+    for channels in row["exact_attempt_channels"]:
+        review = engines.CodexEngine().parse_output(channels["raw"])
+        if (
+            review.session_ref != channels["session_ref"]
+            or review.text != channels["response_text"]
+            or review.raw != channels["raw"]
+        ):
+            raise ValueError("retained raw provider envelope does not reconstruct its response")
+        responses.append(review.text)
+
+    if roles[0].startswith("census-"):
+        manifests: list[dict] = []
+        for role, response in zip(roles[:3], responses[:3], strict=True):
+            lane = role.removeprefix("census-")
+            value = sp.decode_lane(response, mode=cc.PLAN_MODE, lane=lane)
+            sp.validate_lane_value(value, lane=lane, active_classes=[])
+            renamed = {finding["id"]:f"{lane}:{finding['id']}" for finding in value["findings"]}
+            for finding in value["findings"]:
+                finding["id"] = renamed[finding["id"]]
+            for coverage in value["coverage"]:
+                coverage["finding_ids"] = [
+                    renamed[finding_id] for finding_id in coverage["finding_ids"]
+                ]
+            for assessment in value["class_assessments"]:
+                if assessment["finding_id"] is not None:
+                    assessment["finding_id"] = renamed[assessment["finding_id"]]
+            manifests.append(value)
+        sources = [finding for manifest in manifests for finding in manifest["findings"]]
+        settlement = sp.materialize_decision(
+            responses[3], mode=cc.PLAN_MODE, role="census",
+            source_ids=[finding["id"] for finding in sources],
+            source_severities={finding["id"]:finding["severity"] for finding in sources},
+            source_evidence={finding["id"]:finding["evidence"] for finding in sources},
+            assessment_verdicts={}, assessment_findings={}, assessment_evidence={},
+            active_classes=[], durable_debt=[],
+        )
+        return {"manifests":manifests, "settlement":settlement}
+
+    task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
+    settlement = sp.materialize_decision(
+        responses[0], mode=cc.PLAN_MODE, role="correction",
+        active_classes=task["active_classes"], durable_debt=task["existing_debt"],
+    )
+    return {"manifests":[], "settlement":settlement}
+
+
 def validate_artifact(
     artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
 ) -> None:
@@ -332,6 +381,8 @@ def validate_artifact(
         }
         if row["validated_payloads"] != expected_payloads:
             raise ValueError("exact validated responses differ from the audit projection")
+        if _replay_validated_payloads(row, roles) != expected_payloads:
+            raise ValueError("raw provider envelopes do not replay to the audited payloads")
         payload_digest = _sha_text(json.dumps(
             expected_payloads, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         ))
