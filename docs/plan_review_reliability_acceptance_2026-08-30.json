@@ -47,7 +47,7 @@
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "17aaba908f60a26bd4c1f36362c5b98e121effbd36373363cfcf0f1909bf94b9"
+      "sha256": "f1b9e4c70c937435d9e9843c771ec9e1720a744955f6d86d48485e20fbf56093"
     }
   },
   "assertions": [
