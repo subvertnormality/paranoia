@@ -1768,11 +1768,11 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
-        "sha256": "4a04b14624d6c9deb95e4cd2ca7a42e29fa6935218da5d6507b014fb95ee94d1"
+        "sha256": "56865cdf2f36655f0ee10890275cb69f082547e56c6c3912f7eb9769105f4c9c"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
-        "sha256": "6a28d819dacb1a2ff3c2df7dde456c3697e204a6ea34c34633f73022faad6ad1"
+        "sha256": "1b6ed9c2c17bf300fc49bc4bcab06867f66b6ed73adab4332ee40bb1045df42b"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
@@ -1780,7 +1780,7 @@
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior.",
-        "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"
+        "sha256": "b3da557ad21ba983b40da84c431c928c3605997691f6c7e51877161c7c41580e"
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior.",
