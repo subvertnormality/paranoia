@@ -2,7 +2,7 @@
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; neither change alters staged schema validation, mechanized predicate materialization, or retry evidence.",
+      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence.",
       "sha256": "e3395d02646d375fdc776c25088a0a6721e71b50263c8d8112bf2c5ac8957d08"
     },
     "src/paranoia_local/review_census.py": {
