@@ -2,11 +2,11 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, plan normative-restatement review, and Issue #91 validation-retry-only bounded plan-anchor recovery with manifest-only branch consolidation.",
       "sha256": "82c373a0f3300e6efc1c69de1301f07445e4c3a467995774506324d69a7788b3"
     },
     "README.md": {
-      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
+      "scope": "Public bound-rebut settlement, plan normative-restatement review, and Issue #91 validation-retry-only bounded plan-anchor recovery across census, correction, final, and plan-backed branch roles.",
       "sha256": "88d3efd41d91f425725588bac320609bfaa6542620983b14babb1bf4242fcbc8"
     },
     "docs/tool-reference.md": {
@@ -1767,11 +1767,11 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
+        "scope": "Adds arbitration, plan-restatement, and Issue #91 bounded plan-anchor retry guidance without changing retained deterministic replay behavior.",
         "sha256": "56865cdf2f36655f0ee10890275cb69f082547e56c6c3912f7eb9769105f4c9c"
       },
       "README.md": {
-        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
+        "scope": "Documents plan-restatement and Issue #91 bounded plan-anchor recovery acceptance without changing retained deterministic replay behavior.",
         "sha256": "1b6ed9c2c17bf300fc49bc4bcab06867f66b6ed73adab4332ee40bb1045df42b"
       },
       "docs/tool-reference.md": {

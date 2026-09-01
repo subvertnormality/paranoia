@@ -2,11 +2,11 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "scope": "Documents Issue #91 validation-retry-only bounded plan-anchor guidance, the manifest-only branch-consolidation boundary, and 5,260-line public plan and plan-backed branch lifecycle acceptance.",
       "sha256": "272c90a1e9d48887fe6829c5de4a4fc2e953369ed7b927d68c0e8cb0e81d1ef9"
     },
     "README.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "scope": "Documents Issue #91 validation-retry-only bounded plan-anchor recovery and its 5,260-line public plan and plan-backed branch lifecycle coverage; successful initial prompts remain unchanged.",
       "sha256": "98c96982517c84272f72aea2c404280a0cf99dfb42304c7fb8fcaf1d9405bed2"
     },
     "scripts/run_plan_restatement_acceptance.py": {

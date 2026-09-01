@@ -22,8 +22,8 @@
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
     },
     "tests/test_branch_plan_fidelity.py": {
-      "scope": "Adds 5,260-line public plan-backed branch lane and manifest-only consolidation lifecycle coverage for exact anchor rejection, same-session repair, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "7977a208ad00eca50aee2a71d613d60310c25fbf954e5ac149070f1e5c33ed5b"
+      "scope": "Adds 5,260-line public plan-backed branch lane, manifest-only consolidation, correction, and final lifecycle coverage for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "e1339baa22440bb81655c1b89902c12dc34e895e77ac373d211a17d9cc373f9a"
     }
   },
   "claims": {
