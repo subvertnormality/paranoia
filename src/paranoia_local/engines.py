@@ -37,7 +37,7 @@ ROLE_TEXT = "evidence-text"
 EVIDENCE_ROLES = frozenset({ROLE_DISCOVERY, ROLE_BINDING, ROLE_REPOSITORY, ROLE_TEXT})
 
 MIN_CODEX_VERSION = (0, 144, 6)
-MIN_CLAUDE_VERSION = (2, 1, 197)
+MIN_CLAUDE_VERSION = (2, 1, 251)
 
 CODEX_EXTERNAL_FEATURES = (
     "apps", "browser_use", "browser_use_external", "browser_use_full_cdp_access",
@@ -499,7 +499,7 @@ CLAUDE_DENY_TOOLS = ["Write", "Edit", "NotebookEdit"]
 
 class ClaudeEngine(Engine):
     name = "claude"
-    default_model = "claude-fable-5"
+    default_model = "claude-fable-5-1"
     binary = "claude"
 
     def _evidence_tools(self) -> str:

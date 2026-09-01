@@ -132,7 +132,7 @@ print(json.dumps({'type':'turn.completed','usage':{}}))
 """
 
 FAKE_CLAUDE_ARB = """#!/bin/bash
-if [ "$1" = "--version" ]; then echo "claude 2.1.197"; exit 0; fi
+if [ "$1" = "--version" ]; then echo "claude 2.1.251"; exit 0; fi
 """ + _ARB_SCRIPT + """
 python3 -c "
 import json,sys

@@ -603,7 +603,7 @@ to the caller; it is never converted into a request for the cleaner to alter sha
 **Model defaults are explicit constants, not resolved from the engine.**
 `CLEANER_MODEL = "claude-opus-5"`. Revision 2 left `cleaner_model` merely
 optional; following this repo's resolution pattern would then fall back to
-`ClaudeEngine.default_model`, which is `claude-fable-5` (`engines.py:253`) — a
+`ClaudeEngine.default_model`, which is `claude-fable-5-1` — a
 silent violation of the operator's fixed Opus-stage decision. The attester model
 is likewise pinned rather than inherited. Both defaults are tested.
 

@@ -11,7 +11,7 @@ if this page and an installed version differ.
 | Argument | Values | Default |
 |---|---|---|
 | `engine` | `codex` or `claude` | Server configuration |
-| `model` | Provider model name | `gpt-5.6-sol` or `claude-fable-5` |
+| `model` | Provider model name | `gpt-5.6-sol` or `claude-fable-5-1` |
 | `effort` | `low`, `medium`, or `high` | `high`; `query` uses `medium` |
 | `web_search` | Boolean | `true` |
 

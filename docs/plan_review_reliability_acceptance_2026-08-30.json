@@ -7,11 +7,11 @@
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances. Issue #95 documents that a pending final is discharged only by its owning engine.",
-      "sha256": "e74bf1ad6f2809df3c3150c6151a82f4f748ce65044583bc49ed441902d4c42a"
+      "sha256": "f6361772d6c17f8b0ed3e351e121888089ee5b727b06c0dc9d06835742e3cb06"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
-      "sha256": "3957826af9b79ea0bcdc5636bf9bb0cfecaa3f07ce0108d4893810a853493f41"
+      "sha256": "4f14e2acdfaebccf0eddadece9c5206d29d6f324fbfd80f88e9b56e795f77286"
     },
     "scripts/run_plan_review_reliability_acceptance.py": {
       "scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.",
@@ -1780,11 +1780,11 @@
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-        "sha256": "46d8008cc343056146bf27c5b1aed52ec4fbfe8196f63d7a8b65711f1eea1572"
+        "sha256": "4f33f6a6e82a8fa56f3f6573c70701369b85b665f647b05ccdb88934a73a38ad"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
-        "sha256": "2823fcb15415d448f049f617a9e4e111d9810014f83b1ed6416206f5056bc9b0"
+        "sha256": "6edb92a8967f55d399283db88292ebb903e5aac3f958d1e25afe6b816c967331"
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
