@@ -1767,12 +1767,12 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Adds arbitration failure taxonomy and plan normative-restatement review guidance without changing deterministic replay behavior.",
-        "sha256": "c059ee8a4958ede71ab0adbfac79dd0d131c6a2dc2447e73ba59f694a7a2d326"
+        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its public-handler acceptance boundary without changing deterministic replay behavior.",
+        "sha256": "858c5cbf3926cfe5c501b630482a0a9875264c4ddda0159162032654feb86cd7"
       },
       "README.md": {
-        "scope": "Documents plan normative-restatement review and its retained real-provider acceptance without changing deterministic replay behavior.",
-        "sha256": "40f377eda42125ff719d8a47399acbe4cc51b2cb94039baa56598ba9d0876d12"
+        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and replay acceptance without changing deterministic replay behavior.",
+        "sha256": "a089ec35d0288e72347aae695f7297e598852042fce7c687a244e30e2eca83e2"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
