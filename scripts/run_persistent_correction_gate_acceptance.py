@@ -33,7 +33,8 @@ ACCEPTANCE_SOURCES = tuple(sorted(
     for path in (ROOT / "src" / "paranoia_local").glob("*.py")
 )) + (
     "scripts/run_persistent_correction_gate_acceptance.py",
-    "docs/how-it-works.md", "AGENTS.md", "CLAUDE.md",
+    "README.md", "docs/how-it-works.md", "docs/tool-reference.md",
+    "docs/llm-reference.md", "AGENTS.md", "CLAUDE.md",
     "docs/staged_review_protocol_v2_acceptance.md",
     "tests/test_review_census.py", "tests/test_handlers.py",
     "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
@@ -71,8 +72,9 @@ FIXED_PLAN = PLAN.replace(
     "\nValidate the exact coordinate independently from provider-range containment, and reject "
     "a mutation of either channel before Path.write_text."
     "\nThe retained artifact source inventory is the deterministic complete set of every "
-    "Python module under src/paranoia_local, plus this generator, how-it-works.md, AGENTS.md, "
-    "CLAUDE.md, staged_review_protocol_v2_acceptance.md, and the four named test modules "
+    "Python module under src/paranoia_local, plus this generator, README.md, how-it-works.md, "
+    "tool-reference.md, llm-reference.md, AGENTS.md, CLAUDE.md, "
+    "staged_review_protocol_v2_acceptance.md, and the four named test modules "
     "enforced by the shared ACCEPTANCE_SOURCES constant. Commit every bound source before generation "
     "so source_revision and current bytes agree, validate the completed artifact, then publish "
     "it in a separate commit. Before publication, require removed, added, or replaced inventory "
