@@ -6,8 +6,8 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "cee67efafed4d844792b7ab24e8fa4b497f89d26daf0eeb861f4e89d2f322f3a"
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
+      "sha256": "ded2c8889584e2ce2b411340c8ef47d3f9e379f7e352f56eb85ebd273ee4124c"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance plus plan-review-only normative-restatement discovery; this does not alter branch plan-contract binding, authority, capture, or propagation.",
@@ -20,6 +20,10 @@
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
+    },
+    "tests/test_branch_plan_fidelity.py": {
+      "scope": "Extends the two-line captured-path public census-lane regression with invalid-anchor rejection, same-session repair without server-authored out-of-range examples, exact frozen contract and bound, snapshot/cache identity, rejected-payload telemetry, and audit retention. It also adds the 5,260-line public plan-backed branch manifest-only consolidation, correction, and final lifecycle for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "d5166a1ee6b7b366cb8e5f1cd724a5283c6ec0fe99c43daff6f7b84cdb3cf85a"
     }
   },
   "claims": {

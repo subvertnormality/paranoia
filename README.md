@@ -211,6 +211,10 @@ closes that debt and closes its class only when no sibling blocker remains; it
 never grants clearance, and the next critique still performs the normal final.
 Bound citations use the staged anchor grammar and must resolve before settlement;
 tracked plan reviews retain their line count so repeated `plan:` anchors remain bounded.
+When a staged plan citation fails resolution, the bounded same-session retry repeats the legal
+`plan:<line-or-range>` grammar and the current plan bound. It explicitly tells the reviewer to
+discard any column component rather than concatenate line and column digits; validation never
+guesses, clamps, drops evidence, or partially settles an unresolved citation.
 Mechanized branch classes remain predicate-owned and must be closed by a normal
 `critique_branch` sweep rather than a bound rebut.
 

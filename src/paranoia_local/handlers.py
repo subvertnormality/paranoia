@@ -1499,7 +1499,13 @@ def _staged_structural_review(
                 web_search=web_search,
                 response_schema=sp.provider_schema(sp.lane_schema(mode, lane)),
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
-                retry_context=branch_contract_section,
+                retry_context=(
+                    "\n\n".join(filter(None, (
+                        branch_contract_section,
+                        _plan_anchor_retry_context(plan_lines),
+                    ))) if plan_lines is not None
+                    else branch_contract_section
+                ),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
             for finding in parsed["findings"]:
@@ -1628,6 +1634,10 @@ def _staged_structural_review(
                     ],
                     role="census",
                 ),
+                retry_context=(
+                    _plan_anchor_retry_context(plan_lines)
+                    if plan_lines is not None else None
+                ),
             )
         except rc.CensusError as error:
             cacheable = _cacheable_consolidation_error(error)
@@ -1712,7 +1722,13 @@ def _staged_structural_review(
                 assessment_ids=active_ids if role == "final" else [],
                 known_debt=existing, role=role,
             ),
-            retry_context=branch_contract_section,
+            retry_context=(
+                "\n\n".join(filter(None, (
+                    branch_contract_section,
+                    _plan_anchor_retry_context(plan_lines),
+                ))) if plan_lines is not None
+                else branch_contract_section
+            ),
         )
         attempts.extend(call_attempts)
         rejected_payloads.extend(call_rejected)
@@ -2394,6 +2410,19 @@ def _branch_contract_section(contract: _BranchContract) -> str:
     )
 
 
+def _plan_anchor_retry_context(plan_lines: int) -> str:
+    if plan_lines < 1:
+        raise ValueError("plan anchor retry context requires a positive line bound")
+    example_line = min(plan_lines, 4001)
+    return (
+        f"The displayed plan has exactly {plan_lines} lines. A plan citation must be "
+        "`plan:<line>` or `plan:<start>-<end>`, with every integer between 1 and "
+        f"{plan_lines}. If you intended a line:column coordinate, discard the column: "
+        f"line {example_line}, column 1 is `plan:{example_line}`. Do not concatenate "
+        "line and column digits into a plan citation."
+    )
+
+
 def _branch_structural_snapshot(
     *, base_id: str, head_id: str, packet: str,
     contract: _BranchContract | None,
@@ -2463,6 +2492,8 @@ def critique_plan(
         except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
             raise ValueError(f"cannot read plan_path: {exc}") from exc
     plan_view = sp.ArtifactView.from_text(plan_text)
+    if plan_view.line_count < 1:
+        raise ValueError("critique_plan requires a plan containing at least one line")
 
     context = arguments.get("context")
     focus = arguments.get("focus")

@@ -2231,6 +2231,125 @@ def test_all_staged_decision_roles_share_the_bounded_validation_retry(
     ]
 
 
+def test_plan_anchor_retry_repairs_observed_line_column_concatenation(tmp_path):
+    invalid = 'plan:40011'
+    valid = 'plan:4001'
+
+    class Engine:
+        name = "fake"
+
+        def run(self, *args, **kwargs):
+            return Review(text=invalid, session_ref="same-session", raw=invalid)
+
+        def resume(self, session_ref, prompt, *args, **kwargs):
+            assert session_ref == "same-session"
+            assert "exactly 5260 lines" in prompt
+            assert "line 4001, column 1 is `plan:4001`" in prompt
+            assert "Do not concatenate line and column digits" in prompt
+            return Review(text=valid, session_ref=session_ref, raw=valid)
+
+    def parser(text):
+        if text != valid:
+            raise rc.CensusError(
+                "/class_outcomes/example/evidence/0: unresolvable plan anchor "
+                "'plan:40011'"
+            )
+        return {"anchor": text}
+
+    _, parsed, attempts, rejected = handlers._staged_call(
+        role="final", engine=Engine(), prompt="initial final", cwd=tmp_path,
+        model="m", effort="high", timeout=1200, on_progress=None, parser=parser,
+        retry_context=handlers._plan_anchor_retry_context(5260),
+    )
+    assert parsed == {"anchor": valid}
+    assert len(rejected) == 1
+    assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
+
+
+def test_public_plan_consolidation_repairs_observed_anchor_and_settles(
+    repo, tmp_path, monkeypatch,
+):
+    valid_anchor = "plan:4001"
+    invalid_anchor = "plan:40011"
+    retry_prompts = []
+
+    def lane_value(lane_name):
+        findings = []
+        if lane_name == "domain":
+            findings = [{
+                "id":"F1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[valid_anchor], "remedy":"add the guard",
+            }]
+        value = payload(lane(lane_name, findings=findings))
+        if findings:
+            value["coverage"][0].update(
+                status="finding", evidence=[valid_anchor], finding_ids=["F1"],
+            )
+        return wire(value)
+
+    def decision(anchor):
+        return wire({
+            "role":"census", "governing_findings":[{
+                "id":"G1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[anchor], "remedy":"add the guard",
+                "source_ids":["domain:F1"],
+                "classification":{"kind":"one_off", "reason":"plan-local gap"},
+            }],
+            "debt_outcomes":[], "class_actions":{},
+        })
+
+    def run(self, prompt, *args, **kwargs):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            text = lane_value(lane_name)
+            session = f"lane-{lane_name}"
+        else:
+            text = decision(invalid_anchor)
+            session = "consolidation-session"
+        return Review(text=text, session_ref=session, raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "consolidation-session"
+        retry_prompts.append(prompt)
+        text = decision(valid_anchor)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_plan({
+        "repo_path":str(repo),
+        "plan_text":"\n".join(f"line {number}" for number in range(1, 5261)),
+        "lineage":"public-plan-anchor-retry", "round":1,
+        "stakes":"trusted local tool", "claim_verification":False,
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+       now=lambda:"PLAN-ANCHOR")
+
+    assert "STRUCTURAL-ERROR" not in result
+    assert "missing guard" in result
+    assert len(retry_prompts) == 1
+    assert "exactly 5260 lines" in retry_prompts[0]
+    assert "line 4001, column 1 is `plan:4001`" in retry_prompts[0]
+    assert "unresolvable plan anchor 'plan:40011'" in retry_prompts[0]
+    audit = json.loads(next((tmp_path / "logs").glob(
+        "PLAN-ANCHOR-critique_plan-*.json"
+    )).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]][-2:] == [
+        "consolidation", "consolidation-validation-retry",
+    ]
+    assert [row["outcome"] for row in audit["attempt_ledger"]][-2:] == [
+        "validation-invalid", "completed",
+    ]
+    assert audit["rejected_payloads"][0]["role"] == "consolidation"
+    persisted = cc.load_lineage(
+        cc.default_state_root(), "public-plan-anchor-retry",
+        stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert persisted.review_state["debt"][0]["evidence"] == [valid_anchor]
+
+
 def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     active = [{
         "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",
@@ -4330,24 +4449,36 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
         ),
     )
     calls: list[str] = []
+    retry_prompts: list[str] = []
 
-    def run(self, prompt, *args, **kwargs):
-        calls.append(prompt)
+    def response_for(prompt, anchor):
+        task = json.loads(prompt.split("===== TASK INPUT =====\n", 1)[1])
+        active = task["active_classes"]
+        if '"role": "final"' in prompt:
+            coverage = payload(lane("domain"))["coverage"]
+            for row in coverage:
+                row["evidence"] = [anchor]
+            return {
+                "role":"final", "governing_findings":[], "debt_outcomes":[],
+                "class_outcomes":{
+                    row["class_id"]:{"verdict":"satisfied", "evidence":[anchor]}
+                    for row in active
+                },
+                "class_actions":{row["class_id"]:None for row in active},
+                "coverage":coverage,
+            }
         assert prompt.count(prompts.PLAN_PHASE_CLASS_INSTRUCTIONS) == 1
-        active = json.loads(prompt.split("===== TASK INPUT =====\n", 1)[1])[
-            "active_classes"
-        ]
         class_id = active[0]["class_id"]
         if class_id == predecessor:
             value = {
                 "role":"correction", "governing_findings":[],
                 "debt_outcomes":[{
-                    "debt_id":"D1", "status":"open", "evidence":["plan:3"],
+                    "debt_id":"D1", "status":"open", "evidence":[anchor],
                     "reason":"replace the future-artifact invariant before closure",
                 }],
                 "class_outcomes":[{
                     "class_id":predecessor, "verdict":"violated",
-                    "evidence":["plan:3"],
+                    "evidence":[anchor],
                     "basis":{"kind":"carried_debt", "debt_id":"D1"},
                 }],
                 "class_actions":[{
@@ -4366,26 +4497,36 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
             value = {
                 "role":"correction", "governing_findings":[],
                 "debt_outcomes":[{
-                    "debt_id":"D1", "status":"closed", "evidence":["plan:3"],
+                    "debt_id":"D1", "status":"closed", "evidence":[anchor],
                 }],
                 "class_outcomes":[{
                     "class_id":class_id, "verdict":"satisfied",
-                    "evidence":["plan:3"],
+                    "evidence":[anchor],
                 }],
                 "class_actions":{class_id:None},
             }
-        text = wire(value)
+        return value
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        text = wire(response_for(prompt, "plan:40011"))
         return Review(
             text=text, session_ref=f"phase-{len(calls)}", raw=text,
             duration_ms=100 * len(calls), usage={"total_tokens":10 * len(calls)},
         )
 
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        retry_prompts.append(prompt)
+        assert "exactly 5260 lines" in prompt
+        assert "line 4001, column 1 is `plan:4001`" in prompt
+        original = calls[len(retry_prompts) - 1]
+        text = wire(response_for(original, "plan:4001"))
+        return Review(text=text, session_ref=session_ref, raw=text)
+
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
     arguments = {
-        "plan_text":(
-            "# Plan\n\nImplement the verifier in `src/verifier.py`; run "
-            "`pytest tests/test_verifier.py`; any failure blocks delivery."
-        ),
+        "plan_text":"\n".join(f"line {number}" for number in range(1, 5261)),
         "repo_path":str(repo), "lineage":"phase-bound-plan",
         "claim_verification":False, "stakes":stakes,
     }
@@ -4413,15 +4554,31 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
     )
     assert settled.classes[successor].status == cc.CLOSED
     assert settled.review_state["debt"][0]["status"] == "closed"
-    assert len(calls) == 2
+    final = handlers.critique_plan(
+        {**arguments, "round":4}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"PB3",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in final
+    durable = cc.load_lineage(
+        cc.default_state_root(), "phase-bound-plan", stamp="PB4", mode=cc.PLAN_MODE,
+    )
+    assert durable.review_state["phase"] == "clear"
+    assert len(calls) == 3
+    assert len(retry_prompts) == 3
     audits = [
         json.loads(next((tmp_path / "logs").glob(f"{stamp}-critique_plan-*.json")).read_text())
-        for stamp in ("PB1", "PB2")
+        for stamp in ("PB1", "PB2", "PB3")
     ]
-    assert [row["attempt_ledger"][0]["role"] for row in audits] == [
-        "correction", "correction",
+    assert [[row["role"] for row in audit["attempt_ledger"]] for audit in audits] == [
+        ["correction", "correction-validation-retry"],
+        ["correction", "correction-validation-retry"],
+        ["final", "final-validation-retry"],
     ]
-    assert [row["attempt_ledger"][0]["duration_ms"] for row in audits] == [100, 200]
+    assert all(audit["attempt_ledger"][0]["outcome"] == "validation-invalid"
+               for audit in audits)
+    assert all(audit["attempt_ledger"][1]["outcome"] == "completed"
+               for audit in audits)
+    assert all(len(audit["rejected_payloads"]) == 1 for audit in audits)
 
 
 def test_final_collision_audit_preserves_class_and_debt_lifecycle(
