@@ -401,8 +401,8 @@ of the resulting code and tests.
   the public handler, bind the complete executable package source, and reconstruct each exact
   provider invocation, returned result, replayable audit projection, and durable successor from
   source-derived initial state. Retain raw provider stdout as the sole channel authority; derive
-  parsed response, session, usage, return code, failure detail, and stderr through the bound
-  extractor, and do not retain non-reproducible wall-clock observations as proof.
+  parsed response, session, usage, return code, and failure detail through the bound extractor,
+  and exclude non-reproducible process stderr and wall-clock observations from the proof.
   For each existing class, aggregate every independently anchored current occurrence into its one
   governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
   Before predecessor debt can close, require the fresh governing finding to contain every

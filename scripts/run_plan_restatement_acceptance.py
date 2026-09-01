@@ -118,6 +118,8 @@ def _audit_projection(audit: dict) -> dict:
     projected.pop("timestamp", None)
     for attempt in projected.get("attempt_ledger") or []:
         attempt.pop("duration_ms", None)
+        attempt.pop("stderr_sha256", None)
+        attempt.pop("stderr_excerpt", None)
     return projected
 
 
@@ -647,7 +649,6 @@ def validate_artifact(
             )
             required_channels = (
                 "raw_sha256", "response_sha256", "failure_detail_sha256",
-                "stderr_sha256",
             )
             if (
                 not isinstance(session_ref, str) or not session_ref
@@ -675,7 +676,6 @@ def validate_artifact(
                 "response_sha256":_sha_text(parsed.text),
                 "raw_sha256":_sha_text(parsed.raw),
                 "failure_detail_sha256":_sha_text(parsed.failure_detail or ""),
-                "stderr_sha256":_sha_text(parsed.stderr or ""),
                 "returncode":parsed.returncode,
                 "usage":parsed.usage,
             }
@@ -685,7 +685,6 @@ def validate_artifact(
                 (parsed.text, "response_excerpt"),
                 (parsed.raw, "raw_excerpt"),
                 (parsed.failure_detail or "", "failure_detail_excerpt"),
-                (parsed.stderr or "", "stderr_excerpt"),
             ):
                 if value[:4000] != (attempt.get(excerpt_key) or ""):
                     raise ValueError("audit excerpt does not derive from raw provider stdout")
