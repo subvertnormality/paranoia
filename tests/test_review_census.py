@@ -1857,6 +1857,8 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         capture_output=True, text=True, check=True,
     ).stdout.strip() == artifact["source_tree"]
     assert set(artifact["source_sha256"]) == set(acceptance.SOURCE_PATHS)
+    assert set(artifact["source_blob_ids"]) == set(acceptance.SOURCE_PATHS)
+    assert set(artifact["module_metrics"]) == set(acceptance.SOURCE_PATHS)
     changed = set()
     for relative, expected in artifact["source_sha256"].items():
         historical = subprocess.run(
@@ -1864,6 +1866,13 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
             capture_output=True, check=True,
         ).stdout
         assert hashlib.sha256(historical).hexdigest() == expected
+        assert subprocess.run(
+            ["git", "rev-parse", f"{revision}:{relative}"], cwd=root,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip() == artifact["source_blob_ids"][relative]
+        assert artifact["module_metrics"][relative] == {
+            "bytes":len(historical), "lines":len(historical.splitlines()),
+        }
         if (root / relative).read_bytes() == historical:
             continue
         changed.add(relative)
@@ -1891,6 +1900,16 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
     ).stdout.splitlines() == reviewed["numstat"]
     assert artifact["census_cache"] is None
     assert "does_not_prove" in artifact["acceptance_scope"]
+    assert artifact["expected_outcome"] == {
+        "phase":"correction", "convergence":"blocked",
+        "class_id":"acceptance-class", "class_status":"open",
+        "successor_blocking_debt":True,
+        "reason":(
+            "The seeded correction intentionally supplies new exact evidence against a "
+            "conceded class; successful challenge handling must reopen that class and "
+            "persist one successor blocking debt."
+        ),
+    }
     assert artifact["provider"]["engine"] == "codex"
     assert len(artifact["calls"]) == len(artifact["attempt_ledger"]) == 1
     call = artifact["calls"][0]
@@ -1899,6 +1918,17 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
     response = call["response_text"]
     assert hashlib.sha256(response.encode()).hexdigest() == call["response_sha256"]
     assert artifact["attempt_ledger"][0]["response_sha256"] == call["response_sha256"]
+    canonical = lambda value: json.dumps(  # noqa: E731
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    assert artifact["audit_bindings"] == {
+        "attempt_ledger_sha256":hashlib.sha256(
+            canonical(artifact["attempt_ledger"]).encode(),
+        ).hexdigest(),
+        "staged_settlement_sha256":hashlib.sha256(
+            canonical(artifact["settlement"]).encode(),
+        ).hexdigest(),
+    }
 
     after_class = artifact["after_lineage"]["classes"][0]
     active = [{

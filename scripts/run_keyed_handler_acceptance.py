@@ -219,6 +219,20 @@ def main() -> int:
             relative:bytes_digest((ROOT / relative).read_bytes())
             for relative in SOURCE_PATHS
         },
+        "source_blob_ids":{
+            relative:subprocess.run(
+                ["git", "rev-parse", f"{head_id}:{relative}"], cwd=ROOT,
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            for relative in SOURCE_PATHS
+        },
+        "module_metrics":{
+            relative:{
+                "bytes":len((ROOT / relative).read_bytes()),
+                "lines":len((ROOT / relative).read_bytes().splitlines()),
+            }
+            for relative in SOURCE_PATHS
+        },
         "allowed_later_source_diffs":{},
         "reviewed_diff":{
             "base":base_id, "head":head_id,
@@ -236,6 +250,25 @@ def main() -> int:
         "stakes":STAKES, "elapsed_seconds":round(elapsed, 3),
         "calls":artifact_calls, "before_state":before,
         "settlement":settlement,
+        "expected_outcome":{
+            "phase":"correction", "convergence":"blocked",
+            "class_id":"acceptance-class", "class_status":"open",
+            "successor_blocking_debt":True,
+            "reason":(
+                "The seeded correction intentionally supplies new exact evidence "
+                "against a conceded class; successful challenge handling must reopen "
+                "that class and persist one successor blocking debt."
+            ),
+        },
+        "audit_bindings":{
+            "attempt_ledger_sha256":digest(json.dumps(
+                audit["attempt_ledger"], ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            )),
+            "staged_settlement_sha256":digest(json.dumps(
+                settlement, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )),
+        },
         "attempt_ledger":audit["attempt_ledger"],
         "after_lineage":{
             "rounds":lineage.rounds, "next_seq":lineage.next_seq,
