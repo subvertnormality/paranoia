@@ -118,9 +118,17 @@
       "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange.",
       "sha256": "2991bb0dcc06c6aa0ab19231391bf331737b69650a9c9e649dc6ebad53396d14"
     },
+    "src/paranoia_local/engines.py": {
+      "scope": "Updates the future Claude default and minimum CLI; this retained Codex handler exchange is unchanged.",
+      "sha256": "232e2052f618e2c68d53c325878804dcc075489edae8e6fad7a0009240c689e9"
+    },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged.",
       "sha256": "b05d13c1ed39bae1b81a7f2113502cc9150f04b8963acdfab42f12073ce918ac"
+    },
+    "src/paranoia_local/server.py": {
+      "scope": "Updates the public future-Claude default description; this retained Codex handler exchange is unchanged.",
+      "sha256": "1721d36eb6dc93c9cbb11713152f8d0cb0310bc6da87ff5fcca5e29ee9fa06f9"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged.",

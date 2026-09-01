@@ -7,7 +7,7 @@
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
-      "sha256": "a5986a8f0afb4ac39e45e8e425358e614c9043504e7a0082efc6aa2932a4aea5"
+      "sha256": "0e37990502ad44e5c9b637e4e13f0e8dec9d2c0a874a2c7372f0e0388effe418"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
@@ -15,7 +15,7 @@
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
-      "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
+      "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/server.py": {
       "scope": "Issue #94 documents the new structured concession-challenge field; retained provider exchanges are unchanged.",
-      "sha256": "5198ff6963d57267dc6a186d786b9268a3cfeeddc348e0b59b981894e4b8c72e"
+      "sha256": "e111b5d87058bee98fae5c1ee8d5e2bd4bd47e3a3dc000fe12905552b633a1db"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery.",

@@ -10,8 +10,8 @@
       "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"
     },
     "src/paranoia_local/engines.py": {
-      "scope": "Factors existing subprocess-result finalization into a reusable production step; arbitration behavior and the retained provider exchange are unchanged.",
-      "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
+      "scope": "Updates the future Claude default and minimum CLI while preserving this retained Fable 5 arbitration exchange through its source-bound historical validator.",
+      "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review guidance, unrelated plan normative-restatement discovery, issue #98's staged unmechanized class sweep, and field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",

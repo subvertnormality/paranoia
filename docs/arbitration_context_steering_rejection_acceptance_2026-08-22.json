@@ -2,8 +2,8 @@
   "acceptance_kind": "arbitration-context-steering-rejected",
   "allowed_later_source_diffs": {
     "src/paranoia_local/engines.py": {
-      "scope": "Factors existing subprocess-result finalization into a reusable production step; arbitration rejection behavior and the retained provider exchange are unchanged.",
-      "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
+      "scope": "Updates the future Claude default and minimum CLI; this retained rejection exchange remains bound to its historical Fable 5 route.",
+      "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds unrelated staged plan normative-restatement and issue #98 unmechanized class-sweep guidance; arbitration cleaner, attester, and decider instructions remain unchanged.",
