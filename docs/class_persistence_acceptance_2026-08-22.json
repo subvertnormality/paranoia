@@ -4,6 +4,10 @@
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback; this does not alter staged class persistence.",
         "sha256": "1936e915a0529e87c84fb0e244859583a89aeda56d17d82030af34568318f42f"
+    },
+    "src/paranoia_local/review_census.py": {
+      "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged class persistence proved by this historical acceptance.",
+      "sha256": "9b6315bd10f31d893d8cc3ac255a38286bd3f8ded239213cc3b466eb644eba51"
     }
   },
   "attempt_ledger": [
