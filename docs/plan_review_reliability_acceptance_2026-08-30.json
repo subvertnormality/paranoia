@@ -1767,8 +1767,12 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
-        "sha256": "7c74b6cd286f72118656186cff1e026f92260709bf66a86dbb62d8e394442c86"
+        "scope": "Adds arbitration failure taxonomy and plan normative-restatement review guidance without changing deterministic replay behavior.",
+        "sha256": "c059ee8a4958ede71ab0adbfac79dd0d131c6a2dc2447e73ba59f694a7a2d326"
+      },
+      "README.md": {
+        "scope": "Documents plan normative-restatement review without changing deterministic replay behavior.",
+        "sha256": "7b62b0ccc6ef1b8ecc3e265080dddaccbd276c2b0cc04ca12029a9c095dec479"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
@@ -1779,8 +1783,8 @@
         "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds the closed-predecessor/current-successor rebut debt-id regression without changing deterministic replay behavior.",
-        "sha256": "0c52f35f51002315707bc263a736d0fcd1f3a636ed2d095e6a20c43ea079193c"
+        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior.",
+        "sha256": "8ba9b7c4906df30a62fd12403991a5221746049b523ea56fc2c4e9b80db50a62"
       }
     },
     "checks": {
