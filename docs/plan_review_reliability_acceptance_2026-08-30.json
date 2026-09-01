@@ -7,7 +7,7 @@
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances. Issue #95 documents that a pending final is discharged only by its owning engine.",
-      "sha256": "83501fc50910e45c0737be8e93c64469b48fff699c22553724e8cd16f3a4d0cb"
+      "sha256": "ed14cd74c4293effd2669d9f037824f4ea340c26a3f2106ab80d71444f40c4d8"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -39,7 +39,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "32b553c731c066d05827566598d1e85d34e70da2a8da1b31ad2c45534a428bd0"
+      "sha256": "82f9e8913300eb751c2f6f4a8624c39923e9443b450a4a3add27f00f08a091b7"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
@@ -1776,7 +1776,7 @@
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-          "sha256": "a3657c789b32fca23a2d291a96be76fedc51b9b5aa826ce5fbaaec3ddecb59b9"
+          "sha256": "7a28279ffb3e9fe9b389cfeaf42c8038ae1a3259225c768e07cb79dab9404dcc"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
@@ -1788,7 +1788,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-          "sha256": "1df85504a757939be929eb5919491f00d14cd9f7a9360a2e8377e98923a171d6"
+          "sha256": "442c226b6437fc2045bbee8ed5e6001f93e6ff208a25b704cad0ba272895d913"
       }
     },
     "checks": {

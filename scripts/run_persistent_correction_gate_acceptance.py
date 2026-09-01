@@ -29,6 +29,16 @@ CLASS_ID = "gate-class"
 SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
 LEGACY_SOURCE_REVISION = "bb068a1c359765f12b9c2295a88f039424c7d4f9"
+LEGACY_ACCEPTANCE_SCOPE = {
+    "status":"historical",
+    "proves":"the correction-gate behavior recorded at the pinned source revision",
+    "does_not_claim":"current engine-owned final selection or clearance",
+}
+CURRENT_ACCEPTANCE_SCOPE = {
+    "status":"current",
+    "proves":"correction-gate behavior through an engine-owned final and clearance",
+    "does_not_claim":"behavior outside the retained public plan-handler fixture",
+}
 LEGACY_REPAIR_PLAN_SHA256 = "7060753ab927b4a4276a00693f6ff498d2315f9be77f131aa425f30fbfd8e2c5"
 ACCEPTANCE_SOURCES = tuple(sorted(
     str(path.relative_to(ROOT))
@@ -493,7 +503,7 @@ def validate_artifact(
             raise ValueError("retained acceptance differs from its committed Git envelope")
     expected_keys = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
-        "legacy_unowned_final",
+        "legacy_unowned_final", "acceptance_scope",
         "allowed_later_source_diffs",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
@@ -519,6 +529,11 @@ def validate_artifact(
         raise ValueError("legacy final marker must be boolean")
     if legacy_unowned_final and artifact["source_revision"] != LEGACY_SOURCE_REVISION:
         raise ValueError("legacy final marker is permitted only for the pinned historical run")
+    expected_scope = (
+        LEGACY_ACCEPTANCE_SCOPE if legacy_unowned_final else CURRENT_ACCEPTANCE_SCOPE
+    )
+    if artifact["acceptance_scope"] != expected_scope:
+        raise ValueError("acceptance scope does not match the historical final marker")
     surfaces = {
         "docs/how-it-works.md": (
             "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
@@ -1180,6 +1195,7 @@ def main() -> int:
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
         "legacy_unowned_final":False,
+        "acceptance_scope":CURRENT_ACCEPTANCE_SCOPE,
         "version":2, "date":"2026-08-24", "source_revision":revision,
         "source_sha256":{
             path:hashlib.sha256(_git_bytes("show", f"{revision}:{path}")).hexdigest()

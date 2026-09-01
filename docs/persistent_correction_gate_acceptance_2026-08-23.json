@@ -1,5 +1,10 @@
 {
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
+  "acceptance_scope": {
+    "does_not_claim": "current engine-owned final selection or clearance",
+    "proves": "the correction-gate behavior recorded at the pinned source revision",
+    "status": "historical"
+  },
   "legacy_unowned_final": true,
   "allowed_later_source_diffs": {
     "AGENTS.md": {
@@ -16,7 +21,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "f66c7f7103d16cfcd69ce28c790529d985a9b675dd2df0be4a9d496b348cd81f"
+      "sha256": "82601ece48e6fba44ae8b2bb02cc50b7cf3cda3c9f0694778bc97f89a2783270"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
@@ -64,7 +69,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
-      "sha256": "23569aa23a5bd2a2a5a81f9e58580dc9961b3cbd72b1b631456e46945b666035"
+      "sha256": "4aad9c78c6c984a1e6e611ad732f5d16eef33e943708f7f5eafbfbb5d34485e8"
     }
   },
   "after_lineage": {

@@ -7,7 +7,7 @@
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
-      "sha256": "8b3469782d4e0a28090a08329b6169050df863cbce03b6cf8c562f6eef765027"
+      "sha256": "3691864df6f8107787fcec496a06441efc997c3c595bccab8b4c05e75e582200"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
@@ -27,7 +27,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "8309f9cae7cb2d7a1ab8202801f1defbd6b7a4ecda1968000daf0e9ee5ff3f59"
+      "sha256": "71cf455d1aa6731102604995fee09a27b22e6fe199ea995e072bcde6f09a0400"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

@@ -1495,6 +1495,10 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     # This retained 2026-08-23 run predates engine-owned final state; current
     # final-route artifacts below carry and assert their explicit owner.
     assert artifact["legacy_unowned_final"] is True
+    assert artifact["acceptance_scope"] == acceptance.LEGACY_ACCEPTANCE_SCOPE
+    assert "current engine-owned final" in artifact["acceptance_scope"][
+        "does_not_claim"
+    ]
     assert "final_engine" not in artifact["after_repair_lineage"]["review_state"]
     assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
     assert artifact["final_lineage"]["review_state"]["phase"] == "clear"

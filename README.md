@@ -263,6 +263,10 @@ A different engine may still report new debt, but its clean result cannot discha
 that pending gate; the trailer names the required engine. Older unowned final state
 re-enters census once rather than guessing an owner.
 
+The retained 2026-08-23 persistent-correction acceptance predates final ownership
+and is historical evidence only; it does not certify the current final-selection or
+clearance route. Current owner behavior is exercised through both public handlers.
+
 A clear census can finish immediately. Otherwise, increase `round` only after
 you have changed the reviewed artifact. Failed or rejected rounds can reuse the
 same label; a successfully settled round requires the next label to increase.
