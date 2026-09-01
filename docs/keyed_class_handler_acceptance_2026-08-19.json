@@ -5,8 +5,8 @@
       {
         "class_id": "acceptance-class",
         "detail": null,
-        "first_round": 0,
-        "invariant": "The retained keyed handler acceptance is bound to current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay.",
+        "first_round": 1,
+        "invariant": "The retained keyed handler acceptance is bound to current head 5221b93396f7e69c23efa4a613130dbc2be6a522 and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay.",
         "matches": [],
         "pathspec": null,
         "pattern": null,
@@ -18,7 +18,43 @@
     ],
     "next_seq": 1,
     "review_state": {
+      "correction_control": {
+        "classes": {
+          "acceptance-class": {
+            "last_session_ref": "01a05d24-ce32-7ad0-a02f-4d3b021dcaeb",
+            "reopen_count": 1,
+            "reset_round": null
+          }
+        },
+        "version": 1
+      },
       "debt": [
+        {
+          "class_ids": [
+            "acceptance-class"
+          ],
+          "concession": {
+            "evidence": [
+              "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"
+            ],
+            "reason": "The old pointer claim did not match the durable record.",
+            "round": 1,
+            "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "version": 1
+          },
+          "evidence": [
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"
+          ],
+          "finding_id": "conceded-acceptance-gap",
+          "first_round": 1,
+          "id": "D0",
+          "last_round": 1,
+          "remedy": "Do not repeat the withdrawn demand without new evidence.",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "closed",
+          "summary": "A prior acceptance demand was withdrawn."
+        },
         {
           "class_ids": [
             "acceptance-class"
@@ -26,58 +62,109 @@
           "evidence": [
             "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
             "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
-            "repository/tests/test_review_census.py:204-213"
+            "repository/tests/test_review_census.py:1797-1816"
           ],
           "finding_id": "historical-acceptance-gap",
-          "first_round": 0,
+          "first_round": 1,
           "id": "D1",
-          "last_round": 1,
-          "reason": "The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.",
+          "last_round": 2,
           "remedy": "Run and retain the current production handler with exact keyed pointers.",
           "severity": "MAJOR",
           "source_ids": [],
-          "status": "open",
+          "status": "closed",
           "summary": "The retained handler lifecycle predates the current keyed diagnostic contract."
+        },
+        {
+          "class_ids": [
+            "acceptance-class"
+          ],
+          "evidence": [
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9",
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+            "repository/scripts/run_keyed_handler_acceptance.py:35-38",
+            "repository/tests/test_review_census.py:1797-1816"
+          ],
+          "finding_id": "current-head-handler-acceptance-gap",
+          "first_round": 2,
+          "id": "D2",
+          "last_round": 2,
+          "remedy": "Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.",
+          "severity": "MAJOR",
+          "source_ids": [],
+          "status": "open",
+          "summary": "The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle."
         }
       ],
-      "last_round": 1,
+      "last_round": 2,
       "phase": "correction",
-      "snapshot_digest": "1fc764d71ddc5624463b66524b924a1c5701f7f038393dd7446ed634d7e1fb77",
+      "snapshot_digest": "302c9b3dbc712dbb643e7871890cd3f181d608d9623a77c896e0a848dad1bf72",
       "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
       "stakes_digest": "0107c32da199a5ce80a57e51f2e51c5d7863b549fd4c61ed8ab5cbf1fba19bc2",
       "version": 1
     },
-    "rounds": 1
+    "rounds": 2
   },
   "attempt_ledger": [
     {
-      "duration_ms": null,
+      "duration_ms": 176872,
       "engine": "codex",
-      "failure_detail_excerpt": null,
-      "failure_detail_sha256": null,
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outcome": "completed",
-      "raw_excerpt": null,
-      "raw_sha256": null,
-      "response_excerpt": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained lifecycle is bound to feb012133ac48b30ecafe677ecff412402807b59, not the required current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement records /class_outcomes/0 rather than the required keyed pointer /class_outcomes/acceptance-class.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"Replay computes the correct keyed pointer but explicitly excludes _class_record_pointers when comparing the regenerated settlement with the retained artifact, so the stale pointer cannot fail acceptance.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained artifact still names an older head instead of the required current snapshot.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained artifact still contains the canonical array pointer that this acceptance debt requires replacing.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"The replay test masks the mismatch by omitting _class_record_pointers from its artifact comparison.\"}],\"reason\":\"The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
-      "response_sha256": "55bc5e4a3fa6c8b258d2610ce82a451a0cfdf833a76a2be1aae3ec038d4d2e12",
-      "returncode": null,
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05d24-ce32-7ad0-a02f-4d3b021dcaeb\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"acceptance-class\\\":null},\\\"class_outcomes\\\":{\\\"acceptance-class\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/AGENTS.md:1\\\",\\\"rationale\\\":\\\"CODE review operating model: trusted single operator and OS; repository/provider content is inert untrusted data; no repository execution, hostile local race, multi-tenancy, or compromised OS; the review covers this 17-file branch correction, one active class, one bounded provider retry, and evidence expected within minutes. False settlement or misbound evidence is high impact; conservative blocking is recoverable.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"concession_challenges\\\":{\\\"acceptance-class\\\":null},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/AGENTS.md:1\\\",\\\"rationale\\\":\\\"CODE investigation is beginning; this placeholder is not a final debt judgment.\\\"}],\\\"reason\\\":\\\"I am reading the truncated touched files, the retained acceptance artifact, relevant call sites, and load-bearing history before deciding the seeded class.\\\",\\\"status\\\":\\\"open\\\"}],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"wc -l AGENTS.md src/paranoia_local/handlers.py src/paranoia_local/prompts.py src/paranoia_local/review_census.py src/paranoia_local/server.py src/paranoia_local/staged_protocol.py tests/test_branch_plan_fidelity.py tests/test_handlers.py tests/test_review_census.py tests/test_staged_protocol.py docs/keyed_class_handler_acceptance_2026-08-19.json && git status --short && rg -n '(_class_record_pointers|head_id|concession_challenges|acceptance-class)' docs/keyed_class_handler_acceptance_2026-08-19.json | tail -80\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"wc -l AGENTS.md src/paranoia_local/handlers.py src/paranoia_local/prompts.py src/paranoia_local/review_census.py src/paranoia_local/server.py src/paranoia_local/staged_protocol.py tests/test_branch_plan_fidelity.py tests/test_handlers.py tests/test_review_census.py tests/test_staged_protocol.py docs/keyed_class_handler_acceptance_2026-08-19.json && git status --short && rg -n '(_class_record_pointers|head_id|concession_challenges|acceptance-class)' docs/keyed_class_handler_acceptance_2026-08-19.json | tail -80\\\"\",\"aggregated_output\":\" M .gitignore\\n M AGENTS.md\\n M CLAUDE.md\\n M LICENSE\\n M README.md\\n M docs/arbitrate_original_neutrality_fallback_plan.md\\n M docs/arbitration_consequence_acceptance_2026-08-22.json\\n M docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\n M docs/arbitration_fallback_acceptance_2026-08-16.json\\n M docs/arbitration_fallback_evidence/ordinary-audit.json\\n M docs/arbitration_fallback_evidence/ordinary-timing.json\\n M docs/arbitration_fallback_evidence/original-attested-audit.json\\n M docs/arbitration_fallback_evidence/snapshot-commit.txt\\n M docs/arbitration_fallback_evidence/timing.json\\n M docs/arbitration_plan.md\\n M docs/arbitration_reliability_acceptance_2026-08-12.json\\n M docs/arbitration_reliability_evidence/preceding-failed-audit.json\\n M docs/arbitration_reliability_evidence/primary-audit.json\\n M docs/arbitration_research_plan.md\\n M docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\n M docs/authoritative_capture_acceptance_2026-08-20.json\\n M docs/authoritative_capture_segmentation_plan.md\\n M docs/branch_plan_fidelity_acceptance_2026-08-22.json\\n M docs/branch_plan_fidelity_plan.md\\n M docs/claim_binding_acceptance_2026-08-14.json\\n M docs/claim_discovery_timeout_acceptance_2026-08-22.json\\n M docs/claim_verification.md\\n M docs/class_closure_plan.md\\n M docs/class_occurrence_batch_acceptance_2026-08-30.json\\n M docs/class_persis",
+      "raw_sha256": "2d28df0aceace7f5cfa310901f482321fb44be231221e63e585a62b93957f07a",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 2400,
+      "response_excerpt": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"finding_id\":\"current-head-handler-acceptance-gap\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"The retained lineage still defines the acceptance invariant against head 9ef782b163fa0c80914c75458dbb08133e7b9e5d, not the reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The artifact's authoritative head_id is 9ef782b163fa0c80914c75458dbb08133e7b9e5d, proving that the current-head lifecycle has not been retained.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement now has the exact keyed pointer, distinguishing this current-head violation from the conceded obsolete pointer allegation.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:35-38\",\"rationale\":\"The production acceptance generator derives head_id from HEAD, so rerunning it at the reviewed snapshot would replace the stale provenance.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"The replay test reconstructs the current concession-aware schema and materialized settlement and compares them exactly with the retained artifact, so a current regeneration is required.\"}],\"verdict\":\"violated\"}},\"concession_challenges\":{\"acceptance-class\":{\"debt_id\":\"D0\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"New retained evidence shows that the artifact's own acceptance invariant remains tied to the older head while already naming the correct keyed pointer.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained head_id is independently stale relative to reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The pointer is now exactly /class_outcomes/acceptance-class, so this challenge does not revive the withdrawn pointer demand.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"Current replay requires the concession-aware schema and exact settlement, establishing a changed acceptance contract not adjudicated by the prior concession.\"}],\"reason\":\"The concession correctly withdrew the old pointer allegation, and that allegation remains withdrawn. Distinct current evidence now shows the retained artifact is bound to head 9ef782b163fa0c80914c75458dbb08133e7b9e5d rather than reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522, while the pointer itself is correct and replay now compares the complete current settlement.\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The remaining reachable occurrence is the stale retained head and is incorporated into the fresh aggregate finding.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The predecessor's pointer concern is no longer present because the retained pointer is now exactly keyed.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"Replay now compares the current schema and complete materialized settlement without excluding _class_record_pointers, so D1 is superseded by the fresh current-head finding rather than retained as a narrower duplicate.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"class_id\":\"acceptance-class\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"The retained lineage embeds the obsolete 9ef782b163fa0c80914c75458dbb08133e7b9e5d head in its acceptance invariant.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The top",
+      "response_sha256": "dd11eb014ed9b4d5205168fcf33d79c149276823604947fbc8c14f4b547ac0c5",
+      "returncode": 0,
       "role": "correction",
       "sequence": 1,
-      "session_ref": "01a01a28-879a-7ab2-aede-d38271faeb70",
-      "stderr_excerpt": null,
-      "stderr_sha256": null,
+      "session_ref": "01a05d24-ce32-7ad0-a02f-4d3b021dcaeb",
+      "stderr_excerpt": "2026-09-01T13:24:47.780607Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-09-01T13:24:50.165204Z  WARN codex_core::agents_md: project doc exceeds remaining budget; truncating path=file:///mnt/c/Users/andy/AppData/Local/Temp/paranoia-wt-11edrl3x/tree/AGENTS.md remaining_bytes=32768\n2026-09-01T13:25:15.009417Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T13:25:33.545088Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T13:25:41.511740Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T13:26:45.488439Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T13:27:43.360497Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+      "stderr_sha256": "f2256e7d01565dd6a923c4fb6720aff4a44c80cc6b430e1c654b40d73e0f3359",
       "usage": {
-        "cached_input_tokens": 273920,
-        "input_tokens": 430005,
-        "output_tokens": 2806,
-        "reasoning_output_tokens": 1913
+        "cached_input_tokens": 510976,
+        "input_tokens": 660876,
+        "output_tokens": 6781,
+        "reasoning_output_tokens": 4361
       },
-      "validation_issue": null
+      "validation_issue": null,
+      "validation_pointer": null
     }
   ],
-  "base_id": "259c26d5471f4513cd7e5b8db0d56d423161c869",
+  "base_id": "df9b639756ceef0883c7bd1319758860566b4848",
   "before_state": {
     "debt": [
+      {
+        "class_ids": [
+          "acceptance-class"
+        ],
+        "concession": {
+          "evidence": [
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"
+          ],
+          "reason": "The old pointer claim did not match the durable record.",
+          "round": 1,
+          "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "version": 1
+        },
+        "evidence": [
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"
+        ],
+        "finding_id": "conceded-acceptance-gap",
+        "first_round": 1,
+        "id": "D0",
+        "last_round": 1,
+        "remedy": "Do not repeat the withdrawn demand without new evidence.",
+        "severity": "MAJOR",
+        "source_ids": [],
+        "status": "closed",
+        "summary": "A prior acceptance demand was withdrawn."
+      },
       {
         "class_ids": [
           "acceptance-class"
@@ -86,9 +173,9 @@
           "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949"
         ],
         "finding_id": "historical-acceptance-gap",
-        "first_round": 0,
+        "first_round": 1,
         "id": "D1",
-        "last_round": 0,
+        "last_round": 1,
         "remedy": "Run and retain the current production handler with exact keyed pointers.",
         "severity": "MAJOR",
         "source_ids": [],
@@ -96,18 +183,19 @@
         "summary": "The retained handler lifecycle predates the current keyed diagnostic contract."
       }
     ],
+    "last_round": 1,
     "phase": "correction",
-    "snapshot_digest": "seed",
+    "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
     "stakes_digest": "0107c32da199a5ce80a57e51f2e51c5d7863b549fd4c61ed8ab5cbf1fba19bc2",
     "version": 1
   },
   "calls": [
     {
-      "prompt_sha256": "bb0a04406c6332ee54063caf14048db1e0a7c8eba56089017f80817f0fbb1854",
-      "raw_sha256": "c3b1f1fcd6dae9c061f6410c2920ba22dcbea8fd1bed15d55c8cef2b1b978937",
-      "response_sha256": "55bc5e4a3fa6c8b258d2610ce82a451a0cfdf833a76a2be1aae3ec038d4d2e12",
-      "response_text": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"debt_id\":\"D1\",\"kind\":\"carried_debt\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained lifecycle is bound to feb012133ac48b30ecafe677ecff412402807b59, not the required current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement records /class_outcomes/0 rather than the required keyed pointer /class_outcomes/acceptance-class.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"Replay computes the correct keyed pointer but explicitly excludes _class_record_pointers when comparing the regenerated settlement with the retained artifact, so the stale pointer cannot fail acceptance.\"}],\"verdict\":\"violated\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained artifact still names an older head instead of the required current snapshot.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained artifact still contains the canonical array pointer that this acceptance debt requires replacing.\"},{\"anchor\":\"repository/tests/test_review_census.py:204-213\",\"rationale\":\"The replay test masks the mismatch by omitting _class_record_pointers from its artifact comparison.\"}],\"reason\":\"The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.\",\"status\":\"open\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+      "prompt_sha256": "e7472faf3fa488056d12ae5a4e6be261a36ea120558168046ce779d8ad026a01",
+      "raw_sha256": "2d28df0aceace7f5cfa310901f482321fb44be231221e63e585a62b93957f07a",
+      "response_sha256": "dd11eb014ed9b4d5205168fcf33d79c149276823604947fbc8c14f4b547ac0c5",
+      "response_text": "{\"class_actions\":{\"acceptance-class\":null},\"class_outcomes\":{\"acceptance-class\":{\"basis\":{\"finding_id\":\"current-head-handler-acceptance-gap\",\"kind\":\"new_finding\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"The retained lineage still defines the acceptance invariant against head 9ef782b163fa0c80914c75458dbb08133e7b9e5d, not the reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The artifact's authoritative head_id is 9ef782b163fa0c80914c75458dbb08133e7b9e5d, proving that the current-head lifecycle has not been retained.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The retained settlement now has the exact keyed pointer, distinguishing this current-head violation from the conceded obsolete pointer allegation.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:35-38\",\"rationale\":\"The production acceptance generator derives head_id from HEAD, so rerunning it at the reviewed snapshot would replace the stale provenance.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"The replay test reconstructs the current concession-aware schema and materialized settlement and compares them exactly with the retained artifact, so a current regeneration is required.\"}],\"verdict\":\"violated\"}},\"concession_challenges\":{\"acceptance-class\":{\"debt_id\":\"D0\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"New retained evidence shows that the artifact's own acceptance invariant remains tied to the older head while already naming the correct keyed pointer.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The retained head_id is independently stale relative to reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The pointer is now exactly /class_outcomes/acceptance-class, so this challenge does not revive the withdrawn pointer demand.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"Current replay requires the concession-aware schema and exact settlement, establishing a changed acceptance contract not adjudicated by the prior concession.\"}],\"reason\":\"The concession correctly withdrew the old pointer allegation, and that allegation remains withdrawn. Distinct current evidence now shows the retained artifact is bound to head 9ef782b163fa0c80914c75458dbb08133e7b9e5d rather than reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522, while the pointer itself is correct and replay now compares the complete current settlement.\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The remaining reachable occurrence is the stale retained head and is incorporated into the fresh aggregate finding.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The predecessor's pointer concern is no longer present because the retained pointer is now exactly keyed.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"Replay now compares the current schema and complete materialized settlement without excluding _class_record_pointers, so D1 is superseded by the fresh current-head finding rather than retained as a narrower duplicate.\"}],\"status\":\"closed\"}],\"governing_findings\":[{\"classification\":{\"class_id\":\"acceptance-class\",\"kind\":\"existing_class\"},\"evidence\":[{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9\",\"rationale\":\"The retained lineage embeds the obsolete 9ef782b163fa0c80914c75458dbb08133e7b9e5d head in its acceptance invariant.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935\",\"rationale\":\"The top-level retained provenance independently records obsolete head 9ef782b163fa0c80914c75458dbb08133e7b9e5d instead of reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522.\"},{\"anchor\":\"repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949\",\"rationale\":\"The exact keyed pointer is retained, proving the defect is the current-head binding rather than the previously withdrawn pointer claim.\"},{\"anchor\":\"repository/scripts/run_keyed_handler_acceptance.py:35-38\",\"rationale\":\"The generator names HEAD as the provenance authority, so the retained artifact should have been regenerated at this reviewed snapshot.\"},{\"anchor\":\"repository/tests/test_review_census.py:1797-1816\",\"rationale\":\"The acceptance replay reconstructs the concession-aware schema and exact settlement, making regeneration and complete replay the production acceptance boundary.\"}],\"id\":\"current-head-handler-acceptance-gap\",\"remedy\":\"Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.\",\"severity\":\"MAJOR\",\"summary\":\"The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle.\"}],\"role\":\"correction\"}",
       "route": "fresh",
       "schema": {
         "$defs": {
@@ -555,6 +643,73 @@
             ],
             "type": "object"
           },
+          "concession_challenges": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance-class": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "debt_id": {
+                        "const": "D0",
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "anchor": {
+                              "maxLength": 512,
+                              "minLength": 1,
+                              "pattern": "^(?:plan|repository/.+):[1-9][0-9]*(?:-[1-9][0-9]*)?$",
+                              "type": "string"
+                            },
+                            "rationale": {
+                              "maxLength": 500,
+                              "minLength": 1,
+                              "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "anchor",
+                            "rationale"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 20,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "reason": {
+                        "maxLength": 4000,
+                        "minLength": 1,
+                        "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "debt_id",
+                      "reason",
+                      "evidence"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "acceptance-class"
+            ],
+            "type": "object"
+          },
           "debt_outcomes": {
             "items": {
               "anyOf": [
@@ -915,24 +1070,25 @@
           "role",
           "governing_findings",
           "debt_outcomes",
+          "concession_challenges",
           "class_outcomes",
           "class_actions"
         ],
         "type": "object"
       },
-      "schema_sha256": "5e044b4c342cc5b9c02b483f6bbdbcb713a92a9e6c87082bc258ce33e79f6635",
-      "session_ref": "01a01a28-879a-7ab2-aede-d38271faeb70",
+      "schema_sha256": "84e24f7820fb12a1b46428067f7f03ae09e6ed1037a3213bfd7a8ea9626639de",
+      "session_ref": "01a05d24-ce32-7ad0-a02f-4d3b021dcaeb",
       "usage": {
-        "cached_input_tokens": 273920,
-        "input_tokens": 430005,
-        "output_tokens": 2806,
-        "reasoning_output_tokens": 1913
+        "cached_input_tokens": 510976,
+        "input_tokens": 660876,
+        "output_tokens": 6781,
+        "reasoning_output_tokens": 4361
       }
     }
   ],
   "date": "2026-08-19",
-  "elapsed_seconds": 77.854,
-  "head_id": "9ef782b163fa0c80914c75458dbb08133e7b9e5d",
+  "elapsed_seconds": 178.629,
+  "head_id": "5221b93396f7e69c23efa4a613130dbc2be6a522",
   "lineage_id": "keyed-class-handler-acceptance-20260819",
   "provider": {
     "cli_version": "codex-cli 0.144.6",
@@ -941,52 +1097,106 @@
     "model": "gpt-5.6-sol",
     "web_search": false
   },
-  "result_sha256": "fb9462c5e5546371671ed97534b6284c290e75c3245b2f2d45b019692105421e",
-  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The retained handler lifecycle predates the current keyed diagnostic contract. — remains open: The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion. [classes: acceptance-class] (repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949, repository/tests/test_review_census.py:204-213)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run and retain the current production handler with exact keyed pointers.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a01a28-879a-7ab2-aede-d38271faeb70` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 1)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class The retained keyed handler acceptance is bound to current head 9ef782b163fa0c80914c75458dbb08133e7b9e5d and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+  "result_sha256": "af7c9e19173d6802eb210c1ef3f4d24589c57e75cda9fbb00cdce8e1e2301cc4",
+  "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle. [classes: acceptance-class] (repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949, repository/scripts/run_keyed_handler_acceptance.py:35-38, repository/tests/test_review_census.py:1797-1816)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05d24-ce32-7ad0-a02f-4d3b021dcaeb` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class The retained keyed handler acceptance is bound to current head 5221b93396f7e69c23efa4a613130dbc2be6a522 and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nREOPEN-WAVE: 1 previously closed class(es) reopened this round: acceptance-class — re-arm any prior disposition and reassess scope before another correction\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
   "settlement": {
     "_class_record_pointers": [
       "/class_outcomes/acceptance-class"
     ],
-    "_finding_class_refs": {},
+    "_finding_class_refs": {
+      "current-head-handler-acceptance-gap": "acceptance-class"
+    },
     "assessment_dispositions": [
       {
         "assessment_id": "acceptance-class",
-        "governing_id": "historical-acceptance-gap"
+        "governing_id": "current-head-handler-acceptance-gap"
       }
     ],
     "class_assessments": [
       {
         "class_id": "acceptance-class",
         "evidence": [
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9",
           "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
           "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
-          "repository/tests/test_review_census.py:204-213"
+          "repository/scripts/run_keyed_handler_acceptance.py:35-38",
+          "repository/tests/test_review_census.py:1797-1816"
         ],
-        "finding_id": "historical-acceptance-gap",
+        "finding_id": "current-head-handler-acceptance-gap",
         "verdict": "violated"
       }
     ],
-    "class_dispositions": [],
+    "class_dispositions": [
+      {
+        "class_id": "acceptance-class",
+        "finding_id": "current-head-handler-acceptance-gap",
+        "kind": "existing_class"
+      }
+    ],
     "class_records": [
       {
         "class_id": "acceptance-class",
         "op": "reopen"
       }
     ],
-    "debt": [],
+    "concession_challenges": [
+      {
+        "challenge": {
+          "debt_id": "D0",
+          "evidence": [
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9",
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+            "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+            "repository/tests/test_review_census.py:1797-1816"
+          ],
+          "reason": "The concession correctly withdrew the old pointer allegation, and that allegation remains withdrawn. Distinct current evidence now shows the retained artifact is bound to head 9ef782b163fa0c80914c75458dbb08133e7b9e5d rather than reviewed head 5221b93396f7e69c23efa4a613130dbc2be6a522, while the pointer itself is correct and replay now compares the complete current settlement."
+        },
+        "class_id": "acceptance-class"
+      }
+    ],
+    "debt": [
+      {
+        "evidence": [
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+          "repository/scripts/run_keyed_handler_acceptance.py:35-38",
+          "repository/tests/test_review_census.py:1797-1816"
+        ],
+        "finding_id": "current-head-handler-acceptance-gap",
+        "id": "D2",
+        "remedy": "Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.",
+        "severity": "MAJOR",
+        "status": "open",
+        "summary": "The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle."
+      }
+    ],
     "debt_updates": [
       {
         "evidence": [
           "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
           "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
-          "repository/tests/test_review_census.py:204-213"
+          "repository/tests/test_review_census.py:1797-1816"
         ],
         "id": "D1",
-        "reason": "The current-head production-handler acceptance remains unretained: regenerate it against 9ef782b163fa0c80914c75458dbb08133e7b9e5d, retain /class_outcomes/acceptance-class, and compare that field during replay without exclusion.",
-        "status": "open"
+        "status": "closed"
       }
     ],
-    "findings": [],
+    "findings": [
+      {
+        "evidence": [
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935",
+          "repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949",
+          "repository/scripts/run_keyed_handler_acceptance.py:35-38",
+          "repository/tests/test_review_census.py:1797-1816"
+        ],
+        "id": "current-head-handler-acceptance-gap",
+        "remedy": "Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.",
+        "severity": "MAJOR",
+        "summary": "The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle."
+      }
+    ],
     "role": "correction",
     "source_dispositions": []
   },
