@@ -834,7 +834,7 @@ def validate_artifact(
         and isinstance(repair_prompts, list) and repair_prompts
         and artifact["repair_prompt_sha256"] == [_sha(row) for row in repair_prompts]
         and repair_audit.get("round") == 8
-        and repair_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and repair_audit.get("plan_digest") == _sha(repair_plan)[:16]
         and repair_audit.get("attempt_ledger") == repair_attempts
         and isinstance(repair_attempts, list) and 1 <= len(repair_attempts) <= 2
         and repair_attempts[-1].get("role") in {
@@ -864,7 +864,7 @@ def validate_artifact(
         and repair_task.get("stakes") == STAKES
         and repair_task.get("review_scope") == "closure_candidate"
         and repair_task.get("checklist") == list(sp.CHECKLIST)
-        and FIXED_PLAN.splitlines()[SIBLING_LINE - 1]
+        and repair_plan.splitlines()[SIBLING_LINE - 1]
         in repair_task.get("artifact", "")
         and repair_prompts[0].count(
             handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS
@@ -883,7 +883,7 @@ def validate_artifact(
         and isinstance(final_prompts, list) and final_prompts
         and artifact["final_prompt_sha256"] == [_sha(row) for row in final_prompts]
         and final_audit.get("round") == 9
-        and final_audit.get("plan_digest") == _sha(FIXED_PLAN)[:16]
+        and final_audit.get("plan_digest") == _sha(repair_plan)[:16]
         and final_audit.get("attempt_ledger") == final_attempts
         and isinstance(final_attempts, list) and 1 <= len(final_attempts) <= 2
         and final_attempts[-1].get("role") in {"final", "final-validation-retry"}
@@ -910,7 +910,7 @@ def validate_artifact(
         == [CLASS_ID, SIBLING_CLASS_ID]
         and all(
             line in final_task.get("artifact", "")
-            for line in FIXED_PLAN.splitlines() if line
+            for line in repair_plan.splitlines() if line
         )
         and handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in final_prompts[0]
         and len({
