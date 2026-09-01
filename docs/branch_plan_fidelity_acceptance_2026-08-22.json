@@ -6,8 +6,8 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
-      "sha256": "e800db91c403e76e103cb7c0ccbb16997c0ce480d2a2d0666c6917863a791fbd"
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
+      "sha256": "ded2c8889584e2ce2b411340c8ef47d3f9e379f7e352f56eb85ebd273ee4124c"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance plus plan-review-only normative-restatement discovery; this does not alter branch plan-contract binding, authority, capture, or propagation.",
@@ -22,8 +22,8 @@
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
     },
     "tests/test_branch_plan_fidelity.py": {
-      "scope": "Adds 5,260-line public plan-backed branch lane, manifest-only consolidation, correction, and final lifecycle coverage for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "e1339baa22440bb81655c1b89902c12dc34e895e77ac373d211a17d9cc373f9a"
+      "scope": "Adds 5,260-line public plan-backed branch lane, manifest-only consolidation, correction, and final lifecycle coverage for exact anchor rejection, same-session repair without server-authored out-of-range examples, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "d5166a1ee6b7b366cb8e5f1cd724a5283c6ec0fe99c43daff6f7b84cdb3cf85a"
     }
   },
   "claims": {

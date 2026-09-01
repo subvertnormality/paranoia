@@ -2418,9 +2418,8 @@ def _plan_anchor_retry_context(plan_lines: int) -> str:
         f"The displayed plan has exactly {plan_lines} lines. A plan citation must be "
         "`plan:<line>` or `plan:<start>-<end>`, with every integer between 1 and "
         f"{plan_lines}. If you intended a line:column coordinate, discard the column: "
-        f"line {example_line}, column 1 is `plan:{example_line}`, never "
-        f"`plan:{example_line}1`. Do not concatenate "
-        "line and column digits."
+        f"line {example_line}, column 1 is `plan:{example_line}`. Do not concatenate "
+        "line and column digits into a plan citation."
     )
 
 

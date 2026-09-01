@@ -571,7 +571,7 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     assert len(consolidation) == 1 and rendered not in consolidation[0]
     assert len(retry_prompts) == 1 and rendered in retry_prompts[0]
     assert "exactly 2 lines" in retry_prompts[0]
-    assert "line 2, column 1 is `plan:2`, never `plan:21`" in retry_prompts[0]
+    assert "line 2, column 1 is `plan:2`" in retry_prompts[0]
     assert "unresolvable plan anchor 'plan:21'" in retry_prompts[0]
     assert len(cache_bindings) == 1
     cache_kwargs, cache_result = cache_bindings[0]
@@ -675,7 +675,7 @@ def test_public_branch_consolidation_repairs_long_plan_anchor_manifest_only(
     assert len(retry_prompts) == 1
     retry = retry_prompts[0]
     assert "exactly 5260 lines" in retry
-    assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in retry
+    assert "line 4001, column 1 is `plan:4001`" in retry
     assert "unresolvable plan anchor 'plan:40011'" in retry
     assert "BRANCH CONTRACT AUTHORITY" not in retry
     assert "contract line 4001" not in retry
@@ -744,7 +744,7 @@ def test_public_branch_consolidation_repairs_long_plan_anchor_manifest_only(
     assert [role for role, _ in followup_retries] == ["correction", "final"]
     for _, retry_prompt in followup_retries:
         assert "exactly 5260 lines" in retry_prompt
-        assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in retry_prompt
+        assert "line 4001, column 1 is `plan:4001`" in retry_prompt
         assert "BRANCH CONTRACT AUTHORITY" in retry_prompt
         assert "contract line 4001" in retry_prompt
         assert "unresolvable plan anchor 'plan:40011'" in retry_prompt

@@ -2245,7 +2245,7 @@ def test_plan_anchor_retry_repairs_observed_line_column_concatenation(tmp_path):
             assert session_ref == "same-session"
             assert "exactly 5260 lines" in prompt
             assert "line 4001, column 1 is `plan:4001`" in prompt
-            assert "never `plan:40011`" in prompt
+            assert "Do not concatenate line and column digits" in prompt
             return Review(text=valid, session_ref=session_ref, raw=valid)
 
     def parser(text):
@@ -2331,7 +2331,7 @@ def test_public_plan_consolidation_repairs_observed_anchor_and_settles(
     assert "missing guard" in result
     assert len(retry_prompts) == 1
     assert "exactly 5260 lines" in retry_prompts[0]
-    assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in retry_prompts[0]
+    assert "line 4001, column 1 is `plan:4001`" in retry_prompts[0]
     assert "unresolvable plan anchor 'plan:40011'" in retry_prompts[0]
     audit = json.loads(next((tmp_path / "logs").glob(
         "PLAN-ANCHOR-critique_plan-*.json"
@@ -4518,7 +4518,7 @@ def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
     def resume(self, session_ref, prompt, *args, **kwargs):
         retry_prompts.append(prompt)
         assert "exactly 5260 lines" in prompt
-        assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in prompt
+        assert "line 4001, column 1 is `plan:4001`" in prompt
         original = calls[len(retry_prompts) - 1]
         text = wire(response_for(original, "plan:4001"))
         return Review(text=text, session_ref=session_ref, raw=text)

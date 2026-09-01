@@ -18,8 +18,8 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
-      "sha256": "a6eeca3c97192672716e46373b91afd8b74960bc181875db3edd4e12b036895e"
+      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
+      "sha256": "30ebdd5a05124461232897800bed43e1546d0aa558b4035ed444384d8042884c"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
@@ -38,8 +38,8 @@
       "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
     },
     "tests/test_review_census.py": {
-      "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions.",
-      "sha256": "cdfdea02114ea6fc45f30f9b97e13e7608cb8a49b839001dd5765dc1eb1a55c4"
+      "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions that retain malformed anchors only in validator diagnostics.",
+      "sha256": "274aae2115c0ccb5093cd0df86a117844d3eaba09241b13e7510b84b1649a903"
     }
   },
   "assertions": [

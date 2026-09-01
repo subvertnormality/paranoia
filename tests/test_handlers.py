@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -546,16 +547,27 @@ def test_plan_anchor_retry_context_repairs_observed_line_column_shape() -> None:
     context = handlers._plan_anchor_retry_context(5260)
     assert "exactly 5260 lines" in context
     assert "line 4001, column 1 is `plan:4001`" in context
-    assert "never `plan:40011`" in context
     assert "Do not concatenate line and column digits" in context
+    assert "plan:40011" not in context
 
 
 def test_plan_anchor_retry_context_uses_an_in_bounds_example() -> None:
     context = handlers._plan_anchor_retry_context(3)
     assert "exactly 3 lines" in context
     assert "line 3, column 1 is `plan:3`" in context
-    assert "never `plan:31`" in context
+    assert "plan:31" not in context
     assert "plan:4001" not in context
+
+
+@pytest.mark.parametrize("plan_lines", [1, 3, 5260])
+def test_plan_anchor_retry_context_authors_only_in_bounds_examples(plan_lines: int) -> None:
+    context = handlers._plan_anchor_retry_context(plan_lines)
+    anchors = re.findall(r"`(plan:(?:\d+)(?:-\d+)?)`", context)
+    assert anchors
+    for anchor in anchors:
+        start, separator, end = anchor.removeprefix("plan:").partition("-")
+        assert 1 <= int(start) <= plan_lines
+        assert not separator or int(start) <= int(end) <= plan_lines
 
 
 def test_plan_anchor_retry_context_rejects_a_zero_bound() -> None:
