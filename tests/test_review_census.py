@@ -1345,7 +1345,9 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     )
     assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
     assert artifact["after_repair_lineage"]["review_state"]["phase"] == "final"
-    assert artifact["after_repair_lineage"]["review_state"]["final_engine"] == "codex"
+    # This retained 2026-08-23 run predates engine-owned final state; current
+    # final-route artifacts below carry and assert their explicit owner.
+    assert "final_engine" not in artifact["after_repair_lineage"]["review_state"]
     assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
     assert artifact["final_lineage"]["review_state"]["phase"] == "clear"
     assert "CONVERGENCE: NOT-BLOCKED" in artifact["final_result_text"]

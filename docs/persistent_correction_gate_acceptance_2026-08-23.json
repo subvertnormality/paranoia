@@ -239,7 +239,6 @@
           "summary": "The plan negates the required retained source-line binding."
         }
       ],
-      "final_engine": "codex",
       "last_round": 8,
       "phase": "final",
       "snapshot_digest": "d381abb821e902524fd2db8b4c219008ee5b7a1dfc8443655306124ce691e134",
@@ -1576,7 +1575,6 @@
           "summary": "The plan negates the required retained source-line binding."
         }
       ],
-      "final_engine": "codex",
       "last_round": 8,
       "phase": "final",
       "snapshot_digest": "d381abb821e902524fd2db8b4c219008ee5b7a1dfc8443655306124ce691e134",

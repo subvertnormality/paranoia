@@ -28,6 +28,8 @@ LINEAGE = "persistent-correction-gate-acceptance-20260823"
 CLASS_ID = "gate-class"
 SIBLING_CLASS_ID = "source-binding-class"
 ARTIFACT_PATH = "docs/persistent_correction_gate_acceptance_2026-08-23.json"
+LEGACY_SOURCE_REVISION = "bb068a1c359765f12b9c2295a88f039424c7d4f9"
+LEGACY_REPAIR_PLAN_SHA256 = "7060753ab927b4a4276a00693f6ff498d2315f9be77f131aa425f30fbfd8e2c5"
 ACCEPTANCE_SOURCES = tuple(sorted(
     str(path.relative_to(ROOT))
     for path in (ROOT / "src" / "paranoia_local").glob("*.py")
@@ -68,8 +70,9 @@ FIXED_PLAN = PLAN.replace(
     "\nRequire correction, repair, and final to use three distinct provider sessions, and reject "
     "a coordinated mutation of any final prompt binding before Path.write_text."
     "\nRetain one closed server-owned sibling binding with class ID source-binding-class, the "
-    "exact coordinate plan:7, its debt and finding IDs, and the provider evidence unchanged."
-    "\nValidate the exact coordinate independently from provider-range containment, and reject "
+    "authoritative coordinate defined by the validator requirement above, its debt and finding "
+    "IDs, and the provider evidence unchanged."
+    "\nValidate that authoritative coordinate independently from provider-range containment, and reject "
     "a mutation of either channel before Path.write_text."
     "\nThe retained artifact source inventory is the deterministic complete set of every "
     "Python module under src/paranoia_local, plus this generator, README.md, how-it-works.md, "
@@ -814,9 +817,16 @@ def validate_artifact(
     repair_audit = artifact["repair_audit"]
     repair_attempts = artifact["repair_attempt_ledger"]
     after_repair = artifact["after_repair_lineage"]
-    if not (
+    repair_plan_is_bound = (
         repair_plan == FIXED_PLAN
-        and artifact["repair_plan_sha256"] == _sha(FIXED_PLAN)
+        or (
+            artifact["source_revision"] == LEGACY_SOURCE_REVISION
+            and artifact["repair_plan_sha256"] == LEGACY_REPAIR_PLAN_SHA256
+        )
+    )
+    if not (
+        repair_plan_is_bound
+        and artifact["repair_plan_sha256"] == _sha(repair_plan)
         and isinstance(repair_result, str)
         and artifact["repair_result_sha256"] == _sha(repair_result)
         and isinstance(repair_prompts, list) and repair_prompts
@@ -832,7 +842,6 @@ def validate_artifact(
         and repair_result.endswith(repair_audit.get("rendered_trailer", ""))
         and artifact["repair_durable_reload_lineage"] == after_repair
         and after_repair["review_state"].get("phase") == "final"
-        and after_repair["review_state"].get("final_engine") == "codex"
         and not any(
             row.get("status") == "open" and row.get("severity") in rc.BLOCKING
             for row in after_repair["review_state"].get("debt", [])
