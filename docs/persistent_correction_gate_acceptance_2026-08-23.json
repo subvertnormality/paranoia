@@ -61,7 +61,7 @@
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
-      "sha256": "16048ab7b566e59f4325b932899fa463b0190ff2f42e62165db2a995a9c49908"
+      "sha256": "91a3f9a86a52efa7d3129c5bba1a1a77558828a916604e77f2158a106d9008db"
     },
     "tests/test_handlers.py": {
       "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, proves every server-authored plan citation example resolves at bounds 1, 3, and 5,260, and adds public empty-plan preflight coverage.",
