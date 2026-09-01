@@ -1,6 +1,15 @@
 {
   "acceptance_kind": "plan-normative-restatement-public-handler-v1",
-  "allowed_later_source_diffs": {},
+  "allowed_later_source_diffs": {
+    "scripts/run_plan_restatement_acceptance.py": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "c69ab3644fae7eaa645fb8c0c008121c8dfc35a9cc53af1916955d1221e03424"
+    },
+    "tests/test_plan_restatement_acceptance.py": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "511c8c477c724ef6d44a4cdc383574ad2ad7440c94cae81f1a4d8a039a746326"
+    }
+  },
   "claims": {
     "does_not_prove": [
       "Every future provider response will classify every semantic restatement correctly.",
