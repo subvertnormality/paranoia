@@ -39,7 +39,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions.",
-      "sha256": "59aee5982f1ebf85a67335cf7f0854a32d50c33e4d8511f6977e79c231cb3d3a"
+      "sha256": "dde5058df9c0825ee5b30c2cde76749a7e296f7fc7ffc60ad728dcd3be5cab05"
     }
   },
   "assertions": [
@@ -1784,7 +1784,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior.",
-        "sha256": "8ba9b7c4906df30a62fd12403991a5221746049b523ea56fc2c4e9b80db50a62"
+        "sha256": "2f4e171ce3014fd1c97aee86cff8085465888ac52fede20cc97d3d88d4509283"
       }
     },
     "checks": {

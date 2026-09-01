@@ -59,7 +59,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds public aggregate-occurrence and plan-restatement prompt coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "3c8485f8e553266ff65a725899d179275f8c0bf20e68ad0453c3c4aadbb360d5"
+      "sha256": "3370b591adb700235ec5d0776f4f54980565844bc9d5080174dcc3ce0a05191c"
     }
   },
   "after_lineage": {

@@ -9,7 +9,7 @@
     "src/paranoia_local/prompts.py": {"scope": "Bound-rebut and arbitration diagnostics plus plan-review normative-restatement discovery; branch occurrence aggregation instructions are unchanged.", "sha256": "014a64f0efcab7adbafd5691b605ee26e7bb8e75c192770b8ad18552faee06a7"},
     "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and trailer guidance; branch occurrence materialization is unchanged.", "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"},
     "src/paranoia_local/server.py": {"scope": "Public bound-rebut debt identity and arbitration diagnostic schema documentation; branch occurrence handling is unchanged.", "sha256": "6805f8e6078ef710081f518978bf3a5707aed935689fc69a4e682c1843dfaa15"},
-    "tests/test_review_census.py": {"scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions.", "sha256": "59aee5982f1ebf85a67335cf7f0854a32d50c33e4d8511f6977e79c231cb3d3a"}
+    "tests/test_review_census.py": {"scope": "Phase projection, rebut settlement, plan-final prompt digest, and plan-anchor retry regressions.", "sha256": "dde5058df9c0825ee5b30c2cde76749a7e296f7fc7ffc60ad728dcd3be5cab05"}
   },
   "version": 1,
   "date": "2026-08-30",
