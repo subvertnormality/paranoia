@@ -18,8 +18,8 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, initial prompts, and accepted settlement remain unchanged.",
-      "sha256": "7fbc47f530606b94d3bec56a397c719a18f1e19aad240c275f542118da560e24"
+      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, initial prompts, and accepted settlement remain unchanged.",
+      "sha256": "117ac8d6677e07de9f828a99ef8e3e14e9f5f3aa3d084f14b5f9ab6d3c891206"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation; retained provider exchanges are unchanged.",

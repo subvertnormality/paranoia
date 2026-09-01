@@ -26,8 +26,8 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged; the retained correction-gate transition is unchanged.",
-      "sha256": "99a12d43e16c0d91a910389abb6700f194a67cbe8ee76203a0885a906ae4ac3a"
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged; the retained correction-gate transition is unchanged.",
+      "sha256": "cba276075fb28c09deb3b9d37006f21ed5cb321d10fa47493f6fa970d4ab3d3a"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -54,8 +54,8 @@
       "sha256": "16048ab7b566e59f4325b932899fa463b0190ff2f42e62165db2a995a9c49908"
     },
     "tests/test_handlers.py": {
-      "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples, including short-plan bounds.",
-      "sha256": "4b852f01f7069b00bb7320c00e3541f73a1e81f7639f5411159240407e2797a7"
+      "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, plus public empty-plan preflight coverage.",
+      "sha256": "7582a4a340d448bae4497995529806814570cb944c3e4ed6edf6c5e392e41460"
     },
     "tests/test_review_census.py": {
       "scope": "Adds public aggregate-occurrence and plan-restatement prompt coverage alongside existing preflight regressions while retaining the historical correction-gate assertions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle coverage.",

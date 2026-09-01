@@ -18,8 +18,8 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
-      "sha256": "9e67c423f37fc0c930f39e8db8755a92b8865156b9d13293e89c4729de63f018"
+      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
+      "sha256": "a6eeca3c97192672716e46373b91afd8b74960bc181875db3edd4e12b036895e"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
@@ -1779,8 +1779,8 @@
         "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
-        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
-        "sha256": "f817a92cff46d019845e9d4796e444ccc5f714f6236701fa2011062fc231eed1"
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
+        "sha256": "0661475938aee3f609e29d5de1f7f1e8202491fe4c0d78086fce0184bb228cc4"
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds public plan consolidation anchor-retry regressions.",
