@@ -18,8 +18,8 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role while keeping branch consolidation manifest-only; retained successful prompts and attempt telemetry semantics are unchanged.",
-      "sha256": "f44f73c3da88added8c868d6020973383e9affb711d39a35e3f2b6f30d31aaba"
+      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role while keeping branch consolidation manifest-only and contract-free branch retries unchanged; retained successful prompts and attempt telemetry semantics are unchanged.",
+      "sha256": "9e67c423f37fc0c930f39e8db8755a92b8865156b9d13293e89c4729de63f018"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
@@ -1780,7 +1780,7 @@
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance without changing retained successful deterministic replay behavior.",
-        "sha256": "bf3a3cd50b5febef5bf2c4f83a44e0e25413a3b8e47e95e397e669f7cfd4afe4"
+        "sha256": "f817a92cff46d019845e9d4796e444ccc5f714f6236701fa2011062fc231eed1"
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id, plan-final prompt-digest, and public plan consolidation anchor-retry regressions without changing retained deterministic replay behavior.",

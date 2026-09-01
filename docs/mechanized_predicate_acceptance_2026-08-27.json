@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim diagnostics and validation-retry-only bounded plan-anchor coordinate guidance; this does not alter staged schema validation, mechanized matching, correction routing, accepted class settlement, or durable reload.",
-      "sha256": "8802535bf41e865b854fd39f7d60e43bd17d8b33d62126433a5f33259fe06191"
+      "sha256": "91e8dca60425b0a4641f325473e84292a61537ae2f8da11e1a64e497dbb8ce95"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged schema validation, mechanized predicate evidence, matching, or replacement semantics.",

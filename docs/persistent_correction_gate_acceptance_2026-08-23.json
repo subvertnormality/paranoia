@@ -26,8 +26,8 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history rendering plus validation-retry-only bounded plan-anchor coordinate guidance; correction-gate transition and accepted settlement remain unchanged.",
-      "sha256": "4221ca77015e0ce0bc35d9678bb62a71d74dd4340c9fc421e7df4f527c89f2c3"
+      "scope": "Adds claim-history rendering plus validation-retry-only bounded plan-anchor guidance for plan-bearing roles while leaving contract-free branch retries, correction-gate transition, and accepted settlement unchanged.",
+      "sha256": "99a12d43e16c0d91a910389abb6700f194a67cbe8ee76203a0885a906ae4ac3a"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",

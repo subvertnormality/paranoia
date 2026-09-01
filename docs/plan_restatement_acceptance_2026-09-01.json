@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role; successful provider prompts and accepted settlement are unchanged.",
-      "sha256": "b3ffd37867c672d0de02edc99ae881d7a1da76b6d0bcafaf060a7c681ed71508"
+      "sha256": "7fbc47f530606b94d3bec56a397c719a18f1e19aad240c275f542118da560e24"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation; retained provider exchanges are unchanged.",
