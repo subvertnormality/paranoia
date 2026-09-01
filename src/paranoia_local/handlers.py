@@ -1168,6 +1168,13 @@ def _staged_structural_review(
         )
         if mode == cc.PLAN_MODE and plan_lines is not None:
             state["plan_line_count"] = plan_lines
+        # Normalization is an authoritative migration, not speculative settlement.
+        # Failure rollback must retain it or an execution failure can resurrect a
+        # legacy ownerless final (or another normalized predecessor) after the
+        # handler has already selected the migrated role.
+        lineage.review_state = deepcopy(state)
+        if closure.prepared_lineage is not None:
+            closure.prepared_lineage.review_state = deepcopy(state)
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")

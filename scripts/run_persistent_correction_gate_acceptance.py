@@ -493,6 +493,7 @@ def validate_artifact(
             raise ValueError("retained acceptance differs from its committed Git envelope")
     expected_keys = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
+        "legacy_unowned_final",
         "allowed_later_source_diffs",
         "provider", "fixture", "before_lineage", "after_lineage", "audit",
         "attempt_ledger", "provider_call_count", "elapsed_seconds", "result_text",
@@ -513,6 +514,11 @@ def validate_artifact(
         raise ValueError("acceptance fields are not closed and exact")
     if artifact["acceptance_kind"] != "persistent-correction-gate-public-plan-handler":
         raise ValueError("wrong acceptance kind")
+    legacy_unowned_final = artifact["legacy_unowned_final"]
+    if type(legacy_unowned_final) is not bool:
+        raise ValueError("legacy final marker must be boolean")
+    if legacy_unowned_final and artifact["source_revision"] != LEGACY_SOURCE_REVISION:
+        raise ValueError("legacy final marker is permitted only for the pinned historical run")
     surfaces = {
         "docs/how-it-works.md": (
             "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
@@ -844,6 +850,10 @@ def validate_artifact(
         and repair_result.endswith(repair_audit.get("rendered_trailer", ""))
         and artifact["repair_durable_reload_lineage"] == after_repair
         and after_repair["review_state"].get("phase") == "final"
+        and (
+            legacy_unowned_final
+            or after_repair["review_state"].get("final_engine") == "codex"
+        )
         and not any(
             row.get("status") == "open" and row.get("severity") in rc.BLOCKING
             for row in after_repair["review_state"].get("debt", [])
@@ -1169,6 +1179,7 @@ def main() -> int:
     source_paths = list(ACCEPTANCE_SOURCES)
     artifact = {
         "acceptance_kind":"persistent-correction-gate-public-plan-handler",
+        "legacy_unowned_final":False,
         "version":2, "date":"2026-08-24", "source_revision":revision,
         "source_sha256":{
             path:hashlib.sha256(_git_bytes("show", f"{revision}:{path}")).hexdigest()
