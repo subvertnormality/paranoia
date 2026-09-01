@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.metadata
 import json
 import os
 import subprocess
@@ -47,7 +46,7 @@ Update the queue configuration, worker, API documentation, and tests together. R
 TARGETED_PLAN = """# Targeted prompt correction
 
 ## Scope
-Change only src/paranoia_local/prompts.py and tests/test_prompts.py.
+Change only src/paranoia_local/prompts.py, tests/test_prompts.py, and README.md.
 
 ## Acceptance
 Run `/home/andy/tools/paranoia-local/.venv/bin/pytest -q tests/test_prompts.py`; a nonzero exit blocks delivery.
@@ -237,6 +236,7 @@ def validate_artifact(
     matches = [
         row for row in findings
         if "independently normative" in row["summary"].lower()
+        or "independently authoritative" in row["summary"].lower()
         or "sources of authority" in row["summary"].lower()
     ]
     if len(matches) != 1:
