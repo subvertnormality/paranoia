@@ -695,6 +695,80 @@ def test_public_branch_consolidation_repairs_long_plan_anchor_manifest_only(
     )
     assert settled.review_state["debt"][0]["evidence"] == [valid_anchor]
 
+    followup_retries = []
+
+    def followup_value(role, anchor):
+        if role == "correction":
+            return _wire({
+                "role":"correction", "governing_findings":[],
+                "debt_outcomes":[{
+                    "debt_id":"D1", "status":"closed", "evidence":[anchor],
+                }],
+                "class_outcomes":{}, "class_actions":{},
+            })
+        coverage = _lane("behaviour")["coverage"]
+        for row in coverage:
+            row["evidence"] = [anchor]
+        return _wire({
+            "role":"final", "governing_findings":[], "debt_outcomes":[],
+            "class_outcomes":{}, "class_actions":{}, "coverage":coverage,
+        })
+
+    def followup_run(self, prompt, *args, **kwargs):
+        role = "correction" if '"role": "correction"' in prompt else "final"
+        text = followup_value(role, invalid_anchor)
+        return Review(text=text, raw=text, session_ref=f"{role}-session")
+
+    def followup_resume(self, session_ref, prompt, *args, **kwargs):
+        role = session_ref.removesuffix("-session")
+        followup_retries.append((role, prompt))
+        text = followup_value(role, valid_anchor)
+        return Review(text=text, raw=text, session_ref=session_ref)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", followup_run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", followup_resume)
+    common = {
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"long-branch-consolidation-anchor", "stakes":"trusted local tool",
+    }
+    correction = handlers.critique_branch(
+        {**common, "round":2}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"LONG-CORRECTION",
+    )
+    assert "STRUCTURAL-PHASE: final" in correction
+    final = handlers.critique_branch(
+        {**common, "round":3}, engine=handlers.eng.CodexEngine(),
+        log_dir=tmp_path / "logs", now=lambda:"LONG-FINAL",
+    )
+    assert "CONVERGENCE: NOT-BLOCKED" in final
+    assert [role for role, _ in followup_retries] == ["correction", "final"]
+    for _, retry_prompt in followup_retries:
+        assert "exactly 5260 lines" in retry_prompt
+        assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in retry_prompt
+        assert "BRANCH CONTRACT AUTHORITY" in retry_prompt
+        assert "contract line 4001" in retry_prompt
+        assert "unresolvable plan anchor 'plan:40011'" in retry_prompt
+    for stamp, role in (
+        ("LONG-CORRECTION", "correction"), ("LONG-FINAL", "final"),
+    ):
+        followup_audit = json.loads(next((tmp_path / "logs").glob(
+            f"{stamp}-critique_branch-*.json"
+        )).read_text())
+        assert [row["role"] for row in followup_audit["attempt_ledger"]] == [
+            role, f"{role}-validation-retry",
+        ]
+        assert [row["outcome"] for row in followup_audit["attempt_ledger"]] == [
+            "validation-invalid", "completed",
+        ]
+        assert followup_audit["rejected_payloads"][0]["role"] == role
+    durable = cc.load_lineage(
+        cc.default_state_root(), "long-branch-consolidation-anchor",
+        stamp="finished", mode=cc.BRANCH_MODE,
+    )
+    assert durable.review_state["phase"] == "clear"
+    assert durable.review_state["debt"][0]["status"] == "closed"
+    assert durable.branch_contract["text"] == contract
+
 
 @pytest.mark.parametrize("action", ["mutate", "delete"])
 def test_captured_path_survives_correction_final_and_settlement_identity(
