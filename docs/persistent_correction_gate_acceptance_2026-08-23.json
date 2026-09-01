@@ -2,7 +2,7 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class occurrence, rebut settlement, arbitration, plan restatement, and Issue #91 bounded plan-anchor retry lifecycles while leaving the retained correction-gate run, control state, and source binding unchanged.",
+      "scope": "Documents class occurrence, rebut, arbitration, plan restatement, complete-package source/raw/derived-channel/return-code/stderr/wall-clock proof boundaries, and Issue #91 retry grammar; executable lifecycle coverage belongs to test allowances, while the retained correction-gate run, control state, and source binding remain unchanged.",
       "sha256": "7eb8bd7b2428d726c0b6c9fc7a1accaa668cc3a55e4a669bc1055488f1e4e325"
     },
     "docs/how-it-works.md": {
@@ -26,7 +26,7 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history rendering plus validation-retry-only bounded plan-anchor guidance for plan-bearing roles while leaving contract-free branch retries, correction-gate transition, and accepted settlement unchanged.",
+      "scope": "Plan and plan-backed branch lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, correction-gate transition, initial prompts, and accepted settlement remain unchanged.",
       "sha256": "99a12d43e16c0d91a910389abb6700f194a67cbe8ee76203a0885a906ae4ac3a"
     },
     "src/paranoia_local/plan_claims.py": {

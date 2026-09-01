@@ -6,7 +6,7 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure handling remain documented; validation-retry-only bounded plan-anchor coordinate guidance does not alter branch plan-contract binding, authority, capture, propagation, successful prompts, or accepted settlement.",
+      "scope": "Plan and plan-backed branch census lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries remain unchanged. This does not alter branch plan-contract binding, authority, capture, propagation, initial prompts, or accepted settlement.",
       "sha256": "2afee7663126892afcff9c3421734d796f935a5517cfe7f1973446be6f76107d"
     },
     "src/paranoia_local/prompts.py": {

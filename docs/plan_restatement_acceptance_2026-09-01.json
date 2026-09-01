@@ -2,11 +2,11 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents Issue #91 validation-retry-only bounded plan-anchor guidance, the manifest-only branch-consolidation boundary, and 5,260-line public plan and plan-backed branch lifecycle acceptance.",
+      "scope": "Documents acceptance replay and structural-validator rules, complete-package source identity, raw stdout, derived channels, exact return codes, stderr and wall-clock proof boundaries, plus Issue #91 retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
       "sha256": "272c90a1e9d48887fe6829c5de4a4fc2e953369ed7b927d68c0e8cb0e81d1ef9"
     },
     "README.md": {
-      "scope": "Documents Issue #91 validation-retry-only bounded plan-anchor recovery and its 5,260-line public plan and plan-backed branch lifecycle coverage; successful initial prompts remain unchanged.",
+      "scope": "Documents complete-package source, raw-stdout, derived-channel, return-code, stderr and wall-clock acceptance boundaries plus Issue #91 retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
       "sha256": "98c96982517c84272f72aea2c404280a0cf99dfb42304c7fb8fcaf1d9405bed2"
     },
     "scripts/run_plan_restatement_acceptance.py": {
@@ -18,7 +18,7 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role; successful provider prompts and accepted settlement are unchanged.",
+      "scope": "Plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, initial prompts, and accepted settlement remain unchanged.",
       "sha256": "7fbc47f530606b94d3bec56a397c719a18f1e19aad240c275f542118da560e24"
     },
     "tests/test_review_census.py": {

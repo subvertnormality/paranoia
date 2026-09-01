@@ -2,7 +2,7 @@
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim diagnostics and validation-retry-only bounded plan-anchor coordinate guidance; this does not alter staged schema validation, mechanized matching, correction routing, accepted class settlement, or durable reload.",
+      "scope": "Plan and plan-backed branch lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation is bound-only and manifest-only; contract-free branch retries remain unchanged. This does not alter staged schema validation, mechanized matching, correction routing, accepted class settlement, or durable reload.",
       "sha256": "91e8dca60425b0a4641f325473e84292a61537ae2f8da11e1a64e497dbb8ce95"
     },
     "src/paranoia_local/review_census.py": {
