@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback; this does not alter staged class persistence.",
-      "sha256": "736835da73e01e6349d12efb0409cc489050090462d8e8165b2e837396331a1e"
+        "sha256": "1936e915a0529e87c84fb0e244859583a89aeda56d17d82030af34568318f42f"
     }
   },
   "attempt_ledger": [
