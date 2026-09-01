@@ -529,3 +529,11 @@ def test_plan_anchor_retry_context_repairs_observed_line_column_shape() -> None:
     assert "line 4001, column 1 is `plan:4001`" in context
     assert "never `plan:40011`" in context
     assert "Do not concatenate line and column digits" in context
+
+
+def test_plan_anchor_retry_context_uses_an_in_bounds_example() -> None:
+    context = handlers._plan_anchor_retry_context(3)
+    assert "exactly 3 lines" in context
+    assert "line 3, column 1 is `plan:3`" in context
+    assert "never `plan:31`" in context
+    assert "plan:4001" not in context

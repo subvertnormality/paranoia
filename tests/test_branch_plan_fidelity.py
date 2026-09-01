@@ -528,7 +528,11 @@ def test_public_handler_uses_one_captured_path_object_after_load(
         if "ROLE: census lane behaviour" in prompt and invalid_behaviour:
             invalid_behaviour = False
             scripted.prompts.append(prompt)
-            return Review(text="invalid fixture", raw="invalid fixture", session_ref="retry-s")
+            invalid = _lane("behaviour")
+            for row in invalid["coverage"]:
+                row["evidence"] = ["plan:21"]
+            text = _wire(invalid)
+            return Review(text=text, raw=text, session_ref="retry-s")
         return scripted.run(prompt, *args, **kwargs)
 
     def resume(self, session_ref, prompt, *args, **kwargs):
@@ -566,6 +570,9 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     assert len(lane_prompts) == 3 and all(rendered in prompt for prompt in lane_prompts)
     assert len(consolidation) == 1 and rendered not in consolidation[0]
     assert len(retry_prompts) == 1 and rendered in retry_prompts[0]
+    assert "exactly 2 lines" in retry_prompts[0]
+    assert "line 2, column 1 is `plan:2`, never `plan:21`" in retry_prompts[0]
+    assert "unresolvable plan anchor 'plan:21'" in retry_prompts[0]
     assert len(cache_bindings) == 1
     cache_kwargs, cache_result = cache_bindings[0]
     assert all(
@@ -580,6 +587,15 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     audit = json.loads(next((tmp_path / "logs").glob(
         f"CAP-{action}-critique_branch-*.json"
     )).read_text())
+    ledger = {row["role"]:row for row in audit["attempt_ledger"]}
+    assert set(ledger) == {
+        "census-behaviour", "census-behaviour-validation-retry",
+        "census-execution", "census-integrity", "consolidation",
+    }
+    assert ledger["census-behaviour"]["outcome"] == "validation-invalid"
+    assert ledger["census-behaviour-validation-retry"]["outcome"] == "completed"
+    assert len(audit["rejected_payloads"]) == 1
+    assert audit["rejected_payloads"][0]["role"] == "census-behaviour"
     assert audit["plan_text"] == original
     assert len(audit["structural_snapshot"]) == 64
     packet = handlers.orientation.build_packet(

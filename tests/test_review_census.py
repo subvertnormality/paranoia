@@ -2266,6 +2266,90 @@ def test_plan_anchor_retry_repairs_observed_line_column_concatenation(tmp_path):
     assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
 
 
+def test_public_plan_consolidation_repairs_observed_anchor_and_settles(
+    repo, tmp_path, monkeypatch,
+):
+    valid_anchor = "plan:5"
+    invalid_anchor = "plan:51"
+    retry_prompts = []
+
+    def lane_value(lane_name):
+        findings = []
+        if lane_name == "domain":
+            findings = [{
+                "id":"F1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[valid_anchor], "remedy":"add the guard",
+            }]
+        value = payload(lane(lane_name, findings=findings))
+        if findings:
+            value["coverage"][0].update(
+                status="finding", evidence=[valid_anchor], finding_ids=["F1"],
+            )
+        return wire(value)
+
+    def decision(anchor):
+        return wire({
+            "role":"census", "governing_findings":[{
+                "id":"G1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[anchor], "remedy":"add the guard",
+                "source_ids":["domain:F1"],
+                "classification":{"kind":"one_off", "reason":"plan-local gap"},
+            }],
+            "debt_outcomes":[], "class_actions":{},
+        })
+
+    def run(self, prompt, *args, **kwargs):
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            text = lane_value(lane_name)
+            session = f"lane-{lane_name}"
+        else:
+            text = decision(invalid_anchor)
+            session = "consolidation-session"
+        return Review(text=text, session_ref=session, raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "consolidation-session"
+        retry_prompts.append(prompt)
+        text = decision(valid_anchor)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_plan({
+        "repo_path":str(repo),
+        "plan_text":"one\ntwo\nthree\nfour\nfive",
+        "lineage":"public-plan-anchor-retry", "round":1,
+        "stakes":"trusted local tool", "claim_verification":False,
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+       now=lambda:"PLAN-ANCHOR")
+
+    assert "STRUCTURAL-ERROR" not in result
+    assert "missing guard" in result
+    assert len(retry_prompts) == 1
+    assert "exactly 5 lines" in retry_prompts[0]
+    assert "line 5, column 1 is `plan:5`, never `plan:51`" in retry_prompts[0]
+    assert "unresolvable plan anchor 'plan:51'" in retry_prompts[0]
+    audit = json.loads(next((tmp_path / "logs").glob(
+        "PLAN-ANCHOR-critique_plan-*.json"
+    )).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]][-2:] == [
+        "consolidation", "consolidation-validation-retry",
+    ]
+    assert [row["outcome"] for row in audit["attempt_ledger"]][-2:] == [
+        "validation-invalid", "completed",
+    ]
+    assert audit["rejected_payloads"][0]["role"] == "consolidation"
+    persisted = cc.load_lineage(
+        cc.default_state_root(), "public-plan-anchor-retry",
+        stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert persisted.review_state["debt"][0]["evidence"] == [valid_anchor]
+
+
 def test_removed_census_outcome_field_receives_schema_retry(tmp_path):
     active = [{
         "class_id": "class-a", "invariant": "class invariant", "severity": "MAJOR",

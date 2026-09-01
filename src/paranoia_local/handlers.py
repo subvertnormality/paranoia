@@ -1634,6 +1634,12 @@ def _staged_structural_review(
                     ],
                     role="census",
                 ),
+                retry_context=(
+                    "\n\n".join(filter(None, (
+                        branch_contract_section,
+                        _plan_anchor_retry_context(plan_lines),
+                    ))) if plan_lines is not None else None
+                ),
             )
         except rc.CensusError as error:
             cacheable = _cacheable_consolidation_error(error)
@@ -2407,11 +2413,13 @@ def _branch_contract_section(contract: _BranchContract) -> str:
 
 
 def _plan_anchor_retry_context(plan_lines: int) -> str:
+    example_line = min(plan_lines, 4001)
     return (
         f"The displayed plan has exactly {plan_lines} lines. A plan citation must be "
         "`plan:<line>` or `plan:<start>-<end>`, with every integer between 1 and "
         f"{plan_lines}. If you intended a line:column coordinate, discard the column: "
-        "line 4001, column 1 is `plan:4001`, never `plan:40011`. Do not concatenate "
+        f"line {example_line}, column 1 is `plan:{example_line}`, never "
+        f"`plan:{example_line}1`. Do not concatenate "
         "line and column digits."
     )
 
