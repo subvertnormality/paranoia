@@ -35,6 +35,10 @@ def _wire(value):
                 project(child)
 
     project(value)
+    if isinstance(value, dict) and value.get("role") in {
+        "census", "correction", "final",
+    }:
+        value.setdefault("concession_challenges", {})
     return json.dumps(value)
 
 

@@ -42,6 +42,8 @@
   through the shared inert Git launcher so missing promised objects cannot lazy-fetch;
 - require claim closure, class closure, real acceptance, updated docs, and a governing computed
   `CONVERGENCE: NOT-BLOCKED` before delivery.
+- treat AGENTS.md as authoritative for durable concession challenges and derive every active-class
+  cardinality from `class_closure.MAX_ACTIVE_CLASSES`; do not restate a numeric policy limit here.
 - preserve class closure on staged plan and branch reviews: explicitly disposition every governing
   finding as one-off/new/existing, bind every new record, use the canonical class engine, and expose
   `CLASS-REGISTER` and `CLASS-CLOSURE`; structural debt alone is not feature parity.
@@ -54,7 +56,7 @@
   the one same-session validation retry: preserve outcome-free standalone lifecycle actions, non-downgrading severity, both legal
   unmechanized branch replacement forms (procedural replacement and mechanized replacement), mechanization-preserving replacement, and the distinct
   census/final/debt-bound correction/fresh-finding outcome-authority paths. A violated gated class requires
-  replacement. Keep the 100-class/schema/provider boundary, durable failure diagnostics, and atomic
+  replacement. Keep the `class_closure.MAX_ACTIVE_CLASSES`-derived schema/provider boundary, durable failure diagnostics, and atomic
   settlement unchanged; this remains all-or-nothing settlement, with no cross-round repair state.
 - derive the deterministic close for a satisfied open unmechanized class, and reuse a complete
   post-validation-rejection census only when its snapshot, full body/debt input, stakes, mode,

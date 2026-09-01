@@ -564,6 +564,16 @@ class-bound rebut against the stored current session and exact open debt. Bound 
 closed CONCEDE/HOLD disposition: HOLD is audit-only; CONCEDE closes only the named debt and closes
 the class only when no sibling blocker remains. It never grants clearance. Preserve this state
 atomically with the lineage and store the exact returned trailer in plan and branch audit records.
+Persist a validated CONCEDE as a closed optional concession on that exact debt, separately retaining
+the original finding proposition/evidence and the concession reason/evidence/snapshot/round. Every
+later staged role receives the latest concession for each non-superseded active class. A fresh
+finding, reopen, or replacement targeting such a class must explicitly challenge that adjudication
+with new resolved evidence; unrelated snapshot or stakes changes do not erase it. This is a
+challenge requirement, not an exemption: changed relevant evidence can still reopen the class.
+Build one canonical closed prior-concession projection, enforce its aggregate cap prospectively in
+the rebut transaction and again before provider work, and bind its exact bytes to prompts, cache,
+settlement, and audit. `class_closure.MAX_ACTIVE_CLASSES` is the sole numeric active-class authority;
+all schema, registration, provider, policy, and test projections derive from that symbol.
 Mechanized branch classes remain owned by the canonical predicate sweep: refuse their bound rebut
 before provider spend and require `critique_branch` to decide closure.
 The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt

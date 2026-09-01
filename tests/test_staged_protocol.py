@@ -42,6 +42,7 @@ def wire_value(value):
 
     visit(value)
     if isinstance(value, dict) and value.get("role") in {"census", "correction", "final"}:
+        value.setdefault("concession_challenges", {})
         for label in ("class_outcomes", "class_actions"):
             rows = value.get(label)
             if not isinstance(rows, list):
@@ -51,6 +52,11 @@ def wire_value(value):
                     key:child for key, child in row.items() if key != "class_id"
                 }
                 for row in rows
+            }
+        challenges = value.get("concession_challenges")
+        if isinstance(challenges, list):
+            value["concession_challenges"] = {
+                row["class_id"]:row["challenge"] for row in challenges
             }
     return value
 
@@ -119,6 +125,7 @@ def decision(role="census", **overrides):
         "governing_findings": [],
         "debt_outcomes": [],
         "class_actions": [],
+        "concession_challenges": [],
     }
     if role != "census":
         value["class_outcomes"] = []
@@ -172,6 +179,79 @@ def durable_debt(
         "first_round": 1,
         "last_round": 1,
     }
+
+
+def prior_concession(cid="class-a", debt_id="D7"):
+    return {cid:{
+        "debt_id":debt_id, "finding_id":"old-finding",
+        "summary":"historic occurrence", "remedy":"repair it",
+        "finding_evidence":["plan:1"],
+        "concession":{
+            "version":1, "reason":"the prior demand was disproved",
+            "evidence":["plan:2"], "snapshot_digest":"a" * 64, "round":2,
+        },
+    }}
+
+
+def test_conceded_class_requires_exact_keyed_challenge_only_when_retargeted():
+    active = [active_class(status=cc.CLOSED)]
+    concessions = prior_concession()
+    fresh = decision(
+        "final", coverage=coverage("G1"),
+        governing_findings=[finding(
+            "G1", classification={"kind":"existing_class", "class_id":"class-a"},
+        )],
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"violated", "evidence":["plan:1"],
+            "basis":{"kind":"new_finding", "finding_id":"G1"},
+        }],
+        class_actions=[],
+        concession_challenges=[{"class_id":"class-a", "challenge":None}],
+    )
+    with pytest.raises(sp.ProtocolError, match=(
+        r"/concession_challenges/class-a: newly targeting a conceded class"
+    )):
+        materialize(fresh, active_classes=active, prior_concessions=concessions)
+
+    fresh["concession_challenges"][0]["challenge"] = {
+        "debt_id":"D7", "reason":"new reachable evidence contradicts the concession",
+        "evidence":["plan:1"],
+    }
+    result = materialize(
+        fresh, active_classes=active, prior_concessions=concessions,
+    )
+    assert result["concession_challenges"] == [{
+        "class_id":"class-a", "challenge":{
+            "debt_id":"D7", "reason":"new reachable evidence contradicts the concession",
+            "evidence":["plan:1"],
+        },
+    }]
+    assert {row["op"] for row in result["class_records"]} == {"reopen"}
+
+    clean = decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied", "evidence":["plan:1"],
+        }],
+        concession_challenges=[deepcopy(fresh["concession_challenges"][0])],
+    )
+    with pytest.raises(sp.ProtocolError, match=r"challenge must be null"):
+        materialize(clean, active_classes=active, prior_concessions=concessions)
+
+
+def test_concession_challenge_fresh_schema_is_closed_exact_and_bounded():
+    concessions = prior_concession()
+    schema = sp.decision_schema(
+        cc.PLAN_MODE, "census", active_classes=[active_class()],
+        prior_concessions=concessions,
+    )
+    challenge = schema["properties"]["concession_challenges"]
+    assert challenge["required"] == ["class-a"]
+    assert challenge["additionalProperties"] is False
+    body = challenge["properties"]["class-a"]["anyOf"][1]
+    assert body["properties"]["debt_id"]["const"] == "D7"
+    assert body["properties"]["reason"]["maxLength"] == 4_000
+    assert body["properties"]["evidence"]["maxItems"] == 20
 
 
 def materialize(value, **kwargs):
@@ -382,7 +462,9 @@ def test_issue_78_guidance_is_bounded_utf8_and_public_docs_agree():
             "replacement_forms":all(token in lowered for token in (
                 "procedural", "mechanized replacement",
             )),
-            "scale":"100 class" in lowered or "100 active class" in lowered,
+                "scale":any(token in lowered for token in (
+                    "100 class", "100 active class", "max_active_classes",
+                )),
             "schema_unchanged":"schema" in lowered and "unchanged" in lowered,
             "single_retry":(
                 "one retry" in lowered or "single corrective retry" in lowered
@@ -560,7 +642,7 @@ def test_maximum_keyed_schema_fits_claude_single_argument_transport():
         ))
         Draft202012Validator.check_schema(schema)
         sizes[role] = len(sp.canonical_schema(schema).encode("utf-8"))
-    assert sizes == {"census":15677, "correction":22975, "final":24197}
+    assert sizes == {"census":15802, "correction":23100, "final":24322}
     assert max(sizes.values()) < 32_768
 
 
@@ -583,6 +665,7 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
             classes = probe["active_classes"]
             assert len(classes) == probe["active_class_count"]
             durable_debt = probe["durable_debt"]
+            prior_concessions = probe.get("prior_concessions", {})
             role = probe["role"]
             outcome_ids = sp.expected_outcome_class_ids(
                 role, active_classes=classes, durable_debt=durable_debt,
@@ -590,6 +673,7 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
             schema = sp.provider_schema(sp.decision_schema(
                 cc.BRANCH_MODE, role, active_classes=classes,
                 outcome_class_ids=outcome_ids,
+                prior_concessions=prior_concessions,
             ))
             schema_text = sp.canonical_schema(schema)
             assert len(schema_text.encode("utf-8")) == probe["schema_bytes"]
@@ -608,10 +692,12 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
                 decoded = sp.decode_decision(
                     text, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
                     **probe.get("materialize_kwargs", {}),
                 )
     assert {

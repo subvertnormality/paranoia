@@ -33,7 +33,7 @@ def digest(text: str) -> str:
 
 def main() -> int:
     head_id = subprocess.run(
-        ["git", "rev-parse", "codex/fix-consolidation-registers^{commit}"],
+        ["git", "rev-parse", "HEAD^{commit}"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout.strip()
     base_id = subprocess.run(
@@ -43,26 +43,39 @@ def main() -> int:
     state_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-state-"))
     log_root = Path(tempfile.mkdtemp(prefix="paranoia-keyed-handler-log-"))
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
-    before = rc.normalize_state({}, stakes=STAKES, snapshot="seed")
+    before = rc.normalize_state({}, stakes=STAKES, snapshot="a" * 64)
     before["phase"] = "correction"
+    before["last_round"] = 1
     before["debt"] = [{
+        "id":"D0", "finding_id":"conceded-acceptance-gap", "status":"closed",
+        "severity":"MAJOR", "summary":"A prior acceptance demand was withdrawn.",
+        "evidence":["repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"],
+        "remedy":"Do not repeat the withdrawn demand without new evidence.",
+        "source_ids":[], "class_ids":["acceptance-class"],
+        "first_round":1, "last_round":1,
+        "concession":{
+            "version":1, "reason":"The old pointer claim did not match the durable record.",
+            "evidence":["repository/docs/keyed_class_handler_acceptance_2026-08-19.json:1"],
+            "snapshot_digest":"a" * 64, "round":1,
+        },
+    }, {
         "id":"D1", "finding_id":"historical-acceptance-gap", "status":"open",
         "severity":"MAJOR",
         "summary":"The retained handler lifecycle predates the current keyed diagnostic contract.",
         "evidence":["repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949"],
         "remedy":"Run and retain the current production handler with exact keyed pointers.",
         "source_ids":[], "class_ids":["acceptance-class"],
-        "first_round":0, "last_round":0,
+        "first_round":1, "last_round":1,
     }]
     tracked = cc.TrackedClass(
         "acceptance-class",
         "The retained keyed handler acceptance is bound to current head " + head_id +
         " and records _class_record_pointers as exactly "
         "['/class_outcomes/acceptance-class'] without excluding that field from replay.",
-        "MAJOR", 0, cc.CLOSED, procedure="replay the complete retained handler artifact",
+        "MAJOR", 1, cc.CLOSED, procedure="replay the complete retained handler artifact",
     )
     cc.save_lineage(state_root, cc.Lineage(
-        LINEAGE, rounds=0, next_seq=1, classes={tracked.class_id:tracked},
+        LINEAGE, rounds=1, next_seq=1, classes={tracked.class_id:tracked},
         mode=cc.BRANCH_MODE, review_state=before,
     ))
     engine = engines.CodexEngine()
@@ -94,16 +107,18 @@ def main() -> int:
     engine.resume = record_resume  # type: ignore[method-assign]
     args = {
         "repo_path":str(ROOT), "base_ref":"main",
-        "head_ref":"codex/fix-consolidation-registers", "lineage":LINEAGE,
-        "round":1, "converge":True, "class_closure":True, "isolate":True,
+        "head_ref":"HEAD", "lineage":LINEAGE,
+        "round":2, "converge":True, "class_closure":True, "isolate":True,
         "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
         "stakes":STAKES,
         "project_summary":"Paranoia Local is a trusted-single-user local review MCP server.",
         "diff_intent":"Prove the keyed staged class-decision protocol through its production handler.",
         "focus":(
-            "Assess only the seeded acceptance class. The existing retained artifact predates "
-            "the named head and records a canonical array pointer, so preserve the open debt "
-            "and violated carried-debt binding with exact repository evidence."
+            "Assess only the seeded acceptance class. A prior demand was durably conceded, "
+            "but the current retained artifact now supplies distinct new evidence. Emit one "
+            "fresh existing-class finding, close D1 as superseded by that aggregate finding, "
+            "author the violated new_finding outcome, and explicitly challenge D0 with the "
+            "new repository evidence."
         ),
     }
     started = time.monotonic()
@@ -135,8 +150,19 @@ def main() -> int:
     if current_class.status != cc.OPEN:
         raise RuntimeError("derived reopen did not persist")
     current_debt = next(row for row in lineage.review_state["debt"] if row["id"] == "D1")
-    if current_debt["status"] != "open" or current_debt["class_ids"] != ["acceptance-class"]:
+    if current_debt["status"] != "closed" or current_debt["class_ids"] != ["acceptance-class"]:
         raise RuntimeError("durable debt binding changed unexpectedly")
+    successor = [
+        row for row in lineage.review_state["debt"]
+        if row["id"] not in {"D0", "D1"} and row.get("status") == "open"
+        and row.get("class_ids") == ["acceptance-class"]
+    ]
+    if len(successor) != 1:
+        raise RuntimeError("fresh aggregate debt did not replace D1 exactly")
+    if not settlement.get("concession_challenges") or (
+        settlement["concession_challenges"][0].get("challenge") or {}
+    ).get("debt_id") != "D0":
+        raise RuntimeError("durable concession challenge is absent")
     if "STRUCTURAL-PHASE: correction" not in result or "CONVERGENCE: BLOCKED" not in result:
         raise RuntimeError("rendered staged trailer is not the expected blocked correction")
     artifact_calls = []

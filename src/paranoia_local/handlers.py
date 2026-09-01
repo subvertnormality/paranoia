@@ -559,6 +559,7 @@ def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
 
 def _staged_lane_prompt(
     *, mode: str, lane: str, active_classes: list[dict[str, Any]], body: str,
+    prior_concessions_text: str,
     plan_contract: bool = False,
 ) -> str:
     instructions = (
@@ -568,7 +569,10 @@ def _staged_lane_prompt(
     lane_body = (
         f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(sp.CHECKLIST)}\n"
         "ACTIVE CLASSES: "
-        f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
+        f"{json.dumps(active_classes if lane == 'integrity' else [])}\n"
+        "PRIOR CONCESSIONS: "
+        f"{prior_concessions_text}"
+        f"\n\n{body}"
     )
     return prompts.compose(instructions, lane_body)
 
@@ -1203,8 +1207,12 @@ def _staged_structural_review(
         # A pre-staging malformed-register round is not silently normalized into an
         # empty verified register. Its only autonomous recovery is a fresh cold census
         # that sees the exact durable failure it supersedes.
+        concession_history = [
+            deepcopy(row) for row in state.get("debt", [])
+            if isinstance(row, dict) and "concession" in row
+        ]
         state = rc.normalize_state(None, stakes=stakes, snapshot=snapshot)
-        state["debt"] = [{
+        state["debt"] = [*concession_history, {
             "id":"legacy-register", "finding_id":"legacy-register",
             "status":"open", "severity":cc.BLOCKER,
             "summary":"A pre-staging review left unresolved class-register debt.",
@@ -1219,6 +1227,17 @@ def _staged_structural_review(
         )
     phase = state["phase"]
     active_classes = _active_class_rows(lineage, mode)
+    try:
+        prior_concessions = rc.prior_concessions(
+            state.get("debt", []), lineage.active(),
+        )
+        prior_concessions_text = rc.canonical_prior_concessions(
+            state.get("debt", []), lineage.active(),
+        )
+    except rc.CensusError as exc:
+        raise _staged_error(
+            str(exc), role=f"{phase}-preflight", kind="validation",
+        ) from exc
     plan_correction_units: tuple[str, ...] | None = None
     if phase == "correction":
         try:
@@ -1369,6 +1388,7 @@ def _staged_structural_review(
             value, issues = sp.decode_decision_with_issues(
                 text, mode=mode, role=role, active_classes=active_classes,
                 durable_debt=state.get("debt", []),
+                prior_concessions=prior_concessions,
             )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
@@ -1383,6 +1403,7 @@ def _staged_structural_review(
                 assessment_evidence=assessment_evidence,
                 active_classes=active_classes,
                 durable_debt=state.get("debt", []),
+                prior_concessions=prior_concessions,
             )
         except sp.ProtocolError as exc:
             issues.extend(str(exc).splitlines())
@@ -1472,6 +1493,7 @@ def _staged_structural_review(
         lane_prompts = {
             lane:_staged_lane_prompt(
                 mode=mode, lane=lane, active_classes=active_classes, body=body,
+                prior_concessions_text=prior_concessions_text,
                 plan_contract=plan_contract,
             )
             for lane in lanes
@@ -1482,6 +1504,7 @@ def _staged_structural_review(
         consolidation_context = json.dumps({
             "role": "census", "stakes": stakes,
             "active_classes": active_classes, "existing_debt": existing_debt,
+            "prior_concessions": prior_concessions,
         }, ensure_ascii=False, separators=(",", ":"))
         if len(consolidation_context) > sp.MAX_CONSOLIDATION_CONTEXT_CHARS:
             raise _staged_error(
@@ -1612,12 +1635,14 @@ def _staged_structural_review(
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
             "existing_debt": existing_debt,
+            "prior_concessions": prior_concessions,
         }, ensure_ascii=False, separators=(",", ":"))
         try:
             prompt = prompts.compose(
                 f"{prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)}\n"
                 f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
-                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes)}",
+                f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
+                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes, prior_concessions=prior_concessions)}",
                 consolidation_body,
             )
             prompt_issue = _staged_prompt_issue(
@@ -1636,6 +1661,7 @@ def _staged_structural_review(
                 web_search=web_search,
                 response_schema=sp.provider_schema(sp.decision_schema(
                     mode, "census", active_classes=active_classes,
+                    prior_concessions=prior_concessions,
                 )),
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
@@ -1691,6 +1717,7 @@ def _staged_structural_review(
         stage_task = {
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
+            "prior_concessions": prior_concessions,
             "correction_gates": correction_gates if role == "correction" else [],
             "checklist": list(sp.CHECKLIST) if role == "final" or closure_candidate else [],
             "artifact": body,
@@ -1711,10 +1738,12 @@ def _staged_structural_review(
             mode, role, active_classes=active_classes,
             outcome_class_ids=outcome_class_ids,
             correction_gates=correction_gates if role == "correction" else (),
+            prior_concessions=prior_concessions,
         )
         prompt = prompts.compose(
             f"{followup_instructions}\n"
             f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
+            f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
             f"{decision_instructions}",
             stage_body,
         )
@@ -1732,6 +1761,7 @@ def _staged_structural_review(
             response_schema=sp.provider_schema(sp.decision_schema(
                 mode, role, active_classes=active_classes,
                 outcome_class_ids=outcome_class_ids,
+                prior_concessions=prior_concessions,
             )),
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
@@ -4683,9 +4713,10 @@ def rebut(
                     draft = cc.copy_lineage(lineage)
                     draft.review_state = rc.settle_rebut_concession(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
-                        evidence=rebut_evidence,
+                        reason=parsed["reason"], evidence=rebut_evidence,
                         blocking_class_ids=[item.class_id for item in draft.blocking()],
                         engine_name=engine.name,
+                        active_classes=draft.active(),
                     )
                     still_bound = any(
                         row.get("status") == "open"

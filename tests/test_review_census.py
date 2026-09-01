@@ -555,7 +555,7 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor], "remedy":"repair it", "source_ids":[],
                 "class_ids":[class_id], "first_round":1, "last_round":1,
             })
-    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
     state.update(phase=phase, debt=debt, last_round=1)
     if phase == "final":
         state["final_engine"] = "fake"
@@ -693,20 +693,20 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "7feff6a654de54fd12a1fe76c0bf4fe7768f29cf1a88fc77d98e1beea7b2cb88",
-        "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
+            "4cadc110ae7ec5207e1603ac326f59eedc958b778df511f616d34c8ae674e054",
+        "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "4d0d3562cd2957e35cb5ff9888f0f8958d4fd3519e719bb6920cc5ab65f1913e",
-        "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
+            "f6a5100df8b6e0ed9a1920fc3ade6499a07efc9d5c8e1374e6bcee6dbe108b40",
+        "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "5a640851dddb258a2c1f651a99bbbc759811d5cbeef24cf5c9f9f05cac09c061",
-        "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
+            "21e2abc00556b3b6dc48e2c3546d8409cb9bba87c235a5b647cdf146ea19ec2e",
+        "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
         "clear",
     ),
 ])
@@ -1794,20 +1794,24 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         "procedure":after_class["procedure"],
     }]
     debt = artifact["before_state"]["debt"]
+    prior_concessions = rc.prior_concessions(debt, active)
     expected_schema = sp.provider_schema(sp.decision_schema(
         cc.BRANCH_MODE, "correction", active_classes=active,
         outcome_class_ids=sp.expected_outcome_class_ids(
             "correction", active_classes=active, durable_debt=debt,
         ),
+        prior_concessions=prior_concessions,
     ))
     assert call["schema"] == expected_schema
     decoded = sp.decode_decision(
         response, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
+        prior_concessions=prior_concessions,
     )
     settlement = sp.materialize_decision_value(
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
+        prior_concessions=prior_concessions,
     )
     assert settlement == artifact["settlement"]
 
@@ -1842,7 +1846,10 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
     )
     assert replay_lineage.classes[tracked.class_id].status == cc.OPEN
     assert artifact["after_lineage"]["classes"][0]["status"] == cc.OPEN
-    assert artifact["after_lineage"]["review_state"]["debt"][0]["status"] == "open"
+    assert any(
+        row["status"] == "open" and row.get("class_ids") == ["acceptance-class"]
+        for row in artifact["after_lineage"]["review_state"]["debt"]
+    )
     result = artifact["result_text"]
     assert hashlib.sha256(result.encode()).hexdigest() == artifact["result_sha256"]
     assert "STRUCTURAL-PHASE: correction" in result
@@ -1872,6 +1879,7 @@ def wire_value(value):
     if isinstance(value, dict) and value.get("role") in {
         "census", "correction", "final",
     }:
+        value.setdefault("concession_challenges", {})
         for label in ("class_outcomes", "class_actions"):
             rows = value.get(label)
             if not isinstance(rows, list):
@@ -1881,6 +1889,11 @@ def wire_value(value):
                     key:child for key, child in row.items() if key != "class_id"
                 }
                 for row in rows
+            }
+        challenges = value.get("concession_challenges")
+        if isinstance(challenges, list):
+            value["concession_challenges"] = {
+                row["class_id"]:row["challenge"] for row in challenges
             }
     return value
 
@@ -4660,17 +4673,26 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         "source_ids":[], "class_ids":["class-b"], "first_round":2,
         "last_round":4, "reason":"open",
     }
-    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
     state.update(phase="correction", last_round=4, debt=[target, sibling])
+    active = [cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    )]
     before = json.loads(json.dumps(state))
     settled = rc.settle_rebut_concession(
-        state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+        state, debt_id="D1", class_id="class-a", reason="the demand is disproved",
+        evidence=["plan:3"], active_classes=active,
         blocking_class_ids=["class-a", "class-b"], engine_name="codex",
     )
     assert state == before
     assert settled["phase"] == "correction"
     assert settled["debt"][0]["status"] == "closed"
-    assert settled["debt"][0]["evidence"] == ["plan:3"]
+    assert settled["debt"][0]["evidence"] == ["plan:1"]
+    assert settled["debt"][0]["concession"] == {
+        "version":1, "reason":"the demand is disproved", "evidence":["plan:3"],
+        "snapshot_digest":rc.digest("p"), "round":4,
+    }
     assert "reason" not in settled["debt"][0]
     assert settled["debt"][1] == sibling
 
@@ -4679,15 +4701,87 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         invalid[key] = ["blocked"] if key.endswith("classes") else {"blocked":True}
         with pytest.raises(rc.CensusError, match="unresolved structural state"):
             rc.settle_rebut_concession(
-                invalid, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+                invalid, debt_id="D1", class_id="class-a", reason="disproved",
+                evidence=["plan:3"], active_classes=active,
                 blocking_class_ids=["class-a", "class-b"], engine_name="codex",
             )
     with pytest.raises(rc.CensusError, match="unbound blocking classes"):
         rc.settle_rebut_concession(
-            state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+            state, debt_id="D1", class_id="class-a", reason="disproved",
+            evidence=["plan:3"], active_classes=active,
             blocking_class_ids=["class-a", "class-b", "class-c"],
             engine_name="codex",
         )
+
+
+def test_concession_history_is_closed_exact_and_survives_review_resets():
+    row = {
+        "id":"D1", "finding_id":"F1", "status":"closed", "severity":cc.MAJOR,
+        "summary":"historic demand", "evidence":["plan:1"], "remedy":"withdraw",
+        "source_ids":[], "class_ids":["class-a"], "first_round":1,
+        "last_round":4, "concession":{
+            "version":1, "reason":"the demand was disproved", "evidence":["plan:2"],
+            "snapshot_digest":"a" * 64, "round":4,
+        },
+    }
+    active = [cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    )]
+    assert rc.prior_concessions([row], active)["class-a"]["debt_id"] == "D1"
+    raw = rc.normalize_state(None, stakes="old", snapshot="b" * 64)
+    raw.update(phase="clear", debt=[row], last_round=4)
+    changed_snapshot = rc.normalize_state(raw, stakes="old", snapshot="c" * 64)
+    assert changed_snapshot["debt"] == [row]
+    changed_stakes = rc.normalize_state(raw, stakes="new", snapshot="d" * 64)
+    assert changed_stakes["debt"] == [row]
+
+    for mutate in (
+        lambda item:item["concession"].update(round=3),
+        lambda item:item["concession"].update(round=5),
+        lambda item:item.update(status="open"),
+        lambda item:item["concession"].update(snapshot_digest="A" * 64),
+        lambda item:item["concession"].update(extra=True),
+    ):
+        invalid = deepcopy(row)
+        mutate(invalid)
+        with pytest.raises(rc.CensusError):
+            rc.validate_persisted_debt([invalid])
+
+
+def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
+    active = [cc.TrackedClass(
+        f"class-{index:02d}", f"invariant {index}", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    ) for index in range(20)]
+    rows = [{
+        "id":f"D{index:02d}", "finding_id":f"F{index:02d}", "status":"closed",
+        "severity":cc.MAJOR, "summary":"historic", "evidence":["plan:1"],
+        "remedy":"withdraw", "source_ids":[], "class_ids":[item.class_id],
+        "first_round":1, "last_round":1, "concession":{
+            "version":1, "reason":"x", "evidence":["plan:1"],
+            "snapshot_digest":"a" * 64, "round":1,
+        },
+    } for index, item in enumerate(active)]
+    base = len(json.dumps(
+        rc.prior_concessions(rows, active), ensure_ascii=False,
+        sort_keys=True, separators=(",", ":"),
+    ))
+    remaining = rc.MAX_CLASS_CONTEXT_CHARS - base
+    assert 0 <= remaining <= len(rows) * (rc.MAX_CONCESSION_REASON_CHARS - 1)
+    for row in rows:
+        add = min(remaining, rc.MAX_CONCESSION_REASON_CHARS - 1)
+        row["concession"]["reason"] += "x" * add
+        remaining -= add
+    assert remaining == 0
+    assert len(rc.canonical_prior_concessions(rows, active)) == 64_000
+    target = next(
+        row for row in reversed(rows)
+        if len(row["concession"]["reason"]) < rc.MAX_CONCESSION_REASON_CHARS
+    )
+    target["concession"]["reason"] += "x"
+    with pytest.raises(rc.CensusError, match="64001 characters"):
+        rc.canonical_prior_concessions(rows, active)
 
 
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
