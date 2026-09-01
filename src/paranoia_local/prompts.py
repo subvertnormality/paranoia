@@ -517,6 +517,10 @@ including an explicit statement when a category has no applicable site. If any o
 report all independently evidenced occurrences in the class's single aggregate finding. Do not
 accept a repair merely because it resolves every previously cited site.
 
+In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
+author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
+establish that the invariant-wide search completed.
+
 If the task contains nonempty correction_gates, close or replace every named class so it is no
 longer blocking. Rotating debt, changing evidence, or retaining another blocking severity does
 not satisfy that server-owned gate.

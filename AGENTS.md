@@ -405,6 +405,9 @@ of the resulting code and tests.
   boundary. Enumerate and inspect every site/property category named there before satisfaction or
   closure, account explicitly for empty or inapplicable categories, and aggregate every surviving
   occurrence into the class's one finding. Mechanized classes retain their server-run predicate.
+  Preserve standalone lifecycle actions, but require an authored evidence-bearing satisfied
+  outcome whenever correction closes an otherwise outcome-optional unmechanized class; a bare
+  close action never proves the invariant-wide search completed.
   Retained acceptance for the plan-restatement duty must exercise both broad plan roles through
   the public handler, bind the complete executable package source, and reconstruct each exact
   provider invocation, returned result, replayable audit projection, and durable successor from

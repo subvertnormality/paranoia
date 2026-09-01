@@ -754,19 +754,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "f8a853c1393e94b40bc802f68fff79baca598dd8633a4d0a370b0d2ba90d33bd",
+            "88101c0f4fbdc3c1df36039e61bcf7cac2f284bb84efd7e4b3c9a1e739edf7a9",
         "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "42786c1aa2a0ed2bb1b632f084d2514cb16c3bc984ae80131efa3470afdfd77a",
+            "cdbd6c18bba0394cddd4810fd2b363620247f9b6b195ff6e19670f7c3fd6452d",
         "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "cc9862adc271744a51270354745b73ab0bb1ae512d5915e52218e3f668d492b4",
+            "2530d27d2529ce81cfc2af2e2e7698900f8e6affbcf946065b8422c480ac0674",
         "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
         "clear",
     ),
@@ -4910,6 +4910,121 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         assert durable.review_state["plan_line_count"] == 3
     else:
         assert "plan_line_count" not in durable.review_state
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+def test_public_correction_retries_evidence_free_standalone_close(
+    repo_with_branch, tmp_path, monkeypatch, mode,
+):
+    lineage_id = f"evidenced-standalone-close-{mode}"
+    anchors = (
+        ["plan:1", "plan:2"] if mode == cc.PLAN_MODE else
+        ["repository/app.py:1", "repository/extra.py:1"]
+    )
+    classes = {
+        "debt-class":cc.TrackedClass(
+            "debt-class", "the known blocker is repaired", cc.MAJOR, 1, cc.OPEN,
+            procedure="inspect the known blocker",
+        ),
+        "category-class":cc.TrackedClass(
+            "category-class",
+            "definitions, call sites, and acceptance properties all agree",
+            cc.MAJOR, 1, cc.OPEN,
+            procedure="inspect definitions, call sites, and acceptance properties",
+        ),
+    }
+    state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
+    state.update(phase="correction", debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":cc.MAJOR,
+        "summary":"known blocker", "evidence":[anchors[0]],
+        "remedy":"repair the known blocker", "source_ids":[],
+        "class_ids":["debt-class"], "first_round":1, "last_round":1,
+    }], last_round=1)
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=mode, rounds=1, next_seq=2,
+            classes=classes, review_state=state,
+        ),
+    )
+    calls = []
+
+    def response_value(*, evidenced):
+        outcomes = [{
+            "class_id":"debt-class", "verdict":"satisfied",
+            "evidence":[anchors[0]],
+        }]
+        if evidenced:
+            outcomes.append({
+                "class_id":"category-class", "verdict":"satisfied",
+                "evidence":anchors,
+            })
+        return {
+            "role":"correction", "governing_findings":[],
+            "debt_outcomes":[{
+                "debt_id":"D1", "status":"closed", "evidence":[anchors[0]],
+            }],
+            "class_outcomes":outcomes,
+            "class_actions":{
+                "debt-class":None,
+                "category-class":{"kind":"close"},
+            },
+        }
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        text = wire(response_value(evidenced=False))
+        return Review(text=text, session_ref="standalone-close-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "standalone-close-session"
+        calls.append(prompt)
+        assert "/class_actions/category-class" in prompt
+        assert "authored satisfied class outcome with evidence" in prompt
+        text = wire(response_value(evidenced=True))
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    args = {
+        "repo_path":str(repo_with_branch), "lineage":lineage_id, "round":2,
+        "stakes":"trusted local tool",
+    }
+    invoke = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
+    if mode == cc.PLAN_MODE:
+        args.update(plan_text="# Contract\n\nComplete categories.", claim_verification=False)
+    else:
+        args.update(base_ref="main", head_ref="feature")
+    result = invoke(
+        args, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda:"STANDALONE",
+    )
+
+    assert len(calls) == 2
+    assert "STRUCTURAL-PHASE: final" in result
+    assert "class invariant and" in calls[0]
+    assert "definitions, call sites, and acceptance properties all agree" in calls[0]
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert durable.classes["debt-class"].status == cc.CLOSED
+    assert durable.classes["category-class"].status == cc.CLOSED
+    audit = json.loads(next(
+        (tmp_path / "logs").glob("STANDALONE-critique_*-*.json")
+    ).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]] == [
+        "correction", "correction-validation-retry",
+    ]
+    assert audit["staged_settlement"]["class_assessments"] == [
+        {
+            "class_id":"debt-class", "verdict":"satisfied",
+            "evidence":[anchors[0]], "finding_id":None,
+        },
+        {
+            "class_id":"category-class", "verdict":"satisfied",
+            "evidence":anchors, "finding_id":None,
+        },
+    ]
 
 
 def test_plan_active_class_view_is_phase_correct_and_branch_view_is_unchanged():

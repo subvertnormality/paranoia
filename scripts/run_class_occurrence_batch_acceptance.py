@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -57,6 +58,9 @@ closing the class. The assessment evidence rationales must account for every nam
 including an explicit statement when a category has no applicable site. If any occurrence remains,
 report all independently evidenced occurrences in the class's single aggregate finding. Do not
 accept a repair merely because it resolves every previously cited site."""
+ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS = """In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
+author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
+establish that the invariant-wide search completed."""
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -70,6 +74,22 @@ def _sha_text(value: str) -> str:
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS + "\n\n", "")
+    prompt, count = re.subn(
+        r"class_outcomes is a closed object permitting exactly these class IDs: "
+        r"\[[^\]]*\]; required keys are exactly: (\[[^\]]*\])\. ",
+        r"class_outcomes is a closed object keyed by exactly these required class IDs: \1. ",
+        prompt,
+    )
+    if count != 1:
+        raise ValueError("current prompt omits the #98 class-outcome guidance")
+    prompt = prompt.replace(
+        "Every close requires an authored satisfied outcome with evidence. When an authoritative "
+        "outcome exists, reopen requires violated; other outcome-free standalone lifecycle "
+        "actions remain legal only as listed. ",
+        "When an authoritative outcome exists, close requires satisfied and reopen requires "
+        "violated; outcome-free standalone lifecycle actions remain legal only as listed. ",
+    )
     prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
     start = " concession_challenges is a closed object"
     finish = "Never put class_id inside an outcome or action value."

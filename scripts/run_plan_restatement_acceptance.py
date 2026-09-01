@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -222,6 +223,27 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(
+        "In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must\n"
+        "author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot\n"
+        "establish that the invariant-wide search completed.\n\n",
+        "",
+    )
+    prompt, count = re.subn(
+        r"class_outcomes is a closed object permitting exactly these class IDs: "
+        r"\[[^\]]*\]; required keys are exactly: (\[[^\]]*\])\. ",
+        r"class_outcomes is a closed object keyed by exactly these required class IDs: \1. ",
+        prompt,
+    )
+    if count != 1:
+        raise ValueError("current prompt omits the #98 class-outcome guidance")
+    prompt = prompt.replace(
+        "Every close requires an authored satisfied outcome with evidence. When an authoritative "
+        "outcome exists, reopen requires violated; other outcome-free standalone lifecycle "
+        "actions remain legal only as listed. ",
+        "When an authoritative outcome exists, close requires satisfied and reopen requires "
+        "violated; outcome-free standalone lifecycle actions remain legal only as listed. ",
+    )
     prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
     start = " concession_challenges is a closed object"
     finish = "Never put class_id inside an outcome or action value."

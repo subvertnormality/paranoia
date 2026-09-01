@@ -258,6 +258,8 @@ For each unmechanized class being assessed, the durable invariant and procedure 
 scope. The reviewer must enumerate and inspect every site/property category they name, explicitly
 account for empty or inapplicable categories, and cannot close the class merely because all anchors
 from its current debt were repaired. Mechanized classes remain bounded by the server-run predicate.
+An outcome-optional unmechanized class may still use a standalone correction `close`, but only with
+an authored `satisfied` outcome and evidence; a bare close is validation-invalid.
 A fresh aggregate finding must close the class's prior open debt after incorporating every
 still-reachable predecessor occurrence, so one class does not accumulate duplicate blockers.
 Before that transition, the correction materializer requires the finding to contain every
