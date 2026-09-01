@@ -347,10 +347,17 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
         cc.BRANCH_MODE, "correction", active_classes=[manual, mechanized],
         outcome_class_ids=["manual"],
     )
-    assert correction["properties"]["class_outcomes"]["required"] == ["manual"]
-    assert set(correction["properties"]["class_outcomes"]["properties"]) == {
+    correction_outcomes = correction["properties"]["class_outcomes"]
+    assert correction_outcomes["required"] == ["manual"]
+    assert set(correction_outcomes["properties"]) == {
         "manual", "mechanized",
     }
+    assert correction_outcomes["properties"]["manual"] == {
+        "$ref":"#/$defs/class_outcome",
+    }
+    assert correction_outcomes["properties"]["mechanized"] == {"anyOf":[
+        {"type":"null"}, {"$ref":"#/$defs/class_outcome"},
+    ]}
     classification = correction["properties"]["governing_findings"]["items"][
         "properties"
     ]["classification"]
@@ -368,6 +375,33 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
     )
     assert no_assessment["properties"]["class_id"]["enum"] == ["manual"]
     assert with_assessment["properties"]["class_id"]["enum"] == ["mechanized"]
+
+
+def test_zero_debt_correction_schema_requires_nullable_slot_for_every_active_class():
+    classes = [active_class(f"{index:08x}") for index in range(59)]
+    schema = sp.provider_schema(sp.decision_schema(
+        cc.PLAN_MODE, "correction", active_classes=classes,
+        outcome_class_ids=[],
+    ))
+    outcomes = schema["properties"]["class_outcomes"]
+    assert outcomes["required"] == list(outcomes["properties"])
+    assert len(outcomes["required"]) == 59
+    assert all(
+        body == {"anyOf":[
+            {"type":"null"}, {"$ref":"#/$defs/class_outcome"},
+        ]}
+        for body in outcomes["properties"].values()
+    )
+    Draft202012Validator.check_schema(schema)
+
+    value = wire_value(decision("correction"))
+    value["class_outcomes"] = {cls["class_id"]:None for cls in classes}
+    value["class_actions"] = {cls["class_id"]:None for cls in classes}
+    decoded = sp.decode_decision(
+        json.dumps(value), mode=cc.PLAN_MODE, role="correction",
+        active_classes=classes,
+    )
+    assert decoded["class_outcomes"] == []
 
 
 def test_class_decision_instructions_are_state_severity_and_gate_specific():
@@ -1695,6 +1729,9 @@ def test_correction_standalone_close_requires_authored_satisfied_outcome(status)
     outcomes = schema["properties"]["class_outcomes"]
     assert outcomes["required"] == []
     assert set(outcomes["properties"]) == {"class-a"}
+    assert outcomes["properties"]["class-a"] == {"anyOf":[
+        {"type":"null"}, {"$ref":"#/$defs/class_outcome"},
+    ]}
 
     bare = decision("correction", class_actions=[{
         "kind":"close", "class_id":"class-a",
