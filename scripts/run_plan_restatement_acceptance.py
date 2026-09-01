@@ -384,16 +384,23 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                         replay_root / "state",
                         cc._from_json(TARGETED_LINEAGE, row["initial_lineage"]),
                     )
-                expected_invocations = iter(row["exact_invocations"])
-                expected_channels = iter(row["exact_attempt_channels"])
+                pending = {
+                    invocation["prompt_sha256"]:(invocation, channels)
+                    for invocation, channels in zip(
+                        row["exact_invocations"], row["exact_attempt_channels"],
+                        strict=True,
+                    )
+                }
+                if len(pending) != len(row["exact_invocations"]):
+                    raise ValueError("retained route contains duplicate provider prompts")
 
                 def playback_run(self, prompt, *args, **kwargs):
-                    try:
-                        invocation = next(expected_invocations)
-                        channels = next(expected_channels)
-                    except StopIteration as exc:
-                        raise ValueError("public-handler replay admitted an extra provider call") from exc
-                    if _invocation(prompt, args, kwargs) != invocation:
+                    actual = _invocation(prompt, args, kwargs)
+                    matched = pending.pop(actual["prompt_sha256"], None)
+                    if matched is None:
+                        raise ValueError("public-handler replay admitted an unknown provider call")
+                    invocation, channels = matched
+                    if actual != invocation:
                         raise ValueError("public-handler replay invocation differs from retained input")
                     parsed = engines.CodexEngine().parse_output(channels["raw"])
                     return replace(
@@ -415,11 +422,8 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     "effort":"high", "stakes":STAKES,
                 }, engine=engines.CodexEngine(), log_dir=log_dir,
                    now=lambda: row["audit"]["timestamp"])
-                try:
-                    next(expected_invocations)
+                if pending:
                     raise ValueError("public-handler replay omitted a retained invocation")
-                except StopIteration:
-                    pass
                 replay_audit = _load_one(log_dir, "*-critique_plan-*.json")
                 replay_lineage = json.loads(
                     (cc.lineage_dir(replay_root / "state") / f"{row['lineage']}.json")
