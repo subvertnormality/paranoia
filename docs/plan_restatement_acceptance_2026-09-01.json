@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
-      "sha256": "3afde2a8c14340a19cd5bb46e906da29381829a4e5f2b87c3e7cee7ff13e091b"
+      "sha256": "7fdfa4eee3a201fba2695d1c06ca946e6b8cd59b7b07f732c2c720e4c8a23c7d"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #94 adds concession-challenge instructions outside the retained normative-restatement exchange.",
@@ -39,7 +39,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "df03188afd49d481dfe0b84d24e67d27722ebaa85272a67c5f1576d46c38bbe0"
+      "sha256": "c3806d68e432c6c546a8a33d1aeabb59a5bb12254aa08081be2c0aec99b532a9"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

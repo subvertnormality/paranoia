@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity into final settlement and bound-rebut transitions.",
-      "sha256": "04f963eaadf5a50b01b543c547282f8fe460a83ef8b31254adccd4ecb892a496"
+      "sha256": "3fbbdb3657c83757bd2de51ea05b14ac2ec22e156174a2323e43ffa3366e26ca"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
@@ -43,7 +43,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "d252b4d4b6514b1bb9a41716f869f7dde465afecc21f1c586114cff425541fed"
+      "sha256": "9df54c8f6d7f5518e903218dafdea52b9e29cabd495b10278a8688e454fd056c"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
