@@ -1,9 +1,21 @@
 {
-  "acceptance_kind": "plan-normative-restatement-public-handler-v1",
+  "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
+    "AGENTS.md": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "a174bd5d8a0dc5d6ffb3ef69ac963c86484745169aef1a58361ea4fc53837b2b"
+    },
+    "README.md": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "68313e9dbbad1ec97b3c2f33e62f2781300b248021d44a67154cdab534c954e7"
+    },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "feac7e235e56309d95a433402d486e641305fa69432e0debce3c8faf7e14df4b"
+      "sha256": "1ca9efee51cb899a76b6b73b37f8160c761fbc1cbd37bfee68598dc36d23c13d"
+    },
+    "tests/test_plan_restatement_acceptance.py": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "f05904049127477b60b326735e1a059df2adca8e7865fba8cc969f04d8438562"
     }
   },
   "claims": {
@@ -21,11 +33,10 @@
   },
   "date": "2026-09-01",
   "discovery": {
-    "audit": {
+    "audit_projection": {
       "already_raised": [],
       "attempt_ledger": [
         {
-          "duration_ms": 109239,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -54,7 +65,6 @@
           "validation_pointer": null
         },
         {
-          "duration_ms": 177137,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -83,7 +93,6 @@
           "validation_pointer": null
         },
         {
-          "duration_ms": 103816,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -112,7 +121,6 @@
           "validation_pointer": null
         },
         {
-          "duration_ms": 59697,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -928,7 +936,6 @@
         ]
       },
       "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [FATAL] The queue plan is not bound to an implementation surface in the supplied repository. [classes: 1d85ab6f] (plan:1-16, repository/README.md:1-23, repository/pyproject.toml:5-18, repository/scripts/run_plan_restatement_acceptance.py:1-2, repository/scripts/run_plan_restatement_acceptance.py:32-48, repository/tests/test_plan_restatement_acceptance.py:10-23, plan:16, repository/scripts/run_plan_restatement_acceptance.py:23-47, repository/src/paranoia_local/handlers.py:62-73, repository/src/paranoia_local/handlers.py:3623-3728, repository/README.md:109-119, repository/scripts/run_plan_restatement_acceptance.py:23-48, repository/README.md:15-23, repository/src/paranoia_local/server.py:474-486)\n- [BLOCKER] The plan gives the 64-item batch maximum three independent normative authorities. [classes: 5eb6237a] (plan:4, plan:7, plan:10, plan:3-4, plan:6-7, plan:9-10)\n- [BLOCKER] The oversized-batch rejection contract leaves atomicity, observable failure, state, and recovery undefined. [classes: 1e501eaa] (plan:7, plan:10, plan:13)\n- [BLOCKER] The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence. [classes: 358bf288] (plan:15-16, repository/pyproject.toml:30-42, plan:16, plan:7, plan:10, repository/pyproject.toml:40-43, plan:12-13, repository/README.md:415-423)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [FATAL] Resolve artifact identity before implementation: either replace the fixture with a plan naming every exact affected path, symbol, production entry point, public document, test, and command in this repository, or move the card to the queue-owning repository and bind its actual targets there.\n- [BLOCKER] Retain one sole normative definition of the limit and rewrite the worker, API, documentation, configuration, and test obligations to reference or derive from it while specifying only their layer-specific responsibilities.\n- [BLOCKER] Define one shared oversized-submission contract for worker and API boundaries: atomic whole-batch rejection or a precise partial-result rule, exact error or status, resulting queue and worker state, permitted side effects, treatment of already queued oversized work, retry eligibility, and recovery behavior.\n- [BLOCKER] Name every affected file, symbol, production entry point, public document, and test; provide exact focused and full-suite commands with assertions for 64-item success and the fully specified 65-item result through each boundary; and state that unresolved targets, no tests collected, skipped required cases, failed assertions, or nonzero exits block delivery.",
-      "timestamp": "20260901T042402",
       "tool": "critique_plan"
     },
     "durable_lineage": {
@@ -3254,11 +3261,10 @@
     }
   },
   "final_control": {
-    "audit": {
+    "audit_projection": {
       "already_raised": [],
       "attempt_ledger": [
         {
-          "duration_ms": 186820,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -3500,7 +3506,6 @@
         "source_dispositions": []
       },
       "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The retry ceiling has two independently authoritative definitions. [classes: dcc9adc5] (plan:13, plan:14)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Because the retry limit is declared unrelated to this targeted correction, remove both operative statements from this card. If the limit is actually required here, designate exactly one of plan:13 or plan:14 as the sole authority and rewrite the other as an explicit reference or derivation; repair both sites together.",
-      "timestamp": "20260901T042747",
       "tool": "critique_plan"
     },
     "durable_lineage": {
@@ -4827,32 +4832,49 @@
     }
   },
   "provider": {
-    "cli_version": "codex-cli 0.144.6",
     "effort": "high",
     "engine": "codex",
-    "model": "gpt-5.6-sol"
+    "model": "gpt-5.6-sol",
+    "web_search": false
   },
   "source_revision": "dadd1b38c16a135797bbc3a754c90ac41a8da339",
   "source_sha256": {
     "AGENTS.md": "cc03017f3fcbc091ffbfcfd58996477e51b165a91a2d51110b41b707c0971209",
     "README.md": "9ff4321bd414742980d9ce2b4fd8cdc55c0cc71657a86b3948c81eeeb11e655c",
     "scripts/run_plan_restatement_acceptance.py": "5742e02baf927017f33c46e6cae9f9aa3cd39967812d1d322dd2e52b0af3855a",
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "3fc6b20f2a44d8159076bc561ddaa601f39cdbf0db52b478baea23a60987f169",
+    "src/paranoia_local/arbitration.py": "6b9adf82707e5cb30f2bb7761eb8d333d1f8092d194ccd892a187909cdb0b0df",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
     "src/paranoia_local/class_closure.py": "ef657392205ef181956227a8b98d2c7421a8af5cf9d6dca54cc563b52bf340eb",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/engines.py": "ab61f789bb153bc2e70219b2219477f9ce62239e535e2fa351582bee90ee1089",
+    "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
     "src/paranoia_local/handlers.py": "65ba53fc4d9662925aa3175275f255c5603ed7b0b7dd158fb2ce1392f8f6c0d6",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+    "src/paranoia_local/logs.py": "9f7933fdac27fe6c5926f190d8ffccfc0b4a19535816a5459a65b03b4cb6084a",
+    "src/paranoia_local/orientation.py": "51c93c51b845f5fdea07c60dc34a372680f503a886b15db467ff8a397acd0241",
+    "src/paranoia_local/plan_claims.py": "9547e36aae26b25d9e78456dec226b078dd5db0965b17b1e830eac82b995291d",
     "src/paranoia_local/prompts.py": "d5d7f14bdb9ea9ec396a1c0bd2cefbce129ff08f7dc42f26b6c8284328ac7d01",
     "src/paranoia_local/review_census.py": "6fb5904d3b723399f9faa45a37bdfb5c7993b59040b84400e5776c2611f69122",
+    "src/paranoia_local/runner.py": "fbbe1131126ab959eb84e9df9e0e0c10b040d08ee4a44870e3b9472042079c73",
+    "src/paranoia_local/server.py": "789e1054c11b601e55ede4f71ef7b44c9010509fcfd23eb7cd82a8c06dfd3e95",
     "src/paranoia_local/staged_protocol.py": "93e2d814b0a61173996091306096bb7df3f458710f5108d407066e62fee25796",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121",
     "tests/test_plan_restatement_acceptance.py": "5faa8c8685a6804b0555e32580cdd4026224bd66c1bed2dfa161b9e4d4b9b806",
     "tests/test_prompts.py": "d22f5a059e9d6e44565afd2a80fbae454aef6955df037828ae76513fca3b994c",
     "tests/test_review_census.py": "fe4d6b18799e7263f4bbe72d24c2b263b53e509eb5816d17ff816a0a40d9ea94"
   },
   "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.",
   "targeted_control": {
-    "audit": {
+    "audit_projection": {
       "already_raised": [],
       "attempt_ledger": [
         {
-          "duration_ms": 29251,
           "engine": "codex",
           "failure_detail_excerpt": "",
           "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -4997,7 +5019,6 @@
         "source_dispositions": []
       },
       "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
-      "timestamp": "20260901T042436",
       "tool": "critique_plan"
     },
     "durable_lineage": {
@@ -6085,5 +6106,5 @@
       }
     }
   },
-  "version": 1
+  "version": 2
 }
