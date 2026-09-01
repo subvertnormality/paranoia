@@ -1788,7 +1788,7 @@
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
-          "sha256": "e75a2045ef15e3f5acb025f9f576b4074ddaba29a3368499056229146041178b"
+          "sha256": "263fe9fbf6938cc7ed93c311d9cdb1aa10e1b79f08c5d5935d0974a315c934bd"
       },
       "tests/test_plan_claims.py": {
         "scope": "Issue #94 updates an isolated staged fixture to satisfy the exact concession-challenge wire schema; deterministic replay assertions are unchanged.",
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-          "sha256": "3881dede52dfc70a890ccf91e6e3ff6e88e4805113be90d7fcc3d3de4ce33f9c"
+          "sha256": "e3f274eca87b69c83621c819dd5ed81491a520dbcd1b2f850440e606ed230b6e"
       }
     },
     "checks": {
