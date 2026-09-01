@@ -9,7 +9,7 @@
     "src/paranoia_local/prompts.py": {"scope": "Bound-rebut and arbitration diagnostics plus plan-review normative-restatement discovery; branch occurrence aggregation instructions are unchanged.", "sha256": "014a64f0efcab7adbafd5691b605ee26e7bb8e75c192770b8ad18552faee06a7"},
     "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and trailer guidance; branch occurrence materialization is unchanged.", "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"},
     "src/paranoia_local/server.py": {"scope": "Public bound-rebut debt identity and arbitration diagnostic schema documentation; branch occurrence handling is unchanged.", "sha256": "6805f8e6078ef710081f518978bf3a5707aed935689fc69a4e682c1843dfaa15"},
-    "tests/test_review_census.py": {"scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions that retain malformed anchors only in validator diagnostics.", "sha256": "274aae2115c0ccb5093cd0df86a117844d3eaba09241b13e7510b84b1649a903"}
+    "tests/test_review_census.py": {"scope": "Phase projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.", "sha256": "274aae2115c0ccb5093cd0df86a117844d3eaba09241b13e7510b84b1649a903"}
   },
   "version": 1,
   "date": "2026-08-30",

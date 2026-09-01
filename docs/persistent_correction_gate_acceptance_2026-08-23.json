@@ -58,7 +58,7 @@
       "sha256": "77f046005d916687f566805d6c78e538dfe127503766c31dfdc9fe5798ccfecf"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds public aggregate-occurrence and plan-restatement prompt coverage alongside existing preflight regressions while retaining the historical correction-gate assertions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle coverage that retains malformed anchors only in validator diagnostics.",
+      "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
       "sha256": "830000f6d6d969737996d0b697a5d5ec0f7eaded935b5452f0f5b66bf3dd321f"
     }
   },

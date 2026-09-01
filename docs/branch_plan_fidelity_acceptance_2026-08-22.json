@@ -22,7 +22,7 @@
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
     },
     "tests/test_branch_plan_fidelity.py": {
-      "scope": "Adds 5,260-line public plan-backed branch lane, manifest-only consolidation, correction, and final lifecycle coverage for exact anchor rejection, same-session repair without server-authored out-of-range examples, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "scope": "Extends the two-line captured-path public census-lane regression with invalid-anchor rejection, same-session repair without server-authored out-of-range examples, exact frozen contract and bound, snapshot/cache identity, rejected-payload telemetry, and audit retention. It also adds the 5,260-line public plan-backed branch manifest-only consolidation, correction, and final lifecycle for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
       "sha256": "d5166a1ee6b7b366cb8e5f1cd724a5283c6ec0fe99c43daff6f7b84cdb3cf85a"
     }
   },

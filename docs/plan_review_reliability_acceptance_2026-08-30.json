@@ -38,7 +38,7 @@
       "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
     },
     "tests/test_review_census.py": {
-      "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions that retain malformed anchors only in validator diagnostics.",
+      "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
       "sha256": "274aae2115c0ccb5093cd0df86a117844d3eaba09241b13e7510b84b1649a903"
     }
   },
@@ -1783,7 +1783,7 @@
         "sha256": "c9f9719466a9dfbf6506996526a39e99427fd87f81df02c7972ea59fd06b76dd"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds public plan consolidation anchor-retry regressions that retain malformed anchors only in validator diagnostics.",
+        "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
         "sha256": "2afcf900a8823c04243dab996d0b4e4ce82b40f4dbf67fcb6bf511dbad0b9acb"
       }
     },
