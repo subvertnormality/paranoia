@@ -2,8 +2,8 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, and plan normative-restatement review contract.",
-      "sha256": "66ebafc60d287938f5ff603e04ea97ef53c34177d3a9ba89ed9881ac4e5b088a"
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its public-handler acceptance boundary.",
+      "sha256": "5e7a1f8967a22e33be551ad689381c517c356ba79df0173fd0280d626f47217f"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained real-provider acceptance documentation.",
