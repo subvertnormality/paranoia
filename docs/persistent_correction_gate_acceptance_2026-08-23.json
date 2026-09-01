@@ -2,8 +2,8 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class-occurrence, rebut settlement, and arbitration failure taxonomy while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "ee27e5151362068b5259d0a176b61b1ae650182e2676c1ec3680dbdaf0597efe"
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, and the plan-only normative-restatement audit while leaving the retained correction-gate run, control state, and source binding unchanged.",
+      "sha256": "a619d9e4056e2e1b0d2f645b17cbcebfe9a952ac62baf2536fcc1755459f594a"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
@@ -30,8 +30,8 @@
       "sha256": "e18452b6891a5b1a9027977f544893809f43110d13b1de3b0665e131c796573d"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Adds shared plan-and-branch co-asserting-site and class-occurrence aggregation guidance; correction-gate lifecycle instructions remain unchanged.",
-      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
+      "scope": "Adds shared co-asserting-site guidance plus plan-only broad normative-restatement discovery; correction-gate lifecycle and targeted scope remain unchanged.",
+      "sha256": "2ace7d78eeda462e1b2eb00d9d9c6ac9b21008fc10adab962b3dbbda8138d2b8"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows.",
@@ -54,8 +54,8 @@
       "sha256": "5d025d3287ecd1d48f20c9ebeaf881eea1d17d475aa48ea81c95e520a785ecef"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds public plan-and-branch aggregate-occurrence correction and bounded-retry coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
-      "sha256": "4f47f639404ad23ebf0e0b983f74579a661318528d32ebd2ecbd7de09e00ddd8"
+      "scope": "Adds public aggregate-occurrence and plan-restatement prompt coverage alongside existing preflight regressions while retaining the historical correction-gate assertions.",
+      "sha256": "3c8485f8e553266ff65a725899d179275f8c0bf20e68ad0453c3c4aadbb360d5"
     }
   },
   "after_lineage": {
