@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, orientation, review_census as rc
+from paranoia_local import staged_protocol as sp
 
 OUTPUT = ROOT / "docs" / "plan_restatement_acceptance_2026-09-01.json"
 DISCOVERY_LINEAGE = "plan-restatement-discovery-acceptance-20260901"
@@ -236,7 +237,8 @@ def validate_artifact(
     ):
         if set(row) != {
             "lineage", "plan", "prompts", "prompt_sha256", "result_text",
-            "result_sha256", "audit", "durable_lineage",
+            "result_sha256", "audit", "durable_lineage", "validated_payloads",
+            "validated_payload_sha256", "provider_response_sha256",
         }:
             raise ValueError("route record is not closed")
         if row["lineage"] != lineage_id or row["plan"] != plan:
@@ -250,6 +252,55 @@ def validate_artifact(
             raise ValueError("provider call topology changed")
         if any(item.get("outcome") != "completed" for item in attempts):
             raise ValueError("acceptance contains a failed provider attempt")
+        if row["provider_response_sha256"] != [
+            item.get("response_sha256") for item in attempts
+        ]:
+            raise ValueError("provider response digests are not attempt-bound")
+        for prompt, attempt in zip(row["prompts"], attempts, strict=True):
+            session_ref = attempt.get("session_ref")
+            role = attempt.get("role")
+            role_marker = (
+                f"ROLE: census lane {role.removeprefix('census-')}"
+                if isinstance(role, str) and role.startswith("census-")
+                else '"role":"census"' if role == "consolidation"
+                else '"role": "correction"'
+            )
+            required_channels = (
+                "raw_sha256", "response_sha256", "failure_detail_sha256",
+                "stderr_sha256",
+            )
+            if (
+                not isinstance(session_ref, str) or not session_ref
+                or any(
+                    not isinstance(attempt.get(key), str)
+                    or len(attempt[key]) != 64
+                    for key in required_channels
+                )
+                or not attempt.get("raw_excerpt", "").startswith(
+                    '{"type":"thread.started","thread_id":' + json.dumps(session_ref)
+                )
+                or not isinstance(attempt.get("response_excerpt"), str)
+                or not attempt["response_excerpt"]
+                or role_marker not in prompt
+            ):
+                raise ValueError("attempt channel, session, role, and prompt binding failed")
+        expected_payloads = {
+            "manifests":row["audit"].get("staged_manifests") or [],
+            "settlement":row["audit"].get("staged_settlement"),
+        }
+        if row["validated_payloads"] != expected_payloads:
+            raise ValueError("exact validated responses differ from the audit projection")
+        payload_digest = _sha_text(json.dumps(
+            expected_payloads, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ))
+        if row["validated_payload_sha256"] != payload_digest:
+            raise ValueError("validated response payload digest mismatch")
+        for manifest in expected_payloads["manifests"]:
+            lane = manifest.get("lane")
+            parsed = sp.decode_canonical_lane(
+                json.dumps(manifest, ensure_ascii=False), mode=cc.PLAN_MODE, lane=lane,
+            )
+            sp.validate_lane_value(parsed, lane=lane, active_classes=[])
         if not row["result_text"].endswith(row["audit"].get("rendered_trailer", "")):
             raise ValueError("rendered trailer is not the returned durable result")
 
@@ -348,11 +399,23 @@ def main() -> int:
 
     def route(lineage_id: str, plan: str, value: tuple) -> dict:
         result, prompts, audit, lineage = value
+        validated_payloads = {
+            "manifests":audit.get("staged_manifests") or [],
+            "settlement":audit.get("staged_settlement"),
+        }
         return {
             "lineage":lineage_id, "plan":plan, "prompts":prompts,
             "prompt_sha256":[_sha_text(item) for item in prompts],
             "result_text":result, "result_sha256":_sha_text(result),
             "audit":audit, "durable_lineage":lineage,
+            "validated_payloads":validated_payloads,
+            "validated_payload_sha256":_sha_text(json.dumps(
+                validated_payloads, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            )),
+            "provider_response_sha256":[
+                item["response_sha256"] for item in audit["attempt_ledger"]
+            ],
         }
 
     artifact = {
