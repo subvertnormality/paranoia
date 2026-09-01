@@ -1502,9 +1502,9 @@ def _staged_structural_review(
                 retry_context=(
                     "\n\n".join(filter(None, (
                         branch_contract_section,
-                        _plan_anchor_retry_context(plan_lines)
-                        if plan_lines is not None else None,
-                    ))) or None
+                        _plan_anchor_retry_context(plan_lines),
+                    ))) if plan_lines is not None
+                    else sp.citation_instructions(mode, plan_contract=plan_contract)
                 ),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -1721,9 +1721,9 @@ def _staged_structural_review(
             retry_context=(
                 "\n\n".join(filter(None, (
                     branch_contract_section,
-                    _plan_anchor_retry_context(plan_lines)
-                    if plan_lines is not None else None,
-                ))) or None
+                    _plan_anchor_retry_context(plan_lines),
+                ))) if plan_lines is not None
+                else sp.citation_instructions(mode, plan_contract=plan_contract)
             ),
         )
         attempts.extend(call_attempts)
