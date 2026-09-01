@@ -18,8 +18,8 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role; retained successful prompts and attempt telemetry semantics are unchanged.",
-      "sha256": "c43ed648a108b726c3a2429bbe1450df2dee99824fe76528b998fd2b94dcf4c5"
+      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role while keeping branch consolidation manifest-only; retained successful prompts and attempt telemetry semantics are unchanged.",
+      "sha256": "f44f73c3da88added8c868d6020973383e9affb711d39a35e3f2b6f30d31aaba"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
@@ -38,8 +38,8 @@
       "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
     },
     "tests/test_review_census.py": {
-      "scope": "Phase projection, rebut settlement, plan-final prompt digest, and public plan consolidation anchor-retry lifecycle regressions.",
-      "sha256": "9aaf06047a7ad68881f71f20ad600645d3de64acc564d931cc40d11a0fcc7b8c"
+      "scope": "Phase projection, rebut settlement, plan-final prompt digest, and 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions.",
+      "sha256": "cdfdea02114ea6fc45f30f9b97e13e7608cb8a49b839001dd5765dc1eb1a55c4"
     }
   },
   "assertions": [
@@ -1780,11 +1780,11 @@
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance without changing retained successful deterministic replay behavior.",
-        "sha256": "c65c7b7edd5e578e3a26ef3e695811310f77d5b240829643e9c23ddd47fcdf27"
+        "sha256": "bf3a3cd50b5febef5bf2c4f83a44e0e25413a3b8e47e95e397e669f7cfd4afe4"
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id, plan-final prompt-digest, and public plan consolidation anchor-retry regressions without changing retained deterministic replay behavior.",
-        "sha256": "860f36a29d4a417f5285620eb84756682c4ecf526b20513dedc0397bf1710238"
+        "sha256": "646ed775dbdaa2315a86393d64d4525166772ee70cf97b48b33278f870e47062"
       }
     },
     "checks": {

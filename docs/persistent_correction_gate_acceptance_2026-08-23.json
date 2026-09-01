@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history rendering plus validation-retry-only bounded plan-anchor coordinate guidance; correction-gate transition and accepted settlement remain unchanged.",
-      "sha256": "569ffcf03326c90893899e9c9111ce253bef8b09ef1c3c01858147af28e2ebbb"
+      "sha256": "4221ca77015e0ce0bc35d9678bb62a71d74dd4340c9fc421e7df4f527c89f2c3"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -58,8 +58,8 @@
       "sha256": "4b852f01f7069b00bb7320c00e3541f73a1e81f7639f5411159240407e2797a7"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds aggregate-occurrence, plan-restatement, and public plan consolidation anchor-retry lifecycle coverage while retaining historical correction-gate assertions.",
-      "sha256": "2d9309d4c12fbfa4016b4c2586d12905a1e1e82f7314c86690c7a176342047f0"
+      "scope": "Adds aggregate-occurrence, plan-restatement, and 5,260-line public plan census, correction, and final anchor-retry lifecycle coverage while retaining historical correction-gate assertions.",
+      "sha256": "aadfb04c434537df7da4bce94677f71939bcf8959823315e3df35e7d174dccc7"
     }
   },
   "after_lineage": {

@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim diagnostics and validation-retry-only bounded plan-anchor coordinate guidance; this does not alter staged class persistence, reopen derivation, accepted settlement, rendering, or durable reload.",
-      "sha256": "4b0152b75b8ab51141a03e46731b46cd67cf9cd02e2adb02fe530b25f91fdb29"
+      "sha256": "36f163a91ba6a995bbb573c52ebb5f01974788de1eb3a5a2b0be93c837b95b98"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged class persistence, reopen derivation, or mechanized matching.",

@@ -7,7 +7,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure handling remain documented; validation-retry-only bounded plan-anchor coordinate guidance does not alter branch plan-contract binding, authority, capture, propagation, successful prompts, or accepted settlement.",
-      "sha256": "ea3e1c38cb0c630cc7f75925028b6275412694dcae8f7f445d8637488d715576"
+      "sha256": "ee201fa79a24786650c524a82c85b717a73473f5dd1ed27467be81e1d9bd7f98"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance plus plan-review-only normative-restatement discovery; this does not alter branch plan-contract binding, authority, capture, or propagation.",
@@ -22,8 +22,8 @@
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
     },
     "tests/test_branch_plan_fidelity.py": {
-      "scope": "Adds public plan-backed branch lifecycle coverage for bounded anchor retry and audit retention; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "1ff71fcdfcebdb6d6aed8537eeb3fa217cde019b9ccbcce3b63b9e4d32d97c5f"
+      "scope": "Adds 5,260-line public plan-backed branch lane and manifest-only consolidation lifecycle coverage for exact anchor rejection, same-session repair, audit retention, settlement, and durable reload; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "7977a208ad00eca50aee2a71d613d60310c25fbf954e5ac149070f1e5c33ed5b"
     }
   },
   "claims": {
