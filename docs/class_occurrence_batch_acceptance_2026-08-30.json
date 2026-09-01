@@ -1,7 +1,7 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
-    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation plus a uniquely empty, no-concession projection for replaying this pre-issue-94 provider payload without changing its retained bytes or digest.", "sha256": "479d7d71c1f4a9e64c1146834464e8ba4bd2cb90769d8920384074a4b431b08d"},
+    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation plus exact projection of the empty issue #94 concession member and issue #98's future prompt addition when replaying this historical provider payload without changing its retained bytes or digest.", "sha256": "cfb42b36f872630d391aabaf487b36751a831988b12c8b22a0d6793f4e429050"},
     "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
     "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
     "src/paranoia_local/engines.py": {"scope": "Factors existing subprocess-result finalization into a reusable production step; branch class-occurrence aggregation and the retained provider exchange are unchanged.", "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"},

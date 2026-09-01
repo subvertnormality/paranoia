@@ -49,6 +49,14 @@ FORBIDDEN_ANSWER_KEYS = (
     "independent active sites", "aggregate both exact anchors",
     "two active configuration files", "independently violates",
 )
+ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS = """For every supplied unmechanized active class that this role assesses, treat the class invariant and
+procedure as the primary search boundary, not the current finding, debt wording, known anchors, or
+claimed patch. Enumerate every distinct site or property category named by that invariant or
+procedure and inspect the complete reviewed artifact for each one before returning `satisfied` or
+closing the class. The assessment evidence rationales must account for every named category,
+including an explicit statement when a category has no applicable site. If any occurrence remains,
+report all independently evidenced occurrences in the class's single aggregate finding. Do not
+accept a repair merely because it resolves every previously cited site."""
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -61,6 +69,7 @@ def _sha_text(value: str) -> str:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
+    prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
     start = " concession_challenges is a closed object"
     finish = "Never put class_id inside an outcome or action value."
