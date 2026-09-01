@@ -6,8 +6,8 @@
       "sha256": "66ebafc60d287938f5ff603e04ea97ef53c34177d3a9ba89ed9881ac4e5b088a"
     },
     "README.md": {
-      "scope": "Public bound-rebut settlement and plan normative-restatement review documentation.",
-      "sha256": "0aecf8394e0939c646842308d7fcdda288d872e53d0b6cc7417ef71ad80801f0"
+      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained real-provider acceptance documentation.",
+      "sha256": "3a735af2558f82abda325db830534115f773e32598c0bc79091acf9f6a3258b9"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -1771,8 +1771,8 @@
         "sha256": "c059ee8a4958ede71ab0adbfac79dd0d131c6a2dc2447e73ba59f694a7a2d326"
       },
       "README.md": {
-        "scope": "Documents plan normative-restatement review without changing deterministic replay behavior.",
-        "sha256": "7b62b0ccc6ef1b8ecc3e265080dddaccbd276c2b0cc04ca12029a9c095dec479"
+        "scope": "Documents plan normative-restatement review and its retained real-provider acceptance without changing deterministic replay behavior.",
+        "sha256": "40f377eda42125ff719d8a47399acbe4cc51b2cb94039baa56598ba9d0876d12"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
