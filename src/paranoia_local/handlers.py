@@ -187,7 +187,10 @@ def _reserve_branch_contract(
             state_root, lineage_id, stamp=stamp, mode=cc.BRANCH_MODE,
             pending_owned=True,
         )
-        last_round = lineage.review_state.get("last_round")
+        last_round = (
+            lineage.review_state.get("last_round")
+            if isinstance(lineage.review_state, dict) else None
+        )
         if type(last_round) is int and round_no <= last_round:
             raise ValueError(
                 f"tracked round must be greater than durable last_round {last_round}; "
@@ -902,6 +905,7 @@ def _settle_staged_failure(
     preflight_failure = str(
         getattr(error, "stage_role", "")
     ).endswith("-preflight")
+    preserve_raw_top_level = preflight_failure and not isinstance(raw_state, dict)
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
         and isinstance(raw_state.get("phase"), str)
@@ -973,12 +977,14 @@ def _settle_staged_failure(
             ):
                 control["classes"][class_id]["last_session_ref"] = successful_session
         state["correction_control"] = control
-    closure.lineage.review_state = state
+    if not preserve_raw_top_level:
+        closure.lineage.review_state = state
     closure.staged_manifests = getattr(error, "manifests", [])
     closure.rejected_payloads = deepcopy(rejected_payloads)
     register_status, error_body = _staged_failure_surface(error)
     try:
-        cc.save_lineage(closure.state_root, closure.lineage)
+        if not preserve_raw_top_level:
+            cc.save_lineage(closure.state_root, closure.lineage)
     except cc.StateUnavailable as exc:
         closure.unavailable = str(exc)
         message = f"lineage state unavailable after staged failure: {exc}"
@@ -1167,6 +1173,20 @@ def _staged_structural_review(
     assert closure.lineage is not None
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
+    if closure.preflight_validation_error is not None:
+        raw_phase = (
+            lineage.review_state.get("phase")
+            if isinstance(lineage.review_state, dict) else None
+        )
+        role = (
+            f"{raw_phase}-preflight"
+            if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+            else "structural-preflight"
+        )
+        raise _staged_error(
+            str(closure.preflight_validation_error),
+            role=role, kind="validation",
+        )
     try:
         persisted_state = lineage.review_state
         state = rc.normalize_state(
@@ -2691,6 +2711,8 @@ def critique_plan(
         structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
         if closure.lineage:
             try:
+                if closure.preflight_validation_error is not None:
+                    raise closure.preflight_validation_error
                 normalized_structural_state = rc.normalize_state(
                     closure.lineage.review_state, stakes=stakes or "",
                     snapshot=structural_snapshot,
@@ -4849,7 +4871,7 @@ class _ClosureRound:
         # folding and stakes reopenings are provisional until staged settlement saves.
         self.prepared_lineage = cc.copy_lineage(self.lineage)
         raw_state = self.lineage.review_state
-        if raw_state:
+        if raw_state != {}:
             active = [
                 item for item in self.lineage.classes.values()
                 if item.status != cc.SUPERSEDED
@@ -4878,6 +4900,8 @@ class _ClosureRound:
     def require_forward_round(self) -> None:
         """Reject replayed/decreasing tracked labels before any provider or snapshot work."""
         if self.lineage is None:
+            return
+        if self.preflight_validation_error is not None:
             return
         last = self.lineage.review_state.get("last_round")
         if type(last) is int and self.round_no <= last:

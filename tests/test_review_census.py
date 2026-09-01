@@ -1050,6 +1050,60 @@ def test_malformed_plan_history_blocks_before_stakes_reopen(
     assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
 
 
+@pytest.mark.parametrize("mode,raw_state", [
+    (cc.PLAN_MODE, []),
+    (cc.PLAN_MODE, ""),
+    (cc.BRANCH_MODE, []),
+])
+def test_public_handler_rejects_falsy_nonmapping_state_before_class_view(
+    repo, repo_with_branch, tmp_path, monkeypatch, mode, raw_state,
+):
+    lineage_id = f"falsy-top-level-{mode}-{type(raw_state).__name__}"
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED, procedure="inspect it",
+    )
+    lineage = cc.Lineage(
+        lineage_id, mode=mode, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=raw_state,
+    )
+    cc.save_lineage(cc.default_state_root(), lineage)
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("class view must not precede raw-state validation")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.cc, "render_unmechanized", forbidden)
+    monkeypatch.setattr(handlers.cc, "sweep", forbidden)
+    engine = handlers.eng.CodexEngine()
+    if mode == cc.PLAN_MODE:
+        result = handlers.critique_plan({
+            "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
+            "round":2, "stakes":"s",
+        }, engine=engine, log_dir=tmp_path / "plan-logs", now=lambda: "TOP-PLAN")
+    else:
+        result = handlers.critique_branch({
+            "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+            "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
+            "class_closure":True,
+        }, engine=engine, log_dir=tmp_path / "branch-logs", now=lambda: "TOP-BRANCH")
+
+    assert calls == []
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    assert reloaded.review_state == raw_state
+    assert reloaded.classes["class-a"].status == cc.CLOSED
+
+
 @pytest.mark.parametrize("malformed_debt", [
     {},
     ["not-an-object"],
