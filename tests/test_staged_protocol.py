@@ -348,7 +348,9 @@ def test_keyed_decision_schema_exposes_only_role_legal_class_decisions():
         outcome_class_ids=["manual"],
     )
     assert correction["properties"]["class_outcomes"]["required"] == ["manual"]
-    assert set(correction["properties"]["class_outcomes"]["properties"]) == {"manual"}
+    assert set(correction["properties"]["class_outcomes"]["properties"]) == {
+        "manual", "mechanized",
+    }
     classification = correction["properties"]["governing_findings"]["items"][
         "properties"
     ]["classification"]
@@ -648,6 +650,13 @@ def test_maximum_keyed_schema_fits_claude_single_argument_transport():
 
 
 def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
+    spec = importlib.util.spec_from_file_location(
+        "keyed_provider_acceptance_issue_98",
+        ROOT / "scripts/run_keyed_class_provider_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
     artifact = json.loads(
         (ROOT / "docs/keyed_class_decision_provider_acceptance_2026-08-19.json").read_text()
     )
@@ -676,6 +685,9 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
                 outcome_class_ids=outcome_ids,
                 prior_concessions=prior_concessions,
             ))
+            schema = acceptance.historical_issue_98_schema(
+                schema, role=role, outcome_ids=outcome_ids,
+            )
             schema_text = sp.canonical_schema(schema)
             assert len(schema_text.encode("utf-8")) == probe["schema_bytes"]
             assert hashlib.sha256(schema_text.encode()).hexdigest() == probe[
@@ -1646,15 +1658,8 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
         assert lineage.classes[minted[0]].procedure == "inspect the replacement invariant"
 
 
-@pytest.mark.parametrize(("status", "kind", "expected"), [
-    (cc.OPEN, "close", cc.CLOSED),
-    (cc.CLOSED, "close", cc.CLOSED),
-    (cc.CLOSED, "reopen", cc.OPEN),
-])
-def test_correction_preserves_outcome_independent_standalone_lifecycle(
-    status, kind, expected,
-):
-    active = active_class(status=status)
+def test_correction_preserves_outcome_independent_standalone_reopen():
+    active = active_class(status=cc.CLOSED)
     rendered = sp.class_decision_instructions(
         cc.BRANCH_MODE, "correction", active_classes=[active],
         outcome_class_ids=[],
@@ -1663,21 +1668,53 @@ def test_correction_preserves_outcome_independent_standalone_lifecycle(
     surface = json.loads(
         rendered.split(prefix, 1)[1].split(". Outcome authority", 1)[0]
     )
-    assert kind in surface["class-a"]["lifecycle"]
+    assert "reopen" in surface["class-a"]["lifecycle"]
     parsed = materialize(
         decision("correction", class_actions=[{
-            "kind":kind, "class_id":"class-a",
+            "kind":"reopen", "class_id":"class-a",
         }]),
         active_classes=[active],
     )
     assert parsed["class_assessments"] == []
-    assert parsed["class_records"] == [{"op":kind, "class_id":"class-a"}]
+    assert parsed["class_records"] == [{"op":"reopen", "class_id":"class-a"}]
     lineage = lineage_with_active(active)
     cc.apply_register(
         lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
         round_no=2,
     )
-    assert lineage.classes["class-a"].status == expected
+    assert lineage.classes["class-a"].status == cc.OPEN
+
+
+@pytest.mark.parametrize("status", [cc.OPEN, cc.CLOSED])
+def test_correction_standalone_close_requires_authored_satisfied_outcome(status):
+    active = active_class(status=status)
+    schema = sp.decision_schema(
+        cc.BRANCH_MODE, "correction", active_classes=[active],
+        outcome_class_ids=[],
+    )
+    outcomes = schema["properties"]["class_outcomes"]
+    assert outcomes["required"] == []
+    assert set(outcomes["properties"]) == {"class-a"}
+
+    bare = decision("correction", class_actions=[{
+        "kind":"close", "class_id":"class-a",
+    }])
+    with pytest.raises(
+        sp.ProtocolError,
+        match="close requires an authored satisfied class outcome with evidence",
+    ):
+        materialize(bare, active_classes=[active])
+
+    evidenced = deepcopy(bare)
+    evidenced["class_outcomes"] = [{
+        "class_id":"class-a", "verdict":"satisfied", "evidence":["plan:1"],
+    }]
+    parsed = materialize(evidenced, active_classes=[active])
+    assert parsed["class_assessments"] == [{
+        "class_id":"class-a", "verdict":"satisfied", "evidence":["plan:1"],
+        "finding_id":None,
+    }]
+    assert parsed["class_records"] == [{"op":"close", "class_id":"class-a"}]
 
 
 def test_satisfied_open_mechanized_class_cannot_be_model_closed():
@@ -3154,25 +3191,35 @@ def test_historical_v1_v2_remaining_legal_shape_matrix_is_equivalent():
     (cc.OPEN, "close", cc.CLOSED),
     (cc.CLOSED, "reopen", cc.OPEN),
 ])
-def test_historical_v1_v2_standalone_close_reopen_are_equivalent(
+def test_v1_v2_evidenced_close_and_standalone_reopen_are_equivalent(
     status, kind, expected,
 ):
     active = active_class(status=status)
+    outcomes = ([{
+        "class_id":"class-a", "verdict":"satisfied", "evidence":["plan:1"],
+    }] if kind == "close" else [])
     parsed = materialize(
         decision("correction", class_actions=[{
             "kind":kind, "class_id":"class-a",
-        }]),
+        }], class_outcomes=outcomes),
         active_classes=[active],
     )
     legacy = {
         "role":"correction", "source_dispositions":[],
-        "assessment_dispositions":[], "findings":[], "debt":[],
+        "assessment_dispositions":([{
+            "assessment_id":"class-a", "governing_id":None,
+        }] if kind == "close" else []),
+        "findings":[], "debt":[],
         "debt_updates":[], "class_dispositions":[],
         "class_records":[{"op":kind, "class_id":"class-a"}],
-        "class_assessments":[],
+        "class_assessments":([{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1"], "finding_id":None,
+        }] if kind == "close" else []),
     }
     legacy = historical_v1_reference(
         legacy, role="correction", active=[active],
+        assessment_verdicts={"class-a":"satisfied"} if kind == "close" else {},
     )
     v2_durable = durable_projection(
         parsed, active=[active], phase="correction",

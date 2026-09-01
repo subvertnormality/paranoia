@@ -6,8 +6,8 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Adds unrelated staged plan normative-restatement guidance; arbitration cleaner, attester, and decider instructions remain unchanged.",
-      "sha256": "e4b5055270a39a2ca63711acc3e1d4b308ac06861abbbd7dec3a15ab6c78a563"
+      "scope": "Adds unrelated staged plan normative-restatement and issue #98 unmechanized class-sweep guidance; arbitration cleaner, attester, and decider instructions remain unchanged.",
+      "sha256": "903fa7c6f0447a5f788589657f2c12fbdc25c1d6b3f7a964ad4a42c0e158bd21"
     }
   },
   "audit": {

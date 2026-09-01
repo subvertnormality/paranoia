@@ -137,6 +137,11 @@ class TestStagedReviewInstructions:
             assert "one representative defect" in followup
             assert "close every supplied" in followup
             assert "narrower predecessor" in followup
+            assert "class invariant and" in followup
+            assert "procedure as the primary search boundary" in followup
+            assert "every distinct site or property category" in followup
+            assert "no applicable site" in followup
+            assert "previously cited site" in followup
             assert "Consolidate one existing class to at most one new finding" not in followup
 
     def test_phase_class_rule_remains_plan_only(self) -> None:

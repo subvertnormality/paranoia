@@ -25,6 +25,20 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
+def historical_issue_98_schema(
+    schema: dict, *, role: str, outcome_ids: list[str],
+) -> dict:
+    """Project the current schema to the exact pre-#98 provider surface."""
+    value = json.loads(json.dumps(schema))
+    if role != "correction":
+        return value
+    outcomes = value["properties"]["class_outcomes"]
+    outcomes["properties"] = {
+        class_id:outcomes["properties"][class_id] for class_id in outcome_ids
+    }
+    return value
+
+
 def active_class(index: int) -> dict:
     mechanized = index % 2 == 0
     return {
@@ -182,7 +196,10 @@ def validate_artifact(artifact: dict) -> None:
                 outcome_class_ids=outcome_ids,
                 prior_concessions=prior_concessions,
             ))
-            schema_text = sp.canonical_schema(schema)
+            historical_schema = historical_issue_98_schema(
+                schema, role=role, outcome_ids=outcome_ids,
+            )
+            schema_text = sp.canonical_schema(historical_schema)
             if (
                 probe.get("active_class_count") != len(classes)
                 or probe.get("required_outcome_count") != len(outcome_ids)

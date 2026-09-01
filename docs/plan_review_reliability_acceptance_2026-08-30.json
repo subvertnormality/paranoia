@@ -3,15 +3,15 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "891a8c6a27f383d4bf89a31128aebfcc23e5706d9b7002381cd86d18ef6e5708"
+      "sha256": "51a44240781792be41f90cddaec4e5ab3f73790396407485173fc6cf7c96c9f4"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances. Issue #95 documents that a pending final is discharged only by its owning engine.",
-      "sha256": "91cbaf823d0d757101ab394517e001e75ec46cbc781d35ab6bf836b9eb9ebfb4"
+      "sha256": "e74bf1ad6f2809df3c3150c6151a82f4f748ce65044583bc49ed441902d4c42a"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
-      "sha256": "f994c8eeec14171f08c6d5d4ea4c3617450d81e49147b4e385b50811481efe17"
+      "sha256": "3957826af9b79ea0bcdc5636bf9bb0cfecaa3f07ce0108d4893810a853493f41"
     },
     "scripts/run_plan_review_reliability_acceptance.py": {
       "scope": "Fail-closed exact later-diff validation using a writable local clone for deterministic replay.",
@@ -22,8 +22,8 @@
       "sha256": "3fbbdb3657c83757bd2de51ea05b14ac2ec22e156174a2323e43ffa3366e26ca"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
-      "sha256": "221723db5ca9f0ed4e931d25d6b323f4a5015aca014760805b8461c841b363fe"
+      "scope": "Bound-rebut structured instructions, broad plan normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; retained provider exchanges remain historical.",
+      "sha256": "0dee00ce1c390b8aacd8c4302652e2d57d847dd20d71e8102b1387b583246ce3"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge.",
@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged.",
-      "sha256": "f1cf70f7ccc6c71aad1ef13e4a1757564af0163cd286fd92ef0521e2826bb87e"
+      "sha256": "53d5aff59a4cd9855f4712df7326d3b7702423b79fe199caf6de90e24addced3"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
@@ -39,15 +39,15 @@
     },
     "tests/test_prompts.py": {
       "scope": "Arbitration advocacy and plan normative-restatement prompt regressions; retained provider exchanges remain unchanged.",
-      "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
+      "sha256": "8312586aa9c52977342d85875a5ea0e55db9b48fee6e4699321b3392376a69ae"
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "9df54c8f6d7f5518e903218dafdea52b9e29cabd495b10278a8688e454fd056c"
+      "sha256": "f2fffc70f9f0c1b01552eac19fb499eb9e647135c0f906cbe78bc16e914d27c6"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "f1b9e4c70c937435d9e9843c771ec9e1720a744955f6d86d48485e20fbf56093"
+      "sha256": "22bb885bc59a985f862c4c562f0fd1603c7ec775c8e58b4adb86489e69cbdb1a"
     }
   },
   "assertions": [
@@ -1776,15 +1776,15 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-          "sha256": "65ae6391d7d4f87079203b15a771390cf8fb8b49101b479297656f16c20c65ec"
+        "sha256": "e64d29d4054b87eefd7640ade4dba76e78d82f83daf4b915913b11e53cfb061b"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-          "sha256": "3490d00e15a78e10f27cb4b24756a918649aecca7d611a84661e875bcd400ce0"
+        "sha256": "46d8008cc343056146bf27c5b1aed52ec4fbfe8196f63d7a8b65711f1eea1572"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
-        "sha256": "d2980cfe3f012bee84207692abaed06521409e013c7cb3f7706afbf55b7c4374"
+        "sha256": "2823fcb15415d448f049f617a9e4e111d9810014f83b1ed6416206f5056bc9b0"
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-          "sha256": "e3f274eca87b69c83621c819dd5ed81491a520dbcd1b2f850440e606ed230b6e"
+        "sha256": "b6fe435d4d329f0e75ac909648e3e5d00418bad52a6831c559cf60341d3959e0"
       }
     },
     "checks": {

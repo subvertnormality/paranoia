@@ -133,16 +133,22 @@ def class_decision_instructions(
         "instead supply the exact projected debt_id plus a bounded reason and new "
         "repository/plan evidence that contradicts or invalidates the concession."
     )
+    permitted_outcome_ids = (
+        [row["class_id"] for row in active_classes]
+        if role == "correction" else list(outcome_class_ids)
+    )
     return (
-        "class_outcomes is a closed object keyed by exactly these required class IDs: "
+        "class_outcomes is a closed object permitting exactly these class IDs: "
+        f"{json.dumps(permitted_outcome_ids, ensure_ascii=False)}; required keys are exactly: "
         f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
         "class_actions is a closed object with one independent-action slot per active "
         "class. Every listed key is required; use null when no "
         "independent action is needed. The exact current decision surface is: "
         f"{json.dumps(actions, ensure_ascii=False, separators=(',', ':'))}. "
         f"Outcome authority for this role: {authority}. "
-        "When an authoritative outcome exists, close requires satisfied and reopen requires "
-        "violated; outcome-free standalone lifecycle actions remain legal only as listed. "
+        "Every close requires an authored satisfied outcome with evidence. When an authoritative "
+        "outcome exists, reopen requires violated; other outcome-free standalone lifecycle "
+        "actions remain legal only as listed. "
         "Reclassify and replace may retain or strengthen severity but never downgrade. "
         "Replacement preserves a mechanized class; use only a listed replacement form. "
         f"{gate_guidance}{concession_guidance} Never put class_id inside "
@@ -540,9 +546,20 @@ def decision_schema(
             )
         else:
             outcome_ids = list(outcome_class_ids)
+            permitted_outcome_ids = list(dict.fromkeys([
+                *outcome_ids,
+                *(
+                    cls["class_id"] for cls in (active_classes or ())
+                    if role == "correction"
+                ),
+            ]))
             definitions["class_outcome"] = _class_outcome_body()
             properties["class_outcomes"] = _object(
-                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},
+                {
+                    cid:{"$ref":"#/$defs/class_outcome"}
+                    for cid in permitted_outcome_ids
+                },
+                required=outcome_ids,
             )
     if canonical:
         properties["class_actions"] = _array(
@@ -1321,10 +1338,14 @@ def materialize_decision_value(
                 if cid in classes
             }
         )
-        if set(outcomes) != authored_classes:
+        optional_authored_classes = set(outcomes) - authored_classes
+        missing_authored_classes = authored_classes - set(outcomes)
+        unknown_authored_classes = set(outcomes) - set(classes)
+        if missing_authored_classes or unknown_authored_classes:
             issues.append(
-                f"/class_outcomes: expected exactly {sorted(authored_classes)}, "
-                f"got {sorted(outcomes)}"
+                "/class_outcomes: must include every required class and only active "
+                f"optional classes; missing={sorted(missing_authored_classes)}, "
+                f"unknown={sorted(unknown_authored_classes)}"
             )
         if role == "correction":
             finding_indexes = {
@@ -1335,6 +1356,13 @@ def materialize_decision_value(
                 classification = findings[finding_index]["classification"]
                 pointer = f"/governing_findings/{finding_index}/classification"
                 if cid not in authored_classes:
+                    if cid in optional_authored_classes:
+                        issues.append(
+                            f"{outcome_pointers.get(cid, '/class_outcomes')}: a fresh "
+                            "non-debt-bound existing-class finding derives its outcome "
+                            "from classification.assessment_evidence; omit the optional "
+                            "authored outcome"
+                        )
                     evidence = classification.get("assessment_evidence")
                     if not isinstance(evidence, list):
                         issues.append(
@@ -1397,7 +1425,9 @@ def materialize_decision_value(
                             f"{debt_id!r}; include every still-reachable predecessor "
                             "occurrence in the aggregate finding"
                         )
-        expected_model_classes = authored_classes | set(existing_findings)
+        expected_model_classes = (
+            authored_classes | set(existing_findings) | optional_authored_classes
+        )
         if set(outcomes) != expected_model_classes:
             issues.append(
                 f"/class_outcomes: expected exactly {sorted(expected_model_classes)}, "
@@ -1538,11 +1568,13 @@ def materialize_decision_value(
             issues.append(f"{action_pointer}/class_id: unknown active class")
             continue
         status = classes[cid]["status"]
-        if (
-            action["kind"] == "close" and cid in outcomes
-            and outcomes[cid]["verdict"] != "satisfied"
+        if action["kind"] == "close" and (
+            cid not in outcomes or outcomes[cid]["verdict"] != "satisfied"
         ):
-            issues.append(f"{action_pointer}: close requires satisfied outcome")
+            issues.append(
+                f"{action_pointer}: close requires an authored satisfied class outcome "
+                "with evidence"
+            )
         if action["kind"] == "reopen" and status != cc.CLOSED:
             issues.append(f"{action_pointer}: reopen requires closed class")
         if (

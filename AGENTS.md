@@ -400,6 +400,14 @@ of the resulting code and tests.
   a fixed round count. When a finding changes a rule, value, schema, lifecycle, or ordering
   contract, require its evidence and remedy to cover every material co-asserting site in the
   complete artifact, including definitions, call sites, tests, and fixtures in branch review.
+  When correction or final assesses an unmechanized active class, use its durable invariant and
+  procedure—not its current finding, debt wording, known anchors, or claimed patch—as the search
+  boundary. Enumerate and inspect every site/property category named there before satisfaction or
+  closure, account explicitly for empty or inapplicable categories, and aggregate every surviving
+  occurrence into the class's one finding. Mechanized classes retain their server-run predicate.
+  Preserve standalone lifecycle actions, but require an authored evidence-bearing satisfied
+  outcome whenever correction closes an otherwise outcome-optional unmechanized class; a bare
+  close action never proves the invariant-wide search completed.
   Retained acceptance for the plan-restatement duty must exercise both broad plan roles through
   the public handler, bind the complete executable package source, and reconstruct each exact
   provider invocation, returned result, replayable audit projection, and durable successor from

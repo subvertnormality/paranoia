@@ -508,6 +508,19 @@ fresh cold whole-artifact review over all nine checklist items and every active 
 Every anchor must resolve. The provider-supplied JSON Schema is the sole structural contract;
 return only its object, without a marker, fence, or prose.
 
+For every supplied unmechanized active class that this role assesses, treat the class invariant and
+procedure as the primary search boundary, not the current finding, debt wording, known anchors, or
+claimed patch. Enumerate every distinct site or property category named by that invariant or
+procedure and inspect the complete reviewed artifact for each one before returning `satisfied` or
+closing the class. The assessment evidence rationales must account for every named category,
+including an explicit statement when a category has no applicable site. If any occurrence remains,
+report all independently evidenced occurrences in the class's single aggregate finding. Do not
+accept a repair merely because it resolves every previously cited site.
+
+In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
+author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
+establish that the invariant-wide search completed.
+
 If the task contains nonempty correction_gates, close or replace every named class so it is no
 longer blocking. Rotating debt, changing evidence, or retaining another blocking severity does
 not satisfy that server-owned gate.

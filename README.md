@@ -310,6 +310,13 @@ co-asserting sites, so definitions, call sites, tests, fixtures, and contract se
 together. Each settlement retains one finding and outcome per class; historical debt IDs may close
 and a fresh occurrence may receive a new ID, while the server-owned correction gate still rejects
 rephrasing that leaves the class blocking.
+For an unmechanized class, correction and final use the durable class invariant and procedure as
+the search boundary rather than limiting review to the current debt or its known anchors. Every
+site or property category named there must be inspected and accounted for before the class can be
+reported satisfied; any surviving occurrences are returned together. Mechanized classes continue
+to use their server-run violation predicates.
+An otherwise standalone correction `close` must carry an authored `satisfied` class outcome and
+evidence; the server rejects a bare close through the existing bounded validation retry.
 A fresh aggregate finding closes the class's narrower prior open debt after incorporating every
 still-reachable predecessor occurrence, preventing duplicate blockers for one class.
 The correction materializer cross-checks the fresh finding against its matching violated class
