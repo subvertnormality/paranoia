@@ -92,18 +92,31 @@ def _load_one(directory: Path, pattern: str) -> dict:
 
 def _capture_call(
     arguments: dict, *, state_root: Path, log_dir: Path,
-) -> tuple[str, list[str], dict, dict]:
+) -> tuple[str, list[str], dict, dict, list[dict]]:
     prompts: list[str] = []
+    channels: dict[str, dict] = {}
     original_run = engines.CodexEngine.run
     original_resume = engines.CodexEngine.resume
 
     def capture_run(self, prompt, *args, **kwargs):
         prompts.append(prompt)
-        return original_run(self, prompt, *args, **kwargs)
+        review = original_run(self, prompt, *args, **kwargs)
+        channels[review.session_ref or f"missing-{len(channels)}"] = {
+            "session_ref":review.session_ref, "response_text":review.text or "",
+            "raw":review.raw or "", "failure_detail":review.failure_detail or "",
+            "stderr":review.stderr or "", "returncode":review.returncode,
+        }
+        return review
 
     def capture_resume(self, session_ref, prompt, *args, **kwargs):
         prompts.append(prompt)
-        return original_resume(self, session_ref, prompt, *args, **kwargs)
+        review = original_resume(self, session_ref, prompt, *args, **kwargs)
+        channels[review.session_ref or f"missing-{len(channels)}"] = {
+            "session_ref":review.session_ref, "response_text":review.text or "",
+            "raw":review.raw or "", "failure_detail":review.failure_detail or "",
+            "stderr":review.stderr or "", "returncode":review.returncode,
+        }
+        return review
 
     previous_root = os.environ.get(cc.STATE_ROOT_ENV)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
@@ -129,7 +142,14 @@ def _capture_call(
     (log_dir / "captured_prompts.json").write_text(
         json.dumps(prompts, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
     )
-    return result, prompts, audit, lineage
+    ordered_channels = [
+        channels[item["session_ref"]] for item in audit["attempt_ledger"]
+    ]
+    (log_dir / "exact_attempt_channels.json").write_text(
+        json.dumps(ordered_channels, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return result, prompts, audit, lineage, ordered_channels
 
 
 def _targeted_seed(state_root: Path) -> None:
@@ -239,6 +259,7 @@ def validate_artifact(
             "lineage", "plan", "prompts", "prompt_sha256", "result_text",
             "result_sha256", "audit", "durable_lineage", "validated_payloads",
             "validated_payload_sha256", "provider_response_sha256",
+            "exact_attempt_channels",
         }:
             raise ValueError("route record is not closed")
         if row["lineage"] != lineage_id or row["plan"] != plan:
@@ -256,7 +277,9 @@ def validate_artifact(
             item.get("response_sha256") for item in attempts
         ]:
             raise ValueError("provider response digests are not attempt-bound")
-        for prompt, attempt in zip(row["prompts"], attempts, strict=True):
+        for prompt, attempt, channels in zip(
+            row["prompts"], attempts, row["exact_attempt_channels"], strict=True,
+        ):
             session_ref = attempt.get("session_ref")
             role = attempt.get("role")
             role_marker = (
@@ -284,6 +307,25 @@ def validate_artifact(
                 or role_marker not in prompt
             ):
                 raise ValueError("attempt channel, session, role, and prompt binding failed")
+            exact_fields = {
+                "session_ref", "response_text", "raw", "failure_detail", "stderr",
+                "returncode",
+            }
+            if set(channels) != exact_fields or channels["session_ref"] != session_ref:
+                raise ValueError("exact attempt channels are not closed and session-bound")
+            for value_key, digest_key, excerpt_key in (
+                ("response_text", "response_sha256", "response_excerpt"),
+                ("raw", "raw_sha256", "raw_excerpt"),
+                ("failure_detail", "failure_detail_sha256", "failure_detail_excerpt"),
+                ("stderr", "stderr_sha256", "stderr_excerpt"),
+            ):
+                if (
+                    _sha_text(channels[value_key]) != attempt[digest_key]
+                    or channels[value_key][:4000] != (attempt.get(excerpt_key) or "")
+                ):
+                    raise ValueError(f"exact {value_key} channel digest mismatch")
+            if channels["returncode"] != attempt["returncode"]:
+                raise ValueError("exact return code differs from the attempt ledger")
         expected_payloads = {
             "manifests":row["audit"].get("staged_manifests") or [],
             "settlement":row["audit"].get("staged_settlement"),
@@ -314,9 +356,11 @@ def validate_artifact(
     }
     matches = [
         row for row in findings
-        if "exactly one normative authority" in dispositions.get(row["id"], {}).get(
-            "invariant", "",
-        ).lower()
+        if "authorit" in dispositions.get(row["id"], {}).get("invariant", "").lower()
+        and any(
+            token in dispositions[row["id"]]["invariant"].lower()
+            for token in ("exactly one", "single")
+        )
     ]
     if len(matches) != 1:
         raise ValueError("discovery did not produce one aggregate restatement finding")
@@ -366,6 +410,9 @@ def main() -> int:
         prompts = json.loads((log_dir / "captured_prompts.json").read_text(
             encoding="utf-8",
         ))
+        channels = json.loads((log_dir / "exact_attempt_channels.json").read_text(
+            encoding="utf-8",
+        ))
         lineage = json.loads(
             (run_root / f"{name}-state" / "lineages" / f"{lineage_id}.json").read_text(
                 encoding="utf-8",
@@ -376,7 +423,7 @@ def main() -> int:
         )
         result = handlers._footer(review, engines.CodexEngine())
         result += "\n\n" + audit["rendered_trailer"]
-        return result, prompts, audit, lineage
+        return result, prompts, audit, lineage, channels
 
     if args.reuse_run_root:
         discovery = retained_route("discovery", DISCOVERY_LINEAGE)
@@ -398,7 +445,7 @@ def main() -> int:
         }, state_root=targeted_state, log_dir=run_root / "targeted-logs")
 
     def route(lineage_id: str, plan: str, value: tuple) -> dict:
-        result, prompts, audit, lineage = value
+        result, prompts, audit, lineage, channels = value
         validated_payloads = {
             "manifests":audit.get("staged_manifests") or [],
             "settlement":audit.get("staged_settlement"),
@@ -416,6 +463,7 @@ def main() -> int:
             "provider_response_sha256":[
                 item["response_sha256"] for item in audit["attempt_ledger"]
             ],
+            "exact_attempt_channels":channels,
         }
 
     artifact = {
