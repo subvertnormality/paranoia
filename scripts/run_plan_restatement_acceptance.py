@@ -676,6 +676,11 @@ def validate_artifact(
             }
             if set(channels) != exact_fields:
                 raise ValueError("raw provider channel envelope is not closed")
+            if (
+                type(channels["returncode"]) is not int
+                or type(attempt.get("returncode")) is not int
+            ):
+                raise ValueError("provider return code must be an exact integer")
             parsed = engines.CodexEngine().parse_output(channels["raw"])
             derived = {
                 "session_ref":parsed.session_ref,

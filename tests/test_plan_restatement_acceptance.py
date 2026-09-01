@@ -236,3 +236,27 @@ def test_restatement_acceptance_rejects_nonzero_retained_returncode() -> None:
         ValueError, match="reconstruct audit settlement|reconstruct returned result|engine failed",
     ):
         acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+@pytest.mark.parametrize("forged_returncode", [False, 0.0])
+def test_restatement_acceptance_rejects_noninteger_retained_returncode(
+    forged_returncode: object,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/plan_restatement_acceptance_2026-09-01.json"
+    spec = importlib.util.spec_from_file_location(
+        "plan_restatement_acceptance_returncode_type_mutation",
+        root / "scripts/run_plan_restatement_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
+    artifact["final_control"]["exact_attempt_channels"][0][
+        "returncode"
+    ] = forged_returncode
+    artifact["final_control"]["audit_projection"]["attempt_ledger"][0][
+        "returncode"
+    ] = forged_returncode
+    with pytest.raises(ValueError, match="return code must be an exact integer"):
+        acceptance.validate_artifact(artifact, root, require_committed=False)
