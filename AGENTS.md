@@ -426,8 +426,7 @@ of the resulting code and tests.
   Bind a pending cold-final obligation to the engine whose settlement created it. A clean
   final from another engine may not discharge that obligation, though any fresh debt it finds
   still reopens correction. Migrate legacy unowned final state through one fresh census rather
-  than guessing an owner. Documentation-only closure after an otherwise clean code final does
-  not require another cold final.
+  than guessing an owner.
   During broad plan census and final, proactively inspect for one normative contract asserted as
   independently authoritative at multiple operative sites, even before the copies drift. Require
   one authoritative definition and references or derived projections elsewhere, while exempting

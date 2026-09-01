@@ -101,7 +101,7 @@ def main() -> int:
     seed.review_state = rc.normalize_state(
         None, stakes=STAKES, snapshot=structural_snapshot,
     )
-    seed.review_state.update(phase="final", last_round=2, debt=[])
+    seed.review_state.update(phase="final", final_engine="codex", last_round=2, debt=[])
     cc.save_lineage(state_root, seed)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
 
@@ -156,6 +156,7 @@ def main() -> int:
             "base_id": base_id, "head_id": head_id,
             "packet_sha256": _digest(packet), "structural_snapshot": structural_snapshot,
             "lineage": LINEAGE_ID, "round": 3, "class_id": CLASS_ID,
+            "final_engine": "codex",
             "class_first_round": 1, "class_before": cc.CLOSED,
             "class_after": durable.classes[CLASS_ID].status,
         },

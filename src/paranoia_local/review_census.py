@@ -101,12 +101,9 @@ def settle_rebut_concession(
         if row.get("status") == "open" and row.get("severity") in BLOCKING
     ]
     if blocking:
-        out["phase"] = "correction"
-        out.pop("final_engine", None)
+        set_phase(out, "correction")
     else:
-        _validate_engine_name(engine_name, "/final_engine")
-        out["phase"] = "final"
-        out["final_engine"] = engine_name
+        set_phase(out, "final", final_engine=engine_name)
     return out
 
 
@@ -237,11 +234,10 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     if out["phase"] == "final" and not _engine_name_valid(out.get("final_engine")):
         # Pre-owner state cannot establish which reviewer earned the pending final.
         # Re-enter broad review once rather than let any later engine clear it.
-        out["phase"] = "census"
-        out.pop("final_engine", None)
+        set_phase(out, "census")
     if out["phase"] == "clear" and out.get("snapshot_digest") != snapshot:
-        out.update(phase="census", snapshot_digest=snapshot, debt=[])
-        out.pop("final_engine", None)
+        set_phase(out, "census")
+        out.update(snapshot_digest=snapshot, debt=[])
     return out
 
 
@@ -252,6 +248,20 @@ def _engine_name_valid(value: Any) -> bool:
 def _validate_engine_name(value: Any, pointer: str) -> None:
     if not _engine_name_valid(value):
         raise CensusError(f"{pointer}: invalid persisted engine name")
+
+
+def set_phase(
+    state: dict[str, Any], phase: str, *, final_engine: str | None = None,
+) -> None:
+    """Apply the complete durable phase/owner invariant in one transition."""
+    if phase not in PHASES:
+        raise CensusError(f"invalid review phase {phase!r}")
+    state["phase"] = phase
+    if phase == "final":
+        _validate_engine_name(final_engine, "/final_engine")
+        state["final_engine"] = final_engine
+    else:
+        state.pop("final_engine", None)
 
 
 def _persisted_text(value: Any, pointer: str, *, optional: bool = False) -> None:
@@ -797,13 +807,9 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
     else:
         next_phase = "clear"
     out = dict(state)
-    out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
-    if next_phase == "final":
-        out["final_engine"] = (
-            state["final_engine"] if phase == "final" else engine_name
-        )
-    else:
-        out.pop("final_engine", None)
+    owner = state.get("final_engine") if phase == "final" else engine_name
+    set_phase(out, next_phase, final_engine=owner if next_phase == "final" else None)
+    out.update(snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
     out.pop("validation_debt", None)
     out.pop("staged_failure", None)

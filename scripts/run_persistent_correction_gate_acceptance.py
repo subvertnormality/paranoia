@@ -217,11 +217,11 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
         for debt in state.get("debt", [])
     )
     if unbound:
-        state["phase"] = "correction" if blocking_debt else "census"
+        rc.set_phase(state, "correction" if blocking_debt else "census")
         state["unbound_class_ids"] = unbound
         state.pop("unbound_classes", None)
     elif lineage.blocking():
-        state["phase"] = "correction"
+        rc.set_phase(state, "correction")
     replacement_successors = [
         minted_by_record[index]
         for index, row in enumerate(settlement["class_records"])
@@ -826,6 +826,7 @@ def validate_artifact(
         and repair_result.endswith(repair_audit.get("rendered_trailer", ""))
         and artifact["repair_durable_reload_lineage"] == after_repair
         and after_repair["review_state"].get("phase") == "final"
+        and after_repair["review_state"].get("final_engine") == "codex"
         and not any(
             row.get("status") == "open" and row.get("severity") in rc.BLOCKING
             for row in after_repair["review_state"].get("debt", [])

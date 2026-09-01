@@ -2,7 +2,7 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates and the documentation-only cold-final rule.",
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
       "sha256": "e29ddb56cf431af68371efeddaf09d621242b9fa2af6678c101c6f642203b441"
     },
     "CLAUDE.md": {
@@ -239,6 +239,7 @@
           "summary": "The plan negates the required retained source-line binding."
         }
       ],
+      "final_engine": "codex",
       "last_round": 8,
       "phase": "final",
       "snapshot_digest": "d381abb821e902524fd2db8b4c219008ee5b7a1dfc8443655306124ce691e134",
@@ -1575,6 +1576,7 @@
           "summary": "The plan negates the required retained source-line binding."
         }
       ],
+      "final_engine": "codex",
       "last_round": 8,
       "phase": "final",
       "snapshot_digest": "d381abb821e902524fd2db8b4c219008ee5b7a1dfc8443655306124ce691e134",

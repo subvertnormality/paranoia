@@ -1237,7 +1237,7 @@ def _staged_structural_review(
         # spending a correction/final call cannot add a structural judgement.  Migrate
         # only the mechanically unambiguous predecessor shape and keep claim debt as the
         # independent combined-verdict blocker.
-        state["phase"] = "clear"
+        rc.set_phase(state, "clear")
         lineage.review_state = state
         lineage.debt = None
         lineage.rounds += 1
@@ -1281,11 +1281,13 @@ def _staged_structural_review(
     ) and has_blocking_debt:
         # State written by the earlier over-broad gate already has actionable debt;
         # resume targeted correction rather than paying for a redundant census.
-        state["phase"] = phase = "correction"
+        rc.set_phase(state, "correction")
+        phase = "correction"
     if phase != "census" and unbound_blocking and not has_blocking_debt:
         # A reopened or migrated class without governing staged debt needs the broad
         # integrity lane, not an empty targeted correction that can never settle it.
-        state["phase"] = phase = "census"
+        rc.set_phase(state, "census")
+        phase = "census"
     correction_gates = (
         rc.correction_gates(
             lineage.active(), correction_control, round_no=round_no,
@@ -1771,11 +1773,11 @@ def _staged_structural_review(
         for d in state.get("debt", [])
     )
     if unbound:
-        state["phase"] = "correction" if has_blocking_debt else "census"
+        rc.set_phase(state, "correction" if has_blocking_debt else "census")
         state["unbound_class_ids"] = [c.class_id for c in unbound]
         state.pop("unbound_classes", None)
     elif lineage.blocking():
-        state["phase"] = "correction"
+        rc.set_phase(state, "correction")
     explicit_reopened = tuple(
         row["class_id"] for row in settlement["class_records"]
         if row.get("op") == "reopen" and isinstance(row.get("class_id"), str)

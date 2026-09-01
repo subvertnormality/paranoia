@@ -370,6 +370,25 @@ def test_persisted_final_owner_is_required_only_in_final_phase():
         rc.validate_persisted_state(misplaced, [])
 
 
+def test_set_phase_owns_final_and_clears_owner_for_every_other_phase():
+    state = _closed_persisted_state()
+
+    rc.set_phase(state, "final", final_engine="codex")
+    assert state["phase"] == "final"
+    assert state["final_engine"] == "codex"
+
+    for phase in ("census", "correction", "clear"):
+        rc.set_phase(state, phase)
+        assert state["phase"] == phase
+        assert "final_engine" not in state
+        rc.set_phase(state, "final", final_engine="codex")
+
+    with pytest.raises(rc.CensusError, match="final_engine"):
+        rc.set_phase(state, "final")
+    with pytest.raises(rc.CensusError, match="invalid review phase"):
+        rc.set_phase(state, "unknown")
+
+
 def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
     anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
     (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
@@ -1326,6 +1345,7 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
     )
     assert artifact["after_lineage"]["review_state"]["phase"] == "correction"
     assert artifact["after_repair_lineage"]["review_state"]["phase"] == "final"
+    assert artifact["after_repair_lineage"]["review_state"]["final_engine"] == "codex"
     assert "CONVERGENCE: NOT-BLOCKED" not in artifact["repair_result_text"]
     assert artifact["final_lineage"]["review_state"]["phase"] == "clear"
     assert "CONVERGENCE: NOT-BLOCKED" in artifact["final_result_text"]
@@ -3401,6 +3421,7 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert artifact["fixture"]["class_after"] == cc.OPEN
     assert artifact["fixture"]["class_first_round"] == 1
     assert artifact["fixture"]["round"] == 3
+    assert artifact["fixture"]["final_engine"] == "codex"
     assert artifact["attempt_ledger"] == [{
         **artifact["attempt_ledger"][0],
         "role": "final", "outcome": "completed", "returncode": 0,
@@ -3461,6 +3482,7 @@ def test_mechanized_predicate_acceptance_is_source_and_route_bound() -> None:
     assert set(allowed_later) == changed
     assert artifact["provider"]["engine"] == "codex"
     assert artifact["provider"]["web_search"] is False
+    assert artifact["fixture"]["final_engine"] == "codex"
     outcomes = [row["outcome"] for row in artifact["attempt_ledger"]]
     assert outcomes == ["validation-invalid", "completed"]
     assert [row["role"] for row in artifact["attempt_ledger"]] == [

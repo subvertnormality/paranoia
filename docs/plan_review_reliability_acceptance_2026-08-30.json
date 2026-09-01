@@ -2,7 +2,7 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates and the documentation-only cold-final rule.",
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
       "sha256": "ef1fd23df6ad6a632e2902661f8d5fe280f8f64f9ff8ee8f3947f32241c17f27"
     },
     "README.md": {

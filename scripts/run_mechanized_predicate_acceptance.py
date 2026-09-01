@@ -107,7 +107,7 @@ def main() -> int:
     seed.review_state = rc.normalize_state(
         None, stakes=STAKES, snapshot=structural_snapshot,
     )
-    seed.review_state.update(phase="final", last_round=1, debt=[])
+    seed.review_state.update(phase="final", final_engine="codex", last_round=1, debt=[])
     cc.save_lineage(state_root, seed)
     os.environ[cc.STATE_ROOT_ENV] = str(state_root)
 
@@ -252,6 +252,7 @@ def main() -> int:
         "fixture":{
             "base_id":base_id, "head_id":head_id, "lineage":LINEAGE_ID,
             "round":2, "class_id":CLASS_ID, "successor_id":successor_id,
+            "final_engine":"codex",
             "packet_sha256":_digest(packet), "structural_snapshot":structural_snapshot,
             "initial_payload_fault_injection":(
                 "After a real Codex call established the session and raw channels, the "
