@@ -1,6 +1,7 @@
 import base64
 import gzip
 import hashlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -707,6 +708,30 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
         "minimal-correction", "populated-correction", "maximum-final",
         "representative-census",
     }
+
+
+def test_provider_acceptance_partial_updates_retain_concession_authority():
+    spec = importlib.util.spec_from_file_location(
+        "keyed_provider_acceptance",
+        ROOT / "scripts/run_keyed_class_provider_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = json.loads(
+        (ROOT / "docs/keyed_class_decision_provider_acceptance_2026-08-19.json")
+        .read_text()
+    )
+    acceptance.validate_artifact(artifact)
+    broken = deepcopy(artifact)
+    maximum = next(
+        probe for provider in broken["providers"]
+        for probe in provider["probes"]
+        if probe["shape"] == "maximum-final"
+    )
+    maximum["prior_concessions"] = {}
+    with pytest.raises(RuntimeError, match="probe authority is inconsistent"):
+        acceptance.validate_artifact(broken)
 
 
 def test_model_citation_instructions_name_closed_shape_and_mode_anchors():

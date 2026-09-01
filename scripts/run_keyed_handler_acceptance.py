@@ -19,6 +19,10 @@ from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, review_census as rc
 
 OUTPUT = ROOT / "docs" / "keyed_class_handler_acceptance_2026-08-19.json"
+SOURCE_PATHS = tuple(sorted(
+    str(path.relative_to(ROOT))
+    for path in (ROOT / "src" / "paranoia_local").glob("*.py")
+)) + ("scripts/run_keyed_handler_acceptance.py", "tests/test_review_census.py")
 LINEAGE = "keyed-class-handler-acceptance-20260819"
 STAKES = (
     "One trusted operator and OS; repository and provider bytes are untrusted static data; "
@@ -29,6 +33,10 @@ STAKES = (
 
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def bytes_digest(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
 def main() -> int:
@@ -183,6 +191,18 @@ def main() -> int:
         })
     artifact = {
         "acceptance_kind":"keyed-staged-class-decision-handler-lifecycle",
+        "acceptance_scope":{
+            "proves":(
+                "At source_revision, the signed-in public critique_branch correction "
+                "confronted a durable concession with new exact repository evidence, "
+                "reopened the class, superseded the sibling debt, persisted successor "
+                "debt, and retained its audit-bound provider response."
+            ),
+            "does_not_prove":(
+                "A clean review result, a census-cache lifecycle, or that arbitrary "
+                "future source/provider versions reproduce this historical exchange."
+            ),
+        },
         "version":1, "date":"2026-08-19", "provider":{
             "engine":"codex",
             "cli_version":subprocess.run(
@@ -190,6 +210,28 @@ def main() -> int:
             ).stdout.strip(),
             "model":"gpt-5.6-sol", "effort":"high", "web_search":False,
         },
+        "source_revision":head_id,
+        "source_tree":subprocess.run(
+            ["git", "rev-parse", f"{head_id}^{{tree}}"], cwd=ROOT,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip(),
+        "source_sha256":{
+            relative:bytes_digest((ROOT / relative).read_bytes())
+            for relative in SOURCE_PATHS
+        },
+        "allowed_later_source_diffs":{},
+        "reviewed_diff":{
+            "base":base_id, "head":head_id,
+            "sha256":bytes_digest(subprocess.run(
+                ["git", "diff", "--binary", base_id, head_id], cwd=ROOT,
+                capture_output=True, check=True,
+            ).stdout),
+            "numstat":subprocess.run(
+                ["git", "diff", "--numstat", base_id, head_id], cwd=ROOT,
+                capture_output=True, text=True, check=True,
+            ).stdout.splitlines(),
+        },
+        "census_cache":None,
         "base_id":base_id, "head_id":head_id, "lineage_id":LINEAGE,
         "stakes":STAKES, "elapsed_seconds":round(elapsed, 3),
         "calls":artifact_calls, "before_state":before,

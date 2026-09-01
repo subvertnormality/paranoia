@@ -1,5 +1,19 @@
 {
   "acceptance_kind": "keyed-staged-class-decision-handler-lifecycle",
+  "acceptance_scope": {
+    "does_not_prove": "A clean review result, a census-cache lifecycle, or that arbitrary future source/provider versions reproduce this historical exchange.",
+    "proves": "At source_revision, the signed-in public critique_branch correction confronted a durable concession with new exact repository evidence, reopened the class, superseded the sibling debt, persisted successor debt, and retained its audit-bound provider response."
+  },
+  "allowed_later_source_diffs": {
+    "scripts/run_keyed_handler_acceptance.py": {
+      "scope": "Adds deterministic source/diff/scope metadata for this retained exchange without changing its provider bytes, settlement, or durable result.",
+      "sha256": "43118ed0b37fa7d285fa490cd2a47afc7a7be75185a53a704b14115dcbaf6821"
+    },
+    "tests/test_review_census.py": {
+      "scope": "Adds deterministic source-bound replay and issue #94 regressions without changing this retained provider exchange.",
+      "sha256": "cd7441b6a3c7cc7e0ff064ba7d3815a61707a56aca23e1ab117ac37bd1579ad1"
+    }
+  },
   "after_lineage": {
     "classes": [
       {
@@ -1087,6 +1101,7 @@
     }
   ],
   "date": "2026-08-19",
+  "census_cache": null,
   "elapsed_seconds": 178.629,
   "head_id": "5221b93396f7e69c23efa4a613130dbc2be6a522",
   "lineage_id": "keyed-class-handler-acceptance-20260819",
@@ -1096,6 +1111,30 @@
     "engine": "codex",
     "model": "gpt-5.6-sol",
     "web_search": false
+  },
+  "reviewed_diff": {
+    "base": "df9b639756ceef0883c7bd1319758860566b4848",
+    "head": "5221b93396f7e69c23efa4a613130dbc2be6a522",
+    "numstat": [
+      "10\t0\tAGENTS.md",
+      "3\t1\tCLAUDE.md",
+      "5\t0\tREADME.md",
+      "5\t0\tdocs/how-it-works.md",
+      "4\t0\tdocs/llm-reference.md",
+      "4\t0\tdocs/tool-reference.md",
+      "30\t2\tscripts/run_keyed_class_provider_acceptance.py",
+      "45\t16\tscripts/run_keyed_handler_acceptance.py",
+      "35\t4\tsrc/paranoia_local/handlers.py",
+      "2\t0\tsrc/paranoia_local/prompts.py",
+      "148\t8\tsrc/paranoia_local/review_census.py",
+      "1\t0\tsrc/paranoia_local/server.py",
+      "110\t4\tsrc/paranoia_local/staged_protocol.py",
+      "4\t0\ttests/test_branch_plan_fidelity.py",
+      "9\t5\ttests/test_handlers.py",
+      "107\t13\ttests/test_review_census.py",
+      "88\t2\ttests/test_staged_protocol.py"
+    ],
+    "sha256": "292d79216715c6a48d7535051c3dc21496ae03c4435788c783ac003db97b6e03"
   },
   "result_sha256": "af7c9e19173d6802eb210c1ef3f4d24589c57e75cda9fbb00cdce8e1e2301cc4",
   "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The retained production-handler acceptance is still bound to an older Git head, so it does not prove the current keyed lifecycle. [classes: acceptance-class] (repository/docs/keyed_class_handler_acceptance_2026-08-19.json:9, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:935, repository/docs/keyed_class_handler_acceptance_2026-08-19.json:947-949, repository/scripts/run_keyed_handler_acceptance.py:35-38, repository/tests/test_review_census.py:1797-1816)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Run scripts/run_keyed_handler_acceptance.py at head 5221b93396f7e69c23efa4a613130dbc2be6a522, retain the resulting artifact with that exact head_id and keyed _class_record_pointers, and verify the existing replay's exact schema and settlement equality, including concession_challenges.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05d24-ce32-7ad0-a02f-4d3b021dcaeb` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: keyed-class-handler-acceptance-20260819 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — REOPEN acceptance-class\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\n  acceptance-class The retained keyed handler acceptance is bound to current head 5221b93396f7e69c23efa4a613130dbc2be6a522 and records _class_record_pointers as exactly ['/class_outcomes/acceptance-class'] without excluding that field from replay. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nREOPEN-WAVE: 1 previously closed class(es) reopened this round: acceptance-class — re-arm any prior disposition and reassess scope before another correction\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
@@ -1200,6 +1239,35 @@
     "role": "correction",
     "source_dispositions": []
   },
+  "source_revision": "5221b93396f7e69c23efa4a613130dbc2be6a522",
+  "source_sha256": {
+    "scripts/run_keyed_handler_acceptance.py": "ba32ca5b95a81ada3ad12b0ea8bf9c3e00b652eb8ec85a655007a1c4787691c2",
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "3fc6b20f2a44d8159076bc561ddaa601f39cdbf0db52b478baea23a60987f169",
+    "src/paranoia_local/arbitration.py": "6b9adf82707e5cb30f2bb7761eb8d333d1f8092d194ccd892a187909cdb0b0df",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/class_closure.py": "ef657392205ef181956227a8b98d2c7421a8af5cf9d6dca54cc563b52bf340eb",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/engines.py": "8e2568401fe814e38dc441a9fb95d2cb0e8777d3be98a33cd9e97f82c87abd8a",
+    "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/handlers.py": "04f3a765ddc1f7c8ea3ce0db2a7c96663520e31cef417d5e6b585e4041d13ba7",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+    "src/paranoia_local/logs.py": "9f7933fdac27fe6c5926f190d8ffccfc0b4a19535816a5459a65b03b4cb6084a",
+    "src/paranoia_local/orientation.py": "51c93c51b845f5fdea07c60dc34a372680f503a886b15db467ff8a397acd0241",
+    "src/paranoia_local/plan_claims.py": "9547e36aae26b25d9e78456dec226b078dd5db0965b17b1e830eac82b995291d",
+    "src/paranoia_local/prompts.py": "95e2e375975be077624b15e35574354d09629e44ea831b22616e3789d7fcf009",
+    "src/paranoia_local/review_census.py": "92d77174c393d0e2081257e068484e07e0e36608184426f4268cc0efc1e80f8d",
+    "src/paranoia_local/runner.py": "fbbe1131126ab959eb84e9df9e0e0c10b040d08ee4a44870e3b9472042079c73",
+    "src/paranoia_local/server.py": "9c85905f8d83e8c243ac3a15dd17e80938c255b18f2ba389267cc158b4b681f6",
+    "src/paranoia_local/staged_protocol.py": "bba55adfdd832030ad4154d33720bb9ed6283edacfb1ba03eb8f1c930dee1532",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121",
+    "tests/test_review_census.py": "7b73c212c5ed1e5851931d16861ff2d19e14aab4e37200d3b8666197a63782a4"
+  },
+  "source_tree": "5baddb361dbf908335b76d597934d3babd3c81d0",
   "stakes": "One trusted operator and OS; repository and provider bytes are untrusted static data; no repository execution or hostile local race; one bounded correction retry; false settlement or wrong class/evidence binding is high impact; recoverable blocking is acceptable.",
   "version": 1
 }

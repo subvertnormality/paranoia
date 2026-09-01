@@ -1810,14 +1810,67 @@ def assert_five_headings(text):
 
 
 def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/keyed_class_handler_acceptance_2026-08-19.json"
     artifact = json.loads(
-        (Path(__file__).resolve().parents[1]
-         / "docs/keyed_class_handler_acceptance_2026-08-19.json").read_text()
+        artifact_path.read_text()
     )
     assert artifact["acceptance_kind"] == (
         "keyed-staged-class-decision-handler-lifecycle"
     )
     assert artifact["version"] == 1
+    committed = json.loads(subprocess.run(
+        ["git", "show", f"HEAD:{artifact_path.relative_to(root)}"], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout)
+    assert committed == artifact
+    spec = importlib.util.spec_from_file_location(
+        "keyed_handler_acceptance", root / "scripts/run_keyed_handler_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    revision = artifact["source_revision"]
+    assert revision == artifact["head_id"]
+    assert subprocess.run(
+        ["git", "rev-parse", f"{revision}^{{tree}}"], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout.strip() == artifact["source_tree"]
+    assert set(artifact["source_sha256"]) == set(acceptance.SOURCE_PATHS)
+    changed = set()
+    for relative, expected in artifact["source_sha256"].items():
+        historical = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=root,
+            capture_output=True, check=True,
+        ).stdout
+        assert hashlib.sha256(historical).hexdigest() == expected
+        if (root / relative).read_bytes() == historical:
+            continue
+        changed.add(relative)
+        allowance = artifact["allowed_later_source_diffs"].get(relative)
+        assert isinstance(allowance, dict) and set(allowance) == {"scope", "sha256"}
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", revision, "--", relative], cwd=root,
+            capture_output=True, check=True,
+        ).stdout
+        assert hashlib.sha256(diff).hexdigest() == allowance["sha256"]
+        assert allowance["scope"].strip()
+    assert changed == set(artifact["allowed_later_source_diffs"])
+    reviewed = artifact["reviewed_diff"]
+    assert (reviewed["base"], reviewed["head"]) == (
+        artifact["base_id"], artifact["head_id"],
+    )
+    reviewed_diff = subprocess.run(
+        ["git", "diff", "--binary", reviewed["base"], reviewed["head"]], cwd=root,
+        capture_output=True, check=True,
+    ).stdout
+    assert hashlib.sha256(reviewed_diff).hexdigest() == reviewed["sha256"]
+    assert subprocess.run(
+        ["git", "diff", "--numstat", reviewed["base"], reviewed["head"]], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout.splitlines() == reviewed["numstat"]
+    assert artifact["census_cache"] is None
+    assert "does_not_prove" in artifact["acceptance_scope"]
     assert artifact["provider"]["engine"] == "codex"
     assert len(artifact["calls"]) == len(artifact["attempt_ledger"]) == 1
     call = artifact["calls"][0]
