@@ -906,6 +906,10 @@ def _settle_staged_failure(
         getattr(error, "stage_role", "")
     ).endswith("-preflight")
     preserve_raw_top_level = preflight_failure and not isinstance(raw_state, dict)
+    preserve_unknown_mapping = (
+        preflight_failure and isinstance(raw_state, dict) and bool(raw_state)
+        and raw_state.get("version") != 1
+    )
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
         and isinstance(raw_state.get("phase"), str)
@@ -923,7 +927,8 @@ def _settle_staged_failure(
         state = deepcopy(raw_state)
     else:
         state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
-    state.pop("census_cache", None)
+    if not preserve_unknown_mapping:
+        state.pop("census_cache", None)
     state.pop("validation_debt", None)
     state.pop("staged_failure", None)
     state.pop("format_debt", None)

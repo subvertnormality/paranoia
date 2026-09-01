@@ -1054,8 +1054,14 @@ def test_malformed_plan_history_blocks_before_stakes_reopen(
     (cc.PLAN_MODE, []),
     (cc.PLAN_MODE, ""),
     (cc.BRANCH_MODE, []),
-    (cc.PLAN_MODE, {"version":0, "sentinel":{"keep":True}}),
-    (cc.BRANCH_MODE, {"version":0, "sentinel":{"keep":True}}),
+    (cc.PLAN_MODE, {
+        "version":0, "sentinel":{"keep":True}, "census_cache":{"keep":True},
+        "format_debt":{"old":"replace"},
+    }),
+    (cc.BRANCH_MODE, {
+        "version":0, "sentinel":{"keep":True}, "census_cache":{"keep":True},
+        "format_debt":{"old":"replace"},
+    }),
 ])
 def test_public_handler_rejects_malformed_top_level_state_before_class_view(
     repo, repo_with_branch, tmp_path, monkeypatch, mode, raw_state,
@@ -1108,6 +1114,8 @@ def test_public_handler_rejects_malformed_top_level_state_before_class_view(
     if raw_state:
         assert reloaded.review_state["version"] == 0
         assert reloaded.review_state["sentinel"] == {"keep":True}
+        assert reloaded.review_state["census_cache"] == {"keep":True}
+        assert "format_debt" not in reloaded.review_state
         assert reloaded.review_state["staged_failure"]["kind"] == "validation"
     else:
         assert reloaded.review_state == raw_state
