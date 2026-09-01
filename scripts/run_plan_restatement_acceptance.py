@@ -380,9 +380,12 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
         try:
             for name, row, plan, round_no in routes:
                 if name == "targeted":
+                    source_snapshot = orientation.wrap_commit(
+                        ROOT, source_tree, artifact["source_revision"],
+                    )
                     cc.save_lineage(
                         replay_root / "state",
-                        cc._from_json(TARGETED_LINEAGE, row["initial_lineage"]),
+                        _targeted_initial(source_snapshot),
                     )
                 pending = {
                     invocation["prompt_sha256"]:(invocation, channels)
