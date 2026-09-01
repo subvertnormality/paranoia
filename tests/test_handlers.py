@@ -209,6 +209,25 @@ class TestCritiquePlan:
         )
         assert "risky thing" in eng.calls[0]["prompt"]
 
+    def test_empty_plan_path_is_rejected_before_provider_or_lineage(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        state_root = tmp_path / "state"
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(state_root))
+        plan = tmp_path / "empty.md"
+        plan.write_text("")
+        eng = FakeEngine()
+        with pytest.raises(ValueError, match="at least one line"):
+            handlers.critique_plan(
+                {
+                    "plan_path":str(plan), "repo_path":str(repo),
+                    "lineage":"empty-plan", "round":1,
+                },
+                engine=eng, log_dir=tmp_path / "logs", now=fixed_clock,
+            )
+        assert eng.calls == []
+        assert not state_root.exists()
+
     def test_stakes_and_round_reach_plan_reviewer(self, repo: Path, tmp_path: Path) -> None:
         eng = FakeEngine()
         handlers.critique_plan(
@@ -537,3 +556,8 @@ def test_plan_anchor_retry_context_uses_an_in_bounds_example() -> None:
     assert "line 3, column 1 is `plan:3`" in context
     assert "never `plan:31`" in context
     assert "plan:4001" not in context
+
+
+def test_plan_anchor_retry_context_rejects_a_zero_bound() -> None:
+    with pytest.raises(ValueError, match="positive line bound"):
+        handlers._plan_anchor_retry_context(0)

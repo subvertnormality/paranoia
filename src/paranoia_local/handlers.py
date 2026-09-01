@@ -2411,6 +2411,8 @@ def _branch_contract_section(contract: _BranchContract) -> str:
 
 
 def _plan_anchor_retry_context(plan_lines: int) -> str:
+    if plan_lines < 1:
+        raise ValueError("plan anchor retry context requires a positive line bound")
     example_line = min(plan_lines, 4001)
     return (
         f"The displayed plan has exactly {plan_lines} lines. A plan citation must be "
@@ -2491,6 +2493,8 @@ def critique_plan(
         except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
             raise ValueError(f"cannot read plan_path: {exc}") from exc
     plan_view = sp.ArtifactView.from_text(plan_text)
+    if plan_view.line_count < 1:
+        raise ValueError("critique_plan requires a plan containing at least one line")
 
     context = arguments.get("context")
     focus = arguments.get("focus")
