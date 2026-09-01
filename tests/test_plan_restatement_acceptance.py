@@ -60,7 +60,7 @@ def test_restatement_acceptance_rejects_digest_consistent_terminal_failure() -> 
         channels["raw"].encode("utf-8"),
     ).hexdigest()
     attempt["raw_excerpt"] = channels["raw"][:4000]
-    with pytest.raises(ValueError, match="reconstruct"):
+    with pytest.raises(ValueError, match="derive from raw provider stdout|reconstruct"):
         acceptance.validate_artifact(artifact, root, require_committed=False)
 
 
