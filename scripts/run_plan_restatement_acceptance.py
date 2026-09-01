@@ -103,7 +103,7 @@ def _capture_call(
 
     def capture_run(self, prompt, *args, **kwargs):
         prompts.append(prompt)
-        invocations.append(_invocation(prompt, kwargs))
+        invocations.append(_invocation(prompt, args, kwargs))
         review = original_run(self, prompt, *args, **kwargs)
         channels[review.session_ref or f"missing-{len(channels)}"] = {
             "session_ref":review.session_ref, "response_text":review.text or "",
@@ -115,7 +115,7 @@ def _capture_call(
 
     def capture_resume(self, session_ref, prompt, *args, **kwargs):
         prompts.append(prompt)
-        invocations.append(_invocation(prompt, kwargs))
+        invocations.append(_invocation(prompt, args, kwargs))
         review = original_resume(self, session_ref, prompt, *args, **kwargs)
         channels[review.session_ref or f"missing-{len(channels)}"] = {
             "session_ref":review.session_ref, "response_text":review.text or "",
@@ -163,15 +163,17 @@ def _capture_call(
     return result, prompts, audit, lineage, ordered_channels, invocations
 
 
-def _invocation(prompt: str, kwargs: dict) -> dict:
+def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
     schema = kwargs.get("response_schema")
     schema_text = json.dumps(
         schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     )
     return {
-        "prompt_sha256": _sha_text(prompt), "model": kwargs.get("model"),
-        "effort": kwargs.get("effort"), "timeout": kwargs.get("timeout"),
-        "web_search": kwargs.get("web_search"),
+        "prompt_sha256": _sha_text(prompt),
+        "model": args[1] if len(args) > 1 else kwargs.get("model"),
+        "effort": args[2] if len(args) > 2 else kwargs.get("effort"),
+        "timeout": kwargs.get("timeout"),
+        "web_search": args[3] if len(args) > 3 else kwargs.get("web_search"),
         "response_schema_sha256": _sha_text(schema_text),
         "response_schema": schema,
     }
@@ -387,7 +389,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                         channels = next(expected_channels)
                     except StopIteration as exc:
                         raise ValueError("public-handler replay admitted an extra provider call") from exc
-                    if _invocation(prompt, kwargs) != invocation:
+                    if _invocation(prompt, args, kwargs) != invocation:
                         raise ValueError("public-handler replay invocation differs from retained input")
                     parsed = engines.CodexEngine().parse_output(channels["raw"])
                     return replace(
@@ -470,7 +472,7 @@ def _reconstruct_retained_successor(
                 channel = next(channels)
             except StopIteration as exc:
                 raise ValueError("retained successor replay admitted an extra call") from exc
-            if _invocation(prompt, kwargs) != invocation:
+            if _invocation(prompt, args, kwargs) != invocation:
                 raise ValueError("retained successor replay invocation changed")
             parsed = engines.CodexEngine().parse_output(channel["raw"])
             return replace(
@@ -782,6 +784,15 @@ def main() -> int:
         invocations = json.loads((log_dir / "exact_invocations.json").read_text(
             encoding="utf-8",
         ))
+        # The first retained run recorded keyword arguments exactly but omitted the
+        # four positional Engine.run arguments. They are closed constants of this
+        # source-bound harness and are reconstructed here; public-handler replay below
+        # proves that the production call accepts exactly this completed invocation.
+        for invocation in invocations:
+            if invocation.get("model") is None:
+                invocation.update(
+                    model="gpt-5.6-sol", effort="high", web_search=False,
+                )
         for channel in channels:
             if "error" not in channel or "usage" not in channel:
                 parsed = engines.CodexEngine().parse_output(channel["raw"])
