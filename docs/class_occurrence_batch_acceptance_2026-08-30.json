@@ -5,10 +5,10 @@
     "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
     "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
     "src/paranoia_local/handlers.py": {"scope": "Plan-only phase projection and debt-targeted rebut settlement; branch occurrence aggregation is unchanged.", "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"},
-    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut and arbitration field-bound diagnostic instructions, including original-option advocacy guidance; branch occurrence aggregation instructions are unchanged.", "sha256": "6d828676723ed3b6be6ac041317cad90c046924bd8c0d5b96b777e4b9716489d"},
+    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut and arbitration diagnostics plus plan-review normative-restatement discovery; branch occurrence aggregation instructions are unchanged.", "sha256": "014a64f0efcab7adbafd5691b605ee26e7bb8e75c192770b8ad18552faee06a7"},
     "src/paranoia_local/review_census.py": {"scope": "Debt-targeted rebut settlement and trailer guidance; branch occurrence materialization is unchanged.", "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"},
     "src/paranoia_local/server.py": {"scope": "Public bound-rebut debt identity and arbitration diagnostic schema documentation; branch occurrence handling is unchanged.", "sha256": "6805f8e6078ef710081f518978bf3a5707aed935689fc69a4e682c1843dfaa15"},
-    "tests/test_review_census.py": {"scope": "Phase projection and rebut settlement regressions plus updated prompt digest.", "sha256": "8e2e2fc54a1fcb69e2eb8463510fa03fd06bf791d3be7030a03d4837e344fde6"}
+    "tests/test_review_census.py": {"scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions.", "sha256": "59aee5982f1ebf85a67335cf7f0854a32d50c33e4d8511f6977e79c231cb3d3a"}
   },
   "version": 1,
   "date": "2026-08-30",
