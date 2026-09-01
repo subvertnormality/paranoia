@@ -1772,31 +1772,23 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-          "sha256": "f84a18469362dc524a7a99cb41fa38171e0df1a45062be3958df2925b1a0c471"
+          "sha256": "42a49290ba3af2c878ff7e8ecd5a5ff701a9a1ec5bbe1c5300554edb7c2a82c8"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-          "sha256": "83501fc50910e45c0737be8e93c64469b48fff699c22553724e8cd16f3a4d0cb"
+          "sha256": "a3657c789b32fca23a2d291a96be76fedc51b9b5aa826ce5fbaaec3ddecb59b9"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
-        "sha256": "b255c87d7c28b0188f5244ce7c442456b631500e5e78443798288441a4a1a8a5"
-      },
-      "scripts/run_plan_review_reliability_acceptance.py": {
-        "scope": "Issue #95 validates engine-owned final-regression state while preserving the retained deterministic replay topology.",
-        "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
+        "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
-          "sha256": "e56fda13c582fcc7a46b3132dc4817445e7a7b95e655fb08bb1d2810438b1788"
+          "sha256": "408884b75fd5a7c3f1cff30c172d7fd840372832c9edae70db7c98d8618c98cb"
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-          "sha256": "b94d4ebbae82aa7dc8fc898280640a0b550ba38084421749de10a4828af462ed"
-      },
-      "tests/test_plan_claims.py": {
-        "scope": "Issue #95 updates source-bound lifecycle assertions without changing deterministic plan-review replay behavior.",
-        "sha256": "a24889f41352cdcee62ea3a86b13111479321586baf277fe68121e691837d8a8"
+          "sha256": "d25c540eeba31b6bc57c84c6ea10eaa38710579ae35e0b586b60e3c53bdbb28f"
       }
     },
     "checks": {
