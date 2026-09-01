@@ -136,11 +136,14 @@ def main() -> int:
     settlement = audit.get("staged_settlement")
     if not isinstance(settlement, dict):
         raise RuntimeError("production staged settlement is absent")
-    if settlement["class_assessments"] != [{
-        "class_id":"acceptance-class", "verdict":"violated",
-        "evidence":settlement["class_assessments"][0]["evidence"],
-        "finding_id":"historical-acceptance-gap",
-    }]:
+    assessments = settlement.get("class_assessments", [])
+    if (
+        len(assessments) != 1
+        or assessments[0].get("class_id") != "acceptance-class"
+        or assessments[0].get("verdict") != "violated"
+        or not assessments[0].get("evidence")
+        or assessments[0].get("finding_id") in {None, "historical-acceptance-gap"}
+    ):
         raise RuntimeError("unexpected staged class assessment")
     if settlement["class_records"] != [{
         "op":"reopen", "class_id":"acceptance-class",
