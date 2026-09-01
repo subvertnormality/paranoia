@@ -164,9 +164,11 @@ def _critique_plan_with_prompt_capture(
     return result, captured
 
 
-def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
+def _fixture_lineage(
+    structural_snapshot: str, *, concession_history: bool = True,
+) -> cc.Lineage:
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
-    state.update(phase="correction", last_round=6, debt=[{
+    history = [{
         "id":"D0", "finding_id":"G0", "status":"closed", "severity":"MAJOR",
         "summary":"a prior gate demand was withdrawn", "remedy":"do not repeat it",
         "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
@@ -175,7 +177,8 @@ def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
             "evidence":["plan:4"], "snapshot_digest":structural_snapshot,
             "round":5,
         },
-    }, {
+    }] if concession_history else []
+    state.update(phase="correction", last_round=6, debt=[*history, {
         "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
         "summary":"the correction gate lacked public-handler acceptance",
         "reason":"acceptance was not yet exercised", "remedy":"exercise the handler",
@@ -728,7 +731,9 @@ def validate_artifact(
         raise ValueError("returned/audited trailer binding mismatch")
     before = artifact["before_lineage"]
     after = artifact["after_lineage"]
-    if before != cc._to_json(_fixture_lineage(fixture["structural_snapshot"])):
+    if before != cc._to_json(_fixture_lineage(
+        fixture["structural_snapshot"], concession_history=not legacy_unowned_final,
+    )):
         raise ValueError("recorded prebuilt lineage differs from the complete fixture")
     if artifact["durable_reload_lineage"] != after:
         raise ValueError("durable reload differs from the recorded post-review lineage")
