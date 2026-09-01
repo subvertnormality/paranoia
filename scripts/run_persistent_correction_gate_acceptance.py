@@ -190,6 +190,7 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
     state = rc.settle_state(
         state, settlement, phase="correction",
         snapshot=before["review_state"]["snapshot_digest"], round_no=7,
+        engine_name=audit["engine"],
     )
     replacements = {
         class_id: tracked.superseded_by

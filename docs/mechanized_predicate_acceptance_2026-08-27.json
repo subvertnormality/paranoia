@@ -2,12 +2,12 @@
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Claim-evidence failure-phase prefixes, source-local binding omission, aggregate capture-deadline/group classification, and ordered terminal claim-debt attempt projection only; this does not alter staged schema validation, mechanized predicate matching, correction routing, class settlement, or durable reload. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
-      "sha256": "06096c9159483805b101dbaa79054cc6ca245a7fac4c97b2535cdec78ef00ba6"
+      "scope": "Claim-evidence failure-phase prefixes, source-local binding omission, aggregate capture-deadline/group classification, and ordered terminal claim-debt attempt projection only; this does not alter staged schema validation, mechanized predicate matching, or replacement. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through final settlement.",
+      "sha256": "26a035ffb04d1fc85d8e8ee7ad585665586803a98db9d4d251b450abc4a34d24"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged schema validation, mechanized predicate evidence, matching, or replacement semantics.",
-      "sha256": "17a9d1ca13a8684f5a6f472c72096dc30d182cf961ce42863d4ae81554559946"
+      "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged schema validation, mechanized predicate evidence, matching, or replacement semantics. Issue #95 adds final-engine ownership and legacy migration.",
+      "sha256": "3c1671b0b3a7f172e44b9270e5fd8a985b69a2f34876915909825e0754c164ec"
     }
   },
   "attempt_ledger": [

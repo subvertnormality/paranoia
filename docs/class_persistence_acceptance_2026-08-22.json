@@ -2,12 +2,12 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
-      "sha256": "30e499adbef102b438a4a75101fff89c8c35b850beee3819ee8028604407588c"
+      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, or durable reload. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through final settlement; class reopen derivation and mechanized persistence remain unchanged.",
+      "sha256": "7195d76a03d557073b70a0ba494c48880f13f3dd6851cd826bd2f16ba6c7c142"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged class persistence, reopen derivation, or mechanized matching.",
-      "sha256": "17a9d1ca13a8684f5a6f472c72096dc30d182cf961ce42863d4ae81554559946"
+      "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged class persistence, reopen derivation, or mechanized matching. Issue #95 adds final-engine ownership and legacy migration.",
+      "sha256": "3c1671b0b3a7f172e44b9270e5fd8a985b69a2f34876915909825e0754c164ec"
     }
   },
   "attempt_ledger": [

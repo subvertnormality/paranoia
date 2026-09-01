@@ -2,12 +2,12 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
-      "sha256": "272c90a1e9d48887fe6829c5de4a4fc2e953369ed7b927d68c0e8cb0e81d1ef9"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates and the documentation-only cold-final rule.",
+      "sha256": "fee41418a300bc6e9c81fd8a2007ddaa443a7fe13639b43aa0ce49ff9ba47ab6"
     },
     "README.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
-      "sha256": "98c96982517c84272f72aea2c404280a0cf99dfb42304c7fb8fcaf1d9405bed2"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
+      "sha256": "8b3469782d4e0a28090a08329b6169050df863cbce03b6cf8c562f6eef765027"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
@@ -18,12 +18,16 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, initial prompts, and accepted settlement remain unchanged.",
-      "sha256": "54e6db761804f7f7846cfdf718ff601626ccf7f66080601cc7e295ec0914428b"
+      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
+      "sha256": "aa29a4f4d828d63c5fb80b8019c139f7ce90260a0c3c55866f77c5fba3692ecd"
+    },
+    "src/paranoia_local/review_census.py": {
+      "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",
+      "sha256": "fffca0adfc98589b8408829b056a4b9db6dc05b759d1d785b8ccf63890469735"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged.",
-      "sha256": "a66869a85992e982e2bf03a8917b7988855ce9f5bee359003cded6692294c7f2"
+      "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
+      "sha256": "80df1a821e751e3ab9e8db948bd472411100a62e64ed7b3431dec6a3df805abf"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
@@ -4564,6 +4568,7 @@
           }
         ],
         "last_round": 2,
+        "final_engine": "codex",
         "phase": "final",
         "plan_line_count": 14,
         "snapshot_digest": "a688c3b3fa67fea5255560f37008844206b84b8b6d67e484b49b90c48590bd07",
@@ -4867,7 +4872,7 @@
       "plan_path": null,
       "register_status": "staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed",
       "rejected_payloads": [],
-      "rendered_trailer": "LINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "rendered_trailer": "LINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
       "retry_register": null,
       "returncode": 0,
       "round": 2,
@@ -5077,6 +5082,7 @@
           }
         ],
         "last_round": 2,
+        "final_engine": "codex",
         "phase": "final",
         "plan_line_count": 14,
         "snapshot_digest": "a688c3b3fa67fea5255560f37008844206b84b8b6d67e484b49b90c48590bd07",
@@ -5943,8 +5949,8 @@
     "provider_response_sha256": [
       "a0b8e616ae8e37089f8a4e2effdec71188bc1632bde156f0a7819b825c56dc3c"
     ],
-    "result_sha256": "33133957d99333c3b21ced2d296dfd2b007cdd9a2b3e51ceb36d48e2b0f319bd",
-    "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05afe-dfda-70d1-b601-ab2333f4919f` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "result_sha256": "fa6c2f9a73981aa9aeb6604e9f85177b4370982baeab3bb7843fd007f616a456",
+    "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05afe-dfda-70d1-b601-ab2333f4919f` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
     "validated_payload_sha256": "5fc65db06bc7d878607a4f9dfe60c50c29de5ff1ad893eb8de86e8c7edaa0754",
     "validated_payloads": {
       "manifests": [],

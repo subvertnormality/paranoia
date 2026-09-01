@@ -1744,7 +1744,10 @@ def _staged_structural_review(
     )
     if mode == cc.BRANCH_MODE:
         closure._sweep(only=minted)
-    state = rc.settle_state(state, settlement, phase=phase, snapshot=snapshot, round_no=round_no)
+    state = rc.settle_state(
+        state, settlement, phase=phase, snapshot=snapshot, round_no=round_no,
+        engine_name=engine.name,
+    )
     replacements = {
         cid: cls.superseded_by for cid, cls in lineage.classes.items()
         if cls.status == cc.SUPERSEDED and cls.superseded_by
@@ -4666,6 +4669,7 @@ def rebut(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
                         evidence=rebut_evidence,
                         blocking_class_ids=[item.class_id for item in draft.blocking()],
+                        engine_name=engine.name,
                     )
                     still_bound = any(
                         row.get("status") == "open"

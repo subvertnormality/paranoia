@@ -1352,7 +1352,7 @@ def test_census_existing_advisory_violation_still_mints_debt():
     }]
     state = rc.settle_state(
         rc.normalize_state({}, stakes="s", snapshot="p"), parsed,
-        phase="census", snapshot="p", round_no=1,
+        phase="census", snapshot="p", round_no=1, engine_name="codex",
     )
     assert state["debt"][0]["class_ids"] == ["class-a"]
     assert state["phase"] == "clear"
@@ -1522,7 +1522,7 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
     minted = cc.apply_register(lineage, register, round_no=2)
     state = rc.settle_state(
         {"phase": "correction", "debt": [durable_debt()]}, parsed,
-        phase="correction", snapshot="s", round_no=2,
+        phase="correction", snapshot="s", round_no=2, engine_name="codex",
     )
     assert state["debt"][0]["status"] == "closed"
     if action["kind"] == "reclassify":
@@ -1985,9 +1985,11 @@ def test_finding_collision_rekeys_new_finding_class_basis():
 
     state = rc.normalize_state({}, stakes="s", snapshot="before")
     state["phase"] = "final"
+    state["final_engine"] = "codex"
     state["debt"] = [durable_debt(status="closed")]
     settled = rc.settle_state(
         state, parsed, phase="final", snapshot="after", round_no=2,
+        engine_name="codex",
     )
     historic = next(row for row in settled["debt"] if row["id"] == "D7")
     fresh = next(row for row in settled["debt"] if row["id"] != "D7")
@@ -2361,9 +2363,12 @@ def durable_projection(
     minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
     state = rc.normalize_state({}, stakes="s", snapshot="before")
     state["phase"] = phase
+    if phase == "final":
+        state["final_engine"] = "codex"
     state["debt"] = deepcopy(list(prior_debt))
     state = rc.settle_state(
         state, settlement, phase=phase, snapshot="after", round_no=2,
+        engine_name="codex",
     )
     for debt in state["debt"]:
         debt.setdefault("class_ids", []).extend(
@@ -2537,6 +2542,7 @@ def test_frozen_historical_v1_correction_projection_is_preserved():
     state.update(phase="correction", debt=deepcopy(debts))
     settled = rc.settle_state(
         state, parsed, phase="correction", snapshot="after", round_no=2,
+        engine_name="codex",
     )
     fresh = next(row for row in settled["debt"] if row["id"] not in {"D7", "D8"})
     assert fresh["evidence"] == ["plan:1", "plan:2"]

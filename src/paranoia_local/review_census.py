@@ -32,7 +32,7 @@ STATE_KEYS = frozenset({
     "version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt",
     "last_round", "format_debt", "validation_debt", "staged_failure",
     "census_cache", "unbound_classes", "unbound_class_ids",
-    "correction_control", "plan_line_count",
+    "correction_control", "plan_line_count", "final_engine",
 })
 DEBT_KEYS = frozenset({
     "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
@@ -50,7 +50,7 @@ class CensusError(ValueError):
 
 def settle_rebut_concession(
     state: Mapping[str, Any], *, debt_id: str, class_id: str,
-    evidence: Sequence[str], blocking_class_ids: Sequence[str],
+    evidence: Sequence[str], blocking_class_ids: Sequence[str], engine_name: str,
 ) -> dict[str, Any]:
     """Close one exactly bound debt without applying round-settlement cleanup."""
     if state.get("phase") != "correction":
@@ -100,7 +100,13 @@ def settle_rebut_concession(
         row for row in out["debt"]
         if row.get("status") == "open" and row.get("severity") in BLOCKING
     ]
-    out["phase"] = "correction" if blocking else "final"
+    if blocking:
+        out["phase"] = "correction"
+        out.pop("final_engine", None)
+    else:
+        _validate_engine_name(engine_name, "/final_engine")
+        out["phase"] = "final"
+        out["final_engine"] = engine_name
     return out
 
 
@@ -228,9 +234,24 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
         or not isinstance(out.get("debt"), list)
     ):
         raise CensusError("invalid persisted review_state")
+    if out["phase"] == "final" and not _engine_name_valid(out.get("final_engine")):
+        # Pre-owner state cannot establish which reviewer earned the pending final.
+        # Re-enter broad review once rather than let any later engine clear it.
+        out["phase"] = "census"
+        out.pop("final_engine", None)
     if out["phase"] == "clear" and out.get("snapshot_digest") != snapshot:
         out.update(phase="census", snapshot_digest=snapshot, debt=[])
+        out.pop("final_engine", None)
     return out
+
+
+def _engine_name_valid(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and len(value) <= 120
+
+
+def _validate_engine_name(value: Any, pointer: str) -> None:
+    if not _engine_name_valid(value):
+        raise CensusError(f"{pointer}: invalid persisted engine name")
 
 
 def _persisted_text(value: Any, pointer: str, *, optional: bool = False) -> None:
@@ -377,6 +398,10 @@ def validate_persisted_state(
         raise CensusError("/stakes: persisted stakes must be a string")
     if not isinstance(state.get("phase"), str) or state["phase"] not in PHASES:
         raise CensusError("/phase: invalid persisted review_state phase")
+    if state["phase"] == "final":
+        _validate_engine_name(state.get("final_engine"), "/final_engine")
+    elif "final_engine" in state:
+        raise CensusError("/final_engine: permitted only while final is required")
     if "last_round" in state and (
         type(state["last_round"]) is not int or state["last_round"] < 1
     ):
@@ -725,7 +750,8 @@ def register_from_records(
 
 
 def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: str,
-                 snapshot: str, round_no: int) -> dict[str, Any]:
+                 snapshot: str, round_no: int, engine_name: str) -> dict[str, Any]:
+    _validate_engine_name(engine_name, "/final_engine")
     old = {d["id"]: dict(d) for d in state.get("debt", []) if isinstance(d, dict) and d.get("id")}
     for update in settlement.get("debt_updates", []):
         item = old[update["id"]]
@@ -758,9 +784,26 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
         row["first_round"] = round_no; row["last_round"] = round_no
         old[row["id"]] = row
     active = [d for d in old.values() if d.get("status") == "open" and d.get("severity") in BLOCKING]
-    next_phase = "correction" if active else ("clear" if phase == "census" else "final" if phase == "correction" else "clear")
+    if active:
+        next_phase = "correction"
+    elif phase == "census":
+        next_phase = "clear"
+    elif phase == "correction":
+        next_phase = "final"
+    elif phase == "final" and state.get("final_engine") != engine_name:
+        # Another reviewer may discover debt, but its clean response cannot discharge
+        # the cold-final obligation earned by a different reviewer.
+        next_phase = "final"
+    else:
+        next_phase = "clear"
     out = dict(state)
     out.update(phase=next_phase, snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
+    if next_phase == "final":
+        out["final_engine"] = (
+            state["final_engine"] if phase == "final" else engine_name
+        )
+    else:
+        out.pop("final_engine", None)
     out.pop("format_debt", None)
     out.pop("validation_debt", None)
     out.pop("staged_failure", None)
@@ -875,7 +918,9 @@ def trailer(
     elif state.get("unbound_class_ids"):
         lines.append("CONVERGENCE: BLOCKED — class closure remains open.")
     elif phase == "final":
-        lines.append("FINAL-REGRESSION: required")
+        owner = state.get("final_engine")
+        suffix = f" engine={trailer_diagnostic(owner)}" if owner else ""
+        lines.append(f"FINAL-REGRESSION: required{suffix}")
         lines.append("CONVERGENCE: BLOCKED — cold final regression is required.")
     elif phase == "clear" and not debt:
         lines.append("CONVERGENCE: NOT-BLOCKED — staged structural debt is clear.")

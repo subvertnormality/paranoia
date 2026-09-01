@@ -288,6 +288,88 @@ def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
         rc.validate_persisted_state(unbound_state, [])
 
 
+def test_legacy_unowned_final_reenters_census_without_dropping_history():
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="final", last_round=7, debt=[{
+        "id":"D1", "finding_id":"F1", "status":"closed", "severity":cc.MAJOR,
+        "summary":"historic defect", "evidence":["plan:1"], "remedy":"fixed",
+        "source_ids":[], "class_ids":[], "first_round":3, "last_round":6,
+    }])
+
+    normalized = rc.normalize_state(state, stakes="s", snapshot="snapshot")
+
+    assert normalized["phase"] == "census"
+    assert normalized["debt"] == state["debt"]
+    assert "final_engine" not in normalized
+
+
+def test_final_regression_is_discharged_only_by_its_owner():
+    empty = {
+        "debt_updates":[], "debt":[], "source_dispositions":[],
+        "assessment_dispositions":[],
+    }
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="correction", last_round=1)
+    owned = rc.settle_state(
+        state, empty, phase="correction", snapshot="snapshot", round_no=2,
+        engine_name="codex",
+    )
+    assert owned["phase"] == "final"
+    assert owned["final_engine"] == "codex"
+
+    foreign = rc.settle_state(
+        owned, empty, phase="final", snapshot="snapshot", round_no=3,
+        engine_name="claude",
+    )
+    assert foreign["phase"] == "final"
+    assert foreign["final_engine"] == "codex"
+    assert "FINAL-REGRESSION: required engine=codex" in rc.trailer(foreign)
+
+    cleared = rc.settle_state(
+        foreign, empty, phase="final", snapshot="snapshot", round_no=4,
+        engine_name="codex",
+    )
+    assert cleared["phase"] == "clear"
+    assert "final_engine" not in cleared
+
+
+def test_foreign_final_finding_reopens_correction_and_removes_owner():
+    state = rc.normalize_state(None, stakes="s", snapshot="snapshot")
+    state.update(phase="final", final_engine="codex", last_round=2)
+    finding = {
+        "debt_updates":[], "source_dispositions":[], "assessment_dispositions":[],
+        "debt":[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"fresh defect", "evidence":["plan:1"], "remedy":"repair",
+        }],
+    }
+
+    reopened = rc.settle_state(
+        state, finding, phase="final", snapshot="snapshot", round_no=3,
+        engine_name="claude",
+    )
+
+    assert reopened["phase"] == "correction"
+    assert "final_engine" not in reopened
+    assert reopened["debt"][0]["status"] == "open"
+
+
+def test_persisted_final_owner_is_required_only_in_final_phase():
+    final = _closed_persisted_state()
+    final.update(phase="final", final_engine="codex")
+    assert rc.validate_persisted_state(final, [])["final_engine"] == "codex"
+
+    missing = dict(final)
+    missing.pop("final_engine")
+    with pytest.raises(rc.CensusError, match="final_engine"):
+        rc.validate_persisted_state(missing, [])
+
+    misplaced = _closed_persisted_state()
+    misplaced["final_engine"] = "codex"
+    with pytest.raises(rc.CensusError, match="permitted only"):
+        rc.validate_persisted_state(misplaced, [])
+
+
 def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
     anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
     (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
@@ -309,6 +391,8 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
             })
     state = rc.normalize_state(None, stakes="s", snapshot="p")
     state.update(phase=phase, debt=debt, last_round=1)
+    if phase == "final":
+        state["final_engine"] = "fake"
     lineage = cc.Lineage(
         "scope-fixture", mode=mode, classes=classes,
         next_seq=class_count + 1, review_state=state,
@@ -4399,7 +4483,7 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
     before = json.loads(json.dumps(state))
     settled = rc.settle_rebut_concession(
         state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
-        blocking_class_ids=["class-a", "class-b"],
+        blocking_class_ids=["class-a", "class-b"], engine_name="codex",
     )
     assert state == before
     assert settled["phase"] == "correction"
@@ -4414,12 +4498,13 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         with pytest.raises(rc.CensusError, match="unresolved structural state"):
             rc.settle_rebut_concession(
                 invalid, debt_id="D1", class_id="class-a", evidence=["plan:3"],
-                blocking_class_ids=["class-a", "class-b"],
+                blocking_class_ids=["class-a", "class-b"], engine_name="codex",
             )
     with pytest.raises(rc.CensusError, match="unbound blocking classes"):
         rc.settle_rebut_concession(
             state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
             blocking_class_ids=["class-a", "class-b", "class-c"],
+            engine_name="codex",
         )
 
 
@@ -4587,6 +4672,7 @@ def test_final_collision_audit_preserves_class_and_debt_lifecycle(
     stakes = "trusted local tool"
     state = rc.normalize_state({}, stakes=stakes, snapshot="prior")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     state["debt"] = [{
         "id":"D7", "finding_id":"G1", "status":"closed", "severity":"MAJOR",
         "summary":"historic occurrence", "evidence":["plan:1"],
@@ -5070,6 +5156,7 @@ def test_staged_mechanizing_replace_transfers_debt_to_successor(tmp_path):
     (tmp_path / "src" / "a.py").write_text("BROKEN\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     state["debt"] = [{
         "id":"historic", "finding_id":"historic", "status":"closed",
         "severity":"MAJOR", "summary":"past occurrence", "evidence":["repository/src/a.py:1"],
@@ -5492,6 +5579,7 @@ def test_vacuous_mechanized_class_is_repaired_by_same_session_retry(tmp_path):
     (tmp_path / "app.py").write_text("value = next(iter(distinct))\n")
     state = rc.normalize_state({}, stakes="s", snapshot="p")
     state["phase"] = "final"
+    state["final_engine"] = "fake"
     lineage = cc.Lineage(
         "predicate-retry", mode=cc.BRANCH_MODE, review_state=state,
     )

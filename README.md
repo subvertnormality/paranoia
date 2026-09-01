@@ -258,6 +258,11 @@ phases:
 2. **Correction:** later rounds target durable debt and the effects of your fixes.
 3. **Final:** after debt closes, one fresh whole-artifact regression is required.
 
+The engine that closes correction debt owns the resulting final-regression gate.
+A different engine may still report new debt, but its clean result cannot discharge
+that pending gate; the trailer names the required engine. Older unowned final state
+re-enters census once rather than guessing an owner.
+
 A clear census can finish immediately. Otherwise, increase `round` only after
 you have changed the reviewed artifact. Failed or rejected rounds can reuse the
 same label; a successfully settled round requires the next label to increase.
