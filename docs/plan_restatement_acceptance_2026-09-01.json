@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "1b75606ea507b5238393e256360bbe0a8efb1254d607b789e9ac72ef70d05004"
+      "sha256": "272c90a1e9d48887fe6829c5de4a4fc2e953369ed7b927d68c0e8cb0e81d1ef9"
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "b680e7f588d5761867bfce451d897c965417f9419e1b2072f42b0ef2a4c53e81"
+      "sha256": "98c96982517c84272f72aea2c404280a0cf99dfb42304c7fb8fcaf1d9405bed2"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

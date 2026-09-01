@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
-      "sha256": "64e530443b7570199fb2700c9890dd161d28a4e4381a0518d20013ce3bc28023"
+      "sha256": "82c373a0f3300e6efc1c69de1301f07445e4c3a467995774506324d69a7788b3"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
-      "sha256": "22f3602e47bde3099889eddc401e5d2e01aeb2d7d2eca10b78c68865b7003ccf"
+      "sha256": "88d3efd41d91f425725588bac320609bfaa6542620983b14babb1bf4242fcbc8"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.",
-      "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"
+      "sha256": "ac846e0c217f248859e8d505a7c831cbd14489996a931cbbb6352c3e4025ea6f"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
