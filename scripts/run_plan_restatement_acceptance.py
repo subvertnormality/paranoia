@@ -620,7 +620,7 @@ def validate_artifact(
                 f"ROLE: census lane {role.removeprefix('census-')}"
                 if isinstance(role, str) and role.startswith("census-")
                 else '"role":"census"' if role == "consolidation"
-                else '"role": "correction"'
+                else f'"role": "{role}"'
             )
             required_channels = (
                 "raw_sha256", "response_sha256", "failure_detail_sha256",
