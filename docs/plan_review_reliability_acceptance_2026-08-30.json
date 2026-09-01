@@ -2,12 +2,12 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its public-handler acceptance boundary.",
-      "sha256": "5e7a1f8967a22e33be551ad689381c517c356ba79df0173fd0280d626f47217f"
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
+      "sha256": "f2e86fad2f560f1eb651b4c49dc1a514cdcba41fc45f370b5b1cff2439b92c89"
     },
     "README.md": {
-      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, and replay acceptance documentation.",
-      "sha256": "aeea3859a1891df1f3302b4800822f567fd50dfb27383b3e969b938be5776be2"
+      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
+      "sha256": "89b229bb539aab426475e4dcb171d82aa90a84d8f6914c519da8154714488f78"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -1767,12 +1767,12 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its public-handler acceptance boundary without changing deterministic replay behavior.",
-        "sha256": "858c5cbf3926cfe5c501b630482a0a9875264c4ddda0159162032654feb86cd7"
+        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
+        "sha256": "d517b74b6afb066c20a76dbaff58ccf1fc3d36449f80e059393f911e10b0edd9"
       },
       "README.md": {
-        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and replay acceptance without changing deterministic replay behavior.",
-        "sha256": "a089ec35d0288e72347aae695f7297e598852042fce7c687a244e30e2eca83e2"
+        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
+        "sha256": "560ab6d912cc2b9d2c347f29cb5377127d9d6b7d953e18d573eb60f3062d107c"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",

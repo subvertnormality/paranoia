@@ -2,8 +2,8 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its public-handler acceptance boundary while leaving the retained correction-gate run, control state, and source binding unchanged.",
-      "sha256": "979ef24f2c33616333f9a4cd0646d55ed2e0ea9cd2db91c2a40c0cc91911605b"
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged.",
+      "sha256": "03c5755a789a44d0312c2de45078d8aa9cdf1c89ac9d628b0fd65a10fd674013"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
