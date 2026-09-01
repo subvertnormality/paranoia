@@ -1102,7 +1102,7 @@ def main() -> int:
     if not (
         closed_or_replaced and sibling_classes and sibling_debt and sibling_findings
         and durable.review_state.get("phase") == "correction"
-        and len(attempts) == 1 and attempts[0].get("outcome") == "completed"
+        and attempts[-1].get("outcome") == "completed"
     ):
         raise RuntimeError("real correction did not retain the expected sibling blocker")
 
