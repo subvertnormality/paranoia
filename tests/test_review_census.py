@@ -1003,6 +1003,46 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
 
 
+def test_malformed_plan_history_blocks_before_stakes_reopen(
+    repo, tmp_path, monkeypatch,
+):
+    state = rc.normalize_state(None, stakes="old stakes", snapshot="old")
+    state.update(phase="correction", debt=[{}], last_round=1)
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED, procedure="inspect it",
+    )
+    lineage_id = "malformed-history-before-stakes-reopen"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    result = handlers.critique_plan({
+        "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
+        "round":2, "stakes":"new stakes",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+       now=lambda: "PREFLIGHT-BEFORE-REOPEN")
+
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    assert "REOPEN-WAVE:" not in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert reloaded.classes["class-a"].status == cc.CLOSED
+    assert reloaded.review_state["debt"] == [{}]
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
+
+
 @pytest.mark.parametrize("malformed_debt", [
     {},
     ["not-an-object"],

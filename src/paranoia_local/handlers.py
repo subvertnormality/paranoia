@@ -2637,34 +2637,10 @@ def critique_plan(
             closure.release()
             raise
 
-    if closure and closure.lineage is not None:
-        prior_review = closure.lineage.review_state
-        current_stakes_digest = rc.digest(stakes or "")
-        claim_history = pc.normalize_state(closure.lineage.claim_state)
-        unknown_calibration = (
-            not isinstance(prior_review, dict)
-            or prior_review.get("version") != 1
-            or prior_review.get("stakes_digest") != current_stakes_digest
-        )
-        has_prior_state = bool(
-            closure.lineage.rounds or closure.lineage.classes
-            or claim_history["claims"] or claim_history.get("debt")
-            or claim_history.get("plan_snapshot")
-        )
-        if (
-            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
-            and unknown_calibration and has_prior_state
-        ):
-            # Structural calibration and claim authority share the same stakes. When the
-            # claim phase is disabled, retain its packets exactly but remember that no
-            # verdict may freeze across this transition. The next enabled call performs
-            # a full audit over that preserved inventory.
-            closure.lineage.claim_reverify_required = True
-            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
-            closure.reopened_class_ids = tuple(dict.fromkeys(
-                (*closure.reopened_class_ids, *stakes_reopened)
-            ))
-            blocks = closure._blocks()
+    claim_history = pc.normalize_state(
+        closure.lineage.claim_state
+        if closure and closure.lineage is not None else None
+    )
     claim_state: dict[str, Any] = (
         closure.lineage.claim_state
         if closure and closure.lineage is not None
@@ -2750,6 +2726,31 @@ def critique_plan(
                 )
                 attempt_ledger.extend(structural_attempts)
                 staged_preflight_failed = True
+    if closure and closure.lineage is not None and not staged_preflight_failed:
+        prior_review = closure.lineage.review_state
+        current_stakes_digest = rc.digest(stakes or "")
+        unknown_calibration = (
+            not isinstance(prior_review, dict)
+            or prior_review.get("version") != 1
+            or prior_review.get("stakes_digest") != current_stakes_digest
+        )
+        has_prior_state = bool(
+            closure.lineage.rounds or closure.lineage.classes
+            or claim_history["claims"] or claim_history.get("debt")
+            or claim_history.get("plan_snapshot")
+        )
+        if (
+            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+            and unknown_calibration and has_prior_state
+        ):
+            # Do not mutate the active class view until the complete durable structural
+            # register has passed its raw concession/debt preflight above.
+            closure.lineage.claim_reverify_required = True
+            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
+            closure.reopened_class_ids = tuple(dict.fromkeys(
+                (*closure.reopened_class_ids, *stakes_reopened)
+            ))
+            blocks = closure._blocks()
     if claim_verification and not staged_preflight_failed:
         claim_started = time.monotonic()
         if closure and closure.unavailable:

@@ -114,9 +114,13 @@
       "scope": "Adds deterministic source/diff/scope metadata for this retained exchange without changing its provider bytes, settlement, or durable result.",
       "sha256": "fb4e397f16dfd63180d146ba414649be43f1365b50ef38b60c0ebc187899dddd"
     },
+    "src/paranoia_local/handlers.py": {
+      "scope": "Moves stakes-driven class reopening after the existing raw structural-state preflight; it does not alter this retained same-stakes provider exchange.",
+      "sha256": "ed017019c04bb62635bbe3ef26b51b33a78f9334b295cbee190e8e59ed33cdec"
+    },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay and issue #94 regressions without changing this retained provider exchange.",
-      "sha256": "6014eff4793ed8c2697bbd9592b1f88f0cd073807ba40703fd3febbe1ad4df79"
+      "sha256": "2ca4c28ecd17f637994e738a74903fd4da769eb3a98cc105136c14cc415058b5"
     }
   },
   "attempt_ledger": [
