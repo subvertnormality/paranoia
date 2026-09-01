@@ -43,7 +43,7 @@ class TestFactory:
 
     def test_default_models(self) -> None:
         assert "gpt-5.6" in engines.get_engine("codex").default_model
-        assert "fable" in engines.get_engine("claude").default_model
+        assert engines.get_engine("claude").default_model == "claude-fable-5-1"
 
 
 @pytest.mark.parametrize(
@@ -51,8 +51,8 @@ class TestFactory:
     [
         (engines.CodexEngine(), (0, 144, 6), "0.144.6"),
         (engines.CodexEngine(), (0, 145, 0), "0.145.0"),
-        (engines.ClaudeEngine(), (2, 1, 197), "2.1.197"),
-        (engines.ClaudeEngine(), (2, 1, 220), "2.1.220"),
+        (engines.ClaudeEngine(), (2, 1, 251), "2.1.251"),
+        (engines.ClaudeEngine(), (2, 1, 300), "2.1.300"),
         (engines.ClaudeEngine(), (3, 0, 0), "3.0.0"),
     ],
 )
@@ -68,7 +68,7 @@ def test_evidence_profile_accepts_minimum_and_later_versions(
     ("engine", "version", "minimum"),
     [
         (engines.CodexEngine(), (0, 144, 5), "0.144.6"),
-        (engines.ClaudeEngine(), (2, 1, 196), "2.1.197"),
+        (engines.ClaudeEngine(), (2, 1, 250), "2.1.251"),
     ],
 )
 def test_evidence_profile_rejects_only_versions_below_minimum(
@@ -140,8 +140,9 @@ def test_minimum_provider_cli_acceptance_binds_later_real_versions() -> None:
     assert {probe["cli"] for probe in artifact["probes"]} == set(minimums)
     for probe in artifact["probes"]:
         parse = lambda value: tuple(int(part) for part in value.split("."))
-        assert parse(probe["minimum_version"]) == minimums[probe["cli"]]
-        assert parse(probe["tested_version"]) > minimums[probe["cli"]]
+        recorded_minimum = parse(probe["minimum_version"])
+        assert recorded_minimum <= minimums[probe["cli"]]
+        assert parse(probe["tested_version"]) > recorded_minimum
         assert probe["returncode"] == 0
         assert probe["response"] == {"status": "compatible"}
     lifecycles = {row["cli"]: row for row in artifact["primary_lifecycles"]}

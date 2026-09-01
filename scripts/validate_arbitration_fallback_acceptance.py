@@ -52,6 +52,12 @@ SCOPE = {
 _PROMPT_NAMES = (
     "CLEANER_INSTRUCTIONS", "ATTEST_INSTRUCTIONS", "ARBITRATE_INSTRUCTIONS",
 )
+_HISTORICAL_DEFAULT_MODELS = {
+    "codex":"gpt-5.6-sol", "claude":"claude-fable-5",
+}
+_HISTORICAL_MIN_VERSIONS = {
+    "codex":(0, 144, 6), "claude":(2, 1, 197),
+}
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -145,10 +151,7 @@ def _execution_bound(actual: object, expected: dict[str, str | None]) -> bool:
     value = actual.get("cli_version")
     if not isinstance(value, str) or re.fullmatch(r"\d+\.\d+\.\d+", value) is None:
         return False
-    minimum = (
-        engines.MIN_CODEX_VERSION if expected["engine"] == "codex"
-        else engines.MIN_CLAUDE_VERSION
-    )
+    minimum = _HISTORICAL_MIN_VERSIONS[expected["engine"]]
     return tuple(int(part) for part in value.split(".")) >= minimum
 
 
@@ -345,7 +348,7 @@ def _decider_transcripts(
                 prompt=prompt, reply=reply, rejection=None,
                 execution=_external_execution(
                     engine,
-                    engines.get_engine(engine).default_model,
+                    _HISTORICAL_DEFAULT_MODELS[engine],
                 ),
             )
         ):

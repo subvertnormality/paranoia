@@ -36,7 +36,7 @@ You need:
 - Git 2.36 or later on `PATH`; and
 - the reviewing agent's stable CLI, installed and signed in:
   [Codex CLI](https://developers.openai.com/codex) 0.144.6 or later, or
-  [Claude Code](https://code.claude.com) 2.1.197 or later.
+  [Claude Code](https://code.claude.com) 2.1.251 or later.
 
 Most tools need only the reviewer CLI. `arbitrate` uses both vendors and needs
 both CLIs.
