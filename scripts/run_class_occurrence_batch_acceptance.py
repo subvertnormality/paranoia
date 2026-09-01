@@ -61,7 +61,7 @@ def _sha_text(value: str) -> str:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
-    prompt = prompt.replace("PRIOR CONCESSIONS: []\n", "")
+    prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
     start = " concession_challenges is a closed object"
     finish = "Never put class_id inside an outcome or action value."
     if start in prompt:
@@ -73,8 +73,10 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     if found and task_text.startswith("{"):
         task = json.loads(task_text)
         prior = task.pop("prior_concessions", None)
-        if prior not in (None, []):
-            raise ValueError("historical replay cannot discard a concession")
+        if prior not in (None, [], {}):
+            raise ValueError(
+                f"historical replay cannot discard a concession: {prior!r}"
+            )
         prompt = head + found + json.dumps(task, ensure_ascii=False)
     return prompt
 

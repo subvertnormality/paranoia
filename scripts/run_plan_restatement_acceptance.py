@@ -213,7 +213,7 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
-    prompt = prompt.replace("PRIOR CONCESSIONS: []\n", "")
+    prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
     start = " concession_challenges is a closed object"
     finish = "Never put class_id inside an outcome or action value."
     if start in prompt:
@@ -225,7 +225,7 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     if found and task_text.startswith("{"):
         task = json.loads(task_text)
         prior = task.pop("prior_concessions", None)
-        if prior not in (None, []):
+        if prior not in (None, [], {}):
             raise ValueError("historical replay cannot discard a concession")
         compact = task_text.startswith('{"role":"census"')
         task_text = json.dumps(
@@ -389,19 +389,19 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         expected = [
             handlers._staged_lane_prompt(
                 mode=cc.PLAN_MODE, lane=lane, active_classes=[], body=body,
-                prior_concessions_text="[]",
+                prior_concessions_text="{}",
             )
             for lane in sp.LANES[cc.PLAN_MODE]
         ]
         consolidation_body = json.dumps({
             "role":"census", "stakes":STAKES, "manifests":manifests,
-            "active_classes":[], "existing_debt":[], "prior_concessions":[],
+            "active_classes":[], "existing_debt":[], "prior_concessions":{},
         }, ensure_ascii=False, separators=(",", ":"))
         expected.append(prompts.compose(
             f"{prompts.staged_consolidation_instructions(cc.PLAN_MODE)}\n"
             f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
-            "PRIOR CONCESSIONS: []\n"
-            f"{sp.class_decision_instructions(cc.PLAN_MODE, 'census', active_classes=[], prior_concessions=[])}",
+            "PRIOR CONCESSIONS: {}\n"
+            f"{sp.class_decision_instructions(cc.PLAN_MODE, 'census', active_classes=[], prior_concessions={})}",
             consolidation_body,
         ))
         return [_historical_no_concession_prompt(item) for item in expected]
@@ -427,7 +427,7 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     expected_task = {
         "role":role, "stakes":STAKES, "existing_debt":debt,
         "active_classes":handlers._active_class_rows(lineage, cc.PLAN_MODE),
-        "prior_concessions":[],
+        "prior_concessions":{},
         "correction_gates":[],
         "checklist":list(sp.CHECKLIST) if role == "final" else [],
         "artifact":f"=== REVIEW STAKES ===\n{STAKES}\n\n{body}",
@@ -446,8 +446,8 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     instructions = (
         f"{prompts.staged_followup_instructions(cc.PLAN_MODE)}\n"
         f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
-        "PRIOR CONCESSIONS: []\n"
-        f"{sp.class_decision_instructions(cc.PLAN_MODE, role, active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[], prior_concessions=[])}"
+        "PRIOR CONCESSIONS: {}\n"
+        f"{sp.class_decision_instructions(cc.PLAN_MODE, role, active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[], prior_concessions={})}"
     )
     return [_historical_no_concession_prompt(
         prompts.compose(instructions, json.dumps(expected_task, ensure_ascii=False)),
