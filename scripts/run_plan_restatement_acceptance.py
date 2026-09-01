@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from paranoia_local import class_closure as cc
-from paranoia_local import engines, handlers, orientation, review_census as rc
+from paranoia_local import engines, handlers, orientation, prompts, review_census as rc
 from paranoia_local import staged_protocol as sp
 
 OUTPUT = ROOT / "docs" / "plan_restatement_acceptance_2026-09-01.json"
@@ -247,6 +247,59 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
     return {"manifests":[], "settlement":settlement}
 
 
+def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
+    """Render the exact expected provider inputs through production prompt builders."""
+    if roles[0].startswith("census-"):
+        body = handlers._plan_body(
+            sp.ArtifactView.from_text(DISCOVERY_PLAN), None, None, [], True,
+        )
+        body = (
+            f"=== REVIEW STAKES ===\n{STAKES}\n\n{body}\n\n"
+            "The pinned repository evidence root is `repository/`. Treat that prefix "
+            "as the project root; no live Git or web tools are available."
+        )
+        manifests = row["validated_payloads"]["manifests"]
+        expected = [
+            handlers._staged_lane_prompt(
+                mode=cc.PLAN_MODE, lane=lane, active_classes=[], body=body,
+            )
+            for lane in sp.LANES[cc.PLAN_MODE]
+        ]
+        consolidation_body = json.dumps({
+            "role":"census", "stakes":STAKES, "manifests":manifests,
+            "active_classes":[], "existing_debt":[],
+        }, ensure_ascii=False, separators=(",", ":"))
+        expected.append(prompts.compose(
+            f"{prompts.staged_consolidation_instructions(cc.PLAN_MODE)}\n"
+            f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
+            f"{sp.class_decision_instructions(cc.PLAN_MODE, 'census', active_classes=[])}",
+            consolidation_body,
+        ))
+        return expected
+
+    task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
+    if (
+        task.get("role") != "correction" or task.get("stakes") != STAKES
+        or task.get("review_scope") != "targeted" or task.get("checklist") != []
+        or {item.get("class_id") for item in task.get("active_classes", [])}
+        != {"exact-scope", "exact-command", "fail-closed"}
+        or {item.get("id") for item in task.get("existing_debt", [])}
+        != {"D1", "D2", "D3"}
+        or sp.ArtifactView.from_text(TARGETED_PLAN).rendered not in task.get("artifact", "")
+    ):
+        raise ValueError("targeted prompt task differs from the fixed acceptance fixture")
+    outcome_ids = sp.expected_outcome_class_ids(
+        "correction", active_classes=task["active_classes"],
+        durable_debt=task["existing_debt"],
+    )
+    instructions = (
+        f"{prompts.staged_followup_instructions(cc.PLAN_MODE)}\n"
+        f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
+        f"{sp.class_decision_instructions(cc.PLAN_MODE, 'correction', active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[])}"
+    )
+    return [prompts.compose(instructions, json.dumps(task, ensure_ascii=False))]
+
+
 def validate_artifact(
     artifact: dict, root: Path = ROOT, *, require_committed: bool = True,
 ) -> None:
@@ -320,6 +373,8 @@ def validate_artifact(
             raise ValueError("route input binding changed")
         if row["prompt_sha256"] != [_sha_text(item) for item in row["prompts"]]:
             raise ValueError("prompt digest mismatch")
+        if row["prompts"] != _reconstruct_prompts(row, roles):
+            raise ValueError("retained prompts differ from production reconstruction")
         if row["result_sha256"] != _sha_text(row["result_text"]):
             raise ValueError("result digest mismatch")
         attempts = row["audit"].get("attempt_ledger")
