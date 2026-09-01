@@ -905,7 +905,9 @@ def _settle_staged_failure(
     preflight_failure = str(
         getattr(error, "stage_role", "")
     ).endswith("-preflight")
-    preserve_raw_top_level = preflight_failure and not isinstance(raw_state, dict)
+    preserve_raw_top_level = preflight_failure and (
+        not isinstance(raw_state, dict) or raw_state == {}
+    )
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
         and isinstance(raw_state.get("phase"), str)
@@ -914,12 +916,12 @@ def _settle_staged_failure(
     ):
         state = deepcopy(raw_state)
     elif (
-        preflight_failure and isinstance(raw_state, dict)
-        and raw_state.get("version") == 1
+        preflight_failure and isinstance(raw_state, dict) and raw_state
     ):
         # A structural preflight may be rejecting the top-level debt container
-        # itself. Preserve those malformed durable bytes for diagnosis while adding
-        # the structured failure beside them; rendering uses a sanitized projection.
+        # or an older/unknown top-level shape. Preserve every nonempty durable mapping
+        # for diagnosis while replacing only bounded failure fields; exact {} remains
+        # the sole new-lineage authority. Rendering uses a sanitized projection.
         state = deepcopy(raw_state)
     else:
         state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
@@ -4874,7 +4876,11 @@ class _ClosureRound:
         # folding and stakes reopenings are provisional until staged settlement saves.
         self.prepared_lineage = cc.copy_lineage(self.lineage)
         raw_state = self.lineage.review_state
-        if raw_state != {}:
+        canonical_new_state = raw_state == {} and not any((
+            self.lineage.rounds, self.lineage.classes, self.lineage.debt,
+            self.lineage.claim_state, self.lineage.branch_contract,
+        ))
+        if not canonical_new_state:
             active = [
                 item for item in self.lineage.classes.values()
                 if item.status != cc.SUPERSEDED

@@ -1054,11 +1054,18 @@ def test_malformed_plan_history_blocks_before_stakes_reopen(
     (cc.PLAN_MODE, []),
     (cc.PLAN_MODE, ""),
     (cc.BRANCH_MODE, []),
+    (cc.PLAN_MODE, {"version":0, "sentinel":{"keep":True}}),
+    (cc.BRANCH_MODE, {"version":0, "sentinel":{"keep":True}}),
+    (cc.PLAN_MODE, {}),
+    (cc.BRANCH_MODE, {}),
 ])
-def test_public_handler_rejects_falsy_nonmapping_state_before_class_view(
+def test_public_handler_rejects_malformed_top_level_state_before_class_view(
     repo, repo_with_branch, tmp_path, monkeypatch, mode, raw_state,
 ):
-    lineage_id = f"falsy-top-level-{mode}-{type(raw_state).__name__}"
+    raw_label = hashlib.sha256(
+        json.dumps(raw_state, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:8]
+    lineage_id = f"malformed-top-level-{mode}-{type(raw_state).__name__}-{raw_label}"
     tracked = cc.TrackedClass(
         "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED, procedure="inspect it",
     )
@@ -1100,7 +1107,12 @@ def test_public_handler_rejects_falsy_nonmapping_state_before_class_view(
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=mode,
     )
-    assert reloaded.review_state == raw_state
+    if raw_state:
+        assert reloaded.review_state["version"] == 0
+        assert reloaded.review_state["sentinel"] == {"keep":True}
+        assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    else:
+        assert reloaded.review_state == raw_state
     assert reloaded.classes["class-a"].status == cc.CLOSED
 
 
