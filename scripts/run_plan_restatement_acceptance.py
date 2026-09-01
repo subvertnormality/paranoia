@@ -429,9 +429,12 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     invocation, channels = matched
                     if actual != invocation:
                         raise ValueError("public-handler replay invocation differs from retained input")
-                    return replace(
-                        engines.CodexEngine().parse_output(channels["raw"]),
+                    playback_engine = engines.CodexEngine()
+                    return playback_engine._finalize_review(
+                        playback_engine.parse_output(channels["raw"]),
                         returncode=channels["returncode"],
+                        stderr="",
+                        measured_duration_ms=0,
                     )
 
                 engines.CodexEngine.run = playback_run
