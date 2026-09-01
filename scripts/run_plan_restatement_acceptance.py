@@ -742,12 +742,16 @@ def validate_artifact(
     settlement = targeted["audit"]["staged_settlement"]
     if settlement["findings"] or targeted["durable_lineage"]["review_state"]["phase"] != "final":
         raise ValueError("targeted correction discovered unrelated novelty or failed to close")
-    if any(_anchor_covers(anchor, 12) for row in settlement["findings"] for anchor in row["evidence"]):
+    if any(
+        _anchor_covers(anchor, line)
+        for row in settlement["findings"] for anchor in row["evidence"]
+        for line in (13, 14)
+    ):
         raise ValueError("targeted correction audited the unrelated restatement cluster")
     final_findings = final["audit"]["staged_settlement"]["findings"]
     if len(final_findings) != 1 or not all(
         any(_anchor_covers(anchor, line) for anchor in final_findings[0]["evidence"])
-        for line in (12, 13)
+        for line in (13, 14)
     ):
         raise ValueError("cold final did not discover the complete unrelated restatement cluster")
     if final["durable_lineage"]["review_state"]["phase"] != "correction":
