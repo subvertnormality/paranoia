@@ -4711,8 +4711,10 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         ["repository/app.py:1", "repository/extra.py:1"]
     )
     tracked = cc.TrackedClass(
-        "class-0", "every duplicate contract site agrees", cc.MAJOR, 1,
-        cc.OPEN, procedure="inspect every independently anchored site",
+        "class-0",
+        "definitions, call sites, and acceptance properties all agree",
+        cc.MAJOR, 1, cc.OPEN,
+        procedure="inspect definitions, call sites, and acceptance properties",
     )
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
     state.update(phase="correction", debt=[{
@@ -4786,6 +4788,11 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
     assert len(calls) == 2
     assert "exhaustively consolidate every" in calls[0]
     assert "trace every site" in calls[0]
+    assert "class invariant and" in calls[0]
+    assert "procedure as the primary search boundary" in calls[0]
+    assert "every distinct site or property category" in calls[0]
+    assert "definitions, call sites, and acceptance properties all agree" in calls[0]
+    assert "inspect definitions, call sites, and acceptance properties" in calls[0]
     assert "STRUCTURAL-PHASE: correction" in result
     durable = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=mode,
