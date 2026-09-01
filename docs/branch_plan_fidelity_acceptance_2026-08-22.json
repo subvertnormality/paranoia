@@ -10,8 +10,8 @@
       "sha256": "c6e5f806486f67764e641157a9f59fd3547ccd4d9b64a4808d56f18f0f537704"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Shared co-asserting-site guidance plus plan-review-only normative-restatement discovery; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "8cf51eb6d53bc887bf3bcac42ac0245297c7985654c88c4fcd56f43bd251a789"
+      "scope": "Shared co-asserting-site guidance, plan-review-only normative-restatement discovery, and issue #98's invariant-scoped unmechanized follow-up sweep; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained provider exchanges remain historical.",
+      "sha256": "eeb5d00fff326f5216d773d7b15881794725ac7f09dbc20d0262e281f56e6e61"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",

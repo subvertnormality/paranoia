@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "504d2750d2567193cd72630e671227b4561e156b65cd2cdf803b5438ebed3e89"
+      "sha256": "a3fe4791bd83cea399cee9f4392b3561f6be6b31e9ebb2788e892a4361d678fe"
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
-      "sha256": "392b55d3a78e8ea8c8ddde0ceb261bf08ad26143267f9ae63646a73a5cb0f25f"
+      "sha256": "8f1bf7744cc1bee35de0e9d5ee9d1b4ba5f0a382812f877d608007c1bcbc1eda"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
@@ -22,8 +22,8 @@
       "sha256": "7fdfa4eee3a201fba2695d1c06ca946e6b8cd59b7b07f732c2c720e4c8a23c7d"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Issue #94 adds concession-challenge instructions outside the retained normative-restatement exchange.",
-      "sha256": "b422cd26034b14b37a0bdb8ae6a41d7d0c834415bde1e127e58542bf7a427515"
+      "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange.",
+      "sha256": "168e0434c9906c1c284f398e2bbf5e1846cd4aeabd51d03f949b5631dabc0e6b"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",
@@ -39,7 +39,11 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "c3806d68e432c6c546a8a33d1aeabb59a5bb12254aa08081be2c0aec99b532a9"
+      "sha256": "ef9ca1ccb2d419075e60dc40ef72bb3bb9899fb09fd8e1a83d3f2dad739bf93c"
+    },
+    "tests/test_prompts.py": {
+      "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged.",
+      "sha256": "ecea08782ab70f2ce258b0bf7cbdf20b164ba00a609fd257c52bd1cc06390c48"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
