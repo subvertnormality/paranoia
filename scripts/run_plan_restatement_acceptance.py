@@ -229,13 +229,16 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         "establish that the invariant-wide search completed.\n\n",
         "",
     )
+    owns_class_guidance = (
+        "class_outcomes is a closed object permitting exactly these class IDs:" in prompt
+    )
     prompt, count = re.subn(
         r"class_outcomes is a closed object permitting exactly these class IDs: "
         r"\[[^\]]*\]; required keys are exactly: (\[[^\]]*\])\. ",
         r"class_outcomes is a closed object keyed by exactly these required class IDs: \1. ",
         prompt,
     )
-    if count != 1:
+    if owns_class_guidance and count != 1:
         raise ValueError("current prompt omits the #98 class-outcome guidance")
     prompt = prompt.replace(
         "Every close requires an authored satisfied outcome with evidence. When an authoritative "
