@@ -976,6 +976,12 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(
+        handlers.cc, "render_unmechanized",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("class rendering must not precede raw-state validation")
+        ),
+    )
     engine = handlers.eng.CodexEngine()
     result = handlers.critique_plan({
         "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
@@ -983,6 +989,7 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "PREFLIGHT")
     assert calls == []
     assert "CONVERGENCE: BLOCKED" in result
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
     )
@@ -1081,6 +1088,12 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
         raise AssertionError("provider must not run")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(
+        handlers.cc, "sweep",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("class sweep must not precede raw-state validation")
+        ),
+    )
     result = handlers.critique_branch({
         "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
         "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
@@ -1089,6 +1102,7 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
        now=lambda: "BRANCH-PREFLIGHT")
     assert calls == []
     assert "CONVERGENCE: BLOCKED" in result
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
     )

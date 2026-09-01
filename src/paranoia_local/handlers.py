@@ -484,6 +484,12 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
             f"CLASS-REGISTER: {status}\n"
             "CLASS-CLOSURE: STATE-UNAVAILABLE — lineage could not be loaded."
         )
+    if closure.preflight_validation_error is not None:
+        return (
+            f"CLASS-REGISTER: {status}\n"
+            "CLASS-CLOSURE: STATE-UNAVAILABLE — durable structural state failed "
+            "validation before class projection."
+        )
     return cc.render_trailer(
         closure.lineage, register_status=status, include_verdict=False,
     )
@@ -1014,11 +1020,16 @@ def _settle_staged_failure(
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(
             trailer_state,
-            class_first_rounds={
-                item.class_id: item.first_round
-                for item in closure.lineage.blocking()
-            },
-            reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
+            class_first_rounds=(
+                {} if preflight_failure else {
+                    item.class_id:item.first_round
+                    for item in closure.lineage.blocking()
+                }
+            ),
+            reopened_class_ids=(
+                () if preflight_failure
+                else getattr(closure, "reopened_class_ids", ())
+            ),
             session_ref=authorized_failure_session,
             round_label=closure.round_no,
             correction_gates=getattr(closure, "correction_gates", ()),
@@ -1156,7 +1167,6 @@ def _staged_structural_review(
     assert closure.lineage is not None
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
-    _staged_class_context(closure._blocks())
     try:
         persisted_state = lineage.review_state
         state = rc.normalize_state(
@@ -1197,6 +1207,7 @@ def _staged_structural_review(
             else "structural-preflight"
         )
         raise _staged_error(str(exc), role=role, kind="validation") from exc
+    _staged_class_context(closure._blocks())
     stakes_recalibration = (
         isinstance(lineage.review_state, dict)
         and lineage.review_state.get("version") == 1
@@ -4809,6 +4820,7 @@ class _ClosureRound:
         self.claims_enabled = False
         self.reopened_class_ids: tuple[str, ...] = ()
         self.prepared_lineage: cc.Lineage | None = None
+        self.preflight_validation_error: rc.CensusError | None = None
         self.correction_gates: list[dict[str, Any]] = []
         self._latched = latch_owned
         self._settled = False
@@ -4836,6 +4848,21 @@ class _ClosureRound:
         # Rejection atomicity is defined from this point. Branch sweeps, exemption
         # folding and stakes reopenings are provisional until staged settlement saves.
         self.prepared_lineage = cc.copy_lineage(self.lineage)
+        raw_state = self.lineage.review_state
+        if raw_state:
+            active = [
+                item for item in self.lineage.classes.values()
+                if item.status != cc.SUPERSEDED
+            ]
+            try:
+                rc.validate_persisted_state(
+                    raw_state, active, correction_control_source=raw_state,
+                )
+            except rc.CensusError as exc:
+                # The staged public preflight persists the bounded diagnostic. Do not
+                # sweep, project, or render a class view from invalid durable authority.
+                self.preflight_validation_error = exc
+                return []
         self._before_sweep()
         closed_before = {
             item.class_id for item in self.lineage.active()
