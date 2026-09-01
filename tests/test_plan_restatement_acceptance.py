@@ -232,5 +232,7 @@ def test_restatement_acceptance_rejects_nonzero_retained_returncode() -> None:
     artifact["final_control"]["audit_projection"]["attempt_ledger"][0][
         "returncode"
     ] = 17
-    with pytest.raises(ValueError, match="reconstruct returned result|engine failed"):
+    with pytest.raises(
+        ValueError, match="reconstruct audit settlement|reconstruct returned result|engine failed",
+    ):
         acceptance.validate_artifact(artifact, root, require_committed=False)
