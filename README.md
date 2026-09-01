@@ -211,6 +211,10 @@ closes that debt and closes its class only when no sibling blocker remains; it
 never grants clearance, and the next critique still performs the normal final.
 Bound citations use the staged anchor grammar and must resolve before settlement;
 tracked plan reviews retain their line count so repeated `plan:` anchors remain bounded.
+Plan and bound branch-contract prompts display coordinates as `[PLAN-LINE NNNNN]` markers,
+while citations remain `plan:<line>` or `plan:<start>-<end>`. The distinct marker prevents
+line prefixes from resembling `line:column`; validation never guesses, clamps, drops evidence,
+or partially settles an unresolved citation.
 Mechanized branch classes remain predicate-owned and must be closed by a normal
 `critique_branch` sweep rather than a bound rebut.
 

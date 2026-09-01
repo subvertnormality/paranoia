@@ -124,7 +124,7 @@ def _branch_contract_view(
             raise ValueError("plan_digest does not match the supplied branch plan contract")
     lines = tuple(text.split("\n"))
     return _BranchContract(
-        original=text, lines=lines, rendered=external_sources.numbered_lines(lines),
+        original=text, lines=lines, rendered=external_sources.numbered_plan_lines(lines),
         digest=digest, supplied_path=supplied_path, assertion=assertion, reused=reused,
     )
 
@@ -1499,7 +1499,10 @@ def _staged_structural_review(
                 web_search=web_search,
                 response_schema=sp.provider_schema(sp.lane_schema(mode, lane)),
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
-                retry_context=branch_contract_section,
+                retry_context=(
+                    branch_contract_section
+                    or sp.citation_instructions(mode, plan_contract=plan_contract)
+                ),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
             for finding in parsed["findings"]:
@@ -1712,7 +1715,10 @@ def _staged_structural_review(
                 assessment_ids=active_ids if role == "final" else [],
                 known_debt=existing, role=role,
             ),
-            retry_context=branch_contract_section,
+            retry_context=(
+                branch_contract_section
+                or sp.citation_instructions(mode, plan_contract=plan_contract)
+            ),
         )
         attempts.extend(call_attempts)
         rejected_payloads.extend(call_rejected)
