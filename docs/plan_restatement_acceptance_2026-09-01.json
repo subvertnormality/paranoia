@@ -18,7 +18,7 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 adds plan-only validation-retry coordinate guidance; successful provider prompts, settlement, and unrelated behavior are unchanged.",
+      "scope": "Issue #91 adds plan-only validation-retry coordinate guidance; successful provider prompts and settlement are unchanged.",
       "sha256": "a3d8668a75bcb3d562efb0d1bfcc7b57530ba81a82dcf076bd0a3ceef240a8a3"
     },
     "tests/test_plan_restatement_acceptance.py": {

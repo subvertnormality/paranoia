@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
-      "sha256": "80d3d5e28a41983ecc0e9be645ad7c46bb4b9c2a272ab30e8b17a03807090cc3"
+      "sha256": "f46e48ebcf986a3697e28aeb2be9b91635a2a0ec00eacdd77c6558971cc18238"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged class persistence, reopen derivation, or mechanized matching.",
