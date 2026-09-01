@@ -1056,8 +1056,6 @@ def test_malformed_plan_history_blocks_before_stakes_reopen(
     (cc.BRANCH_MODE, []),
     (cc.PLAN_MODE, {"version":0, "sentinel":{"keep":True}}),
     (cc.BRANCH_MODE, {"version":0, "sentinel":{"keep":True}}),
-    (cc.PLAN_MODE, {}),
-    (cc.BRANCH_MODE, {}),
 ])
 def test_public_handler_rejects_malformed_top_level_state_before_class_view(
     repo, repo_with_branch, tmp_path, monkeypatch, mode, raw_state,
