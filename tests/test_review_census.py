@@ -3422,11 +3422,17 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert artifact["fixture"]["class_first_round"] == 1
     assert artifact["fixture"]["round"] == 3
     assert artifact["fixture"]["final_engine"] == "codex"
-    assert artifact["attempt_ledger"] == [{
-        **artifact["attempt_ledger"][0],
-        "role": "final", "outcome": "completed", "returncode": 0,
-    }]
-    assert artifact["attempt_ledger"][0]["session_ref"]
+    attempts = artifact["attempt_ledger"]
+    assert 1 <= len(attempts) <= 2
+    assert all(row["role"] == "final" for row in attempts[:1])
+    assert all(
+        row["role"] == "final-validation-retry"
+        and row["outcome"] == "completed" and row["returncode"] == 0
+        for row in attempts[1:]
+    )
+    assert attempts[-1]["outcome"] == "completed"
+    assert all(row["outcome"] == "validation-invalid" for row in attempts[:-1])
+    assert attempts[-1]["session_ref"]
     assert artifact["settlement"]["class_records"] == [{
         "op": "reopen", "class_id": artifact["fixture"]["class_id"],
     }]
@@ -3437,7 +3443,7 @@ def test_real_code_branch_class_persistence_acceptance_is_source_bound() -> None
     assert "PERSISTENCE: 60c1a55e currently open; round-label span 3" in result
     assert "REOPEN-WAVE: 1 previously closed class(es) reopened this round" in result
     assert result.count(
-        "rebut with session_ref=" + artifact["attempt_ledger"][0]["session_ref"]
+        "rebut with session_ref=" + attempts[-1]["session_ref"]
     ) == 1
     assert "CONVERGENCE: BLOCKED" in result
 

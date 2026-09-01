@@ -140,7 +140,11 @@ def main() -> int:
     } not in settlement.get("class_records", []):
         raise RuntimeError("accepted settlement omitted the derived reopen record")
     attempts = audit.get("attempt_ledger", [])
-    if not attempts or any(row.get("outcome") != "completed" for row in attempts):
+    if (
+        not 1 <= len(attempts) <= 2
+        or attempts[-1].get("outcome") != "completed"
+        or any(row.get("outcome") != "validation-invalid" for row in attempts[:-1])
+    ):
         raise RuntimeError("acceptance did not complete through the provider route")
 
     source_revision = _run("git", "rev-parse", "HEAD", cwd=ROOT)

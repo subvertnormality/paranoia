@@ -643,8 +643,12 @@ def validate_artifact(
         raise ValueError("audit gate projection mismatch")
     if audit.get("attempt_ledger") != attempts:
         raise ValueError("attempt ledger is not exact")
-    if not isinstance(attempts, list) or len(attempts) != 1:
-        raise ValueError("closure-sweep acceptance requires exactly one provider attempt")
+    if (
+        not isinstance(attempts, list) or not 1 <= len(attempts) <= 2
+        or attempts[-1].get("outcome") != "completed"
+        or any(row.get("outcome") != "validation-invalid" for row in attempts[:-1])
+    ):
+        raise ValueError("closure-sweep acceptance exceeded its bounded retry topology")
     if artifact["provider_call_count"] != len(attempts):
         raise ValueError("provider call count mismatch")
     if any(
@@ -1023,8 +1027,8 @@ def main() -> int:
     attempts = audit.get("attempt_ledger")
     if not isinstance(attempts, list) or not 1 <= len(attempts) <= 2:
         raise RuntimeError("acceptance exceeded the correction plus one retry topology")
-    if len(captured_prompts) != 1:
-        raise RuntimeError("acceptance did not use exactly one captured correction prompt")
+    if len(captured_prompts) != len(attempts):
+        raise RuntimeError("captured correction prompts do not match provider attempts")
     durable = cc.load_lineage(state_root, LINEAGE, stamp="reload", mode=cc.PLAN_MODE)
     closed_or_replaced = durable.classes[CLASS_ID].status in {cc.CLOSED, cc.SUPERSEDED}
     sibling_classes = [durable.classes[SIBLING_CLASS_ID]]
