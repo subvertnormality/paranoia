@@ -301,6 +301,26 @@ The same check runs before a non-debt-bound correction finding can derive its vi
 `classification.assessment_evidence`.
 Correction settlement rejects any prospective state with more than one open debt for an active class.
 
+Broad plan census and final roles also inspect proactively for one normative contract stated as
+authoritative in multiple operative locations, even before the copies visibly disagree. They ask
+for one authoritative definition with references or derived projections elsewhere. This is a
+semantic review duty, not a repeated-token lint: examples, faithful table explanations, generated
+projections, and summaries that explicitly defer to the governing definition remain valid.
+Targeted correction does not reopen unrelated plan material for this audit.
+The retained real-provider acceptance in
+`docs/plan_restatement_acceptance_2026-09-01.json` binds the four-call broad census,
+the complete operative restatement cluster, the deferred-example exemption, durable settlement,
+and a separate targeted-correction scope control to exact prompts and source bytes. It then
+continues that lineage through a real cold final, where the previously out-of-scope duplicate
+contract is discovered and persisted. The validator replays every retained raw provider envelope
+through the production extractor and public `critique_plan` handler from source-derived initial
+lineages, and requires the returned result, replayable audit projection, and complete durable
+successor to match. The source inventory covers the complete executable `paranoia_local` package;
+raw stdout is the sole text-channel authority. Parsed response, session, usage, and failure detail
+are derived from it; the observed subprocess return code is retained separately and drives replay.
+Process stderr and local wall-clock duration are deliberately not claimed because neither can be
+independently reproduced from stdout.
+
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
 

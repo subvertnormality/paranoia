@@ -397,6 +397,13 @@ of the resulting code and tests.
   a fixed round count. When a finding changes a rule, value, schema, lifecycle, or ordering
   contract, require its evidence and remedy to cover every material co-asserting site in the
   complete artifact, including definitions, call sites, tests, and fixtures in branch review.
+  Retained acceptance for the plan-restatement duty must exercise both broad plan roles through
+  the public handler, bind the complete executable package source, and reconstruct each exact
+  provider invocation, returned result, replayable audit projection, and durable successor from
+  source-derived initial state. Retain raw provider stdout as the sole text-channel authority;
+  derive parsed response, session, usage, and failure detail through the bound extractor, retain
+  the observed subprocess return code separately and apply it during replay, and exclude
+  non-reproducible process stderr and wall-clock observations from the proof.
   For each existing class, aggregate every independently anchored current occurrence into its one
   governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
   Before predecessor debt can close, require the fresh governing finding to contain every
@@ -413,6 +420,13 @@ of the resulting code and tests.
   and broad cold final lifecycle; its external claim register remains out of scope. Do not reopen external inventory for repository
   mechanics or “missing atomic bridges,” and do not repeatedly hunt unrelated unchanged material
   for novelty between the census and final regression.
+  During broad plan census and final, proactively inspect for one normative contract asserted as
+  independently authoritative at multiple operative sites, even before the copies drift. Require
+  one authoritative definition and references or derived projections elsewhere, while exempting
+  worked examples, faithful table/prose explanations, generated projections, summaries that
+  explicitly defer to the authority, and coincidentally equal tokens. Keep this semantic and
+  reviewer-owned; do not add textual duplicate heuristics, a provider call, or unrelated discovery
+  during targeted correction.
   Surface every currently blocking class spanning at least three caller round labels with its
   round-label span, current-debt start label, and current reviewer session for `rebut`; do not infer a per-round
   presence count that durable state does not store. Mark any class reopen transition as a reopen

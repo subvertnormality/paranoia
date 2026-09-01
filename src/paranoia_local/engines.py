@@ -226,39 +226,55 @@ class Engine(ABC):
                         "claude did not return the requested structured_output object"
                     ),
                 )
+        return self._finalize_review(
+            review,
+            returncode=result.returncode,
+            stderr=result.stderr,
+            measured_duration_ms=measured_duration_ms,
+        )
+
+    def _finalize_review(
+        self,
+        review: Review,
+        *,
+        returncode: int,
+        stderr: str,
+        measured_duration_ms: int,
+    ) -> Review:
+        """Apply process outcome semantics to an already parsed provider response."""
         # A review is failed if the process exited non-zero OR the engine reported an
         # in-band error (e.g. Claude's is_error) — the latter can occur with rc 0 and
         # non-empty stdout, which the old "rc != 0 AND empty stdout" gate silently
         # swallowed, defeating any downstream fallback.
-        failed = result.returncode != 0 or review.error
-        stderr = result.stderr if result.stderr else None
+        failed = returncode != 0 or review.error
+        retained_stderr = stderr if stderr else None
         failure_detail = (
             (
-                review.failure_detail or (result.stderr if result.stderr.strip() else None)
-                or f"{self.name} exited with return code {result.returncode}"
-            ) if result.returncode != 0
+                review.failure_detail or (stderr if stderr.strip() else None)
+                or f"{self.name} exited with return code {returncode}"
+            ) if returncode != 0
             else review.failure_detail
         )
         if failed and not (review.text or "").strip():
             detail = failure_detail or review.raw or "engine failure"
             return Review(
                 text=(
-                    f"[paranoia-local error] {self.name} exited {result.returncode}: "
+                    f"[paranoia-local error] {self.name} exited {returncode}: "
                     f"{detail.strip()[:2000]}"
                 ),
                 session_ref=review.session_ref,
-                raw=result.stdout,
-                returncode=result.returncode,
+                raw=review.raw,
+                returncode=returncode,
                 error=True,
                 duration_ms=measured_duration_ms,
                 failure_detail=detail,
-                stderr=stderr,
+                stderr=retained_stderr,
                 provider_duration_ms=review.duration_ms,
             )
         return replace(
-            review, returncode=result.returncode, error=failed,
+            review, returncode=returncode, error=failed,
             duration_ms=measured_duration_ms,
-            failure_detail=failure_detail, stderr=stderr,
+            failure_detail=failure_detail, stderr=retained_stderr,
             provider_duration_ms=review.duration_ms,
         )
 

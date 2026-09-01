@@ -2,12 +2,12 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Debt-targeted rebut settlement and arbitration-only failure taxonomy contract.",
-      "sha256": "5b4ff2bf52cc775b612fd5ea1d16a396e3e0600466150876f29b01ab0f93da57"
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
+      "sha256": "64e530443b7570199fb2700c9890dd161d28a4e4381a0518d20013ce3bc28023"
     },
     "README.md": {
-      "scope": "Public bound-rebut settlement documentation.",
-      "sha256": "a927eb554f8388218e028677dd7e742e58b5775a15626d4f1cc2f69754d7b128"
+      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
+      "sha256": "22f3602e47bde3099889eddc401e5d2e01aeb2d7d2eca10b78c68865b7003ccf"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -22,8 +22,8 @@
       "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Bound-rebut structured instructions; retained plan review roles are unchanged.",
-      "sha256": "6d828676723ed3b6be6ac041317cad90c046924bd8c0d5b96b777e4b9716489d"
+      "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
+      "sha256": "014a64f0efcab7adbafd5691b605ee26e7bb8e75c192770b8ad18552faee06a7"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance.",
@@ -34,12 +34,12 @@
       "sha256": "a24889f41352cdcee62ea3a86b13111479321586baf277fe68121e691837d8a8"
     },
     "tests/test_prompts.py": {
-      "scope": "Arbitration-only original-option advocacy prompt regression; retained plan review behavior is unchanged.",
-      "sha256": "eda9d3ea4d55b9fadd9098e0a091dfafd266c55718f960be3efec63a258776d4"
+      "scope": "Arbitration advocacy and plan normative-restatement prompt regressions; retained provider exchanges remain unchanged.",
+      "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
     },
     "tests/test_review_census.py": {
-      "scope": "Phase projection and rebut settlement regressions plus updated prompt digest.",
-      "sha256": "8e2e2fc54a1fcb69e2eb8463510fa03fd06bf791d3be7030a03d4837e344fde6"
+      "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions.",
+      "sha256": "59aee5982f1ebf85a67335cf7f0854a32d50c33e4d8511f6977e79c231cb3d3a"
     }
   },
   "assertions": [
@@ -1767,8 +1767,12 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Adds arbitration-only failure taxonomy without changing deterministic plan-review replay behavior.",
-        "sha256": "7c74b6cd286f72118656186cff1e026f92260709bf66a86dbb62d8e394442c86"
+        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
+        "sha256": "4a04b14624d6c9deb95e4cd2ca7a42e29fa6935218da5d6507b014fb95ee94d1"
+      },
+      "README.md": {
+        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
+        "sha256": "6a28d819dacb1a2ff3c2df7dde456c3697e204a6ea34c34633f73022faad6ad1"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
@@ -1779,8 +1783,8 @@
         "sha256": "7fff5b549f2e70b383c0a115ee76f9a5a234b1e8815ee592a72d6388c13b1695"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds the closed-predecessor/current-successor rebut debt-id regression without changing deterministic replay behavior.",
-        "sha256": "0c52f35f51002315707bc263a736d0fcd1f3a636ed2d095e6a20c43ea079193c"
+        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior.",
+        "sha256": "8ba9b7c4906df30a62fd12403991a5221746049b523ea56fc2c4e9b80db50a62"
       }
     },
     "checks": {

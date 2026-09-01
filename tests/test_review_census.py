@@ -443,7 +443,7 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "e0f6e28736a5bbe7aa1cbb43edfd8a00e4415ce81a0e84e70fe899a28e83f9bf",
+            "7feff6a654de54fd12a1fe76c0bf4fe7768f29cf1a88fc77d98e1beea7b2cb88",
         "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
         "clear",
     ),

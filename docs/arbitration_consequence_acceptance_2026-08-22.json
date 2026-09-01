@@ -9,9 +9,13 @@
       "scope": "Adds the symmetric attester reply-size circuit breaker; the retained consequence-only successful exchange stays below both reply limits.",
       "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"
     },
+    "src/paranoia_local/engines.py": {
+      "scope": "Factors existing subprocess-result finalization into a reusable production step; arbitration behavior and the retained provider exchange are unchanged.",
+      "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
+    },
     "src/paranoia_local/prompts.py": {
-      "scope": "Shared staged-review guidance plus field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",
-      "sha256": "a224199e2efebbf0c3322368ac6c8ede40b156a464a60bd00a0f33a30c41bb33"
+      "scope": "Shared staged-review guidance, unrelated plan normative-restatement discovery, and field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",
+      "sha256": "2ace7d78eeda462e1b2eb00d9d9c6ac9b21008fc10adab962b3dbbda8138d2b8"
     }
   },
   "audit": {

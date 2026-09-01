@@ -147,6 +147,23 @@ class TestStagedReviewInstructions:
             prompts.staged_followup_instructions("branch")
         )
 
+    def test_normative_restatement_audit_is_plan_only_and_scope_aware(self) -> None:
+        for text in (
+            prompts.staged_census_instructions("plan", "domain"),
+            prompts.staged_followup_instructions("plan"),
+        ):
+            assert prompts.PLAN_RESTATEMENT_INSTRUCTIONS in text
+            assert "independently authoritative" in text
+            assert "repeated tokens or equal numbers alone" in text
+            assert "review_scope `targeted`" in text
+
+        assert prompts.PLAN_RESTATEMENT_INSTRUCTIONS not in (
+            prompts.staged_census_instructions("branch", "domain")
+        )
+        assert prompts.PLAN_RESTATEMENT_INSTRUCTIONS not in (
+            prompts.staged_followup_instructions("branch")
+        )
+
     def test_plan_anchors_have_one_unambiguous_spelling(self) -> None:
         for text in (
             prompts.staged_census_instructions("plan", "domain"),

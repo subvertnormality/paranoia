@@ -161,6 +161,22 @@ remedy cover them together; do not propose or accept a one-site repair that woul
 rule asserted elsewhere."""
 
 
+PLAN_RESTATEMENT_INSTRUCTIONS = """## Proactive normative-restatement audit
+
+During a broad plan census or final, identify rules, thresholds, identifiers, measured values, and
+other normative contracts that the plan states as independently authoritative in more than one
+place. Treat multiple sources of authority as one structural defect even while their wording still
+agrees: require one authoritative definition and make the other operative sites cite or derive from
+it, so one edit cannot make the contract internally inconsistent. Cite the complete independently
+operative cluster in the finding.
+
+Do not infer a defect from repeated tokens or equal numbers alone. Worked examples, a table and its
+faithful prose explanation, generated projections, and summaries that explicitly defer to the
+authoritative definition may repeat a value legitimately. Judge semantic authority from context.
+When the task role is correction with review_scope `targeted`, do not use this audit to hunt
+unrelated novelty; apply it only to the supplied debt, classes, repairs, and transitive effects."""
+
+
 PLAN_REVIEW_CORE_INSTRUCTIONS = PLAN_REVIEW_INSTRUCTIONS
 PLAN_REVIEW_INSTRUCTIONS += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
 
@@ -416,6 +432,7 @@ def staged_census_instructions(
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     if mode == "plan":
         instructions += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        instructions += "\n\n" + PLAN_RESTATEMENT_INSTRUCTIONS
     return instructions + "\n\n" + COASSERTION_INSTRUCTIONS
 
 
@@ -430,6 +447,7 @@ def staged_followup_instructions(mode: str, *, plan_contract: bool = False) -> s
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     if mode == "plan":
         instructions += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        instructions += "\n\n" + PLAN_RESTATEMENT_INSTRUCTIONS
     return instructions + "\n\n" + COASSERTION_INSTRUCTIONS
 
 
