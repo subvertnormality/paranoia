@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,7 @@ from paranoia_local import staged_protocol as sp
 OUTPUT = ROOT / "docs" / "plan_restatement_acceptance_2026-09-01.json"
 DISCOVERY_LINEAGE = "plan-restatement-discovery-acceptance-20260901"
 TARGETED_LINEAGE = "plan-restatement-targeted-control-20260901"
+FINAL_LINEAGE = TARGETED_LINEAGE
 STAKES = (
     "One trusted operator and OS; repository and plan bytes are untrusted data only; "
     "no repository execution, hostile local race, compromised OS, or multitenancy; "
@@ -92,14 +94,16 @@ def _load_one(directory: Path, pattern: str) -> dict:
 
 def _capture_call(
     arguments: dict, *, state_root: Path, log_dir: Path,
-) -> tuple[str, list[str], dict, dict, list[dict]]:
+) -> tuple[str, list[str], dict, dict, list[dict], list[dict]]:
     prompts: list[str] = []
     channels: dict[str, dict] = {}
+    invocations: list[dict] = []
     original_run = engines.CodexEngine.run
     original_resume = engines.CodexEngine.resume
 
     def capture_run(self, prompt, *args, **kwargs):
         prompts.append(prompt)
+        invocations.append(_invocation(prompt, kwargs))
         review = original_run(self, prompt, *args, **kwargs)
         channels[review.session_ref or f"missing-{len(channels)}"] = {
             "session_ref":review.session_ref, "response_text":review.text or "",
@@ -111,6 +115,7 @@ def _capture_call(
 
     def capture_resume(self, session_ref, prompt, *args, **kwargs):
         prompts.append(prompt)
+        invocations.append(_invocation(prompt, kwargs))
         review = original_resume(self, session_ref, prompt, *args, **kwargs)
         channels[review.session_ref or f"missing-{len(channels)}"] = {
             "session_ref":review.session_ref, "response_text":review.text or "",
@@ -151,7 +156,25 @@ def _capture_call(
         json.dumps(ordered_channels, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return result, prompts, audit, lineage, ordered_channels
+    (log_dir / "exact_invocations.json").write_text(
+        json.dumps(invocations, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return result, prompts, audit, lineage, ordered_channels, invocations
+
+
+def _invocation(prompt: str, kwargs: dict) -> dict:
+    schema = kwargs.get("response_schema")
+    schema_text = json.dumps(
+        schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return {
+        "prompt_sha256": _sha_text(prompt), "model": kwargs.get("model"),
+        "effort": kwargs.get("effort"), "timeout": kwargs.get("timeout"),
+        "web_search": kwargs.get("web_search"),
+        "response_schema_sha256": _sha_text(schema_text),
+        "response_schema": schema,
+    }
 
 
 def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
@@ -176,19 +199,25 @@ def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
     return classes, debt
 
 
-def _targeted_seed(state_root: Path) -> None:
-    parent = orientation.resolve_head(ROOT)
-    snapshot = orientation.wrap_commit(
-        ROOT, orientation.snapshot_tree(ROOT, parent), parent,
-    )
+def _targeted_initial(snapshot: str) -> cc.Lineage:
     structural = rc.digest(f"{TARGETED_PLAN}\0{snapshot}")
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural)
     classes, debt = _targeted_components()
     state.update(phase="correction", last_round=1, debt=debt)
-    cc.save_lineage(state_root, cc.Lineage(
+    return cc.Lineage(
         TARGETED_LINEAGE, rounds=1, next_seq=4, classes=classes,
         review_state=state, mode=cc.PLAN_MODE,
-    ))
+    )
+
+
+def _targeted_seed(state_root: Path) -> cc.Lineage:
+    parent = orientation.resolve_head(ROOT)
+    snapshot = orientation.wrap_commit(
+        ROOT, orientation.snapshot_tree(ROOT, parent), parent,
+    )
+    lineage = _targeted_initial(snapshot)
+    cc.save_lineage(state_root, lineage)
+    return lineage
 
 
 def _anchor_covers(anchor: object, line: int) -> bool:
@@ -245,8 +274,9 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
         return {"manifests":manifests, "settlement":settlement}
 
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
+    role = roles[0]
     settlement = sp.materialize_decision(
-        responses[0], mode=cc.PLAN_MODE, role="correction",
+        responses[0], mode=cc.PLAN_MODE, role=role,
         active_classes=task["active_classes"], durable_debt=task["existing_debt"],
     )
     return {"manifests":[], "settlement":settlement}
@@ -282,11 +312,16 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         ))
         return expected
 
-    classes, debt = _targeted_components()
-    lineage = cc.Lineage(
-        TARGETED_LINEAGE, rounds=1, next_seq=4, classes=classes,
-        review_state={"debt":debt}, mode=cc.PLAN_MODE,
-    )
+    role = roles[0]
+    if role == "final":
+        lineage = cc._from_json(FINAL_LINEAGE, row["initial_lineage"])
+        debt = [item for item in lineage.review_state["debt"] if item["status"] == "open"]
+    else:
+        classes, debt = _targeted_components()
+        lineage = cc.Lineage(
+            TARGETED_LINEAGE, rounds=1, next_seq=4, classes=classes,
+            review_state={"debt":debt}, mode=cc.PLAN_MODE,
+        )
     body = handlers._plan_body(
         sp.ArtifactView.from_text(TARGETED_PLAN), None, None, [], True,
         class_blocks=[cc.render_unmechanized(lineage)],
@@ -296,25 +331,117 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         "as the project root; no live Git or web tools are available."
     )
     expected_task = {
-        "role":"correction", "stakes":STAKES, "existing_debt":debt,
+        "role":role, "stakes":STAKES, "existing_debt":debt,
         "active_classes":handlers._active_class_rows(lineage, cc.PLAN_MODE),
-        "correction_gates":[], "checklist":[],
+        "correction_gates":[],
+        "checklist":list(sp.CHECKLIST) if role == "final" else [],
         "artifact":f"=== REVIEW STAKES ===\n{STAKES}\n\n{body}",
-        "review_scope":"targeted",
     }
+    if role == "correction":
+        expected_task["review_scope"] = "targeted"
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
     if task != expected_task:
         raise ValueError("targeted prompt task differs from its seeded production reconstruction")
     outcome_ids = sp.expected_outcome_class_ids(
-        "correction", active_classes=task["active_classes"],
+        role, active_classes=task["active_classes"],
         durable_debt=task["existing_debt"],
     )
     instructions = (
         f"{prompts.staged_followup_instructions(cc.PLAN_MODE)}\n"
         f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
-        f"{sp.class_decision_instructions(cc.PLAN_MODE, 'correction', active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[])}"
+        f"{sp.class_decision_instructions(cc.PLAN_MODE, role, active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[])}"
     )
     return [prompts.compose(instructions, json.dumps(expected_task, ensure_ascii=False))]
+
+
+def _replay_public_handler(artifact: dict, source_tree: str) -> None:
+    """Rebuild results and durable successors through the production public handler."""
+    routes = (
+        ("discovery", artifact["discovery"], DISCOVERY_PLAN, 1),
+        ("targeted", artifact["targeted_control"], TARGETED_PLAN, 2),
+        ("final", artifact["final_control"], TARGETED_PLAN, 3),
+    )
+    original_run = engines.CodexEngine.run
+    original_resume = engines.CodexEngine.resume
+    original_head = orientation.resolve_head
+    original_tree = orientation.snapshot_tree
+    previous_root = os.environ.get(cc.STATE_ROOT_ENV)
+    with tempfile.TemporaryDirectory(prefix="plan-restatement-replay-") as raw_root:
+        replay_root = Path(raw_root)
+        os.environ[cc.STATE_ROOT_ENV] = str(replay_root / "state")
+        orientation.resolve_head = lambda repo: artifact["source_revision"]
+        orientation.snapshot_tree = lambda repo, parent: source_tree
+        try:
+            for name, row, plan, round_no in routes:
+                if name == "targeted":
+                    cc.save_lineage(
+                        replay_root / "state",
+                        cc._from_json(TARGETED_LINEAGE, row["initial_lineage"]),
+                    )
+                expected_invocations = iter(row["exact_invocations"])
+                expected_channels = iter(row["exact_attempt_channels"])
+
+                def playback_run(self, prompt, *args, **kwargs):
+                    try:
+                        invocation = next(expected_invocations)
+                        channels = next(expected_channels)
+                    except StopIteration as exc:
+                        raise ValueError("public-handler replay admitted an extra provider call") from exc
+                    if _invocation(prompt, kwargs) != invocation:
+                        raise ValueError("public-handler replay invocation differs from retained input")
+                    parsed = engines.CodexEngine().parse_output(channels["raw"])
+                    return replace(
+                        parsed, stderr=channels["stderr"],
+                        failure_detail=channels["failure_detail"],
+                        returncode=channels["returncode"],
+                    )
+
+                engines.CodexEngine.run = playback_run
+                engines.CodexEngine.resume = lambda *args, **kwargs: playback_run(
+                    args[0], args[2], *args[3:], **kwargs
+                )
+                log_dir = replay_root / f"{name}-logs"
+                result = handlers.critique_plan({
+                    "repo_path":str(ROOT), "plan_text":plan,
+                    "lineage":row["lineage"], "round":round_no,
+                    "class_closure":True, "claim_verification":False,
+                    "web_search":False, "model":"gpt-5.6-sol",
+                    "effort":"high", "stakes":STAKES,
+                }, engine=engines.CodexEngine(), log_dir=log_dir,
+                   now=lambda: row["audit"]["timestamp"])
+                try:
+                    next(expected_invocations)
+                    raise ValueError("public-handler replay omitted a retained invocation")
+                except StopIteration:
+                    pass
+                replay_audit = _load_one(log_dir, "*-critique_plan-*.json")
+                replay_lineage = json.loads(
+                    (cc.lineage_dir(replay_root / "state") / f"{row['lineage']}.json")
+                    .read_text(encoding="utf-8")
+                )
+                if result != row["result_text"]:
+                    raise ValueError("public-handler replay did not reconstruct returned result")
+                if replay_lineage != row["durable_lineage"]:
+                    raise ValueError("public-handler replay did not reconstruct durable lineage")
+                stable_audit_keys = (
+                    "text", "session_ref", "returncode", "error", "round", "lineage",
+                    "register_status", "staged_manifests", "staged_settlement",
+                    "rendered_trailer", "rejected_payloads", "correction_gates",
+                )
+                if any(
+                    replay_audit.get(key) != row["audit"].get(key)
+                    for key in stable_audit_keys
+                ):
+                    raise ValueError("public-handler replay did not reconstruct audit settlement")
+        finally:
+            engines.CodexEngine.run = original_run
+            engines.CodexEngine.resume = original_resume
+            orientation.resolve_head = original_head
+            orientation.snapshot_tree = original_tree
+            if previous_root is None:
+                os.environ.pop(cc.STATE_ROOT_ENV, None)
+            else:
+                os.environ[cc.STATE_ROOT_ENV] = previous_root
 
 
 def validate_artifact(
@@ -323,7 +450,8 @@ def validate_artifact(
     expected = {
         "acceptance_kind", "version", "date", "source_revision", "source_sha256",
         "allowed_later_source_diffs",
-        "provider", "stakes", "discovery", "targeted_control", "claims",
+        "provider", "stakes", "discovery", "targeted_control", "final_control",
+        "claims",
     }
     if set(artifact) != expected:
         raise ValueError("acceptance envelope is not closed")
@@ -374,16 +502,30 @@ def validate_artifact(
 
     discovery = artifact["discovery"]
     targeted = artifact["targeted_control"]
+    final = artifact["final_control"]
+    tree = _git("rev-parse", f"{revision}^{{tree}}")
+    source_snapshot = orientation.wrap_commit(root, tree, revision)
+    expected_discovery_initial = cc._to_json(
+        cc.Lineage(DISCOVERY_LINEAGE, mode=cc.PLAN_MODE)
+    )
+    expected_targeted_initial = cc._to_json(_targeted_initial(source_snapshot))
+    if discovery.get("initial_lineage") != expected_discovery_initial:
+        raise ValueError("discovery initial lineage is not source-derived")
+    if targeted.get("initial_lineage") != expected_targeted_initial:
+        raise ValueError("targeted initial lineage is not source-derived")
+    if final.get("initial_lineage") != targeted.get("durable_lineage"):
+        raise ValueError("final initial lineage is not the targeted durable successor")
     for row, plan, lineage_id, roles in (
         (discovery, DISCOVERY_PLAN, DISCOVERY_LINEAGE,
          ["census-domain", "census-execution", "census-integrity", "consolidation"]),
         (targeted, TARGETED_PLAN, TARGETED_LINEAGE, ["correction"]),
+        (final, TARGETED_PLAN, FINAL_LINEAGE, ["final"]),
     ):
         if set(row) != {
             "lineage", "plan", "prompts", "prompt_sha256", "result_text",
             "result_sha256", "audit", "durable_lineage", "validated_payloads",
             "validated_payload_sha256", "provider_response_sha256",
-            "exact_attempt_channels",
+            "exact_attempt_channels", "exact_invocations", "initial_lineage",
         }:
             raise ValueError("route record is not closed")
         if row["lineage"] != lineage_id or row["plan"] != plan:
@@ -392,6 +534,8 @@ def validate_artifact(
             raise ValueError("prompt digest mismatch")
         if row["prompts"] != _reconstruct_prompts(row, roles):
             raise ValueError("retained prompts differ from production reconstruction")
+        if len(row["exact_invocations"]) != len(row["prompts"]):
+            raise ValueError("exact invocation inventory does not match provider calls")
         if row["result_sha256"] != _sha_text(row["result_text"]):
             raise ValueError("result digest mismatch")
         attempts = row["audit"].get("attempt_ledger")
@@ -454,6 +598,26 @@ def validate_artifact(
                 raise ValueError("exact return code differs from the attempt ledger")
             if channels["error"] is not False or channels["usage"] != attempt["usage"]:
                 raise ValueError("exact parser status or usage differs from the attempt ledger")
+        for prompt, invocation in zip(
+            row["prompts"], row["exact_invocations"], strict=True,
+        ):
+            if set(invocation) != {
+                "prompt_sha256", "model", "effort", "timeout", "web_search",
+                "response_schema_sha256", "response_schema",
+            }:
+                raise ValueError("provider invocation is not closed")
+            schema_text = json.dumps(
+                invocation["response_schema"], ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            )
+            if (
+                invocation["prompt_sha256"] != _sha_text(prompt)
+                or invocation["model"] != "gpt-5.6-sol"
+                or invocation["effort"] != "high"
+                or invocation["web_search"] is not False
+                or invocation["response_schema_sha256"] != _sha_text(schema_text)
+            ):
+                raise ValueError("provider invocation differs from its retained route")
         expected_payloads = {
             "manifests":row["audit"].get("staged_manifests") or [],
             "settlement":row["audit"].get("staged_settlement"),
@@ -475,6 +639,8 @@ def validate_artifact(
             sp.validate_lane_value(parsed, lane=lane, active_classes=[])
         if not row["result_text"].endswith(row["audit"].get("rendered_trailer", "")):
             raise ValueError("rendered trailer is not the returned durable result")
+
+    _replay_public_handler(artifact, tree)
 
     findings = discovery["audit"]["staged_settlement"]["findings"]
     settlement = discovery["audit"]["staged_settlement"]
@@ -510,6 +676,14 @@ def validate_artifact(
         raise ValueError("targeted correction discovered unrelated novelty or failed to close")
     if any(_anchor_covers(anchor, 12) for row in settlement["findings"] for anchor in row["evidence"]):
         raise ValueError("targeted correction audited the unrelated restatement cluster")
+    final_findings = final["audit"]["staged_settlement"]["findings"]
+    if len(final_findings) != 1 or not all(
+        any(_anchor_covers(anchor, line) for anchor in final_findings[0]["evidence"])
+        for line in (12, 13)
+    ):
+        raise ValueError("cold final did not discover the complete unrelated restatement cluster")
+    if final["durable_lineage"]["review_state"]["phase"] != "correction":
+        raise ValueError("cold final did not persist its newly discovered blocking debt")
     claims = artifact["claims"]
     if set(claims) != {"proves", "does_not_prove"}:
         raise ValueError("acceptance claims are not closed")
@@ -543,6 +717,9 @@ def main() -> int:
         channels = json.loads((log_dir / "exact_attempt_channels.json").read_text(
             encoding="utf-8",
         ))
+        invocations = json.loads((log_dir / "exact_invocations.json").read_text(
+            encoding="utf-8",
+        ))
         for channel in channels:
             if "error" not in channel or "usage" not in channel:
                 parsed = engines.CodexEngine().parse_output(channel["raw"])
@@ -558,11 +735,16 @@ def main() -> int:
         )
         result = handlers._footer(review, engines.CodexEngine())
         result += "\n\n" + audit["rendered_trailer"]
-        return result, prompts, audit, lineage, channels
+        return result, prompts, audit, lineage, channels, invocations
 
     if args.reuse_run_root:
         discovery = retained_route("discovery", DISCOVERY_LINEAGE)
         targeted = retained_route("targeted", TARGETED_LINEAGE)
+        final = retained_route("final", FINAL_LINEAGE)
+        targeted_initial = cc._from_json(
+            TARGETED_LINEAGE,
+            json.loads((run_root / "targeted-initial.json").read_text(encoding="utf-8")),
+        )
     else:
         discovery = _capture_call({
             "repo_path":str(ROOT), "plan_text":DISCOVERY_PLAN,
@@ -571,16 +753,27 @@ def main() -> int:
             "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
         }, state_root=run_root / "discovery-state", log_dir=run_root / "discovery-logs")
         targeted_state = run_root / "targeted-state"
-        _targeted_seed(targeted_state)
+        targeted_initial = _targeted_seed(targeted_state)
+        (run_root / "targeted-initial.json").write_text(
+            json.dumps(cc._to_json(targeted_initial), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
         targeted = _capture_call({
             "repo_path":str(ROOT), "plan_text":TARGETED_PLAN,
             "lineage":TARGETED_LINEAGE, "round":2, "class_closure":True,
             "claim_verification":False, "web_search":False,
             "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
         }, state_root=targeted_state, log_dir=run_root / "targeted-logs")
+        final = _capture_call({
+            "repo_path":str(ROOT), "plan_text":TARGETED_PLAN,
+            "lineage":FINAL_LINEAGE, "round":3, "class_closure":True,
+            "claim_verification":False, "web_search":False,
+            "model":"gpt-5.6-sol", "effort":"high", "stakes":STAKES,
+        }, state_root=targeted_state, log_dir=run_root / "final-logs")
 
-    def route(lineage_id: str, plan: str, value: tuple) -> dict:
-        result, prompts, audit, lineage, channels = value
+    empty_initial = cc.Lineage(DISCOVERY_LINEAGE, mode=cc.PLAN_MODE)
+    def route(lineage_id: str, plan: str, value: tuple, initial: cc.Lineage | dict) -> dict:
+        result, prompts, audit, lineage, channels, invocations = value
         validated_payloads = {
             "manifests":audit.get("staged_manifests") or [],
             "settlement":audit.get("staged_settlement"),
@@ -598,7 +791,10 @@ def main() -> int:
             "provider_response_sha256":[
                 item["response_sha256"] for item in audit["attempt_ledger"]
             ],
-            "exact_attempt_channels":channels,
+            "exact_attempt_channels":channels, "exact_invocations":invocations,
+            "initial_lineage":(
+                cc._to_json(initial) if isinstance(initial, cc.Lineage) else initial
+            ),
         }
 
     artifact = {
@@ -618,13 +814,19 @@ def main() -> int:
             ).stdout.strip(),
         },
         "stakes":STAKES,
-        "discovery":route(DISCOVERY_LINEAGE, DISCOVERY_PLAN, discovery),
-        "targeted_control":route(TARGETED_LINEAGE, TARGETED_PLAN, targeted),
+        "discovery":route(DISCOVERY_LINEAGE, DISCOVERY_PLAN, discovery, empty_initial),
+        "targeted_control":route(
+            TARGETED_LINEAGE, TARGETED_PLAN, targeted, targeted_initial,
+        ),
+        "final_control":route(
+            FINAL_LINEAGE, TARGETED_PLAN, final, targeted[3],
+        ),
         "claims":{
             "proves":[
                 "A real Codex four-call broad plan census produced one aggregate finding for every independently authoritative operative restatement.",
                 "The same finding excluded an illustrative example that explicitly deferred to the governing authority.",
                 "A separate real Codex targeted correction closed three supplied classes without discovering an unrelated restatement cluster.",
+                "A following real Codex cold final discovered that unrelated operative restatement cluster and persisted blocking debt.",
             ],
             "does_not_prove":[
                 "Every future provider response will classify every semantic restatement correctly.",

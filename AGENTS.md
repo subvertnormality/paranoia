@@ -397,6 +397,9 @@ of the resulting code and tests.
   a fixed round count. When a finding changes a rule, value, schema, lifecycle, or ordering
   contract, require its evidence and remedy to cover every material co-asserting site in the
   complete artifact, including definitions, call sites, tests, and fixtures in branch review.
+  Retained acceptance for the plan-restatement duty must exercise both broad plan roles through
+  the public handler and reconstruct each exact provider invocation, returned result, audit
+  settlement, and durable successor from source-derived initial state.
   For each existing class, aggregate every independently anchored current occurrence into its one
   governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
   Before predecessor debt can close, require the fresh governing finding to contain every

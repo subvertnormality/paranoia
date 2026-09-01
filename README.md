@@ -310,7 +310,12 @@ Targeted correction does not reopen unrelated plan material for this audit.
 The retained real-provider acceptance in
 `docs/plan_restatement_acceptance_2026-09-01.json` binds the four-call broad census,
 the complete operative restatement cluster, the deferred-example exemption, durable settlement,
-and a separate targeted-correction scope control to exact prompts and source bytes.
+and a separate targeted-correction scope control to exact prompts and source bytes. It then
+continues that lineage through a real cold final, where the previously out-of-scope duplicate
+contract is discovered and persisted. The validator replays every retained raw provider envelope
+through the production extractor and public `critique_plan` handler from source-derived initial
+lineages, and requires the returned result, audit settlement, and complete durable successor to
+match.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
