@@ -484,7 +484,7 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
             f"CLASS-REGISTER: {status}\n"
             "CLASS-CLOSURE: STATE-UNAVAILABLE — lineage could not be loaded."
         )
-    if closure.preflight_validation_error is not None:
+    if getattr(closure, "preflight_validation_error", None) is not None:
         return (
             f"CLASS-REGISTER: {status}\n"
             "CLASS-CLOSURE: STATE-UNAVAILABLE — durable structural state failed "

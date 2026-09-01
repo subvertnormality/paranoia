@@ -115,8 +115,8 @@
       "sha256": "fb4e397f16dfd63180d146ba414649be43f1365b50ef38b60c0ebc187899dddd"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Moves stakes-driven class reopening after the existing raw structural-state preflight; it does not alter this retained same-stakes provider exchange.",
-      "sha256": "7cc280ef7898108b2992655a08417301d1e9bd807bc2ab74600c13aec4ffbfc4"
+      "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange.",
+      "sha256": "d2eb362f08c38e1fbab525158074a4f83f45e3be045fd857511d4a18c5b6b5dd"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay and issue #94 regressions without changing this retained provider exchange.",

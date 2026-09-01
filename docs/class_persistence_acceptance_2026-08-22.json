@@ -2,8 +2,8 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback; this does not alter staged class persistence.",
-        "sha256": "1936e915a0529e87c84fb0e244859583a89aeda56d17d82030af34568318f42f"
+      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; neither change alters this accepted valid-state class persistence lifecycle.",
+      "sha256": "e3395d02646d375fdc776c25088a0a6721e71b50263c8d8112bf2c5ac8957d08"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged class persistence proved by this historical acceptance.",
