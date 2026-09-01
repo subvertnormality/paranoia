@@ -429,7 +429,10 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     invocation, channels = matched
                     if actual != invocation:
                         raise ValueError("public-handler replay invocation differs from retained input")
-                    return engines.CodexEngine().parse_output(channels["raw"])
+                    return replace(
+                        engines.CodexEngine().parse_output(channels["raw"]),
+                        returncode=channels["returncode"],
+                    )
 
                 engines.CodexEngine.run = playback_run
                 engines.CodexEngine.resume = lambda *args, **kwargs: playback_run(
@@ -666,7 +669,7 @@ def validate_artifact(
             ):
                 raise ValueError("attempt channel, session, role, and prompt binding failed")
             exact_fields = {
-                "raw",
+                "raw", "returncode",
             }
             if set(channels) != exact_fields:
                 raise ValueError("raw provider channel envelope is not closed")
@@ -676,11 +679,12 @@ def validate_artifact(
                 "response_sha256":_sha_text(parsed.text),
                 "raw_sha256":_sha_text(parsed.raw),
                 "failure_detail_sha256":_sha_text(parsed.failure_detail or ""),
-                "returncode":parsed.returncode,
                 "usage":parsed.usage,
             }
             if any(attempt.get(key) != value for key, value in derived.items()):
                 raise ValueError("audit attempt does not derive from raw provider stdout")
+            if attempt.get("returncode") != channels["returncode"]:
+                raise ValueError("audit return code does not match retained process status")
             for value, excerpt_key in (
                 (parsed.text, "response_excerpt"),
                 (parsed.raw, "raw_excerpt"),
@@ -909,7 +913,10 @@ def main() -> int:
             "provider_response_sha256":[
                 item["response_sha256"] for item in audit["attempt_ledger"]
             ],
-            "exact_attempt_channels":[{"raw":item["raw"]} for item in channels],
+            "exact_attempt_channels":[
+                {"raw":item["raw"], "returncode":item["returncode"]}
+                for item in channels
+            ],
             "exact_invocations":invocations,
             "initial_lineage":(
                 cc._to_json(initial) if isinstance(initial, cc.Lineage) else initial

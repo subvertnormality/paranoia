@@ -316,9 +316,10 @@ contract is discovered and persisted. The validator replays every retained raw p
 through the production extractor and public `critique_plan` handler from source-derived initial
 lineages, and requires the returned result, replayable audit projection, and complete durable
 successor to match. The source inventory covers the complete executable `paranoia_local` package;
-raw stdout is the sole channel authority. Parsed response, session, usage, return code, and
-failure detail are derived; process stderr and local wall-clock duration are deliberately not
-claimed because raw stdout cannot independently reproduce them.
+raw stdout is the sole text-channel authority. Parsed response, session, usage, and failure detail
+are derived from it; the observed subprocess return code is retained separately and drives replay.
+Process stderr and local wall-clock duration are deliberately not claimed because neither can be
+independently reproduced from stdout.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
