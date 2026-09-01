@@ -15,7 +15,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "10347742ee84612e32a68682f0e7163b83c2a99187020d4e73fa361d60ee74ef"
+      "sha256": "231e5d8b8990c852dfb1b926bbf9ac712ac1f8a4ba3d9d1a1af9307ac4c67ffd"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
