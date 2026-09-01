@@ -265,14 +265,7 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
     responses: list[str] = []
     for channels in row["exact_attempt_channels"]:
         review = engines.CodexEngine().parse_output(channels["raw"])
-        if (
-            review.session_ref != channels["session_ref"]
-            or review.text != channels["response_text"]
-            or review.raw != channels["raw"]
-            or review.error != channels["error"]
-            or (review.failure_detail or "") != channels["failure_detail"]
-            or review.usage != channels["usage"]
-        ):
+        if review.raw != channels["raw"]:
             raise ValueError("retained raw provider envelope does not reconstruct its response")
         responses.append(review.text)
 
@@ -434,12 +427,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     invocation, channels = matched
                     if actual != invocation:
                         raise ValueError("public-handler replay invocation differs from retained input")
-                    parsed = engines.CodexEngine().parse_output(channels["raw"])
-                    return replace(
-                        parsed, stderr=channels["stderr"],
-                        failure_detail=channels["failure_detail"],
-                        returncode=channels["returncode"],
-                    )
+                    return engines.CodexEngine().parse_output(channels["raw"])
 
                 engines.CodexEngine.run = playback_run
                 engines.CodexEngine.resume = lambda *args, **kwargs: playback_run(
@@ -677,26 +665,32 @@ def validate_artifact(
             ):
                 raise ValueError("attempt channel, session, role, and prompt binding failed")
             exact_fields = {
-                "session_ref", "response_text", "raw", "failure_detail", "stderr",
-                "returncode", "error", "usage",
+                "raw",
             }
-            if set(channels) != exact_fields or channels["session_ref"] != session_ref:
-                raise ValueError("exact attempt channels are not closed and session-bound")
-            for value_key, digest_key, excerpt_key in (
-                ("response_text", "response_sha256", "response_excerpt"),
-                ("raw", "raw_sha256", "raw_excerpt"),
-                ("failure_detail", "failure_detail_sha256", "failure_detail_excerpt"),
-                ("stderr", "stderr_sha256", "stderr_excerpt"),
+            if set(channels) != exact_fields:
+                raise ValueError("raw provider channel envelope is not closed")
+            parsed = engines.CodexEngine().parse_output(channels["raw"])
+            derived = {
+                "session_ref":parsed.session_ref,
+                "response_sha256":_sha_text(parsed.text),
+                "raw_sha256":_sha_text(parsed.raw),
+                "failure_detail_sha256":_sha_text(parsed.failure_detail or ""),
+                "stderr_sha256":_sha_text(parsed.stderr or ""),
+                "returncode":parsed.returncode,
+                "usage":parsed.usage,
+            }
+            if any(attempt.get(key) != value for key, value in derived.items()):
+                raise ValueError("audit attempt does not derive from raw provider stdout")
+            for value, excerpt_key in (
+                (parsed.text, "response_excerpt"),
+                (parsed.raw, "raw_excerpt"),
+                (parsed.failure_detail or "", "failure_detail_excerpt"),
+                (parsed.stderr or "", "stderr_excerpt"),
             ):
-                if (
-                    _sha_text(channels[value_key]) != attempt[digest_key]
-                    or channels[value_key][:4000] != (attempt.get(excerpt_key) or "")
-                ):
-                    raise ValueError(f"exact {value_key} channel digest mismatch")
-            if channels["returncode"] != attempt["returncode"]:
-                raise ValueError("exact return code differs from the attempt ledger")
-            if channels["error"] is not False or channels["usage"] != attempt["usage"]:
-                raise ValueError("exact parser status or usage differs from the attempt ledger")
+                if value[:4000] != (attempt.get(excerpt_key) or ""):
+                    raise ValueError("audit excerpt does not derive from raw provider stdout")
+            if parsed.error or attempt.get("outcome") != "completed":
+                raise ValueError("accepted provider stdout does not represent completion")
         for prompt, invocation in zip(
             row["prompts"], row["exact_invocations"], strict=True,
         ):
@@ -916,7 +910,8 @@ def main() -> int:
             "provider_response_sha256":[
                 item["response_sha256"] for item in audit["attempt_ledger"]
             ],
-            "exact_attempt_channels":channels, "exact_invocations":invocations,
+            "exact_attempt_channels":[{"raw":item["raw"]} for item in channels],
+            "exact_invocations":invocations,
             "initial_lineage":(
                 cc._to_json(initial) if isinstance(initial, cc.Lineage) else initial
             ),
