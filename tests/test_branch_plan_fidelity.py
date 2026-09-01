@@ -675,7 +675,7 @@ def test_contract_view_is_injective_at_terminal_lf_and_rejects_other_separators(
     without_lf = handlers._branch_contract_view("one")
     assert with_lf.lines == ("one", "")
     assert with_lf.line_count == 2
-    assert "00002: " in with_lf.rendered
+    assert "[PLAN-LINE 00002] " in with_lf.rendered
     assert without_lf.lines == ("one",)
     assert with_lf.digest != without_lf.digest
     for invalid in ("one\r\ntwo", "one\rtwo", "one\u2028two", "one\x00two"):

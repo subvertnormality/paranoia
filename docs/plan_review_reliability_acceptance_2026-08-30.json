@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
-      "sha256": "64e530443b7570199fb2700c9890dd161d28a4e4381a0518d20013ce3bc28023"
+      "sha256": "5ae9dea51301cc9558bfc8851837fc131e475eece95cf80a0822705f2ee1917c"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
-      "sha256": "22f3602e47bde3099889eddc401e5d2e01aeb2d7d2eca10b78c68865b7003ccf"
+      "sha256": "0de75c61fdb6592f80282ccbcdb775f1289fc59de049337f63fdd25c6d8c7aae"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -19,15 +19,19 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged.",
-      "sha256": "2c6b287ae547a45c862567bf004d0d12a53cb617e70255f83cc43f0d4e250214"
+      "sha256": "acd167242b10062549e8419b7c491da452d206230b82794fa655075b68f88cc3"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions plus broad plan normative-restatement discovery; retained provider exchanges remain historical.",
-      "sha256": "014a64f0efcab7adbafd5691b605ee26e7bb8e75c192770b8ad18552faee06a7"
+      "sha256": "05eed6dc54f93b985ddd8ef81050c18667a9fd5a6b9e7abc85a5d4697b7c4f78"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance.",
       "sha256": "e52ee19fb4b9a6beb091705f0ff464db5afc3c886fe6319bb7cd4668cdc5431d"
+    },
+    "src/paranoia_local/staged_protocol.py": {
+      "scope": "Issue #91 changes only plan coordinate presentation and validation-retry guidance; retained provider exchanges and unrelated behavior are unchanged.",
+      "sha256": "aabb5c077e45ca24d5fc1914fa84b9b702d1947d8af934fe07d4ca91b3e75c2d"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
@@ -39,7 +43,11 @@
     },
     "tests/test_review_census.py": {
       "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions.",
-      "sha256": "59aee5982f1ebf85a67335cf7f0854a32d50c33e4d8511f6977e79c231cb3d3a"
+      "sha256": "0eb2d442ba0cbf95cf3b6dddd5bd485ee161101c8b0898d261ce7307ed8efb2c"
+    },
+    "tests/test_staged_protocol.py": {
+      "scope": "Issue #91 changes only plan coordinate presentation and validation-retry guidance; retained provider exchanges and unrelated behavior are unchanged.",
+      "sha256": "357f017b40f530e325640386421670c9a25b79f2439dd195895c53f68dd25258"
     }
   },
   "assertions": [
