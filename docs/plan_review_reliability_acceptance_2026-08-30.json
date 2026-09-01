@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary.",
-      "sha256": "f2e86fad2f560f1eb651b4c49dc1a514cdcba41fc45f370b5b1cff2439b92c89"
+      "sha256": "2638f8f942161c6f2c6f0a92e8160a42e90884079e622424ff57de8bd51218bc"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation.",
-      "sha256": "89b229bb539aab426475e4dcb171d82aa90a84d8f6914c519da8154714488f78"
+      "sha256": "77f719dfc1001e7bcdb2e897e6efeb211d0aa839718ad527001e6b8a1f314bb5"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -1768,11 +1768,11 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
-        "sha256": "d517b74b6afb066c20a76dbaff58ccf1fc3d36449f80e059393f911e10b0edd9"
+        "sha256": "8189b45f45a7dba0c95bc502826250d26a4f9b981c2cf894b8583bce2cb023f7"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
-        "sha256": "560ab6d912cc2b9d2c347f29cb5377127d9d6b7d953e18d573eb60f3062d107c"
+        "sha256": "423f4f15fe43b7b91ea7d7bedc832172263f78b0d058b8fbd45847658c6440b3"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
