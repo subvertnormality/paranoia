@@ -6,8 +6,8 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "e88298098267f9d9dfd0b786899ae4e67a70345dd6370e0c9bc2fa20a100fc34"
+      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan-backed branch staged role; this does not alter branch plan-contract binding, authority, capture, propagation, successful prompts, or accepted settlement.",
+      "sha256": "ea3e1c38cb0c630cc7f75925028b6275412694dcae8f7f445d8637488d715576"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance plus plan-review-only normative-restatement discovery; this does not alter branch plan-contract binding, authority, capture, or propagation.",
@@ -20,6 +20,10 @@
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",
       "sha256": "cd48bd38fa0777ed389ba52f6fe37154aac0f06fafc7ea4b6173102f6a25519a"
+    },
+    "tests/test_branch_plan_fidelity.py": {
+      "scope": "Adds public plan-backed branch lifecycle coverage for bounded anchor retry and audit retention; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "1ff71fcdfcebdb6d6aed8537eeb3fa217cde019b9ccbcce3b63b9e4d32d97c5f"
     }
   },
   "claims": {

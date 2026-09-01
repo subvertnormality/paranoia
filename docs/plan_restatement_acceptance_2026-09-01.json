@@ -18,12 +18,12 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 adds plan-only validation-retry coordinate guidance; successful provider prompts and settlement are unchanged.",
-      "sha256": "a3d8668a75bcb3d562efb0d1bfcc7b57530ba81a82dcf076bd0a3ceef240a8a3"
+      "scope": "Issue #91 adds validation-retry-only bounded plan-anchor coordinate guidance to every plan and plan-backed branch staged role; successful provider prompts and accepted settlement are unchanged.",
+      "sha256": "754731ab0d127a3dff30f6d75963d4eb5aef029b950e1df6a1133646502c419a"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds a deterministic lifecycle regression for the observed 5,260-line plan anchor retry; retained provider exchanges are unchanged.",
-      "sha256": "c8686dbe555ceea76febc5d47ab3d48720eebcbadaae1c85df41a859290ca96d"
+      "scope": "Adds unit and public plan consolidation lifecycle regressions for observed line-column anchor concatenation; retained provider exchanges are unchanged.",
+      "sha256": "7bed24e1dae81b8037a245647f59fdc7905017b4623bdf5fe67e336b1bc449f9"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

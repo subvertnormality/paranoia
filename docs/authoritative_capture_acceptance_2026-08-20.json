@@ -103,10 +103,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "404d7cea59a7df5978b4da388b807e2733325a6750fd2404fe2572c65f32e51f",
-      "additions": 1835,
+      "sha256": "1a87f75325d1a463e6adb52c7696478482b5dec0454f30f2f86ef45886ab6b5a",
+      "additions": 1843,
       "deletions": 175,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, ordered terminal retry diagnostics, and validation-retry-only bounded plan-anchor coordinate guidance through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
     },
     "allowed_later_review_census_diff": {
       "sha256": "b7fdcf91dcc4e0e7f9be2bccf3b258841a94f8fb9398efcf3a4d230ef4503109",

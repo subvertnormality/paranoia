@@ -2,8 +2,8 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload.",
-      "sha256": "f46e48ebcf986a3697e28aeb2be9b91635a2a0ec00eacdd77c6558971cc18238"
+      "scope": "Adds claim diagnostics and validation-retry-only bounded plan-anchor coordinate guidance; this does not alter staged class persistence, reopen derivation, accepted settlement, rendering, or durable reload.",
+      "sha256": "4b0152b75b8ab51141a03e46731b46cd67cf9cd02e2adb02fe530b25f91fdb29"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Missing active correction-control rows are initialized while stale inactive rows still reject; this does not alter staged class persistence, reopen derivation, or mechanized matching.",
