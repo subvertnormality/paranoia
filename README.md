@@ -314,8 +314,9 @@ and a separate targeted-correction scope control to exact prompts and source byt
 continues that lineage through a real cold final, where the previously out-of-scope duplicate
 contract is discovered and persisted. The validator replays every retained raw provider envelope
 through the production extractor and public `critique_plan` handler from source-derived initial
-lineages, and requires the returned result, audit settlement, and complete durable successor to
-match.
+lineages, and requires the returned result, replayable audit projection, and complete durable
+successor to match. The source inventory covers the complete executable `paranoia_local` package;
+non-reproducible local wall-clock duration is deliberately not claimed by the artifact.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).

@@ -62,13 +62,33 @@ This section independently defines the retry ceiling as 12.
 Another operative section independently defines the retry ceiling as 12.
 """
 SOURCES = (
-    "AGENTS.md", "README.md", "src/paranoia_local/class_closure.py",
-    "src/paranoia_local/handlers.py", "src/paranoia_local/prompts.py",
-    "src/paranoia_local/review_census.py", "src/paranoia_local/staged_protocol.py",
-    "scripts/run_plan_restatement_acceptance.py",
+    "AGENTS.md", "README.md", "scripts/run_plan_restatement_acceptance.py",
     "tests/test_plan_restatement_acceptance.py", "tests/test_prompts.py",
     "tests/test_review_census.py",
+    *tuple(
+        f"src/paranoia_local/{name}" for name in (
+            "__init__.py", "arbitrate_handler.py", "arbitration.py",
+            "arbitration_research.py", "class_closure.py", "cli.py", "config.py",
+            "engines.py", "evidence.py", "external_sources.py", "handlers.py",
+            "inert_git.py", "inert_tree.py", "logs.py", "orientation.py",
+            "plan_claims.py", "prompts.py", "review_census.py", "runner.py",
+            "server.py", "staged_protocol.py", "textsafe.py", "worktree.py",
+        )
+    ),
 )
+CLAIMS = {
+    "proves":[
+        "A real Codex four-call broad plan census produced one aggregate finding for every independently authoritative operative restatement.",
+        "The same finding excluded an illustrative example that explicitly deferred to the governing authority.",
+        "A separate real Codex targeted correction closed three supplied classes without discovering an unrelated restatement cluster.",
+        "A following real Codex cold final discovered that unrelated operative restatement cluster and persisted blocking debt.",
+    ],
+    "does_not_prove":[
+        "Every future provider response will classify every semantic restatement correctly.",
+        "Textual equality by itself identifies normative authority.",
+        "Branch review behavior changed.",
+    ],
+}
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -90,6 +110,15 @@ def _load_one(directory: Path, pattern: str) -> dict:
     if len(paths) != 1:
         raise ValueError(f"expected one {pattern} record, found {len(paths)}")
     return json.loads(paths[0].read_text(encoding="utf-8"))
+
+
+def _audit_projection(audit: dict) -> dict:
+    """Retain only audit fields the source-bound public replay reproduces exactly."""
+    projected = json.loads(json.dumps(audit, ensure_ascii=False))
+    projected.pop("timestamp", None)
+    for attempt in projected.get("attempt_ledger") or []:
+        attempt.pop("duration_ms", None)
+    return projected
 
 
 def _capture_call(
@@ -424,7 +453,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     "web_search":False, "model":"gpt-5.6-sol",
                     "effort":"high", "stakes":STAKES,
                 }, engine=engines.CodexEngine(), log_dir=log_dir,
-                   now=lambda: row["audit"]["timestamp"])
+                   now=lambda: "20260901T000000")
                 if pending:
                     raise ValueError("public-handler replay omitted a retained invocation")
                 replay_audit = _load_one(log_dir, "*-critique_plan-*.json")
@@ -436,15 +465,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     raise ValueError("public-handler replay did not reconstruct returned result")
                 if replay_lineage != row["durable_lineage"]:
                     raise ValueError("public-handler replay did not reconstruct durable lineage")
-                stable_audit_keys = (
-                    "text", "session_ref", "returncode", "error", "round", "lineage",
-                    "register_status", "staged_manifests", "staged_settlement",
-                    "rendered_trailer", "rejected_payloads", "correction_gates",
-                )
-                if any(
-                    replay_audit.get(key) != row["audit"].get(key)
-                    for key in stable_audit_keys
-                ):
+                if _audit_projection(replay_audit) != row["audit_projection"]:
                     raise ValueError("public-handler replay did not reconstruct audit settlement")
         finally:
             engines.CodexEngine.run = original_run
@@ -531,8 +552,8 @@ def validate_artifact(
     if set(artifact) != expected:
         raise ValueError("acceptance envelope is not closed")
     if (
-        artifact["acceptance_kind"] != "plan-normative-restatement-public-handler-v1"
-        or artifact["version"] != 1 or artifact["date"] != "2026-09-01"
+        artifact["acceptance_kind"] != "plan-normative-restatement-public-handler-v2"
+        or artifact["version"] != 2 or artifact["date"] != "2026-09-01"
         or artifact["stakes"] != STAKES
     ):
         raise ValueError("acceptance identity is not exact")
@@ -570,9 +591,12 @@ def validate_artifact(
     if changed != set(allowed):
         raise ValueError("later-source allowance inventory is not exact")
     provider = artifact["provider"]
-    if set(provider) != {"engine", "model", "effort", "cli_version"}:
+    if set(provider) != {"engine", "model", "effort", "web_search"}:
         raise ValueError("provider binding is not closed")
-    if provider["engine"] != "codex" or provider["model"] != "gpt-5.6-sol":
+    if provider != {
+        "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
+        "web_search":False,
+    }:
         raise ValueError("provider route is not the accepted Codex route")
 
     discovery = artifact["discovery"]
@@ -598,7 +622,7 @@ def validate_artifact(
     ):
         if set(row) != {
             "lineage", "plan", "prompts", "prompt_sha256", "result_text",
-            "result_sha256", "audit", "durable_lineage", "validated_payloads",
+            "result_sha256", "audit_projection", "durable_lineage", "validated_payloads",
             "validated_payload_sha256", "provider_response_sha256",
             "exact_attempt_channels", "exact_invocations", "initial_lineage",
         }:
@@ -613,7 +637,7 @@ def validate_artifact(
             raise ValueError("exact invocation inventory does not match provider calls")
         if row["result_sha256"] != _sha_text(row["result_text"]):
             raise ValueError("result digest mismatch")
-        attempts = row["audit"].get("attempt_ledger")
+        attempts = row["audit_projection"].get("attempt_ledger")
         if [item.get("role") for item in attempts or []] != roles:
             raise ValueError("provider call topology changed")
         if any(item.get("outcome") != "completed" for item in attempts):
@@ -694,8 +718,8 @@ def validate_artifact(
             ):
                 raise ValueError("provider invocation differs from its retained route")
         expected_payloads = {
-            "manifests":row["audit"].get("staged_manifests") or [],
-            "settlement":row["audit"].get("staged_settlement"),
+            "manifests":row["audit_projection"].get("staged_manifests") or [],
+            "settlement":row["audit_projection"].get("staged_settlement"),
         }
         if row["validated_payloads"] != expected_payloads:
             raise ValueError("exact validated responses differ from the audit projection")
@@ -712,13 +736,15 @@ def validate_artifact(
                 json.dumps(manifest, ensure_ascii=False), mode=cc.PLAN_MODE, lane=lane,
             )
             sp.validate_lane_value(parsed, lane=lane, active_classes=[])
-        if not row["result_text"].endswith(row["audit"].get("rendered_trailer", "")):
+        if not row["result_text"].endswith(
+            row["audit_projection"].get("rendered_trailer", "")
+        ):
             raise ValueError("rendered trailer is not the returned durable result")
 
     _replay_public_handler(artifact, tree)
 
-    findings = discovery["audit"]["staged_settlement"]["findings"]
-    settlement = discovery["audit"]["staged_settlement"]
+    findings = discovery["audit_projection"]["staged_settlement"]["findings"]
+    settlement = discovery["audit_projection"]["staged_settlement"]
     records = settlement["class_records"]
     dispositions = {
         row["finding_id"]:records[row["record_index"]]
@@ -746,7 +772,7 @@ def validate_artifact(
     targeted_task = json.loads(targeted["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
     if targeted_task.get("review_scope") != "targeted" or targeted_task.get("checklist") != []:
         raise ValueError("targeted control did not use the bounded correction scope")
-    settlement = targeted["audit"]["staged_settlement"]
+    settlement = targeted["audit_projection"]["staged_settlement"]
     if settlement["findings"] or targeted["durable_lineage"]["review_state"]["phase"] != "final":
         raise ValueError("targeted correction discovered unrelated novelty or failed to close")
     if any(
@@ -755,7 +781,7 @@ def validate_artifact(
         for line in (13, 14)
     ):
         raise ValueError("targeted correction audited the unrelated restatement cluster")
-    final_findings = final["audit"]["staged_settlement"]["findings"]
+    final_findings = final["audit_projection"]["staged_settlement"]["findings"]
     if len(final_findings) != 1 or not all(
         any(_anchor_covers(anchor, line) for anchor in final_findings[0]["evidence"])
         for line in (13, 14)
@@ -763,9 +789,8 @@ def validate_artifact(
         raise ValueError("cold final did not discover the complete unrelated restatement cluster")
     if final["durable_lineage"]["review_state"]["phase"] != "correction":
         raise ValueError("cold final did not persist its newly discovered blocking debt")
-    claims = artifact["claims"]
-    if set(claims) != {"proves", "does_not_prove"}:
-        raise ValueError("acceptance claims are not closed")
+    if artifact["claims"] != CLAIMS:
+        raise ValueError("acceptance claims are not exact")
 
 
 def main() -> int:
@@ -881,7 +906,8 @@ def main() -> int:
             "lineage":lineage_id, "plan":plan, "prompts":prompts,
             "prompt_sha256":[_sha_text(item) for item in prompts],
             "result_text":result, "result_sha256":_sha_text(result),
-            "audit":audit, "durable_lineage":lineage,
+            "audit_projection":_audit_projection(audit),
+            "durable_lineage":lineage,
             "validated_payloads":validated_payloads,
             "validated_payload_sha256":_sha_text(json.dumps(
                 validated_payloads, ensure_ascii=False, sort_keys=True,
@@ -897,8 +923,8 @@ def main() -> int:
         }
 
     artifact = {
-        "acceptance_kind":"plan-normative-restatement-public-handler-v1",
-        "version":1, "date":"2026-09-01", "source_revision":revision,
+        "acceptance_kind":"plan-normative-restatement-public-handler-v2",
+        "version":2, "date":"2026-09-01", "source_revision":revision,
         "source_sha256":{
             relative:_sha_bytes(subprocess.run(
                 ["git", "show", f"{revision}:{relative}"], cwd=ROOT, check=True,
@@ -908,9 +934,7 @@ def main() -> int:
         "allowed_later_source_diffs":{},
         "provider":{
             "engine":"codex", "model":"gpt-5.6-sol", "effort":"high",
-            "cli_version":subprocess.run(
-                ["codex", "--version"], check=True, capture_output=True, text=True,
-            ).stdout.strip(),
+            "web_search":False,
         },
         "stakes":STAKES,
         "discovery":route(DISCOVERY_LINEAGE, DISCOVERY_PLAN, discovery, empty_initial),
@@ -920,19 +944,7 @@ def main() -> int:
         "final_control":route(
             FINAL_LINEAGE, TARGETED_PLAN, final, targeted[3],
         ),
-        "claims":{
-            "proves":[
-                "A real Codex four-call broad plan census produced one aggregate finding for every independently authoritative operative restatement.",
-                "The same finding excluded an illustrative example that explicitly deferred to the governing authority.",
-                "A separate real Codex targeted correction closed three supplied classes without discovering an unrelated restatement cluster.",
-                "A following real Codex cold final discovered that unrelated operative restatement cluster and persisted blocking debt.",
-            ],
-            "does_not_prove":[
-                "Every future provider response will classify every semantic restatement correctly.",
-                "Textual equality by itself identifies normative authority.",
-                "Branch review behavior changed.",
-            ],
-        },
+        "claims":CLAIMS,
     }
     for relative in SOURCES:
         historical = subprocess.run(

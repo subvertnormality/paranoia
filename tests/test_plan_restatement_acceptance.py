@@ -35,7 +35,7 @@ def test_restatement_acceptance_rejects_digest_consistent_response_substitution(
     spec.loader.exec_module(acceptance)
     artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
     replacement = '{"lane":"domain"}'
-    attempt = artifact["discovery"]["audit"]["attempt_ledger"][0]
+    attempt = artifact["discovery"]["audit_projection"]["attempt_ledger"][0]
     channels = artifact["discovery"]["exact_attempt_channels"][0]
     digest = hashlib.sha256(replacement.encode("utf-8")).hexdigest()
     channels["response_text"] = replacement
@@ -57,7 +57,7 @@ def test_restatement_acceptance_rejects_digest_consistent_terminal_failure() -> 
     acceptance = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(acceptance)
     artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
-    attempt = artifact["discovery"]["audit"]["attempt_ledger"][0]
+    attempt = artifact["discovery"]["audit_projection"]["attempt_ledger"][0]
     channels = artifact["discovery"]["exact_attempt_channels"][0]
     channels["raw"] += (
         '\n{"type":"turn.failed","error":{"message":"forged terminal failure"}}\n'
@@ -166,4 +166,36 @@ def test_restatement_acceptance_rejects_forged_returned_result() -> None:
     row["result_text"] += "\nforged"
     row["result_sha256"] = hashlib.sha256(row["result_text"].encode("utf-8")).hexdigest()
     with pytest.raises(ValueError, match="returned durable result|returned result"):
+        acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+def test_restatement_acceptance_rejects_forged_provider_route() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/plan_restatement_acceptance_2026-09-01.json"
+    spec = importlib.util.spec_from_file_location(
+        "plan_restatement_acceptance_provider_mutation",
+        root / "scripts/run_plan_restatement_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
+    artifact["provider"]["effort"] = "low"
+    with pytest.raises(ValueError, match="provider route"):
+        acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+def test_restatement_acceptance_rejects_forged_audit_telemetry() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/plan_restatement_acceptance_2026-09-01.json"
+    spec = importlib.util.spec_from_file_location(
+        "plan_restatement_acceptance_audit_mutation",
+        root / "scripts/run_plan_restatement_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
+    artifact["final_control"]["audit_projection"]["attempt_ledger"][0]["sequence"] = 99
+    with pytest.raises(ValueError, match="audit settlement"):
         acceptance.validate_artifact(artifact, root, require_committed=False)
