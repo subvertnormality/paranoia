@@ -90,3 +90,25 @@ def test_restatement_acceptance_rejects_digest_consistent_prompt_substitution() 
     ).hexdigest()
     with pytest.raises(ValueError, match="production reconstruction"):
         acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+def test_restatement_acceptance_rejects_digest_consistent_targeted_prompt_mutation() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/plan_restatement_acceptance_2026-09-01.json"
+    spec = importlib.util.spec_from_file_location(
+        "plan_restatement_acceptance_targeted_prompt_mutation",
+        root / "scripts/run_plan_restatement_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
+    prompt = artifact["targeted_control"]["prompts"][0]
+    artifact["targeted_control"]["prompts"][0] = prompt.replace(
+        '"review_scope": "targeted"', '"review_scope": "closure_candidate"', 1,
+    )
+    artifact["targeted_control"]["prompt_sha256"][0] = hashlib.sha256(
+        artifact["targeted_control"]["prompts"][0].encode("utf-8"),
+    ).hexdigest()
+    with pytest.raises(ValueError, match="seeded production reconstruction"):
+        acceptance.validate_artifact(artifact, root, require_committed=False)

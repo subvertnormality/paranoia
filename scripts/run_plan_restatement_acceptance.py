@@ -154,13 +154,7 @@ def _capture_call(
     return result, prompts, audit, lineage, ordered_channels
 
 
-def _targeted_seed(state_root: Path) -> None:
-    parent = orientation.resolve_head(ROOT)
-    snapshot = orientation.wrap_commit(
-        ROOT, orientation.snapshot_tree(ROOT, parent), parent,
-    )
-    structural = rc.digest(f"{TARGETED_PLAN}\0{snapshot}")
-    state = rc.normalize_state(None, stakes=STAKES, snapshot=structural)
+def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
     classes: dict[str, cc.TrackedClass] = {}
     debt: list[dict] = []
     definitions = (
@@ -179,6 +173,17 @@ def _targeted_seed(state_root: Path) -> None:
             "remedy":f"Satisfy {invariant}", "evidence":[anchor], "source_ids":[],
             "class_ids":[class_id], "first_round":1, "last_round":1,
         })
+    return classes, debt
+
+
+def _targeted_seed(state_root: Path) -> None:
+    parent = orientation.resolve_head(ROOT)
+    snapshot = orientation.wrap_commit(
+        ROOT, orientation.snapshot_tree(ROOT, parent), parent,
+    )
+    structural = rc.digest(f"{TARGETED_PLAN}\0{snapshot}")
+    state = rc.normalize_state(None, stakes=STAKES, snapshot=structural)
+    classes, debt = _targeted_components()
     state.update(phase="correction", last_round=1, debt=debt)
     cc.save_lineage(state_root, cc.Lineage(
         TARGETED_LINEAGE, rounds=1, next_seq=4, classes=classes,
@@ -277,17 +282,29 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         ))
         return expected
 
+    classes, debt = _targeted_components()
+    lineage = cc.Lineage(
+        TARGETED_LINEAGE, rounds=1, next_seq=4, classes=classes,
+        review_state={"debt":debt}, mode=cc.PLAN_MODE,
+    )
+    body = handlers._plan_body(
+        sp.ArtifactView.from_text(TARGETED_PLAN), None, None, [], True,
+        class_blocks=[cc.render_unmechanized(lineage)],
+    )
+    body += (
+        "\n\nThe pinned repository evidence root is `repository/`. Treat that prefix "
+        "as the project root; no live Git or web tools are available."
+    )
+    expected_task = {
+        "role":"correction", "stakes":STAKES, "existing_debt":debt,
+        "active_classes":handlers._active_class_rows(lineage, cc.PLAN_MODE),
+        "correction_gates":[], "checklist":[],
+        "artifact":f"=== REVIEW STAKES ===\n{STAKES}\n\n{body}",
+        "review_scope":"targeted",
+    }
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
-    if (
-        task.get("role") != "correction" or task.get("stakes") != STAKES
-        or task.get("review_scope") != "targeted" or task.get("checklist") != []
-        or {item.get("class_id") for item in task.get("active_classes", [])}
-        != {"exact-scope", "exact-command", "fail-closed"}
-        or {item.get("id") for item in task.get("existing_debt", [])}
-        != {"D1", "D2", "D3"}
-        or sp.ArtifactView.from_text(TARGETED_PLAN).rendered not in task.get("artifact", "")
-    ):
-        raise ValueError("targeted prompt task differs from the fixed acceptance fixture")
+    if task != expected_task:
+        raise ValueError("targeted prompt task differs from its seeded production reconstruction")
     outcome_ids = sp.expected_outcome_class_ids(
         "correction", active_classes=task["active_classes"],
         durable_debt=task["existing_debt"],
@@ -297,7 +314,7 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
         f"{sp.class_decision_instructions(cc.PLAN_MODE, 'correction', active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[])}"
     )
-    return [prompts.compose(instructions, json.dumps(task, ensure_ascii=False))]
+    return [prompts.compose(instructions, json.dumps(expected_task, ensure_ascii=False))]
 
 
 def validate_artifact(
