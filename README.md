@@ -307,6 +307,10 @@ for one authoritative definition with references or derived projections elsewher
 semantic review duty, not a repeated-token lint: examples, faithful table explanations, generated
 projections, and summaries that explicitly defer to the governing definition remain valid.
 Targeted correction does not reopen unrelated plan material for this audit.
+The retained real-provider acceptance in
+`docs/plan_restatement_acceptance_2026-09-01.json` binds the four-call broad census,
+the complete operative restatement cluster, the deferred-example exemption, durable settlement,
+and a separate targeted-correction scope control to exact prompts and source bytes.
 
 For lifecycle details, persistence controls, false-positive exemptions, and
 failure recovery, read [How Paranoia works](docs/how-it-works.md).
