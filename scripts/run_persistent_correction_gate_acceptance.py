@@ -50,6 +50,8 @@ ACCEPTANCE_SOURCES = tuple(sorted(
     "docs/staged_review_protocol_v2_acceptance.md",
     "tests/test_review_census.py", "tests/test_handlers.py",
     "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
+    "tests/conftest.py", "pyproject.toml",
+    "scripts/build_branch_plan_fidelity_acceptance.py",
 )
 PLAN = (
     "# Change\n\n"
@@ -87,7 +89,8 @@ FIXED_PLAN = PLAN.replace(
     "\nThe retained artifact source inventory is the deterministic complete set of every "
     "Python module under src/paranoia_local, plus this generator, README.md, how-it-works.md, "
     "tool-reference.md, llm-reference.md, AGENTS.md, CLAUDE.md, "
-    "staged_review_protocol_v2_acceptance.md, and the four named test modules "
+    "staged_review_protocol_v2_acceptance.md, the four named test modules, "
+    "tests/conftest.py, pyproject.toml, and build_branch_plan_fidelity_acceptance.py "
     "enforced by the shared ACCEPTANCE_SOURCES constant. Commit every bound source before generation "
     "so source_revision and current bytes agree, validate the completed artifact, then publish "
     "it in a separate commit. Before publication, require removed, added, or replaced inventory "
