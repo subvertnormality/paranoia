@@ -44,3 +44,27 @@ def test_restatement_acceptance_rejects_digest_consistent_response_substitution(
     artifact["discovery"]["provider_response_sha256"][0] = digest
     with pytest.raises(ValueError, match="reconstruct"):
         acceptance.validate_artifact(artifact, root, require_committed=False)
+
+
+def test_restatement_acceptance_rejects_digest_consistent_terminal_failure() -> None:
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/plan_restatement_acceptance_2026-09-01.json"
+    spec = importlib.util.spec_from_file_location(
+        "plan_restatement_acceptance_failure_mutation",
+        root / "scripts/run_plan_restatement_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    artifact = deepcopy(json.loads(artifact_path.read_text(encoding="utf-8")))
+    attempt = artifact["discovery"]["audit"]["attempt_ledger"][0]
+    channels = artifact["discovery"]["exact_attempt_channels"][0]
+    channels["raw"] += (
+        '\n{"type":"turn.failed","error":{"message":"forged terminal failure"}}\n'
+    )
+    attempt["raw_sha256"] = hashlib.sha256(
+        channels["raw"].encode("utf-8"),
+    ).hexdigest()
+    attempt["raw_excerpt"] = channels["raw"][:4000]
+    with pytest.raises(ValueError, match="reconstruct"):
+        acceptance.validate_artifact(artifact, root, require_committed=False)

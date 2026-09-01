@@ -105,6 +105,7 @@ def _capture_call(
             "session_ref":review.session_ref, "response_text":review.text or "",
             "raw":review.raw or "", "failure_detail":review.failure_detail or "",
             "stderr":review.stderr or "", "returncode":review.returncode,
+            "error":review.error, "usage":review.usage,
         }
         return review
 
@@ -115,6 +116,7 @@ def _capture_call(
             "session_ref":review.session_ref, "response_text":review.text or "",
             "raw":review.raw or "", "failure_detail":review.failure_detail or "",
             "stderr":review.stderr or "", "returncode":review.returncode,
+            "error":review.error, "usage":review.usage,
         }
         return review
 
@@ -202,6 +204,9 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
             review.session_ref != channels["session_ref"]
             or review.text != channels["response_text"]
             or review.raw != channels["raw"]
+            or review.error != channels["error"]
+            or (review.failure_detail or "") != channels["failure_detail"]
+            or review.usage != channels["usage"]
         ):
             raise ValueError("retained raw provider envelope does not reconstruct its response")
         responses.append(review.text)
@@ -358,7 +363,7 @@ def validate_artifact(
                 raise ValueError("attempt channel, session, role, and prompt binding failed")
             exact_fields = {
                 "session_ref", "response_text", "raw", "failure_detail", "stderr",
-                "returncode",
+                "returncode", "error", "usage",
             }
             if set(channels) != exact_fields or channels["session_ref"] != session_ref:
                 raise ValueError("exact attempt channels are not closed and session-bound")
@@ -375,6 +380,8 @@ def validate_artifact(
                     raise ValueError(f"exact {value_key} channel digest mismatch")
             if channels["returncode"] != attempt["returncode"]:
                 raise ValueError("exact return code differs from the attempt ledger")
+            if channels["error"] is not False or channels["usage"] != attempt["usage"]:
+                raise ValueError("exact parser status or usage differs from the attempt ledger")
         expected_payloads = {
             "manifests":row["audit"].get("staged_manifests") or [],
             "settlement":row["audit"].get("staged_settlement"),
@@ -464,6 +471,11 @@ def main() -> int:
         channels = json.loads((log_dir / "exact_attempt_channels.json").read_text(
             encoding="utf-8",
         ))
+        for channel in channels:
+            if "error" not in channel or "usage" not in channel:
+                parsed = engines.CodexEngine().parse_output(channel["raw"])
+                channel["error"] = parsed.error
+                channel["usage"] = parsed.usage
         lineage = json.loads(
             (run_root / f"{name}-state" / "lineages" / f"{lineage_id}.json").read_text(
                 encoding="utf-8",
