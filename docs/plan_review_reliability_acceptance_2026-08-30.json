@@ -1779,12 +1779,12 @@
         "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
-        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
-        "sha256": "0661475938aee3f609e29d5de1f7f1e8202491fe4c0d78086fce0184bb228cc4"
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
+        "sha256": "c9f9719466a9dfbf6506996526a39e99427fd87f81df02c7972ea59fd06b76dd"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds public plan consolidation anchor-retry regressions.",
-        "sha256": "646ed775dbdaa2315a86393d64d4525166772ee70cf97b48b33278f870e47062"
+        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds public plan consolidation anchor-retry regressions that retain malformed anchors only in validator diagnostics.",
+        "sha256": "2afcf900a8823c04243dab996d0b4e4ce82b40f4dbf67fcb6bf511dbad0b9acb"
       }
     },
     "checks": {
