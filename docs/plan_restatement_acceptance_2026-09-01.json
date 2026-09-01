@@ -1,0 +1,1435 @@
+{
+  "acceptance_kind": "plan-normative-restatement-public-handler-v1",
+  "allowed_later_source_diffs": {
+    "scripts/run_plan_restatement_acceptance.py": {
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
+      "sha256": "0a39c01228c3ffc7b6c45e17fe394493e1533cc58a91e31baa874c97bfd316a1"
+    }
+  },
+  "claims": {
+    "does_not_prove": [
+      "Every future provider response will classify every semantic restatement correctly.",
+      "Textual equality by itself identifies normative authority.",
+      "Branch review behavior changed."
+    ],
+    "proves": [
+      "A real Codex four-call broad plan census produced one aggregate finding for every independently authoritative operative restatement.",
+      "The same finding excluded an illustrative example that explicitly deferred to the governing authority.",
+      "A separate real Codex targeted correction closed three supplied classes without discovering an unrelated restatement cluster."
+    ]
+  },
+  "date": "2026-09-01",
+  "discovery": {
+    "audit": {
+      "already_raised": [],
+      "attempt_ledger": [
+        {
+          "duration_ms": 201737,
+          "engine": "codex",
+          "failure_detail_excerpt": "",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outcome": "completed",
+          "provider_duration_ms": null,
+          "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05ab2-f23b-7fa0-a61f-d8da7eddbf2c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_assessments\\\":[],\\\"coverage\\\":[{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"I’m reading the complete plan and pinned repository, then will return only the schema object.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Repository premise checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Transformation checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Consumer checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Failure and recovery checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Acceptance checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"tests-acceptance\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Documentation and operations checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"docs-operations\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Consistency checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"consistency\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"},{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"Proportionality checks are in progress.\\\"}],\\\"finding_ids\\\":[],\\\"id\\\":\\\"proportionality\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"Review in progress.\\\"}],\\\"findings\\\":[],\\\"lane\\\":\\\"domain\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'pwd && rg --files -uu repository .agents .codex 2>/dev/null | sort'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'pwd && rg --files -uu repository .agents .codex 2>/dev/null | sort'\",\"aggregated_output\":\"repository/.gitignore\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/LICENSE\\nrepository/README.md\\nrepository/docs/arbitrate_original_neutrality_fallback_plan.md\\nrepository/docs/arbitration_consequence_acceptance_2026-08-22.json\\nrepository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/arbitration_fallback_acceptance_2026-08-16.json\\nrepository/docs/arbitration_fallback_evidence/ordinary-audit.json\\nrepository/docs/arbitration_fallback_evidence/ordinary-timing.json\\nrepository/docs/arbitration_fallback_evidence/original-attested-audit.json\\nrepository/docs/arbitration_fallback_evidence/snapshot-commit.txt\\nrepository/docs/arbitration_fallback_evidence/timing.json\\nrepository/docs/arbitration_plan.md\\nrepository/docs/arbitration_reliability_acceptance_2026-08-12.json\\nrepository/docs/arbitration_reliability_evidence/preceding-failed-audit.json\\nrepository/docs/arbitration_reliability_evidence/primary-audit.json\\nrepository/docs/arbitration_research_plan.md\\nrepository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\nrepository/docs/authoritative_capture_acceptance_2026-08-20.json\\nrepository/docs/authoritative_capture_segmentation_plan.md\\nrepository/docs/branch_plan_fidelity_acceptance_2026-08-22.json\\nrepository/docs/branch_plan_fidelity_plan.md\\nrepository/docs/claim_binding_acceptance_2026-08-14.json\\nrepos",
+          "raw_sha256": "a188bab3f4c9669f719ada5b831cd8ddf57122b79505308710e8c83f854986bf",
+          "rejected_reply_excerpt": null,
+          "rejected_reply_sha256": null,
+          "requested_timeout_sec": 1800,
+          "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:1-16\",\"rationale\":\"The artifact presents a queue feature card but lacks a repository-bound target, complete rejection semantics, exact implementation scope, and executable acceptance commands.\"},{\"anchor\":\"repository/scripts/run_plan_restatement_acceptance.py:29-45\",\"rationale\":\"The repository defines the supplied text verbatim as DISCOVERY_PLAN, demonstrating that it is a synthetic review input rather than a queue implementation plan.\"}],\"finding_ids\":[\"F2\",\"F3\",\"F4\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The artifact is the wrong kind of plan for this repository and does not completely bind the proposed behavior or implementation.\"},{\"evidence\":[{\"anchor\":\"repository/README.md:1-23\",\"rationale\":\"The repository is an MCP adversarial-review server whose documented capabilities do not include a queue-processing product surface.\"},{\"anchor\":\"repository/src/paranoia_local/server.py:474-486\",\"rationale\":\"The production handler inventory contains review, query, rebuttal, and arbitration operations, not the worker or queue API assumed by the plan.\"},{\"anchor\":\"repository/scripts/run_plan_restatement_acceptance.py:283-288\",\"rationale\":\"Production acceptance tooling submits the identical text to critique_plan as a discovery fixture.\"}],\"finding_ids\":[\"F2\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"Repository evidence contradicts the premise that this card identifies an existing queue configuration, worker, and API implementation surface.\"},{\"evidence\":[{\"anchor\":\"plan:7-10\",\"rationale\":\"The only oversize transformation rule says each boundary rejects a sixty-fifth item without defining whether the entire batch or only that item is rejected.\"},{\"anchor\":\"plan:12-13\",\"rationale\":\"The sole worked example covers only successful boundary input and does not resolve oversize state-transition behavior.\"}],\"finding_ids\":[\"F3\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The core oversize-batch state transition is ambiguous.\"},{\"evidence\":[{\"anchor\":\"plan:4\",\"rationale\":\"The governing section directs all implementations and tests to use its authority.\"},{\"anchor\":\"plan:7\",\"rationale\":\"The worker is made a separate normative consumer and authority for the same limit.\"},{\"anchor\":\"plan:10\",\"rationale\":\"The API is made another separate normative consumer and authority for the same limit.\"}],\"finding_ids\":[\"F1\",\"F3\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Worker and API consumers have split authority and underdefined rejection outcomes.\"},{\"evidence\":[{\"anchor\":\"plan:7-10\",\"rationale\":\"Neither rejection contract specifies partial-enqueue prevention, observable error behavior, queue state after failure, or whether retry is safe.\"}],\"finding_ids\":[\"F3\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Ordinary oversize rejection and recovery behavior is not bound.\"},{\"evidence\":[{\"anchor\":\"plan:15-16\",\"rationale\":\"The plan requests focused and full tests but supplies neither executable commands nor exact test targets.\"},{\"anchor\":\"repository/pyproject.toml:40-43\",\"rationale\":\"The repository defines pytest discovery under tests, but the plan does not bind a focused target or an exact full-suite invocation.\"}],\"finding_ids\":[\"F3\",\"F4\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is not executable and does not cover the unresolved rejection semantics.\"},{\"evidence\":[{\"anchor\":\"plan:15-16\",\"rationale\":\"API documentation is named only as a generic category, with no repository path, public contract surface, configuration documentation, or synchronized acceptance boundary.\"},{\"anchor\":\"repository/README.md:304-313\",\"rationale\":\"The repository's relevant public contract concerns normative-restatement review and its retained acceptance artifact, which the queue plan does not identify.\"}],\"finding_ids\":[\"F2\",\"F4\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"The documentation obligation is neither repository-aligne",
+          "response_sha256": "f73c3115478d0bb33fc3b160868edf638cc42b06bdcdb6eb0ff1e9a9c944c0a4",
+          "returncode": 0,
+          "role": "census-domain",
+          "sequence": 1,
+          "session_ref": "01a05ab2-f23b-7fa0-a61f-d8da7eddbf2c",
+          "stderr_excerpt": "2026-09-01T02:01:11.649520Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:19.517176Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:30.968286Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:03:17.131743Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:04:32.393680Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n2026-09-01T02:04:32.398790Z  WARN codex_core::shell_snapshot: Failed to delete shell snapshot at AbsolutePathBuf(\"/mnt/c/Users/andy/.codex/shell_snapshots/01a05ab2-f23b-7fa0-a61f-d8da7eddbf2c.1788228071999649811.sh\"): Os { code: 2, kind: NotFound, message: \"No such file or directory\" }\n",
+          "stderr_sha256": "f8c7afdb33589c7e9b13e7a78340aa3bbc7c3d36e30754e212d367f1696d4940",
+          "usage": {
+            "cached_input_tokens": 189952,
+            "input_tokens": 258244,
+            "output_tokens": 8598,
+            "reasoning_output_tokens": 5180
+          },
+          "validation_issue": null,
+          "validation_pointer": null
+        },
+        {
+          "duration_ms": 227635,
+          "engine": "codex",
+          "failure_detail_excerpt": "",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outcome": "completed",
+          "provider_duration_ms": null,
+          "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05ab2-f2d2-7860-b080-fb692289718c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"find repository -type f -print | sort && rg -n --hidden --glob '\\\"'!*.pyc'\\\"' '' repository\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"find repository -type f -print | sort && rg -n --hidden --glob '\\\"'!*.pyc'\\\"' '' repository\\\"\",\"aggregated_output\":\"repository/pyproject.toml:1:[build-system]\\nrepository/pyproject.toml:2:requires = [\\\"hatchling\\\"]\\nrepository/pyproject.toml:3:build-backend = \\\"hatchling.build\\\"\\nrepository/pyproject.toml:4:\\nrepository/pyproject.toml:5:[project]\\nrepository/pyproject.toml:6:name = \\\"paranoia-local\\\"\\nrepository/pyproject.toml:7:version = \\\"0.1.0\\\"\\nrepository/pyproject.toml:8:description = \\\"A local MCP server for cross-agent adversarial code review — Claude Code and Codex CLI critique each other's work over their own subscriptions, with full repo access.\\\"\\nrepository/pyproject.toml:9:readme = \\\"README.md\\\"\\nrepository/pyproject.toml:10:requires-python = \\\">=3.11\\\"\\nrepository/pyproject.toml:11:license = { text = \\\"MIT\\\" }\\nrepository/pyproject.toml:12:authors = [{ name = \\\"Andrew Hillel\\\" }]\\nrepository/pyproject.toml:13:keywords = [\\\"mcp\\\", \\\"code-review\\\", \\\"claude-code\\\", \\\"codex\\\", \\\"adversarial-review\\\"]\\nrepository/pyproject.toml:14:dependencies = [\\nrepository/pyproject.toml:15:    # MCP 2.0 renamed Tool.inputSchema and is not API-compatible with this server.\\nrepository/pyproject.toml:16:    \\\"mcp>=1.2.0,<2\\\",\\nrepository/pyproject.toml:17:    \\\"trafilatura>=2.0,<3\\\",\\nrepository/pyproject.toml:18:    \\\"jsonschema>=4.23,<5\\\",\\nrepository/pyproject.toml:19:]\\nrepository/pyproject.toml:20:\\nrepository/pyproject.toml:21:[project.optional-dependencies]\\nrepository/pyproject.toml:22:dev = [\\nrepository/pyproject.toml:23:    \\\"pytest>=8.0\\\",\\nrepository/pyproject.toml:24:    \\\"pytest-asyncio>=0.23\\\",\\nrepository/pyproject.toml:25:    # Mutation testing for the arbitration protocol's pure core, where a surviving\\nrepository/pyproject.toml:26:    # mutant means a control that does not actually hold.\\nrepository/pyproject.toml:27:    \\\"mutmut>=3.0\\\",\\nrepository/pyproject.toml:28:]\\nrepository/pyproject.toml:29:\\nrepository/pyproject.toml:30:[project.scripts]\\nrepository/pyproject.toml:31:paranoia-local = \\\"paranoia_local.cli:main\\\"\\nrepository/pyproject.toml:32:\\nrepository/pyproject.toml:33:[project.urls]\\nrepository/pyproject.toml:34:Homepage = \\\"https://github.com/subvertnormality/paranoia-local\\\"\\nrepository/pyproject.toml:35:Source = \\\"https://github.com/subvertnormality/paranoia-local\\\"\\nrepository/pyproject.toml:36:\\nrepository/pyproject.toml:37:[tool.hatch.build.targets.wheel]\\nrepository/pyproject.toml:38:packages = [\\\"src/paranoia_local\\\"]\\nrepository/pyproject.toml:39:\\nrepository/pyproject.toml:40:[tool.pytest.ini_options]\\nrepository/pyproject.toml:41:asyncio_mode = \\\"auto\\\"\\nrepository/pyproject.toml:42:testpaths = [\\\"tests\\\"]\\nrepository/pyproject.toml:43:pythonpath = [\\\"src\\\", \\\".\\\"]\\nrepository/AGENTS.md:1:# Repository agent instructions\\nrepository/AGENTS.md:2:\\nrepository/AGENTS.md:3:These instructions govern work in paranoia-local. User instructions take precedence but do\\nrepository/AGENTS.md:4:not silently expand scope.\\nrepository/AGENTS.md:5:\\nrepository/AGENTS.md:6:## Freeze proportionate stakes\\nrepository/AGENTS.md:7:\\nrepository/AGENTS.md:8:Before any convergence loop, state one concrete, stable operating model: deployment,\\nrepository/AGENTS.md:9:operators, trusted actors, untrusted inputs, active adversary capabilities, concurrency,\\nrepository/AGENTS.md:10:network boundary, expected files/claims/rounds/latency, consequences of false clear versus\\nrepository/AGENTS.md:11:false block, and explicit exclusions. Avoid vague labels such as “produc",
+          "raw_sha256": "89b346d600ce0b04b0a6138af380e89b27b955ae8aeafbcd460b3abcbe656655",
+          "rejected_reply_excerpt": null,
+          "rejected_reply_sha256": null,
+          "requested_timeout_sec": 1800,
+          "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:15-16\",\"rationale\":\"The only implementation section gives generic component categories and generic test-suite descriptions rather than a repository-resolvable implementation and acceptance contract.\"}],\"finding_ids\":[\"F001\",\"F003\",\"F004\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan lacks resolvable implementation scope, executable acceptance evidence, and complete rejection semantics.\"},{\"evidence\":[{\"anchor\":\"repository/src/paranoia_local/handlers.py:62-73\",\"rationale\":\"The repository's existing batching limits concern evidence-model calls, prompt characters, capture sources, and aggregate batch counts, none of which the plan identifies or relates to its proposed 64-item limit.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:3623-3728\",\"rationale\":\"The actual batching implementation is _binding_batches, which packs captured evidence by rendered prompt size and enforces an aggregate batch-count ceiling; the plan does not name this implementation or explain whether it is the intended target.\"},{\"anchor\":\"repository/README.md:109-119\",\"rationale\":\"The documented public surface consists of review, query, rebuttal, and arbitration tools, so the plan's unnamed queue API and worker cannot be mapped to a documented repository surface.\"}],\"finding_ids\":[\"F001\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The proposed queue, worker, and API surfaces are not bound to the repository's actual batching or public interfaces.\"},{\"evidence\":[{\"anchor\":\"plan:7\",\"rationale\":\"Saying the worker rejects a sixty-fifth item does not define the state transition for the containing batch.\"},{\"anchor\":\"plan:10\",\"rationale\":\"The API statement likewise leaves request atomicity and side effects unspecified.\"}],\"finding_ids\":[\"F004\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The limit-enforcement transformation is ambiguous about whole-batch rejection versus partial acceptance.\"},{\"evidence\":[{\"anchor\":\"plan:7\",\"rationale\":\"The worker is named as a consumer without a defined error, queue-state, or retry contract.\"},{\"anchor\":\"plan:10\",\"rationale\":\"The API is named as a consumer without an observable response contract.\"},{\"anchor\":\"repository/README.md:109-119\",\"rationale\":\"The repository's documented consumers and public tools do not include the queue API described by the plan.\"}],\"finding_ids\":[\"F001\",\"F004\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Neither the intended repository consumers nor their observable boundary behavior are completely specified.\"},{\"evidence\":[{\"anchor\":\"plan:7\",\"rationale\":\"Worker rejection is stated without specifying what remains queued or how processing may recover.\"},{\"anchor\":\"plan:10\",\"rationale\":\"API rejection is stated without defining retry safety, partial effects, or the returned failure.\"}],\"finding_ids\":[\"F004\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Oversized-batch rejection has no atomicity or recovery contract.\"},{\"evidence\":[{\"anchor\":\"plan:16\",\"rationale\":\"“Focused queue tests” and “full suite” are not exact commands, named test targets, or enumerated assertions, even though delivery is said to fail when they fail.\"},{\"anchor\":\"repository/pyproject.toml:40-43\",\"rationale\":\"The repository defines pytest configuration and the tests root, providing a concrete basis from which exact commands and focused test paths could have been named.\"}],\"finding_ids\":[\"F003\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is fail-closed in principle but is not executable or behaviorally complete.\"},{\"evidence\":[{\"anchor\":\"plan:16\",\"rationale\":\"The plan says only to update “API documentation” and does not identify the repository document or the rejection, configuration, and recovery behavior it must publish.\"},{\"anchor\":\"repository/README.md:109-119\",\"rationale\":\"The repository has a documented public tool surface, but the plan does not identify how or where a queue API belongs t",
+          "response_sha256": "6cc22a5cb2f4001db1f3a928e6dcf9adddd2611945c2ae89747070fd841fa9f3",
+          "returncode": 0,
+          "role": "census-execution",
+          "sequence": 2,
+          "session_ref": "01a05ab2-f2d2-7860-b080-fb692289718c",
+          "stderr_excerpt": "2026-09-01T02:01:11.653969Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:01:56.508828Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:01.324523Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:10.174272Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:18.272714Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:25.167285Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:30.539680Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:37.968876Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:43.760428Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:53.871129Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:03:57.933589Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:04:58.305707Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+          "stderr_sha256": "529a9dbe30c911b812d84020fd020733be27651668f3a3c50a896009497c4c7a",
+          "usage": {
+            "cached_input_tokens": 628480,
+            "input_tokens": 727555,
+            "output_tokens": 9444,
+            "reasoning_output_tokens": 5684
+          },
+          "validation_issue": null,
+          "validation_pointer": null
+        },
+        {
+          "duration_ms": 95174,
+          "engine": "codex",
+          "failure_detail_excerpt": "",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outcome": "completed",
+          "provider_duration_ms": null,
+          "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05ab2-f246-7531-9303-c2d2ec296f69\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"find repository -type f -print | sort && sed -n '1,220p' repository/* 2>/dev/null\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"find repository -type f -print | sort && sed -n '1,220p' repository/* 2>/dev/null\\\"\",\"aggregated_output\":\"nding, apply it through the canonical class engine,\\nand render `CLASS-REGISTER` plus `CLASS-CLOSURE` with canonical IDs and blocking detail alongside the\\nsingle staged structural verdict. Concrete structural debt is not a substitute for class closure.\\nWhen lineage state is unavailable or persistence is ambiguous, render both class fields but use\\n`CLASS-CLOSURE: STATE-UNAVAILABLE`; never present unconfirmed in-memory counts as durable state.\\n\\n## Classes are architectural hypotheses\\n\\nAn open class is not a patch instruction. Triage all open/reopened classes together: concrete\\nreachable failure, required actor capabilities, user/public invariant, shared root cause,\\nproportionate disposition, and smallest coherent remedy. Stop patching and hold an architecture\\ncheckpoint when a class recurs, a late round opens an architectural class, two fix cycles do\\nnot reduce blockers, a fix adds a subsystem/trust boundary/persistence protocol, or the change\\nbudget is materially exceeded. Choose refactor, narrower contract, staged rollout, or no-go.\\n\\nAt a checkpoint, do not “fix every class” line by line. Re-read the request, group patterns,\\nmeasure current diff/runtime, and simplify. A clean review means no in-scope blocking class\\nunder frozen stakes—not defense against every imaginable environment.\\n\\n## Optimize for a workable product\\n\\nPriority order:\\n\\n1. accurate domain behavior and verdicts;\\n2. reliable ordinary operation and recoverable failures;\\n3. useful latency and bounded resources;\\n\",\"exit_code\":4,\"status\":\"failed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files -uu repository | sort; wc -l $(rg --files -uu repository | sort)'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files -uu repository | sort; wc -l $(rg --files -uu repository | sort)'\",\"aggregated_output\":\"     11 repository/.gitignore\\n    572 repository/AGENTS.md\\n     65 repository/CLAUDE.md\\n     21 repository/LICENSE\\n    430 repository/README.md\\n    162 repository/docs/arbitrate_original_neutrality_fallback_plan.md\\n    350 repository/docs/arbitration_consequence_acceptance_2026-08-22.json\\n    180 repository/docs/arbitration_context_steering_rejection_acceptance_2026-08-22.json\\n     68 repository/docs/arbitration_fallback_acceptance_2026-08-16.json\\n    198 repository/docs/arbitration_fallback_evidence/ordinary-audit.json\\n      7 repository/docs/arbitration_fallback_evidence/ordinary-timing.json\\n    212 repository/docs/arbitration_fallback_evidence/original-attested-audit.json\\n      6 repository/docs/arbitration_fallback_evidence/snapshot-commit.txt\\n      7 repository/docs/arbitration_fallback_evidence/timing.json\\n   1272 repository/docs/arbitration_plan.md\\n    110 repository/docs/arbitration_reliability_acceptance_2026-08-12.json\\n   1142 repository/docs/arbitration_reliability_evidence/preceding-failed-audit.json\\n   1263 repository/docs/arbitration_reliability_evidence/primary-audit.json\\n    630 repository/docs/arbitration_research_plan.md\\n    179 repository/docs/arbitration_steering_rejection_acceptance_2026-08-22.json\\n    142 repository/docs/authoritative_capture_acceptance_2026-08-20.json\\n    146 repository/docs/authoritative_capture_segmentation_plan.md\\n   1891 repository/docs/branch_plan_fideli",
+          "raw_sha256": "4059d6dc79c23c147a156d388b383eb3fcf2b72e52bda6d669dafc92fd566093",
+          "rejected_reply_excerpt": null,
+          "rejected_reply_sha256": null,
+          "requested_timeout_sec": 1800,
+          "response_excerpt": "{\"class_assessments\":[],\"coverage\":[{\"evidence\":[{\"anchor\":\"plan:15-16\",\"rationale\":\"The only implementation section gives conceptual component names and generic test-suite labels, without repository-resolvable change sites or executable acceptance commands.\"},{\"anchor\":\"plan:3-10\",\"rationale\":\"The limit contracts do not specify whether an oversized batch is rejected atomically or partially processed.\"}],\"finding_ids\":[\"F-001\",\"F-003\",\"F-004\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan is not sufficiently bound to the supplied artifact, and its rejection and acceptance contracts are incomplete.\"},{\"evidence\":[{\"anchor\":\"repository/pyproject.toml:5-18\",\"rationale\":\"The repository identifies itself as an MCP adversarial-code-review server, not a queue service.\"},{\"anchor\":\"repository/pyproject.toml:30-38\",\"rationale\":\"The declared executable and packaged implementation are paranoia_local modules; no queue worker or queue API target is identified.\"},{\"anchor\":\"repository/README.md:15-23\",\"rationale\":\"The documented product capabilities are review, claim verification, rebuttal, and arbitration, with no queue API or worker described.\"},{\"anchor\":\"plan:15-16\",\"rationale\":\"The plan nevertheless assumes queue configuration, worker, and API-documentation targets without mapping them to this repository.\"}],\"finding_ids\":[\"F-001\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The proposed subsystem cannot be resolved in the supplied repository.\"},{\"evidence\":[{\"anchor\":\"plan:3-10\",\"rationale\":\"The plan defines a maximum and rejection statements but omits the state transition for a batch containing more than 64 items.\"}],\"finding_ids\":[\"F-003\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"Oversized-batch transformation and side-effect semantics are unspecified.\"},{\"evidence\":[{\"anchor\":\"plan:6-10\",\"rationale\":\"Worker and API are named as consumers, but their independently observable behavior for one oversized batch is not defined precisely.\"}],\"finding_ids\":[\"F-003\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"The worker/API boundary contract leaves partial-versus-atomic rejection ambiguous.\"},{\"evidence\":[{\"anchor\":\"plan:6-10\",\"rationale\":\"Saying each consumer rejects a sixty-fifth item does not state whether the first 64 items remain accepted, are rolled back, or are never submitted.\"},{\"anchor\":\"plan:15-16\",\"rationale\":\"Failing delivery on test failure is fail-closed for the build, but it does not define runtime recovery or absence of partial effects for rejected batches.\"}],\"finding_ids\":[\"F-003\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Runtime failure and recovery behavior for oversized batches is incomplete.\"},{\"evidence\":[{\"anchor\":\"plan:12-16\",\"rationale\":\"The 64-item case is only an illustrative example, while acceptance names no commands and no required boundary assertions for 64 and 65 items through the worker and API.\"},{\"anchor\":\"repository/pyproject.toml:40-43\",\"rationale\":\"The repository declares pytest and the tests directory, providing a concrete test entry point that the plan could name but does not.\"}],\"finding_ids\":[\"F-004\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is not executable or tied to observable boundary outcomes.\"},{\"evidence\":[{\"anchor\":\"plan:15-16\",\"rationale\":\"“API documentation” is only a generic category and is not mapped to an existing public document or operation in this repository.\"},{\"anchor\":\"repository/README.md:25-27\",\"rationale\":\"The repository identifies README, tool-reference, and llms.txt as public operational documentation, but the plan names none of these or another exact target.\"}],\"finding_ids\":[\"F-001\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"The documentation update has no repository-resolvable target.\"},{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"This section declares the governing limit to be the normative authority.\"},{\"anchor\":\"plan:6-7\",\"rationale\":\"The worker section independently redef",
+          "response_sha256": "d60fde538d833a61cbc55a02b7a3be367a67afe3dadda5f0bbe50fbd8932c03c",
+          "returncode": 0,
+          "role": "census-integrity",
+          "sequence": 3,
+          "session_ref": "01a05ab2-f246-7531-9303-c2d2ec296f69",
+          "stderr_excerpt": "2026-09-01T02:01:11.653733Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:02:45.854891Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+          "stderr_sha256": "03be359932e37100a11d513e16d1f136906c2c3a9da831288aad8f03812fe018",
+          "usage": {
+            "cached_input_tokens": 70656,
+            "input_tokens": 108976,
+            "output_tokens": 4487,
+            "reasoning_output_tokens": 2350
+          },
+          "validation_issue": null,
+          "validation_pointer": null
+        },
+        {
+          "duration_ms": 53289,
+          "engine": "codex",
+          "failure_detail_excerpt": "",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outcome": "completed",
+          "provider_duration_ms": null,
+          "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05ab6-6b77-7792-9a3a-3ec2a4b6d183\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{},\\\"debt_outcomes\\\":[],\\\"governing_findings\\\":[{\\\"classification\\\":{\\\"definition\\\":{\\\"invariant\\\":\\\"The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review.\\\",\\\"procedure\\\":\\\"Compare the plan's claimed subsystem and artifact identity with repository metadata and public interfaces, resolve each named implementation, test, documentation, and output target, and mark the class violated if the repository is wrong, any target is absent or ambiguous, or the proposed work cannot be traced to an existing implementation surface.\\\",\\\"severity\\\":\\\"FATAL\\\"},\\\"kind\\\":\\\"new_class\\\"},\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-16\\\",\\\"rationale\\\":\\\"The complete plan presents a queue configuration, worker, and API implementation card that does not identify repository-resolvable targets.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_restatement_acceptance.py:29-45\\\",\\\"rationale\\\":\\\"These lines establish that the supplied plan content is a synthetic normative-restatement fixture rather than a repository implementation card.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_restatement_acceptance.py:238-256\\\",\\\"rationale\\\":\\\"These lines show how the repository treats and evaluates the synthetic plan fixture.\\\"},{\\\"anchor\\\":\\\"repository/scripts/run_plan_restatement_acceptance.py:283-288\\\",\\\"rationale\\\":\\\"These lines further identify the artifact's fixture role and contradict the proposed implementation premise.\\\"},{\\\"anchor\\\":\\\"plan:16\\\",\\\"rationale\\\":\\\"The acceptance and documentation instruction does not name resolvable repository targets or production entry points.\\\"},{\\\"anchor\\\":\\\"repository/src/paranoia_local/handlers.py:62-73\\\",\\\"rationale\\\":\\\"These lines expose the repository's actual batching-related implementation surface, which the plan does not name or bind.\\\"},{\\\"anchor\\\":\\\"repository/src/paranoia_local/handlers.py:3623-3728\\\",\\\"rationale\\\":\\\"These lines contain the repository's concrete batch handling behavior and constraints, demonstrating the mismatch with the asserted queue worker and API surfaces.\\\"},{\\\"anchor\\\":\\\"repository/tests/test_plan_claims.py:2624-2648\\\",\\\"rationale\\\":\\\"These tests identify the repository-specific behavior that a correctly bound plan would need to address.\\\"},{\\\"anchor\\\":\\\"repository/README.md:109-119\\\",\\\"rationale\\\":\\\"The documented public batching interface differs from and is not connected to the queue interfaces asserted by the plan.\\\"},{\\\"anchor\\\":\\\"plan:15-16\\\",\\\"rationale\\\":\\\"The implementation, test, and documentation obligations remain generic and provide no exact repository paths or symbols.\\\"},{\\\"anchor\\\":\\\"repository/pyproject.toml:5-18\\\",\\\"rationale\\\":\\\"Project metadata identifies the supplied repository and does not support the plan's asserted queue subsystem premise.\\\"},{\\\"anchor\\\":\\\"repository/pyproject.toml:30-38\\\",\\\"rationale\\\":\\\"The declared package and entry-point configuration provides no resolvable queue worker or API target matching the plan.\\\"},{\\\"anchor\\\":\\\"repository/README.md:15-23\\\",\\\"rationale\\\":\\\"The repository overview describes a different product and implementation surface from the proposed queue card.\\\"}],\\\"id\\\":\\\"governing:repository-binding\\\",\\\"remedy\\\":\\\"Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.\\\",\\\"severity\\\":\\\"FATAL\\\",\\\"source_ids\\\":[\\\"domain:F2\\\",\\\"execution:F001\\\",\\\"integrity:",
+          "raw_sha256": "3aaa19500ed2b10faa8420b28ed8884c76727b8af34d9f1c1a6141df5d06226a",
+          "rejected_reply_excerpt": null,
+          "rejected_reply_sha256": null,
+          "requested_timeout_sec": 1200,
+          "response_excerpt": "{\"class_actions\":{},\"debt_outcomes\":[],\"governing_findings\":[{\"classification\":{\"definition\":{\"invariant\":\"The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review.\",\"procedure\":\"Compare the plan's claimed subsystem and artifact identity with repository metadata and public interfaces, resolve each named implementation, test, documentation, and output target, and mark the class violated if the repository is wrong, any target is absent or ambiguous, or the proposed work cannot be traced to an existing implementation surface.\",\"severity\":\"FATAL\"},\"kind\":\"new_class\"},\"evidence\":[{\"anchor\":\"plan:1-16\",\"rationale\":\"The complete plan presents a queue configuration, worker, and API implementation card that does not identify repository-resolvable targets.\"},{\"anchor\":\"repository/scripts/run_plan_restatement_acceptance.py:29-45\",\"rationale\":\"These lines establish that the supplied plan content is a synthetic normative-restatement fixture rather than a repository implementation card.\"},{\"anchor\":\"repository/scripts/run_plan_restatement_acceptance.py:238-256\",\"rationale\":\"These lines show how the repository treats and evaluates the synthetic plan fixture.\"},{\"anchor\":\"repository/scripts/run_plan_restatement_acceptance.py:283-288\",\"rationale\":\"These lines further identify the artifact's fixture role and contradict the proposed implementation premise.\"},{\"anchor\":\"plan:16\",\"rationale\":\"The acceptance and documentation instruction does not name resolvable repository targets or production entry points.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:62-73\",\"rationale\":\"These lines expose the repository's actual batching-related implementation surface, which the plan does not name or bind.\"},{\"anchor\":\"repository/src/paranoia_local/handlers.py:3623-3728\",\"rationale\":\"These lines contain the repository's concrete batch handling behavior and constraints, demonstrating the mismatch with the asserted queue worker and API surfaces.\"},{\"anchor\":\"repository/tests/test_plan_claims.py:2624-2648\",\"rationale\":\"These tests identify the repository-specific behavior that a correctly bound plan would need to address.\"},{\"anchor\":\"repository/README.md:109-119\",\"rationale\":\"The documented public batching interface differs from and is not connected to the queue interfaces asserted by the plan.\"},{\"anchor\":\"plan:15-16\",\"rationale\":\"The implementation, test, and documentation obligations remain generic and provide no exact repository paths or symbols.\"},{\"anchor\":\"repository/pyproject.toml:5-18\",\"rationale\":\"Project metadata identifies the supplied repository and does not support the plan's asserted queue subsystem premise.\"},{\"anchor\":\"repository/pyproject.toml:30-38\",\"rationale\":\"The declared package and entry-point configuration provides no resolvable queue worker or API target matching the plan.\"},{\"anchor\":\"repository/README.md:15-23\",\"rationale\":\"The repository overview describes a different product and implementation surface from the proposed queue card.\"}],\"id\":\"governing:repository-binding\",\"remedy\":\"Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.\",\"severity\":\"FATAL\",\"source_ids\":[\"domain:F2\",\"execution:F001\",\"integrity:F-001\"],\"summary\":\"The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository.\"},{\"classification\":{\"definition\":{\"invariant\":\"A plan must designate exactly one normative authority for each shared rule and require every consumer, test, and document to reference or derive fr",
+          "response_sha256": "2886c0ab83f1674201f223d4c7d865c2bcdca9607d70d034f023e5e862e0730c",
+          "returncode": 0,
+          "role": "consolidation",
+          "sequence": 4,
+          "session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+          "stderr_excerpt": "2026-09-01T02:04:59.267261Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 95 column 5\n2026-09-01T02:05:51.893744Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+          "stderr_sha256": "5246a911a560d888cd72bfcb266d0b2ffa8800694961b02bf3af18165107ff47",
+          "usage": {
+            "cached_input_tokens": 0,
+            "input_tokens": 13076,
+            "output_tokens": 2744,
+            "reasoning_output_tokens": 672
+          },
+          "validation_issue": null,
+          "validation_pointer": null
+        }
+      ],
+      "claim_audit_failed": null,
+      "claim_counts": null,
+      "claim_duration_ms": null,
+      "claim_last_accepted_counts": null,
+      "claim_model_calls": 0,
+      "claim_nonadjudicated_count": null,
+      "claim_status": "disabled",
+      "claim_verification": false,
+      "class_closure": true,
+      "correction_gates": [],
+      "engine": "codex",
+      "error": false,
+      "grounded": true,
+      "lineage": "plan-restatement-discovery-acceptance-20260901",
+      "model": "gpt-5.6-sol",
+      "plan_digest": "60e8487b5da77e1c",
+      "plan_path": null,
+      "register_status": "staged census parsed — NEW a77d070f, NEW 05b88b73, NEW 958aea82, NEW 77ad88cc",
+      "rejected_payloads": [],
+      "rendered_trailer": "LINEAGE: plan-restatement-discovery-acceptance-20260901 (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed — NEW a77d070f, NEW 05b88b73, NEW 958aea82, NEW 77ad88cc\nCLASS-CLOSURE: 4 open, 0 closed, 0 surviving matches, 0 exempt, 4 unmechanized\n  05b88b73 A plan must designate exactly one normative authority for each shared rule and require every consumer, test, and document to reference or derive from that authority without independently restating the rule as operative policy. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  77ad88cc A plan's acceptance contract must name the exact implementation and documentation scope, focused and full-suite executable commands, required observable assertions for every enforcing boundary and threshold case, and fail-closed treatment of missing targets, absent or skipped tests, failed assertions, and nonzero command results. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  958aea82 A plan for boundary rejection must define one shared, observable state-transition contract covering atomicity or explicitly permitted partial acceptance, side effects, error or status behavior, retained state, retry eligibility, and recovery at every enforcing boundary. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  a77d070f The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 4 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "retry_register": null,
+      "returncode": 0,
+      "round": 1,
+      "session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+      "staged_manifests": [
+        {
+          "class_assessments": [],
+          "coverage": [
+            {
+              "evidence": [
+                "plan:1-16",
+                "repository/scripts/run_plan_restatement_acceptance.py:29-45"
+              ],
+              "finding_ids": [
+                "domain:F2",
+                "domain:F3",
+                "domain:F4"
+              ],
+              "id": "artifact-complete",
+              "status": "finding",
+              "summary": "The artifact is the wrong kind of plan for this repository and does not completely bind the proposed behavior or implementation."
+            },
+            {
+              "evidence": [
+                "repository/README.md:1-23",
+                "repository/src/paranoia_local/server.py:474-486",
+                "repository/scripts/run_plan_restatement_acceptance.py:283-288"
+              ],
+              "finding_ids": [
+                "domain:F2"
+              ],
+              "id": "repository-premises",
+              "status": "finding",
+              "summary": "Repository evidence contradicts the premise that this card identifies an existing queue configuration, worker, and API implementation surface."
+            },
+            {
+              "evidence": [
+                "plan:7-10",
+                "plan:12-13"
+              ],
+              "finding_ids": [
+                "domain:F3"
+              ],
+              "id": "transformations",
+              "status": "finding",
+              "summary": "The core oversize-batch state transition is ambiguous."
+            },
+            {
+              "evidence": [
+                "plan:4",
+                "plan:7",
+                "plan:10"
+              ],
+              "finding_ids": [
+                "domain:F1",
+                "domain:F3"
+              ],
+              "id": "consumers",
+              "status": "finding",
+              "summary": "Worker and API consumers have split authority and underdefined rejection outcomes."
+            },
+            {
+              "evidence": [
+                "plan:7-10"
+              ],
+              "finding_ids": [
+                "domain:F3"
+              ],
+              "id": "failure-recovery",
+              "status": "finding",
+              "summary": "Ordinary oversize rejection and recovery behavior is not bound."
+            },
+            {
+              "evidence": [
+                "plan:15-16",
+                "repository/pyproject.toml:40-43"
+              ],
+              "finding_ids": [
+                "domain:F3",
+                "domain:F4"
+              ],
+              "id": "tests-acceptance",
+              "status": "finding",
+              "summary": "Acceptance is not executable and does not cover the unresolved rejection semantics."
+            },
+            {
+              "evidence": [
+                "plan:15-16",
+                "repository/README.md:304-313"
+              ],
+              "finding_ids": [
+                "domain:F2",
+                "domain:F4"
+              ],
+              "id": "docs-operations",
+              "status": "finding",
+              "summary": "The documentation obligation is neither repository-aligned nor exactly scoped."
+            },
+            {
+              "evidence": [
+                "plan:4",
+                "plan:7",
+                "plan:10",
+                "repository/src/paranoia_local/prompts.py:164-175"
+              ],
+              "finding_ids": [
+                "domain:F1"
+              ],
+              "id": "consistency",
+              "status": "finding",
+              "summary": "The 64-item limit has three independently operative authorities."
+            },
+            {
+              "evidence": [
+                "plan:15-16"
+              ],
+              "finding_ids": [],
+              "id": "proportionality",
+              "status": "covered",
+              "summary": "No separate disproportionate hardening or scope-expansion defect is present."
+            }
+          ],
+          "findings": [
+            {
+              "evidence": [
+                "plan:4",
+                "plan:7",
+                "plan:10"
+              ],
+              "id": "domain:F1",
+              "remedy": "Keep plan:4 as the sole normative definition. Rewrite the worker and API sections to cite that definition and specify only their derived enforcement behavior; require configuration, documentation, and tests to derive or reference the same authority rather than restating it independently.",
+              "severity": "MAJOR",
+              "summary": "The plan creates three independent authorities for the queue batch maximum."
+            },
+            {
+              "evidence": [
+                "plan:1-16",
+                "repository/scripts/run_plan_restatement_acceptance.py:29-45",
+                "repository/scripts/run_plan_restatement_acceptance.py:238-256",
+                "repository/scripts/run_plan_restatement_acceptance.py:283-288"
+              ],
+              "id": "domain:F2",
+              "remedy": "Resolve the artifact identity before implementation: for this repository, replace it with a plan naming the exact normative-restatement acceptance sources, tests, documentation, output artifact, and commands. If a real queue change is intended, supply the queue repository and identify its actual configuration, worker, API, documentation, and test paths and symbols.",
+              "severity": "FATAL",
+              "summary": "The supplied queue plan is the repository's synthetic reviewer fixture, not a repository-bound implementation card."
+            },
+            {
+              "evidence": [
+                "plan:7",
+                "plan:10",
+                "plan:13"
+              ],
+              "id": "domain:F3",
+              "remedy": "Define one shared oversize-batch invariant for both boundaries: whether rejection is whole-batch atomic or partial, the observable error/status, resulting queue state, and retry eligibility. Add acceptance cases for below-limit, exactly-64, and 65-item inputs at every enforcing boundary, including assertions that failed input cannot leave unintended partial work.",
+              "severity": "MAJOR",
+              "summary": "The 65-item rejection contract omits atomicity, observable failure, and recovery semantics."
+            },
+            {
+              "evidence": [
+                "plan:15-16",
+                "repository/src/paranoia_local/prompts.py:134-145"
+              ],
+              "id": "domain:F4",
+              "remedy": "Name every implementation and documentation file and affected symbol, then provide exact focused and full-suite commands with expected assertions. Require missing targets, no-tests-collected outcomes, skipped required cases, or any nonzero exit to block delivery.",
+              "severity": "MAJOR",
+              "summary": "Implementation scope and acceptance evidence are not executable or exact."
+            }
+          ],
+          "lane": "domain"
+        },
+        {
+          "class_assessments": [],
+          "coverage": [
+            {
+              "evidence": [
+                "plan:15-16"
+              ],
+              "finding_ids": [
+                "execution:F001",
+                "execution:F003",
+                "execution:F004"
+              ],
+              "id": "artifact-complete",
+              "status": "finding",
+              "summary": "The plan lacks resolvable implementation scope, executable acceptance evidence, and complete rejection semantics."
+            },
+            {
+              "evidence": [
+                "repository/src/paranoia_local/handlers.py:62-73",
+                "repository/src/paranoia_local/handlers.py:3623-3728",
+                "repository/README.md:109-119"
+              ],
+              "finding_ids": [
+                "execution:F001"
+              ],
+              "id": "repository-premises",
+              "status": "finding",
+              "summary": "The proposed queue, worker, and API surfaces are not bound to the repository's actual batching or public interfaces."
+            },
+            {
+              "evidence": [
+                "plan:7",
+                "plan:10"
+              ],
+              "finding_ids": [
+                "execution:F004"
+              ],
+              "id": "transformations",
+              "status": "finding",
+              "summary": "The limit-enforcement transformation is ambiguous about whole-batch rejection versus partial acceptance."
+            },
+            {
+              "evidence": [
+                "plan:7",
+                "plan:10",
+                "repository/README.md:109-119"
+              ],
+              "finding_ids": [
+                "execution:F001",
+                "execution:F004"
+              ],
+              "id": "consumers",
+              "status": "finding",
+              "summary": "Neither the intended repository consumers nor their observable boundary behavior are completely specified."
+            },
+            {
+              "evidence": [
+                "plan:7",
+                "plan:10"
+              ],
+              "finding_ids": [
+                "execution:F004"
+              ],
+              "id": "failure-recovery",
+              "status": "finding",
+              "summary": "Oversized-batch rejection has no atomicity or recovery contract."
+            },
+            {
+              "evidence": [
+                "plan:16",
+                "repository/pyproject.toml:40-43"
+              ],
+              "finding_ids": [
+                "execution:F003"
+              ],
+              "id": "tests-acceptance",
+              "status": "finding",
+              "summary": "Acceptance is fail-closed in principle but is not executable or behaviorally complete."
+            },
+            {
+              "evidence": [
+                "plan:16",
+                "repository/README.md:109-119"
+              ],
+              "finding_ids": [
+                "execution:F001",
+                "execution:F004"
+              ],
+              "id": "docs-operations",
+              "status": "finding",
+              "summary": "The documentation obligation is neither repository-resolvable nor complete enough to describe operational rejection behavior."
+            },
+            {
+              "evidence": [
+                "plan:4",
+                "plan:7",
+                "plan:10"
+              ],
+              "finding_ids": [
+                "execution:F002"
+              ],
+              "id": "consistency",
+              "status": "finding",
+              "summary": "The 64-item rule has three independently authoritative definitions."
+            },
+            {
+              "evidence": [
+                "plan:15-16"
+              ],
+              "finding_ids": [],
+              "id": "proportionality",
+              "status": "covered",
+              "summary": "No separate proportionality defect is evident under the stated single-operator stakes."
+            }
+          ],
+          "findings": [
+            {
+              "evidence": [
+                "plan:16",
+                "repository/src/paranoia_local/handlers.py:62-73",
+                "repository/src/paranoia_local/handlers.py:3623-3728",
+                "repository/tests/test_plan_claims.py:2624-2648",
+                "repository/README.md:109-119"
+              ],
+              "id": "execution:F001",
+              "remedy": "Bind the card to the correct repository surface: either supply the repository containing the asserted queue worker/API, or rewrite the plan to name every intended path, symbol, production entry point, test file, and public document here. If the target is _binding_batches, explicitly state how the 64-item rule composes with the existing character and aggregate-batch ceilings.",
+              "severity": "BLOCKER",
+              "summary": "The plan's queue implementation target cannot be resolved against this repository."
+            },
+            {
+              "evidence": [
+                "plan:4",
+                "plan:7",
+                "plan:10"
+              ],
+              "id": "execution:F002",
+              "remedy": "Keep plan line 4 as the sole authoritative definition. Rewrite the worker and API contracts to reference or derive from that definition while retaining their layer-specific enforcement obligations; update all three operative sections together.",
+              "severity": "MAJOR",
+              "summary": "The 64-item maximum is independently authoritative in three operative sections."
+            },
+            {
+              "evidence": [
+                "plan:16",
+                "plan:7",
+                "plan:10",
+                "repository/pyproject.toml:40-43"
+              ],
+              "id": "execution:F003",
+              "remedy": "Name exact focused and full-suite commands and require assertions for 64-item success and 65-item rejection through each named production entry point, plus configuration propagation. Preserve the existing requirement that any nonzero command result blocks delivery.",
+              "severity": "MAJOR",
+              "summary": "The acceptance section is a vague promise to test rather than executable evidence."
+            },
+            {
+              "evidence": [
+                "plan:7",
+                "plan:10"
+              ],
+              "id": "execution:F004",
+              "remedy": "Define one shared boundary contract for both layers: whether an oversized batch is rejected atomically before side effects, the exact API error/status, the worker's queue-state outcome, treatment of already queued oversized work, and retry behavior. Require both layers and their documentation/tests to derive from that contract.",
+              "severity": "MAJOR",
+              "summary": "Oversized-batch rejection semantics and recovery behavior are undefined."
+            }
+          ],
+          "lane": "execution"
+        },
+        {
+          "class_assessments": [],
+          "coverage": [
+            {
+              "evidence": [
+                "plan:15-16",
+                "plan:3-10"
+              ],
+              "finding_ids": [
+                "integrity:F-001",
+                "integrity:F-003",
+                "integrity:F-004"
+              ],
+              "id": "artifact-complete",
+              "status": "finding",
+              "summary": "The plan is not sufficiently bound to the supplied artifact, and its rejection and acceptance contracts are incomplete."
+            },
+            {
+              "evidence": [
+                "repository/pyproject.toml:5-18",
+                "repository/pyproject.toml:30-38",
+                "repository/README.md:15-23",
+                "plan:15-16"
+              ],
+              "finding_ids": [
+                "integrity:F-001"
+              ],
+              "id": "repository-premises",
+              "status": "finding",
+              "summary": "The proposed subsystem cannot be resolved in the supplied repository."
+            },
+            {
+              "evidence": [
+                "plan:3-10"
+              ],
+              "finding_ids": [
+                "integrity:F-003"
+              ],
+              "id": "transformations",
+              "status": "finding",
+              "summary": "Oversized-batch transformation and side-effect semantics are unspecified."
+            },
+            {
+              "evidence": [
+                "plan:6-10"
+              ],
+              "finding_ids": [
+                "integrity:F-003"
+              ],
+              "id": "consumers",
+              "status": "finding",
+              "summary": "The worker/API boundary contract leaves partial-versus-atomic rejection ambiguous."
+            },
+            {
+              "evidence": [
+                "plan:6-10",
+                "plan:15-16"
+              ],
+              "finding_ids": [
+                "integrity:F-003"
+              ],
+              "id": "failure-recovery",
+              "status": "finding",
+              "summary": "Runtime failure and recovery behavior for oversized batches is incomplete."
+            },
+            {
+              "evidence": [
+                "plan:12-16",
+                "repository/pyproject.toml:40-43"
+              ],
+              "finding_ids": [
+                "integrity:F-004"
+              ],
+              "id": "tests-acceptance",
+              "status": "finding",
+              "summary": "Acceptance is not executable or tied to observable boundary outcomes."
+            },
+            {
+              "evidence": [
+                "plan:15-16",
+                "repository/README.md:25-27"
+              ],
+              "finding_ids": [
+                "integrity:F-001"
+              ],
+              "id": "docs-operations",
+              "status": "finding",
+              "summary": "The documentation update has no repository-resolvable target."
+            },
+            {
+              "evidence": [
+                "plan:3-4",
+                "plan:6-7",
+                "plan:9-10"
+              ],
+              "finding_ids": [
+                "integrity:F-002"
+              ],
+              "id": "consistency",
+              "status": "finding",
+              "summary": "The plan deliberately creates three independently authoritative definitions of one limit."
+            },
+            {
+              "evidence": [
+                "plan:1-16"
+              ],
+              "finding_ids": [],
+              "id": "proportionality",
+              "status": "covered",
+              "summary": "The reported repairs remain confined to the queue-limit card and do not introduce out-of-scope hardening."
+            }
+          ],
+          "findings": [
+            {
+              "evidence": [
+                "plan:15-16",
+                "repository/pyproject.toml:5-18",
+                "repository/pyproject.toml:30-38",
+                "repository/README.md:15-23"
+              ],
+              "id": "integrity:F-001",
+              "remedy": "Either move this card to the repository that owns the queue subsystem or revise it to name the exact existing configuration symbol, worker/API entry points, public documentation files, and test files in this repository. Do not begin implementation until every target resolves.",
+              "severity": "BLOCKER",
+              "summary": "The plan is not bound to an implementation surface in the supplied repository."
+            },
+            {
+              "evidence": [
+                "plan:3-4",
+                "plan:6-7",
+                "plan:9-10"
+              ],
+              "id": "integrity:F-002",
+              "remedy": "Keep the value in exactly one authoritative configuration or contract definition. Rewrite the worker and API sections to cite or derive from that authority without independently restating 64; update their tests and documentation from the same source.",
+              "severity": "BLOCKER",
+              "summary": "The batch maximum has three independent normative authorities."
+            },
+            {
+              "evidence": [
+                "plan:3-10"
+              ],
+              "id": "integrity:F-003",
+              "remedy": "Specify one observable oversized-batch invariant for both entry points: whether the complete request is rejected with zero enqueue/processing effects or a defined prefix is accepted. Name error/status behavior, retry eligibility, and state consistency, then require tests of that exact invariant.",
+              "severity": "BLOCKER",
+              "summary": "Oversized-batch rejection semantics are ambiguous and may permit partial processing."
+            },
+            {
+              "evidence": [
+                "plan:12-16",
+                "repository/pyproject.toml:40-43"
+              ],
+              "id": "integrity:F-004",
+              "remedy": "Name the exact focused and full-suite commands and require assertions that 64 items succeed and 65 items produce the specified fail-closed result through each production worker/API entry point, including the selected side-effect invariant. Delivery must remain blocked on any nonzero command result or failed assertion.",
+              "severity": "BLOCKER",
+              "summary": "The acceptance plan is not executable and does not prove the boundary contract."
+            }
+          ],
+          "lane": "integrity"
+        }
+      ],
+      "staged_settlement": {
+        "_class_record_pointers": [
+          "/governing_findings/0/classification/definition",
+          "/governing_findings/1/classification/definition",
+          "/governing_findings/2/classification/definition",
+          "/governing_findings/3/classification/definition"
+        ],
+        "_finding_class_refs": {
+          "governing:executable-acceptance": "record:3",
+          "governing:rejection-contract": "record:2",
+          "governing:repository-binding": "record:0",
+          "governing:single-authority": "record:1"
+        },
+        "assessment_dispositions": [],
+        "class_assessments": [],
+        "class_dispositions": [
+          {
+            "finding_id": "governing:repository-binding",
+            "kind": "new_class",
+            "record_index": 0
+          },
+          {
+            "finding_id": "governing:single-authority",
+            "kind": "new_class",
+            "record_index": 1
+          },
+          {
+            "finding_id": "governing:rejection-contract",
+            "kind": "new_class",
+            "record_index": 2
+          },
+          {
+            "finding_id": "governing:executable-acceptance",
+            "kind": "new_class",
+            "record_index": 3
+          }
+        ],
+        "class_records": [
+          {
+            "invariant": "The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review.",
+            "op": "new",
+            "procedure": "Compare the plan's claimed subsystem and artifact identity with repository metadata and public interfaces, resolve each named implementation, test, documentation, and output target, and mark the class violated if the repository is wrong, any target is absent or ambiguous, or the proposed work cannot be traced to an existing implementation surface.",
+            "severity": "FATAL"
+          },
+          {
+            "invariant": "A plan must designate exactly one normative authority for each shared rule and require every consumer, test, and document to reference or derive from that authority without independently restating the rule as operative policy.",
+            "op": "new",
+            "procedure": "Identify every operative statement of the same rule, determine whether one is explicitly authoritative, and verify that all other occurrences are defined as derived enforcement or presentation. Mark the class violated when two or more independently normative statements can diverge.",
+            "severity": "BLOCKER"
+          },
+          {
+            "invariant": "A plan for boundary rejection must define one shared, observable state-transition contract covering atomicity or explicitly permitted partial acceptance, side effects, error or status behavior, retained state, retry eligibility, and recovery at every enforcing boundary.",
+            "op": "new",
+            "procedure": "Trace each enforcing boundary described by the plan and verify that the plan unambiguously specifies the precondition, accepted or rejected unit, observable result, state after failure, side effects, and retry behavior. Mark the class violated if any outcome admits both whole-batch rejection and partial processing or leaves recovery behavior undefined.",
+            "severity": "BLOCKER"
+          },
+          {
+            "invariant": "A plan's acceptance contract must name the exact implementation and documentation scope, focused and full-suite executable commands, required observable assertions for every enforcing boundary and threshold case, and fail-closed treatment of missing targets, absent or skipped tests, failed assertions, and nonzero command results.",
+            "op": "new",
+            "procedure": "Review the plan without executing future implementation: resolve every named path, symbol, entry point, test, document, and command; map each required behavior to an explicit assertion; and verify that all missing, skipped, uncollected, failed, or nonzero outcomes block delivery. Mark the class violated when scope or evidence is vague, incomplete, or non-executable.",
+            "severity": "BLOCKER"
+          }
+        ],
+        "debt": [
+          {
+            "evidence": [
+              "plan:1-16",
+              "repository/scripts/run_plan_restatement_acceptance.py:29-45",
+              "repository/scripts/run_plan_restatement_acceptance.py:238-256",
+              "repository/scripts/run_plan_restatement_acceptance.py:283-288",
+              "plan:16",
+              "repository/src/paranoia_local/handlers.py:62-73",
+              "repository/src/paranoia_local/handlers.py:3623-3728",
+              "repository/tests/test_plan_claims.py:2624-2648",
+              "repository/README.md:109-119",
+              "plan:15-16",
+              "repository/pyproject.toml:5-18",
+              "repository/pyproject.toml:30-38",
+              "repository/README.md:15-23"
+            ],
+            "finding_id": "governing:repository-binding",
+            "id": "D1",
+            "remedy": "Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.",
+            "severity": "FATAL",
+            "status": "open",
+            "summary": "The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository."
+          },
+          {
+            "evidence": [
+              "plan:4",
+              "plan:7",
+              "plan:10",
+              "plan:3-4",
+              "plan:6-7",
+              "plan:9-10"
+            ],
+            "finding_id": "governing:single-authority",
+            "id": "D2",
+            "remedy": "Retain one authoritative configuration or contract definition and rewrite the worker, API, test, and documentation obligations to reference or derive from it while preserving their layer-specific enforcement requirements.",
+            "severity": "BLOCKER",
+            "status": "open",
+            "summary": "The plan creates three independently normative authorities for the same 64-item batch maximum."
+          },
+          {
+            "evidence": [
+              "plan:7",
+              "plan:10",
+              "plan:13",
+              "plan:3-10"
+            ],
+            "finding_id": "governing:rejection-contract",
+            "id": "D3",
+            "remedy": "Define one plan-reviewable oversized-batch contract shared by both boundaries: whole-batch atomic rejection or a precisely defined partial result, exact API error or status, worker queue-state outcome, permitted side effects, handling of already queued oversized work, retry eligibility, and recovery behavior. Require tests and documentation to derive from that contract.",
+            "severity": "BLOCKER",
+            "status": "open",
+            "summary": "The oversized-batch rejection contract does not bind atomicity, observable failure, side effects, resulting state, or recovery."
+          },
+          {
+            "evidence": [
+              "plan:15-16",
+              "repository/src/paranoia_local/prompts.py:134-145",
+              "plan:16",
+              "plan:7",
+              "plan:10",
+              "repository/pyproject.toml:40-43",
+              "plan:12-16"
+            ],
+            "finding_id": "governing:executable-acceptance",
+            "id": "D4",
+            "remedy": "Name every affected implementation and documentation path and symbol, each production worker and API entry point, and exact focused and full-suite commands. Require assertions for below-limit behavior, 64-item success, 65-item fail-closed behavior, configuration propagation, and the selected side-effect and recovery invariant at every boundary; missing targets, no tests collected, skipped required cases, failed assertions, or nonzero exits must block delivery.",
+            "severity": "BLOCKER",
+            "status": "open",
+            "summary": "The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence."
+          }
+        ],
+        "debt_updates": [],
+        "findings": [
+          {
+            "evidence": [
+              "plan:1-16",
+              "repository/scripts/run_plan_restatement_acceptance.py:29-45",
+              "repository/scripts/run_plan_restatement_acceptance.py:238-256",
+              "repository/scripts/run_plan_restatement_acceptance.py:283-288",
+              "plan:16",
+              "repository/src/paranoia_local/handlers.py:62-73",
+              "repository/src/paranoia_local/handlers.py:3623-3728",
+              "repository/tests/test_plan_claims.py:2624-2648",
+              "repository/README.md:109-119",
+              "plan:15-16",
+              "repository/pyproject.toml:5-18",
+              "repository/pyproject.toml:30-38",
+              "repository/README.md:15-23"
+            ],
+            "id": "governing:repository-binding",
+            "remedy": "Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.",
+            "severity": "FATAL",
+            "summary": "The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository."
+          },
+          {
+            "evidence": [
+              "plan:4",
+              "plan:7",
+              "plan:10",
+              "plan:3-4",
+              "plan:6-7",
+              "plan:9-10"
+            ],
+            "id": "governing:single-authority",
+            "remedy": "Retain one authoritative configuration or contract definition and rewrite the worker, API, test, and documentation obligations to reference or derive from it while preserving their layer-specific enforcement requirements.",
+            "severity": "BLOCKER",
+            "summary": "The plan creates three independently normative authorities for the same 64-item batch maximum."
+          },
+          {
+            "evidence": [
+              "plan:7",
+              "plan:10",
+              "plan:13",
+              "plan:3-10"
+            ],
+            "id": "governing:rejection-contract",
+            "remedy": "Define one plan-reviewable oversized-batch contract shared by both boundaries: whole-batch atomic rejection or a precisely defined partial result, exact API error or status, worker queue-state outcome, permitted side effects, handling of already queued oversized work, retry eligibility, and recovery behavior. Require tests and documentation to derive from that contract.",
+            "severity": "BLOCKER",
+            "summary": "The oversized-batch rejection contract does not bind atomicity, observable failure, side effects, resulting state, or recovery."
+          },
+          {
+            "evidence": [
+              "plan:15-16",
+              "repository/src/paranoia_local/prompts.py:134-145",
+              "plan:16",
+              "plan:7",
+              "plan:10",
+              "repository/pyproject.toml:40-43",
+              "plan:12-16"
+            ],
+            "id": "governing:executable-acceptance",
+            "remedy": "Name every affected implementation and documentation path and symbol, each production worker and API entry point, and exact focused and full-suite commands. Require assertions for below-limit behavior, 64-item success, 65-item fail-closed behavior, configuration propagation, and the selected side-effect and recovery invariant at every boundary; missing targets, no tests collected, skipped required cases, failed assertions, or nonzero exits must block delivery.",
+            "severity": "BLOCKER",
+            "summary": "The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence."
+          }
+        ],
+        "role": "census",
+        "source_dispositions": [
+          {
+            "governing_id": "governing:repository-binding",
+            "source_id": "domain:F2"
+          },
+          {
+            "governing_id": "governing:repository-binding",
+            "source_id": "execution:F001"
+          },
+          {
+            "governing_id": "governing:repository-binding",
+            "source_id": "integrity:F-001"
+          },
+          {
+            "governing_id": "governing:single-authority",
+            "source_id": "domain:F1"
+          },
+          {
+            "governing_id": "governing:single-authority",
+            "source_id": "execution:F002"
+          },
+          {
+            "governing_id": "governing:single-authority",
+            "source_id": "integrity:F-002"
+          },
+          {
+            "governing_id": "governing:rejection-contract",
+            "source_id": "domain:F3"
+          },
+          {
+            "governing_id": "governing:rejection-contract",
+            "source_id": "execution:F004"
+          },
+          {
+            "governing_id": "governing:rejection-contract",
+            "source_id": "integrity:F-003"
+          },
+          {
+            "governing_id": "governing:executable-acceptance",
+            "source_id": "domain:F4"
+          },
+          {
+            "governing_id": "governing:executable-acceptance",
+            "source_id": "execution:F003"
+          },
+          {
+            "governing_id": "governing:executable-acceptance",
+            "source_id": "integrity:F-004"
+          }
+        ]
+      },
+      "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [FATAL] The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository. [classes: a77d070f] (plan:1-16, repository/scripts/run_plan_restatement_acceptance.py:29-45, repository/scripts/run_plan_restatement_acceptance.py:238-256, repository/scripts/run_plan_restatement_acceptance.py:283-288, plan:16, repository/src/paranoia_local/handlers.py:62-73, repository/src/paranoia_local/handlers.py:3623-3728, repository/tests/test_plan_claims.py:2624-2648, repository/README.md:109-119, plan:15-16, repository/pyproject.toml:5-18, repository/pyproject.toml:30-38, repository/README.md:15-23)\n- [BLOCKER] The plan creates three independently normative authorities for the same 64-item batch maximum. [classes: 05b88b73] (plan:4, plan:7, plan:10, plan:3-4, plan:6-7, plan:9-10)\n- [BLOCKER] The oversized-batch rejection contract does not bind atomicity, observable failure, side effects, resulting state, or recovery. [classes: 958aea82] (plan:7, plan:10, plan:13, plan:3-10)\n- [BLOCKER] The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence. [classes: 77ad88cc] (plan:15-16, repository/src/paranoia_local/prompts.py:134-145, plan:16, plan:7, plan:10, repository/pyproject.toml:40-43, plan:12-16)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [FATAL] Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.\n- [BLOCKER] Retain one authoritative configuration or contract definition and rewrite the worker, API, test, and documentation obligations to reference or derive from it while preserving their layer-specific enforcement requirements.\n- [BLOCKER] Define one plan-reviewable oversized-batch contract shared by both boundaries: whole-batch atomic rejection or a precisely defined partial result, exact API error or status, worker queue-state outcome, permitted side effects, handling of already queued oversized work, retry eligibility, and recovery behavior. Require tests and documentation to derive from that contract.\n- [BLOCKER] Name every affected implementation and documentation path and symbol, each production worker and API entry point, and exact focused and full-suite commands. Require assertions for below-limit behavior, 64-item success, 65-item fail-closed behavior, configuration propagation, and the selected side-effect and recovery invariant at every boundary; missing targets, no tests collected, skipped required cases, failed assertions, or nonzero exits must block delivery.",
+      "timestamp": "20260901T030552",
+      "tool": "critique_plan"
+    },
+    "durable_lineage": {
+      "claim_reverify_required": false,
+      "claim_state": {},
+      "classes": [
+        {
+          "class_id": "a77d070f",
+          "first_round": 1,
+          "invariant": "The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review.",
+          "matches": [],
+          "procedure": "Compare the plan's claimed subsystem and artifact identity with repository metadata and public interfaces, resolve each named implementation, test, documentation, and output target, and mark the class violated if the repository is wrong, any target is absent or ambiguous, or the proposed work cannot be traced to an existing implementation surface.",
+          "severity": "FATAL",
+          "status": "open"
+        },
+        {
+          "class_id": "05b88b73",
+          "first_round": 1,
+          "invariant": "A plan must designate exactly one normative authority for each shared rule and require every consumer, test, and document to reference or derive from that authority without independently restating the rule as operative policy.",
+          "matches": [],
+          "procedure": "Identify every operative statement of the same rule, determine whether one is explicitly authoritative, and verify that all other occurrences are defined as derived enforcement or presentation. Mark the class violated when two or more independently normative statements can diverge.",
+          "severity": "BLOCKER",
+          "status": "open"
+        },
+        {
+          "class_id": "958aea82",
+          "first_round": 1,
+          "invariant": "A plan for boundary rejection must define one shared, observable state-transition contract covering atomicity or explicitly permitted partial acceptance, side effects, error or status behavior, retained state, retry eligibility, and recovery at every enforcing boundary.",
+          "matches": [],
+          "procedure": "Trace each enforcing boundary described by the plan and verify that the plan unambiguously specifies the precondition, accepted or rejected unit, observable result, state after failure, side effects, and retry behavior. Mark the class violated if any outcome admits both whole-batch rejection and partial processing or leaves recovery behavior undefined.",
+          "severity": "BLOCKER",
+          "status": "open"
+        },
+        {
+          "class_id": "77ad88cc",
+          "first_round": 1,
+          "invariant": "A plan's acceptance contract must name the exact implementation and documentation scope, focused and full-suite executable commands, required observable assertions for every enforcing boundary and threshold case, and fail-closed treatment of missing targets, absent or skipped tests, failed assertions, and nonzero command results.",
+          "matches": [],
+          "procedure": "Review the plan without executing future implementation: resolve every named path, symbol, entry point, test, document, and command; map each required behavior to an explicit assertion; and verify that all missing, skipped, uncollected, failed, or nonzero outcomes block delivery. Mark the class violated when scope or evidence is vague, incomplete, or non-executable.",
+          "severity": "BLOCKER",
+          "status": "open"
+        }
+      ],
+      "debt": null,
+      "exemptions": [],
+      "mode": "plan",
+      "next_seq": 5,
+      "review_state": {
+        "correction_control": {
+          "classes": {
+            "05b88b73": {
+              "last_session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+              "reopen_count": 0,
+              "reset_round": null
+            },
+            "77ad88cc": {
+              "last_session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+              "reopen_count": 0,
+              "reset_round": null
+            },
+            "958aea82": {
+              "last_session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+              "reopen_count": 0,
+              "reset_round": null
+            },
+            "a77d070f": {
+              "last_session_ref": "01a05ab6-6b77-7792-9a3a-3ec2a4b6d183",
+              "reopen_count": 0,
+              "reset_round": null
+            }
+          },
+          "version": 1
+        },
+        "debt": [
+          {
+            "class_ids": [
+              "a77d070f"
+            ],
+            "evidence": [
+              "plan:1-16",
+              "repository/scripts/run_plan_restatement_acceptance.py:29-45",
+              "repository/scripts/run_plan_restatement_acceptance.py:238-256",
+              "repository/scripts/run_plan_restatement_acceptance.py:283-288",
+              "plan:16",
+              "repository/src/paranoia_local/handlers.py:62-73",
+              "repository/src/paranoia_local/handlers.py:3623-3728",
+              "repository/tests/test_plan_claims.py:2624-2648",
+              "repository/README.md:109-119",
+              "plan:15-16",
+              "repository/pyproject.toml:5-18",
+              "repository/pyproject.toml:30-38",
+              "repository/README.md:15-23"
+            ],
+            "finding_id": "governing:repository-binding",
+            "first_round": 1,
+            "id": "D1",
+            "last_round": 1,
+            "remedy": "Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.",
+            "severity": "FATAL",
+            "source_ids": [
+              "domain:F2",
+              "execution:F001",
+              "integrity:F-001"
+            ],
+            "status": "open",
+            "summary": "The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository."
+          },
+          {
+            "class_ids": [
+              "05b88b73"
+            ],
+            "evidence": [
+              "plan:4",
+              "plan:7",
+              "plan:10",
+              "plan:3-4",
+              "plan:6-7",
+              "plan:9-10"
+            ],
+            "finding_id": "governing:single-authority",
+            "first_round": 1,
+            "id": "D2",
+            "last_round": 1,
+            "remedy": "Retain one authoritative configuration or contract definition and rewrite the worker, API, test, and documentation obligations to reference or derive from it while preserving their layer-specific enforcement requirements.",
+            "severity": "BLOCKER",
+            "source_ids": [
+              "domain:F1",
+              "execution:F002",
+              "integrity:F-002"
+            ],
+            "status": "open",
+            "summary": "The plan creates three independently normative authorities for the same 64-item batch maximum."
+          },
+          {
+            "class_ids": [
+              "958aea82"
+            ],
+            "evidence": [
+              "plan:7",
+              "plan:10",
+              "plan:13",
+              "plan:3-10"
+            ],
+            "finding_id": "governing:rejection-contract",
+            "first_round": 1,
+            "id": "D3",
+            "last_round": 1,
+            "remedy": "Define one plan-reviewable oversized-batch contract shared by both boundaries: whole-batch atomic rejection or a precisely defined partial result, exact API error or status, worker queue-state outcome, permitted side effects, handling of already queued oversized work, retry eligibility, and recovery behavior. Require tests and documentation to derive from that contract.",
+            "severity": "BLOCKER",
+            "source_ids": [
+              "domain:F3",
+              "execution:F004",
+              "integrity:F-003"
+            ],
+            "status": "open",
+            "summary": "The oversized-batch rejection contract does not bind atomicity, observable failure, side effects, resulting state, or recovery."
+          },
+          {
+            "class_ids": [
+              "77ad88cc"
+            ],
+            "evidence": [
+              "plan:15-16",
+              "repository/src/paranoia_local/prompts.py:134-145",
+              "plan:16",
+              "plan:7",
+              "plan:10",
+              "repository/pyproject.toml:40-43",
+              "plan:12-16"
+            ],
+            "finding_id": "governing:executable-acceptance",
+            "first_round": 1,
+            "id": "D4",
+            "last_round": 1,
+            "remedy": "Name every affected implementation and documentation path and symbol, each production worker and API entry point, and exact focused and full-suite commands. Require assertions for below-limit behavior, 64-item success, 65-item fail-closed behavior, configuration propagation, and the selected side-effect and recovery invariant at every boundary; missing targets, no tests collected, skipped required cases, failed assertions, or nonzero exits must block delivery.",
+            "severity": "BLOCKER",
+            "source_ids": [
+              "domain:F4",
+              "execution:F003",
+              "integrity:F-004"
+            ],
+            "status": "open",
+            "summary": "The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence."
+          }
+        ],
+        "last_round": 1,
+        "phase": "correction",
+        "plan_line_count": 16,
+        "snapshot_digest": "7d4a960372dd1de9d50201efb8066545bee28ac45bfd0feffacc1fbcb128e4b3",
+        "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.",
+        "stakes_digest": "9fb1d3e09ae3635adcbe8c13eadd965b303e8b010351e24455345c4b967b3d64",
+        "version": 1
+      },
+      "rounds": 1
+    },
+    "lineage": "plan-restatement-discovery-acceptance-20260901",
+    "plan": "# Queue batching change\n\n## Governing limit\nThe queue batch maximum is normatively defined here as exactly 64 items. All implementations and tests must use this authority.\n\n## Worker contract\nThis section independently and normatively defines the same queue batch maximum as exactly 64 items. The worker rejects a sixty-fifth item.\n\n## API contract\nThis section independently and normatively defines the queue batch maximum as exactly 64 items. The API rejects a sixty-fifth item.\n\n## Example\nA worked example sends 64 items and succeeds. This example is illustrative and defers to the Governing limit.\n\n## Implementation and acceptance\nUpdate the queue configuration, worker, API documentation, and tests together. Run the focused queue tests and the full suite; fail delivery if either fails.\n",
+    "prompt_sha256": [
+      "8da71a24a8ce3e2f5fcfe90fcbb480017c941d8b22217bdad920d47be821f89e",
+      "061c1d48193ebd542ab202336bed14a22ffcef0aff4d12447b2f42cceb87f8a3",
+      "518695c4a6b09ad2ed2878bd43a74edd4fcb1f9a4b159f640e6dbb609cf0d73e",
+      "9a1f559692c74fb01257ba965328e2a46cb60814d96d3dc3e8599a19ef029e07"
+    ],
+    "prompts": [
+      "You are one independent lane in a cold structural review census.\nRead the complete supplied artifact and repository. Own every checklist item from your lane's\nperspective and report every in-scope severity; do not defer issues to another lane. The plan is displayed with `NNNNN: ` coordinate prefixes that are\npresentation metadata, not plan text. Cite it only as `plan:<line>` or\n`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as\n`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned\nfilesystem repository root is the `repository/` directory relative to your current directory;\nread repository files through that directory, not from the workspace root.\nEvery evidence anchor must resolve. The provider-supplied JSON Schema is the sole structural\ncontract; return only its object, without a marker, fence, or prose.\n\nCover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded\nrepair and is named by at least one finding-status coverage row; non-finding coverage names no\nfindings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active\nclass exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\n\n## Proactive normative-restatement audit\n\nDuring a broad plan census or final, identify rules, thresholds, identifiers, measured values, and\nother normative contracts that the plan states as independently authoritative in more than one\nplace. Treat multiple sources of authority as one structural defect even while their wording still\nagrees: require one authoritative definition and make the other operative sites cite or derive from\nit, so one edit cannot make the contract internally inconsistent. Cite the complete independently\noperative cluster in the finding.\n\nDo not infer a defect from repeated tokens or equal numbers alone. Worked examples, a table and its\nfaithful prose explanation, generated projections, and summaries that explicitly defer to the\nauthoritative definition may repeat a value legitimately. Judge semantic authority from context.\nWhen the task role is correction with review_scope `targeted`, do not use this audit to hunt\nunrelated novelty; apply it only to the supplied debt, classes, repairs, and transitive effects.\n\n## Complete semantic repair sites\n\nWhen a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in\nthe reviewed artifact that independently asserts or depends on that same contract. In code, sites\ninclude definitions, call sites, tests, fixtures, and documentation; in plans, they include every\nindependent contract section. Include every material co-asserting site in evidence and make the\nremedy cover them together; do not propose or accept a one-site repair that would leave the old\nrule asserted elsewhere.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\n\n===== TASK INPUT =====\n\nROLE: census lane domain\nCHECKLIST: [\"artifact-complete\", \"repository-premises\", \"transformations\", \"consumers\", \"failure-recovery\", \"tests-acceptance\", \"docs-operations\", \"consistency\", \"proportionality\"]\nACTIVE CLASSES: []\n\n=== REVIEW STAKES ===\nOne trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\n\n=== REPOSITORY IS AVAILABLE ===\nYou are inside the repository this plan concerns. Read the code to test every premise the plan makes about current behaviour.\n\n=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\n00001: # Queue batching change\n00002: \n00003: ## Governing limit\n00004: The queue batch maximum is normatively defined here as exactly 64 items. All implementations and tests must use this authority.\n00005: \n00006: ## Worker contract\n00007: This section independently and normatively defines the same queue batch maximum as exactly 64 items. The worker rejects a sixty-fifth item.\n00008: \n00009: ## API contract\n00010: This section independently and normatively defines the queue batch maximum as exactly 64 items. The API rejects a sixty-fifth item.\n00011: \n00012: ## Example\n00013: A worked example sends 64 items and succeeds. This example is illustrative and defers to the Governing limit.\n00014: \n00015: ## Implementation and acceptance\n00016: Update the queue configuration, worker, API documentation, and tests together. Run the focused queue tests and the full suite; fail delivery if either fails.\n\nThe pinned repository evidence root is `repository/`. Treat that prefix as the project root; no live Git or web tools are available.",
+      "You are one independent lane in a cold structural review census.\nRead the complete supplied artifact and repository. Own every checklist item from your lane's\nperspective and report every in-scope severity; do not defer issues to another lane. The plan is displayed with `NNNNN: ` coordinate prefixes that are\npresentation metadata, not plan text. Cite it only as `plan:<line>` or\n`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as\n`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned\nfilesystem repository root is the `repository/` directory relative to your current directory;\nread repository files through that directory, not from the workspace root.\nEvery evidence anchor must resolve. The provider-supplied JSON Schema is the sole structural\ncontract; return only its object, without a marker, fence, or prose.\n\nCover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded\nrepair and is named by at least one finding-status coverage row; non-finding coverage names no\nfindings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active\nclass exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\n\n## Proactive normative-restatement audit\n\nDuring a broad plan census or final, identify rules, thresholds, identifiers, measured values, and\nother normative contracts that the plan states as independently authoritative in more than one\nplace. Treat multiple sources of authority as one structural defect even while their wording still\nagrees: require one authoritative definition and make the other operative sites cite or derive from\nit, so one edit cannot make the contract internally inconsistent. Cite the complete independently\noperative cluster in the finding.\n\nDo not infer a defect from repeated tokens or equal numbers alone. Worked examples, a table and its\nfaithful prose explanation, generated projections, and summaries that explicitly defer to the\nauthoritative definition may repeat a value legitimately. Judge semantic authority from context.\nWhen the task role is correction with review_scope `targeted`, do not use this audit to hunt\nunrelated novelty; apply it only to the supplied debt, classes, repairs, and transitive effects.\n\n## Complete semantic repair sites\n\nWhen a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in\nthe reviewed artifact that independently asserts or depends on that same contract. In code, sites\ninclude definitions, call sites, tests, fixtures, and documentation; in plans, they include every\nindependent contract section. Include every material co-asserting site in evidence and make the\nremedy cover them together; do not propose or accept a one-site repair that would leave the old\nrule asserted elsewhere.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\n\n===== TASK INPUT =====\n\nROLE: census lane execution\nCHECKLIST: [\"artifact-complete\", \"repository-premises\", \"transformations\", \"consumers\", \"failure-recovery\", \"tests-acceptance\", \"docs-operations\", \"consistency\", \"proportionality\"]\nACTIVE CLASSES: []\n\n=== REVIEW STAKES ===\nOne trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\n\n=== REPOSITORY IS AVAILABLE ===\nYou are inside the repository this plan concerns. Read the code to test every premise the plan makes about current behaviour.\n\n=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\n00001: # Queue batching change\n00002: \n00003: ## Governing limit\n00004: The queue batch maximum is normatively defined here as exactly 64 items. All implementations and tests must use this authority.\n00005: \n00006: ## Worker contract\n00007: This section independently and normatively defines the same queue batch maximum as exactly 64 items. The worker rejects a sixty-fifth item.\n00008: \n00009: ## API contract\n00010: This section independently and normatively defines the queue batch maximum as exactly 64 items. The API rejects a sixty-fifth item.\n00011: \n00012: ## Example\n00013: A worked example sends 64 items and succeeds. This example is illustrative and defers to the Governing limit.\n00014: \n00015: ## Implementation and acceptance\n00016: Update the queue configuration, worker, API documentation, and tests together. Run the focused queue tests and the full suite; fail delivery if either fails.\n\nThe pinned repository evidence root is `repository/`. Treat that prefix as the project root; no live Git or web tools are available.",
+      "You are one independent lane in a cold structural review census.\nRead the complete supplied artifact and repository. Own every checklist item from your lane's\nperspective and report every in-scope severity; do not defer issues to another lane. The plan is displayed with `NNNNN: ` coordinate prefixes that are\npresentation metadata, not plan text. Cite it only as `plan:<line>` or\n`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as\n`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned\nfilesystem repository root is the `repository/` directory relative to your current directory;\nread repository files through that directory, not from the workspace root.\nEvery evidence anchor must resolve. The provider-supplied JSON Schema is the sole structural\ncontract; return only its object, without a marker, fence, or prose.\n\nCover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded\nrepair and is named by at least one finding-status coverage row; non-finding coverage names no\nfindings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active\nclass exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\n\n## Proactive normative-restatement audit\n\nDuring a broad plan census or final, identify rules, thresholds, identifiers, measured values, and\nother normative contracts that the plan states as independently authoritative in more than one\nplace. Treat multiple sources of authority as one structural defect even while their wording still\nagrees: require one authoritative definition and make the other operative sites cite or derive from\nit, so one edit cannot make the contract internally inconsistent. Cite the complete independently\noperative cluster in the finding.\n\nDo not infer a defect from repeated tokens or equal numbers alone. Worked examples, a table and its\nfaithful prose explanation, generated projections, and summaries that explicitly defer to the\nauthoritative definition may repeat a value legitimately. Judge semantic authority from context.\nWhen the task role is correction with review_scope `targeted`, do not use this audit to hunt\nunrelated novelty; apply it only to the supplied debt, classes, repairs, and transitive effects.\n\n## Complete semantic repair sites\n\nWhen a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in\nthe reviewed artifact that independently asserts or depends on that same contract. In code, sites\ninclude definitions, call sites, tests, fixtures, and documentation; in plans, they include every\nindependent contract section. Include every material co-asserting site in evidence and make the\nremedy cover them together; do not propose or accept a one-site repair that would leave the old\nrule asserted elsewhere.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\n\n===== TASK INPUT =====\n\nROLE: census lane integrity\nCHECKLIST: [\"artifact-complete\", \"repository-premises\", \"transformations\", \"consumers\", \"failure-recovery\", \"tests-acceptance\", \"docs-operations\", \"consistency\", \"proportionality\"]\nACTIVE CLASSES: []\n\n=== REVIEW STAKES ===\nOne trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\n\n=== REPOSITORY IS AVAILABLE ===\nYou are inside the repository this plan concerns. Read the code to test every premise the plan makes about current behaviour.\n\n=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\n00001: # Queue batching change\n00002: \n00003: ## Governing limit\n00004: The queue batch maximum is normatively defined here as exactly 64 items. All implementations and tests must use this authority.\n00005: \n00006: ## Worker contract\n00007: This section independently and normatively defines the same queue batch maximum as exactly 64 items. The worker rejects a sixty-fifth item.\n00008: \n00009: ## API contract\n00010: This section independently and normatively defines the queue batch maximum as exactly 64 items. The API rejects a sixty-fifth item.\n00011: \n00012: ## Example\n00013: A worked example sends 64 items and succeeds. This example is illustrative and defers to the Governing limit.\n00014: \n00015: ## Implementation and acceptance\n00016: Update the queue configuration, worker, API documentation, and tests together. Run the focused queue tests and the full suite; fail delivery if either fails.\n\nThe pinned repository evidence root is `repository/`. Treat that prefix as the project root; no live Git or web tools are available.",
+      "Consolidate validated lane manifests; do not conduct a new\nreview. The provider-supplied JSON Schema is the sole structural contract; return only its object,\nwithout a marker, fence, or prose.\n\nMap every source through governing_findings.source_ids, preserve the highest merged severity, and\ncite only evidence present on at least one mapped source. Include the complete union of evidence\nfrom every mapped source; the server deterministically projects that union so consolidation cannot\ndiscard a co-asserting site already found by a lane.\nClassify each governing finding once: one_off only when its reasoning cannot recur; new_class with a\ncomplete reusable definition and explicit class severity; or existing_class naming the active\nclass. One source may fan out only to distinct existing-class findings for distinct violated\nassessments that cited it. Consolidate all occurrences of one existing class into one finding.\n\nThe server derives census class outcomes exactly from the validated integrity manifest. Do not\nrepeat them. For each violated assessment, classify exactly one governing finding to that active\nclass and include the assessment's cited integrity source in that finding's source_ids. A\ncross-lane finding may classify as existing_class only when that class's integrity assessment is\nviolated and its cited source is included; otherwise classify the finding as one_off or new_class.\nReturn one\ndebt_outcome for every supplied open debt: open needs current evidence and a concrete remaining\ncondition; closed needs current evidence. Do not invent debt or IDs. class_actions is keyed by every\nactive class: use null when no independent action is needed, otherwise one lifecycle/severity\ndecision. Closed mechanized violation requires replace with a corrected violation-only predicate;\nreopen applies only to unmechanized classes.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\nclass_outcomes is a closed object keyed by exactly these required class IDs: []. class_actions is a closed object with one independent-action slot per active class. Every listed key is required; use null when no independent action is needed. The exact current decision surface is: {}. Outcome authority for this role: server derives outcomes from integrity assessments. When an authoritative outcome exists, close requires satisfied and reopen requires violated; outcome-free standalone lifecycle actions remain legal only as listed. Reclassify and replace may retain or strengthen severity but never downgrade. Replacement preserves a mechanized class; use only a listed replacement form.  Never put class_id inside an outcome or action value.\n\n===== TASK INPUT =====\n\n{\"role\":\"census\",\"stakes\":\"One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\",\"manifests\":[{\"class_assessments\":[],\"coverage\":[{\"evidence\":[\"plan:1-16\",\"repository/scripts/run_plan_restatement_acceptance.py:29-45\"],\"finding_ids\":[\"domain:F2\",\"domain:F3\",\"domain:F4\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The artifact is the wrong kind of plan for this repository and does not completely bind the proposed behavior or implementation.\"},{\"evidence\":[\"repository/README.md:1-23\",\"repository/src/paranoia_local/server.py:474-486\",\"repository/scripts/run_plan_restatement_acceptance.py:283-288\"],\"finding_ids\":[\"domain:F2\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"Repository evidence contradicts the premise that this card identifies an existing queue configuration, worker, and API implementation surface.\"},{\"evidence\":[\"plan:7-10\",\"plan:12-13\"],\"finding_ids\":[\"domain:F3\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The core oversize-batch state transition is ambiguous.\"},{\"evidence\":[\"plan:4\",\"plan:7\",\"plan:10\"],\"finding_ids\":[\"domain:F1\",\"domain:F3\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Worker and API consumers have split authority and underdefined rejection outcomes.\"},{\"evidence\":[\"plan:7-10\"],\"finding_ids\":[\"domain:F3\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Ordinary oversize rejection and recovery behavior is not bound.\"},{\"evidence\":[\"plan:15-16\",\"repository/pyproject.toml:40-43\"],\"finding_ids\":[\"domain:F3\",\"domain:F4\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is not executable and does not cover the unresolved rejection semantics.\"},{\"evidence\":[\"plan:15-16\",\"repository/README.md:304-313\"],\"finding_ids\":[\"domain:F2\",\"domain:F4\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"The documentation obligation is neither repository-aligned nor exactly scoped.\"},{\"evidence\":[\"plan:4\",\"plan:7\",\"plan:10\",\"repository/src/paranoia_local/prompts.py:164-175\"],\"finding_ids\":[\"domain:F1\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"The 64-item limit has three independently operative authorities.\"},{\"evidence\":[\"plan:15-16\"],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"No separate disproportionate hardening or scope-expansion defect is present.\"}],\"findings\":[{\"evidence\":[\"plan:4\",\"plan:7\",\"plan:10\"],\"id\":\"domain:F1\",\"remedy\":\"Keep plan:4 as the sole normative definition. Rewrite the worker and API sections to cite that definition and specify only their derived enforcement behavior; require configuration, documentation, and tests to derive or reference the same authority rather than restating it independently.\",\"severity\":\"MAJOR\",\"summary\":\"The plan creates three independent authorities for the queue batch maximum.\"},{\"evidence\":[\"plan:1-16\",\"repository/scripts/run_plan_restatement_acceptance.py:29-45\",\"repository/scripts/run_plan_restatement_acceptance.py:238-256\",\"repository/scripts/run_plan_restatement_acceptance.py:283-288\"],\"id\":\"domain:F2\",\"remedy\":\"Resolve the artifact identity before implementation: for this repository, replace it with a plan naming the exact normative-restatement acceptance sources, tests, documentation, output artifact, and commands. If a real queue change is intended, supply the queue repository and identify its actual configuration, worker, API, documentation, and test paths and symbols.\",\"severity\":\"FATAL\",\"summary\":\"The supplied queue plan is the repository's synthetic reviewer fixture, not a repository-bound implementation card.\"},{\"evidence\":[\"plan:7\",\"plan:10\",\"plan:13\"],\"id\":\"domain:F3\",\"remedy\":\"Define one shared oversize-batch invariant for both boundaries: whether rejection is whole-batch atomic or partial, the observable error/status, resulting queue state, and retry eligibility. Add acceptance cases for below-limit, exactly-64, and 65-item inputs at every enforcing boundary, including assertions that failed input cannot leave unintended partial work.\",\"severity\":\"MAJOR\",\"summary\":\"The 65-item rejection contract omits atomicity, observable failure, and recovery semantics.\"},{\"evidence\":[\"plan:15-16\",\"repository/src/paranoia_local/prompts.py:134-145\"],\"id\":\"domain:F4\",\"remedy\":\"Name every implementation and documentation file and affected symbol, then provide exact focused and full-suite commands with expected assertions. Require missing targets, no-tests-collected outcomes, skipped required cases, or any nonzero exit to block delivery.\",\"severity\":\"MAJOR\",\"summary\":\"Implementation scope and acceptance evidence are not executable or exact.\"}],\"lane\":\"domain\"},{\"class_assessments\":[],\"coverage\":[{\"evidence\":[\"plan:15-16\"],\"finding_ids\":[\"execution:F001\",\"execution:F003\",\"execution:F004\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan lacks resolvable implementation scope, executable acceptance evidence, and complete rejection semantics.\"},{\"evidence\":[\"repository/src/paranoia_local/handlers.py:62-73\",\"repository/src/paranoia_local/handlers.py:3623-3728\",\"repository/README.md:109-119\"],\"finding_ids\":[\"execution:F001\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The proposed queue, worker, and API surfaces are not bound to the repository's actual batching or public interfaces.\"},{\"evidence\":[\"plan:7\",\"plan:10\"],\"finding_ids\":[\"execution:F004\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The limit-enforcement transformation is ambiguous about whole-batch rejection versus partial acceptance.\"},{\"evidence\":[\"plan:7\",\"plan:10\",\"repository/README.md:109-119\"],\"finding_ids\":[\"execution:F001\",\"execution:F004\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Neither the intended repository consumers nor their observable boundary behavior are completely specified.\"},{\"evidence\":[\"plan:7\",\"plan:10\"],\"finding_ids\":[\"execution:F004\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Oversized-batch rejection has no atomicity or recovery contract.\"},{\"evidence\":[\"plan:16\",\"repository/pyproject.toml:40-43\"],\"finding_ids\":[\"execution:F003\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is fail-closed in principle but is not executable or behaviorally complete.\"},{\"evidence\":[\"plan:16\",\"repository/README.md:109-119\"],\"finding_ids\":[\"execution:F001\",\"execution:F004\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"The documentation obligation is neither repository-resolvable nor complete enough to describe operational rejection behavior.\"},{\"evidence\":[\"plan:4\",\"plan:7\",\"plan:10\"],\"finding_ids\":[\"execution:F002\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"The 64-item rule has three independently authoritative definitions.\"},{\"evidence\":[\"plan:15-16\"],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"No separate proportionality defect is evident under the stated single-operator stakes.\"}],\"findings\":[{\"evidence\":[\"plan:16\",\"repository/src/paranoia_local/handlers.py:62-73\",\"repository/src/paranoia_local/handlers.py:3623-3728\",\"repository/tests/test_plan_claims.py:2624-2648\",\"repository/README.md:109-119\"],\"id\":\"execution:F001\",\"remedy\":\"Bind the card to the correct repository surface: either supply the repository containing the asserted queue worker/API, or rewrite the plan to name every intended path, symbol, production entry point, test file, and public document here. If the target is _binding_batches, explicitly state how the 64-item rule composes with the existing character and aggregate-batch ceilings.\",\"severity\":\"BLOCKER\",\"summary\":\"The plan's queue implementation target cannot be resolved against this repository.\"},{\"evidence\":[\"plan:4\",\"plan:7\",\"plan:10\"],\"id\":\"execution:F002\",\"remedy\":\"Keep plan line 4 as the sole authoritative definition. Rewrite the worker and API contracts to reference or derive from that definition while retaining their layer-specific enforcement obligations; update all three operative sections together.\",\"severity\":\"MAJOR\",\"summary\":\"The 64-item maximum is independently authoritative in three operative sections.\"},{\"evidence\":[\"plan:16\",\"plan:7\",\"plan:10\",\"repository/pyproject.toml:40-43\"],\"id\":\"execution:F003\",\"remedy\":\"Name exact focused and full-suite commands and require assertions for 64-item success and 65-item rejection through each named production entry point, plus configuration propagation. Preserve the existing requirement that any nonzero command result blocks delivery.\",\"severity\":\"MAJOR\",\"summary\":\"The acceptance section is a vague promise to test rather than executable evidence.\"},{\"evidence\":[\"plan:7\",\"plan:10\"],\"id\":\"execution:F004\",\"remedy\":\"Define one shared boundary contract for both layers: whether an oversized batch is rejected atomically before side effects, the exact API error/status, the worker's queue-state outcome, treatment of already queued oversized work, and retry behavior. Require both layers and their documentation/tests to derive from that contract.\",\"severity\":\"MAJOR\",\"summary\":\"Oversized-batch rejection semantics and recovery behavior are undefined.\"}],\"lane\":\"execution\"},{\"class_assessments\":[],\"coverage\":[{\"evidence\":[\"plan:15-16\",\"plan:3-10\"],\"finding_ids\":[\"integrity:F-001\",\"integrity:F-003\",\"integrity:F-004\"],\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan is not sufficiently bound to the supplied artifact, and its rejection and acceptance contracts are incomplete.\"},{\"evidence\":[\"repository/pyproject.toml:5-18\",\"repository/pyproject.toml:30-38\",\"repository/README.md:15-23\",\"plan:15-16\"],\"finding_ids\":[\"integrity:F-001\"],\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The proposed subsystem cannot be resolved in the supplied repository.\"},{\"evidence\":[\"plan:3-10\"],\"finding_ids\":[\"integrity:F-003\"],\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"Oversized-batch transformation and side-effect semantics are unspecified.\"},{\"evidence\":[\"plan:6-10\"],\"finding_ids\":[\"integrity:F-003\"],\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"The worker/API boundary contract leaves partial-versus-atomic rejection ambiguous.\"},{\"evidence\":[\"plan:6-10\",\"plan:15-16\"],\"finding_ids\":[\"integrity:F-003\"],\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Runtime failure and recovery behavior for oversized batches is incomplete.\"},{\"evidence\":[\"plan:12-16\",\"repository/pyproject.toml:40-43\"],\"finding_ids\":[\"integrity:F-004\"],\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"Acceptance is not executable or tied to observable boundary outcomes.\"},{\"evidence\":[\"plan:15-16\",\"repository/README.md:25-27\"],\"finding_ids\":[\"integrity:F-001\"],\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"The documentation update has no repository-resolvable target.\"},{\"evidence\":[\"plan:3-4\",\"plan:6-7\",\"plan:9-10\"],\"finding_ids\":[\"integrity:F-002\"],\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"The plan deliberately creates three independently authoritative definitions of one limit.\"},{\"evidence\":[\"plan:1-16\"],\"finding_ids\":[],\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"The reported repairs remain confined to the queue-limit card and do not introduce out-of-scope hardening.\"}],\"findings\":[{\"evidence\":[\"plan:15-16\",\"repository/pyproject.toml:5-18\",\"repository/pyproject.toml:30-38\",\"repository/README.md:15-23\"],\"id\":\"integrity:F-001\",\"remedy\":\"Either move this card to the repository that owns the queue subsystem or revise it to name the exact existing configuration symbol, worker/API entry points, public documentation files, and test files in this repository. Do not begin implementation until every target resolves.\",\"severity\":\"BLOCKER\",\"summary\":\"The plan is not bound to an implementation surface in the supplied repository.\"},{\"evidence\":[\"plan:3-4\",\"plan:6-7\",\"plan:9-10\"],\"id\":\"integrity:F-002\",\"remedy\":\"Keep the value in exactly one authoritative configuration or contract definition. Rewrite the worker and API sections to cite or derive from that authority without independently restating 64; update their tests and documentation from the same source.\",\"severity\":\"BLOCKER\",\"summary\":\"The batch maximum has three independent normative authorities.\"},{\"evidence\":[\"plan:3-10\"],\"id\":\"integrity:F-003\",\"remedy\":\"Specify one observable oversized-batch invariant for both entry points: whether the complete request is rejected with zero enqueue/processing effects or a defined prefix is accepted. Name error/status behavior, retry eligibility, and state consistency, then require tests of that exact invariant.\",\"severity\":\"BLOCKER\",\"summary\":\"Oversized-batch rejection semantics are ambiguous and may permit partial processing.\"},{\"evidence\":[\"plan:12-16\",\"repository/pyproject.toml:40-43\"],\"id\":\"integrity:F-004\",\"remedy\":\"Name the exact focused and full-suite commands and require assertions that 64 items succeed and 65 items produce the specified fail-closed result through each production worker/API entry point, including the selected side-effect invariant. Delivery must remain blocked on any nonzero command result or failed assertion.\",\"severity\":\"BLOCKER\",\"summary\":\"The acceptance plan is not executable and does not prove the boundary contract.\"}],\"lane\":\"integrity\"}],\"active_classes\":[],\"existing_debt\":[]}"
+    ],
+    "result_sha256": "841f3f59562b955b2f18f7c7fc218fa23143e366743fa7c5feca2b89ac65a274",
+    "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [FATAL] The plan is a synthetic fixture and is not bound to a resolvable implementation surface in the supplied repository. [classes: a77d070f] (plan:1-16, repository/scripts/run_plan_restatement_acceptance.py:29-45, repository/scripts/run_plan_restatement_acceptance.py:238-256, repository/scripts/run_plan_restatement_acceptance.py:283-288, plan:16, repository/src/paranoia_local/handlers.py:62-73, repository/src/paranoia_local/handlers.py:3623-3728, repository/tests/test_plan_claims.py:2624-2648, repository/README.md:109-119, plan:15-16, repository/pyproject.toml:5-18, repository/pyproject.toml:30-38, repository/README.md:15-23)\n- [BLOCKER] The plan creates three independently normative authorities for the same 64-item batch maximum. [classes: 05b88b73] (plan:4, plan:7, plan:10, plan:3-4, plan:6-7, plan:9-10)\n- [BLOCKER] The oversized-batch rejection contract does not bind atomicity, observable failure, side effects, resulting state, or recovery. [classes: 958aea82] (plan:7, plan:10, plan:13, plan:3-10)\n- [BLOCKER] The plan does not define exact implementation scope or executable, behaviorally complete, fail-closed acceptance evidence. [classes: 77ad88cc] (plan:15-16, repository/src/paranoia_local/prompts.py:134-145, plan:16, plan:7, plan:10, repository/pyproject.toml:40-43, plan:12-16)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [FATAL] Replace the fixture with a repository-bound plan that names the exact normative-restatement sources, affected symbols, tests, documentation, output artifact, and commands. If a queue change is actually intended, move the card to the owning repository and identify its exact configuration, worker, API, documentation, and test targets before implementation.\n- [BLOCKER] Retain one authoritative configuration or contract definition and rewrite the worker, API, test, and documentation obligations to reference or derive from it while preserving their layer-specific enforcement requirements.\n- [BLOCKER] Define one plan-reviewable oversized-batch contract shared by both boundaries: whole-batch atomic rejection or a precisely defined partial result, exact API error or status, worker queue-state outcome, permitted side effects, handling of already queued oversized work, retry eligibility, and recovery behavior. Require tests and documentation to derive from that contract.\n- [BLOCKER] Name every affected implementation and documentation path and symbol, each production worker and API entry point, and exact focused and full-suite commands. Require assertions for below-limit behavior, 64-item success, 65-item fail-closed behavior, configuration propagation, and the selected side-effect and recovery invariant at every boundary; missing targets, no tests collected, skipped required cases, failed assertions, or nonzero exits must block delivery.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05ab6-6b77-7792-9a3a-3ec2a4b6d183` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: plan-restatement-discovery-acceptance-20260901 (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed — NEW a77d070f, NEW 05b88b73, NEW 958aea82, NEW 77ad88cc\nCLASS-CLOSURE: 4 open, 0 closed, 0 surviving matches, 0 exempt, 4 unmechanized\n  05b88b73 A plan must designate exactly one normative authority for each shared rule and require every consumer, test, and document to reference or derive from that authority without independently restating the rule as operative policy. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  77ad88cc A plan's acceptance contract must name the exact implementation and documentation scope, focused and full-suite executable commands, required observable assertions for every enforcing boundary and threshold case, and fail-closed treatment of missing targets, absent or skipped tests, failed assertions, and nonzero command results. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  958aea82 A plan for boundary rejection must define one shared, observable state-transition contract covering atomicity or explicitly permitted partial acceptance, side effects, error or status behavior, retained state, retry eligibility, and recovery at every enforcing boundary. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  a77d070f The plan must identify the correct repository and bind every proposed production, test, documentation, and output change to exact existing paths, symbols, entry points, and repository-supported commands; every named target must be resolvable during plan review. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 4 blocking open\nCONVERGENCE: BLOCKED — staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0"
+  },
+  "provider": {
+    "cli_version": "codex-cli 0.144.6",
+    "effort": "high",
+    "engine": "codex",
+    "model": "gpt-5.6-sol"
+  },
+  "source_revision": "5ed7c6b0bd9e6e350420a85ad83555ed9df03dda",
+  "source_sha256": {
+    "AGENTS.md": "edd5e662afe9852f194c31ab44cf17360ad5bc7d6e8fd4ff695e052ff029aa35",
+    "README.md": "34c6eb366a17ddf1c68bbcb4b70aad704ed4f5c8a8106776062fa37cedbb7925",
+    "scripts/run_plan_restatement_acceptance.py": "6415332cca4a0c4ab66874d7861e8c11fea7cb39e33772aafc8e7c964e3fa58f",
+    "src/paranoia_local/class_closure.py": "ef657392205ef181956227a8b98d2c7421a8af5cf9d6dca54cc563b52bf340eb",
+    "src/paranoia_local/handlers.py": "65ba53fc4d9662925aa3175275f255c5603ed7b0b7dd158fb2ce1392f8f6c0d6",
+    "src/paranoia_local/prompts.py": "d5d7f14bdb9ea9ec396a1c0bd2cefbce129ff08f7dc42f26b6c8284328ac7d01",
+    "src/paranoia_local/review_census.py": "6fb5904d3b723399f9faa45a37bdfb5c7993b59040b84400e5776c2611f69122",
+    "src/paranoia_local/staged_protocol.py": "93e2d814b0a61173996091306096bb7df3f458710f5108d407066e62fee25796",
+    "tests/test_plan_restatement_acceptance.py": "78bfd140de4d80d5a598a82da86b4df8eca9eb98b51e7774941d162d74e7d6d4",
+    "tests/test_prompts.py": "d22f5a059e9d6e44565afd2a80fbae454aef6955df037828ae76513fca3b994c",
+    "tests/test_review_census.py": "fe4d6b18799e7263f4bbe72d24c2b263b53e509eb5816d17ff816a0a40d9ea94"
+  },
+  "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.",
+  "targeted_control": {
+    "audit": {
+      "already_raised": [],
+      "attempt_ledger": [
+        {
+          "duration_ms": 50413,
+          "engine": "codex",
+          "failure_detail_excerpt": "",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outcome": "completed",
+          "provider_duration_ms": null,
+          "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a05ab7-4d9c-7a10-941e-f38671103f99\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\\"class_actions\\\":{\\\"exact-command\\\":null,\\\"exact-scope\\\":null,\\\"fail-closed\\\":null},\\\"class_outcomes\\\":{\\\"exact-command\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:6-7\\\",\\\"rationale\\\":\\\"I’m checking the named command against the pinned repository before deciding whether this open class can close.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"},\\\"exact-scope\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"I’m verifying that every named scope path exists and matches the stated work.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"},\\\"fail-closed\\\":{\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:6-7\\\",\\\"rationale\\\":\\\"The acceptance clause explicitly makes a nonzero result block delivery.\\\"}],\\\"verdict\\\":\\\"satisfied\\\"}},\\\"debt_outcomes\\\":[{\\\"debt_id\\\":\\\"D1\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3-4\\\",\\\"rationale\\\":\\\"The plan enumerates three exact repository-relative files and limits changes to them.\\\"}],\\\"status\\\":\\\"closed\\\"},{\\\"debt_id\\\":\\\"D2\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:6-7\\\",\\\"rationale\\\":\\\"The plan provides a concrete pytest invocation and target.\\\"}],\\\"status\\\":\\\"closed\\\"},{\\\"debt_id\\\":\\\"D3\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:6-7\\\",\\\"rationale\\\":\\\"The plan states that a nonzero acceptance-command exit blocks delivery.\\\"}],\\\"status\\\":\\\"closed\\\"}],\\\"governing_findings\\\":[],\\\"role\\\":\\\"correction\\\"}\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"retry|prompt|README|pytest|test_prompts\\\" repository/src/paranoia_local/prompts.py repository/tests/test_prompts.py repository/README.md'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files repository && rg -n \\\"retry|prompt|README|pytest|test_prompts\\\" repository/src/paranoia_local/prompts.py repository/tests/test_prompts.py repository/README.md'\",\"aggregated_output\":\"repository/llms.txt\\nrepository/LICENSE\\nrepository/AGENTS.md\\nrepository/CLAUDE.md\\nrepository/pyproject.toml\\nrepository/README.md\\nrepository/tests/test_handlers.py\\nrepository/tests/test_external_sources.py\\nrepository/tests/test_evidence.py\\nrepository/tests/test_engines.py\\nrepository/tests/test_converge.py\\nrepository/tests/test_config_logs.py\\nrepository/tests/test_class_occurrence_batch_acceptance.py\\nrepository/tests/test_class_closure_integration.py\\nrepository/tests/test_class_closure.py\\nrepository/tests/test_branch_plan_fidelity.py\\nrepository/tests/test_arbitration_research.py\\nrepository/tests/test_arbitration_fallback_acceptance.py\\nrepository/tests/test_arbitration_consequence_acceptance.py\\nrepository/tests/test_arbitration.py\\nrepository/tests/test_arbitrate_handler.py\\nrepository/tests/test_acceptance_validator.py\\nrepository/tests/conftest.py\\nrepository/tests/test_plan_restatement_acceptance.py\\nrepository/tests/test_plan_class_closure.py\\nrepository/tests/test_plan_claims.py\\nrepository/tests/test_packet.py\\nrepository/tests/test_orientation.py\\nrepository/tests/test_integration.py\\nrepository/tests/test_instrumentation.py\\nrepository/tests/test_inert_tree.py\\nrepository/tests/test_server.py\\nrepository/tests/test_review_census.py\\nrepository/tests/test_prompts.py\\nrepository/tests/test_progress.py\\nrepository/tests/test_staged_protocol.py\\nrepository/tests/test_snapshot.py\\nrepository/tests/test_worktree.py\\nrepository/tests/__init__.py\\nrepository/docs/evidence_capture_acceptance_2026-08-10.json\\nrepository/docs/duplicate_class_outcome_acceptance_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_plan.md\\nrepository/docs/derive_census_class_outcomes_authenticated_material_2026-08-15.json\\nrepository/docs/derive_census_class_outcomes_acceptance_2026-08-15.json\\nrepository/docs/cleaning_attestation_timing_2026-08-13.json\\nrepository/docs/authoritati",
+          "raw_sha256": "d8dacc79fa92bb2edb6936199dc245d210dc42437d31819fcdc9b39463d2d3ef",
+          "rejected_reply_excerpt": null,
+          "rejected_reply_sha256": null,
+          "requested_timeout_sec": 2400,
+          "response_excerpt": "{\"class_actions\":{\"exact-command\":null,\"exact-scope\":null,\"fail-closed\":null},\"class_outcomes\":{\"exact-command\":{\"evidence\":[{\"anchor\":\"plan:6-7\",\"rationale\":\"The plan gives a concrete pytest executable invocation with the focused test-file argument.\"},{\"anchor\":\"repository/tests/test_prompts.py:1\",\"rationale\":\"The acceptance command's named test target exists and imports the prompt module under review.\"},{\"anchor\":\"repository/pyproject.toml:40-43\",\"rationale\":\"The repository defines pytest configuration and makes the source package importable for the named test.\"}],\"verdict\":\"satisfied\"},\"exact-scope\":{\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The scope is bounded with an exhaustive change-only list of three exact repository-relative file paths.\"}],\"verdict\":\"satisfied\"},\"fail-closed\":{\"evidence\":[{\"anchor\":\"plan:6-7\",\"rationale\":\"The acceptance contract explicitly states that a nonzero command exit blocks delivery.\"}],\"verdict\":\"satisfied\"}},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"plan:3-4\",\"rationale\":\"The repaired scope names each permitted implementation, test, and documentation file exactly and excludes other changes.\"}],\"status\":\"closed\"},{\"debt_id\":\"D2\",\"evidence\":[{\"anchor\":\"plan:6-7\",\"rationale\":\"The repaired acceptance section names a complete executable pytest command.\"},{\"anchor\":\"repository/tests/test_prompts.py:1\",\"rationale\":\"The command's focused test-file target exists in the pinned repository.\"},{\"anchor\":\"repository/pyproject.toml:40-43\",\"rationale\":\"Repository pytest configuration supports collection and source imports for that target.\"}],\"status\":\"closed\"},{\"debt_id\":\"D3\",\"evidence\":[{\"anchor\":\"plan:6-7\",\"rationale\":\"The repaired acceptance section makes any nonzero exit a delivery blocker.\"}],\"status\":\"closed\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+          "response_sha256": "71a48dfa29537d3f307b77337a69e84ed9c7e1bc3d6f7ff6f99b102e5c99dc0c",
+          "returncode": 0,
+          "role": "correction",
+          "sequence": 1,
+          "session_ref": "01a05ab7-4d9c-7a10-941e-f38671103f99",
+          "stderr_excerpt": "2026-09-01T02:06:47.232730Z  WARN codex_file_watcher: failed to unwatch /mnt/c/Users/andy/.codex/skills/.system: No watch was found. about [\"/mnt/c/Users/andy/.codex/skills/.system\"]\n",
+          "stderr_sha256": "84f3c6e3a7e2fc0b051a90aa443ceec0a82b06baac0dbd1ba613e781f48b4a8c",
+          "usage": {
+            "cached_input_tokens": 28160,
+            "input_tokens": 51844,
+            "output_tokens": 2230,
+            "reasoning_output_tokens": 1224
+          },
+          "validation_issue": null,
+          "validation_pointer": null
+        }
+      ],
+      "claim_audit_failed": null,
+      "claim_counts": null,
+      "claim_duration_ms": null,
+      "claim_last_accepted_counts": null,
+      "claim_model_calls": 0,
+      "claim_nonadjudicated_count": null,
+      "claim_status": "disabled",
+      "claim_verification": false,
+      "class_closure": true,
+      "correction_gates": [],
+      "engine": "codex",
+      "error": false,
+      "grounded": true,
+      "lineage": "plan-restatement-targeted-control-20260901",
+      "model": "gpt-5.6-sol",
+      "plan_digest": "74b46b02ebdb99e6",
+      "plan_path": null,
+      "register_status": "staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed",
+      "rejected_payloads": [],
+      "rendered_trailer": "LINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "retry_register": null,
+      "returncode": 0,
+      "round": 2,
+      "session_ref": "01a05ab7-4d9c-7a10-941e-f38671103f99",
+      "staged_manifests": null,
+      "staged_settlement": {
+        "_class_record_pointers": [
+          "/class_outcomes/exact-command",
+          "/class_outcomes/exact-scope",
+          "/class_outcomes/fail-closed"
+        ],
+        "_finding_class_refs": {},
+        "assessment_dispositions": [
+          {
+            "assessment_id": "exact-command",
+            "governing_id": null
+          },
+          {
+            "assessment_id": "exact-scope",
+            "governing_id": null
+          },
+          {
+            "assessment_id": "fail-closed",
+            "governing_id": null
+          }
+        ],
+        "class_assessments": [
+          {
+            "class_id": "exact-command",
+            "evidence": [
+              "plan:6-7",
+              "repository/tests/test_prompts.py:1",
+              "repository/pyproject.toml:40-43"
+            ],
+            "finding_id": null,
+            "verdict": "satisfied"
+          },
+          {
+            "class_id": "exact-scope",
+            "evidence": [
+              "plan:3-4"
+            ],
+            "finding_id": null,
+            "verdict": "satisfied"
+          },
+          {
+            "class_id": "fail-closed",
+            "evidence": [
+              "plan:6-7"
+            ],
+            "finding_id": null,
+            "verdict": "satisfied"
+          }
+        ],
+        "class_dispositions": [],
+        "class_records": [
+          {
+            "class_id": "exact-command",
+            "op": "close"
+          },
+          {
+            "class_id": "exact-scope",
+            "op": "close"
+          },
+          {
+            "class_id": "fail-closed",
+            "op": "close"
+          }
+        ],
+        "debt": [],
+        "debt_updates": [
+          {
+            "evidence": [
+              "plan:3-4"
+            ],
+            "id": "D1",
+            "status": "closed"
+          },
+          {
+            "evidence": [
+              "plan:6-7",
+              "repository/tests/test_prompts.py:1",
+              "repository/pyproject.toml:40-43"
+            ],
+            "id": "D2",
+            "status": "closed"
+          },
+          {
+            "evidence": [
+              "plan:6-7"
+            ],
+            "id": "D3",
+            "status": "closed"
+          }
+        ],
+        "findings": [],
+        "role": "correction",
+        "source_dispositions": []
+      },
+      "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+      "timestamp": "20260901T030647",
+      "tool": "critique_plan"
+    },
+    "durable_lineage": {
+      "claim_reverify_required": false,
+      "claim_state": {},
+      "classes": [
+        {
+          "class_id": "exact-scope",
+          "first_round": 1,
+          "invariant": "The plan names the exact files in scope.",
+          "matches": [],
+          "procedure": "Inspect plan:3-4 for the named obligation.",
+          "severity": "MAJOR",
+          "status": "closed"
+        },
+        {
+          "class_id": "exact-command",
+          "first_round": 1,
+          "invariant": "The plan names an executable acceptance command.",
+          "matches": [],
+          "procedure": "Inspect plan:6-7 for the named obligation.",
+          "severity": "MAJOR",
+          "status": "closed"
+        },
+        {
+          "class_id": "fail-closed",
+          "first_round": 1,
+          "invariant": "The plan states that acceptance failure blocks delivery.",
+          "matches": [],
+          "procedure": "Inspect plan:6-7 for the named obligation.",
+          "severity": "MAJOR",
+          "status": "closed"
+        }
+      ],
+      "debt": null,
+      "exemptions": [],
+      "mode": "plan",
+      "next_seq": 4,
+      "review_state": {
+        "correction_control": {
+          "classes": {
+            "exact-command": {
+              "last_session_ref": null,
+              "reopen_count": 0,
+              "reset_round": null
+            },
+            "exact-scope": {
+              "last_session_ref": null,
+              "reopen_count": 0,
+              "reset_round": null
+            },
+            "fail-closed": {
+              "last_session_ref": null,
+              "reopen_count": 0,
+              "reset_round": null
+            }
+          },
+          "version": 1
+        },
+        "debt": [
+          {
+            "class_ids": [
+              "exact-scope"
+            ],
+            "evidence": [
+              "plan:3-4"
+            ],
+            "finding_id": "G1",
+            "first_round": 1,
+            "id": "D1",
+            "last_round": 2,
+            "remedy": "Satisfy The plan names the exact files in scope.",
+            "severity": "MAJOR",
+            "source_ids": [],
+            "status": "closed",
+            "summary": "The plan names the exact files in scope."
+          },
+          {
+            "class_ids": [
+              "exact-command"
+            ],
+            "evidence": [
+              "plan:6-7",
+              "repository/tests/test_prompts.py:1",
+              "repository/pyproject.toml:40-43"
+            ],
+            "finding_id": "G2",
+            "first_round": 1,
+            "id": "D2",
+            "last_round": 2,
+            "remedy": "Satisfy The plan names an executable acceptance command.",
+            "severity": "MAJOR",
+            "source_ids": [],
+            "status": "closed",
+            "summary": "The plan names an executable acceptance command."
+          },
+          {
+            "class_ids": [
+              "fail-closed"
+            ],
+            "evidence": [
+              "plan:6-7"
+            ],
+            "finding_id": "G3",
+            "first_round": 1,
+            "id": "D3",
+            "last_round": 2,
+            "remedy": "Satisfy The plan states that acceptance failure blocks delivery.",
+            "severity": "MAJOR",
+            "source_ids": [],
+            "status": "closed",
+            "summary": "The plan states that acceptance failure blocks delivery."
+          }
+        ],
+        "last_round": 2,
+        "phase": "final",
+        "plan_line_count": 14,
+        "snapshot_digest": "52bcb9067232332bb3ce2f4b9683bda843fa0bf364ae41594727345dda36373c",
+        "stakes": "One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.",
+        "stakes_digest": "9fb1d3e09ae3635adcbe8c13eadd965b303e8b010351e24455345c4b967b3d64",
+        "version": 1
+      },
+      "rounds": 2
+    },
+    "lineage": "plan-restatement-targeted-control-20260901",
+    "plan": "# Targeted prompt correction\n\n## Scope\nChange only src/paranoia_local/prompts.py, tests/test_prompts.py, and README.md.\n\n## Acceptance\nRun `/home/andy/tools/paranoia-local/.venv/bin/pytest -q tests/test_prompts.py`; a nonzero exit blocks delivery.\n\n## Documentation\nUpdate README.md with the public behavior before delivery.\n\n## Unrelated limits\nThis section independently defines the retry ceiling as 12.\nAnother operative section independently defines the retry ceiling as 12.\n",
+    "prompt_sha256": [
+      "58affefa5d6cb517d228893374d6bfbe4028010e13c06a433427b04c71c6e153"
+    ],
+    "prompts": [
+      "Perform the staged structural role named in the task. Correction\ntargets every open debt item, its classes, the claimed repairs, and transitive effects. Final is a\nfresh cold whole-artifact review over all nine checklist items and every active class. The plan is displayed with `NNNNN: ` coordinate prefixes that are\npresentation metadata, not plan text. Cite it only as `plan:<line>` or\n`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as\n`repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned\nfilesystem repository root is the `repository/` directory relative to your current directory;\nread repository files through that directory, not from the workspace root.\nEvery anchor must resolve. The provider-supplied JSON Schema is the sole structural contract;\nreturn only its object, without a marker, fence, or prose.\n\nIf the task contains nonempty correction_gates, close or replace every named class so it is no\nlonger blocking. Rotating debt, changing evidence, or retaining another blocking severity does\nnot satisfy that server-owned gate.\n\nClassify every new governing finding once as one_off, new_class with an explicit definition and\nclass severity, or existing_class. For each existing class, exhaustively consolidate every\nindependently evidenced current occurrence into its one governing finding: cite every distinct\nanchor and make the bounded remedy cover each site rather than choosing one representative defect.\nRephrasing or rotating the same anchor is not another occurrence and does not satisfy a gate.\nWhen a fresh existing-class finding aggregates a class's current occurrences, close every supplied\nopen debt already bound to that class; do not leave a narrower predecessor open beside the new\naggregate debt. If a predecessor occurrence is still reachable, include it in the aggregate first.\nEvery supplied open debt receives exactly one outcome; open needs current evidence and a concrete\nremaining condition, closed needs current evidence. A violated class uses new_finding for a new\noccurrence, or carried_debt naming exactly one representative open debt; other historical debts\nremain independent outcomes. Satisfaction has no basis. Correction covers exactly affected\nclasses; final covers every active class and all checklist rows. class_outcomes and class_actions\nare keyed objects whose values never repeat class_id. Every active class has one action slot; use\nnull or at most one independent close, reopen,\nnon-downgrading reclassify, or replacement decision per action key. For a new existing-class finding\nwhose class has no required outcome key, put its distinct class-assessment citations in\nclassification.assessment_evidence; the server derives the violated outcome. A fresh finding for a\nrequired debt-bound class needs that authored violated outcome to use new_finding basis naming the\nfresh finding; carried_debt is only for no fresh occurrence. Open unmechanized satisfaction may omit\nits redundant close; the server derives it. Closed mechanized violation requires replace.\n\n## Plan-phase class semantics\n\nJudge whether the PLAN completely and correctly binds future implementation work; do not require\nthe plan itself to contain artifacts that can exist only after implementation runs. An in-card\nimplementation obligation is phase-satisfied only when the plan names its exact implementation\nscope, defines executable acceptance evidence, and states fail-closed behavior. Ownership is useful\nmetadata but never substitutes for scope. A vague promise to test, capture, mutate, or verify remains\nviolated.\n\nAn otherwise blocking in-scope obligation deferred outside this card remains blocking unless the\nplan routes it to a named durable residual with an owner and acceptance boundary. This rule never\npromotes MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work into blocking debt.\n\nEvery new plan class must state a plan-reviewable invariant about the completeness or correctness of\nthat contract, never an invariant satisfiable only by executing future code. If an inherited plan\nclass itself demands produced implementation artifacts, replace it with a phase-correct invariant;\ndo not recur solely because the future artifact does not exist, and do not claim implementation has\npassed. A later branch review independently judges the resulting code and tests.\n\n## Proactive normative-restatement audit\n\nDuring a broad plan census or final, identify rules, thresholds, identifiers, measured values, and\nother normative contracts that the plan states as independently authoritative in more than one\nplace. Treat multiple sources of authority as one structural defect even while their wording still\nagrees: require one authoritative definition and make the other operative sites cite or derive from\nit, so one edit cannot make the contract internally inconsistent. Cite the complete independently\noperative cluster in the finding.\n\nDo not infer a defect from repeated tokens or equal numbers alone. Worked examples, a table and its\nfaithful prose explanation, generated projections, and summaries that explicitly defer to the\nauthoritative definition may repeat a value legitimately. Judge semantic authority from context.\nWhen the task role is correction with review_scope `targeted`, do not use this audit to hunt\nunrelated novelty; apply it only to the supplied debt, classes, repairs, and transitive effects.\n\n## Complete semantic repair sites\n\nWhen a finding concerns a rule, value, schema, lifecycle, or ordering contract, trace every site in\nthe reviewed artifact that independently asserts or depends on that same contract. In code, sites\ninclude definitions, call sites, tests, fixtures, and documentation; in plans, they include every\nindependent contract section. Include every material co-asserting site in evidence and make the\nremedy cover them together; do not propose or accept a one-site repair that would leave the old\nrule asserted elsewhere.\nEvery evidence array item is exactly a closed `{\"anchor\":\"<citation>\",\"rationale\":\"why these lines support this row\"}` object, where `<citation>` is `plan:<line-or-range>` or `repository/<path>:<line-or-range>`. Put only the bare citation in `anchor`; put all explanation in `rationale`; and use one object per citation, never join citations.\nclass_outcomes is a closed object keyed by exactly these required class IDs: [\"exact-scope\", \"exact-command\", \"fail-closed\"]. class_actions is a closed object with one independent-action slot per active class. Every listed key is required; use null when no independent action is needed. The exact current decision surface is: {\"exact-scope\":{\"status\":\"open\",\"severity\":\"MAJOR\",\"mechanized\":false,\"required_outcome\":true,\"lifecycle\":[\"close\"],\"reclassify_severities\":[\"FATAL\",\"BLOCKER\",\"MAJOR\"],\"replacement_forms\":[\"procedure\"]},\"exact-command\":{\"status\":\"open\",\"severity\":\"MAJOR\",\"mechanized\":false,\"required_outcome\":true,\"lifecycle\":[\"close\"],\"reclassify_severities\":[\"FATAL\",\"BLOCKER\",\"MAJOR\"],\"replacement_forms\":[\"procedure\"]},\"fail-closed\":{\"status\":\"open\",\"severity\":\"MAJOR\",\"mechanized\":false,\"required_outcome\":true,\"lifecycle\":[\"close\"],\"reclassify_severities\":[\"FATAL\",\"BLOCKER\",\"MAJOR\"],\"replacement_forms\":[\"procedure\"]}}. Outcome authority for this role: author outcomes for debt-bound classes; a fresh finding for a debt-bound class uses its exact new_finding basis, while a distinct non-debt-bound fresh finding supplies assessment_evidence and the server derives violation. When an authoritative outcome exists, close requires satisfied and reopen requires violated; outcome-free standalone lifecycle actions remain legal only as listed. Reclassify and replace may retain or strengthen severity but never downgrade. Replacement preserves a mechanized class; use only a listed replacement form.  Never put class_id inside an outcome or action value.\n\n===== TASK INPUT =====\n\n{\"role\": \"correction\", \"stakes\": \"One trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\", \"existing_debt\": [{\"id\": \"D1\", \"finding_id\": \"G1\", \"status\": \"open\", \"severity\": \"MAJOR\", \"summary\": \"The plan names the exact files in scope.\", \"reason\": \"seeded control debt\", \"remedy\": \"Satisfy The plan names the exact files in scope.\", \"evidence\": [\"plan:3-4\"], \"source_ids\": [], \"class_ids\": [\"exact-scope\"], \"first_round\": 1, \"last_round\": 1}, {\"id\": \"D2\", \"finding_id\": \"G2\", \"status\": \"open\", \"severity\": \"MAJOR\", \"summary\": \"The plan names an executable acceptance command.\", \"reason\": \"seeded control debt\", \"remedy\": \"Satisfy The plan names an executable acceptance command.\", \"evidence\": [\"plan:6-7\"], \"source_ids\": [], \"class_ids\": [\"exact-command\"], \"first_round\": 1, \"last_round\": 1}, {\"id\": \"D3\", \"finding_id\": \"G3\", \"status\": \"open\", \"severity\": \"MAJOR\", \"summary\": \"The plan states that acceptance failure blocks delivery.\", \"reason\": \"seeded control debt\", \"remedy\": \"Satisfy The plan states that acceptance failure blocks delivery.\", \"evidence\": [\"plan:6-7\"], \"source_ids\": [], \"class_ids\": [\"fail-closed\"], \"first_round\": 1, \"last_round\": 1}], \"active_classes\": [{\"class_id\": \"exact-scope\", \"invariant\": \"PLAN-PHASE INTERPRETATION: the current plan completely and correctly binds the future implementation needed to satisfy this durable invariant: The plan names the exact files in scope.\", \"severity\": \"MAJOR\", \"status\": \"open\", \"mechanized\": false, \"pattern\": null, \"pathspec\": null, \"procedure\": \"Judge the plan contract, not whether expected pre-implementation code already passes. Require exact implementation scope, executable acceptance evidence, and fail-closed behavior. An in-scope blocking deferral also requires a named durable residual, owner, and acceptance boundary. Never promote MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work. Repository reads may challenge current premises, feasibility, named interfaces, and completeness. Durable procedure context: Inspect plan:3-4 for the named obligation.\"}, {\"class_id\": \"exact-command\", \"invariant\": \"PLAN-PHASE INTERPRETATION: the current plan completely and correctly binds the future implementation needed to satisfy this durable invariant: The plan names an executable acceptance command.\", \"severity\": \"MAJOR\", \"status\": \"open\", \"mechanized\": false, \"pattern\": null, \"pathspec\": null, \"procedure\": \"Judge the plan contract, not whether expected pre-implementation code already passes. Require exact implementation scope, executable acceptance evidence, and fail-closed behavior. An in-scope blocking deferral also requires a named durable residual, owner, and acceptance boundary. Never promote MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work. Repository reads may challenge current premises, feasibility, named interfaces, and completeness. Durable procedure context: Inspect plan:6-7 for the named obligation.\"}, {\"class_id\": \"fail-closed\", \"invariant\": \"PLAN-PHASE INTERPRETATION: the current plan completely and correctly binds the future implementation needed to satisfy this durable invariant: The plan states that acceptance failure blocks delivery.\", \"severity\": \"MAJOR\", \"status\": \"open\", \"mechanized\": false, \"pattern\": null, \"pathspec\": null, \"procedure\": \"Judge the plan contract, not whether expected pre-implementation code already passes. Require exact implementation scope, executable acceptance evidence, and fail-closed behavior. An in-scope blocking deferral also requires a named durable residual, owner, and acceptance boundary. Never promote MINOR, OUT-OF-SCOPE, stakes-excluded, or declared non-goal work. Repository reads may challenge current premises, feasibility, named interfaces, and completeness. Durable procedure context: Inspect plan:6-7 for the named obligation.\"}], \"correction_gates\": [], \"checklist\": [], \"artifact\": \"=== REVIEW STAKES ===\\nOne trusted operator and OS; repository and plan bytes are untrusted data only; no repository execution, hostile local race, compromised OS, or multitenancy; one small plan; false clearance is high impact and recoverable blocking is acceptable.\\n\\n=== REPOSITORY IS AVAILABLE ===\\nYou are inside the repository this plan concerns. Read the code to test every premise the plan makes about current behaviour.\\n\\n=== PLAN — DISPLAYED PREFIXES ARE CITATION COORDINATES, NOT PLAN TEXT ===\\n00001: # Targeted prompt correction\\n00002: \\n00003: ## Scope\\n00004: Change only src/paranoia_local/prompts.py, tests/test_prompts.py, and README.md.\\n00005: \\n00006: ## Acceptance\\n00007: Run `/home/andy/tools/paranoia-local/.venv/bin/pytest -q tests/test_prompts.py`; a nonzero exit blocks delivery.\\n00008: \\n00009: ## Documentation\\n00010: Update README.md with the public behavior before delivery.\\n00011: \\n00012: ## Unrelated limits\\n00013: This section independently defines the retry ceiling as 12.\\n00014: Another operative section independently defines the retry ceiling as 12.\\n\\n=== UNMECHANIZED CLASSES — no predicate; you are the check ===\\nNo predicate can check these — you are the check. Re-verify EVERY entry by its procedure, including the closed ones: a closed class is exactly what `REOPEN` exists for. The ROUND severity floor does not apply to any entry here, and where this block and the already-raised block conflict, THIS block governs. Emit `CLOSED: <id>` when one is genuinely closed, or `REOPEN: <id>` when a closed one is violated again — report a closed one's recurrence whatever its individual severity, because nothing else will notice it.\\n\\n[exact-command, MAJOR, open — BLOCKING, first raised round 1] The plan names an executable acceptance command.\\n  procedure: Inspect plan:6-7 for the named obligation.\\n[exact-scope, MAJOR, open — BLOCKING, first raised round 1] The plan names the exact files in scope.\\n  procedure: Inspect plan:3-4 for the named obligation.\\n[fail-closed, MAJOR, open — BLOCKING, first raised round 1] The plan states that acceptance failure blocks delivery.\\n  procedure: Inspect plan:6-7 for the named obligation.\\n\\nThe pinned repository evidence root is `repository/`. Treat that prefix as the project root; no live Git or web tools are available.\", \"review_scope\": \"targeted\"}"
+    ],
+    "result_sha256": "f3334c4d8f4209b86583be26998b16f34808d2d0679710751ed3dd96cb1da4fc",
+    "result_text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local · engine=codex · session_ref=`01a05ab7-4d9c-7a10-941e-f38671103f99` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: plan-restatement-targeted-control-20260901 (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed — CLOSE exact-command, CLOSE exact-scope, CLOSE fail-closed\nCLASS-CLOSURE: 0 open, 3 closed, 0 surviving matches, 0 exempt, 3 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required\nCONVERGENCE: BLOCKED — cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0"
+  },
+  "version": 1
+}
