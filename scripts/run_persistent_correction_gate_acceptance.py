@@ -164,6 +164,15 @@ def _critique_plan_with_prompt_capture(
 def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
     state.update(phase="correction", last_round=6, debt=[{
+        "id":"D0", "finding_id":"G0", "status":"closed", "severity":"MAJOR",
+        "summary":"a prior gate demand was withdrawn", "remedy":"do not repeat it",
+        "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
+        "first_round":1, "last_round":5, "concession":{
+            "version":1, "reason":"the prior demand was disproved",
+            "evidence":["plan:4"], "snapshot_digest":structural_snapshot,
+            "round":5,
+        },
+    }, {
         "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
         "summary":"the correction gate lacked public-handler acceptance",
         "reason":"acceptance was not yet exercised", "remedy":"exercise the handler",
@@ -779,6 +788,10 @@ def validate_artifact(
     if disposed:
         if not isinstance(settlement, dict) or settlement.get("role") != "correction":
             raise ValueError("accepted response lacks a materialized correction settlement")
+        if settlement.get("concession_challenges") != [{
+            "class_id":CLASS_ID, "challenge":None,
+        }]:
+            raise ValueError("correction did not preserve the durable concession projection")
         if not any(
             row.get("class_id") == CLASS_ID and row.get("op") in {"close", "replace"}
             for row in settlement.get("class_records", [])
