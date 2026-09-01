@@ -50,6 +50,8 @@ ACCEPTANCE_SOURCES = tuple(sorted(
     "docs/staged_review_protocol_v2_acceptance.md",
     "tests/test_review_census.py", "tests/test_handlers.py",
     "tests/test_plan_class_closure.py", "tests/test_plan_claims.py",
+    "tests/conftest.py", "pyproject.toml",
+    "scripts/build_branch_plan_fidelity_acceptance.py",
 )
 PLAN = (
     "# Change\n\n"
@@ -87,7 +89,8 @@ FIXED_PLAN = PLAN.replace(
     "\nThe retained artifact source inventory is the deterministic complete set of every "
     "Python module under src/paranoia_local, plus this generator, README.md, how-it-works.md, "
     "tool-reference.md, llm-reference.md, AGENTS.md, CLAUDE.md, "
-    "staged_review_protocol_v2_acceptance.md, and the four named test modules "
+    "staged_review_protocol_v2_acceptance.md, the four named test modules, "
+    "tests/conftest.py, pyproject.toml, and build_branch_plan_fidelity_acceptance.py "
     "enforced by the shared ACCEPTANCE_SOURCES constant. Commit every bound source before generation "
     "so source_revision and current bytes agree, validate the completed artifact, then publish "
     "it in a separate commit. Before publication, require removed, added, or replaced inventory "
@@ -161,9 +164,21 @@ def _critique_plan_with_prompt_capture(
     return result, captured
 
 
-def _fixture_lineage(structural_snapshot: str) -> cc.Lineage:
+def _fixture_lineage(
+    structural_snapshot: str, *, concession_history: bool = True,
+) -> cc.Lineage:
     state = rc.normalize_state(None, stakes=STAKES, snapshot=structural_snapshot)
-    state.update(phase="correction", last_round=6, debt=[{
+    history = [{
+        "id":"D0", "finding_id":"G0", "status":"closed", "severity":"MAJOR",
+        "summary":"a prior gate demand was withdrawn", "remedy":"do not repeat it",
+        "evidence":["plan:4"], "source_ids":[], "class_ids":[CLASS_ID],
+        "first_round":1, "last_round":5, "concession":{
+            "version":1, "reason":"the prior demand was disproved",
+            "evidence":["plan:4"], "snapshot_digest":structural_snapshot,
+            "round":5,
+        },
+    }] if concession_history else []
+    state.update(phase="correction", last_round=6, debt=[*history, {
         "id":"D1", "finding_id":"G1", "status":"open", "severity":"MAJOR",
         "summary":"the correction gate lacked public-handler acceptance",
         "reason":"acceptance was not yet exercised", "remedy":"exercise the handler",
@@ -568,7 +583,11 @@ def validate_artifact(
     revision = artifact["source_revision"]
     expected_sources = set(ACCEPTANCE_SOURCES)
     if revision == LEGACY_SOURCE_REVISION:
-        expected_sources -= {"README.md", "docs/tool-reference.md", "docs/llm-reference.md"}
+        expected_sources -= {
+            "README.md", "docs/tool-reference.md", "docs/llm-reference.md",
+            "tests/conftest.py", "pyproject.toml",
+            "scripts/build_branch_plan_fidelity_acceptance.py",
+        }
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
     if set(artifact["source_sha256"]) != expected_sources:
@@ -712,7 +731,9 @@ def validate_artifact(
         raise ValueError("returned/audited trailer binding mismatch")
     before = artifact["before_lineage"]
     after = artifact["after_lineage"]
-    if before != cc._to_json(_fixture_lineage(fixture["structural_snapshot"])):
+    if before != cc._to_json(_fixture_lineage(
+        fixture["structural_snapshot"], concession_history=not legacy_unowned_final,
+    )):
         raise ValueError("recorded prebuilt lineage differs from the complete fixture")
     if artifact["durable_reload_lineage"] != after:
         raise ValueError("durable reload differs from the recorded post-review lineage")
@@ -779,6 +800,10 @@ def validate_artifact(
     if disposed:
         if not isinstance(settlement, dict) or settlement.get("role") != "correction":
             raise ValueError("accepted response lacks a materialized correction settlement")
+        if not legacy_unowned_final and settlement.get("concession_challenges") != [{
+            "class_id":CLASS_ID, "challenge":None,
+        }]:
+            raise ValueError("correction did not preserve the durable concession projection")
         if not any(
             row.get("class_id") == CLASS_ID and row.get("op") in {"close", "replace"}
             for row in settlement.get("class_records", [])
@@ -1089,7 +1114,7 @@ def main() -> int:
     if not (
         closed_or_replaced and sibling_classes and sibling_debt and sibling_findings
         and durable.review_state.get("phase") == "correction"
-        and len(attempts) == 1 and attempts[0].get("outcome") == "completed"
+        and attempts[-1].get("outcome") == "completed"
     ):
         raise RuntimeError("real correction did not retain the expected sibling blocker")
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
@@ -18,6 +19,9 @@ CHECKLIST = sp.CHECKLIST
 LANES = sp.LANES
 BLOCKING = sp.BLOCKING
 MAX_CLASS_CONTEXT_CHARS = 64_000
+MAX_CONCESSION_REASON_CHARS = 4_000
+MAX_CONCESSION_ANCHOR_CHARS = 1_000
+MAX_CONCESSION_EVIDENCE = 20
 MAX_STAGED_PROMPT_CHARS = 5_000_000
 MAX_CONSOLIDATION_PROMPT_CHARS = 1_000_000
 MAX_REJECTED_PAYLOAD_CHARS = 12_000
@@ -36,7 +40,10 @@ STATE_KEYS = frozenset({
 })
 DEBT_KEYS = frozenset({
     "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
-    "source_ids", "class_ids", "first_round", "last_round", "reason",
+    "source_ids", "class_ids", "first_round", "last_round", "reason", "concession",
+})
+CONCESSION_KEYS = frozenset({
+    "version", "reason", "evidence", "snapshot_digest", "round",
 })
 REBUT_FAILURE_FIELDS = (
     "format_debt", "validation_debt", "staged_failure", "unbound_classes",
@@ -50,7 +57,8 @@ class CensusError(ValueError):
 
 def settle_rebut_concession(
     state: Mapping[str, Any], *, debt_id: str, class_id: str,
-    evidence: Sequence[str], blocking_class_ids: Sequence[str], engine_name: str,
+    reason: str, evidence: Sequence[str], blocking_class_ids: Sequence[str],
+    engine_name: str, active_classes: Sequence[cc.TrackedClass] = (),
 ) -> dict[str, Any]:
     """Close one exactly bound debt without applying round-settlement cleanup."""
     if state.get("phase") != "correction":
@@ -73,11 +81,27 @@ def settle_rebut_concession(
     if target.get("class_ids") != [class_id]:
         raise CensusError("bound rebut debt must bind only the supplied class_id")
     closure_evidence = list(evidence)
+    if (
+        not isinstance(reason, str) or not reason.strip()
+        or len(reason) > MAX_CONCESSION_REASON_CHARS
+    ):
+        raise CensusError("bound rebut concession requires bounded nonempty reason")
     if not closure_evidence or any(
-        not isinstance(item, str) or not item.strip() or len(item) > 2_000
+        not isinstance(item, str) or not item.strip()
+        or len(item) > MAX_CONCESSION_ANCHOR_CHARS
         for item in closure_evidence
-    ) or len(closure_evidence) > 20:
+    ) or len(closure_evidence) > MAX_CONCESSION_EVIDENCE:
         raise CensusError("bound rebut concession requires bounded nonempty evidence")
+    if len(closure_evidence) != len(set(closure_evidence)):
+        raise CensusError("bound rebut concession evidence must be unique")
+    snapshot_digest = state.get("snapshot_digest")
+    settlement_round = state.get("last_round")
+    if (
+        not isinstance(snapshot_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", snapshot_digest) is None
+        or type(settlement_round) is not int or settlement_round < 1
+    ):
+        raise CensusError("bound rebut concession requires authoritative snapshot and round")
     open_bound = {
         cid for row in rows if isinstance(row, dict) and row.get("status") == "open"
         and row.get("severity") in BLOCKING
@@ -93,9 +117,14 @@ def settle_rebut_concession(
     for row in out["debt"]:
         if row.get("id") == debt_id:
             row["status"] = "closed"
-            row["evidence"] = closure_evidence
             row.pop("reason", None)
+            row["last_round"] = settlement_round
+            row["concession"] = {
+                "version":1, "reason":reason, "evidence":closure_evidence,
+                "snapshot_digest":snapshot_digest, "round":settlement_round,
+            }
             break
+    canonical_prior_concessions(out["debt"], active_classes)
     blocking = [
         row for row in out["debt"]
         if row.get("status") == "open" and row.get("severity") in BLOCKING
@@ -220,10 +249,20 @@ def attempt_trailer(attempts: Sequence[Attempt] | Sequence[dict[str, Any]]) -> s
 
 def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
     sd = digest(stakes)
-    if not isinstance(raw, dict) or raw.get("version") != 1 or raw.get("stakes_digest") != sd:
+    if not isinstance(raw, dict) or raw.get("version") != 1:
         return {
             "version": 1, "stakes_digest": sd, "stakes": stakes,
             "phase": "census", "snapshot_digest": snapshot, "debt": [],
+        }
+    validated_debt = validate_persisted_debt(raw.get("debt"))
+    retained_history = [
+        deepcopy(dict(row)) for row in validated_debt if "concession" in row
+    ]
+    if raw.get("stakes_digest") != sd:
+        return {
+            "version": 1, "stakes_digest": sd, "stakes": stakes,
+            "phase": "census", "snapshot_digest": snapshot,
+            "debt": retained_history,
         }
     out = dict(raw)
     if (
@@ -237,7 +276,7 @@ def normalize_state(raw: Any, *, stakes: str, snapshot: str) -> dict[str, Any]:
         set_phase(out, "census")
     if out["phase"] == "clear" and out.get("snapshot_digest") != snapshot:
         set_phase(out, "census")
-        out.update(snapshot_digest=snapshot, debt=[])
+        out.update(snapshot_digest=snapshot, debt=retained_history)
     return out
 
 
@@ -280,6 +319,53 @@ def _persisted_string_list(value: Any, pointer: str) -> None:
         raise CensusError(f"{pointer}: persisted members must be unique")
 
 
+def _validate_concession(
+    value: Any, *, pointer: str, row: Mapping[str, Any],
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != CONCESSION_KEYS:
+        raise CensusError(f"{pointer}: invalid persisted concession fields")
+    if value.get("version") != 1 or type(value.get("version")) is not int:
+        raise CensusError(f"{pointer}/version: invalid concession version")
+    reason = value.get("reason")
+    if (
+        not isinstance(reason, str) or not reason.strip()
+        or len(reason) > MAX_CONCESSION_REASON_CHARS
+    ):
+        raise CensusError(f"{pointer}/reason: invalid concession reason")
+    evidence = value.get("evidence")
+    if (
+        not isinstance(evidence, list) or not 1 <= len(evidence) <= MAX_CONCESSION_EVIDENCE
+        or any(
+            not isinstance(item, str) or not item.strip()
+            or len(item) > MAX_CONCESSION_ANCHOR_CHARS
+            for item in evidence
+        )
+        or len(evidence) != len(set(evidence))
+    ):
+        raise CensusError(f"{pointer}/evidence: invalid concession evidence")
+    snapshot_digest = value.get("snapshot_digest")
+    if (
+        not isinstance(snapshot_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", snapshot_digest) is None
+    ):
+        raise CensusError(f"{pointer}/snapshot_digest: invalid concession snapshot")
+    round_no = value.get("round")
+    if (
+        type(round_no) is not int
+        or round_no < 1
+        or round_no < row.get("first_round", 0)
+        or round_no != row.get("last_round")
+    ):
+        raise CensusError(f"{pointer}/round: invalid concession round")
+    if row.get("status") != "closed" or row.get("severity") not in BLOCKING:
+        raise CensusError(f"{pointer}: concession requires closed blocking debt")
+    if (
+        not isinstance(row.get("class_ids"), list)
+        or len(row["class_ids"]) != 1
+    ):
+        raise CensusError(f"{pointer}: concession debt must bind exactly one class")
+
+
 def validate_persisted_debt(debt: Any) -> list[Mapping[str, Any]]:
     """Validate the complete durable debt-row boundary before any consumer uses it."""
     if not isinstance(debt, list):
@@ -291,7 +377,7 @@ def validate_persisted_debt(debt: Any) -> list[Mapping[str, Any]]:
         if not isinstance(row, Mapping):
             raise CensusError(f"{pointer}: persisted debt row must be an object")
         unexpected = set(row) - DEBT_KEYS
-        required = DEBT_KEYS - {"reason"}
+        required = DEBT_KEYS - {"reason", "concession"}
         missing = required - set(row)
         if missing or unexpected:
             raise CensusError(
@@ -330,7 +416,60 @@ def validate_persisted_debt(debt: Any) -> list[Mapping[str, Any]]:
             raise CensusError(f"{pointer}: invalid persisted debt round bounds")
         if "reason" in row:
             _persisted_text(row.get("reason"), f"{pointer}/reason")
+        if "concession" in row:
+            _validate_concession(
+                row["concession"], pointer=f"{pointer}/concession", row=row,
+            )
     return debt
+
+
+def prior_concessions(
+    debt: Any, active_classes: Sequence[cc.TrackedClass] | Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Project the latest durable concession for each non-superseded active class."""
+    rows = validate_persisted_debt(debt)
+    active_ids = {
+        item.class_id if isinstance(item, cc.TrackedClass) else item.get("class_id")
+        for item in active_classes
+    }
+    if None in active_ids or len(active_ids) != len(active_classes):
+        raise CensusError("active concession projection has duplicate or invalid class ids")
+    selected: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        concession = row.get("concession")
+        class_ids = row.get("class_ids", [])
+        if concession is None or len(class_ids) != 1 or class_ids[0] not in active_ids:
+            continue
+        class_id = class_ids[0]
+        previous = selected.get(class_id)
+        if previous is None or (
+            concession["round"], row["id"]
+        ) > (previous["concession"]["round"], previous["id"]):
+            selected[class_id] = row
+    return {
+        class_id:{
+            "debt_id":row["id"], "finding_id":row["finding_id"],
+            "summary":row["summary"], "remedy":row["remedy"],
+            "finding_evidence":list(row["evidence"]),
+            "concession":deepcopy(row["concession"]),
+        }
+        for class_id, row in sorted(selected.items())
+    }
+
+
+def canonical_prior_concessions(
+    debt: Any, active_classes: Sequence[cc.TrackedClass] | Sequence[Mapping[str, Any]],
+) -> str:
+    rendered = json.dumps(
+        prior_concessions(debt, active_classes), ensure_ascii=False,
+        sort_keys=True, separators=(",", ":"),
+    )
+    if len(rendered) > MAX_CLASS_CONTEXT_CHARS:
+        raise CensusError(
+            f"prior concessions are {len(rendered)} characters; maximum is "
+            f"{MAX_CLASS_CONTEXT_CHARS}"
+        )
+    return rendered
 
 
 def _validate_rejected_payloads(value: Any, pointer: str) -> None:
@@ -421,6 +560,7 @@ def validate_persisted_state(
     ):
         raise CensusError("/plan_line_count: invalid persisted plan line count")
     validate_persisted_debt(state.get("debt"))
+    canonical_prior_concessions(state.get("debt"), active)
     failure_keys = [
         key for key in ("format_debt", "validation_debt", "staged_failure")
         if key in state

@@ -99,6 +99,11 @@ only when no sibling blocker remains. It does not grant clearance; the normal
 cold-final lifecycle still decides convergence. Its citations use the staged
 anchor grammar and must resolve against the repository or retained plan line bound
 before settlement.
+The concession is retained separately from the original finding. Each later staged
+role sees the latest concession for every non-superseded class and must explicitly
+challenge it with new resolved evidence before recreating the same blocker. Unrelated
+snapshot or stakes changes preserve that adjudication; relevant changed evidence can
+still reopen the class.
 
 ## Plan contracts in branch review
 

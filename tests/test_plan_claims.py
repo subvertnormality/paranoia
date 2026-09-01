@@ -3289,6 +3289,7 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
             text = json.dumps({
                 "role": "census", "governing_findings": [],
                 "debt_outcomes": [], "class_actions": {},
+                "concession_challenges": {},
             })
         return Review(text=text, session_ref="structural", raw=text)
 

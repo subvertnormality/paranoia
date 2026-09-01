@@ -40,11 +40,27 @@ def citation() -> dict:
     return {"anchor":"plan:1", "rationale":"the fixture establishes this judgement"}
 
 
+def concessions(classes: list[dict]) -> dict:
+    return {
+        cls["class_id"]:{
+            "debt_id":f"C-{cls['class_id']}", "finding_id":f"F-{cls['class_id']}",
+            "summary":"historic conceded occurrence", "remedy":"do not repeat it",
+            "finding_evidence":["plan:1"],
+            "concession":{
+                "version":1, "reason":"the prior demand was disproved",
+                "evidence":["plan:1"], "snapshot_digest":"a" * 64, "round":1,
+            },
+        }
+        for cls in classes
+    }
+
+
 def fixtures() -> list[dict]:
     minimal_classes = [active_class(0)]
     minimal = {
         "role":"correction", "governing_findings":[], "debt_outcomes":[],
         "class_outcomes":{}, "class_actions":{"00000000":None},
+        "concession_challenges":{"00000000":None},
     }
     maximum_classes = [active_class(index) for index in range(sp.MAX_ACTIVE_CLASSES)]
     populated_classes = [active_class(1), active_class(3)]
@@ -75,6 +91,7 @@ def fixtures() -> list[dict]:
             },
         },
         "class_actions":{"00000001":None, "00000003":None},
+        "concession_challenges":{},
     }
     maximum = {
         "role":"final", "governing_findings":[], "debt_outcomes":[],
@@ -85,6 +102,9 @@ def fixtures() -> list[dict]:
             for cls in maximum_classes
         },
         "class_actions":{cls["class_id"]:None for cls in maximum_classes},
+        "concession_challenges":{
+            cls["class_id"]:None for cls in maximum_classes
+        },
         "coverage":[
             {
                 "id":item, "status":"covered", "summary":"checked",
@@ -97,6 +117,7 @@ def fixtures() -> list[dict]:
     census = {
         "role":"census", "governing_findings":[], "debt_outcomes":[],
         "class_actions":{"00000001":None, "00000003":None},
+        "concession_challenges":{},
     }
     census_kwargs = {
         "assessment_verdicts":{"00000001":"satisfied", "00000003":"satisfied"},
@@ -105,16 +126,95 @@ def fixtures() -> list[dict]:
     }
     return [
         {"shape":"minimal-correction", "role":"correction",
-         "classes":minimal_classes, "durable_debt":[], "response":minimal},
+         "classes":minimal_classes, "durable_debt":[],
+         "prior_concessions":concessions(minimal_classes), "response":minimal},
         {"shape":"populated-correction", "role":"correction",
          "classes":populated_classes, "durable_debt":populated_debt,
          "response":populated},
         {"shape":"maximum-final", "role":"final",
-         "classes":maximum_classes, "durable_debt":[], "response":maximum},
+         "classes":maximum_classes, "durable_debt":[],
+         "prior_concessions":concessions(maximum_classes), "response":maximum},
         {"shape":"representative-census", "role":"census",
          "classes":census_classes, "durable_debt":[], "response":census,
          "materialize_kwargs":census_kwargs},
     ]
+
+
+def validate_artifact(artifact: dict) -> None:
+    """Fail closed before publishing a complete or partially refreshed artifact."""
+    if artifact.get("acceptance_kind") != (
+        "keyed-staged-class-decision-provider-capability"
+    ) or artifact.get("version") != 1:
+        raise RuntimeError("provider acceptance identity is invalid")
+    if artifact.get("max_active_classes") != sp.MAX_ACTIVE_CLASSES:
+        raise RuntimeError("provider acceptance active-class bound is stale")
+    expected_fixtures = {row["shape"]:row for row in fixtures()}
+    providers = artifact.get("providers")
+    if not isinstance(providers, list) or {
+        row.get("engine") for row in providers
+    } != {"codex", "claude"}:
+        raise RuntimeError("provider acceptance route inventory is invalid")
+    counted = 0
+    for provider in providers:
+        probes = provider.get("probes")
+        if not isinstance(probes, list) or {
+            row.get("shape") for row in probes
+        } != set(expected_fixtures):
+            raise RuntimeError("provider acceptance probe inventory is invalid")
+        for probe in probes:
+            fixture = expected_fixtures[probe["shape"]]
+            classes = probe.get("active_classes")
+            durable_debt = probe.get("durable_debt")
+            prior_concessions = probe.get("prior_concessions", {})
+            role = probe.get("role")
+            if (
+                classes != fixture["classes"]
+                or durable_debt != fixture["durable_debt"]
+                or prior_concessions != fixture.get("prior_concessions", {})
+                or role != fixture["role"]
+            ):
+                raise RuntimeError("provider acceptance probe authority is inconsistent")
+            outcome_ids = sp.expected_outcome_class_ids(
+                role, active_classes=classes, durable_debt=durable_debt,
+            )
+            schema = sp.provider_schema(sp.decision_schema(
+                cc.BRANCH_MODE, role, active_classes=classes,
+                outcome_class_ids=outcome_ids,
+                prior_concessions=prior_concessions,
+            ))
+            schema_text = sp.canonical_schema(schema)
+            if (
+                probe.get("active_class_count") != len(classes)
+                or probe.get("required_outcome_count") != len(outcome_ids)
+                or probe.get("schema_bytes") != len(schema_text.encode("utf-8"))
+                or probe.get("schema_sha256") != digest(schema_text)
+            ):
+                raise RuntimeError("provider acceptance probe metadata is inconsistent")
+            calls = probe.get("calls")
+            if not isinstance(calls, list) or [
+                row.get("route") for row in calls
+            ] != ["fresh", "resumed"] or len({
+                row.get("session_ref") for row in calls
+            }) != 1:
+                raise RuntimeError("provider acceptance call topology is invalid")
+            for call in calls:
+                text = call.get("response_text")
+                if not isinstance(text, str) or digest(text) != call.get("response_sha256"):
+                    raise RuntimeError("provider acceptance response binding is invalid")
+                decoded = sp.decode_decision(
+                    text, mode=cc.BRANCH_MODE, role=role,
+                    active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
+                )
+                sp.materialize_decision_value(
+                    decoded, mode=cc.BRANCH_MODE, role=role,
+                    active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
+                    **probe.get("materialize_kwargs", {}),
+                )
+            counted += len(calls)
+    if artifact.get("call_count") != counted:
+        raise RuntimeError("provider acceptance aggregate call count is invalid")
 
 
 def version(binary: str) -> str:
@@ -143,12 +243,14 @@ def main() -> int:
             classes = fixture["classes"]
             durable_debt = fixture["durable_debt"]
             role = fixture["role"]
+            prior_concessions = fixture.get("prior_concessions", {})
             outcome_ids = sp.expected_outcome_class_ids(
                 role, active_classes=classes, durable_debt=durable_debt,
             )
             schema = sp.provider_schema(sp.decision_schema(
                 cc.BRANCH_MODE, role, active_classes=classes,
                 outcome_class_ids=outcome_ids,
+                prior_concessions=prior_concessions,
             ))
             schema_text = sp.canonical_schema(schema)
             prompt = (
@@ -195,10 +297,12 @@ def main() -> int:
                 decoded = sp.decode_decision(
                     review.text, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
+                    prior_concessions=prior_concessions,
                     **fixture.get("materialize_kwargs", {}),
                 )
                 session = review.session_ref
@@ -217,6 +321,7 @@ def main() -> int:
                 "active_classes":classes,
                 "required_outcome_count":len(outcome_ids),
                 "durable_debt":durable_debt,
+                "prior_concessions":prior_concessions,
                 "materialize_kwargs":fixture.get("materialize_kwargs", {}),
                 "schema_bytes":len(schema_text.encode("utf-8")),
                 "schema_sha256":digest(schema_text),
@@ -228,6 +333,7 @@ def main() -> int:
         for provider in artifact["providers"] for probe in provider["probes"]
     )
     artifact["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    validate_artifact(artifact)
     OUTPUT.write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -258,13 +364,16 @@ def repair_claude_maximum() -> int:
     )
     fixture = next(row for row in fixtures() if row["shape"] == "maximum-final")
     classes = fixture["classes"]
+    durable_debt = fixture["durable_debt"]
+    prior_concessions = fixture.get("prior_concessions", {})
     role = fixture["role"]
     outcome_ids = sp.expected_outcome_class_ids(
-        role, active_classes=classes, durable_debt=(),
+        role, active_classes=classes, durable_debt=durable_debt,
     )
     schema = sp.provider_schema(sp.decision_schema(
         cc.BRANCH_MODE, role, active_classes=classes,
         outcome_class_ids=outcome_ids,
+        prior_concessions=prior_concessions,
     ))
     prompt = (
         "This is a structured-output transport probe. Assess every class satisfied "
@@ -293,9 +402,11 @@ def repair_claude_maximum() -> int:
             )
         decoded = sp.decode_decision(
             review.text, mode=cc.BRANCH_MODE, role=role, active_classes=classes,
+            durable_debt=durable_debt, prior_concessions=prior_concessions,
         )
         sp.materialize_decision_value(
             decoded, mode=cc.BRANCH_MODE, role=role, active_classes=classes,
+            durable_debt=durable_debt, prior_concessions=prior_concessions,
         )
         session = review.session_ref
         if not session:
@@ -307,6 +418,14 @@ def repair_claude_maximum() -> int:
             "usage":review.usage, "response_text":review.text,
         })
     probe["calls"] = calls
+    probe.update(
+        active_class_count=len(classes), active_classes=classes,
+        required_outcome_count=len(outcome_ids), durable_debt=durable_debt,
+        prior_concessions=prior_concessions,
+        materialize_kwargs=fixture.get("materialize_kwargs", {}),
+        schema_bytes=len(sp.canonical_schema(schema).encode("utf-8")),
+        schema_sha256=digest(sp.canonical_schema(schema)),
+    )
     if any(
         "response_text" not in call
         for item in artifact["providers"] for row in item["probes"]
@@ -317,6 +436,7 @@ def repair_claude_maximum() -> int:
         call["elapsed_seconds"] for item in artifact["providers"]
         for row in item["probes"] for call in row["calls"]
     ), 3)
+    validate_artifact(artifact)
     OUTPUT.write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -332,12 +452,14 @@ def add_shape(shape: str) -> int:
     classes = fixture["classes"]
     durable_debt = fixture["durable_debt"]
     role = fixture["role"]
+    prior_concessions = fixture.get("prior_concessions", {})
     outcome_ids = sp.expected_outcome_class_ids(
         role, active_classes=classes, durable_debt=durable_debt,
     )
     schema = sp.provider_schema(sp.decision_schema(
         cc.BRANCH_MODE, role, active_classes=classes,
         outcome_class_ids=outcome_ids,
+        prior_concessions=prior_concessions,
     ))
     schema_text = sp.canonical_schema(schema)
     prompt = (
@@ -370,10 +492,12 @@ def add_shape(shape: str) -> int:
             decoded = sp.decode_decision(
                 review.text, mode=cc.BRANCH_MODE, role=role,
                 active_classes=classes, durable_debt=durable_debt,
+                prior_concessions=prior_concessions,
             )
             sp.materialize_decision_value(
                 decoded, mode=cc.BRANCH_MODE, role=role,
                 active_classes=classes, durable_debt=durable_debt,
+                prior_concessions=prior_concessions,
                 **fixture.get("materialize_kwargs", {}),
             )
             session = review.session_ref
@@ -391,6 +515,7 @@ def add_shape(shape: str) -> int:
             "active_classes":classes,
             "required_outcome_count":len(outcome_ids),
             "durable_debt":durable_debt,
+            "prior_concessions":prior_concessions,
             "materialize_kwargs":fixture.get("materialize_kwargs", {}),
             "schema_bytes":len(schema_text.encode("utf-8")),
             "schema_sha256":digest(schema_text), "calls":calls,
@@ -414,6 +539,7 @@ def add_shape(shape: str) -> int:
         call["elapsed_seconds"] for item in artifact["providers"]
         for row in item["probes"] for call in row["calls"]
     ), 3)
+    validate_artifact(artifact)
     OUTPUT.write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

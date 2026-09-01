@@ -292,7 +292,7 @@ class TestRebut:
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
-        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
         debt = {
             "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
             "summary":"wrong finding", "evidence":["plan:1"], "remedy":"withdraw",
@@ -333,6 +333,10 @@ class TestRebut:
         assert reloaded.review_state["last_round"] == 7
         assert reloaded.review_state["debt"][0]["status"] == "closed"
         assert reloaded.review_state["debt"][0]["evidence"] == ["plan:1"]
+        assert reloaded.review_state["debt"][0]["concession"] == {
+            "version":1, "reason":"The finding used the wrong path.",
+            "evidence":["plan:1"], "snapshot_digest":rc.digest("p"), "round":7,
+        }
         assert "reason" not in reloaded.review_state["debt"][0]
         assert reloaded.classes["class-a"].status == cc.CLOSED
         assert reloaded.review_state["correction_control"]["classes"]["class-a"] == {
@@ -377,7 +381,7 @@ class TestRebut:
             "source_ids":[], "class_ids":["class-a"], "first_round":1,
             "last_round":7, "reason":"still present",
         }
-        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
         state.update(phase="correction", last_round=7, debt=[debt])
         state["correction_control"] = {"version":1, "classes":{"class-a":{
             "reset_round":None, "reopen_count":3, "last_session_ref":"sess-1",
@@ -411,7 +415,7 @@ class TestRebut:
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
-        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
         state.update(phase="correction", last_round=2, debt=[{
             "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
             "summary":"wrong contract finding", "evidence":["plan:2"],
@@ -464,7 +468,7 @@ class TestRebut:
         prior_evidence, evidence, error,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
-        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
         state.update(phase="correction", last_round=2, debt=[{
             "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
             "summary":"finding", "evidence":prior_evidence,
@@ -506,7 +510,7 @@ class TestRebut:
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
-        state = rc.normalize_state(None, stakes="s", snapshot="p")
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
         state.update(phase="correction", last_round=7, debt=[{
             "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
             "summary":"wrong finding", "evidence":["plan:1"], "remedy":"withdraw",

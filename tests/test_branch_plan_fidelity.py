@@ -35,6 +35,10 @@ def _wire(value):
                 project(child)
 
     project(value)
+    if isinstance(value, dict) and value.get("role") in {
+        "census", "correction", "final",
+    }:
+        value.setdefault("concession_challenges", {})
     return json.dumps(value)
 
 
@@ -1141,7 +1145,11 @@ def test_contract_survives_stakes_and_review_state_normalization(
     result = handlers.critique_branch({
         **common, "round": 2, "stakes": stakes,
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    if transition == "review-version":
+        assert "CONVERGENCE: BLOCKED" in result
+        assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
+    else:
+        assert "CONVERGENCE: NOT-BLOCKED" in result
     after = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="N3", mode=cc.BRANCH_MODE,
     ).branch_contract

@@ -209,6 +209,11 @@ The unbound form is non-mutating. For a persistently gated class, optional
 to one current durable target. `HOLD` is audit-only. A validated `CONCEDE`
 closes that debt and closes its class only when no sibling blocker remains; it
 never grants clearance, and the next critique still performs the normal final.
+The closed debt retains a durable concession record. Later staged reviewers see
+that exact prior adjudication and must provide a keyed challenge with new resolved
+evidence before the same class can be violated, reopened, or replaced. The record
+survives unrelated snapshot and stakes changes, but it is not an exemption from a
+genuine changed occurrence.
 Bound citations use the staged anchor grammar and must resolve before settlement;
 tracked plan reviews retain their line count so repeated `plan:` anchors remain bounded.
 When a staged plan citation fails resolution, the bounded same-session retry repeats the legal

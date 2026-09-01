@@ -193,6 +193,10 @@ blocking class and the open debt must bind only that class. `HOLD` is audit-only
 remains. Its citation objects must resolve under the staged anchor grammar before
 settlement; plan citations require the retained reviewed-plan line bound. The
 unbound form remains prose-returning and non-mutating.
+A bound concession remains reviewer-visible as a separate adjudication record.
+Any later finding, reopen, or replacement for that class requires the decision's
+keyed challenge with new resolved evidence; unrelated snapshot and stakes changes
+do not remove it.
 
 ## `arbitrate`
 

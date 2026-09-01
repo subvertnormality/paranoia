@@ -187,7 +187,10 @@ def _reserve_branch_contract(
             state_root, lineage_id, stamp=stamp, mode=cc.BRANCH_MODE,
             pending_owned=True,
         )
-        last_round = lineage.review_state.get("last_round")
+        last_round = (
+            lineage.review_state.get("last_round")
+            if isinstance(lineage.review_state, dict) else None
+        )
         if type(last_round) is int and round_no <= last_round:
             raise ValueError(
                 f"tracked round must be greater than durable last_round {last_round}; "
@@ -484,6 +487,12 @@ def _staged_class_trailer(closure: "_ClosureRound", status: str) -> str:
             f"CLASS-REGISTER: {status}\n"
             "CLASS-CLOSURE: STATE-UNAVAILABLE — lineage could not be loaded."
         )
+    if getattr(closure, "preflight_validation_error", None) is not None:
+        return (
+            f"CLASS-REGISTER: {status}\n"
+            "CLASS-CLOSURE: STATE-UNAVAILABLE — durable structural state failed "
+            "validation before class projection."
+        )
     return cc.render_trailer(
         closure.lineage, register_status=status, include_verdict=False,
     )
@@ -559,6 +568,7 @@ def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
 
 def _staged_lane_prompt(
     *, mode: str, lane: str, active_classes: list[dict[str, Any]], body: str,
+    prior_concessions_text: str,
     plan_contract: bool = False,
 ) -> str:
     instructions = (
@@ -568,7 +578,10 @@ def _staged_lane_prompt(
     lane_body = (
         f"ROLE: census lane {lane}\nCHECKLIST: {json.dumps(sp.CHECKLIST)}\n"
         "ACTIVE CLASSES: "
-        f"{json.dumps(active_classes if lane == 'integrity' else [])}\n\n{body}"
+        f"{json.dumps(active_classes if lane == 'integrity' else [])}\n"
+        "PRIOR CONCESSIONS: "
+        f"{prior_concessions_text}"
+        f"\n\n{body}"
     )
     return prompts.compose(instructions, lane_body)
 
@@ -892,6 +905,11 @@ def _settle_staged_failure(
     preflight_failure = str(
         getattr(error, "stage_role", "")
     ).endswith("-preflight")
+    preserve_raw_top_level = preflight_failure and not isinstance(raw_state, dict)
+    preserve_unknown_mapping = (
+        preflight_failure and isinstance(raw_state, dict) and bool(raw_state)
+        and raw_state.get("version") != 1
+    )
     if (
         isinstance(raw_state, dict) and raw_state.get("version") == 1
         and isinstance(raw_state.get("phase"), str)
@@ -900,16 +918,17 @@ def _settle_staged_failure(
     ):
         state = deepcopy(raw_state)
     elif (
-        preflight_failure and isinstance(raw_state, dict)
-        and raw_state.get("version") == 1
+        preflight_failure and isinstance(raw_state, dict) and raw_state
     ):
         # A structural preflight may be rejecting the top-level debt container
-        # itself. Preserve those malformed durable bytes for diagnosis while adding
-        # the structured failure beside them; rendering uses a sanitized projection.
+        # or an older/unknown top-level shape. Preserve every nonempty durable mapping
+        # for diagnosis while replacing only bounded failure fields; exact {} remains
+        # the sole new-lineage authority. Rendering uses a sanitized projection.
         state = deepcopy(raw_state)
     else:
         state = rc.normalize_state(raw_state, stakes=stakes, snapshot=snapshot)
-    state.pop("census_cache", None)
+    if not preserve_unknown_mapping:
+        state.pop("census_cache", None)
     state.pop("validation_debt", None)
     state.pop("staged_failure", None)
     state.pop("format_debt", None)
@@ -963,12 +982,14 @@ def _settle_staged_failure(
             ):
                 control["classes"][class_id]["last_session_ref"] = successful_session
         state["correction_control"] = control
-    closure.lineage.review_state = state
+    if not preserve_raw_top_level:
+        closure.lineage.review_state = state
     closure.staged_manifests = getattr(error, "manifests", [])
     closure.rejected_payloads = deepcopy(rejected_payloads)
     register_status, error_body = _staged_failure_surface(error)
     try:
-        cc.save_lineage(closure.state_root, closure.lineage)
+        if not preserve_raw_top_level:
+            cc.save_lineage(closure.state_root, closure.lineage)
     except cc.StateUnavailable as exc:
         closure.unavailable = str(exc)
         message = f"lineage state unavailable after staged failure: {exc}"
@@ -1010,11 +1031,16 @@ def _settle_staged_failure(
         _staged_class_trailer(closure, closure.register_status),
         rc.trailer(
             trailer_state,
-            class_first_rounds={
-                item.class_id: item.first_round
-                for item in closure.lineage.blocking()
-            },
-            reopened_class_ids=getattr(closure, "reopened_class_ids", ()),
+            class_first_rounds=(
+                {} if preflight_failure else {
+                    item.class_id:item.first_round
+                    for item in closure.lineage.blocking()
+                }
+            ),
+            reopened_class_ids=(
+                () if preflight_failure
+                else getattr(closure, "reopened_class_ids", ())
+            ),
             session_ref=authorized_failure_session,
             round_label=closure.round_no,
             correction_gates=getattr(closure, "correction_gates", ()),
@@ -1152,7 +1178,23 @@ def _staged_structural_review(
     assert closure.lineage is not None
     lineage = closure.lineage
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
-    _staged_class_context(closure._blocks())
+    preflight_validation_error = getattr(
+        closure, "preflight_validation_error", None,
+    )
+    if preflight_validation_error is not None:
+        raw_phase = (
+            lineage.review_state.get("phase")
+            if isinstance(lineage.review_state, dict) else None
+        )
+        role = (
+            f"{raw_phase}-preflight"
+            if isinstance(raw_phase, str) and raw_phase in rc.PHASES
+            else "structural-preflight"
+        )
+        raise _staged_error(
+            str(preflight_validation_error),
+            role=role, kind="validation",
+        )
     try:
         persisted_state = lineage.review_state
         state = rc.normalize_state(
@@ -1193,6 +1235,7 @@ def _staged_structural_review(
             else "structural-preflight"
         )
         raise _staged_error(str(exc), role=role, kind="validation") from exc
+    _staged_class_context(closure._blocks())
     stakes_recalibration = (
         isinstance(lineage.review_state, dict)
         and lineage.review_state.get("version") == 1
@@ -1203,8 +1246,12 @@ def _staged_structural_review(
         # A pre-staging malformed-register round is not silently normalized into an
         # empty verified register. Its only autonomous recovery is a fresh cold census
         # that sees the exact durable failure it supersedes.
+        concession_history = [
+            deepcopy(row) for row in state.get("debt", [])
+            if isinstance(row, dict) and "concession" in row
+        ]
         state = rc.normalize_state(None, stakes=stakes, snapshot=snapshot)
-        state["debt"] = [{
+        state["debt"] = [*concession_history, {
             "id":"legacy-register", "finding_id":"legacy-register",
             "status":"open", "severity":cc.BLOCKER,
             "summary":"A pre-staging review left unresolved class-register debt.",
@@ -1219,6 +1266,17 @@ def _staged_structural_review(
         )
     phase = state["phase"]
     active_classes = _active_class_rows(lineage, mode)
+    try:
+        prior_concessions = rc.prior_concessions(
+            state.get("debt", []), lineage.active(),
+        )
+        prior_concessions_text = rc.canonical_prior_concessions(
+            state.get("debt", []), lineage.active(),
+        )
+    except rc.CensusError as exc:
+        raise _staged_error(
+            str(exc), role=f"{phase}-preflight", kind="validation",
+        ) from exc
     plan_correction_units: tuple[str, ...] | None = None
     if phase == "correction":
         try:
@@ -1369,6 +1427,7 @@ def _staged_structural_review(
             value, issues = sp.decode_decision_with_issues(
                 text, mode=mode, role=role, active_classes=active_classes,
                 durable_debt=state.get("debt", []),
+                prior_concessions=prior_concessions,
             )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
@@ -1383,6 +1442,7 @@ def _staged_structural_review(
                 assessment_evidence=assessment_evidence,
                 active_classes=active_classes,
                 durable_debt=state.get("debt", []),
+                prior_concessions=prior_concessions,
             )
         except sp.ProtocolError as exc:
             issues.extend(str(exc).splitlines())
@@ -1472,6 +1532,7 @@ def _staged_structural_review(
         lane_prompts = {
             lane:_staged_lane_prompt(
                 mode=mode, lane=lane, active_classes=active_classes, body=body,
+                prior_concessions_text=prior_concessions_text,
                 plan_contract=plan_contract,
             )
             for lane in lanes
@@ -1482,6 +1543,7 @@ def _staged_structural_review(
         consolidation_context = json.dumps({
             "role": "census", "stakes": stakes,
             "active_classes": active_classes, "existing_debt": existing_debt,
+            "prior_concessions": prior_concessions,
         }, ensure_ascii=False, separators=(",", ":"))
         if len(consolidation_context) > sp.MAX_CONSOLIDATION_CONTEXT_CHARS:
             raise _staged_error(
@@ -1612,12 +1674,14 @@ def _staged_structural_review(
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
             "existing_debt": existing_debt,
+            "prior_concessions": prior_concessions,
         }, ensure_ascii=False, separators=(",", ":"))
         try:
             prompt = prompts.compose(
                 f"{prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)}\n"
                 f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
-                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes)}",
+                f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
+                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes, prior_concessions=prior_concessions)}",
                 consolidation_body,
             )
             prompt_issue = _staged_prompt_issue(
@@ -1636,6 +1700,7 @@ def _staged_structural_review(
                 web_search=web_search,
                 response_schema=sp.provider_schema(sp.decision_schema(
                     mode, "census", active_classes=active_classes,
+                    prior_concessions=prior_concessions,
                 )),
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
@@ -1691,6 +1756,7 @@ def _staged_structural_review(
         stage_task = {
             "role": role, "stakes": stakes, "existing_debt": open_debt,
             "active_classes": active_classes,
+            "prior_concessions": prior_concessions,
             "correction_gates": correction_gates if role == "correction" else [],
             "checklist": list(sp.CHECKLIST) if role == "final" or closure_candidate else [],
             "artifact": body,
@@ -1711,10 +1777,12 @@ def _staged_structural_review(
             mode, role, active_classes=active_classes,
             outcome_class_ids=outcome_class_ids,
             correction_gates=correction_gates if role == "correction" else (),
+            prior_concessions=prior_concessions,
         )
         prompt = prompts.compose(
             f"{followup_instructions}\n"
             f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
+            f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
             f"{decision_instructions}",
             stage_body,
         )
@@ -1732,6 +1800,7 @@ def _staged_structural_review(
             response_schema=sp.provider_schema(sp.decision_schema(
                 mode, role, active_classes=active_classes,
                 outcome_class_ids=outcome_class_ids,
+                prior_concessions=prior_concessions,
             )),
             parser=lambda text: validate_settlement(
                 text, source_ids=[],
@@ -2607,34 +2676,10 @@ def critique_plan(
             closure.release()
             raise
 
-    if closure and closure.lineage is not None:
-        prior_review = closure.lineage.review_state
-        current_stakes_digest = rc.digest(stakes or "")
-        claim_history = pc.normalize_state(closure.lineage.claim_state)
-        unknown_calibration = (
-            not isinstance(prior_review, dict)
-            or prior_review.get("version") != 1
-            or prior_review.get("stakes_digest") != current_stakes_digest
-        )
-        has_prior_state = bool(
-            closure.lineage.rounds or closure.lineage.classes
-            or claim_history["claims"] or claim_history.get("debt")
-            or claim_history.get("plan_snapshot")
-        )
-        if (
-            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
-            and unknown_calibration and has_prior_state
-        ):
-            # Structural calibration and claim authority share the same stakes. When the
-            # claim phase is disabled, retain its packets exactly but remember that no
-            # verdict may freeze across this transition. The next enabled call performs
-            # a full audit over that preserved inventory.
-            closure.lineage.claim_reverify_required = True
-            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
-            closure.reopened_class_ids = tuple(dict.fromkeys(
-                (*closure.reopened_class_ids, *stakes_reopened)
-            ))
-            blocks = closure._blocks()
+    claim_history = pc.normalize_state(
+        closure.lineage.claim_state
+        if closure and closure.lineage is not None else None
+    )
     claim_state: dict[str, Any] = (
         closure.lineage.claim_state
         if closure and closure.lineage is not None
@@ -2674,6 +2719,8 @@ def critique_plan(
         structural_snapshot = rc.digest(f"{plan_text}\0{snapshot}")
         if closure.lineage:
             try:
+                if closure.preflight_validation_error is not None:
+                    raise closure.preflight_validation_error
                 normalized_structural_state = rc.normalize_state(
                     closure.lineage.review_state, stakes=stakes or "",
                     snapshot=structural_snapshot,
@@ -2720,6 +2767,31 @@ def critique_plan(
                 )
                 attempt_ledger.extend(structural_attempts)
                 staged_preflight_failed = True
+    if closure and closure.lineage is not None and not staged_preflight_failed:
+        prior_review = closure.lineage.review_state
+        current_stakes_digest = rc.digest(stakes or "")
+        unknown_calibration = (
+            not isinstance(prior_review, dict)
+            or prior_review.get("version") != 1
+            or prior_review.get("stakes_digest") != current_stakes_digest
+        )
+        has_prior_state = bool(
+            closure.lineage.rounds or closure.lineage.classes
+            or claim_history["claims"] or claim_history.get("debt")
+            or claim_history.get("plan_snapshot")
+        )
+        if (
+            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+            and unknown_calibration and has_prior_state
+        ):
+            # Do not mutate the active class view until the complete durable structural
+            # register has passed its raw concession/debt preflight above.
+            closure.lineage.claim_reverify_required = True
+            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
+            closure.reopened_class_ids = tuple(dict.fromkeys(
+                (*closure.reopened_class_ids, *stakes_reopened)
+            ))
+            blocks = closure._blocks()
     if claim_verification and not staged_preflight_failed:
         claim_started = time.monotonic()
         if closure and closure.unavailable:
@@ -4683,9 +4755,10 @@ def rebut(
                     draft = cc.copy_lineage(lineage)
                     draft.review_state = rc.settle_rebut_concession(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
-                        evidence=rebut_evidence,
+                        reason=parsed["reason"], evidence=rebut_evidence,
                         blocking_class_ids=[item.class_id for item in draft.blocking()],
                         engine_name=engine.name,
+                        active_classes=draft.active(),
                     )
                     still_bound = any(
                         row.get("status") == "open"
@@ -4777,6 +4850,7 @@ class _ClosureRound:
         self.claims_enabled = False
         self.reopened_class_ids: tuple[str, ...] = ()
         self.prepared_lineage: cc.Lineage | None = None
+        self.preflight_validation_error: rc.CensusError | None = None
         self.correction_gates: list[dict[str, Any]] = []
         self._latched = latch_owned
         self._settled = False
@@ -4804,6 +4878,31 @@ class _ClosureRound:
         # Rejection atomicity is defined from this point. Branch sweeps, exemption
         # folding and stakes reopenings are provisional until staged settlement saves.
         self.prepared_lineage = cc.copy_lineage(self.lineage)
+        raw_state = self.lineage.review_state
+        if raw_state != {}:
+            active = [
+                item for item in self.lineage.classes.values()
+                if item.status != cc.SUPERSEDED
+            ]
+            try:
+                validation_state = raw_state
+                if (
+                    isinstance(raw_state, dict)
+                    and raw_state.get("phase") == "final"
+                    and "final_engine" not in raw_state
+                ):
+                    # Preserve the existing ownerless-final migration: validate the
+                    # exact server normalization that will re-enter cold census.
+                    validation_state = dict(raw_state)
+                    rc.set_phase(validation_state, "census")
+                rc.validate_persisted_state(
+                    validation_state, active, correction_control_source=raw_state,
+                )
+            except rc.CensusError as exc:
+                # The staged public preflight persists the bounded diagnostic. Do not
+                # sweep, project, or render a class view from invalid durable authority.
+                self.preflight_validation_error = exc
+                return []
         self._before_sweep()
         closed_before = {
             item.class_id for item in self.lineage.active()
@@ -4819,6 +4918,8 @@ class _ClosureRound:
     def require_forward_round(self) -> None:
         """Reject replayed/decreasing tracked labels before any provider or snapshot work."""
         if self.lineage is None:
+            return
+        if self.preflight_validation_error is not None:
             return
         last = self.lineage.review_state.get("last_round")
         if type(last) is int and self.round_no <= last:

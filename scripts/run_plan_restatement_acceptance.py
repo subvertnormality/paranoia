@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -210,6 +211,61 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
     }
 
 
+def _historical_no_concession_prompt(prompt: str) -> str:
+    """Project a current empty-concession prompt to this pre-cutover artifact."""
+    prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
+    start = " concession_challenges is a closed object"
+    finish = "Never put class_id inside an outcome or action value."
+    if start in prompt:
+        begin = prompt.index(start)
+        end = prompt.index(finish, begin)
+        prompt = prompt[:begin] + " " + prompt[end:]
+    marker = "===== TASK INPUT =====\n\n"
+    head, found, task_text = prompt.partition(marker)
+    if found and task_text.startswith("{"):
+        task = json.loads(task_text)
+        prior = task.pop("prior_concessions", None)
+        if prior not in (None, [], {}):
+            raise ValueError("historical replay cannot discard a concession")
+        compact = task_text.startswith('{"role":"census"')
+        task_text = json.dumps(
+            task, ensure_ascii=False,
+            separators=(",", ":") if compact else None,
+        )
+        prompt = head + found + task_text
+    return prompt
+
+
+def _historical_no_concession_invocation(
+    prompt: str, args: tuple, kwargs: dict,
+) -> dict:
+    """Bind current replay to the exact pre-cutover prompt and schema."""
+    value = _invocation(prompt, args, kwargs)
+    value["prompt_sha256"] = _sha_text(_historical_no_concession_prompt(prompt))
+    schema = deepcopy(value["response_schema"])
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+    if "concession_challenges" in properties:
+        properties.pop("concession_challenges")
+        if "concession_challenges" not in required:
+            raise ValueError("current replay schema does not require concession_challenges")
+        required.remove("concession_challenges")
+    value["response_schema"] = schema
+    value["response_schema_sha256"] = _sha_text(json.dumps(
+        schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ))
+    return value
+
+
+def _pre_concession_response(text: str) -> str:
+    """Add the only valid challenge map for a lineage with no concessions."""
+    wire = json.loads(text)
+    if "concession_challenges" in wire:
+        raise ValueError("historical response unexpectedly owns a concession challenge")
+    wire["concession_challenges"] = {}
+    return json.dumps(wire, ensure_ascii=False, separators=(",", ":"))
+
+
 def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
     classes: dict[str, cc.TrackedClass] = {}
     debt: list[dict] = []
@@ -290,13 +346,16 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
             manifests.append(value)
         sources = [finding for manifest in manifests for finding in manifest["findings"]]
         settlement = sp.materialize_decision(
-            responses[3], mode=cc.PLAN_MODE, role="census",
+            _pre_concession_response(responses[3]),
+            mode=cc.PLAN_MODE, role="census",
             source_ids=[finding["id"] for finding in sources],
             source_severities={finding["id"]:finding["severity"] for finding in sources},
             source_evidence={finding["id"]:finding["evidence"] for finding in sources},
             assessment_verdicts={}, assessment_findings={}, assessment_evidence={},
             active_classes=[], durable_debt=[],
         )
+        if settlement.pop("concession_challenges", None) != []:
+            raise ValueError("historical census concession projection is not empty")
         return {"manifests":manifests, "settlement":settlement}
 
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
@@ -306,9 +365,12 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
     )
     role = roles[0]
     settlement = sp.materialize_decision(
-        responses[0], mode=cc.PLAN_MODE, role=role,
+        _pre_concession_response(responses[0]),
+        mode=cc.PLAN_MODE, role=role,
         active_classes=task["active_classes"], durable_debt=durable_debt,
     )
+    if settlement.pop("concession_challenges", None) != []:
+        raise ValueError("historical follow-up concession projection is not empty")
     return {"manifests":[], "settlement":settlement}
 
 
@@ -327,20 +389,22 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
         expected = [
             handlers._staged_lane_prompt(
                 mode=cc.PLAN_MODE, lane=lane, active_classes=[], body=body,
+                prior_concessions_text="{}",
             )
             for lane in sp.LANES[cc.PLAN_MODE]
         ]
         consolidation_body = json.dumps({
             "role":"census", "stakes":STAKES, "manifests":manifests,
-            "active_classes":[], "existing_debt":[],
+            "active_classes":[], "existing_debt":[], "prior_concessions":{},
         }, ensure_ascii=False, separators=(",", ":"))
         expected.append(prompts.compose(
             f"{prompts.staged_consolidation_instructions(cc.PLAN_MODE)}\n"
             f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
-            f"{sp.class_decision_instructions(cc.PLAN_MODE, 'census', active_classes=[])}",
+            "PRIOR CONCESSIONS: {}\n"
+            f"{sp.class_decision_instructions(cc.PLAN_MODE, 'census', active_classes=[], prior_concessions={})}",
             consolidation_body,
         ))
-        return expected
+        return [_historical_no_concession_prompt(item) for item in expected]
 
     role = roles[0]
     if role == "final":
@@ -363,6 +427,7 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     expected_task = {
         "role":role, "stakes":STAKES, "existing_debt":debt,
         "active_classes":handlers._active_class_rows(lineage, cc.PLAN_MODE),
+        "prior_concessions":{},
         "correction_gates":[],
         "checklist":list(sp.CHECKLIST) if role == "final" else [],
         "artifact":f"=== REVIEW STAKES ===\n{STAKES}\n\n{body}",
@@ -370,7 +435,9 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     if role == "correction":
         expected_task["review_scope"] = "targeted"
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
-    if task != expected_task:
+    historical_task = dict(expected_task)
+    historical_task.pop("prior_concessions")
+    if task != historical_task:
         raise ValueError("targeted prompt task differs from its seeded production reconstruction")
     outcome_ids = sp.expected_outcome_class_ids(
         role, active_classes=task["active_classes"],
@@ -379,9 +446,12 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     instructions = (
         f"{prompts.staged_followup_instructions(cc.PLAN_MODE)}\n"
         f"{sp.citation_instructions(cc.PLAN_MODE)}\n"
-        f"{sp.class_decision_instructions(cc.PLAN_MODE, role, active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[])}"
+        "PRIOR CONCESSIONS: {}\n"
+        f"{sp.class_decision_instructions(cc.PLAN_MODE, role, active_classes=task['active_classes'], outcome_class_ids=outcome_ids, correction_gates=[], prior_concessions={})}"
     )
-    return [prompts.compose(instructions, json.dumps(expected_task, ensure_ascii=False))]
+    return [_historical_no_concession_prompt(
+        prompts.compose(instructions, json.dumps(expected_task, ensure_ascii=False)),
+    )]
 
 
 def _replay_public_handler(artifact: dict, source_tree: str) -> None:
@@ -395,6 +465,17 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
     original_resume = engines.CodexEngine.resume
     original_head = orientation.resolve_head
     original_tree = orientation.snapshot_tree
+    original_decode = sp.decode_decision_with_issues
+    original_materialize = sp.materialize_decision_value
+
+    def replay_decode(text: str, *args, **kwargs):
+        return original_decode(_pre_concession_response(text), *args, **kwargs)
+
+    def replay_materialize(*args, **kwargs):
+        settlement = original_materialize(*args, **kwargs)
+        if settlement.pop("concession_challenges", None) != []:
+            raise ValueError("historical handler concession projection is not empty")
+        return settlement
     previous_root = os.environ.get(cc.STATE_ROOT_ENV)
     with tempfile.TemporaryDirectory(prefix="plan-restatement-replay-") as raw_root:
         replay_root = Path(raw_root)
@@ -422,7 +503,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     raise ValueError("retained route contains duplicate provider prompts")
 
                 def playback_run(self, prompt, *args, **kwargs):
-                    actual = _invocation(prompt, args, kwargs)
+                    actual = _historical_no_concession_invocation(prompt, args, kwargs)
                     matched = pending.pop(actual["prompt_sha256"], None)
                     if matched is None:
                         raise ValueError("public-handler replay admitted an unknown provider call")
@@ -441,6 +522,8 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                 engines.CodexEngine.resume = lambda *args, **kwargs: playback_run(
                     args[0], args[2], *args[3:], **kwargs
                 )
+                sp.decode_decision_with_issues = replay_decode
+                sp.materialize_decision_value = replay_materialize
                 log_dir = replay_root / f"{name}-logs"
                 result = handlers.critique_plan({
                     "repo_path":str(ROOT), "plan_text":plan,
@@ -466,6 +549,8 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
         finally:
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
+            sp.decode_decision_with_issues = original_decode
+            sp.materialize_decision_value = original_materialize
             orientation.resolve_head = original_head
             orientation.snapshot_tree = original_tree
             if previous_root is None:

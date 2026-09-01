@@ -34,7 +34,7 @@ MAX_RATIONALE_CHARS = 500
 MAX_ISSUES = 24
 MAX_ISSUE_CHARS = 8_000
 MAX_LANE_FINDINGS = 100
-MAX_ACTIVE_CLASSES = 100
+MAX_ACTIVE_CLASSES = cc.MAX_ACTIVE_CLASSES
 MAX_CENSUS_SOURCES = len(LANES[cc.PLAN_MODE]) * MAX_LANE_FINDINGS
 # One source normally produces one governing finding.  Fan-out may additionally
 # produce one distinct existing-class finding for every active class.
@@ -74,6 +74,7 @@ def class_decision_instructions(
     mode: str, role: str, *, active_classes: Sequence[dict[str, Any]],
     outcome_class_ids: Sequence[str] = (),
     correction_gates: Sequence[dict[str, Any]] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     """Render the keyed surface and canonical action rules beside the schema."""
     if mode not in {cc.PLAN_MODE, cc.BRANCH_MODE}:
@@ -123,6 +124,15 @@ def class_decision_instructions(
             "valid replacement, while satisfied open unmechanized state closes by "
             "derivation; retaining a blocking severity does not satisfy the gate."
         )
+    concession_ids = list((prior_concessions or {}).keys())
+    concession_guidance = (
+        " concession_challenges is a closed object keyed by exactly these durable "
+        f"concession class IDs: {json.dumps(concession_ids, ensure_ascii=False)}. "
+        "Every key is required. Use null unless this response newly targets that class "
+        "with an existing-class finding, reopen, or replacement. A targeted class must "
+        "instead supply the exact projected debt_id plus a bounded reason and new "
+        "repository/plan evidence that contradicts or invalidates the concession."
+    )
     return (
         "class_outcomes is a closed object keyed by exactly these required class IDs: "
         f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
@@ -135,7 +145,7 @@ def class_decision_instructions(
         "violated; outcome-free standalone lifecycle actions remain legal only as listed. "
         "Reclassify and replace may retain or strengthen severity but never downgrade. "
         "Replacement preserves a mechanized class; use only a listed replacement form. "
-        f"{gate_guidance} Never put class_id inside "
+        f"{gate_guidance}{concession_guidance} Never put class_id inside "
         "an outcome or action value."
     )
 
@@ -440,6 +450,37 @@ def _class_action_body(mode: str, cls: dict[str, Any]) -> dict[str, Any]:
     return {"anyOf": alternatives}
 
 
+def _concession_challenge(*, debt_id: str, canonical: bool = False) -> dict[str, Any]:
+    evidence = _array(
+        _anchor() if canonical else _citation(),
+        maximum=20, minimum=1, unique=canonical,
+    )
+    return {"anyOf":[
+        {"type":"null"},
+        _object({
+            "debt_id": _string(120, const=debt_id),
+            "reason": _string(4_000),
+            "evidence": evidence,
+        }),
+    ]}
+
+
+def _canonical_concession_challenge() -> dict[str, Any]:
+    return _object({
+        "class_id": _string(120),
+        "challenge": {"anyOf":[
+            {"type":"null"},
+            _object({
+                "debt_id": _string(120),
+                "reason": _string(4_000),
+                "evidence": _array(
+                    _anchor(), maximum=20, minimum=1, unique=True,
+                ),
+            }),
+        ]},
+    })
+
+
 def lane_schema(mode: str, lane: str, *, canonical: bool = False) -> dict[str, Any]:
     if lane not in LANES.get(mode, ()):
         raise ValueError(f"invalid staged lane {lane!r} for {mode!r}")
@@ -462,6 +503,7 @@ def decision_schema(
     mode: str, role: str, *, canonical: bool = False,
     active_classes: Sequence[dict[str, Any]] | None = None,
     outcome_class_ids: Sequence[str] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if mode not in LANES:
         raise ValueError(f"invalid staged mode {mode!r}")
@@ -481,6 +523,16 @@ def decision_schema(
         ),
     }
     definitions: dict[str, Any] = {}
+    concessions = prior_concessions or {}
+    if canonical:
+        properties["concession_challenges"] = _array(
+            _canonical_concession_challenge(), maximum=MAX_ACTIVE_CLASSES,
+        )
+    else:
+        properties["concession_challenges"] = _object({
+            cid:_concession_challenge(debt_id=row["debt_id"])
+            for cid, row in concessions.items()
+        })
     if role != "census":
         if canonical:
             properties["class_outcomes"] = _array(
@@ -751,6 +803,12 @@ def project_decision_wire(value: dict[str, Any]) -> dict[str, Any]:
             for class_id, body in rows.items()
             if body is not None
         ]
+    challenges = projected.get("concession_challenges")
+    if isinstance(challenges, dict):
+        projected["concession_challenges"] = [
+            {"class_id":class_id, "challenge":body}
+            for class_id, body in challenges.items()
+        ]
     return projected
 
 
@@ -762,7 +820,7 @@ def _pointer_token(value: str) -> str:
 def _wire_class_pointers(value: dict[str, Any]) -> dict[str, dict[str, str]]:
     """Retain provider-facing keyed locations across canonical projection."""
     result: dict[str, dict[str, str]] = {}
-    for label in ("class_outcomes", "class_actions"):
+    for label in ("class_outcomes", "class_actions", "concession_challenges"):
         rows = value.get(label)
         if isinstance(rows, dict):
             result[label] = {
@@ -794,7 +852,7 @@ def _remap_class_schema_issues(
 ) -> list[str]:
     """Translate canonical array-row issues back to fresh provider wire keys."""
     replacements: list[tuple[str, str]] = []
-    for label in ("class_outcomes", "class_actions"):
+    for label in ("class_outcomes", "class_actions", "concession_challenges"):
         keyed = value.get("_wire_class_pointers", {}).get(label, {})
         for index, row in enumerate(value.get(label, [])):
             pointer = keyed.get(row["class_id"])
@@ -905,6 +963,7 @@ def decode_decision_with_issues(
     text: str, *, mode: str, role: str,
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the decision wire shape and retain canonical issues for fan-in."""
     outcome_ids = expected_outcome_class_ids(
@@ -915,6 +974,7 @@ def decode_decision_with_issues(
         decision_schema(
             mode, role, active_classes=active_classes,
             outcome_class_ids=outcome_ids,
+            prior_concessions=prior_concessions,
         ),
         max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
@@ -925,6 +985,7 @@ def decode_decision_with_issues(
         decision_schema(
             mode, role, canonical=True, active_classes=active_classes,
             outcome_class_ids=outcome_ids,
+            prior_concessions=prior_concessions,
         ),
     )
     canonical["_wire_class_pointers"] = wire_pointers
@@ -937,11 +998,13 @@ def decode_decision(
     text: str, *, mode: str, role: str,
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Decode and structurally validate a decision before semantic layers run."""
     value, issues = decode_decision_with_issues(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
+        prior_concessions=prior_concessions,
     )
     _raise_semantic_issues(issues)
     return value
@@ -1059,9 +1122,14 @@ def materialize_decision_value(
     assessment_evidence: dict[str, Sequence[str]] | None = None,
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Validate a decoded semantic decision and project it to durable V1 shape."""
     value = deepcopy(value)
+    # Historical canonical acceptance rows predate the fresh wire field. Fresh
+    # provider replies remain closed and require the keyed object in decision_schema.
+    if not prior_concessions:
+        value.setdefault("concession_challenges", [])
     issues: list[str] = []
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
@@ -1081,6 +1149,16 @@ def materialize_decision_value(
     classes = {row["class_id"]: row for row in active_classes}
     if len(classes) != len(active_classes):
         issues.append("/active_classes: duplicate class_id")
+    concessions = prior_concessions or {}
+    challenge_pointers = _class_row_pointers(value, "concession_challenges")
+    challenges = _unique(
+        value["concession_challenges"], "class_id", "concession_challenges", issues,
+    )
+    if set(challenges) != set(concessions):
+        issues.append(
+            f"/concession_challenges: expected exactly {sorted(concessions)}, "
+            f"got {sorted(challenges)}"
+        )
     debt_by_id = {
         row["id"]: row for row in durable_debt
         if isinstance(row, dict) and isinstance(row.get("id"), str)
@@ -1429,6 +1507,30 @@ def materialize_decision_value(
     actions = _unique(
         value["class_actions"], "class_id", "class_actions", issues,
     )
+    challenge_targets = set(existing_findings) | {
+        cid for cid, action in actions.items()
+        if action.get("kind") in {"reopen", "replace"}
+    }
+    for cid, row in challenges.items():
+        pointer = challenge_pointers.get(cid, "/concession_challenges")
+        challenge = row["challenge"]
+        targeted = cid in challenge_targets
+        if targeted and challenge is None:
+            issues.append(
+                f"{pointer}: newly targeting a conceded class requires an "
+                "evidence-backed concession challenge"
+            )
+            continue
+        if not targeted and challenge is not None:
+            issues.append(
+                f"{pointer}: challenge must be null when this response does not "
+                "newly target the conceded class"
+            )
+            continue
+        if challenge is not None:
+            expected_debt = concessions.get(cid, {}).get("debt_id")
+            if challenge.get("debt_id") != expected_debt:
+                issues.append(f"{pointer}/challenge/debt_id: must name {expected_debt!r}")
     derived_actions: list[tuple[dict[str, Any], str]] = []
     for cid, action in actions.items():
         action_pointer = action_pointers[cid]
@@ -1571,6 +1673,7 @@ def materialize_decision_value(
         "class_assessments": materialized_assessments,
         "_finding_class_refs": finding_class,
         "_class_record_pointers": class_record_pointers,
+        "concession_challenges": deepcopy(value["concession_challenges"]),
     }
     if role == "final":
         result["coverage"] = value["coverage"]
@@ -1588,11 +1691,13 @@ def materialize_decision(
     assessment_evidence: dict[str, Sequence[str]] | None = None,
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
+    prior_concessions: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Decode one semantic decision and project it to the durable V1 shape."""
     value = decode_decision(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
+        prior_concessions=prior_concessions,
     )
     return materialize_decision_value(
         value, mode=mode, role=role, source_ids=source_ids,
@@ -1602,4 +1707,5 @@ def materialize_decision(
         assessment_findings=assessment_findings,
         assessment_evidence=assessment_evidence,
         active_classes=active_classes, durable_debt=durable_debt,
+        prior_concessions=prior_concessions,
     )

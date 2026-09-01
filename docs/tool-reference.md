@@ -150,6 +150,10 @@ settlement. Bound citations use the staged anchor grammar and resolve before any
 write; plan anchors also require the retained reviewed-plan line bound. Mechanized
 branch classes are refused before provider spend because
 their canonical predicate sweep, not a model concession, owns closure.
+A conceded debt retains the original finding and a separate durable concession.
+Later staged decisions must submit a keyed, evidence-backed challenge before they
+can target that class again; an unrelated snapshot or stakes change does not erase
+the concession.
 
 ## `arbitrate`
 

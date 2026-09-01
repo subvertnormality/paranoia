@@ -59,6 +59,28 @@ def _sha_text(value: str) -> str:
     return _sha_bytes(value.encode("utf-8", "surrogatepass"))
 
 
+def _historical_no_concession_prompt(prompt: str) -> str:
+    """Project the empty-concession additions out of this retained prompt."""
+    prompt = prompt.replace("PRIOR CONCESSIONS: {}\n", "")
+    start = " concession_challenges is a closed object"
+    finish = "Never put class_id inside an outcome or action value."
+    if start in prompt:
+        begin = prompt.index(start)
+        end = prompt.index(finish, begin)
+        prompt = prompt[:begin] + " " + prompt[end:]
+    marker = "===== TASK INPUT =====\n\n"
+    head, found, task_text = prompt.partition(marker)
+    if found and task_text.startswith("{"):
+        task = json.loads(task_text)
+        prior = task.pop("prior_concessions", None)
+        if prior not in (None, [], {}):
+            raise ValueError(
+                f"historical replay cannot discard a concession: {prior!r}"
+            )
+        prompt = head + found + json.dumps(task, ensure_ascii=False)
+    return prompt
+
+
 def _git(*args: str, cwd: Path = ROOT, env: dict[str, str] | None = None) -> str:
     return subprocess.run(
         ["git", *args], cwd=cwd, env=env, check=True,
@@ -227,14 +249,24 @@ def validate_artifact(
         raise ValueError("before-lineage envelope is not closed and exact")
     active = before["classes"]
     durable_debt = before["review_state"]["debt"]
+    # This retained exchange predates the required issue #94 wire member. The
+    # fixture has no prior concessions, so project only the uniquely valid empty
+    # map for replay; keep the provider text and its digest unchanged.
+    replay_wire = json.loads(calls[-1]["response_text"])
+    if "concession_challenges" in replay_wire:
+        raise ValueError("historical response unexpectedly owns a concession challenge")
+    replay_wire["concession_challenges"] = {}
     decoded = sp.decode_decision(
-        calls[-1]["response_text"], mode=cc.BRANCH_MODE, role="correction",
+        json.dumps(replay_wire, separators=(",", ":")),
+        mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=durable_debt,
     )
     replayed_settlement = sp.materialize_decision_value(
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=durable_debt,
     )
+    if replayed_settlement.pop("concession_challenges", None) != []:
+        raise ValueError("historical concession projection is not empty")
     if replayed_settlement != artifact["settlement"]:
         raise ValueError("retained provider response does not materialize to settlement")
     settlement = artifact["settlement"]
@@ -318,6 +350,16 @@ def validate_artifact(
         replay_index = 0
         original_run = engines.CodexEngine.run
         original_resume = engines.CodexEngine.resume
+        original_decode = sp.decode_decision_with_issues
+
+        def replay_decode(text: str, *args, **kwargs):
+            wire = json.loads(text)
+            if "concession_challenges" in wire:
+                raise ValueError(
+                    "historical response unexpectedly owns a concession challenge"
+                )
+            wire["concession_challenges"] = {}
+            return original_decode(json.dumps(wire, separators=(",", ":")), *args, **kwargs)
 
         def replay_reply(prompt: str) -> Review:
             nonlocal replay_index
@@ -339,6 +381,7 @@ def validate_artifact(
 
         engines.CodexEngine.run = replay_run
         engines.CodexEngine.resume = replay_resume
+        sp.decode_decision_with_issues = replay_decode
         try:
             replay_result = handlers.critique_branch(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
@@ -350,11 +393,14 @@ def validate_artifact(
         finally:
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
+            sp.decode_decision_with_issues = original_decode
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
                 os.environ[cc.STATE_ROOT_ENV] = prior_root
-        if replay_prompts != [row["prompt_text"] for row in calls]:
+        if [
+            _historical_no_concession_prompt(prompt) for prompt in replay_prompts
+        ] != [row["prompt_text"] for row in calls]:
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")

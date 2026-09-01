@@ -536,7 +536,7 @@ def test_public_handlers_migrate_legacy_unowned_final_before_provider_spend(
     assert "CONVERGENCE: BLOCKED" in result
 
 
-def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
+def _followup_fixture(tmp_path, *, mode, phase, class_count=1, concessions=False):
     anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
     (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
     classes = {}
@@ -555,7 +555,18 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor], "remedy":"repair it", "source_ids":[],
                 "class_ids":[class_id], "first_round":1, "last_round":1,
             })
-    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
+    if concessions:
+        debt = [{
+            "id":f"C{index}", "finding_id":f"CF{index}", "status":"closed",
+            "severity":cc.MAJOR, "summary":"conceded demand",
+            "evidence":[anchor], "remedy":"do not repeat it", "source_ids":[],
+            "class_ids":[f"class-{index}"], "first_round":1, "last_round":1,
+            "concession":{
+                "version":1, "reason":"the prior demand was disproved",
+                "evidence":[anchor], "snapshot_digest":rc.digest("p"), "round":1,
+            },
+        } for index in range(class_count)] + debt
     state.update(phase=phase, debt=debt, last_round=1)
     if phase == "final":
         state["final_engine"] = "fake"
@@ -598,6 +609,9 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor],
             } for index in range(class_count)],
             "class_actions":{f"class-{index}":None for index in range(class_count)},
+            "concession_challenges":{
+                f"class-{index}":None for index in range(class_count)
+            } if concessions else {},
         }
     else:
         value = {
@@ -608,6 +622,9 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor],
             } for index in range(class_count)],
             "class_actions":{f"class-{index}":None for index in range(class_count)},
+            "concession_challenges":{
+                f"class-{index}":None for index in range(class_count)
+            } if concessions else {},
         }
         if mode == cc.BRANCH_MODE:
             for row in value["coverage"]:
@@ -628,6 +645,50 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
             return self.run(prompt, *args, **kwargs)
 
     return Closure(), Engine(), anchor
+
+
+@pytest.mark.parametrize("phase", ["correction", "final"])
+def test_public_plan_followups_project_and_preserve_clean_concessions(tmp_path, phase):
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase=phase, concessions=True,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    prompt = engine.calls[0][0]
+    expected = rc.canonical_prior_concessions(
+        closure.lineage.review_state["debt"], closure.lineage.active(),
+    )
+    assert f"PRIOR CONCESSIONS: {expected}" in prompt
+    assert closure.staged_settlement["concession_challenges"] == [{
+        "class_id":"class-0", "challenge":None,
+    }]
+    history = next(
+        row for row in closure.lineage.review_state["debt"] if row["id"] == "C0"
+    )
+    assert history["concession"]["reason"] == "the prior demand was disproved"
+
+
+@pytest.mark.parametrize("phase", ["correction", "final"])
+def test_plan_backed_branch_followups_project_clean_concessions(tmp_path, phase):
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.BRANCH_MODE, phase=phase, concessions=True,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+        branch_contract_section="=== IMPLEMENTATION PLAN CONTRACT ===\n00001: contract",
+    )
+    expected = rc.canonical_prior_concessions(
+        closure.lineage.review_state["debt"], closure.lineage.active(),
+    )
+    assert f"PRIOR CONCESSIONS: {expected}" in engine.calls[0][0]
+    assert closure.staged_settlement["concession_challenges"] == [{
+        "class_id":"class-0", "challenge":None,
+    }]
 
 
 def _task_from_prompt(prompt: str) -> dict:
@@ -693,20 +754,20 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "7feff6a654de54fd12a1fe76c0bf4fe7768f29cf1a88fc77d98e1beea7b2cb88",
-        "1d4a43d7b46b4447884168b935ec249d8e1579623dff1da1a6df5528f1c5a54a",
+            "4cadc110ae7ec5207e1603ac326f59eedc958b778df511f616d34c8ae674e054",
+        "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-        "4d0d3562cd2957e35cb5ff9888f0f8958d4fd3519e719bb6920cc5ab65f1913e",
-        "c87e722ff6b8289abe33e42d5d444968483608ea2757f62c42e38895635b02e2",
+            "f6a5100df8b6e0ed9a1920fc3ade6499a07efc9d5c8e1374e6bcee6dbe108b40",
+        "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-        "5a640851dddb258a2c1f651a99bbbc759811d5cbeef24cf5c9f9f05cac09c061",
-        "7f4cbb976d006646cf85512fc7cc8bd57f5c1e05cff4ab92798d416bae8f4885",
+            "21e2abc00556b3b6dc48e2c3546d8409cb9bba87c235a5b647cdf146ea19ec2e",
+        "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
         "clear",
     ),
 ])
@@ -915,6 +976,12 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(
+        handlers.cc, "render_unmechanized",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("class rendering must not precede raw-state validation")
+        ),
+    )
     engine = handlers.eng.CodexEngine()
     result = handlers.critique_plan({
         "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
@@ -922,6 +989,7 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "PREFLIGHT")
     assert calls == []
     assert "CONVERGENCE: BLOCKED" in result
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
     )
@@ -940,6 +1008,118 @@ def test_public_plan_correction_preflights_debt_before_provider_spend(
     assert result.count("CONVERGENCE: BLOCKED") == 1
     assert "CLAIM-REGISTER:" in audit["rendered_trailer"]
     assert "CLAIM-CLOSURE:" in audit["rendered_trailer"]
+
+
+def test_malformed_plan_history_blocks_before_stakes_reopen(
+    repo, tmp_path, monkeypatch,
+):
+    state = rc.normalize_state(None, stakes="old stakes", snapshot="old")
+    state.update(phase="correction", debt=[{}], last_round=1)
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED, procedure="inspect it",
+    )
+    lineage_id = "malformed-history-before-stakes-reopen"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=state,
+    ))
+
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    result = handlers.critique_plan({
+        "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
+        "round":2, "stakes":"new stakes",
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+       now=lambda: "PREFLIGHT-BEFORE-REOPEN")
+
+    assert calls == []
+    assert "CONVERGENCE: BLOCKED" in result
+    assert "REOPEN-WAVE:" not in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert reloaded.classes["class-a"].status == cc.CLOSED
+    assert reloaded.review_state["debt"] == [{}]
+    assert reloaded.review_state["staged_failure"]["role"] == "correction-preflight"
+
+
+@pytest.mark.parametrize("mode,raw_state", [
+    (cc.PLAN_MODE, []),
+    (cc.PLAN_MODE, ""),
+    (cc.BRANCH_MODE, []),
+    (cc.PLAN_MODE, {
+        "version":0, "sentinel":{"keep":True}, "census_cache":{"keep":True},
+        "format_debt":{"old":"replace"},
+    }),
+    (cc.BRANCH_MODE, {
+        "version":0, "sentinel":{"keep":True}, "census_cache":{"keep":True},
+        "format_debt":{"old":"replace"},
+    }),
+])
+def test_public_handler_rejects_malformed_top_level_state_before_class_view(
+    repo, repo_with_branch, tmp_path, monkeypatch, mode, raw_state,
+):
+    raw_label = hashlib.sha256(
+        json.dumps(raw_state, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:8]
+    lineage_id = f"malformed-top-level-{mode}-{type(raw_state).__name__}-{raw_label}"
+    tracked = cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED, procedure="inspect it",
+    )
+    lineage = cc.Lineage(
+        lineage_id, mode=mode, rounds=1,
+        classes={tracked.class_id:tracked}, review_state=raw_state,
+    )
+    cc.save_lineage(cc.default_state_root(), lineage)
+    calls = []
+
+    def run(self, *args, **kwargs):
+        calls.append(args)
+        raise AssertionError("provider must not run")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("class view must not precede raw-state validation")
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.cc, "render_unmechanized", forbidden)
+    monkeypatch.setattr(handlers.cc, "sweep", forbidden)
+    engine = handlers.eng.CodexEngine()
+    if mode == cc.PLAN_MODE:
+        result = handlers.critique_plan({
+            "repo_path":str(repo), "plan_text":"# Plan\n", "lineage":lineage_id,
+            "round":2, "stakes":"s",
+        }, engine=engine, log_dir=tmp_path / "plan-logs", now=lambda: "TOP-PLAN")
+    else:
+        result = handlers.critique_branch({
+            "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+            "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
+            "class_closure":True,
+        }, engine=engine, log_dir=tmp_path / "branch-logs", now=lambda: "TOP-BRANCH")
+
+    assert calls == []
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
+    assert "CONVERGENCE: BLOCKED" in result
+    reloaded = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=mode,
+    )
+    if raw_state:
+        assert reloaded.review_state["version"] == 0
+        assert reloaded.review_state["sentinel"] == {"keep":True}
+        assert reloaded.review_state["census_cache"] == {"keep":True}
+        assert "format_debt" not in reloaded.review_state
+        assert reloaded.review_state["staged_failure"]["kind"] == "validation"
+    else:
+        assert reloaded.review_state == raw_state
+    assert reloaded.classes["class-a"].status == cc.CLOSED
 
 
 @pytest.mark.parametrize("malformed_debt", [
@@ -980,6 +1160,12 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
         raise AssertionError("provider must not run")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(
+        handlers.cc, "sweep",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("class sweep must not precede raw-state validation")
+        ),
+    )
     result = handlers.critique_branch({
         "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
         "lineage":lineage_id, "round":2, "stakes":"s", "converge":True,
@@ -988,6 +1174,7 @@ def test_public_branch_correction_preflights_debt_before_provider_spend(
        now=lambda: "BRANCH-PREFLIGHT")
     assert calls == []
     assert "CONVERGENCE: BLOCKED" in result
+    assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     reloaded = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
     )
@@ -1769,14 +1956,86 @@ def assert_five_headings(text):
 
 
 def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    artifact_path = root / "docs/keyed_class_handler_acceptance_2026-08-19.json"
     artifact = json.loads(
-        (Path(__file__).resolve().parents[1]
-         / "docs/keyed_class_handler_acceptance_2026-08-19.json").read_text()
+        artifact_path.read_text()
     )
     assert artifact["acceptance_kind"] == (
         "keyed-staged-class-decision-handler-lifecycle"
     )
     assert artifact["version"] == 1
+    committed = json.loads(subprocess.run(
+        ["git", "show", f"HEAD:{artifact_path.relative_to(root)}"], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout)
+    assert committed == artifact
+    spec = importlib.util.spec_from_file_location(
+        "keyed_handler_acceptance", root / "scripts/run_keyed_handler_acceptance.py",
+    )
+    assert spec and spec.loader
+    acceptance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(acceptance)
+    revision = artifact["source_revision"]
+    assert revision == artifact["head_id"]
+    assert subprocess.run(
+        ["git", "rev-parse", f"{revision}^{{tree}}"], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout.strip() == artifact["source_tree"]
+    assert set(artifact["source_sha256"]) == set(acceptance.SOURCE_PATHS)
+    assert set(artifact["source_blob_ids"]) == set(acceptance.SOURCE_PATHS)
+    assert set(artifact["module_metrics"]) == set(acceptance.SOURCE_PATHS)
+    changed = set()
+    for relative, expected in artifact["source_sha256"].items():
+        historical = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"], cwd=root,
+            capture_output=True, check=True,
+        ).stdout
+        assert hashlib.sha256(historical).hexdigest() == expected
+        assert subprocess.run(
+            ["git", "rev-parse", f"{revision}:{relative}"], cwd=root,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip() == artifact["source_blob_ids"][relative]
+        assert artifact["module_metrics"][relative] == {
+            "bytes":len(historical), "lines":len(historical.splitlines()),
+        }
+        if (root / relative).read_bytes() == historical:
+            continue
+        changed.add(relative)
+        allowance = artifact["allowed_later_source_diffs"].get(relative)
+        assert isinstance(allowance, dict) and set(allowance) == {"scope", "sha256"}
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", revision, "--", relative], cwd=root,
+            capture_output=True, check=True,
+        ).stdout
+        assert hashlib.sha256(diff).hexdigest() == allowance["sha256"]
+        assert allowance["scope"].strip()
+    assert changed == set(artifact["allowed_later_source_diffs"])
+    reviewed = artifact["reviewed_diff"]
+    assert (reviewed["base"], reviewed["head"]) == (
+        artifact["base_id"], artifact["head_id"],
+    )
+    reviewed_diff = subprocess.run(
+        ["git", "diff", "--binary", reviewed["base"], reviewed["head"]], cwd=root,
+        capture_output=True, check=True,
+    ).stdout
+    assert hashlib.sha256(reviewed_diff).hexdigest() == reviewed["sha256"]
+    assert subprocess.run(
+        ["git", "diff", "--numstat", reviewed["base"], reviewed["head"]], cwd=root,
+        capture_output=True, text=True, check=True,
+    ).stdout.splitlines() == reviewed["numstat"]
+    assert artifact["census_cache"] is None
+    assert "does_not_prove" in artifact["acceptance_scope"]
+    assert artifact["expected_outcome"] == {
+        "phase":"correction", "convergence":"blocked",
+        "class_id":"acceptance-class", "class_status":"open",
+        "successor_blocking_debt":True,
+        "reason":(
+            "The seeded correction intentionally supplies new exact evidence against a "
+            "conceded class; successful challenge handling must reopen that class and "
+            "persist one successor blocking debt."
+        ),
+    }
     assert artifact["provider"]["engine"] == "codex"
     assert len(artifact["calls"]) == len(artifact["attempt_ledger"]) == 1
     call = artifact["calls"][0]
@@ -1785,6 +2044,17 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
     response = call["response_text"]
     assert hashlib.sha256(response.encode()).hexdigest() == call["response_sha256"]
     assert artifact["attempt_ledger"][0]["response_sha256"] == call["response_sha256"]
+    canonical = lambda value: json.dumps(  # noqa: E731
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    assert artifact["audit_bindings"] == {
+        "attempt_ledger_sha256":hashlib.sha256(
+            canonical(artifact["attempt_ledger"]).encode(),
+        ).hexdigest(),
+        "staged_settlement_sha256":hashlib.sha256(
+            canonical(artifact["settlement"]).encode(),
+        ).hexdigest(),
+    }
 
     after_class = artifact["after_lineage"]["classes"][0]
     active = [{
@@ -1794,20 +2064,24 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         "procedure":after_class["procedure"],
     }]
     debt = artifact["before_state"]["debt"]
+    prior_concessions = rc.prior_concessions(debt, active)
     expected_schema = sp.provider_schema(sp.decision_schema(
         cc.BRANCH_MODE, "correction", active_classes=active,
         outcome_class_ids=sp.expected_outcome_class_ids(
             "correction", active_classes=active, durable_debt=debt,
         ),
+        prior_concessions=prior_concessions,
     ))
     assert call["schema"] == expected_schema
     decoded = sp.decode_decision(
         response, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
+        prior_concessions=prior_concessions,
     )
     settlement = sp.materialize_decision_value(
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=debt,
+        prior_concessions=prior_concessions,
     )
     assert settlement == artifact["settlement"]
 
@@ -1842,7 +2116,10 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
     )
     assert replay_lineage.classes[tracked.class_id].status == cc.OPEN
     assert artifact["after_lineage"]["classes"][0]["status"] == cc.OPEN
-    assert artifact["after_lineage"]["review_state"]["debt"][0]["status"] == "open"
+    assert any(
+        row["status"] == "open" and row.get("class_ids") == ["acceptance-class"]
+        for row in artifact["after_lineage"]["review_state"]["debt"]
+    )
     result = artifact["result_text"]
     assert hashlib.sha256(result.encode()).hexdigest() == artifact["result_sha256"]
     assert "STRUCTURAL-PHASE: correction" in result
@@ -1872,6 +2149,7 @@ def wire_value(value):
     if isinstance(value, dict) and value.get("role") in {
         "census", "correction", "final",
     }:
+        value.setdefault("concession_challenges", {})
         for label in ("class_outcomes", "class_actions"):
             rows = value.get(label)
             if not isinstance(rows, list):
@@ -1881,6 +2159,11 @@ def wire_value(value):
                     key:child for key, child in row.items() if key != "class_id"
                 }
                 for row in rows
+            }
+        challenges = value.get("concession_challenges")
+        if isinstance(challenges, list):
+            value["concession_challenges"] = {
+                row["class_id"]:row["challenge"] for row in challenges
             }
     return value
 
@@ -4660,17 +4943,26 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         "source_ids":[], "class_ids":["class-b"], "first_round":2,
         "last_round":4, "reason":"open",
     }
-    state = rc.normalize_state(None, stakes="s", snapshot="p")
+    state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
     state.update(phase="correction", last_round=4, debt=[target, sibling])
+    active = [cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    )]
     before = json.loads(json.dumps(state))
     settled = rc.settle_rebut_concession(
-        state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+        state, debt_id="D1", class_id="class-a", reason="the demand is disproved",
+        evidence=["plan:3"], active_classes=active,
         blocking_class_ids=["class-a", "class-b"], engine_name="codex",
     )
     assert state == before
     assert settled["phase"] == "correction"
     assert settled["debt"][0]["status"] == "closed"
-    assert settled["debt"][0]["evidence"] == ["plan:3"]
+    assert settled["debt"][0]["evidence"] == ["plan:1"]
+    assert settled["debt"][0]["concession"] == {
+        "version":1, "reason":"the demand is disproved", "evidence":["plan:3"],
+        "snapshot_digest":rc.digest("p"), "round":4,
+    }
     assert "reason" not in settled["debt"][0]
     assert settled["debt"][1] == sibling
 
@@ -4679,15 +4971,132 @@ def test_rebut_concession_settlement_is_targeted_and_refuses_ambiguous_state():
         invalid[key] = ["blocked"] if key.endswith("classes") else {"blocked":True}
         with pytest.raises(rc.CensusError, match="unresolved structural state"):
             rc.settle_rebut_concession(
-                invalid, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+                invalid, debt_id="D1", class_id="class-a", reason="disproved",
+                evidence=["plan:3"], active_classes=active,
                 blocking_class_ids=["class-a", "class-b"], engine_name="codex",
             )
     with pytest.raises(rc.CensusError, match="unbound blocking classes"):
         rc.settle_rebut_concession(
-            state, debt_id="D1", class_id="class-a", evidence=["plan:3"],
+            state, debt_id="D1", class_id="class-a", reason="disproved",
+            evidence=["plan:3"], active_classes=active,
             blocking_class_ids=["class-a", "class-b", "class-c"],
             engine_name="codex",
         )
+
+
+def test_concession_history_is_closed_exact_and_survives_review_resets():
+    row = {
+        "id":"D1", "finding_id":"F1", "status":"closed", "severity":cc.MAJOR,
+        "summary":"historic demand", "evidence":["plan:1"], "remedy":"withdraw",
+        "source_ids":[], "class_ids":["class-a"], "first_round":1,
+        "last_round":4, "concession":{
+            "version":1, "reason":"the demand was disproved", "evidence":["plan:2"],
+            "snapshot_digest":"a" * 64, "round":4,
+        },
+    }
+    active = [cc.TrackedClass(
+        "class-a", "invariant", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    )]
+    assert rc.prior_concessions([row], active)["class-a"]["debt_id"] == "D1"
+    raw = rc.normalize_state(None, stakes="old", snapshot="b" * 64)
+    raw.update(phase="clear", debt=[row], last_round=4)
+    changed_snapshot = rc.normalize_state(raw, stakes="old", snapshot="c" * 64)
+    assert changed_snapshot["debt"] == [row]
+    changed_stakes = rc.normalize_state(raw, stakes="new", snapshot="d" * 64)
+    assert changed_stakes["debt"] == [row]
+
+    for mutate in (
+        lambda item:item["concession"].update(round=3),
+        lambda item:item["concession"].update(round=5),
+        lambda item:item.update(status="open"),
+        lambda item:item["concession"].update(snapshot_digest="A" * 64),
+        lambda item:item["concession"].update(extra=True),
+    ):
+        invalid = deepcopy(row)
+        mutate(invalid)
+        with pytest.raises(rc.CensusError):
+            rc.validate_persisted_debt([invalid])
+
+
+def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
+    active = [cc.TrackedClass(
+        f"class-{index:02d}", f"invariant {index}", cc.MAJOR, 1, cc.CLOSED,
+        procedure="inspect it",
+    ) for index in range(20)]
+    rows = [{
+        "id":f"D{index:02d}", "finding_id":f"F{index:02d}", "status":"closed",
+        "severity":cc.MAJOR, "summary":"historic", "evidence":["plan:1"],
+        "remedy":"withdraw", "source_ids":[], "class_ids":[item.class_id],
+        "first_round":1, "last_round":1, "concession":{
+            "version":1, "reason":"x", "evidence":["plan:1"],
+            "snapshot_digest":"a" * 64, "round":1,
+        },
+    } for index, item in enumerate(active)]
+    base = len(json.dumps(
+        rc.prior_concessions(rows, active), ensure_ascii=False,
+        sort_keys=True, separators=(",", ":"),
+    ))
+    remaining = rc.MAX_CLASS_CONTEXT_CHARS - base
+    assert 0 <= remaining <= len(rows) * (rc.MAX_CONCESSION_REASON_CHARS - 1)
+    for row in rows:
+        add = min(remaining, rc.MAX_CONCESSION_REASON_CHARS - 1)
+        row["concession"]["reason"] += "x" * add
+        remaining -= add
+    assert remaining == 0
+    assert len(rc.canonical_prior_concessions(rows, active)) == 64_000
+    target = next(
+        row for row in reversed(rows)
+        if len(row["concession"]["reason"]) < rc.MAX_CONCESSION_REASON_CHARS
+    )
+    target["concession"]["reason"] += "x"
+    with pytest.raises(rc.CensusError, match="64001 characters"):
+        rc.canonical_prior_concessions(rows, active)
+
+
+def test_staged_preflight_accepts_exact_concession_cap_and_blocks_one_over(tmp_path):
+    def fixture_at_cap():
+        closure, engine, _ = _followup_fixture(
+            tmp_path, mode=cc.PLAN_MODE, phase="final", class_count=20,
+            concessions=True,
+        )
+        rows = closure.lineage.review_state["debt"]
+        remaining = rc.MAX_CLASS_CONTEXT_CHARS - len(
+            rc.canonical_prior_concessions(rows, closure.lineage.active())
+        )
+        for row in rows:
+            add = min(remaining, rc.MAX_CONCESSION_REASON_CHARS - len(
+                row["concession"]["reason"]
+            ))
+            row["concession"]["reason"] += "x" * add
+            remaining -= add
+        assert remaining == 0
+        assert len(rc.canonical_prior_concessions(
+            rows, closure.lineage.active(),
+        )) == rc.MAX_CLASS_CONTEXT_CHARS
+        return closure, engine
+
+    exact, exact_engine = fixture_at_cap()
+    handlers._staged_structural_review(
+        engine=exact_engine, cwd=tmp_path, model="m", effort="high",
+        mode=cc.PLAN_MODE, body="artifact", closure=exact, stakes="s",
+        snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+    )
+    assert len(exact_engine.calls) == 1
+
+    over, over_engine = fixture_at_cap()
+    target = next(
+        row for row in reversed(over.lineage.review_state["debt"])
+        if len(row["concession"]["reason"]) < rc.MAX_CONCESSION_REASON_CHARS
+    )
+    target["concession"]["reason"] += "x"
+    with pytest.raises(rc.CensusError, match="64001 characters"):
+        handlers._staged_structural_review(
+            engine=over_engine, cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=over, stakes="s",
+            snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+        )
+    assert over_engine.calls == []
 
 
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(

@@ -3,15 +3,15 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "02615efd650e52d2a9b025e7d866ad3cd952d8b78539dfb31eb87bfecf92b242"
+      "sha256": "504d2750d2567193cd72630e671227b4561e156b65cd2cdf803b5438ebed3e89"
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
-      "sha256": "3691864df6f8107787fcec496a06441efc997c3c595bccab8b4c05e75e582200"
+      "sha256": "392b55d3a78e8ea8c8ddde0ceb261bf08ad26143267f9ae63646a73a5cb0f25f"
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "8572066d6616542dd5c66cb6d4e7142a37242573de10cfffb8ec85549aafbd9d"
+      "sha256": "fc737b5b17d78852d1ac86f90e72245224971c54362dfecce6bfc91dafec18c6"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
@@ -19,15 +19,27 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
-      "sha256": "c711397104b2beb76a3a2e352da7bb0bacd1e5aec7aa0917be859805b2acb89c"
+      "sha256": "7fdfa4eee3a201fba2695d1c06ca946e6b8cd59b7b07f732c2c720e4c8a23c7d"
+    },
+    "src/paranoia_local/prompts.py": {
+      "scope": "Issue #94 adds concession-challenge instructions outside the retained normative-restatement exchange.",
+      "sha256": "b422cd26034b14b37a0bdb8ae6a41d7d0c834415bde1e127e58542bf7a427515"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",
-      "sha256": "ee32bb86d1cf2d41adfaf4594ec68853c90cffd6e5b24acdcdca290382337e88"
+      "sha256": "02634246b0cec97342faebe2c7eb64d619b9ce7af1101a2af135cc0fcccc61f0"
+    },
+    "src/paranoia_local/server.py": {
+      "scope": "Issue #94 documents the new structured concession-challenge field; retained provider exchanges are unchanged.",
+      "sha256": "5198ff6963d57267dc6a186d786b9268a3cfeeddc348e0b59b981894e4b8c72e"
+    },
+    "src/paranoia_local/staged_protocol.py": {
+      "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery.",
+      "sha256": "f1cf70f7ccc6c71aad1ef13e4a1757564af0163cd286fd92ef0521e2826bb87e"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "71cf455d1aa6731102604995fee09a27b22e6fe199ea995e072bcde6f09a0400"
+      "sha256": "c3806d68e432c6c546a8a33d1aeabb59a5bb12254aa08081be2c0aec99b532a9"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
