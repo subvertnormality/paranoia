@@ -1,14 +1,6 @@
 {
   "acceptance_kind": "arbitration-consequence-not-advocacy",
   "allowed_later_source_diffs": {
-    "scripts/validate_arbitration_consequence_acceptance.py": {
-      "scope": "Issue #91 changes only plan coordinate presentation and validation-retry guidance; retained provider exchanges and unrelated behavior are unchanged.",
-      "sha256": "8428a8479d1134a7ddd3aebe74a8070fbd4d76098f6cc73f45d1fac6674b37ca"
-    },
-    "scripts/validate_arbitration_fallback_acceptance.py": {
-      "scope": "Issue #91 changes only plan coordinate presentation and validation-retry guidance; retained provider exchanges and unrelated behavior are unchanged.",
-      "sha256": "fc6ef112f68eeff68bf3349e98c0289cfdc76ea45767fb3d0980a7e788231883"
-    },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Classifies and field-binds terminal caller-owned advocacy while preserving original fallback, cleaner fidelity rejection, and the retained successful provider exchange.",
       "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"
@@ -23,7 +15,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared staged-review guidance, unrelated plan normative-restatement discovery, and field-bound arbitration advocacy diagnostics; the retained consequence-only successful exchange remains interpreted with its historical prompt.",
-      "sha256": "b864308679874aceac55385661409c0f1383a1ca6f31ca42ceb989e1c7f84305"
+      "sha256": "2ace7d78eeda462e1b2eb00d9d9c6ac9b21008fc10adab962b3dbbda8138d2b8"
     }
   },
   "audit": {

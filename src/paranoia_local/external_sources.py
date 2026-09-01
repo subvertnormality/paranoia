@@ -165,13 +165,6 @@ def numbered_lines(lines: Iterable[str]) -> str:
     return "\n".join(f"{index:05d}: {line}" for index, line in enumerate(lines, 1))
 
 
-def numbered_plan_lines(lines: Iterable[str]) -> str:
-    """Render plan coordinates without a colon that can resemble line:column."""
-    return "\n".join(
-        f"[PLAN-LINE {index:05d}] {line}" for index, line in enumerate(lines, 1)
-    )
-
-
 def numbered_text(text: str) -> str:
     return numbered_lines(text.splitlines())
 

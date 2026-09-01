@@ -16,7 +16,7 @@ from typing import Any, Iterable, Sequence
 from jsonschema import Draft202012Validator
 
 from . import class_closure as cc
-from .external_sources import numbered_plan_lines
+from .external_sources import numbered_lines
 
 CHECKLIST = (
     "artifact-complete", "repository-premises", "transformations", "consumers",
@@ -155,7 +155,7 @@ class ArtifactView:
     @classmethod
     def from_text(cls, text: str) -> "ArtifactView":
         lines = tuple(text.splitlines())
-        return cls(original=text, lines=lines, rendered=numbered_plan_lines(lines))
+        return cls(original=text, lines=lines, rendered=numbered_lines(lines))
 
     @property
     def line_count(self) -> int:

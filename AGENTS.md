@@ -112,10 +112,10 @@ or state digest encoding as a side effect of diagnostic capture.
 
 For the staged Protocol v2 cutover, give plan reviewers a displayed line-number view derived from
 the same line collection used by anchor bounds while retaining original unnumbered bytes for
-digests, claims, and persistence. Use `[PLAN-LINE NNNNN]` display markers so presentation cannot
-resemble a `line:column` citation; accepted anchors remain strict `plan:<line-or-range>`, and retry
-guidance repeats that grammar rather than guessing, clamping, dropping evidence, or partially
-settling. Constrain fresh and resumed provider output with a deterministic
+digests, claims, and persistence. When plan-anchor resolution fails, the bounded same-session retry
+must repeat the strict `plan:<line-or-range>` grammar and current line bound, explicitly discarding
+column coordinates rather than concatenating their digits. Never guess, clamp, drop evidence, or
+partially settle. Constrain fresh and resumed provider output with a deterministic
 provider-compatible projection of the closed, role-specific JSON Schema the server validates.
 Provider-subset omissions such as Codex's unsupported `uniqueItems`, plus non-semantic draft
 metadata that Claude cannot receive, remain fail-closed local constraints and may cause only the

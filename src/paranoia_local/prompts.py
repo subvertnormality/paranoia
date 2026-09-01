@@ -384,10 +384,9 @@ def compose(instructions: str, body: str) -> str:
     return f"{instructions}\n\n===== TASK INPUT =====\n\n{body}"
 
 
-PLAN_EVIDENCE_ANCHORS = """The plan is displayed with `[PLAN-LINE NNNNN]` coordinate markers that are
+PLAN_EVIDENCE_ANCHORS = """The plan is displayed with `NNNNN: ` coordinate prefixes that are
 presentation metadata, not plan text. Cite it only as `plan:<line>` or
-`plan:<start>-<end>`, using the marker's integer without leading zeroes. Never append a column
-number or concatenate line and column digits, and never by its repository path. Cite every other supplied file as
+`plan:<start>-<end>`, using those displayed numbers, never by its repository path. Cite every other supplied file as
 `repository/<path>:<line>` or a range; the literal `repository/` prefix is required. The pinned
 filesystem repository root is the `repository/` directory relative to your current directory;
 read repository files through that directory, not from the workspace root."""
@@ -397,10 +396,8 @@ Cite every supplied file as `repository/<path>:<line>` or a range; the literal `
 prefix is required, including plans, contracts, and documentation."""
 
 BRANCH_PLAN_EVIDENCE_ANCHORS = """This branch review includes one frozen implementation
-contract displayed with `[PLAN-LINE NNNNN]` coordinate markers that are presentation metadata.
-Cite that contract only as `plan:<line>` or
-`plan:<start>-<end>`, using the marker's integer without leading zeroes. Never append a column
-number or concatenate line and column digits. Cite repository files as
+contract displayed with `NNNNN: ` coordinate prefixes that are presentation metadata.
+Cite that contract only as `plan:<line>` or `plan:<start>-<end>`. Cite repository files as
 `repository/<path>:<line>` or a range; the literal `repository/` prefix is required."""
 
 BRANCH_PLAN_FIDELITY_INSTRUCTIONS = """A frozen implementation contract is supplied as

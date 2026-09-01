@@ -124,7 +124,7 @@ def _branch_contract_view(
             raise ValueError("plan_digest does not match the supplied branch plan contract")
     lines = tuple(text.split("\n"))
     return _BranchContract(
-        original=text, lines=lines, rendered=external_sources.numbered_plan_lines(lines),
+        original=text, lines=lines, rendered=external_sources.numbered_lines(lines),
         digest=digest, supplied_path=supplied_path, assertion=assertion, reused=reused,
     )
 
@@ -1500,8 +1500,11 @@ def _staged_structural_review(
                 response_schema=sp.provider_schema(sp.lane_schema(mode, lane)),
                 parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
                 retry_context=(
-                    branch_contract_section
-                    or sp.citation_instructions(mode, plan_contract=plan_contract)
+                    "\n\n".join(filter(None, (
+                        branch_contract_section,
+                        _plan_anchor_retry_context(plan_lines)
+                        if plan_lines is not None else None,
+                    ))) or None
                 ),
             )
             renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
@@ -1716,8 +1719,11 @@ def _staged_structural_review(
                 known_debt=existing, role=role,
             ),
             retry_context=(
-                branch_contract_section
-                or sp.citation_instructions(mode, plan_contract=plan_contract)
+                "\n\n".join(filter(None, (
+                    branch_contract_section,
+                    _plan_anchor_retry_context(plan_lines)
+                    if plan_lines is not None else None,
+                ))) or None
             ),
         )
         attempts.extend(call_attempts)
@@ -2397,6 +2403,16 @@ def _branch_contract_section(contract: _BranchContract) -> str:
         f"{contract.rendered}\n"
         "=== END FROZEN IMPLEMENTATION CONTRACT ===\n"
         f"{authority} Cite this contract only with `plan:<line-or-range>`."
+    )
+
+
+def _plan_anchor_retry_context(plan_lines: int) -> str:
+    return (
+        f"The displayed plan has exactly {plan_lines} lines. A plan citation must be "
+        "`plan:<line>` or `plan:<start>-<end>`, with every integer between 1 and "
+        f"{plan_lines}. If you intended a line:column coordinate, discard the column: "
+        "line 4001, column 1 is `plan:4001`, never `plan:40011`. Do not concatenate "
+        "line and column digits."
     )
 
 

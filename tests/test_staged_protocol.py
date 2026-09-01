@@ -1125,10 +1125,10 @@ def test_derived_census_authenticated_material_recomputes_every_digest():
     ("text", "lines", "rendered"),
     [
         ("", (), ""),
-        ("one", ("one",), "[PLAN-LINE 00001] one"),
-        ("one\n", ("one",), "[PLAN-LINE 00001] one"),
-        ("one\n\nthree", ("one", "", "three"), "[PLAN-LINE 00001] one\n[PLAN-LINE 00002] \n[PLAN-LINE 00003] three"),
-        ("λ\r\nβ", ("λ", "β"), "[PLAN-LINE 00001] λ\n[PLAN-LINE 00002] β"),
+        ("one", ("one",), "00001: one"),
+        ("one\n", ("one",), "00001: one"),
+        ("one\n\nthree", ("one", "", "three"), "00001: one\n00002: \n00003: three"),
+        ("λ\r\nβ", ("λ", "β"), "00001: λ\n00002: β"),
     ],
 )
 def test_artifact_view_has_one_coordinate_source(text, lines, rendered):
@@ -1144,15 +1144,6 @@ def test_artifact_view_line_count_is_the_resolver_bound(tmp_path):
     rc.resolve_anchors({"evidence": ["plan:1-3"]}, root=tmp_path, plan_lines=view.line_count)
     with pytest.raises(rc.CensusError, match="unresolvable plan"):
         rc.resolve_anchors({"evidence": ["plan:1-4"]}, root=tmp_path, plan_lines=view.line_count)
-
-
-def test_large_plan_marker_cannot_resemble_line_column_coordinates():
-    view = sp.ArtifactView.from_text("\n".join(f"line {index}" for index in range(1, 5261)))
-    rendered = view.rendered.splitlines()
-    assert rendered[4000] == "[PLAN-LINE 04001] line 4001"
-    assert rendered[5252] == "[PLAN-LINE 05253] line 5253"
-    assert "04001:" not in rendered[4000]
-    assert "05253:" not in rendered[5252]
 
 
 def test_every_role_schema_is_closed_and_draft_valid():
