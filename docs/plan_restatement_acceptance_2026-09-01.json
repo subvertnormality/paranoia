@@ -11,7 +11,7 @@
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "a18d152a116dc263503d114146c84483db6cad3d15fb2b8bc87b15f418d4fbd9"
+      "sha256": "8572066d6616542dd5c66cb6d4e7142a37242573de10cfffb8ec85549aafbd9d"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
@@ -19,7 +19,7 @@
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "0cf848e8f104fb16343349f802559e110cede42e144ec82678e0dffd1d03ba56"
+      "sha256": "c31ea71a6bda1827663c537169e5a232c4cb1e93b7bd5698ac3490d27f54021e"
     }
   },
   "claims": {
