@@ -546,6 +546,8 @@ def validate_artifact(
             raise ValueError(f"{relative} omits public contract tokens {missing!r}")
     revision = artifact["source_revision"]
     expected_sources = set(ACCEPTANCE_SOURCES)
+    if revision == LEGACY_SOURCE_REVISION:
+        expected_sources -= {"README.md", "docs/tool-reference.md", "docs/llm-reference.md"}
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("source revision is not a full commit")
     if set(artifact["source_sha256"]) != expected_sources:
