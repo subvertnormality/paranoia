@@ -59,6 +59,26 @@ def _sha_text(value: str) -> str:
     return _sha_bytes(value.encode("utf-8", "surrogatepass"))
 
 
+def _historical_no_concession_prompt(prompt: str) -> str:
+    """Project the empty-concession additions out of this retained prompt."""
+    prompt = prompt.replace("PRIOR CONCESSIONS: []\n", "")
+    start = " concession_challenges is a closed object"
+    finish = "Never put class_id inside an outcome or action value."
+    if start in prompt:
+        begin = prompt.index(start)
+        end = prompt.index(finish, begin)
+        prompt = prompt[:begin] + " " + prompt[end:]
+    marker = "===== TASK INPUT =====\n\n"
+    head, found, task_text = prompt.partition(marker)
+    if found and task_text.startswith("{"):
+        task = json.loads(task_text)
+        prior = task.pop("prior_concessions", None)
+        if prior not in (None, []):
+            raise ValueError("historical replay cannot discard a concession")
+        prompt = head + found + json.dumps(task, ensure_ascii=False)
+    return prompt
+
+
 def _git(*args: str, cwd: Path = ROOT, env: dict[str, str] | None = None) -> str:
     return subprocess.run(
         ["git", *args], cwd=cwd, env=env, check=True,
@@ -376,7 +396,9 @@ def validate_artifact(
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
                 os.environ[cc.STATE_ROOT_ENV] = prior_root
-        if replay_prompts != [row["prompt_text"] for row in calls]:
+        if [
+            _historical_no_concession_prompt(prompt) for prompt in replay_prompts
+        ] != [row["prompt_text"] for row in calls]:
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")

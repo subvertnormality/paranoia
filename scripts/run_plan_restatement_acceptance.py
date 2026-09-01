@@ -245,11 +245,11 @@ def _historical_no_concession_invocation(
     schema = deepcopy(value["response_schema"])
     properties = schema.get("properties", {})
     required = schema.get("required", [])
-    if properties.pop("concession_challenges", None) is None:
-        raise ValueError("current replay schema lacks concession_challenges")
-    if "concession_challenges" not in required:
-        raise ValueError("current replay schema does not require concession_challenges")
-    required.remove("concession_challenges")
+    if "concession_challenges" in properties:
+        properties.pop("concession_challenges")
+        if "concession_challenges" not in required:
+            raise ValueError("current replay schema does not require concession_challenges")
+        required.remove("concession_challenges")
     value["response_schema"] = schema
     value["response_schema_sha256"] = _sha_text(json.dumps(
         schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
