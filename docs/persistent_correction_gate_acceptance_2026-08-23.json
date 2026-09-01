@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "e29ddb56cf431af68371efeddaf09d621242b9fa2af6678c101c6f642203b441"
+      "sha256": "018ee9e9b7dbfabdec9253f19e80c9efafc80e9ccb4a60eb5598905926cb3054"
     },
     "CLAUDE.md": {
       "scope": "Issue #95 mirrors the canonical engine-owned final-regression instruction; it does not change the retained correction-gate provider exchange or control counters.",
@@ -15,7 +15,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "792c19cb895c5c34fb4721afb3556d4a686d998196c249e32552bed228ddf310"
+      "sha256": "10347742ee84612e32a68682f0e7163b83c2a99187020d4e73fa361d60ee74ef"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged.",
-      "sha256": "2cd4ebbab503a025c233fb5a2625f922e180af71e6fc946f429155c3ee0567f8"
+      "sha256": "91e0082be1b0c024908ebbc783da023a79ff2a22aacf65457ce6d0d773a5b0f5"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -43,7 +43,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",
-      "sha256": "3c1671b0b3a7f172e44b9270e5fd8a985b69a2f34876915909825e0754c164ec"
+      "sha256": "95c316762668773d96922f978c96ce65ba8a9f5d16aab0367c595d7ef47e0326"
     },
     "src/paranoia_local/server.py": {
       "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",
@@ -63,7 +63,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
-      "sha256": "c0d07408ff55d088871ab7fe8ba4a3afd989ae8333f9c0a77b52ba072cff3664"
+      "sha256": "234781621e0e6a793248a601a7131668fdf01e8674b0f2d5526eae3d91426fa7"
     }
   },
   "after_lineage": {
