@@ -536,7 +536,7 @@ def test_public_handlers_migrate_legacy_unowned_final_before_provider_spend(
     assert "CONVERGENCE: BLOCKED" in result
 
 
-def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
+def _followup_fixture(tmp_path, *, mode, phase, class_count=1, concessions=False):
     anchor = "plan:1" if mode == cc.PLAN_MODE else "repository/a.py:1"
     (tmp_path / "a.py").write_text("fixture\n", encoding="utf-8")
     classes = {}
@@ -556,6 +556,17 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "class_ids":[class_id], "first_round":1, "last_round":1,
             })
     state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
+    if concessions:
+        debt = [{
+            "id":f"C{index}", "finding_id":f"CF{index}", "status":"closed",
+            "severity":cc.MAJOR, "summary":"conceded demand",
+            "evidence":[anchor], "remedy":"do not repeat it", "source_ids":[],
+            "class_ids":[f"class-{index}"], "first_round":1, "last_round":1,
+            "concession":{
+                "version":1, "reason":"the prior demand was disproved",
+                "evidence":[anchor], "snapshot_digest":rc.digest("p"), "round":1,
+            },
+        } for index in range(class_count)] + debt
     state.update(phase=phase, debt=debt, last_round=1)
     if phase == "final":
         state["final_engine"] = "fake"
@@ -598,6 +609,9 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor],
             } for index in range(class_count)],
             "class_actions":{f"class-{index}":None for index in range(class_count)},
+            "concession_challenges":{
+                f"class-{index}":None for index in range(class_count)
+            } if concessions else {},
         }
     else:
         value = {
@@ -608,6 +622,9 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
                 "evidence":[anchor],
             } for index in range(class_count)],
             "class_actions":{f"class-{index}":None for index in range(class_count)},
+            "concession_challenges":{
+                f"class-{index}":None for index in range(class_count)
+            } if concessions else {},
         }
         if mode == cc.BRANCH_MODE:
             for row in value["coverage"]:
@@ -628,6 +645,30 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1):
             return self.run(prompt, *args, **kwargs)
 
     return Closure(), Engine(), anchor
+
+
+@pytest.mark.parametrize("phase", ["correction", "final"])
+def test_public_plan_followups_project_and_preserve_clean_concessions(tmp_path, phase):
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.PLAN_MODE, phase=phase, concessions=True,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high", mode=cc.PLAN_MODE,
+        body="artifact", closure=closure, stakes="s", snapshot="p", round_no=2,
+        on_progress=None, plan_lines=1,
+    )
+    prompt = engine.calls[0][0]
+    expected = rc.canonical_prior_concessions(
+        closure.lineage.review_state["debt"], closure.lineage.active(),
+    )
+    assert f"PRIOR CONCESSIONS: {expected}" in prompt
+    assert closure.staged_settlement["concession_challenges"] == [{
+        "class_id":"class-0", "challenge":None,
+    }]
+    history = next(
+        row for row in closure.lineage.review_state["debt"] if row["id"] == "C0"
+    )
+    assert history["concession"]["reason"] == "the prior demand was disproved"
 
 
 def _task_from_prompt(prompt: str) -> dict:
