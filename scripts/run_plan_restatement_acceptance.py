@@ -234,7 +234,10 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     )
     prompt, count = re.subn(
         r"class_outcomes is a closed object permitting exactly these class IDs: "
-        r"\[[^\]]*\]; required keys are exactly: (\[[^\]]*\])\. ",
+        r"\[[^\]]*\](?:; required keys are exactly: |\. Every permitted key is "
+        r"required by the provider schema; use null for a semantically optional "
+        r"outcome that you are not authoring\. Non-null outcomes are required "
+        r"exactly for these class IDs: )(\[[^\]]*\])\. ",
         r"class_outcomes is a closed object keyed by exactly these required class IDs: \1. ",
         prompt,
     )
