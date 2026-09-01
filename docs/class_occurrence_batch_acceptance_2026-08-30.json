@@ -94,7 +94,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Plan-only phase projection and debt-targeted rebut settlement; branch occurrence aggregation is unchanged.",
-      "sha256": "ac846e0c217f248859e8d505a7c831cbd14489996a931cbbb6352c3e4025ea6f"
+      "sha256": "0348ff9008f6477361e99730d9a57051acc2cf6c92bc1a19ebffa038dbd46190"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut and arbitration diagnostics plus plan-review normative-restatement discovery; branch occurrence aggregation instructions are unchanged.",

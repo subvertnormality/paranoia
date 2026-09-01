@@ -1,142 +1,154 @@
 {
+  "acceptance_claims": {
+    "corroborates": "The named source also completed direct current Codex and Claude binding/cold-attestation routes with the recorded prompt and reply digests.",
+    "does_not_claim": "No exact-maximum provider transport guarantee, arbitrary page support, future provider compatibility, success for every packet through the configured ceiling, or coverage of later unrelated structural-review prompt composition changes in the shared handlers module.",
+    "qualifies": "The named Spotify SEC source completed the current Codex public critique_plan claim lifecycle with an ordinary sibling and survived durable reload as supported."
+  },
   "acceptance_kind": "measured-authoritative-plan-capture-v1",
   "date": "2026-08-21",
-  "acceptance_claims": {
-    "qualifies": "The named Spotify SEC source completed the current Codex public critique_plan claim lifecycle with an ordinary sibling and survived durable reload as supported.",
-    "corroborates": "The named source also completed direct current Codex and Claude binding/cold-attestation routes with the recorded prompt and reply digests.",
-    "does_not_claim": "No exact-maximum provider transport guarantee, arbitrary page support, future provider compatibility, success for every packet through the configured ceiling, or coverage of later unrelated structural-review prompt composition changes in the shared handlers module."
+  "implementation_diff": {
+    "largest_changed_module": "src/paranoia_local/handlers.py",
+    "largest_changed_module_additions": 544,
+    "largest_changed_module_deletions": 111,
+    "largest_changed_module_lines_after": 3415,
+    "scope": "production Python modules relative to reviewed_snapshot.base_commit",
+    "tracked_additions": 735,
+    "tracked_deletions": 125
   },
+  "production_entrypoint": {
+    "claim_debt": null,
+    "durable_reload": true,
+    "elapsed_seconds": 489.033,
+    "engine": "codex",
+    "final_state_sha256": "1b2ea40d3a58b5f64d9717ea03dfa9fb79748e5cd61f6f715620238f166e4898",
+    "lineage_rounds": 1,
+    "model": "gpt-5.6-sol",
+    "ordinary_and_expanded_claims": 2,
+    "public_handler": "critique_plan",
+    "spotify_capture_error": null,
+    "spotify_evidence_index": 1,
+    "spotify_passage_entailment": true,
+    "spotify_publisher_authority": true,
+    "spotify_source_rows": 2,
+    "spotify_text_sha256": "2fbc63a47b1582fa5268afb1184377f14c9d31fdaae2a2134665e263602625c2",
+    "supported_claims_after_reload": 2
+  },
+  "production_preflight_measurement": {
+    "attestation_correction_worst_case_characters": 682351,
+    "attestation_initial_worst_case_characters": 680692,
+    "binding_correction_characters": 628805,
+    "binding_initial_characters": 627172,
+    "configured_ceiling": 685000
+  },
+  "proposition": "Spotify had 675 million monthly active users as of December 31, 2024.",
+  "reviewed_snapshot": {
+    "allowed_later_handlers_diff": {
+      "additions": 1813,
+      "deletions": 175,
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record.",
+      "sha256": "404d7cea59a7df5978b4da388b807e2733325a6750fd2404fe2572c65f32e51f"
+    },
+    "allowed_later_plan_claims_diff": {
+      "additions": 332,
+      "deletions": 32,
+      "scope": "Rejects provider-introduced forms in the closed universal grammar before capture and preserves response acquisition/text extraction/deadline, binding, and attestation phases plus ordered terminal attempts and completed capture siblings in durable diagnostics without demoting an independently supported or refuted claim; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record.",
+      "sha256": "e229f54b228f8b88d2a06ca6dead1160d5216f1237ebccb34ae92e6b6635ee77"
+    },
+    "allowed_later_review_census_diff": {
+      "additions": 559,
+      "deletions": 12,
+      "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics.",
+      "sha256": "b7fdcf91dcc4e0e7f9be2bccf3b258841a94f8fb9398efcf3a4d230ef4503109"
+    },
+    "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
+    "production_source_sha256": {
+      "scripts/run_authoritative_capture_acceptance.py": "c07999eaf1228d83e01c3514cc7218fe5efeb82d3f987fa6738a1cc698bb76e9",
+      "scripts/run_authoritative_capture_entrypoint_acceptance.py": "5168c81590eb37d58f2377fc2802ae8bc626c7ec26adb29ba081df233491435a",
+      "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+      "src/paranoia_local/handlers.py": "94fe0ca85568baae7e219ca47ba6cf4cf756f55a79ac609178bc52ce31dc083a",
+      "src/paranoia_local/plan_claims.py": "3575588572c52016d2901498bae9dfe22e7a9c8bae64550a1671f1aebec2b8d8",
+      "src/paranoia_local/review_census.py": "94242505ae01b0adf4bf6cc8eb24598725d346359ca87b6bfa9dd840e7b3bae9"
+    },
+    "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e"
+  },
+  "routes": [
+    {
+      "attestation_prompt_characters": 627110,
+      "attestation_prompt_sha256": "8dae6abd09297d0c0f38e5e534518c8d2023a8ab5ad10e8988f0d09e8d923626",
+      "attestation_raw_sha256": "e072617a20e3a4c1623424b255a6b0619dd87c4b8266d54a50df802266782da3",
+      "binding_calls": 2,
+      "binding_correction_prompt_sha256": "76c6a15a0a0b1fe440878a6d7be2d775d26cadada3b4a9706f4e446b673257b4",
+      "binding_prompt_characters": 627172,
+      "binding_prompt_sha256": "f0056e12b125b24a80ac06a383ce957abf54ab45034231ca72ebd56378b62e04",
+      "binding_raw_sha256": [
+        "7fdb8f1850f213aa3d5f62054e4064595724672ccc02ca9b178a6fa7421113f9",
+        "f691740fee3ba83982de92dd6ecfd73dd2307f3a8161c1347563153eb7ebf0ae"
+      ],
+      "binding_reply_sha256": [
+        "edfc4a50be49cc25efaa186da26e527cfeac0949b4f8f9ebc89810f13bef1069",
+        "5806844a5a3c81d3a198b0d667a5f1277924e233ef1e0d3e5d44455a168b1534"
+      ],
+      "binding_validation_retries": 1,
+      "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
+      "cli_version": "0.144.6",
+      "elapsed_seconds": 41.344,
+      "engine": "codex",
+      "fresh_binding_bootstrap": true,
+      "fresh_full_context_attestation": true,
+      "initial_binding_issue": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
+      "model": "gpt-5.6-sol",
+      "passage": "MAUs were 675 million as of December 31, 2024. This represented an increase of 12% from the preceding fiscal year. MAUs increased due to our continued investment in driving the growth of our Service through successful consumer marketing campaigns, enhanced content offerings, and product enhancements, resulting in continued user engagement and customer satisfaction.",
+      "passage_entailment": true,
+      "publisher_authority": true,
+      "resumed_binding": true,
+      "verdict": "supported"
+    },
+    {
+      "attestation_prompt_characters": 626965,
+      "attestation_prompt_sha256": "9e48b40446251a1027609140412749447524c63a8d6d51dc1cbccf222f8b3335",
+      "attestation_raw_sha256": "546c4fce58e09b874f1d66e32e16e40581c45830d363994752d1725d451f5c26",
+      "binding_calls": 2,
+      "binding_correction_prompt_sha256": "76c6a15a0a0b1fe440878a6d7be2d775d26cadada3b4a9706f4e446b673257b4",
+      "binding_prompt_characters": 627172,
+      "binding_prompt_sha256": "f0056e12b125b24a80ac06a383ce957abf54ab45034231ca72ebd56378b62e04",
+      "binding_raw_sha256": [
+        "a1bb7ec5a6ea587e13a1e6646a9c323ee31d957b427fdacaee20bf4d73d3dccb",
+        "80a6fb5dd684bc007bf0b64a76c3704c761c729399a122386e3d03473c357ae5"
+      ],
+      "binding_reply_sha256": [
+        "95c2ac4a02c8dac2c55c3192841b3e8f90f414b4dab3f859192f1d2ddf7e5f27",
+        "056413e60bb7d9958f75036152627617c441163a686566acfa729baf4d329708"
+      ],
+      "binding_validation_retries": 1,
+      "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
+      "cli_version": "2.1.197",
+      "elapsed_seconds": 36.081,
+      "engine": "claude",
+      "fresh_binding_bootstrap": true,
+      "fresh_full_context_attestation": true,
+      "initial_binding_issue": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
+      "model": "claude-fable-5",
+      "passage": "We are the world’s most popular audio streaming subscription service with a community of 675 million MAUs and 263 million Premium Subscribers across 184 countries and territories as of December 31, 2024.",
+      "passage_entailment": true,
+      "publisher_authority": true,
+      "resumed_binding": true,
+      "verdict": "supported"
+    }
+  ],
+  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed.",
   "source": {
-    "url": "https://www.sec.gov/Archives/edgar/data/1639920/000163992025000003/ck0001639920-20241231.htm",
-    "title": "Spotify Technology S.A. 2024 Annual Report",
-    "publisher": "Spotify Technology S.A.",
+    "content_sha256": "289b7bef1c4ee87c54154982a807b6641543fbb97a1b265365f111cc51059fe6",
     "expanded_prompt_ceiling": 685000,
     "extracted_characters": 590177,
     "former_limit": 100000,
-    "content_sha256": "289b7bef1c4ee87c54154982a807b6641543fbb97a1b265365f111cc51059fe6",
-    "text_sha256": "2fbc63a47b1582fa5268afb1184377f14c9d31fdaae2a2134665e263602625c2"
-  },
-  "proposition": "Spotify had 675 million monthly active users as of December 31, 2024.",
-  "routes": [
-    {
-      "engine": "codex",
-      "model": "gpt-5.6-sol",
-      "cli_version": "0.144.6",
-      "fresh_binding_bootstrap": true,
-      "resumed_binding": true,
-      "fresh_full_context_attestation": true,
-      "binding_prompt_characters": 627172,
-      "binding_prompt_sha256": "f0056e12b125b24a80ac06a383ce957abf54ab45034231ca72ebd56378b62e04",
-      "binding_correction_prompt_sha256": "76c6a15a0a0b1fe440878a6d7be2d775d26cadada3b4a9706f4e446b673257b4",
-      "attestation_prompt_characters": 627110,
-      "attestation_prompt_sha256": "8dae6abd09297d0c0f38e5e534518c8d2023a8ab5ad10e8988f0d09e8d923626",
-      "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
-      "binding_reply_sha256": ["edfc4a50be49cc25efaa186da26e527cfeac0949b4f8f9ebc89810f13bef1069", "5806844a5a3c81d3a198b0d667a5f1277924e233ef1e0d3e5d44455a168b1534"],
-      "binding_raw_sha256": ["7fdb8f1850f213aa3d5f62054e4064595724672ccc02ca9b178a6fa7421113f9", "f691740fee3ba83982de92dd6ecfd73dd2307f3a8161c1347563153eb7ebf0ae"],
-      "attestation_raw_sha256": "e072617a20e3a4c1623424b255a6b0619dd87c4b8266d54a50df802266782da3",
-      "binding_calls": 2,
-      "binding_validation_retries": 1,
-      "initial_binding_issue": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
-      "passage": "MAUs were 675 million as of December 31, 2024. This represented an increase of 12% from the preceding fiscal year. MAUs increased due to our continued investment in driving the growth of our Service through successful consumer marketing campaigns, enhanced content offerings, and product enhancements, resulting in continued user engagement and customer satisfaction.",
-      "publisher_authority": true,
-      "passage_entailment": true,
-      "verdict": "supported",
-      "elapsed_seconds": 41.344
-    },
-    {
-      "engine": "claude",
-      "model": "claude-fable-5",
-      "cli_version": "2.1.197",
-      "fresh_binding_bootstrap": true,
-      "resumed_binding": true,
-      "fresh_full_context_attestation": true,
-      "binding_prompt_characters": 627172,
-      "binding_prompt_sha256": "f0056e12b125b24a80ac06a383ce957abf54ab45034231ca72ebd56378b62e04",
-      "binding_correction_prompt_sha256": "76c6a15a0a0b1fe440878a6d7be2d775d26cadada3b4a9706f4e446b673257b4",
-      "attestation_prompt_characters": 626965,
-      "attestation_prompt_sha256": "9e48b40446251a1027609140412749447524c63a8d6d51dc1cbccf222f8b3335",
-      "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
-      "binding_reply_sha256": ["95c2ac4a02c8dac2c55c3192841b3e8f90f414b4dab3f859192f1d2ddf7e5f27", "056413e60bb7d9958f75036152627617c441163a686566acfa729baf4d329708"],
-      "binding_raw_sha256": ["a1bb7ec5a6ea587e13a1e6646a9c323ee31d957b427fdacaee20bf4d73d3dccb", "80a6fb5dd684bc007bf0b64a76c3704c761c729399a122386e3d03473c357ae5"],
-      "attestation_raw_sha256": "546c4fce58e09b874f1d66e32e16e40581c45830d363994752d1725d451f5c26",
-      "binding_calls": 2,
-      "binding_validation_retries": 1,
-      "initial_binding_issue": "expected exactly one === PLAN EVIDENCE BINDING JSON === marker",
-      "passage": "We are the world’s most popular audio streaming subscription service with a community of 675 million MAUs and 263 million Premium Subscribers across 184 countries and territories as of December 31, 2024.",
-      "publisher_authority": true,
-      "passage_entailment": true,
-      "verdict": "supported",
-      "elapsed_seconds": 36.081
-    }
-  ],
-  "production_entrypoint": {
-    "engine": "codex",
-    "model": "gpt-5.6-sol",
-    "public_handler": "critique_plan",
-    "lineage_rounds": 1,
-    "ordinary_and_expanded_claims": 2,
-    "supported_claims_after_reload": 2,
-    "claim_debt": null,
-    "spotify_text_sha256": "2fbc63a47b1582fa5268afb1184377f14c9d31fdaae2a2134665e263602625c2",
-    "spotify_capture_error": null,
-    "spotify_evidence_index": 1,
-    "spotify_source_rows": 2,
-    "spotify_publisher_authority": true,
-    "spotify_passage_entailment": true,
-    "durable_reload": true,
-    "elapsed_seconds": 489.033,
-    "final_state_sha256": "1b2ea40d3a58b5f64d9717ea03dfa9fb79748e5cd61f6f715620238f166e4898"
-  },
-  "production_preflight_measurement": {
-    "binding_initial_characters": 627172,
-    "binding_correction_characters": 628805,
-    "attestation_initial_worst_case_characters": 680692,
-    "attestation_correction_worst_case_characters": 682351,
-    "configured_ceiling": 685000
+    "publisher": "Spotify Technology S.A.",
+    "text_sha256": "2fbc63a47b1582fa5268afb1184377f14c9d31fdaae2a2134665e263602625c2",
+    "title": "Spotify Technology S.A. 2024 Annual Report",
+    "url": "https://www.sec.gov/Archives/edgar/data/1639920/000163992025000003/ck0001639920-20241231.htm"
   },
   "tests": {
     "focused": "173 passed",
     "full": "1188 passed",
     "full_git_fixture_signing_disabled": true
-  },
-  "reviewed_snapshot": {
-    "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
-    "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
-    "allowed_later_handlers_diff": {
-      "sha256": "c76647c1bb700f75daeecaa38645f77525f7683c5c99d25f8ae5a202f66f02c1",
-      "additions": 1813,
-      "deletions": 175,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
-    },
-    "allowed_later_review_census_diff": {
-      "sha256": "b7fdcf91dcc4e0e7f9be2bccf3b258841a94f8fb9398efcf3a4d230ef4503109",
-      "additions": 559,
-      "deletions": 12,
-      "scope": "Adds requested timeout, separate provider duration, diagnostic class persistence/reopen rendering, the plan-correction blocking-unit classifier, one closed staged-state validator, and a shared parser for already-accepted evidence coordinates; does not alter capture, binding, cold-attestation, prompt-size, or source-admission semantics."
-    },
-    "allowed_later_plan_claims_diff": {
-      "sha256": "e229f54b228f8b88d2a06ca6dead1160d5216f1237ebccb34ae92e6b6635ee77",
-      "additions": 332,
-      "deletions": 32,
-      "scope": "Rejects provider-introduced forms in the closed universal grammar before capture and preserves response acquisition/text extraction/deadline, binding, and attestation phases plus ordered terminal attempts and completed capture siblings in durable diagnostics without demoting an independently supported or refuted claim; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record."
-    },
-    "production_source_sha256": {
-      "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
-      "src/paranoia_local/handlers.py": "94fe0ca85568baae7e219ca47ba6cf4cf756f55a79ac609178bc52ce31dc083a",
-      "src/paranoia_local/plan_claims.py": "3575588572c52016d2901498bae9dfe22e7a9c8bae64550a1671f1aebec2b8d8",
-      "src/paranoia_local/review_census.py": "94242505ae01b0adf4bf6cc8eb24598725d346359ca87b6bfa9dd840e7b3bae9",
-      "scripts/run_authoritative_capture_acceptance.py": "c07999eaf1228d83e01c3514cc7218fe5efeb82d3f987fa6738a1cc698bb76e9",
-      "scripts/run_authoritative_capture_entrypoint_acceptance.py": "5168c81590eb37d58f2377fc2802ae8bc626c7ec26adb29ba081df233491435a"
-    }
-  },
-  "implementation_diff": {
-    "scope": "production Python modules relative to reviewed_snapshot.base_commit",
-    "tracked_additions": 735,
-    "tracked_deletions": 125,
-    "largest_changed_module": "src/paranoia_local/handlers.py",
-    "largest_changed_module_additions": 544,
-    "largest_changed_module_deletions": 111,
-    "largest_changed_module_lines_after": 3415
-  },
-  "scope": "Plan claim verification only; arbitration and structural-review prompt composition are outside this record. This record proves the named 590177-character SEC source, the measured 682351-character worst-case production preflight, the source-hashed Codex public critique_plan lifecycle at the recorded run with durable reload, and exact-runner Codex/Claude binding and attestation routes. The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here. It does not claim that arbitrary future pages, provider releases, or every packet up to 685000 characters will succeed."
+  }
 }

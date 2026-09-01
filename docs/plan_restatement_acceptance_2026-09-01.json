@@ -17,6 +17,10 @@
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
+    "src/paranoia_local/handlers.py": {
+      "scope": "Issue #91 adds plan-only validation-retry coordinate guidance; successful provider prompts, settlement, and unrelated behavior are unchanged.",
+      "sha256": "a3d8668a75bcb3d562efb0d1bfcc7b57530ba81a82dcf076bd0a3ceef240a8a3"
+    },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
       "sha256": "c31ea71a6bda1827663c537169e5a232c4cb1e93b7bd5698ac3490d27f54021e"

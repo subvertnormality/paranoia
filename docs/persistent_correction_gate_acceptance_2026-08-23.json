@@ -209,7 +209,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record.",
-      "sha256": "64682fbe5564d6b015b620a1c9f476e0294a4342d03579f80fbd5ac8608c3fc9"
+      "sha256": "611da9f8498208a629ca68b8a79cadc7c7a2c20b6f587001be610ae1e172cca9"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
