@@ -1,5 +1,11 @@
 {
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
+  "allowed_later_source_diffs": {
+    "src/paranoia_local/handlers.py": {
+      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence.",
+      "sha256": "0175d394bab201ed1e3fee390f2e818bd09c5c629df5cab5de4e14a7d6227202"
+    }
+  },
   "attempt_ledger": [
     {
       "duration_ms": 27397,

@@ -16,7 +16,7 @@
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
       "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "231e5d8b8990c852dfb1b926bbf9ac712ac1f8a4ba3d9d1a1af9307ac4c67ffd"
+      "sha256": "f66c7f7103d16cfcd69ce28c790529d985a9b675dd2df0be4a9d496b348cd81f"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
@@ -32,7 +32,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged.",
-      "sha256": "91e0082be1b0c024908ebbc783da023a79ff2a22aacf65457ce6d0d773a5b0f5"
+      "sha256": "2ba0a41120d852c0aa44b9b347af73bae51dff03ea34942934a4797eccfe9887"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -60,11 +60,11 @@
     },
     "tests/test_handlers.py": {
       "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, proves every server-authored plan citation example resolves at bounds 1, 3, and 5,260, and adds public empty-plan preflight coverage.",
-      "sha256": "77f046005d916687f566805d6c78e538dfe127503766c31dfdc9fe5798ccfecf"
+      "sha256": "8fb102f454c4e6dfd66bc72052abc4a9aa669b1821bf7a1a002f06e64a0cfa9b"
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
-      "sha256": "234781621e0e6a793248a601a7131668fdf01e8674b0f2d5526eae3d91426fa7"
+      "sha256": "23569aa23a5bd2a2a5a81f9e58580dc9961b3cbd72b1b631456e46945b666035"
     }
   },
   "after_lineage": {
