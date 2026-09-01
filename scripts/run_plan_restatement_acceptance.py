@@ -125,6 +125,9 @@ def _capture_call(
             encoding="utf-8",
         )
     )
+    (log_dir / "captured_prompts.json").write_text(
+        json.dumps(prompts, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
+    )
     return result, prompts, audit, lineage
 
 
@@ -233,12 +236,15 @@ def validate_artifact(
             raise ValueError("rendered trailer is not the returned durable result")
 
     findings = discovery["audit"]["staged_settlement"]["findings"]
-    matches = [
-        row for row in findings
-        if "independently normative" in row["summary"].lower()
-        or "independently authoritative" in row["summary"].lower()
-        or "sources of authority" in row["summary"].lower()
-    ]
+    matches = []
+    for row in findings:
+        evidence = row["evidence"]
+        remedy = row["remedy"].lower()
+        if (
+            all(any(_anchor_covers(anchor, line) for anchor in evidence) for line in (4, 7, 10))
+            and "sole" in remedy and ("authority" in remedy or "definition" in remedy)
+        ):
+            matches.append(row)
     if len(matches) != 1:
         raise ValueError("discovery did not produce one aggregate restatement finding")
     evidence = matches[0]["evidence"]
