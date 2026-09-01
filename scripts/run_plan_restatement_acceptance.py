@@ -276,10 +276,14 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
         return {"manifests":manifests, "settlement":settlement}
 
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
+    durable_debt = (
+        row["initial_lineage"]["review_state"]["debt"]
+        if roles[0] == "final" else task["existing_debt"]
+    )
     role = roles[0]
     settlement = sp.materialize_decision(
         responses[0], mode=cc.PLAN_MODE, role=role,
-        active_classes=task["active_classes"], durable_debt=task["existing_debt"],
+        active_classes=task["active_classes"], durable_debt=durable_debt,
     )
     return {"manifests":[], "settlement":settlement}
 
