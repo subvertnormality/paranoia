@@ -671,6 +671,26 @@ def test_public_plan_followups_project_and_preserve_clean_concessions(tmp_path, 
     assert history["concession"]["reason"] == "the prior demand was disproved"
 
 
+@pytest.mark.parametrize("phase", ["correction", "final"])
+def test_plan_backed_branch_followups_project_clean_concessions(tmp_path, phase):
+    closure, engine, _ = _followup_fixture(
+        tmp_path, mode=cc.BRANCH_MODE, phase=phase, concessions=True,
+    )
+    handlers._staged_structural_review(
+        engine=engine, cwd=tmp_path, model="m", effort="high",
+        mode=cc.BRANCH_MODE, body="artifact", closure=closure, stakes="s",
+        snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+        branch_contract_section="=== IMPLEMENTATION PLAN CONTRACT ===\n00001: contract",
+    )
+    expected = rc.canonical_prior_concessions(
+        closure.lineage.review_state["debt"], closure.lineage.active(),
+    )
+    assert f"PRIOR CONCESSIONS: {expected}" in engine.calls[0][0]
+    assert closure.staged_settlement["concession_challenges"] == [{
+        "class_id":"class-0", "challenge":None,
+    }]
+
+
 def _task_from_prompt(prompt: str) -> dict:
     return json.loads(prompt.split("===== TASK INPUT =====\n\n", 1)[1])
 
@@ -4876,6 +4896,51 @@ def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
     target["concession"]["reason"] += "x"
     with pytest.raises(rc.CensusError, match="64001 characters"):
         rc.canonical_prior_concessions(rows, active)
+
+
+def test_staged_preflight_accepts_exact_concession_cap_and_blocks_one_over(tmp_path):
+    def fixture_at_cap():
+        closure, engine, _ = _followup_fixture(
+            tmp_path, mode=cc.PLAN_MODE, phase="final", class_count=20,
+            concessions=True,
+        )
+        rows = closure.lineage.review_state["debt"]
+        remaining = rc.MAX_CLASS_CONTEXT_CHARS - len(
+            rc.canonical_prior_concessions(rows, closure.lineage.active())
+        )
+        for row in rows:
+            add = min(remaining, rc.MAX_CONCESSION_REASON_CHARS - len(
+                row["concession"]["reason"]
+            ))
+            row["concession"]["reason"] += "x" * add
+            remaining -= add
+        assert remaining == 0
+        assert len(rc.canonical_prior_concessions(
+            rows, closure.lineage.active(),
+        )) == rc.MAX_CLASS_CONTEXT_CHARS
+        return closure, engine
+
+    exact, exact_engine = fixture_at_cap()
+    handlers._staged_structural_review(
+        engine=exact_engine, cwd=tmp_path, model="m", effort="high",
+        mode=cc.PLAN_MODE, body="artifact", closure=exact, stakes="s",
+        snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+    )
+    assert len(exact_engine.calls) == 1
+
+    over, over_engine = fixture_at_cap()
+    target = next(
+        row for row in reversed(over.lineage.review_state["debt"])
+        if len(row["concession"]["reason"]) < rc.MAX_CONCESSION_REASON_CHARS
+    )
+    target["concession"]["reason"] += "x"
+    with pytest.raises(rc.CensusError, match="64001 characters"):
+        handlers._staged_structural_review(
+            engine=over_engine, cwd=tmp_path, model="m", effort="high",
+            mode=cc.PLAN_MODE, body="artifact", closure=over, stakes="s",
+            snapshot="p", round_no=2, on_progress=None, plan_lines=1,
+        )
+    assert over_engine.calls == []
 
 
 def test_plan_handler_replaces_artifact_demand_with_phase_bound_class(
