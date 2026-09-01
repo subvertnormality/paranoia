@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "baf80e9f33d97d6750be15aed9083d296cd4d9f26820a25bc4b09ed5d6f92816"
+      "sha256": "02b2e987e59a183dd91eaf8eda8080ee47821eb43aa09b1de4413782b4303ab0"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",
-      "sha256": "de32d8794fb3af9e55e6d1b1f921c804be108038868b298cc1161e48d6de6da7"
+      "sha256": "0eb82f0a1db5177aeba8d8f20c7cb434016258aa6c2105e77ab1a538e2056881"
     }
   },
   "claims": {
