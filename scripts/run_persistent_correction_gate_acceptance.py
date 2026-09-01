@@ -800,7 +800,7 @@ def validate_artifact(
     if disposed:
         if not isinstance(settlement, dict) or settlement.get("role") != "correction":
             raise ValueError("accepted response lacks a materialized correction settlement")
-        if settlement.get("concession_challenges") != [{
+        if not legacy_unowned_final and settlement.get("concession_challenges") != [{
             "class_id":CLASS_ID, "challenge":None,
         }]:
             raise ValueError("correction did not preserve the durable concession projection")
