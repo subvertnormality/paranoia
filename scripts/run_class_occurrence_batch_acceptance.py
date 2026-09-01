@@ -227,14 +227,24 @@ def validate_artifact(
         raise ValueError("before-lineage envelope is not closed and exact")
     active = before["classes"]
     durable_debt = before["review_state"]["debt"]
+    # This retained exchange predates the required issue #94 wire member. The
+    # fixture has no prior concessions, so project only the uniquely valid empty
+    # map for replay; keep the provider text and its digest unchanged.
+    replay_wire = json.loads(calls[-1]["response_text"])
+    if "concession_challenges" in replay_wire:
+        raise ValueError("historical response unexpectedly owns a concession challenge")
+    replay_wire["concession_challenges"] = {}
     decoded = sp.decode_decision(
-        calls[-1]["response_text"], mode=cc.BRANCH_MODE, role="correction",
+        json.dumps(replay_wire, separators=(",", ":")),
+        mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=durable_debt,
     )
     replayed_settlement = sp.materialize_decision_value(
         decoded, mode=cc.BRANCH_MODE, role="correction",
         active_classes=active, durable_debt=durable_debt,
     )
+    if replayed_settlement.pop("concession_challenges", None) != []:
+        raise ValueError("historical concession projection is not empty")
     if replayed_settlement != artifact["settlement"]:
         raise ValueError("retained provider response does not materialize to settlement")
     settlement = artifact["settlement"]
