@@ -120,11 +120,11 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged.",
-      "sha256": "782d539f8f36e21d68b9f1944145a707aca09c9563791ca26949e8bb04336dfd"
+      "sha256": "b05d13c1ed39bae1b81a7f2113502cc9150f04b8963acdfab42f12073ce918ac"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange.",
-      "sha256": "ba8e5cc896abbb08e28164d1e3c87701c77a7efaa308ac589d8981a42cc5b008"
+      "sha256": "d778cf3f528cba26515015d61b254b873a431786d401255e58cc7a70e8263eec"
     }
   },
   "attempt_ledger": [
