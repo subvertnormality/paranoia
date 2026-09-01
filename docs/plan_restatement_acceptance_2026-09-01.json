@@ -11,7 +11,7 @@
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
-      "sha256": "f3a3e42194875627480a16bd4607c5a76b855a54f3c14755df048e732bb5648e"
+      "sha256": "2e1495dd0304f0178bc29f77eead8ac1f6bbdfee74f46788cb1da4d27938d211"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
