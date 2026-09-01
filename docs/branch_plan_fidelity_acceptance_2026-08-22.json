@@ -6,7 +6,7 @@
       "sha256": "56d3c29511fc7655d1c562c2b8ff4e632727837bdd5f9bedb1ea2ceeba76ce33"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance to every plan-backed branch staged role; this does not alter branch plan-contract binding, authority, capture, propagation, successful prompts, or accepted settlement.",
+      "scope": "Operator-facing staged failure taxonomy and plan-only closure handling remain documented; validation-retry-only bounded plan-anchor coordinate guidance does not alter branch plan-contract binding, authority, capture, propagation, successful prompts, or accepted settlement.",
       "sha256": "ea3e1c38cb0c630cc7f75925028b6275412694dcae8f7f445d8637488d715576"
     },
     "src/paranoia_local/prompts.py": {

@@ -1768,23 +1768,23 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior.",
-        "sha256": "82c373a0f3300e6efc1c69de1301f07445e4c3a467995774506324d69a7788b3"
+        "sha256": "56865cdf2f36655f0ee10890275cb69f082547e56c6c3912f7eb9769105f4c9c"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior.",
-        "sha256": "88d3efd41d91f425725588bac320609bfaa6542620983b14babb1bf4242fcbc8"
+        "sha256": "1b6ed9c2c17bf300fc49bc4bcab06867f66b6ed73adab4332ee40bb1045df42b"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
-        "sha256": "b255c87d7c28b0188f5244ce7c442456b631500e5e78443798288441a4a1a8a5"
+        "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
         "scope": "Adds validation-retry-only bounded plan-anchor coordinate guidance without changing retained successful deterministic replay behavior.",
-        "sha256": "c43ed648a108b726c3a2429bbe1450df2dee99824fe76528b998fd2b94dcf4c5"
+        "sha256": "c65c7b7edd5e578e3a26ef3e695811310f77d5b240829643e9c23ddd47fcdf27"
       },
       "tests/test_review_census.py": {
         "scope": "Adds rebut debt-id, plan-final prompt-digest, and public plan consolidation anchor-retry regressions without changing retained deterministic replay behavior.",
-        "sha256": "9aaf06047a7ad68881f71f20ad600645d3de64acc564d931cc40d11a0fcc7b8c"
+        "sha256": "860f36a29d4a417f5285620eb84756682c4ecf526b20513dedc0397bf1710238"
       }
     },
     "checks": {
