@@ -610,6 +610,92 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     assert cache_kwargs["snapshot"] == audit["structural_snapshot"]
 
 
+def test_public_branch_consolidation_repairs_long_plan_anchor_manifest_only(
+    repo_with_branch: Path, tmp_path: Path, monkeypatch,
+):
+    contract = "\n".join(f"contract line {number}" for number in range(1, 5261))
+    plan = tmp_path / "long-contract.md"
+    plan.write_text(contract, encoding="utf-8")
+    valid_anchor = "plan:4001"
+    invalid_anchor = "plan:40011"
+    retry_prompts = []
+
+    def lane_response(name):
+        value = _lane(name)
+        if name == "behaviour":
+            value["findings"] = [{
+                "id":"F1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[valid_anchor], "remedy":"add the guard",
+            }]
+            value["coverage"][0].update(
+                status="finding", evidence=[valid_anchor], finding_ids=["F1"],
+            )
+        return _wire(value)
+
+    def decision(anchor):
+        return _wire({
+            "role":"census", "governing_findings":[{
+                "id":"G1", "severity":"MAJOR", "summary":"missing guard",
+                "evidence":[anchor], "remedy":"add the guard",
+                "source_ids":["behaviour:F1"],
+                "classification":{"kind":"one_off", "reason":"contract-local gap"},
+            }],
+            "debt_outcomes":[], "class_actions":{},
+        })
+
+    def run(self, prompt, *args, **kwargs):
+        if "ROLE: census lane" in prompt:
+            name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            text = lane_response(name)
+            session = f"lane-{name}"
+        else:
+            text = decision(invalid_anchor)
+            session = "consolidation-session"
+        return Review(text=text, raw=text, session_ref=session)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "consolidation-session"
+        retry_prompts.append(prompt)
+        text = decision(valid_anchor)
+        return Review(text=text, raw=text, session_ref=session_ref)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_branch({
+        "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
+        "lineage":"long-branch-consolidation-anchor", "round":1,
+        "stakes":"trusted local tool", "plan_path":str(plan),
+    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+       now=lambda:"LONG-BRANCH")
+
+    assert "STRUCTURAL-ERROR" not in result
+    assert len(retry_prompts) == 1
+    retry = retry_prompts[0]
+    assert "exactly 5260 lines" in retry
+    assert "line 4001, column 1 is `plan:4001`, never `plan:40011`" in retry
+    assert "unresolvable plan anchor 'plan:40011'" in retry
+    assert "BRANCH CONTRACT AUTHORITY" not in retry
+    assert "contract line 4001" not in retry
+    audit = json.loads(next((tmp_path / "logs").glob(
+        "LONG-BRANCH-critique_branch-*.json"
+    )).read_text())
+    assert [row["role"] for row in audit["attempt_ledger"]][-2:] == [
+        "consolidation", "consolidation-validation-retry",
+    ]
+    assert [row["outcome"] for row in audit["attempt_ledger"]][-2:] == [
+        "validation-invalid", "completed",
+    ]
+    assert audit["rejected_payloads"][0]["role"] == "consolidation"
+    settled = cc.load_lineage(
+        cc.default_state_root(), "long-branch-consolidation-anchor",
+        stamp="after", mode=cc.BRANCH_MODE,
+    )
+    assert settled.review_state["debt"][0]["evidence"] == [valid_anchor]
+
+
 @pytest.mark.parametrize("action", ["mutate", "delete"])
 def test_captured_path_survives_correction_final_and_settlement_identity(
     repo_with_branch: Path, tmp_path: Path, monkeypatch, action: str,

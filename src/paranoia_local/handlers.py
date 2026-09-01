@@ -1635,10 +1635,8 @@ def _staged_structural_review(
                     role="census",
                 ),
                 retry_context=(
-                    "\n\n".join(filter(None, (
-                        branch_contract_section,
-                        _plan_anchor_retry_context(plan_lines),
-                    ))) if plan_lines is not None else None
+                    _plan_anchor_retry_context(plan_lines)
+                    if plan_lines is not None else None
                 ),
             )
         except rc.CensusError as error:
