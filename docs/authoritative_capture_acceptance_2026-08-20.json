@@ -103,8 +103,8 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "2a9dd74274eb6df9ac6b539f2c45258858a8bc3502058a029c4b08f93167ca01",
-      "additions": 1862,
+      "sha256": "4b35fe4e76291640eead716358c191d9572164f7c517e0b7fc355d9cc254109c",
+      "additions": 1869,
       "deletions": 180,
       "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through structural final settlement only."
     },
