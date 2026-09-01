@@ -2,7 +2,7 @@
   "acceptance_kind": "code-branch-class-persistence-reopen-lifecycle",
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan and plan-backed branch lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation is bound-only and manifest-only; contract-free branch retries remain unchanged. This does not alter staged class persistence, reopen derivation, accepted settlement, rendering, or durable reload.",
+      "scope": "Claim-evidence source-local and aggregate capture failure-phase classification, completed-capture metadata, and ordered terminal claim-debt attempt projection only; this does not alter staged class persistence, reopen derivation, settlement, rendering, or durable reload. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
       "sha256": "3bddbc4ea55904389ca1acaee48ea3678e3a8d81bf27130d180ca1b725735325"
     },
     "src/paranoia_local/review_census.py": {

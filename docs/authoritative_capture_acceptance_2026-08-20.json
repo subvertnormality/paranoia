@@ -106,7 +106,7 @@
       "sha256": "f85d9ef2c7c4f449f8e6d0982c3bf78f8af9249d4c0dc44907c58f2bbd53fbe3",
       "additions": 1841,
       "deletions": 175,
-      "scope": "Plan structural protocol, correction control, audit trailers, branch contracts, staged-state validation, mechanized registration, evidence diagnostics, and claim deadlines remain covered. Plan and plan-backed branch lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries remain unchanged. This does not alter capture, binding, cold-attestation success behavior, prompt size, or source-admission semantics proved by this record."
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, and ordered terminal retry diagnostics through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged."
     },
     "allowed_later_review_census_diff": {
       "sha256": "b7fdcf91dcc4e0e7f9be2bccf3b258841a94f8fb9398efcf3a4d230ef4503109",

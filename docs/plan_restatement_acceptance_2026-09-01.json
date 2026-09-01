@@ -2,11 +2,11 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents acceptance replay and structural-validator rules, complete-package source identity, raw stdout, derived channels, exact return codes, stderr and wall-clock proof boundaries, plus Issue #91 retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
       "sha256": "272c90a1e9d48887fe6829c5de4a4fc2e953369ed7b927d68c0e8cb0e81d1ef9"
     },
     "README.md": {
-      "scope": "Documents complete-package source, raw-stdout, derived-channel, return-code, stderr and wall-clock acceptance boundaries plus Issue #91 retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff.",
       "sha256": "98c96982517c84272f72aea2c404280a0cf99dfb42304c7fb8fcaf1d9405bed2"
     },
     "scripts/run_plan_restatement_acceptance.py": {

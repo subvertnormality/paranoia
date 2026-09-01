@@ -2,7 +2,7 @@
   "acceptance_kind": "persistent-correction-gate-public-plan-handler",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class occurrence, rebut, arbitration, plan restatement, complete-package source/raw/derived-channel/return-code/stderr/wall-clock proof boundaries, and Issue #91 retry grammar; executable lifecycle coverage belongs to test allowances, while the retained correction-gate run, control state, and source binding remain unchanged.",
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
       "sha256": "7eb8bd7b2428d726c0b6c9fc7a1accaa668cc3a55e4a669bc1055488f1e4e325"
     },
     "docs/how-it-works.md": {
@@ -26,7 +26,7 @@
       "sha256": "8d0fc720c4e4357d875c195c182171b28bcf2fe68d0786d1721b117c787d861e"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan and plan-backed branch lanes and correction/final retries receive exact plan-bound coordinate repair; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, correction-gate transition, initial prompts, and accepted settlement remain unchanged.",
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged; the retained correction-gate transition is unchanged.",
       "sha256": "99a12d43e16c0d91a910389abb6700f194a67cbe8ee76203a0885a906ae4ac3a"
     },
     "src/paranoia_local/plan_claims.py": {
@@ -54,11 +54,11 @@
       "sha256": "16048ab7b566e59f4325b932899fa463b0190ff2f42e62165db2a995a9c49908"
     },
     "tests/test_handlers.py": {
-      "scope": "Adds exact rebut settlement coverage and bounded plan-anchor retry-context examples, including short-plan bounds.",
+      "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples, including short-plan bounds.",
       "sha256": "4b852f01f7069b00bb7320c00e3541f73a1e81f7639f5411159240407e2797a7"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds aggregate-occurrence, plan-restatement, and 5,260-line public plan census, correction, and final anchor-retry lifecycle coverage while retaining historical correction-gate assertions.",
+      "scope": "Adds public aggregate-occurrence and plan-restatement prompt coverage alongside existing preflight regressions while retaining the historical correction-gate assertions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle coverage.",
       "sha256": "aadfb04c434537df7da4bce94677f71939bcf8959823315e3df35e7d174dccc7"
     }
   },

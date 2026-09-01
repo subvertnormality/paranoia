@@ -2,11 +2,11 @@
   "acceptance_kind": "plan-review-reliability-real-provider-v1",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents debt-targeted rebut settlement, arbitration taxonomy, plan restatement, complete-package source identity, raw stdout, derived channels, exact return codes, stderr and wall-clock proof boundaries, plus Issue #91 retry grammar; executable 5,260-line coverage belongs to test allowances.",
+      "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances.",
       "sha256": "82c373a0f3300e6efc1c69de1301f07445e4c3a467995774506324d69a7788b3"
     },
     "README.md": {
-      "scope": "Documents public rebut and plan-restatement behavior, complete-package source, raw-stdout, derived-channel, return-code, stderr and wall-clock acceptance boundaries, plus Issue #91 retry grammar; executable 5,260-line coverage belongs to test allowances.",
+      "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances.",
       "sha256": "88d3efd41d91f425725588bac320609bfaa6542620983b14babb1bf4242fcbc8"
     },
     "docs/tool-reference.md": {
@@ -18,7 +18,7 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries, initial prompts, accepted settlement, and retained attempt semantics remain unchanged.",
+      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged.",
       "sha256": "9e67c423f37fc0c930f39e8db8755a92b8865156b9d13293e89c4729de63f018"
     },
     "src/paranoia_local/prompts.py": {
@@ -38,7 +38,7 @@
       "sha256": "2dc3418afe35fbd71f74a613a03970fbbbc1fa19a60538eeec5333022ca6ddfb"
     },
     "tests/test_review_census.py": {
-      "scope": "Phase projection, rebut settlement, plan-final prompt digest, and 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions.",
+      "scope": "Phase projection, rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds 5,260-line public plan census, correction, and final anchor-retry lifecycle regressions.",
       "sha256": "cdfdea02114ea6fc45f30f9b97e13e7608cb8a49b839001dd5765dc1eb1a55c4"
     }
   },
@@ -1767,11 +1767,11 @@
   "validation": {
     "allowed_later_source_diffs": {
       "AGENTS.md": {
-        "scope": "Documents arbitration, plan restatement, complete-package source/raw/derived-channel/return-code/stderr/wall-clock proof boundaries, and Issue #91 retry grammar without changing retained deterministic replay behavior; executable lifecycle coverage belongs to test allowances.",
+        "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
         "sha256": "56865cdf2f36655f0ee10890275cb69f082547e56c6c3912f7eb9769105f4c9c"
       },
       "README.md": {
-        "scope": "Documents complete-package source/raw/derived-channel/return-code/stderr/wall-clock acceptance and Issue #91 retry grammar without changing retained deterministic replay behavior; executable lifecycle coverage belongs to test allowances.",
+        "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
         "sha256": "1b6ed9c2c17bf300fc49bc4bcab06867f66b6ed73adab4332ee40bb1045df42b"
       },
       "docs/tool-reference.md": {
@@ -1779,11 +1779,11 @@
         "sha256": "effa1db6014df408b138532fe5f51ea0da65575cbdd4c65b9d7524f6fd920336"
       },
       "src/paranoia_local/handlers.py": {
-        "scope": "Plan and plan-backed branch lanes and correction/final retries receive exact bound guidance; plan-backed consolidation remains manifest-only; contract-free retries and retained successful replay remain unchanged.",
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
         "sha256": "f817a92cff46d019845e9d4796e444ccc5f714f6236701fa2011062fc231eed1"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds rebut debt-id, plan-final prompt-digest, and public plan consolidation anchor-retry regressions without changing retained deterministic replay behavior.",
+        "scope": "Adds rebut debt-id and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds public plan consolidation anchor-retry regressions.",
         "sha256": "646ed775dbdaa2315a86393d64d4525166772ee70cf97b48b33278f870e47062"
       }
     },
