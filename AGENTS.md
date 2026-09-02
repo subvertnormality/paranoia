@@ -167,6 +167,9 @@ schema to the target class so mechanized classes cannot express close/reopen, wh
 semantic validation and the class-engine dry-run remain authoritative for state/outcome
 compatibility. Capability-gate the exact compact minimum and maximum generated schemas on fresh and
 resumed Codex and Claude routes; unsupported schema dialect or transport size blocks the cutover.
+For keyed correction outcomes, require every permitted property in the provider schema and make
+only semantically optional values nullable; project null values away before canonical validation.
+Never expose a property set wider than `required`, because Codex rejects that schema before review.
 When a correction fresh finding targets a debt-bound class, require that class's authored violated
 outcome to use `new_finding` basis naming the exact finding; `carried_debt` is legal only when no
 fresh existing-class finding targets that class. Preserve independently authored finding evidence,

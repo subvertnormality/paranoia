@@ -139,8 +139,10 @@ def class_decision_instructions(
     )
     return (
         "class_outcomes is a closed object permitting exactly these class IDs: "
-        f"{json.dumps(permitted_outcome_ids, ensure_ascii=False)}; required keys are exactly: "
-        f"{json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
+        f"{json.dumps(permitted_outcome_ids, ensure_ascii=False)}. Every permitted key is "
+        "required by the provider schema; use null for a semantically optional outcome "
+        "that you are not authoring. Non-null outcomes are required exactly for these "
+        f"class IDs: {json.dumps(list(outcome_class_ids), ensure_ascii=False)}. "
         "class_actions is a closed object with one independent-action slot per active "
         "class. Every listed key is required; use null when no "
         "independent action is needed. The exact current decision surface is: "
@@ -556,7 +558,14 @@ def decision_schema(
             definitions["class_outcome"] = _class_outcome_body()
             properties["class_outcomes"] = _object(
                 {
-                    cid:{"$ref":"#/$defs/class_outcome"}
+                    cid:(
+                        {"$ref":"#/$defs/class_outcome"}
+                        if cid in outcome_ids
+                        else {"anyOf":[
+                            {"type":"null"},
+                            {"$ref":"#/$defs/class_outcome"},
+                        ]}
+                    )
                     for cid in permitted_outcome_ids
                 },
                 required=outcome_ids,
@@ -610,10 +619,14 @@ def provider_schema(schema: Any) -> Any:
     """
 
     if isinstance(schema, dict):
-        return {
+        projected = {
             key: provider_schema(value)
             for key, value in schema.items() if key not in {"uniqueItems", "$schema"}
         }
+        properties = projected.get("properties")
+        if projected.get("type") == "object" and isinstance(properties, dict):
+            projected["required"] = list(properties)
+        return projected
     if isinstance(schema, list):
         return [provider_schema(value) for value in schema]
     return schema

@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "59df442b50d3d7ca57f2cbd258227bb984a602b400ed72c80b954f1aa31659ba"
+      "sha256": "e047ea29956b584482d31d5b2a5229b93310153326c48329673d75cd5e6a4304"
     },
     "README.md": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
@@ -11,7 +11,7 @@
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
-      "sha256": "f3a3e42194875627480a16bd4607c5a76b855a54f3c14755df048e732bb5648e"
+      "sha256": "2e1495dd0304f0178bc29f77eead8ac1f6bbdfee74f46788cb1da4d27938d211"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
@@ -35,11 +35,11 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery.",
-      "sha256": "53d5aff59a4cd9855f4712df7326d3b7702423b79fe199caf6de90e24addced3"
+      "sha256": "cad7519a423d37e5ca7b6d86f5347d2351181b1ed6a14870069f71fdf76c7e54"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "dce50a3dbb20be933d950155860d64d7d17564ad29538bc47228348588c80765"
+      "sha256": "33f87b7a3ae75ce216dfd5aab7a846cc81523d03504541bffe3e1138aec640d5"
     },
     "tests/test_prompts.py": {
       "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged.",

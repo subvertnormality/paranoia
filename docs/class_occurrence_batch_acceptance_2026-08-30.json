@@ -1,7 +1,7 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
-    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation plus exact projection of the empty issue #94 concession member and issue #98's future prompt addition when replaying this historical provider payload without changing its retained bytes or digest.", "sha256": "da852ac7b0dfae68f9dd232592764fe529c6fbe6ae390b43601cdec09dca1e92"},
+    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed exact later-diff validation plus exact projection of the empty issue #94 concession member and issue #98's future prompt addition when replaying this historical provider payload without changing its retained bytes or digest.", "sha256": "c0fb50d3b923796546cf9d9f7d4a7efa00f93f664abcbf56838fec9b8183f39e"},
     "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
     "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
     "src/paranoia_local/engines.py": {"scope": "Updates the future Claude default and minimum CLI; branch class-occurrence aggregation and the retained Codex provider exchange are unchanged.", "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"},
@@ -9,8 +9,8 @@
     "src/paranoia_local/prompts.py": {"scope": "Bound-rebut, arbitration, restatement, concession-challenge guidance, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider exchange remains historical.", "sha256": "0dee00ce1c390b8aacd8c4302652e2d57d847dd20d71e8102b1387b583246ce3"},
     "src/paranoia_local/review_census.py": {"scope": "Debt-targeted settlement and separately tested durable concession history; branch occurrence materialization is unchanged.", "sha256": "f1fc33ce98dd4c471b4b560d4ae465426facc74b0c6a92a27a8d70237645967f"},
     "src/paranoia_local/server.py": {"scope": "Public rebut identity, arbitration diagnostics, concession challenge schema, and the future Claude default description; branch occurrence handling is unchanged.", "sha256": "a896bb81d25f03b406500556287482ca9df18af1c7329903429ee8fd911ac114"},
-    "src/paranoia_local/staged_protocol.py": {"scope": "Issue #94 adds exact concession challenge validation independently of class occurrence aggregation.", "sha256": "53d5aff59a4cd9855f4712df7326d3b7702423b79fe199caf6de90e24addced3"},
-    "tests/test_review_census.py": {"scope": "Adds isolated concession-history, malformed-state, lifecycle, and invariant-scoped multi-category correction regressions; the retained branch occurrence exchange is unchanged.", "sha256": "f2fffc70f9f0c1b01552eac19fb499eb9e647135c0f906cbe78bc16e914d27c6"}
+    "src/paranoia_local/staged_protocol.py": {"scope": "Issue #94 adds exact concession challenge validation independently of class occurrence aggregation.", "sha256": "cad7519a423d37e5ca7b6d86f5347d2351181b1ed6a14870069f71fdf76c7e54"},
+    "tests/test_review_census.py": {"scope": "Adds isolated concession-history, malformed-state, lifecycle, and invariant-scoped multi-category correction regressions; the retained branch occurrence exchange is unchanged.", "sha256": "e85c2a6fb50a20758d634fcca79c54f4a6d81ecad985a01501be152dc0b3cbf9"}
   },
   "version": 1,
   "date": "2026-08-30",

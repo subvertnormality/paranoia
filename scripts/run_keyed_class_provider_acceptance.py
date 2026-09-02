@@ -36,6 +36,7 @@ def historical_issue_98_schema(
     outcomes["properties"] = {
         class_id:outcomes["properties"][class_id] for class_id in outcome_ids
     }
+    outcomes["required"] = list(outcome_ids)
     return value
 
 

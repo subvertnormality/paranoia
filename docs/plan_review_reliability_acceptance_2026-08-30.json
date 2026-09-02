@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "51a44240781792be41f90cddaec4e5ab3f73790396407485173fc6cf7c96c9f4"
+      "sha256": "225e3cd2e1b3b083d31f45bf94f055a7bae0d2f925305c3f5d70862011cf6387"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances. Issue #95 documents that a pending final is discharged only by its owning engine.",
@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged.",
-      "sha256": "53d5aff59a4cd9855f4712df7326d3b7702423b79fe199caf6de90e24addced3"
+      "sha256": "cad7519a423d37e5ca7b6d86f5347d2351181b1ed6a14870069f71fdf76c7e54"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
@@ -43,11 +43,11 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "f2fffc70f9f0c1b01552eac19fb499eb9e647135c0f906cbe78bc16e914d27c6"
+      "sha256": "e85c2a6fb50a20758d634fcca79c54f4a6d81ecad985a01501be152dc0b3cbf9"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "22bb885bc59a985f862c4c562f0fd1603c7ec775c8e58b4adb86489e69cbdb1a"
+      "sha256": "b23b92bf458642bd3066020072713fa3ec8da09be449a64e7dcdc1ebd7536800"
     }
   },
   "assertions": [
@@ -1776,7 +1776,7 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-        "sha256": "e64d29d4054b87eefd7640ade4dba76e78d82f83daf4b915913b11e53cfb061b"
+        "sha256": "6b034ae33a7d1b10f75171bd68207b773aabef6d918d38c40bb95977fc637506"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-        "sha256": "b6fe435d4d329f0e75ac909648e3e5d00418bad52a6831c559cf60341d3959e0"
+        "sha256": "d4485be7b722aa21f633fe418dc0fd1981542a44505ac9148068124037eea251"
       }
     },
     "checks": {

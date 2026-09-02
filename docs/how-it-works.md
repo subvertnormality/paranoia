@@ -250,6 +250,10 @@ Audit logs are diagnostic, not a recovery protocol.
 - A tracked census normally uses three concurrent calls plus consolidation.
 - Correction and final use one main call; each staged role can receive one
   bounded same-session validation correction.
+- Keyed correction schemas include one required slot per active class because
+  provider structured output requires every declared property to be required.
+  Slots outside the correction's semantic outcome set are nullable and are
+  projected away before canonical validation and settlement.
 - A late plan correction may broaden the search within that same main call; it
   does not add a role or another provider call.
 - Verified plan round 1 adds discovery, binding, and cold attestation.
