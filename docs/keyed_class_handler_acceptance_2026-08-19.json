@@ -112,7 +112,7 @@
   "allowed_later_source_diffs": {
     "scripts/run_keyed_handler_acceptance.py": {
       "scope": "Adds deterministic source/diff/scope metadata for this retained exchange without changing its provider bytes, settlement, or durable result.",
-      "sha256": "fb4e397f16dfd63180d146ba414649be43f1365b50ef38b60c0ebc187899dddd"
+      "sha256": "0a8d45c276f6b4f9b4cabfaa0e58046870ed2bc25f65d4195ed6cbf4bdf2f937"
     },
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds durable member inventory to future unmechanized classes; this retained historical provider exchange and settlement remain unchanged.",

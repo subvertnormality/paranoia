@@ -35,6 +35,42 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
+def historical_issue_98_schema(
+    schema: dict, *, role: str, outcome_ids: list[str],
+) -> dict:
+    """Project the current schema to this retained pre-#98/#106 wire surface."""
+    value = json.loads(json.dumps(schema))
+
+    def project(node):
+        if isinstance(node, dict):
+            alternatives = node.get("anyOf")
+            if isinstance(alternatives, list):
+                node["anyOf"] = [
+                    item for item in alternatives
+                    if "member_coverage" not in item.get("properties", {})
+                ]
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "members" in properties:
+                properties.pop("members")
+                node["required"] = [
+                    item for item in node.get("required", []) if item != "members"
+                ]
+            for child in node.values():
+                project(child)
+        elif isinstance(node, list):
+            for child in node:
+                project(child)
+
+    project(value)
+    if role == "correction":
+        outcomes = value["properties"]["class_outcomes"]
+        outcomes["properties"] = {
+            class_id:outcomes["properties"][class_id] for class_id in outcome_ids
+        }
+        outcomes["required"] = list(outcome_ids)
+    return value
+
+
 def bytes_digest(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
