@@ -126,6 +126,9 @@ def _historical_no_concession_prompt(prompt: str) -> str:
             )
         for row in task.get("active_classes", []):
             row.pop("members", None)
+        task["artifact"] = task["artifact"].replace(
+            "\n  authoritative members: MISSING — replace before satisfaction", "",
+        )
         prompt = head + found + json.dumps(task, ensure_ascii=False)
     return prompt
 
