@@ -557,7 +557,7 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1, concessions=False
         classes[class_id] = cc.TrackedClass(
             class_id, f"invariant {index}", cc.MAJOR, 1,
             cc.OPEN if phase == "correction" else cc.CLOSED,
-            procedure=f"inspect {index}", members=("fixture-member",),
+            procedure=f"inspect {index}", members=("reviewed-path",),
         )
         if phase == "correction":
             debt.append({
@@ -2173,13 +2173,13 @@ def wire_value(value):
         if isinstance(node, dict):
             if node.get("verdict") == "satisfied" and "evidence" in node:
                 node["member_coverage"] = [{
-                    "member_id":"fixture-member", "evidence":node.pop("evidence"),
+                    "member_id":"reviewed-path", "evidence":node.pop("evidence"),
                 }]
             if (
                 "procedure" in node and "invariant" in node and "severity" in node
                 and "members" not in node
             ):
-                node["members"] = ["fixture-member"]
+                node["members"] = ["reviewed-path"]
             for child in node.values():
                 prepare(child)
         elif isinstance(node, list):
@@ -2456,7 +2456,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
     active = [{
         "class_id":"class-a", "invariant":"invariant a", "severity":"MAJOR",
         "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
-        "procedure":"inspect it", "members":["fixture-member"],
+        "procedure":"inspect it", "members":["reviewed-path"],
     }]
     coverage = [
         {
@@ -3025,7 +3025,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
         lineage,
         cc.Register(new_classes=(cc.NewClass(
             "class outcomes preserve integrity evidence", "MAJOR",
-            procedure="inspect consolidation", members=("fixture-member",),
+            procedure="inspect consolidation", members=("reviewed-path",),
         ),)),
         round_no=0,
     )[0]
@@ -4780,7 +4780,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         "definitions, call sites, and acceptance properties all agree",
         cc.MAJOR, 1, cc.OPEN,
         procedure="inspect definitions, call sites, and acceptance properties",
-        members=("fixture-member",),
+        members=("reviewed-path",),
     )
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
     state.update(phase="correction", debt=[{
@@ -4888,7 +4888,7 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         cid:cc.TrackedClass(
             cid, invariant, cc.MAJOR, 1, cc.OPEN,
             procedure="inspect every independently anchored site",
-            members=("fixture-member",),
+            members=("reviewed-path",),
         )
         for cid, invariant in (
             ("debt-class", "the known blocker is repaired"),
@@ -4991,14 +4991,14 @@ def test_public_correction_retries_evidence_free_standalone_close(
     classes = {
         "debt-class":cc.TrackedClass(
             "debt-class", "the known blocker is repaired", cc.MAJOR, 1, cc.OPEN,
-            procedure="inspect the known blocker", members=("fixture-member",),
+            procedure="inspect the known blocker", members=("reviewed-path",),
         ),
         "category-class":cc.TrackedClass(
             "category-class",
             "definitions, call sites, and acceptance properties all agree",
             cc.MAJOR, 1, cc.OPEN,
             procedure="inspect definitions, call sites, and acceptance properties",
-            members=("fixture-member",),
+            members=("reviewed-path",),
         ),
     }
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
@@ -5300,7 +5300,7 @@ def test_concession_history_is_closed_exact_and_survives_review_resets():
 def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
     active = [cc.TrackedClass(
         f"class-{index:02d}", f"invariant {index}", cc.MAJOR, 1, cc.CLOSED,
-        procedure="inspect it", members=("fixture-member",),
+        procedure="inspect it", members=("reviewed-path",),
     ) for index in range(20)]
     rows = [{
         "id":f"D{index:02d}", "finding_id":f"F{index:02d}", "status":"closed",

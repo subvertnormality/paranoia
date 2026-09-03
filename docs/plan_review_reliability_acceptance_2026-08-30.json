@@ -43,11 +43,11 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "417996f0ab1f6fc446951ee582adc67dca54db2314f93716576e3e488e9eb058"
+      "sha256": "d7358be0201482470556c0f034b21040403c6f1d5ee2482a9c22e568ffb90361"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged. Issue #106 tests subset, unknown, duplicate, generic, shared-anchor, and canonical member-coverage boundaries; retained exchanges remain historical.",
-      "sha256": "4ebbae923f4eb1ea0e1348a39f8be8a8c278bdb4d6a7d219f1cac7c7ef23a9d2"
+      "sha256": "9f17d03ab50ee8e8cf2f078381be184cfbd1eba4b037ede3dd4b6297719c14ae"
     }
   },
   "assertions": [
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-          "sha256": "d4691f90bb9d993803ed302118ee0c44ea88b29f1eba74c2ff9c3b3e96386a59"
+          "sha256": "0854354775564ad11ef05b23e04bee7fac060cedf368b53e06271cb760acbd80"
       }
     },
     "checks": {

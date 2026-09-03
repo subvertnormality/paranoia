@@ -57,13 +57,13 @@ def wire_value(value):
         if isinstance(node, dict):
             if node.get("verdict") == "satisfied" and "evidence" in node:
                 node["member_coverage"] = [{
-                    "member_id":"fixture-member", "evidence":node.pop("evidence"),
+                    "member_id":"reviewed-path", "evidence":node.pop("evidence"),
                 }]
             if (
                 "procedure" in node and "invariant" in node and "severity" in node
                 and "members" not in node
             ):
-                node["members"] = ["fixture-member"]
+                node["members"] = ["reviewed-path"]
             for child in node.values():
                 prepare(child)
         elif isinstance(node, list):
@@ -200,7 +200,7 @@ def active_class(
         "pattern": "BAD" if mechanized else None,
         "pathspec": "*.py" if mechanized else None,
         "procedure": None if mechanized else "inspect the recurring path",
-        "members": [] if mechanized else ["fixture-member"],
+        "members": [] if mechanized else ["reviewed-path"],
     }
 
 
@@ -1685,7 +1685,7 @@ def test_new_class_keeps_independent_severity_and_record_binding():
     assert parsed["class_records"] == [{
         "op": "new", "invariant": "all copies preserve identity",
         "severity": "BLOCKER", "procedure": "inspect every copied identity",
-        "members": ["fixture-member"],
+        "members": ["reviewed-path"],
     }]
     assert parsed["debt"][0]["id"] == "D1"
     assert parsed["class_dispositions"][0]["record_index"] == 0
@@ -2703,7 +2703,7 @@ def historical_v1_reference(
     current_records = deepcopy(obj["class_records"])
     for row in current_records:
         if row["op"] in {"new", "replace", "supersede"} and "procedure" in row:
-            row["members"] = ["fixture-member"]
+            row["members"] = ["reviewed-path"]
     obj["class_records"] = current_records
     register = rc.register_from_records(
         current_records, mechanized=None if mode == cc.BRANCH_MODE else False,

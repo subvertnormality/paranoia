@@ -73,7 +73,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "d60d6cac3ca400d38e2d74e62b679b528081ec71d2e502ca56305d64ecd90521"
+      "sha256": "f98f9813f7f7f6cba2ead7175bf723e972086a2556ed9e860427760895f4b089"
     }
   },
   "after_lineage": {
