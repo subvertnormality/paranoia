@@ -183,9 +183,9 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     }
     cached["census_cache"] = {
         "version":rc.CENSUS_CACHE_VERSION, "mode":cc.PLAN_MODE,
-        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
-        "input_digest":"input", "active_classes_digest":"classes",
-        "manifests":[{"lane":"domain"}],
+            "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+            "input_digest":"input", "active_classes_digest":"classes",
+            "manifests":[{"lane":"domain"}], "member_coverage":{},
     }
     accepted.append(cached)
 
@@ -272,9 +272,9 @@ def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
     cache_state["validation_debt"] = "legacy validation failure"
     cache_state["census_cache"] = {
         "version":rc.CENSUS_CACHE_VERSION, "mode":[],
-        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
-        "input_digest":"input", "active_classes_digest":"classes",
-        "manifests":[],
+            "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+            "input_digest":"input", "active_classes_digest":"classes",
+            "manifests":[], "member_coverage":{},
     }
     with pytest.raises(rc.CensusError, match="cache mode"):
         rc.validate_persisted_state(cache_state, [])

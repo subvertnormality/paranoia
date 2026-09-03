@@ -43,7 +43,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "1ec71fe38fb9cc3dc2e50d3021a0abc0d5ef9ed03a172431ffbd736321575d84"
+      "sha256": "27f07b45e0641e321ad52794a797aa41bae2951b131a487c8b69459e12bd1015"
     },
     "tests/test_prompts.py": {
       "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments; retained exchanges remain historical.",

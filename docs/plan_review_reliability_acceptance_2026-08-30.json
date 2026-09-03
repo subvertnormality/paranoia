@@ -43,7 +43,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "613620ec92279b683ef13db51264762ca2319336ab50b61e40970c4e7a00f0b8"
+      "sha256": "9c2bba4c4c0fa5590cf689846478eb4f180bb4f23f0e6a99d9a19f2e3299af2e"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged. Issue #106 tests subset, unknown, duplicate, generic, shared-anchor, and canonical member-coverage boundaries; retained exchanges remain historical.",
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-          "sha256": "78b75b3447d447942e2e79c65ea85e1d83f416f2c8231437dfe4bd26bcfc0284"
+          "sha256": "b9a0ce2a9b8618d37361218756bcf103dfeebfcb782c0c86a4a8b74e5a1a7f47"
       }
     },
     "checks": {
