@@ -144,7 +144,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "37ecadd84c4a27aa284ede16782bda2edb7f115f42701422c9bcff3a82e13c9d"
+      "sha256": "b2c72ed181a81993ba017c28d23aa3d1f1ea83303891f96580a93749a0315c95"
     }
   },
   "attempt_ledger": [

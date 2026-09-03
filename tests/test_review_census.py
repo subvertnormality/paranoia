@@ -765,19 +765,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "2b594c4f138e5bffd0d73b4e5aed45d8acb6e8e745103a46c0f8be8bed1bc64b",
+            "87e1347e3f6e218a4d5de37a95d65f22709e11a083c5ae3a89c3794b037558f3",
         "ea19029412e0e8854fe486279b04c0585540c820dbd3007f31b131ae6e0a54ea",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "2ef20662f49199ea77e20c1e93e40458a21095e347c1a5b782f0e74ac4b9b554",
+            "6b9722e93512f1b6e5b20139d71f499d0239e2e7967762f9aaa46242731f889e",
         "6a8cc807cc90cd736e887c75ae0ebf017a6df86e1c752dd874a54ffafb69ddd8",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "7714089f9a6b2410a15065392a58adf62cbeb34093de50c4662a1edcf9f2b8ab",
+            "cf0efb102fdf304c62285575aee412794e67116eee4742bf2cda3b0f464d2292",
         "335a29dc889acdf9bf9f545f61e25fa425553882b6dc1b3c83835d2b0d62cd9a",
         "clear",
     ),
