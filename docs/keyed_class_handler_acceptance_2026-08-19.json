@@ -136,7 +136,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Carries future unmechanized member inventories through canonical class records; this retained historical provider exchange and settlement remain unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "5bfec9a01cdc673abdde71cdb002a10c7ff6b6f0b7a26872898c11cfbddba057"
+      "sha256": "2437d3aa6a244ab3c45e5ce10345dec652fafec283e5c332acc24766ec4e12e7"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",

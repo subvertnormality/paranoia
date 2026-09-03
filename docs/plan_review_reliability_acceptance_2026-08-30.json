@@ -27,7 +27,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "5d101d749652bacc6d0b5dc71bdb14aa2e8e510f171307229f5c81c5a6cae80c"
+      "sha256": "f51a77a8c1c47da1059f7b88aa199200a2b2a8d1f5f33f90b24bc1f5918f1669"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",

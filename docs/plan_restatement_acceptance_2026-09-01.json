@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "ef84464a1bba695ac8c1f4f19eb6cd035c610ccc19ea81f4631f55107a3f3ba3"
+      "sha256": "e4be1b22d60be2754afe18e12be87ce873d440242ebe3ea602aa64002bceae18"
     },
     "src/paranoia_local/server.py": {
       "scope": "Issue #94 documents the new structured concession-challenge field; retained provider exchanges are unchanged.",

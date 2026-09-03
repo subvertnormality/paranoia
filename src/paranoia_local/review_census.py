@@ -581,7 +581,7 @@ def validate_persisted_state(
         cache = state["census_cache"]
         cache_keys = {
             "version", "mode", "snapshot_digest", "stakes_digest", "input_digest",
-            "active_classes_digest", "manifests",
+            "active_classes_digest", "manifests", "member_coverage",
         }
         if not isinstance(cache, Mapping) or set(cache) != cache_keys:
             raise CensusError("/census_cache: invalid persisted cache envelope")
@@ -600,6 +600,21 @@ def validate_persisted_state(
             not isinstance(row, Mapping) for row in cache["manifests"]
         ):
             raise CensusError("/census_cache/manifests: invalid persisted manifests")
+        received = cache.get("member_coverage")
+        if not isinstance(received, Mapping) or len(received) > cc.MAX_ACTIVE_CLASSES:
+            raise CensusError("/census_cache/member_coverage: invalid persisted member map")
+        for class_id, members in received.items():
+            if not isinstance(class_id, str) or not class_id or len(class_id) > 120:
+                raise CensusError(
+                    "/census_cache/member_coverage: invalid persisted class id"
+                )
+            _persisted_string_list(
+                members, f"/census_cache/member_coverage/{class_id}",
+            )
+            if not members or len(members) > 100:
+                raise CensusError(
+                    f"/census_cache/member_coverage/{class_id}: invalid member count"
+                )
         if "validation_debt" not in state:
             raise CensusError("/census_cache: cache requires validation_debt")
     if "unbound_class_ids" in state:

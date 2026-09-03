@@ -53,7 +53,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "78ec40d09feae0b71f0fa9b54845f57034029ecda64c479d5cfeaf3b6e3036e7"
+      "sha256": "3ff00dd11571df62e7e8a85418b867e00fb082f4152f71162b312467af7ab41d"
     },
     "src/paranoia_local/server.py": {
       "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",

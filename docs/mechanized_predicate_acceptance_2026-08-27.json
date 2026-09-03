@@ -11,7 +11,7 @@
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged schema validation, mechanized predicate validation, or the retry exchange proved by this historical acceptance. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "b07baefbc6ce90ee12a06678fdc94e369707f99a69f651e6a8ae843126645e38"
+      "sha256": "b11a7a6b03019c65a697f7abaf627298c21c4913faca1b11d4c15ea59f53b525"
     }
   },
   "attempt_ledger": [
