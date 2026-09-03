@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged class persistence for the accepted valid-state lifecycle.",
-      "sha256": "2fb864279413619afb6d6a264f6ae3f01856416b75598dcf646df26e802a0bb6"
+      "sha256": "09193a1b104f7e35a476f42bfade573a54ad705d4f1aa7eb069624b2cfdf99ac"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged class persistence proved by this historical acceptance.",
-      "sha256": "9b6315bd10f31d893d8cc3ac255a38286bd3f8ded239213cc3b466eb644eba51"
+      "sha256": "7c4fe06c454012f7fc94946e018b6fc178cb5ae5a57c62258d428dfdecac2d5d"
     }
   },
   "attempt_ledger": [

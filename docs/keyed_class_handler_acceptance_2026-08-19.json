@@ -114,9 +114,13 @@
       "scope": "Adds deterministic source/diff/scope metadata for this retained exchange without changing its provider bytes, settlement, or durable result.",
       "sha256": "fb4e397f16dfd63180d146ba414649be43f1365b50ef38b60c0ebc187899dddd"
     },
+    "src/paranoia_local/class_closure.py": {
+      "scope": "Adds durable member inventory to future unmechanized classes; this retained historical provider exchange and settlement remain unchanged.",
+      "sha256": "ee12ad9cc605bff21c8b44d7a1bcd55d67171b54c5f247532bd3fb2207cc256f"
+    },
     "src/paranoia_local/handlers.py": {
       "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange.",
-      "sha256": "2991bb0dcc06c6aa0ab19231391bf331737b69650a9c9e649dc6ebad53396d14"
+      "sha256": "28cdfd648a4310e0ee38995cdbc913ddba8cc6bc2a79bc8bad7d3ed0f25f9ade"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Updates the future Claude default and minimum CLI; this retained Codex handler exchange is unchanged.",
@@ -124,19 +128,23 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged.",
-      "sha256": "5bdce7aeb9b0a55abae4cc5814556301719a0a5cc005315fe5bed2b5e35720d3"
+      "sha256": "88fd264460d7cab1680e7fa4a3b2ad4415402b2ae37714749c9f1f1a04001f47"
     },
     "src/paranoia_local/server.py": {
       "scope": "Updates the public future-Claude default description; this retained Codex handler exchange is unchanged.",
       "sha256": "1721d36eb6dc93c9cbb11713152f8d0cb0310bc6da87ff5fcca5e29ee9fa06f9"
     },
+    "src/paranoia_local/review_census.py": {
+      "scope": "Carries future unmechanized member inventories through canonical class records; this retained historical provider exchange and settlement remain unchanged.",
+      "sha256": "9f16892d3f40e6c3756d3a88e55ee2389addbe50a5230947f477b35e68f029ca"
+    },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged.",
-      "sha256": "3cc1fbdeac77b87d988909eb1507cc174a8f9c52abd34e7e9ed88a8ccd6d7a21"
+      "sha256": "3e70ab14bd61dd2715804eecde4825df1cd0383727b3ed94e1362583aac664bc"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange.",
-      "sha256": "ef6034ff3edf2996e84f51fae02b213eb9c44fc55e1484ec3095994403e31290"
+      "sha256": "a8bf60085550a51e60e8eb4ecc42a560ce52cb9b9c4e595dae31446cd47a029e"
     }
   },
   "attempt_ledger": [
