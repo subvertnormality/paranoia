@@ -406,6 +406,15 @@ def validate_artifact(
         original_run = engines.CodexEngine.run
         original_resume = engines.CodexEngine.resume
         original_decode = sp.decode_decision_with_issues
+        original_render_unmechanized = cc.render_unmechanized
+
+        def historical_render_unmechanized(lineage):
+            rendered = original_render_unmechanized(lineage)
+            if rendered is None:
+                return None
+            return rendered.replace(
+                "\n  authoritative members: MISSING — replace before satisfaction", "",
+            )
 
         def replay_decode(text: str, *args, **kwargs):
             wire = json.loads(text)
@@ -438,6 +447,7 @@ def validate_artifact(
         engines.CodexEngine.run = replay_run
         engines.CodexEngine.resume = replay_resume
         sp.decode_decision_with_issues = replay_decode
+        cc.render_unmechanized = historical_render_unmechanized
         try:
             replay_result = handlers.critique_branch(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
@@ -450,6 +460,7 @@ def validate_artifact(
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
             sp.decode_decision_with_issues = original_decode
+            cc.render_unmechanized = original_render_unmechanized
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
