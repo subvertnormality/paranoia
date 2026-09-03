@@ -3398,6 +3398,76 @@ def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
     assert "STAGED-ATTEMPTS: total=0" in result
 
 
+@pytest.mark.parametrize("starting_phase", ["clear", "correction"])
+def test_same_snapshot_clear_and_claim_only_cannot_bypass_legacy_member_replacement(
+    repo: Path, tmp_path: Path, monkeypatch, starting_phase: str,
+) -> None:
+    lineage_id = f"legacy-memberless-{starting_phase}-phase"
+    stakes = "trusted local plan; correctness is high impact"
+    parent = handlers.orientation.resolve_head(repo)
+    snapshot = handlers.orientation.wrap_commit(
+        repo, handlers.orientation.snapshot_tree(repo, parent), parent,
+    )
+    structural_snapshot = rc.digest(f"{PLAN}\0{snapshot}")
+    lineage = cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=4,
+        classes={
+            "legacy-a":cc.TrackedClass(
+                "legacy-a", "inspect every route", cc.MAJOR, 1, cc.CLOSED,
+                procedure="inspect routes",
+            ),
+        },
+        claim_state=pc.with_debt(
+            pc.empty_state(), pc.AuditError("claim discovery timed out"),
+            round_no=4, plan_text=PLAN,
+        ),
+        review_state={
+            "version":1, "stakes_digest":rc.digest(stakes), "stakes":stakes,
+            "phase":starting_phase, "snapshot_digest":structural_snapshot,
+            "debt":[], "last_round":4,
+        },
+    )
+    cc.save_lineage(cc.default_state_root(), lineage)
+
+    monkeypatch.setattr(
+        handlers, "_verify_plan_claims",
+        lambda plan_text, prior_state, **kwargs: (prior_state, "failed"),
+    )
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.orientation, "snapshot_tree", lambda *args, **kwargs: "tree")
+    monkeypatch.setattr(handlers.orientation, "wrap_commit", lambda *args, **kwargs: snapshot)
+    calls = []
+
+    def unavailable(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        return Review(
+            text="provider unavailable", session_ref=None, raw="provider unavailable",
+            returncode=1, error=True, failure_detail="provider unavailable",
+        )
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", unavailable)
+
+    result = handlers.critique_plan(
+        {
+            "plan_text":PLAN, "repo_path":str(repo), "lineage":lineage_id,
+            "round":5, "stakes":stakes,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "T5",
+    )
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T6", mode=cc.PLAN_MODE,
+    )
+
+    assert calls, "legacy memberless authority must enter broad census"
+    # Provider failure preserves rejection atomicity; the next attempt detects the
+    # same legacy authority and re-enters census again rather than persisting a guess.
+    assert durable.review_state["phase"] == starting_phase
+    assert durable.classes["legacy-a"].members == ()
+    assert "STRUCTURAL STATE MIGRATED" not in result
+    assert "CONVERGENCE: BLOCKED" in result
+
+
 def test_ambiguous_intermediate_claim_save_retains_lineage_latch(
     repo: Path, tmp_path: Path, monkeypatch,
 ) -> None:

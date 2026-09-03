@@ -22,6 +22,7 @@ introduced by an earlier round's fix:
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -73,7 +74,8 @@ def review_with(register: str, body: str = "## What doesn't work\n\nSomething.")
 PROCEDURE_CLASS = (
     "CLASS: every mutation campaign sits at the frozen card seam\n"
     "SEVERITY: FATAL\n"
-    "PROCEDURE: read every step that starts a campaign; confirm none precedes the freeze"
+    "PROCEDURE: read every step that starts a campaign; confirm none precedes the freeze\n"
+    'MEMBERS: ["campaign-start-step"]'
 )
 
 
@@ -194,7 +196,8 @@ class TestAdvisoryClassesNeverBlock:
         """Both halves together: the reviewer declares convergence at round >=3 AND the
         trailer agrees. A mechanism that blocked here could never be escaped."""
         minor = ("CLASS: wording is inconsistent\nSEVERITY: MINOR\n"
-                 "PROCEDURE: reread the section headings")
+                 "PROCEDURE: reread the section headings\n"
+                 'MEMBERS: ["section-heading"]')
         run_round(FakeEngine(review_with(minor)), tmp_path, round_no=1)
         converged = ("## What doesn't work\n\nCONVERGED — no blocking findings at this "
                      "round.\n\n## Risks\n\nNothing notable.")
@@ -207,7 +210,8 @@ class TestAdvisoryClassesNeverBlock:
         self, tmp_path: Path
     ) -> None:
         minor = ("CLASS: wording is inconsistent\nSEVERITY: MINOR\n"
-                 "PROCEDURE: reread the section headings")
+                 "PROCEDURE: reread the section headings\n"
+                 'MEMBERS: ["section-heading"]')
         run_round(FakeEngine(review_with(minor)), tmp_path, round_no=1)
         engine = FakeEngine(review_with("NONE"))
         run_round(engine, tmp_path, round_no=2)
@@ -226,6 +230,79 @@ class TestAdvisoryClassesNeverBlock:
         out = run_round(FakeEngine(review_with(f"RECLASSIFY: {cid} MINOR")), tmp_path,
                         round_no=2)
         assert "CONVERGENCE: NOT-BLOCKED" in out
+
+    def test_a_legacy_uninventoried_class_cannot_be_reclassified_nonblocking(
+        self, tmp_path: Path
+    ) -> None:
+        run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
+        cid = _only_class_id(tmp_path)
+        lineage = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0002", mode=cc.PLAN_MODE,
+        )
+        lineage.classes[cid] = replace(lineage.classes[cid], members=())
+        cc.save_lineage(cc.default_state_root(), lineage)
+
+        attempted = review_with(f"RECLASSIFY: {cid} MINOR")
+        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        durable = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
+        )
+
+        assert "cannot make legacy class" in out
+        assert "CONVERGENCE: BLOCKED" in out
+        assert durable.classes[cid].severity == cc.FATAL
+        assert durable.classes[cid].members == ()
+
+    def test_a_legacy_uninventoried_class_cannot_be_closed(
+        self, tmp_path: Path
+    ) -> None:
+        run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
+        cid = _only_class_id(tmp_path)
+        lineage = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0002", mode=cc.PLAN_MODE,
+        )
+        lineage.classes[cid] = replace(lineage.classes[cid], members=())
+        cc.save_lineage(cc.default_state_root(), lineage)
+
+        attempted = review_with(f"CLOSED: {cid}")
+        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        durable = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
+        )
+
+        assert "CLOSED requires an inventoried replacement" in out
+        assert "CONVERGENCE: BLOCKED" in out
+        assert durable.classes[cid].status == cc.OPEN
+
+    def test_a_legacy_uninventoried_blocker_cannot_supersede_to_advisory_target(
+        self, tmp_path: Path
+    ) -> None:
+        run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
+        source_id = _only_class_id(tmp_path)
+        lineage = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0002", mode=cc.PLAN_MODE,
+        )
+        lineage.classes[source_id] = replace(lineage.classes[source_id], members=())
+        target_id = cc.apply_register(
+            lineage,
+            cc.Register(new_classes=(cc.NewClass(
+                "advisory successor", cc.MINOR, procedure="inspect it",
+                members=("advisory-site",),
+            ),)),
+            round_no=1,
+        )[0]
+        cc.save_lineage(cc.default_state_root(), lineage)
+
+        attempted = review_with(f"SUPERSEDE: {source_id}\nBY: {target_id}")
+        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        durable = cc.load_lineage(
+            cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
+        )
+
+        assert "requires an inventoried replacement for legacy class" in out
+        assert "CONVERGENCE: BLOCKED" in out
+        assert durable.classes[source_id].status == cc.OPEN
+        assert durable.classes[target_id].severity == cc.MINOR
 
 
 # ── the register grammar in plan mode ─────────────────────────────────────────

@@ -61,6 +61,16 @@ accept a repair merely because it resolves every previously cited site."""
 ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS = """In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
 author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
 establish that the invariant-wide search completed."""
+ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS = """For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit
+`member_coverage` with exactly one row for every stable member ID in that class's server-supplied
+`members` list. Bind each member to its own evidence. Different members may cite the same anchor;
+the server checks member identity before deriving and deduplicating the flat durable evidence. A
+class with an empty legacy member list cannot be satisfied: replace it with a definition containing
+the complete stable inventory. If any member remains violated, return `violated` instead."""
+ISSUE_106_DEFINITION_INSTRUCTIONS = (
+    " Every unmechanized new or replacement definition must enumerate\n"
+    "the complete closed set of stable member IDs governed by its invariant."
+)
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -74,6 +84,8 @@ def _sha_text(value: str) -> str:
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(ISSUE_106_DEFINITION_INSTRUCTIONS, "")
     prompt = prompt.replace(ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS + "\n\n", "")
     owns_class_guidance = (
         "class_outcomes is a closed object permitting exactly these class IDs:" in prompt
@@ -112,6 +124,11 @@ def _historical_no_concession_prompt(prompt: str) -> str:
             raise ValueError(
                 f"historical replay cannot discard a concession: {prior!r}"
             )
+        for row in task.get("active_classes", []):
+            row.pop("members", None)
+        task["artifact"] = task["artifact"].replace(
+            "\n  authoritative members: MISSING — replace before satisfaction", "",
+        )
         prompt = head + found + json.dumps(task, ensure_ascii=False)
     return prompt
 
@@ -163,8 +180,11 @@ def _before_lineage_record() -> dict:
         CLASS_ID, "Every active configuration sets MODE = safe.", "MAJOR", 1,
         cc.OPEN, procedure="inspect every active configuration file",
     )
+    historical_class = {
+        key:value for key, value in vars(tracked).items() if key != "members"
+    }
     return json.loads(json.dumps({
-        "rounds":1, "next_seq":2, "classes":[vars(tracked)], "review_state":state,
+        "rounds":1, "next_seq":2, "classes":[historical_class], "review_state":state,
     }))
 
 
@@ -386,6 +406,15 @@ def validate_artifact(
         original_run = engines.CodexEngine.run
         original_resume = engines.CodexEngine.resume
         original_decode = sp.decode_decision_with_issues
+        original_render_unmechanized = cc.render_unmechanized
+
+        def historical_render_unmechanized(lineage):
+            rendered = original_render_unmechanized(lineage)
+            if rendered is None:
+                return None
+            return rendered.replace(
+                "\n  authoritative members: MISSING — replace before satisfaction", "",
+            )
 
         def replay_decode(text: str, *args, **kwargs):
             wire = json.loads(text)
@@ -394,6 +423,7 @@ def validate_artifact(
                     "historical response unexpectedly owns a concession challenge"
                 )
             wire["concession_challenges"] = {}
+            kwargs["require_closure_coverage"] = False
             return original_decode(json.dumps(wire, separators=(",", ":")), *args, **kwargs)
 
         def replay_reply(prompt: str) -> Review:
@@ -417,6 +447,7 @@ def validate_artifact(
         engines.CodexEngine.run = replay_run
         engines.CodexEngine.resume = replay_resume
         sp.decode_decision_with_issues = replay_decode
+        cc.render_unmechanized = historical_render_unmechanized
         try:
             replay_result = handlers.critique_branch(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
@@ -429,6 +460,7 @@ def validate_artifact(
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
             sp.decode_decision_with_issues = original_decode
+            cc.render_unmechanized = original_render_unmechanized
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
@@ -439,9 +471,14 @@ def validate_artifact(
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")
+        replayed_classes = []
+        for row in durable.classes.values():
+            historical = dict(vars(row))
+            historical.pop("members", None)
+            replayed_classes.append(historical)
         replayed_after = json.loads(json.dumps({
             "rounds":durable.rounds, "next_seq":durable.next_seq,
-            "classes":[vars(row) for row in durable.classes.values()],
+            "classes":replayed_classes,
             "review_state":durable.review_state,
         }))
         if replayed_after != json.loads(json.dumps(after)):

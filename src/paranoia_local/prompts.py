@@ -430,6 +430,8 @@ def staged_census_instructions(
         CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
         if mode == "branch" else instructions
     )
+    if lane == "integrity":
+        instructions += "\n\n" + STAGED_MEMBER_CENSUS_INSTRUCTIONS
     if mode == "branch" and plan_contract:
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     if mode == "plan":
@@ -465,6 +467,12 @@ findings. Non-integrity lanes return no class assessments. Integrity assesses ev
 class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id."""
 
 
+STAGED_MEMBER_CENSUS_INSTRUCTIONS = """For a satisfied unmechanized class, omit flat evidence and
+emit member_coverage containing every server-supplied stable member ID exactly once with its own
+evidence. A legacy class with no members cannot be satisfied; report it violated for replacement
+with an inventoried definition."""
+
+
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
 review. The provider-supplied JSON Schema is the sole structural contract; return only its object,
 without a marker, fence, or prose.
@@ -475,7 +483,8 @@ from every mapped source; the server deterministically projects that union so co
 discard a co-asserting site already found by a lane.
 Classify each governing finding once: one_off only when its reasoning cannot recur; new_class with a
 complete reusable definition and explicit class severity; or existing_class naming the active
-class. One source may fan out only to distinct existing-class findings for distinct violated
+class. Every unmechanized new-class definition must enumerate the complete closed set of stable
+member IDs governed by its invariant. One source may fan out only to distinct existing-class findings for distinct violated
 assessments that cited it. Consolidate all occurrences of one existing class into one finding.
 
 The server derives census class outcomes exactly from the validated integrity manifest. Do not
@@ -517,6 +526,13 @@ including an explicit statement when a category has no applicable site. If any o
 report all independently evidenced occurrences in the class's single aggregate finding. Do not
 accept a repair merely because it resolves every previously cited site.
 
+For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit
+`member_coverage` with exactly one row for every stable member ID in that class's server-supplied
+`members` list. Bind each member to its own evidence. Different members may cite the same anchor;
+the server checks member identity before deriving and deduplicating the flat durable evidence. A
+class with an empty legacy member list cannot be satisfied: replace it with a definition containing
+the complete stable inventory. If any member remains violated, return `violated` instead.
+
 In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
 author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
 establish that the invariant-wide search completed.
@@ -526,7 +542,8 @@ longer blocking. Rotating debt, changing evidence, or retaining another blocking
 not satisfy that server-owned gate.
 
 Classify every new governing finding once as one_off, new_class with an explicit definition and
-class severity, or existing_class. For each existing class, exhaustively consolidate every
+class severity, or existing_class. Every unmechanized new or replacement definition must enumerate
+the complete closed set of stable member IDs governed by its invariant. For each existing class, exhaustively consolidate every
 independently evidenced current occurrence into its one governing finding: cite every distinct
 anchor and make the bounded remedy cover each site rather than choosing one representative defect.
 Rephrasing or rotating the same anchor is not another occurrence and does not satisfy a gate.
@@ -581,6 +598,7 @@ PATHSPEC: <git pathspec bounding the search, or . for the whole tree>
 
 For an invariant no regex can express, replace PATTERN and PATHSPEC with:
 PROCEDURE: <what a reviewer must do to find every violation>
+MEMBERS: ["<stable id for each specific obligation in the class>"]
 
 State changes against classes already shown to you, each its own record:
 CLOSED: <class-id>                 (unmechanized only — you judge it genuinely closed)
@@ -596,6 +614,7 @@ CLASS: <restated invariant>        (optional)
    — or —
 SUPERSEDE: <old-id>
 WITH-PROCEDURE: <procedure>        (the invariant turned out to be inexpressible)
+MEMBERS: ["<stable id for each specific obligation in the replacement>"]
 CLASS: <restated invariant>        (optional)
 
 Rules: one field per line; SEVERITY here is the class's ONLY severity; a pathspec may not
@@ -631,6 +650,7 @@ lines. If you registered no class and changed no state, the whole body is `NONE`
 CLASS: <the invariant, one line, stated WITHOUT reference to any particular section>
 SEVERITY: FATAL|MAJOR|MINOR|OUT-OF-SCOPE
 PROCEDURE: <what a reviewer must do to find every violation of it in this plan>
+MEMBERS: ["<stable id for each specific obligation in the class>"]
 
 State changes against classes already shown to you, each its own record:
 CLOSED: <class-id>                 (you judge it genuinely closed)
@@ -641,6 +661,7 @@ BY: <existing-class-id>            (must be a different, live class)
    — or —
 SUPERSEDE: <old-id>
 WITH-PROCEDURE: <procedure>        (the procedure turned out to be unusable)
+MEMBERS: ["<stable id for each specific obligation in the replacement>"]
 CLASS: <restated invariant>        (optional)
 
 Rules: one field per line; SEVERITY here is the class's ONLY severity; an unknown class

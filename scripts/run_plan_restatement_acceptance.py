@@ -222,7 +222,33 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
+    prompt = prompt.replace(
+        "For a satisfied unmechanized class, omit flat evidence and\n"
+        "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
+        "evidence. A legacy class with no members cannot be satisfied; report it violated for replacement\n"
+        "with an inventoried definition.\n\n",
+        "",
+    )
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(
+        "For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit\n"
+        "`member_coverage` with exactly one row for every stable member ID in that class's server-supplied\n"
+        "`members` list. Bind each member to its own evidence. Different members may cite the same anchor;\n"
+        "the server checks member identity before deriving and deduplicating the flat durable evidence. A\n"
+        "class with an empty legacy member list cannot be satisfied: replace it with a definition containing\n"
+        "the complete stable inventory. If any member remains violated, return `violated` instead.\n\n",
+        "",
+    )
+    prompt = prompt.replace(
+        " Every unmechanized new or replacement definition must enumerate\n"
+        "the complete closed set of stable member IDs governed by its invariant.",
+        "",
+    )
+    prompt = prompt.replace(
+        " Every unmechanized new-class definition must enumerate the complete closed set of stable\n"
+        "member IDs governed by its invariant.",
+        "",
+    )
     prompt = prompt.replace(
         "In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must\n"
         "author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot\n"
@@ -264,6 +290,13 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         prior = task.pop("prior_concessions", None)
         if prior not in (None, [], {}):
             raise ValueError("historical replay cannot discard a concession")
+        for row in task.get("active_classes", []):
+            row.pop("members", None)
+        artifact = task.get("artifact")
+        if isinstance(artifact, str):
+            task["artifact"] = artifact.replace(
+                "\n  authoritative members: MISSING — replace before satisfaction", "",
+            )
         compact = task_text.startswith('{"role":"census"')
         task_text = json.dumps(
             task, ensure_ascii=False,
@@ -280,6 +313,28 @@ def _historical_no_concession_invocation(
     value = _invocation(prompt, args, kwargs)
     value["prompt_sha256"] = _sha_text(_historical_no_concession_prompt(prompt))
     schema = deepcopy(value["response_schema"])
+
+    def project_members(node):
+        if isinstance(node, dict):
+            alternatives = node.get("anyOf")
+            if isinstance(alternatives, list):
+                node["anyOf"] = [
+                    item for item in alternatives
+                    if "member_coverage" not in item.get("properties", {})
+                ]
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "members" in properties:
+                properties.pop("members")
+                node["required"] = [
+                    item for item in node.get("required", []) if item != "members"
+                ]
+            for child in node.values():
+                project_members(child)
+        elif isinstance(node, list):
+            for child in node:
+                project_members(child)
+
+    project_members(schema)
     properties = schema.get("properties", {})
     required = schema.get("required", [])
     if "concession_challenges" in properties:
@@ -295,12 +350,44 @@ def _historical_no_concession_invocation(
 
 
 def _pre_concession_response(text: str) -> str:
-    """Add the only valid challenge map for a lineage with no concessions."""
+    """Project retained pre-#94/#106 payloads into the current decoder."""
     wire = json.loads(text)
     if "concession_challenges" in wire:
         raise ValueError("historical response unexpectedly owns a concession challenge")
     wire["concession_challenges"] = {}
+
+    def add_historical_members(node):
+        if isinstance(node, dict):
+            if (
+                "invariant" in node and "severity" in node and "procedure" in node
+                and "members" not in node
+            ):
+                node["members"] = ["historical-single-member"]
+            for child in node.values():
+                add_historical_members(child)
+        elif isinstance(node, list):
+            for child in node:
+                add_historical_members(child)
+
+    add_historical_members(wire)
     return json.dumps(wire, ensure_ascii=False, separators=(",", ":"))
+
+
+def _pre_member_inventory_projection(value):
+    """Remove only the field absent from retained pre-#106 envelopes."""
+    projected = deepcopy(value)
+
+    def visit(node):
+        if isinstance(node, dict):
+            node.pop("members", None)
+            for child in node.values():
+                visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(projected)
+    return projected
 
 
 def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
@@ -390,9 +477,12 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
             source_evidence={finding["id"]:finding["evidence"] for finding in sources},
             assessment_verdicts={}, assessment_findings={}, assessment_evidence={},
             active_classes=[], durable_debt=[],
+            require_closure_coverage=False,
         )
         if settlement.pop("concession_challenges", None) != []:
             raise ValueError("historical census concession projection is not empty")
+        for record in settlement["class_records"]:
+            record.pop("members", None)
         return {"manifests":manifests, "settlement":settlement}
 
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
@@ -405,9 +495,12 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
         _pre_concession_response(responses[0]),
         mode=cc.PLAN_MODE, role=role,
         active_classes=task["active_classes"], durable_debt=durable_debt,
+        require_closure_coverage=False,
     )
     if settlement.pop("concession_challenges", None) != []:
         raise ValueError("historical follow-up concession projection is not empty")
+    for record in settlement["class_records"]:
+        record.pop("members", None)
     return {"manifests":[], "settlement":settlement}
 
 
@@ -472,8 +565,13 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     if role == "correction":
         expected_task["review_scope"] = "targeted"
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
-    historical_task = dict(expected_task)
+    historical_task = deepcopy(expected_task)
     historical_task.pop("prior_concessions")
+    for active in historical_task["active_classes"]:
+        active.pop("members", None)
+    historical_task["artifact"] = historical_task["artifact"].replace(
+        "\n  authoritative members: MISSING — replace before satisfaction", "",
+    )
     if task != historical_task:
         raise ValueError("targeted prompt task differs from its seeded production reconstruction")
     outcome_ids = sp.expected_outcome_class_ids(
@@ -506,6 +604,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
     original_materialize = sp.materialize_decision_value
 
     def replay_decode(text: str, *args, **kwargs):
+        kwargs["require_closure_coverage"] = False
         return original_decode(_pre_concession_response(text), *args, **kwargs)
 
     def replay_materialize(*args, **kwargs):
@@ -579,9 +678,11 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                 )
                 if result != row["result_text"]:
                     raise ValueError("public-handler replay did not reconstruct returned result")
-                if replay_lineage != row["durable_lineage"]:
+                if _pre_member_inventory_projection(replay_lineage) != row["durable_lineage"]:
                     raise ValueError("public-handler replay did not reconstruct durable lineage")
-                if _audit_projection(replay_audit) != row["audit_projection"]:
+                if _pre_member_inventory_projection(
+                    _audit_projection(replay_audit)
+                ) != row["audit_projection"]:
                     raise ValueError("public-handler replay did not reconstruct audit settlement")
         finally:
             engines.CodexEngine.run = original_run

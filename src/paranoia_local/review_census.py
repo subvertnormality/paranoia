@@ -27,7 +27,7 @@ MAX_CONSOLIDATION_PROMPT_CHARS = 1_000_000
 MAX_REJECTED_PAYLOAD_CHARS = 12_000
 MAX_ENGINE_FAILURE_MESSAGE_CHARS = 4_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
-CENSUS_CACHE_VERSION = 3
+CENSUS_CACHE_VERSION = 4
 PERSISTENCE_REBUT_ROUNDS = 3
 PERSISTENCE_CORRECTION_LIMIT = 6
 REOPEN_CORRECTION_LIMIT = 3
@@ -581,7 +581,7 @@ def validate_persisted_state(
         cache = state["census_cache"]
         cache_keys = {
             "version", "mode", "snapshot_digest", "stakes_digest", "input_digest",
-            "active_classes_digest", "manifests",
+            "active_classes_digest", "manifests", "member_coverage",
         }
         if not isinstance(cache, Mapping) or set(cache) != cache_keys:
             raise CensusError("/census_cache: invalid persisted cache envelope")
@@ -600,6 +600,21 @@ def validate_persisted_state(
             not isinstance(row, Mapping) for row in cache["manifests"]
         ):
             raise CensusError("/census_cache/manifests: invalid persisted manifests")
+        received = cache.get("member_coverage")
+        if not isinstance(received, Mapping) or len(received) > cc.MAX_ACTIVE_CLASSES:
+            raise CensusError("/census_cache/member_coverage: invalid persisted member map")
+        for class_id, members in received.items():
+            if not isinstance(class_id, str) or not class_id or len(class_id) > 120:
+                raise CensusError(
+                    "/census_cache/member_coverage: invalid persisted class id"
+                )
+            _persisted_string_list(
+                members, f"/census_cache/member_coverage/{class_id}",
+            )
+            if not members or len(members) > 100:
+                raise CensusError(
+                    f"/census_cache/member_coverage/{class_id}: invalid member count"
+                )
         if "validation_debt" not in state:
             raise CensusError("/census_cache: cache requires validation_debt")
     if "unbound_class_ids" in state:
@@ -848,7 +863,7 @@ def register_from_records(
         if op == "new":
             allowed = (
                 {"op", "invariant", "severity", "pattern", "pathspec"}
-                if row_mechanized else {"op", "invariant", "severity", "procedure"}
+                if row_mechanized else {"op", "invariant", "severity", "procedure", "members"}
             )
             _exact(row, allowed, "new class record")
             if row.get("severity") not in cc.SEVERITIES:
@@ -859,6 +874,7 @@ def register_from_records(
                 pattern=_bounded(row.get("pattern"), 2000, "pattern") if row_mechanized else None,
                 pathspec=_bounded(row.get("pathspec"), 1000, "pathspec") if row_mechanized else None,
                 procedure=None if row_mechanized else _bounded(row.get("procedure"), 2000, "procedure"),
+                members=() if row_mechanized else _members(row.get("members")),
             ))
         elif op in {"close", "reopen", "reclassify", "replace"}:
             if op in {"close", "reopen"}:
@@ -868,7 +884,7 @@ def register_from_records(
             else:
                 allowed = (
                     {"op", "class_id", "invariant", "severity", "pattern", "pathspec"}
-                    if row_mechanized else {"op", "class_id", "invariant", "severity", "procedure"}
+                    if row_mechanized else {"op", "class_id", "invariant", "severity", "procedure", "members"}
                 )
                 _exact(row, allowed, "class replacement record")
             if op in {"reclassify", "replace"} and row.get("severity") not in cc.SEVERITIES:
@@ -892,6 +908,10 @@ def register_from_records(
                 procedure=(
                     _bounded(row.get("procedure"), 2000, "procedure")
                     if op == "replace" and not row_mechanized else None
+                ),
+                members=(
+                    _members(row.get("members"))
+                    if op == "replace" and not row_mechanized else ()
                 ),
             ))
         else:
@@ -1234,3 +1254,16 @@ def _bounded(value: Any, cap: int, label: str) -> str:
     ):
         raise CensusError(f"{label} must be 1..{cap} characters")
     return value
+
+
+def _members(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 100:
+        raise CensusError("class members must contain 1..100 stable member ids")
+    members = tuple(_bounded(item, 120, "class member id") for item in value)
+    if len(set(members)) != len(members):
+        raise CensusError("class member ids must be unique")
+    try:
+        cc.validate_member_inventory(members)
+    except cc.RegisterError as exc:
+        raise CensusError(str(exc)) from exc
+    return members

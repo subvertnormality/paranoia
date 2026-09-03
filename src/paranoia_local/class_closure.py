@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -49,6 +50,17 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
+GENERIC_MEMBER_TOKENS = frozenset({
+    "all", "every", "each", "any", "whole", "full", "complete", "entire",
+    "everything", "member", "members", "obligation", "obligations", "site",
+    "sites", "case", "cases", "item", "items", "boundary", "boundaries",
+    "class", "classes", "invariant", "invariants", "fixture", "test",
+    "placeholder", "example", "sample", "id", "universe", "entirety", "total",
+    "aggregate", "global", "universal", "active", "current", "known", "remaining",
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+    "eighth", "ninth", "tenth",
+})
 PER_CLASS_TIMEOUT = 20     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
 
@@ -70,6 +82,7 @@ class NewClass:
     pattern: str | None = None
     pathspec: str | None = None
     procedure: str | None = None
+    members: tuple[str, ...] = ()
 
     @property
     def mechanized(self) -> bool:
@@ -88,6 +101,7 @@ class Transition:
     pathspec: str | None = None
     procedure: str | None = None
     invariant: str | None = None
+    members: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -109,6 +123,7 @@ class TrackedClass:
     pattern: str | None = None
     pathspec: str | None = None
     procedure: str | None = None
+    members: tuple[str, ...] = ()
     superseded_by: str | None = None
     detail: str | None = None                 # why malformed / over-broad
     matches: tuple[dict[str, Any], ...] = ()  # last sweep's surviving matches
@@ -143,13 +158,16 @@ def fingerprint(text: str) -> str:
 # ── register parsing ──────────────────────────────────────────────────────────
 
 _NEW_MECHANIZED = {"CLASS", "SEVERITY", "PATTERN", "PATHSPEC"}
-_NEW_UNMECHANIZED = {"CLASS", "SEVERITY", "PROCEDURE"}
+_NEW_UNMECHANIZED_LEGACY = {"CLASS", "SEVERITY", "PROCEDURE"}
+_NEW_UNMECHANIZED = _NEW_UNMECHANIZED_LEGACY | {"MEMBERS"}
 _KNOWN_KEYS = _NEW_MECHANIZED | _NEW_UNMECHANIZED | {
     "CLOSED", "REOPEN", "RECLASSIFY", "SUPERSEDE", "BY", "WITH-PATTERN", "WITH-PROCEDURE",
 }
 
 
-def parse_register(text: str, *, allow_mechanized: bool = True) -> Register:
+def parse_register(
+    text: str, *, allow_mechanized: bool = True, require_members: bool = False,
+) -> Register:
     """Parse the terminal `=== CLASS REGISTER ===` block.
 
     Strict in the manner of `arbitration.parse_*`, because this is the one
@@ -185,9 +203,9 @@ def parse_register(text: str, *, allow_mechanized: bool = True) -> Register:
         if "CLOSED" in keys or "REOPEN" in keys or "RECLASSIFY" in keys:
             transitions.append(_simple_transition(fields, keys))
         elif "SUPERSEDE" in keys:
-            transitions.append(_supersede(fields, keys))
+            transitions.append(_supersede(fields, keys, require_members=require_members))
         elif "CLASS" in keys:
-            new_classes.append(_new_class(fields, keys))
+            new_classes.append(_new_class(fields, keys, require_members=require_members))
         else:
             raise RegisterError(f"unrecognised record: {sorted(keys)}")
     return Register(tuple(new_classes), tuple(transitions))
@@ -243,16 +261,26 @@ def _severity(raw: str) -> str:
     return raw
 
 
-def _new_class(fields: dict[str, str], keys: set[str]) -> NewClass:
+def _new_class(
+    fields: dict[str, str], keys: set[str], *, require_members: bool,
+) -> NewClass:
     invariant, severity = _require(fields, "CLASS"), _severity(_require(fields, "SEVERITY"))
     if keys == _NEW_MECHANIZED:
         pathspec = _require(fields, "PATHSPEC")
         _reject_pathspec_magic(pathspec)
         return NewClass(invariant, severity, pattern=_require(fields, "PATTERN"), pathspec=pathspec)
-    if keys == _NEW_UNMECHANIZED:
-        return NewClass(invariant, severity, procedure=_require(fields, "PROCEDURE"))
+    if keys == _NEW_UNMECHANIZED or keys == _NEW_UNMECHANIZED_LEGACY:
+        if require_members and keys != _NEW_UNMECHANIZED:
+            raise RegisterError(
+                "a new unmechanized class needs PROCEDURE+MEMBERS"
+            )
+        return NewClass(
+            invariant, severity, procedure=_require(fields, "PROCEDURE"),
+            members=_member_field(fields) if "MEMBERS" in keys else (),
+        )
     raise RegisterError(
-        "a new class needs CLASS+SEVERITY plus either PATTERN+PATHSPEC or PROCEDURE, "
+        "a new class needs CLASS+SEVERITY plus either PATTERN+PATHSPEC or "
+        "PROCEDURE+MEMBERS, "
         f"got {sorted(keys)}"
     )
 
@@ -271,7 +299,9 @@ def _simple_transition(fields: dict[str, str], keys: set[str]) -> Transition:
     return Transition("RECLASSIFY", parts[0], severity=_severity(parts[1]))
 
 
-def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
+def _supersede(
+    fields: dict[str, str], keys: set[str], *, require_members: bool,
+) -> Transition:
     old = _require(fields, "SUPERSEDE")
     if keys == {"SUPERSEDE", "BY"}:
         return Transition("SUPERSEDE", old, target=_require(fields, "BY"))
@@ -282,15 +312,37 @@ def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
             "SUPERSEDE", old, pattern=_require(fields, "WITH-PATTERN"),
             pathspec=pathspec, invariant=fields.get("CLASS") or None,
         )
-    if keys <= {"SUPERSEDE", "WITH-PROCEDURE", "CLASS"} and "WITH-PROCEDURE" in keys:
+    if (
+        keys <= {"SUPERSEDE", "WITH-PROCEDURE", "MEMBERS", "CLASS"}
+        and "WITH-PROCEDURE" in keys
+    ):
+        if require_members and "MEMBERS" not in keys:
+            raise RegisterError("WITH-PROCEDURE requires MEMBERS")
         return Transition(
             "SUPERSEDE", old, procedure=_require(fields, "WITH-PROCEDURE"),
             invariant=fields.get("CLASS") or None,
+            members=_member_field(fields) if "MEMBERS" in keys else (),
         )
     raise RegisterError(
-        "SUPERSEDE takes BY, or WITH-PATTERN+PATHSPEC, or WITH-PROCEDURE — "
+        "SUPERSEDE takes BY, or WITH-PATTERN+PATHSPEC, or "
+        "WITH-PROCEDURE+MEMBERS — "
         f"got {sorted(keys)}"
     )
+
+
+def _member_field(fields: dict[str, str]) -> tuple[str, ...]:
+    raw = _require(fields, "MEMBERS")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RegisterError("MEMBERS must be a JSON array of stable member ids") from exc
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise RegisterError("MEMBERS must be a JSON array of stable member ids")
+    members = tuple(value)
+    if not members:
+        raise RegisterError("MEMBERS must contain at least one stable member id")
+    validate_member_inventory(members)
+    return members
 
 
 def _reject_pathspec_magic(pathspec: str) -> None:
@@ -430,6 +482,7 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
                 first_round=int(c["first_round"]), status=c["status"],
                 pattern=c.get("pattern"), pathspec=c.get("pathspec"),
                 procedure=c.get("procedure"), superseded_by=c.get("superseded_by"),
+                members=_persisted_class_members(c),
                 detail=c.get("detail"), matches=tuple(c.get("matches", ())),
             )
             for c in raw.get("classes", [])
@@ -441,6 +494,46 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
         review_state=deepcopy(raw.get("review_state", {})),
         branch_contract=deepcopy(raw.get("branch_contract")),
     )
+
+
+def _persisted_class_members(row: dict[str, Any]) -> tuple[str, ...]:
+    """Validate the new closed field while admitting pre-inventory lineages."""
+    if "members" not in row:
+        return ()
+    value = row["members"]
+    if (
+        not isinstance(value, list) or not 1 <= len(value) <= 100
+        or any(not isinstance(item, str) or not 1 <= len(item) <= 120 for item in value)
+        or len(value) != len(set(value))
+    ):
+        raise ValueError("persisted class members must be 1..100 unique 1..120 character strings")
+    if row.get("pattern") is not None:
+        raise ValueError("persisted mechanized class must not contain members")
+    validate_member_inventory(tuple(value))
+    return tuple(value)
+
+
+def validate_member_inventory(members: tuple[str, ...]) -> None:
+    if not 1 <= len(members) <= 100:
+        raise RegisterError("class members must contain 1..100 stable member ids")
+    if any(not 1 <= len(item) <= 120 for item in members):
+        raise RegisterError("class member ids must contain 1..120 characters")
+    if any(item != " ".join(item.split()) for item in members):
+        raise RegisterError("class member ids must use canonical nonblank spacing")
+    normalized = {" ".join(item.split()).casefold() for item in members}
+    if len(normalized) != len(members):
+        raise RegisterError("class member ids must be unique ignoring case")
+    generic = sorted(
+        item for item in normalized
+        if not any(
+            token not in GENERIC_MEMBER_TOKENS and not token.isdigit()
+            for token in re.findall(r"[a-z0-9]+", item)
+        )
+    )
+    if generic:
+        raise RegisterError(
+            f"class member ids must identify specific obligations, not {generic!r}"
+        )
 
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
@@ -550,7 +643,7 @@ def apply_register(lineage: Lineage, register: Register, *, round_no: int) -> li
                 "tracked. Close or supersede one first."
             )
         minted.append(_add(draft, nc.invariant, nc.severity, round_no,
-                           nc.pattern, nc.pathspec, nc.procedure))
+                           nc.pattern, nc.pathspec, nc.procedure, nc.members))
     if len(draft.active()) > MAX_ACTIVE_CLASSES:
         raise RegisterError(
             f"register would leave {len(draft.active())} non-superseded classes, over the "
@@ -574,7 +667,10 @@ def copy_lineage(lineage: Lineage) -> Lineage:
 
 
 def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
-         pattern: str | None, pathspec: str | None, procedure: str | None) -> str:
+         pattern: str | None, pathspec: str | None, procedure: str | None,
+         members: tuple[str, ...] = ()) -> str:
+    if members:
+        validate_member_inventory(members)
     cid = mint_id(lineage.lineage_id, lineage.next_seq, invariant)
     lineage.next_seq += 1
     lineage.classes[cid] = TrackedClass(
@@ -582,7 +678,7 @@ def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
         # A mechanized class is UNCHECKED until its predicate has actually run, so a
         # class registered this round cannot ride out the round as silently closed.
         status=UNCHECKED if pattern else OPEN,
-        pattern=pattern, pathspec=pathspec, procedure=procedure,
+        pattern=pattern, pathspec=pathspec, procedure=procedure, members=members,
     )
     return cid
 
@@ -623,7 +719,7 @@ def _apply_transition(lineage: Lineage, t: Transition, *, round_no: int, minted:
             raise RegisterError("mechanized REPLACE needs pattern and pathspec")
         new_id = _add(
             lineage, t.invariant or cls.invariant, t.severity or cls.severity,
-            cls.first_round, t.pattern, t.pathspec, t.procedure,
+            cls.first_round, t.pattern, t.pathspec, t.procedure, t.members,
         )
         minted.append(new_id)
         lineage.classes[t.class_id] = replace(
@@ -647,7 +743,7 @@ def _apply_transition(lineage: Lineage, t: Transition, *, round_no: int, minted:
     else:
         new_id = _add(
             lineage, t.invariant or cls.invariant, cls.severity, cls.first_round,
-            t.pattern, t.pathspec, t.procedure,
+            t.pattern, t.pathspec, t.procedure, t.members,
         )
         minted.append(new_id)
     lineage.classes[t.class_id] = replace(cls, status=SUPERSEDED, superseded_by=new_id)
@@ -934,6 +1030,10 @@ def render_unmechanized(lineage: Lineage) -> str | None:
         out.append(f"[{c.class_id}, {c.severity}, {state}{blocks}, first raised round "
                    f"{c.first_round}] {display(c.invariant)}")
         out.append(f"  procedure: {display(c.procedure or '')}")
+        if c.members:
+            out.append(f"  authoritative members: {display(', '.join(c.members))}")
+        else:
+            out.append("  authoritative members: MISSING — replace before satisfaction")
     return "\n".join(out)
 
 

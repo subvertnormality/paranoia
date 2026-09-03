@@ -2,48 +2,52 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "e047ea29956b584482d31d5b2a5229b93310153326c48329673d75cd5e6a4304"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "db6a8da1e0db2cdd7f2f16fa1bef261772d6b39b11e06b1bbec0b3d8b1f57b1a"
     },
     "README.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final.",
-      "sha256": "0e37990502ad44e5c9b637e4e13f0e8dec9d2c0a874a2c7372f0e0388effe418"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "55589ed333afefd9bbde244fa34de695233b84383f30f63fc73476ba1da93e4d"
     },
     "scripts/run_plan_restatement_acceptance.py": {
-      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
-      "sha256": "2e1495dd0304f0178bc29f77eead8ac1f6bbdfee74f46788cb1da4d27938d211"
+      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged. Issue #106 projects post-record member fields and their integrity-only prompt spacing away only while reconstructing the retained historical exchange.",
+      "sha256": "38259533821dab55f8a1eb1cf4a714c986adfdcf4660ab90b30f1b3eddc8a5f1"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
       "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
+    "src/paranoia_local/class_closure.py": {
+      "scope": "Adds durable authoritative members to future unmechanized classes; retained pre-change provider exchanges remain historical. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "cd195fe7eec05c459936aec67e3198a45a72580061a09f7cec5c05653474f874"
+    },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut.",
-      "sha256": "7fdfa4eee3a201fba2695d1c06ca946e6b8cd59b7b07f732c2c720e4c8a23c7d"
+      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "9b2e6aa7da44607255dd0d9294b6dcbb4d32efc6c571f71bc26ecdb7f6a45675"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange.",
-      "sha256": "7e1ba7fc75db45655ccc8b44482e3e7442fac0ed6c586ad98fba8e6738cb9cb2"
+      "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "4afa03e6fe4aed81ef6a277f4394377620d0eab86950154a4d6df5d3b1f3d966"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",
-      "sha256": "02634246b0cec97342faebe2c7eb64d619b9ce7af1101a2af135cc0fcccc61f0"
+      "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
+      "sha256": "e4be1b22d60be2754afe18e12be87ce873d440242ebe3ea602aa64002bceae18"
     },
     "src/paranoia_local/server.py": {
       "scope": "Issue #94 documents the new structured concession-challenge field; retained provider exchanges are unchanged.",
       "sha256": "e111b5d87058bee98fae5c1ee8d5e2bd4bd47e3a3dc000fe12905552b633a1db"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery.",
-      "sha256": "cad7519a423d37e5ca7b6d86f5347d2351181b1ed6a14870069f71fdf76c7e54"
+      "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
+      "sha256": "8a59751c4a7f0898464b3731df5c5e25b21d0ec13fed4cde5e08d50c49814fdb"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "33f87b7a3ae75ce216dfd5aab7a846cc81523d03504541bffe3e1138aec640d5"
+      "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
+      "sha256": "27f07b45e0641e321ad52794a797aa41bae2951b131a487c8b69459e12bd1015"
     },
     "tests/test_prompts.py": {
-      "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged.",
-      "sha256": "ecea08782ab70f2ce258b0bf7cbdf20b164ba00a609fd257c52bd1cc06390c48"
+      "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments; retained exchanges remain historical.",
+      "sha256": "963b238f60e9a6f505e37ffc601e8b492c2e9ca40a285e0ec9cd80638ce9fb97"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

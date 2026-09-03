@@ -297,7 +297,11 @@ def _definition(mode: str, *, mechanized: bool | None = None) -> dict[str, Any]:
         "invariant": _string(1_000),
         "severity": _string(32, enum=cc.SEVERITIES),
     }
-    procedure = _object({**common, "procedure": _string(2_000)})
+    procedure = _object({
+        **common,
+        "procedure": _string(2_000),
+        "members": _array(_string(120), maximum=100, minimum=1, unique=True),
+    })
     if mode == cc.PLAN_MODE or mechanized is False:
         return procedure
     pattern = _object({
@@ -351,20 +355,38 @@ def _classification(
 
 
 def _lane_assessment(*, canonical: bool = False) -> dict[str, Any]:
-    return {"anyOf": [
-        _object({
+    satisfied = _object({
+        "class_id": _string(120),
+        "verdict": _string(32, const="satisfied"),
+        "evidence": _evidence(canonical=canonical),
+        "finding_id": {"type": "null"},
+    })
+    alternatives = [satisfied]
+    if not canonical:
+        alternatives.append(_object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(canonical=canonical),
+            "member_coverage": _array(
+                _member_coverage(), maximum=100, minimum=1,
+            ),
             "finding_id": {"type": "null"},
-        }),
+        }))
+    alternatives.append(
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
             "evidence": _evidence(canonical=canonical),
             "finding_id": _string(120),
-        }),
-    ]}
+        })
+    )
+    return {"anyOf": alternatives}
+
+
+def _member_coverage() -> dict[str, Any]:
+    return _object({
+        "member_id": _string(120),
+        "evidence": _evidence(),
+    })
 
 
 def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
@@ -378,19 +400,29 @@ def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
             "debt_id": _string(120),
         }),
     ]}
-    return {"anyOf": [
-        _object({
+    satisfied = _object({
+        "class_id": _string(120),
+        "verdict": _string(32, const="satisfied"),
+        "evidence": _evidence(canonical=canonical),
+    })
+    alternatives = [satisfied]
+    if not canonical:
+        alternatives.append(_object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(canonical=canonical),
-        }),
+            "member_coverage": _array(
+                _member_coverage(), maximum=100, minimum=1,
+            ),
+        }))
+    alternatives.append(
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
             "evidence": _evidence(canonical=canonical),
             "basis": basis,
-        }),
-    ]}
+        })
+    )
+    return {"anyOf": alternatives}
 
 
 def _class_outcome_body(*, canonical: bool = False) -> dict[str, Any]:
@@ -789,9 +821,19 @@ def project_citations(value: dict[str, Any]) -> dict[str, Any]:
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
-            for key, child in node.items():
+            coverage = node.pop("member_coverage", None)
+            if coverage is not None:
+                evidence: list[str] = []
+                for member in coverage:
+                    for citation in member["evidence"]:
+                        anchor = citation["anchor"]
+                        if anchor not in evidence:
+                            evidence.append(anchor)
+                node["evidence"] = evidence
+            for key, child in list(node.items()):
                 if key in {"evidence", "assessment_evidence"}:
-                    node[key] = [citation["anchor"] for citation in child]
+                    if child and isinstance(child[0], dict):
+                        node[key] = [citation["anchor"] for citation in child]
                 else:
                     visit(child)
         elif isinstance(node, list):
@@ -911,15 +953,99 @@ def _canonical_class_projection_issues(value: dict[str, Any]) -> list[str]:
     return issues
 
 
+def _member_coverage_issues(
+    rows: Sequence[tuple[str, dict[str, Any], str]],
+    active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    """Validate satisfaction against the server-authoritative member inventory."""
+    classes = {row["class_id"]:row for row in active_classes}
+    issues: list[str] = []
+    for class_id, outcome, base in rows:
+        cls = classes.get(class_id)
+        if (
+            cls is None or cls.get("mechanized", False)
+            or outcome.get("verdict") != "satisfied"
+        ):
+            continue
+        expected = list(cls.get("members") or ())
+        coverage = outcome.get("member_coverage")
+        if not expected:
+            issues.append(
+                f"{base}: unmechanized class has no authoritative member inventory; "
+                "replace it with an inventoried definition before satisfaction"
+            )
+            continue
+        if not isinstance(coverage, list):
+            issues.append(
+                f"{base}/member_coverage: required for unmechanized satisfaction; "
+                f"expected exact member ids {expected!r}"
+            )
+            continue
+        got = [row["member_id"] for row in coverage]
+        if len(got) != len(set(got)) or set(got) != set(expected):
+            issues.append(
+                f"{base}/member_coverage: expected every authoritative member exactly "
+                f"once {expected!r}; got {got!r}"
+            )
+        for index, member in enumerate(coverage):
+            anchors = [citation["anchor"] for citation in member["evidence"]]
+            if len(anchors) != len(set(anchors)):
+                issues.append(
+                    f"{base}/member_coverage/{index}/evidence: anchors must be unique "
+                    "within one member"
+                )
+    return issues
+
+
+def _wire_decision_member_coverage_issues(
+    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    outcomes = value.get("class_outcomes", {})
+    if not isinstance(outcomes, dict):
+        return []
+    return _member_coverage_issues([
+        (
+            class_id, outcome,
+            f"/class_outcomes/{_pointer_token(class_id)}",
+        )
+        for class_id, outcome in outcomes.items() if isinstance(outcome, dict)
+    ], active_classes)
+
+
+def _wire_lane_member_coverage_issues(
+    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    return _member_coverage_issues([
+        (row["class_id"], row, f"/class_assessments/{index}")
+        for index, row in enumerate(value.get("class_assessments", []))
+    ], active_classes)
+
+
 def decode_lane_with_issues(
     text: str, *, mode: str, lane: str,
+    active_classes: Sequence[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the closed wire shape and retain canonical issues for fan-in."""
     wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    wire_issues = _wire_lane_member_coverage_issues(wire, active_classes)
     canonical = project_citations(wire)
-    return canonical, _schema_issues(
+    return canonical, wire_issues + _schema_issues(
         canonical, lane_schema(mode, lane, canonical=True),
     )
+
+
+def received_lane_member_ids(
+    text: str, *, mode: str, lane: str,
+) -> dict[str, list[str]]:
+    """Retain received member identities for cache-time authority revalidation."""
+    wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    if lane != "integrity":
+        return {}
+    return {
+        row["class_id"]:[member["member_id"] for member in row["member_coverage"]]
+        for row in wire["class_assessments"]
+        if row.get("verdict") == "satisfied" and "member_coverage" in row
+    }
 
 
 def decode_lane(text: str, *, mode: str, lane: str) -> dict[str, Any]:
@@ -983,7 +1109,10 @@ def validate_lane_value(value: dict[str, Any], *, lane: str,
 def parse_lane(text: str, *, mode: str, lane: str,
                class_ids: Sequence[str] = (),
                active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
-    value = decode_lane(text, mode=mode, lane=lane)
+    value, issues = decode_lane_with_issues(
+        text, mode=mode, lane=lane, active_classes=active_classes,
+    )
+    _raise_semantic_issues(issues)
     return validate_lane_value(
         value, lane=lane, class_ids=class_ids, active_classes=active_classes,
     )
@@ -994,6 +1123,7 @@ def decode_decision_with_issues(
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the decision wire shape and retain canonical issues for fan-in."""
     outcome_ids = expected_outcome_class_ids(
@@ -1009,6 +1139,10 @@ def decode_decision_with_issues(
         max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
     wire_pointers = _wire_class_pointers(wire)
+    wire_issues = (
+        _wire_decision_member_coverage_issues(wire, active_classes or ())
+        if require_closure_coverage else []
+    )
     canonical = project_decision_wire(wire)
     issues = _schema_issues(
         canonical,
@@ -1019,7 +1153,7 @@ def decode_decision_with_issues(
         ),
     )
     canonical["_wire_class_pointers"] = wire_pointers
-    issues = _remap_class_schema_issues(canonical, issues)
+    issues = wire_issues + _remap_class_schema_issues(canonical, issues)
     issues.extend(_canonical_class_projection_issues(canonical))
     return canonical, issues
 
@@ -1029,12 +1163,14 @@ def decode_decision(
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> dict[str, Any]:
     """Decode and structurally validate a decision before semantic layers run."""
     value, issues = decode_decision_with_issues(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
         prior_concessions=prior_concessions,
+        require_closure_coverage=require_closure_coverage,
     )
     _raise_semantic_issues(issues)
     return value
@@ -1737,12 +1873,14 @@ def materialize_decision(
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> dict[str, Any]:
     """Decode one semantic decision and project it to the durable V1 shape."""
     value = decode_decision(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
         prior_concessions=prior_concessions,
+        require_closure_coverage=require_closure_coverage,
     )
     return materialize_decision_value(
         value, mode=mode, role=role, source_ids=source_ids,

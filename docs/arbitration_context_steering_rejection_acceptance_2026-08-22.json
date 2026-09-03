@@ -6,8 +6,8 @@
       "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Adds unrelated staged plan normative-restatement and issue #98 unmechanized class-sweep guidance; arbitration cleaner, attester, and decider instructions remain unchanged.",
-      "sha256": "903fa7c6f0447a5f788589657f2c12fbdc25c1d6b3f7a964ad4a42c0e158bd21"
+      "scope": "Adds unrelated staged plan normative-restatement and issue #98 unmechanized class-sweep guidance; arbitration cleaner, attester, and decider instructions remain unchanged. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "abac7e2385d15d535fb1fa41e875037ae8c1bda04a65b9062e68ff494831a0eb"
     }
   },
   "audit": {

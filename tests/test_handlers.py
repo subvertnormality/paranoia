@@ -302,6 +302,7 @@ class TestRebut:
         state.update(phase="correction", last_round=7, debt=[debt], plan_line_count=1)
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+            members=("reviewed-path",),
         )
         state["correction_control"] = {
             "version":1, "classes":{"class-a":{
@@ -371,6 +372,43 @@ class TestRebut:
                 "lineage":"only-lineage",
             }, engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock)
 
+    def test_bound_rebut_cannot_concede_a_legacy_uninventoried_class(
+        self, repo: Path, tmp_path: Path, monkeypatch,
+    ) -> None:
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        debt = {
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"finding", "evidence":["plan:1"], "remedy":"replace",
+            "source_ids":[], "class_ids":["class-a"], "first_round":1,
+            "last_round":7, "reason":"still present",
+        }
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
+        state.update(phase="correction", last_round=7, debt=[debt], plan_line_count=1)
+        state["correction_control"] = {"version":1, "classes":{"class-a":{
+            "reset_round":None, "reopen_count":0, "last_session_ref":"sess-1",
+        }}}
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            "legacy-bound-rebut", mode=cc.PLAN_MODE,
+            classes={"class-a":cc.TrackedClass(
+                "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+            )}, review_state=state,
+        ))
+        path = tmp_path / "state" / "lineages" / "legacy-bound-rebut.json"
+        before = path.read_bytes()
+        eng = FakeEngine(json.dumps({
+            "disposition":"CONCEDE", "reason":"Withdraw it.",
+            "evidence":[{"anchor":"plan:1", "rationale":"current obligation"}],
+        }))
+
+        with pytest.raises(ValueError, match="inventoried replacement"):
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+                "lineage":"legacy-bound-rebut", "class_id":"class-a",
+                "debt_id":"D1", "lineage_mode":"plan",
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+
+        assert path.read_bytes() == before
+
     def test_bound_rebut_hold_is_audit_only(
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
@@ -427,6 +465,7 @@ class TestRebut:
         }}}
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+            members=("reviewed-path",),
         )
         cc.save_lineage(cc.default_state_root(), cc.Lineage(
             "branch-lf-rebut", mode=cc.BRANCH_MODE,
@@ -519,6 +558,7 @@ class TestRebut:
         }])
         tracked = cc.TrackedClass(
             "class-a", "invariant", cc.MAJOR, 1, cc.OPEN, procedure="inspect",
+            members=("reviewed-path",),
         )
         state["correction_control"] = {"version":1, "classes":{"class-a":{
             "reset_round":None, "reopen_count":3, "last_session_ref":"sess-1",

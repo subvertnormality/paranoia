@@ -122,6 +122,24 @@ class TestRebutInstructions:
 
 
 class TestStagedReviewInstructions:
+    def test_member_inventory_wire_names_are_exact_in_census_and_followup(self) -> None:
+        census = prompts.staged_census_instructions("plan", "integrity")
+        followup = prompts.staged_followup_instructions("plan")
+        assert prompts.STAGED_MEMBER_CENSUS_INSTRUCTIONS in census
+        assert (
+            "For a satisfied unmechanized assessment or outcome, omit flat `evidence` "
+            "and emit\n`member_coverage` with exactly one row for every stable member ID "
+            "in that class's server-supplied\n`members` list."
+        ) in followup
+        for text in (census, followup):
+            assert "member_coverage" in text
+            assert "stable member ID" in text
+            assert "omit flat" in text
+        assert "server-supplied" in followup and "`members` list" in followup
+        assert "member_coverage" not in prompts.staged_census_instructions(
+            "plan", "domain"
+        )
+
     def test_review_roles_require_complete_co_asserting_site_repairs(self) -> None:
         for mode in ("plan", "branch"):
             text = prompts.staged_census_instructions(mode, "domain")

@@ -1,13 +1,17 @@
 {
   "acceptance_kind": "evidence-bound-mechanized-predicate-public-branch",
   "allowed_later_source_diffs": {
+    "src/paranoia_local/class_closure.py": {
+      "scope": "Adds and validates member inventories only for unmechanized classes; it does not alter staged schema validation, mechanized predicate materialization, or retry evidence. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "cd195fe7eec05c459936aec67e3198a45a72580061a09f7cec5c05653474f874"
+    },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence.",
-      "sha256": "2fb864279413619afb6d6a264f6ae3f01856416b75598dcf646df26e802a0bb6"
+      "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
+      "sha256": "55e40ec6f2c6d336a8dc8dd60f5da990a034a6d508af31c0eee4471a91e64f53"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged schema validation, mechanized predicate validation, or the retry exchange proved by this historical acceptance.",
-      "sha256": "9b6315bd10f31d893d8cc3ac255a38286bd3f8ded239213cc3b466eb644eba51"
+      "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged schema validation, mechanized predicate validation, or the retry exchange proved by this historical acceptance. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
+      "sha256": "b11a7a6b03019c65a697f7abaf627298c21c4913faca1b11d4c15ea59f53b525"
     }
   },
   "attempt_ledger": [

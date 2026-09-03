@@ -541,6 +541,7 @@ def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
             "class_id": c.class_id, "invariant": c.invariant,
             "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
             "pattern": c.pattern, "pathspec": c.pathspec, "procedure": c.procedure,
+            "members": list(c.members),
         }
         for c in lineage.active()
     ]
@@ -851,6 +852,7 @@ def _census_cache_binding(
 
 def _cached_census_manifests(
     state: dict[str, Any], *, binding: dict[str, Any], lanes: tuple[str, ...],
+    active_classes: list[dict[str, Any]],
     validate: Callable[[str, str], dict[str, Any]],
 ) -> list[dict[str, Any]] | None:
     cache = state.get("census_cache")
@@ -871,6 +873,29 @@ def _cached_census_manifests(
             validated.append(validate(json.dumps(by_lane[lane], ensure_ascii=False), lane))
     except rc.CensusError:
         return None
+    received = cache.get("member_coverage")
+    if not isinstance(received, dict):
+        return None
+    classes = {row["class_id"]:row for row in active_classes}
+    integrity = validated[lanes.index("integrity")]
+    expected = {
+        row["class_id"]:list(classes[row["class_id"]].get("members") or ())
+        for row in integrity["class_assessments"]
+        if (
+            row["verdict"] == "satisfied"
+            and row["class_id"] in classes
+            and not classes[row["class_id"]].get("mechanized", False)
+        )
+    }
+    if set(received) != set(expected):
+        return None
+    for class_id, members in received.items():
+        if (
+            not isinstance(members, list)
+            or len(members) != len(set(members))
+            or set(members) != set(expected[class_id])
+        ):
+            return None
     return validated
 
 
@@ -1160,6 +1185,9 @@ def _is_legacy_claim_only_phase(
         and not has_blocking_debt
         and not lineage.blocking()
         and not unbound_blocking
+        and not any(
+            not item.mechanized and not item.members for item in lineage.active()
+        )
         and not any(state.get(key) for key in (
             "staged_failure", "validation_debt", "format_debt",
             "unbound_class_ids", "unbound_classes",
@@ -1224,6 +1252,30 @@ def _staged_structural_review(
             lineage.review_state = deepcopy(state)
             if getattr(closure, "prepared_lineage", None) is not None:
                 closure.prepared_lineage.review_state = deepcopy(state)
+        legacy_memberless = [
+            item.class_id for item in lineage.active()
+            if not item.mechanized and not item.members
+        ]
+        memberless_clear_bypass = state.get("phase") == "clear"
+        memberless_claim_only_bypass = (
+            state.get("phase") == "correction"
+            and not state.get("debt") and not lineage.debt
+            and state.get("snapshot_digest") == snapshot
+            and not any(state.get(key) for key in (
+                "staged_failure", "validation_debt", "format_debt",
+                "unbound_class_ids", "unbound_classes",
+            ))
+        )
+        if legacy_memberless and (
+            memberless_clear_bypass or memberless_claim_only_bypass
+        ):
+            retained_history = [
+                deepcopy(row) for row in state.get("debt", [])
+                if isinstance(row, dict) and "concession" in row
+            ]
+            rc.set_phase(state, "census")
+            state["debt"] = retained_history
+            state.pop("census_cache", None)
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -1388,6 +1440,7 @@ def _staged_structural_review(
             else:
                 parsed, issues = sp.decode_lane_with_issues(
                     text, mode=mode, lane=lane,
+                    active_classes=active_classes if lane == "integrity" else (),
                 )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc
@@ -1562,7 +1615,10 @@ def _staged_structural_review(
 
         def run_lane(
             lane: str,
-        ) -> tuple[str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]]]:
+        ) -> tuple[
+            str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]],
+            dict[str, list[str]],
+        ]:
             prompt = lane_prompts[lane]
             prompt_issue = _staged_prompt_issue(prompt, "staged lane prompt")
             if prompt_issue is not None:
@@ -1593,14 +1649,19 @@ def _staged_structural_review(
             for assessment in parsed["class_assessments"]:
                 if assessment["finding_id"] is not None:
                     assessment["finding_id"] = renamed[assessment["finding_id"]]
-            return lane, result, parsed, lane_attempts, lane_rejected
+            return (
+                lane, result, parsed, lane_attempts, lane_rejected,
+                sp.received_lane_member_ids(result.text, mode=mode, lane=lane),
+            )
 
         manifests = _cached_census_manifests(
             state, binding=cache_binding, lanes=lanes,
+            active_classes=active_classes,
             validate=lambda text, lane: validate_lane(
                 text, lane, canonical=True,
             ),
         )
+        received_member_coverage: dict[str, list[str]] = {}
         if manifests is None:
             lane_rows = []
             lane_errors: list[tuple[str, rc.CensusError]] = []
@@ -1646,12 +1707,19 @@ def _staged_structural_review(
                     row[2] for row in lane_rows
                 ]
                 raise first_error
-            for _, _, _, lane_attempts, lane_rejected in lane_rows:
+            for _, _, _, lane_attempts, lane_rejected, _ in lane_rows:
                 attempts.extend(lane_attempts)
                 rejected_payloads.extend(lane_rejected)
             manifests = [row[2] for row in lane_rows]
-        elif on_progress is not None:
-            on_progress("reusing validated census lanes after settlement rejection")
+            received_member_coverage = next(
+                row[5] for row in lane_rows if row[0] == "integrity"
+            )
+        else:
+            received_member_coverage = deepcopy(
+                state["census_cache"]["member_coverage"]
+            )
+            if on_progress is not None:
+                on_progress("reusing validated census lanes after settlement rejection")
         closure.staged_manifests = manifests
         source_ids = [f["id"] for m in manifests for f in m["findings"]]
         source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
@@ -1736,6 +1804,7 @@ def _staged_structural_review(
             if cacheable:
                 error.census_cache = {  # type: ignore[attr-defined]
                     **cache_binding, "manifests":deepcopy(manifests),
+                    "member_coverage":deepcopy(received_member_coverage),
                 }
             raise
         attempts.extend(call_attempts)
@@ -4752,6 +4821,12 @@ def rebut(
                 )
                 review = replace(review, text=rendered)
                 if disposition == "CONCEDE":
+                    tracked = lineage.classes[class_id]
+                    if not tracked.members:
+                        raise cc.RegisterError(
+                            "bound rebut requires an inventoried replacement before "
+                            "legacy unmechanized closure"
+                        )
                     draft = cc.copy_lineage(lineage)
                     draft.review_state = rc.settle_rebut_concession(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
@@ -5053,7 +5128,44 @@ class _ClosureRound:
     def _attempt(self, text: str) -> tuple[list[str], str]:
         """Apply `text`'s register to a draft, and adopt it only if the whole thing holds."""
         assert self.lineage is not None
-        register = cc.parse_register(text, allow_mechanized=self.allow_mechanized)
+        register = cc.parse_register(
+            text, allow_mechanized=self.allow_mechanized, require_members=True,
+        )
+        for transition in register.transitions:
+            if transition.kind == "RECLASSIFY":
+                tracked = self.lineage.classes.get(transition.class_id)
+                severity = transition.severity
+                if (
+                    tracked is not None
+                    and not tracked.mechanized
+                    and not tracked.members
+                    and tracked.severity in cc.BLOCKING_SEVERITIES
+                    and severity not in cc.BLOCKING_SEVERITIES
+                ):
+                    raise cc.RegisterError(
+                        "RECLASSIFY cannot make legacy class "
+                        f"{transition.class_id} nonblocking before an inventoried "
+                        "replacement is installed"
+                    )
+            if transition.kind == "CLOSED":
+                tracked = self.lineage.classes.get(transition.class_id)
+                if tracked is not None and not tracked.mechanized and not tracked.members:
+                    raise cc.RegisterError(
+                        "CLOSED requires an inventoried replacement for legacy class "
+                        f"{transition.class_id}"
+                    )
+            if transition.kind == "SUPERSEDE" and transition.target is not None:
+                source = self.lineage.classes.get(transition.class_id)
+                if source is not None and not source.mechanized and not source.members:
+                    raise cc.RegisterError(
+                        "SUPERSEDE BY requires an inventoried replacement for legacy "
+                        f"class {transition.class_id}"
+                    )
+                target = self.lineage.classes.get(transition.target)
+                if target is not None and not target.mechanized and not target.members:
+                    raise cc.RegisterError(
+                        "SUPERSEDE BY requires an inventoried unmechanized target"
+                    )
         draft = cc.copy_lineage(self.lineage)
         minted = cc.apply_register(draft, register, round_no=self.round_no)
         self.lineage.classes = draft.classes

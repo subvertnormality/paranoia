@@ -408,6 +408,13 @@ of the resulting code and tests.
   boundary. Enumerate and inspect every site/property category named there before satisfaction or
   closure, account explicitly for empty or inapplicable categories, and aggregate every surviving
   occurrence into the class's one finding. Mechanized classes retain their server-run predicate.
+  Store a closed list of stable member IDs on every unmechanized class. A satisfied census
+  assessment, correction outcome, or final outcome must provide exactly one separately evidenced
+  row for every server-supplied member ID. Validate exact set equality before deduplicating shared
+  anchors into the flat durable assessment evidence. A legacy class without authoritative members
+  remains loadable but forces broad census from every staged phase, including same-snapshot clear
+  and claim-only migration, and stays unclosable until replaced with an inventoried definition;
+  do not infer members from prose. Retained text registration requires the same closed inventory.
   Preserve standalone lifecycle actions, but require an authored evidence-bearing satisfied
   outcome whenever correction closes an otherwise outcome-optional unmechanized class; a bare
   close action never proves the invariant-wide search completed.

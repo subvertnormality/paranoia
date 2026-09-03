@@ -71,9 +71,34 @@ class TestRegisterParsing:
             "=== CLASS REGISTER ===\n"
             "CLASS: one\nSEVERITY: MAJOR\nPATTERN: a\nPATHSPEC: src\n\n"
             "CLASS: two\nSEVERITY: MINOR\nPROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )
         assert [c.invariant for c in reg.new_classes] == ["one", "two"]
         assert reg.new_classes[0].mechanized and not reg.new_classes[1].mechanized
+        assert reg.new_classes[1].members == ("reviewed-caller",)
+
+    def test_unmechanized_registration_requires_specific_members(self) -> None:
+        with pytest.raises(cc.RegisterError, match="PROCEDURE\\+MEMBERS"):
+            cc.parse_register(
+                "=== CLASS REGISTER ===\n"
+                "CLASS: a\nSEVERITY: MAJOR\nPROCEDURE: inspect it\n",
+                require_members=True,
+            )
+
+    @pytest.mark.parametrize("members", [
+        [f"member-{index}" for index in range(101)],
+        ["x" * 121],
+    ])
+    def test_text_member_inventory_obeys_the_durable_loader_bounds(
+        self, members: list[str]
+    ) -> None:
+        with pytest.raises(cc.RegisterError, match=r"1\.\.100|1\.\.120"):
+            cc.parse_register(
+                "=== CLASS REGISTER ===\n"
+                "CLASS: a\nSEVERITY: MAJOR\nPROCEDURE: inspect it\n"
+                f"MEMBERS: {json.dumps(members)}\n",
+                require_members=True,
+            )
 
     def test_duplicate_field_within_a_record_is_rejected(self) -> None:
         with pytest.raises(cc.RegisterError, match="duplicate register key"):
@@ -121,7 +146,8 @@ class TestNothingOutsideTheRegisterIsParsed:
 
     def test_a_prose_severity_tag_disagreeing_with_the_register_is_not_an_error(self) -> None:
         text = ("## What doesn't work\n[MAJOR] something\n\n=== CLASS REGISTER ===\n"
-                "CLASS: a\nSEVERITY: MINOR\nPROCEDURE: p\n")
+                "CLASS: a\nSEVERITY: MINOR\nPROCEDURE: p\n"
+                'MEMBERS: ["reviewed-path"]\n')
         assert cc.parse_register(text).new_classes[0].severity == cc.MINOR
 
 
@@ -142,9 +168,12 @@ class TestSupersessionGrammar:
 
     def test_with_procedure_is_available(self) -> None:
         reg = cc.parse_register(
-            "=== CLASS REGISTER ===\nSUPERSEDE: abc12345\nWITH-PROCEDURE: read every caller\n"
+            "=== CLASS REGISTER ===\nSUPERSEDE: abc12345\n"
+            "WITH-PROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )
         assert reg.transitions[0].procedure == "read every caller"
+        assert reg.transitions[0].members == ("reviewed-caller",)
 
 
 # ── state transitions ─────────────────────────────────────────────────────────
@@ -160,6 +189,7 @@ def lineage_with(*specs: tuple[str, str, str | None]) -> cc.Lineage:
                 invariant, severity,
                 pattern=pattern, pathspec="." if pattern else None,
                 procedure=None if pattern else "read it",
+                members=() if pattern else ("primary-obligation",),
             ),)),
             round_no=1,
         )
@@ -225,6 +255,30 @@ class TestIdentityAndTransitions:
         cc.apply_register(lin, cc.Register(
             transitions=(cc.Transition("REOPEN", cid),)), round_no=3)
         assert lin.classes[cid].blocking
+
+    def test_legacy_uninventoried_class_remains_replayable_in_the_pure_engine(self) -> None:
+        lin = cc.Lineage("legacy", classes={
+            "legacy-a":cc.TrackedClass(
+                "legacy-a", "inspect every route", cc.MAJOR, 1, cc.OPEN,
+                procedure="inspect routes",
+            ),
+        })
+        cc.apply_register(lin, cc.Register(
+            transitions=(cc.Transition("CLOSED", "legacy-a"),)
+        ), round_no=2)
+        assert lin.classes["legacy-a"].status == cc.CLOSED
+
+    def test_unmechanized_replacement_installs_new_member_inventory(self) -> None:
+        lin = lineage_with(("old set invariant", cc.MAJOR, None))
+        old = lin.active()[0].class_id
+        minted = cc.apply_register(lin, cc.Register(transitions=(
+            cc.Transition(
+                "REPLACE", old, invariant="new set invariant", severity=cc.MAJOR,
+                procedure="inspect both obligations", members=("left", "right"),
+            ),
+        )), round_no=2)
+        assert lin.classes[old].status == cc.SUPERSEDED
+        assert lin.classes[minted[0]].members == ("left", "right")
 
     def test_a_superseded_source_is_rejected(self) -> None:
         """A superseded class is inert and uncounted against the cap; CLOSED or REOPEN
@@ -305,7 +359,10 @@ class TestCapBoundary:
         lin = self._full()
         victim = lin.active()[0].class_id
         minted = cc.apply_register(lin, cc.Register(transitions=(
-            cc.Transition("SUPERSEDE", victim, procedure="read every caller"),)), round_no=2)
+            cc.Transition(
+                "SUPERSEDE", victim, procedure="read every caller",
+                members=("reviewed-caller",),
+            ),)), round_no=2)
         assert not lin.classes[minted[0]].mechanized
 
 
@@ -549,6 +606,40 @@ class TestLineageState:
         cc.save_lineage(tmp_path, lin)
         again = cc.load_lineage(tmp_path, "test", stamp="s")
         assert again.rounds == 3 and len(again.active()) == 1
+
+    def test_unmechanized_member_inventory_round_trips(self, tmp_path: Path) -> None:
+        lin = lineage_with(("set invariant", cc.MAJOR, None))
+        cc.save_lineage(tmp_path, lin)
+        again = cc.load_lineage(tmp_path, "test", stamp="members")
+        assert again.active()[0].members == ("primary-obligation",)
+
+    def test_legacy_unmechanized_class_is_visibly_uninventoried(self) -> None:
+        lin = cc.Lineage("legacy", classes={
+            "legacy-id":cc.TrackedClass(
+                "legacy-id", "set invariant", cc.MAJOR, 1, cc.OPEN,
+                procedure="inspect it",
+            ),
+        })
+        assert "MISSING — replace before satisfaction" in (
+            cc.render_unmechanized(lin) or ""
+        )
+
+    @pytest.mark.parametrize("members", [[], ["same", "same"], [1], "member"])
+    def test_malformed_persisted_member_inventory_blocks(
+        self, tmp_path: Path, members,
+    ) -> None:
+        folder = cc.lineage_dir(tmp_path)
+        folder.mkdir(parents=True)
+        (folder / "bad.json").write_text(json.dumps({
+            "mode":cc.BRANCH_MODE,
+            "classes":[{
+                "class_id":"bad", "invariant":"set invariant",
+                "severity":cc.MAJOR, "first_round":1, "status":cc.OPEN,
+                "procedure":"inspect it", "members":members,
+            }],
+        }), encoding="utf-8")
+        with pytest.raises(cc.StateUnavailable, match="persisted class members"):
+            cc.load_lineage(tmp_path, "bad", stamp="members")
 
     def test_unparseable_state_blocks_and_is_quarantined(self, tmp_path: Path) -> None:
         d = cc.lineage_dir(tmp_path)

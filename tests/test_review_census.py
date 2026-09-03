@@ -183,9 +183,9 @@ def test_closed_persisted_state_validator_accepts_every_supported_envelope():
     }
     cached["census_cache"] = {
         "version":rc.CENSUS_CACHE_VERSION, "mode":cc.PLAN_MODE,
-        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
-        "input_digest":"input", "active_classes_digest":"classes",
-        "manifests":[{"lane":"domain"}],
+            "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+            "input_digest":"input", "active_classes_digest":"classes",
+            "manifests":[{"lane":"domain"}], "member_coverage":{},
     }
     accepted.append(cached)
 
@@ -272,9 +272,9 @@ def test_closed_persisted_state_validator_rejects_unhashable_nested_enums():
     cache_state["validation_debt"] = "legacy validation failure"
     cache_state["census_cache"] = {
         "version":rc.CENSUS_CACHE_VERSION, "mode":[],
-        "snapshot_digest":"snapshot", "stakes_digest":"stakes",
-        "input_digest":"input", "active_classes_digest":"classes",
-        "manifests":[],
+            "snapshot_digest":"snapshot", "stakes_digest":"stakes",
+            "input_digest":"input", "active_classes_digest":"classes",
+            "manifests":[], "member_coverage":{},
     }
     with pytest.raises(rc.CensusError, match="cache mode"):
         rc.validate_persisted_state(cache_state, [])
@@ -418,7 +418,7 @@ def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
     tracked = cc.TrackedClass(
         "class-a", "the reviewed artifact remains coherent", cc.MAJOR, 1,
         cc.OPEN if initial_phase == "correction" else cc.CLOSED,
-        procedure="inspect the artifact",
+        procedure="inspect the artifact", members=("left-member", "right-member"),
     )
     cc.save_lineage(state_root, cc.Lineage(
         lineage_id, rounds=1, mode=mode, classes={"class-a":tracked},
@@ -439,7 +439,18 @@ def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
     }
     if initial_phase == "final":
         decision_value["coverage"] = coverage
-    decision = wire(decision_value)
+    decision_wire = wire_value(decision_value)
+    decision_wire["class_outcomes"]["class-a"]["member_coverage"] = [
+        {
+            "member_id":member_id,
+            "evidence":[{
+                "anchor":anchor,
+                "rationale":f"{member_id} is proven at the shared coordinate",
+            }],
+        }
+        for member_id in ("left-member", "right-member")
+    ]
+    decision = json.dumps(decision_wire)
 
     calls = []
     engine_class = (
@@ -546,7 +557,7 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1, concessions=False
         classes[class_id] = cc.TrackedClass(
             class_id, f"invariant {index}", cc.MAJOR, 1,
             cc.OPEN if phase == "correction" else cc.CLOSED,
-            procedure=f"inspect {index}",
+            procedure=f"inspect {index}", members=("reviewed-path",),
         )
         if phase == "correction":
             debt.append({
@@ -754,20 +765,20 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "6fa8d4f118af602df6f5a24daeaf9e4208393970cb7326c94c035e67566dce61",
-        "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
+            "87e1347e3f6e218a4d5de37a95d65f22709e11a083c5ae3a89c3794b037558f3",
+        "ea19029412e0e8854fe486279b04c0585540c820dbd3007f31b131ae6e0a54ea",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "1b7ef344b85384d1f54a9de06e5a5709c73cec0b869ab53cb094d56085d21279",
-        "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
+            "6b9722e93512f1b6e5b20139d71f499d0239e2e7967762f9aaa46242731f889e",
+        "6a8cc807cc90cd736e887c75ae0ebf017a6df86e1c752dd874a54ffafb69ddd8",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "30b37a474b918be904f0400f598bdd9aa290d293ea9e00cf4610101f18613f64",
-        "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
+            "cf0efb102fdf304c62285575aee412794e67116eee4742bf2cda3b0f464d2292",
+        "335a29dc889acdf9bf9f545f61e25fa425553882b6dc1b3c83835d2b0d62cd9a",
         "clear",
     ),
 ])
@@ -1839,8 +1850,10 @@ def test_census_cache_requires_every_exact_binding():
         active_classes=[], existing_debt=[], engine_name="codex", model="model",
         effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
     )
-    assert binding["version"] == 3
-    state = {"census_cache":{**binding, "manifests":manifests}}
+    assert binding["version"] == 4
+    state = {"census_cache":{
+        **binding, "manifests":manifests, "member_coverage":{},
+    }}
 
     def validate(text, lane_name):
         try:
@@ -1852,17 +1865,17 @@ def test_census_cache_requires_every_exact_binding():
             raise rc.CensusError(str(exc)) from exc
 
     assert handlers._cached_census_manifests(
-        state, binding=binding, lanes=lanes, validate=validate,
+        state, binding=binding, lanes=lanes, active_classes=[], validate=validate,
     ) == manifests
     for key in binding:
         changed = dict(binding)
         changed[key] = f"different-{binding[key]}"
         assert handlers._cached_census_manifests(
-            state, binding=changed, lanes=lanes, validate=validate,
+            state, binding=changed, lanes=lanes, active_classes=[], validate=validate,
         ) is None
     incomplete = {"census_cache":{**binding, "manifests":manifests[:-1]}}
     assert handlers._cached_census_manifests(
-        incomplete, binding=binding, lanes=lanes, validate=validate,
+        incomplete, binding=binding, lanes=lanes, active_classes=[], validate=validate,
     ) is None
     changed_contract = handlers._census_cache_binding(
         mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
@@ -1872,8 +1885,60 @@ def test_census_cache_requires_every_exact_binding():
     )
     assert changed_contract["input_digest"] != binding["input_digest"]
     assert handlers._cached_census_manifests(
-        state, binding=changed_contract, lanes=lanes, validate=validate,
+        state, binding=changed_contract, lanes=lanes, active_classes=[], validate=validate,
     ) is None
+
+    inventoried = [{
+        "class_id":"class-a", "invariant":"both members hold", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":"inspect both", "members":["left", "right"],
+    }]
+    member_binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=inventoried, existing_debt=[], engine_name="codex",
+        model="model", effort="high", web_search=False, plan_lines=3,
+        lane_prompts=lane_prompts,
+    )
+    changed_members = deepcopy(inventoried)
+    changed_members[0]["members"] = ["left", "right", "third"]
+    changed_member_binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=changed_members, existing_debt=[], engine_name="codex",
+        model="model", effort="high", web_search=False, plan_lines=3,
+        lane_prompts=lane_prompts,
+    )
+    assert member_binding["active_classes_digest"] != (
+        changed_member_binding["active_classes_digest"]
+    )
+
+    satisfied = deepcopy(manifests)
+    satisfied[-1]["class_assessments"] = [{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }]
+    member_state = {"census_cache":{
+        **member_binding, "manifests":satisfied,
+        "member_coverage":{"class-a":["left", "right"]},
+    }}
+    def validate_members(text, lane_name):
+        value = sp.decode_canonical_lane(
+            text, mode=cc.PLAN_MODE, lane=lane_name,
+        )
+        return sp.validate_lane_value(
+            value, lane=lane_name,
+            active_classes=inventoried if lane_name == "integrity" else (),
+        )
+
+    assert handlers._cached_census_manifests(
+        member_state, binding=member_binding, lanes=lanes,
+        active_classes=inventoried, validate=validate_members,
+    ) == satisfied
+    for bad in ({}, {"class-a":["left"]}, {"class-a":["left", "left"]}):
+        member_state["census_cache"]["member_coverage"] = bad
+        assert handlers._cached_census_manifests(
+            member_state, binding=member_binding, lanes=lanes,
+            active_classes=inventoried, validate=validate_members,
+        ) is None
 
 
 def test_assessment_evidence_uses_the_shared_anchor_resolver(tmp_path):
@@ -1919,7 +1984,8 @@ def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
             raise rc.CensusError(str(exc)) from exc
 
     assert handlers._cached_census_manifests(
-        state, binding=binding, lanes=lanes, validate=validate,
+        state, binding=binding, lanes=lanes, active_classes=active,
+        validate=validate,
     ) is None
 
 
@@ -2072,6 +2138,12 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         ),
         prior_concessions=prior_concessions,
     ))
+    expected_schema = acceptance.historical_issue_98_schema(
+        expected_schema, role="correction",
+        outcome_ids=sp.expected_outcome_class_ids(
+            "correction", active_classes=active, durable_debt=debt,
+        ),
+    )
     assert call["schema"] == expected_schema
     decoded = sp.decode_decision(
         response, mode=cc.BRANCH_MODE, role="correction",
@@ -2129,15 +2201,39 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
 def wire_value(value):
     value = json.loads(json.dumps(value))
 
+    def prepare(node):
+        if isinstance(node, dict):
+            if node.get("verdict") == "satisfied" and "evidence" in node:
+                node["member_coverage"] = [{
+                    "member_id":"reviewed-path", "evidence":node.pop("evidence"),
+                }]
+            if (
+                "procedure" in node and "invariant" in node and "severity" in node
+                and "members" not in node
+            ):
+                node["members"] = ["reviewed-path"]
+            for child in node.values():
+                prepare(child)
+        elif isinstance(node, list):
+            for child in node:
+                prepare(child)
+
+    prepare(value)
+
     def visit(node):
         if isinstance(node, dict):
             for key, child in node.items():
                 if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
-                            "anchor":item, "rationale":"fixture evidence",
+                            "anchor":item,
+                            "rationale":(
+                                f"obligation=fixture member {index}; "
+                                "disposition=verified; "
+                                "fixture evidence"
+                            ),
                         }
-                        for item in child
+                        for index, item in enumerate(child)
                     ]
                 else:
                     visit(child)
@@ -2392,7 +2488,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
     active = [{
         "class_id":"class-a", "invariant":"invariant a", "severity":"MAJOR",
         "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
-        "procedure":"inspect it",
+        "procedure":"inspect it", "members":["reviewed-path"],
     }]
     coverage = [
         {
@@ -2409,7 +2505,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
         "class_actions":{"class-a":None}, "coverage":coverage,
     }
     invalid_value = wire_value(base)
-    invalid_value["class_outcomes"]["class-a"]["evidence"] = [
+    invalid_value["class_outcomes"]["class-a"]["member_coverage"][0]["evidence"] = [
         {"anchor":"plan:1", "rationale":"first reason"},
         {"anchor":"plan:1", "rationale":"different reason"},
     ]
@@ -2424,7 +2520,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
 
         def resume(self, session_ref, prompt, *args, **kwargs):
             assert session_ref == "s"
-            assert "/class_outcomes/class-a/evidence:" in prompt
+            assert "/class_outcomes/class-a/member_coverage/0/evidence:" in prompt
             return Review(text=corrected, session_ref="s", raw=corrected)
 
     def parser(text):
@@ -2448,7 +2544,8 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
     assert parsed["class_records"] == [{"op":"close", "class_id":"class-a"}]
     assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
     assert (
-        "/class_outcomes/class-a/evidence: projected anchors must be unique"
+        "/class_outcomes/class-a/member_coverage/0/evidence: anchors must be "
+        "unique within one member"
         in rejected[0]["validation_issue"]
     )
 
@@ -2960,7 +3057,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
         lineage,
         cc.Register(new_classes=(cc.NewClass(
             "class outcomes preserve integrity evidence", "MAJOR",
-            procedure="inspect consolidation",
+            procedure="inspect consolidation", members=("reviewed-path",),
         ),)),
         round_no=0,
     )[0]
@@ -4715,6 +4812,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         "definitions, call sites, and acceptance properties all agree",
         cc.MAJOR, 1, cc.OPEN,
         procedure="inspect definitions, call sites, and acceptance properties",
+        members=("reviewed-path",),
     )
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
     state.update(phase="correction", debt=[{
@@ -4822,6 +4920,7 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         cid:cc.TrackedClass(
             cid, invariant, cc.MAJOR, 1, cc.OPEN,
             procedure="inspect every independently anchored site",
+            members=("reviewed-path",),
         )
         for cid, invariant in (
             ("debt-class", "the known blocker is repaired"),
@@ -4924,13 +5023,14 @@ def test_public_correction_retries_evidence_free_standalone_close(
     classes = {
         "debt-class":cc.TrackedClass(
             "debt-class", "the known blocker is repaired", cc.MAJOR, 1, cc.OPEN,
-            procedure="inspect the known blocker",
+            procedure="inspect the known blocker", members=("reviewed-path",),
         ),
         "category-class":cc.TrackedClass(
             "category-class",
             "definitions, call sites, and acceptance properties all agree",
             cc.MAJOR, 1, cc.OPEN,
             procedure="inspect definitions, call sites, and acceptance properties",
+            members=("reviewed-path",),
         ),
     }
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
@@ -5025,6 +5125,94 @@ def test_public_correction_retries_evidence_free_standalone_close(
             "evidence":anchors, "finding_id":None,
         },
     ]
+
+
+def test_public_correction_retries_subset_closure_with_reported_coordinate_set(
+    repo, tmp_path, monkeypatch,
+):
+    lineage_id = "issue-106-coordinate-coverage"
+    class_id = "e1b85ba4"
+    anchors = [f"plan:{line}" for line in range(1, 11)]
+    state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
+    state.update(phase="correction", last_round=1, debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":cc.MAJOR,
+        "summary":"some provenance coordinates bypass authority",
+        "evidence":anchors[:4], "remedy":"authenticate every coordinate",
+        "source_ids":[], "class_ids":[class_id], "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=cc.PLAN_MODE, rounds=1, next_seq=2,
+            classes={class_id:cc.TrackedClass(
+                class_id,
+                "Caller-supplied governed provenance coordinates must be "
+                "authenticated before they affect any transformation or evidence.",
+                cc.MAJOR, 1, cc.OPEN,
+                procedure=(
+                    "At every trust boundary check receipt IDs, attempt IDs, and "
+                    "lineage digests for each coordinate."
+                ),
+                members=tuple(f"coordinate-{index}" for index in range(1, 11)),
+            )},
+            review_state=state,
+        ),
+    )
+    calls: list[str] = []
+
+    def response(*, complete: bool) -> str:
+        used = anchors if complete else anchors[:4]
+        value = wire_value({
+            "role":"correction", "governing_findings":[],
+            "debt_outcomes":[{
+                "debt_id":"D1", "status":"closed", "evidence":used,
+            }],
+            "class_outcomes":{class_id:{
+                "verdict":"satisfied", "evidence":used,
+            }},
+            "class_actions":{class_id:None},
+            "concession_challenges":{},
+        })
+        value["class_outcomes"][class_id]["member_coverage"] = [{
+            "member_id":f"coordinate-{index + 1}",
+            "evidence":[{
+                "anchor":anchor,
+                "rationale":"authenticated at its production trust boundary",
+            }],
+        } for index, anchor in enumerate(used)]
+        return json.dumps(value)
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        text = response(complete=False)
+        return Review(text=text, session_ref="issue-106-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "issue-106-session"
+        calls.append(prompt)
+        assert f"/class_outcomes/{class_id}/member_coverage" in prompt
+        assert "expected every authoritative member exactly once" in prompt
+        text = response(complete=True)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_plan(
+        {
+            "repo_path":str(repo), "plan_text":"\n".join(anchors),
+            "lineage":lineage_id, "round":2, "stakes":"trusted local tool",
+            "claim_verification":False,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda:"ISSUE106",
+    )
+
+    assert len(calls) == 2
+    assert "STRUCTURAL-PHASE: final" in result
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert durable.classes[class_id].status == cc.CLOSED
 
 
 def test_plan_active_class_view_is_phase_correct_and_branch_view_is_unchanged():
@@ -5144,7 +5332,7 @@ def test_concession_history_is_closed_exact_and_survives_review_resets():
 def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
     active = [cc.TrackedClass(
         f"class-{index:02d}", f"invariant {index}", cc.MAJOR, 1, cc.CLOSED,
-        procedure="inspect it",
+        procedure="inspect it", members=("reviewed-path",),
     ) for index in range(20)]
     rows = [{
         "id":f"D{index:02d}", "finding_id":f"F{index:02d}", "status":"closed",
