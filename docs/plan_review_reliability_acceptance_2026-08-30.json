@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged.",
-      "sha256": "684c28325151bd69abecce6b1c56fdf08a85e542f56f2b3be01094189103672e"
+      "sha256": "4f1b287ae124c27d8e17e2224abc3be3208debb7328b84ec877769495b8bea38"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
@@ -1776,11 +1776,11 @@
     "allowed_later_source_diffs": {
       "AGENTS.md": {
         "scope": "Adds arbitration failure taxonomy, plan normative-restatement review guidance, and its complete-package authoritative public-handler replay boundary without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-        "sha256": "6b034ae33a7d1b10f75171bd68207b773aabef6d918d38c40bb95977fc637506"
+        "sha256": "3c34e7f4d746ec10cbfe27ad41bcbf1aa0934addb2a6d92a1f631c49e0cb8402"
       },
       "README.md": {
         "scope": "Documents plan normative-restatement review and its retained census, correction, cold-final, and complete-package authoritative replay acceptance without changing deterministic replay behavior. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances.",
-        "sha256": "4f33f6a6e82a8fa56f3f6573c70701369b85b665f647b05ccdb88934a73a38ad"
+        "sha256": "03d94336365356c75de9f407af9524588fd7a8efe4e15fa1f272aa89de714da9"
       },
       "docs/tool-reference.md": {
         "scope": "Adds arbitration-only caller-framing guidance without changing deterministic plan-review replay behavior.",
@@ -1796,7 +1796,7 @@
       },
       "tests/test_review_census.py": {
         "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
-        "sha256": "d4485be7b722aa21f633fe418dc0fd1981542a44505ac9148068124037eea251"
+        "sha256": "dc1723ea079dd890f5293b3d2bfff836382b9a122c63c797269588b0120d2649"
       }
     },
     "checks": {

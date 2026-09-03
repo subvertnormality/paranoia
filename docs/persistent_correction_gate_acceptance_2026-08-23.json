@@ -57,7 +57,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
-      "sha256": "8fba5231f7de0b014fda02bb2f3a06e32a5e31256c67564a7df64b3f1e99f96f"
+      "sha256": "a944ab7643abfae4fa8ff34c7f2faca1208ed6f68525f11fddb20492811adadf"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",

@@ -1801,12 +1801,14 @@ def materialize_decision(
     active_classes: Sequence[dict[str, Any]] = (),
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> dict[str, Any]:
     """Decode one semantic decision and project it to the durable V1 shape."""
     value = decode_decision(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
         prior_concessions=prior_concessions,
+        require_closure_coverage=require_closure_coverage,
     )
     return materialize_decision_value(
         value, mode=mode, role=role, source_ids=source_ids,

@@ -400,6 +400,7 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
             source_evidence={finding["id"]:finding["evidence"] for finding in sources},
             assessment_verdicts={}, assessment_findings={}, assessment_evidence={},
             active_classes=[], durable_debt=[],
+            require_closure_coverage=False,
         )
         if settlement.pop("concession_challenges", None) != []:
             raise ValueError("historical census concession projection is not empty")
@@ -415,6 +416,7 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
         _pre_concession_response(responses[0]),
         mode=cc.PLAN_MODE, role=role,
         active_classes=task["active_classes"], durable_debt=durable_debt,
+        require_closure_coverage=False,
     )
     if settlement.pop("concession_challenges", None) != []:
         raise ValueError("historical follow-up concession projection is not empty")
