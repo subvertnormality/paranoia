@@ -372,6 +372,23 @@ def _pre_concession_response(text: str) -> str:
     return json.dumps(wire, ensure_ascii=False, separators=(",", ":"))
 
 
+def _pre_member_inventory_projection(value):
+    """Remove only the field absent from retained pre-#106 envelopes."""
+    projected = deepcopy(value)
+
+    def visit(node):
+        if isinstance(node, dict):
+            node.pop("members", None)
+            for child in node.values():
+                visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(projected)
+    return projected
+
+
 def _targeted_components() -> tuple[dict[str, cc.TrackedClass], list[dict]]:
     classes: dict[str, cc.TrackedClass] = {}
     debt: list[dict] = []
@@ -660,9 +677,11 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                 )
                 if result != row["result_text"]:
                     raise ValueError("public-handler replay did not reconstruct returned result")
-                if replay_lineage != row["durable_lineage"]:
+                if _pre_member_inventory_projection(replay_lineage) != row["durable_lineage"]:
                     raise ValueError("public-handler replay did not reconstruct durable lineage")
-                if _audit_projection(replay_audit) != row["audit_projection"]:
+                if _pre_member_inventory_projection(
+                    _audit_projection(replay_audit)
+                ) != row["audit_projection"]:
                     raise ValueError("public-handler replay did not reconstruct audit settlement")
         finally:
             engines.CodexEngine.run = original_run
