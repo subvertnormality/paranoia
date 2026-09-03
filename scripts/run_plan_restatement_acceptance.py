@@ -349,11 +349,26 @@ def _historical_no_concession_invocation(
 
 
 def _pre_concession_response(text: str) -> str:
-    """Add the only valid challenge map for a lineage with no concessions."""
+    """Project retained pre-#94/#106 payloads into the current decoder."""
     wire = json.loads(text)
     if "concession_challenges" in wire:
         raise ValueError("historical response unexpectedly owns a concession challenge")
     wire["concession_challenges"] = {}
+
+    def add_historical_members(node):
+        if isinstance(node, dict):
+            if (
+                "invariant" in node and "severity" in node and "procedure" in node
+                and "members" not in node
+            ):
+                node["members"] = ["historical-single-member"]
+            for child in node.values():
+                add_historical_members(child)
+        elif isinstance(node, list):
+            for child in node:
+                add_historical_members(child)
+
+    add_historical_members(wire)
     return json.dumps(wire, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -448,6 +463,8 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
         )
         if settlement.pop("concession_challenges", None) != []:
             raise ValueError("historical census concession projection is not empty")
+        for record in settlement["class_records"]:
+            record.pop("members", None)
         return {"manifests":manifests, "settlement":settlement}
 
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
@@ -464,6 +481,8 @@ def _replay_validated_payloads(row: dict, roles: list[str]) -> dict:
     )
     if settlement.pop("concession_challenges", None) != []:
         raise ValueError("historical follow-up concession projection is not empty")
+    for record in settlement["class_records"]:
+        record.pop("members", None)
     return {"manifests":[], "settlement":settlement}
 
 
