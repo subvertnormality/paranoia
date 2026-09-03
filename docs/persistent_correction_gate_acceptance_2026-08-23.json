@@ -16,8 +16,8 @@
       "sha256": "6c3bdb29cc65f351cf9c6eb40a9a429f3802d85d34bde37d1adaa34c316d76b7"
     },
     "src/paranoia_local/class_closure.py": {
-      "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters.",
-      "sha256": "141da254bce6de7b1609688a34bf806c15d8284eaea9fa291a44c69a78652414"
+      "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical.",
+      "sha256": "4db636087a9ee5e56356ad5765a5f6ad7179cbaacfe6d62c0e32688e44f3207c"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
@@ -40,7 +40,7 @@
       "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange.",
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
       "sha256": "bd14ad62c90da5a6846d7cfa3553db5ff96f7c82a1e743822c5bd6a68fc3a172"
     },
     "src/paranoia_local/plan_claims.py": {
@@ -48,11 +48,11 @@
       "sha256": "e18452b6891a5b1a9027977f544893809f43110d13b1de3b0665e131c796573d"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical.",
+      "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical.",
       "sha256": "08f7a549c624794153542516fc3f185f7431cbd41bd2cdc63026d2f4017a344a"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",
+      "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
       "sha256": "78ec40d09feae0b71f0fa9b54845f57034029ecda64c479d5cfeaf3b6e3036e7"
     },
     "src/paranoia_local/server.py": {
@@ -60,8 +60,8 @@
       "sha256": "a896bb81d25f03b406500556287482ca9df18af1c7329903429ee8fd911ac114"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
-      "sha256": "21f37b8d34a2cafee291353f1defb15123e37a2a0393c61895b4e3e917734894"
+      "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
+      "sha256": "aa29be4eedad26396ba69d4ba1b10ac23a10b8685a2b6c96122040beda747578"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
@@ -72,7 +72,7 @@
       "sha256": "70e443626a82959d323be9c6e9d7e8af4ed5998ab165a7b00a82a551fbd48276"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
+      "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
       "sha256": "d60d6cac3ca400d38e2d74e62b679b528081ec71d2e502ca56305d64ecd90521"
     }
   },

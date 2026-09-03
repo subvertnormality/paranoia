@@ -18,36 +18,36 @@
       "sha256": "31d940ae6c64c8e0ed229603276ed5206a45031b6926df63ebb60bcf218c34eb"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity into final settlement and bound-rebut transitions.",
+      "scope": "Plan-phase class projection and debt-targeted rebut settlement; retained attempt telemetry is unchanged. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity into final settlement and bound-rebut transitions. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
       "sha256": "5ce43118c4ee7e52d1868c294d8fea6ebbe24139116e30ad578401ffb66b7949"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Bound-rebut structured instructions, broad plan normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; retained provider exchanges remain historical.",
+      "scope": "Bound-rebut structured instructions, broad plan normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; retained provider exchanges remain historical. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical.",
       "sha256": "dd0ec38ec787c66ca5c6db4c423094426c5c33853304a4bbf0380a585ab223bd"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge.",
+      "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
       "sha256": "5d101d749652bacc6d0b5dc71bdb14aa2e8e510f171307229f5c81c5a6cae80c"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged.",
-      "sha256": "87d8b33d486c580500ff76b5404fba0967ddb4ec59215e79ccba30d767e0dcc2"
+      "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
+      "sha256": "81806e48bb57d1df55cfd68135b0410a3088218c2a895d11c6c59047fcf0c8c7"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
       "sha256": "acee48fe8b55a9dd13472c77fd810d014daa6a68882c54f2a4d6e0ff84a101a0"
     },
     "tests/test_prompts.py": {
-      "scope": "Arbitration advocacy and plan normative-restatement prompt regressions; retained provider exchanges remain unchanged.",
-      "sha256": "33fcfc0107c677f789ce8f2e614623e54898aa394a7a2ac5bcfd12b1fc8cc98c"
+      "scope": "Arbitration advocacy and plan normative-restatement prompt regressions; retained provider exchanges remain unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments; retained exchanges remain historical.",
+      "sha256": "7679eec1cb92700cca821d1e69ea5173113c8fca756e4b6d50014b8eb3aa3487"
     },
     "tests/test_review_census.py": {
-      "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
+      "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
       "sha256": "417996f0ab1f6fc446951ee582adc67dca54db2314f93716576e3e488e9eb058"
     },
     "tests/test_staged_protocol.py": {
-      "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "a77dd4d8deeac5c5f6a06da20f7e52816b6fcac89f258c4d422bf46b7b2bf7c4"
+      "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged. Issue #106 tests subset, unknown, duplicate, generic, shared-anchor, and canonical member-coverage boundaries; retained exchanges remain historical.",
+      "sha256": "4ebbae923f4eb1ea0e1348a39f8be8a8c278bdb4d6a7d219f1cac7c7ef23a9d2"
     }
   },
   "assertions": [
@@ -1787,7 +1787,7 @@
         "sha256": "6edb92a8967f55d399283db88292ebb903e5aac3f958d1e25afe6b816c967331"
       },
       "src/paranoia_local/handlers.py": {
-        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged.",
+        "scope": "Uses the authoritative terminal-LF branch-contract line semantics in bound rebut without changing deterministic replay behavior. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free retries unchanged. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
           "sha256": "1d4f32d7c73359aef411d80747a55e085bafab5a3fac0d46ca254548b07fa961"
       },
       "tests/test_plan_claims.py": {
@@ -1795,7 +1795,7 @@
         "sha256": "a893e998c6506e436b9caac5c40e3dfb17cc1541e2878c3d0eed1d7dc8d01ffa"
       },
       "tests/test_review_census.py": {
-        "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure.",
+        "scope": "Adds debt-targeted rebut settlement and plan-final prompt-digest regressions without changing deterministic replay behavior. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
           "sha256": "d4691f90bb9d993803ed302118ee0c44ea88b29f1eba74c2ff9c3b3e96386a59"
       }
     },

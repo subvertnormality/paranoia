@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -49,9 +50,12 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
-GENERIC_MEMBER_IDS = frozenset({
-    "all", "all members", "all obligations", "complete invariant",
-    "entire invariant", "everything", "full invariant",
+GENERIC_MEMBER_TOKENS = frozenset({
+    "all", "every", "each", "any", "whole", "full", "complete", "entire",
+    "everything", "member", "members", "obligation", "obligations", "site",
+    "sites", "case", "cases", "item", "items", "boundary", "boundaries",
+    "class", "classes", "invariant", "invariants", "fixture", "test",
+    "placeholder", "example", "sample", "id",
 })
 PER_CLASS_TIMEOUT = 20     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
@@ -474,7 +478,13 @@ def validate_member_inventory(members: tuple[str, ...]) -> None:
     normalized = {" ".join(item.split()).casefold() for item in members}
     if len(normalized) != len(members):
         raise RegisterError("class member ids must be unique ignoring case")
-    generic = sorted(normalized & GENERIC_MEMBER_IDS)
+    generic = sorted(
+        item for item in normalized
+        if not any(
+            token not in GENERIC_MEMBER_TOKENS and not token.isdigit()
+            for token in re.findall(r"[a-z0-9]+", item)
+        )
+    )
     if generic:
         raise RegisterError(
             f"class member ids must identify specific obligations, not {generic!r}"

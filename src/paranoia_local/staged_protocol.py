@@ -821,18 +821,21 @@ def project_citations(value: dict[str, Any]) -> dict[str, Any]:
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
-            for key, child in list(node.items()):
-                if key in {"evidence", "assessment_evidence"}:
-                    node[key] = [citation["anchor"] for citation in child]
-                else:
-                    visit(child)
-            if "member_coverage" in node:
+            coverage = node.pop("member_coverage", None)
+            if coverage is not None:
                 evidence: list[str] = []
-                for member in node.pop("member_coverage"):
-                    for anchor in member["evidence"]:
+                for member in coverage:
+                    for citation in member["evidence"]:
+                        anchor = citation["anchor"]
                         if anchor not in evidence:
                             evidence.append(anchor)
                 node["evidence"] = evidence
+            for key, child in list(node.items()):
+                if key in {"evidence", "assessment_evidence"}:
+                    if child and isinstance(child[0], dict):
+                        node[key] = [citation["anchor"] for citation in child]
+                else:
+                    visit(child)
         elif isinstance(node, list):
             for child in node:
                 visit(child)

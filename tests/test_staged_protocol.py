@@ -1691,7 +1691,10 @@ def test_new_class_keeps_independent_severity_and_record_binding():
     assert parsed["class_dispositions"][0]["record_index"] == 0
 
 
-@pytest.mark.parametrize("member_id", ["all", "FULL INVARIANT", "  specific  "])
+@pytest.mark.parametrize("member_id", [
+    "all", "FULL INVARIANT", "every-member", "member-1", "fixture-member",
+    "sample_site_2", "  specific  ",
+])
 def test_unmechanized_definition_rejects_generic_or_noncanonical_member_id(
     member_id,
 ):
