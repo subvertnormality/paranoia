@@ -23,7 +23,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
-      "sha256": "5dd467416ca6b3d0a8379649372478e5fbcd9451c8de39e7e9d330653af6f0b1"
+      "sha256": "ed87a57aabceb4efd840e1863e0030c1a8547fac0e425f1bc811942e6fc9b8ce"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical.",
@@ -39,11 +39,11 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
-      "sha256": "81806e48bb57d1df55cfd68135b0410a3088218c2a895d11c6c59047fcf0c8c7"
+      "sha256": "8a59751c4a7f0898464b3731df5c5e25b21d0ec13fed4cde5e08d50c49814fdb"
     },
     "tests/test_review_census.py": {
       "scope": "Adds 5,260-line unit and public plan census, correction, and final lifecycle regressions for observed line-column anchor concatenation, retaining malformed anchors only in validator diagnostics; retained provider exchanges are unchanged. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "5f42065775661110e7c30207075976d3ba01e02f72562fd643d51d3161baa9bd"
+      "sha256": "1ec71fe38fb9cc3dc2e50d3021a0abc0d5ef9ed03a172431ffbd736321575d84"
     },
     "tests/test_prompts.py": {
       "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments; retained exchanges remain historical.",

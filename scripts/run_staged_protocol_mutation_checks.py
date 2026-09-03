@@ -221,6 +221,13 @@ CROSS_MODULE_MUTATIONS = (
         "test_census_cache_requires_every_exact_binding",
     ),
     (
+        ROOT / "src" / "paranoia_local" / "handlers.py",
+        "tests/test_review_census.py", "received-member-cache-equality",
+        "or set(members) != set(expected[class_id])",
+        "or False",
+        "test_census_cache_requires_every_exact_binding",
+    ),
+    (
         ROOT / "src" / "paranoia_local" / "review_census.py",
         "tests/test_review_census.py", "assessment-anchor-walk",
         'if key in {"evidence", "assessment_evidence"} and isinstance(child, list):',

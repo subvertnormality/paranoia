@@ -7,7 +7,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads the active engine into final settlement only; branch plan-contract capture, digest, and role propagation remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid branch-contract acceptance. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
-      "sha256": "d99e03def7e45b968ea430fa56d51d40f6de22ea6c078a1e9488471c491d9bf7"
+      "sha256": "ef54a12f7d6c4ed505019bb47e93fc3751b4c4a9840cdcece3d8eec0f10e977b"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance, plan-review-only normative-restatement discovery, and issue #98's invariant-scoped unmechanized follow-up sweep; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained provider exchanges remain historical. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical.",
@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
-      "sha256": "911399979ce12e9efab1266f440f9215d877edab917b9a0a1b816fe7bbfc5d6a"
+      "sha256": "62a435b8ef751a78ec9ea05da98811f4ad8c6a5e413a0f856e908d86f8c95fbf"
     },
     "tests/test_branch_plan_fidelity.py": {
       "scope": "Extends the two-line captured-path public census-lane regression with invalid-anchor rejection, same-session repair without server-authored out-of-range examples, exact frozen contract and bound, snapshot/cache identity, rejected-payload telemetry, and audit retention. It also adds the 5,260-line public plan-backed branch manifest-only consolidation, correction, and final lifecycle for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload, plus an isolated malformed review-state fail-closed expectation; this does not alter branch plan-contract binding, authority, capture, or propagation.",

@@ -7,7 +7,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
-      "sha256": "88f5b511f75050b81e994050963e1735ffd00f67d7929b71722c3a7afb9f8a45"
+      "sha256": "a7ab73a64bf328cd5681403fad6046c06945eed157c98cd1c3b42a41e55259a6"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #94 adds separately tested durable concession history and bounded projection; it does not alter staged schema validation, mechanized predicate validation, or the retry exchange proved by this historical acceptance. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",

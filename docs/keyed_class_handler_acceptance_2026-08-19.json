@@ -120,7 +120,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",
-      "sha256": "7c1cb4392268c3483a67001c26f917dde89695f72442ccf974ea53595d44dd09"
+      "sha256": "3d8d5d73fb4801462a59c7a18ac33d847ed3d7a7225f508978e03dd785052302"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Updates the future Claude default and minimum CLI; this retained Codex handler exchange is unchanged.",
@@ -140,11 +140,11 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
-      "sha256": "afaf34df0a3256d96bc1a0f03ca90063793f38cdcc9b1b35d5a5c9fa46aab435"
+      "sha256": "1e1601e4754ba44778d067516197bc90b90a8bebf208c70228df91d26c962b93"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "b2c72ed181a81993ba017c28d23aa3d1f1ea83303891f96580a93749a0315c95"
+      "sha256": "f57bd72d06e532b62636879fbfb3003e217620a773d96390d07c81757fcfd37f"
     }
   },
   "attempt_ledger": [

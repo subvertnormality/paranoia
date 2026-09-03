@@ -1851,7 +1851,9 @@ def test_census_cache_requires_every_exact_binding():
         effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
     )
     assert binding["version"] == 4
-    state = {"census_cache":{**binding, "manifests":manifests}}
+    state = {"census_cache":{
+        **binding, "manifests":manifests, "member_coverage":{},
+    }}
 
     def validate(text, lane_name):
         try:
@@ -1863,17 +1865,17 @@ def test_census_cache_requires_every_exact_binding():
             raise rc.CensusError(str(exc)) from exc
 
     assert handlers._cached_census_manifests(
-        state, binding=binding, lanes=lanes, validate=validate,
+        state, binding=binding, lanes=lanes, active_classes=[], validate=validate,
     ) == manifests
     for key in binding:
         changed = dict(binding)
         changed[key] = f"different-{binding[key]}"
         assert handlers._cached_census_manifests(
-            state, binding=changed, lanes=lanes, validate=validate,
+            state, binding=changed, lanes=lanes, active_classes=[], validate=validate,
         ) is None
     incomplete = {"census_cache":{**binding, "manifests":manifests[:-1]}}
     assert handlers._cached_census_manifests(
-        incomplete, binding=binding, lanes=lanes, validate=validate,
+        incomplete, binding=binding, lanes=lanes, active_classes=[], validate=validate,
     ) is None
     changed_contract = handlers._census_cache_binding(
         mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
@@ -1883,7 +1885,7 @@ def test_census_cache_requires_every_exact_binding():
     )
     assert changed_contract["input_digest"] != binding["input_digest"]
     assert handlers._cached_census_manifests(
-        state, binding=changed_contract, lanes=lanes, validate=validate,
+        state, binding=changed_contract, lanes=lanes, active_classes=[], validate=validate,
     ) is None
 
     inventoried = [{
@@ -1908,6 +1910,35 @@ def test_census_cache_requires_every_exact_binding():
     assert member_binding["active_classes_digest"] != (
         changed_member_binding["active_classes_digest"]
     )
+
+    satisfied = deepcopy(manifests)
+    satisfied[-1]["class_assessments"] = [{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }]
+    member_state = {"census_cache":{
+        **member_binding, "manifests":satisfied,
+        "member_coverage":{"class-a":["left", "right"]},
+    }}
+    def validate_members(text, lane_name):
+        value = sp.decode_canonical_lane(
+            text, mode=cc.PLAN_MODE, lane=lane_name,
+        )
+        return sp.validate_lane_value(
+            value, lane=lane_name,
+            active_classes=inventoried if lane_name == "integrity" else (),
+        )
+
+    assert handlers._cached_census_manifests(
+        member_state, binding=member_binding, lanes=lanes,
+        active_classes=inventoried, validate=validate_members,
+    ) == satisfied
+    for bad in ({}, {"class-a":["left"]}, {"class-a":["left", "left"]}):
+        member_state["census_cache"]["member_coverage"] = bad
+        assert handlers._cached_census_manifests(
+            member_state, binding=member_binding, lanes=lanes,
+            active_classes=inventoried, validate=validate_members,
+        ) is None
 
 
 def test_assessment_evidence_uses_the_shared_anchor_resolver(tmp_path):
@@ -1953,7 +1984,8 @@ def test_pre_cutover_cache_is_revalidated_for_mechanized_class_compatibility():
             raise rc.CensusError(str(exc)) from exc
 
     assert handlers._cached_census_manifests(
-        state, binding=binding, lanes=lanes, validate=validate,
+        state, binding=binding, lanes=lanes, active_classes=active,
+        validate=validate,
     ) is None
 
 

@@ -852,6 +852,7 @@ def _census_cache_binding(
 
 def _cached_census_manifests(
     state: dict[str, Any], *, binding: dict[str, Any], lanes: tuple[str, ...],
+    active_classes: list[dict[str, Any]],
     validate: Callable[[str, str], dict[str, Any]],
 ) -> list[dict[str, Any]] | None:
     cache = state.get("census_cache")
@@ -872,6 +873,29 @@ def _cached_census_manifests(
             validated.append(validate(json.dumps(by_lane[lane], ensure_ascii=False), lane))
     except rc.CensusError:
         return None
+    received = cache.get("member_coverage")
+    if not isinstance(received, dict):
+        return None
+    classes = {row["class_id"]:row for row in active_classes}
+    integrity = validated[lanes.index("integrity")]
+    expected = {
+        row["class_id"]:list(classes[row["class_id"]].get("members") or ())
+        for row in integrity["class_assessments"]
+        if (
+            row["verdict"] == "satisfied"
+            and row["class_id"] in classes
+            and not classes[row["class_id"]].get("mechanized", False)
+        )
+    }
+    if set(received) != set(expected):
+        return None
+    for class_id, members in received.items():
+        if (
+            not isinstance(members, list)
+            or len(members) != len(set(members))
+            or set(members) != set(expected[class_id])
+        ):
+            return None
     return validated
 
 
@@ -1564,7 +1588,10 @@ def _staged_structural_review(
 
         def run_lane(
             lane: str,
-        ) -> tuple[str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]]]:
+        ) -> tuple[
+            str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]],
+            dict[str, list[str]],
+        ]:
             prompt = lane_prompts[lane]
             prompt_issue = _staged_prompt_issue(prompt, "staged lane prompt")
             if prompt_issue is not None:
@@ -1595,14 +1622,19 @@ def _staged_structural_review(
             for assessment in parsed["class_assessments"]:
                 if assessment["finding_id"] is not None:
                     assessment["finding_id"] = renamed[assessment["finding_id"]]
-            return lane, result, parsed, lane_attempts, lane_rejected
+            return (
+                lane, result, parsed, lane_attempts, lane_rejected,
+                sp.received_lane_member_ids(result.text, mode=mode, lane=lane),
+            )
 
         manifests = _cached_census_manifests(
             state, binding=cache_binding, lanes=lanes,
+            active_classes=active_classes,
             validate=lambda text, lane: validate_lane(
                 text, lane, canonical=True,
             ),
         )
+        received_member_coverage: dict[str, list[str]] = {}
         if manifests is None:
             lane_rows = []
             lane_errors: list[tuple[str, rc.CensusError]] = []
@@ -1648,12 +1680,19 @@ def _staged_structural_review(
                     row[2] for row in lane_rows
                 ]
                 raise first_error
-            for _, _, _, lane_attempts, lane_rejected in lane_rows:
+            for _, _, _, lane_attempts, lane_rejected, _ in lane_rows:
                 attempts.extend(lane_attempts)
                 rejected_payloads.extend(lane_rejected)
             manifests = [row[2] for row in lane_rows]
-        elif on_progress is not None:
-            on_progress("reusing validated census lanes after settlement rejection")
+            received_member_coverage = next(
+                row[5] for row in lane_rows if row[0] == "integrity"
+            )
+        else:
+            received_member_coverage = deepcopy(
+                state["census_cache"]["member_coverage"]
+            )
+            if on_progress is not None:
+                on_progress("reusing validated census lanes after settlement rejection")
         closure.staged_manifests = manifests
         source_ids = [f["id"] for m in manifests for f in m["findings"]]
         source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
@@ -1738,6 +1777,7 @@ def _staged_structural_review(
             if cacheable:
                 error.census_cache = {  # type: ignore[attr-defined]
                     **cache_binding, "manifests":deepcopy(manifests),
+                    "member_coverage":deepcopy(received_member_coverage),
                 }
             raise
         attempts.extend(call_attempts)

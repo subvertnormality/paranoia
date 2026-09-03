@@ -1027,12 +1027,25 @@ def decode_lane_with_issues(
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the closed wire shape and retain canonical issues for fan-in."""
     wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    wire_issues = _wire_lane_member_coverage_issues(wire, active_classes)
     canonical = project_citations(wire)
-    return canonical, _wire_lane_member_coverage_issues(
-        wire, active_classes,
-    ) + _schema_issues(
+    return canonical, wire_issues + _schema_issues(
         canonical, lane_schema(mode, lane, canonical=True),
     )
+
+
+def received_lane_member_ids(
+    text: str, *, mode: str, lane: str,
+) -> dict[str, list[str]]:
+    """Retain received member identities for cache-time authority revalidation."""
+    wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
+    if lane != "integrity":
+        return {}
+    return {
+        row["class_id"]:[member["member_id"] for member in row["member_coverage"]]
+        for row in wire["class_assessments"]
+        if row.get("verdict") == "satisfied" and "member_coverage" in row
+    }
 
 
 def decode_lane(text: str, *, mode: str, lane: str) -> dict[str, Any]:
