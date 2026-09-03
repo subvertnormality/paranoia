@@ -418,7 +418,7 @@ def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
     tracked = cc.TrackedClass(
         "class-a", "the reviewed artifact remains coherent", cc.MAJOR, 1,
         cc.OPEN if initial_phase == "correction" else cc.CLOSED,
-        procedure="inspect the artifact",
+        procedure="inspect the artifact", members=("fixture-member",),
     )
     cc.save_lineage(state_root, cc.Lineage(
         lineage_id, rounds=1, mode=mode, classes={"class-a":tracked},
@@ -546,7 +546,7 @@ def _followup_fixture(tmp_path, *, mode, phase, class_count=1, concessions=False
         classes[class_id] = cc.TrackedClass(
             class_id, f"invariant {index}", cc.MAJOR, 1,
             cc.OPEN if phase == "correction" else cc.CLOSED,
-            procedure=f"inspect {index}",
+            procedure=f"inspect {index}", members=("fixture-member",),
         )
         if phase == "correction":
             debt.append({
@@ -754,20 +754,20 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "94f7f7966391ecad3af2705b56e34363d668dc0b6244f2635e72230dcf54310c",
-        "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
+            "2b594c4f138e5bffd0d73b4e5aed45d8acb6e8e745103a46c0f8be8bed1bc64b",
+        "ea19029412e0e8854fe486279b04c0585540c820dbd3007f31b131ae6e0a54ea",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "2e5bc12f06beedec213b98edc40afb2231dd70bfb4038535972f75ddf743bfab",
-        "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
+            "2ef20662f49199ea77e20c1e93e40458a21095e347c1a5b782f0e74ac4b9b554",
+        "6a8cc807cc90cd736e887c75ae0ebf017a6df86e1c752dd874a54ffafb69ddd8",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "fd9e4747f5c7c4a817ef64777b6a6749e52496355ef3e1b806c9d74263c4597c",
-        "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
+            "7714089f9a6b2410a15065392a58adf62cbeb34093de50c4662a1edcf9f2b8ab",
+        "335a29dc889acdf9bf9f545f61e25fa425553882b6dc1b3c83835d2b0d62cd9a",
         "clear",
     ),
 ])
@@ -2129,6 +2129,25 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
 def wire_value(value):
     value = json.loads(json.dumps(value))
 
+    def prepare(node):
+        if isinstance(node, dict):
+            if node.get("verdict") == "satisfied" and "evidence" in node:
+                node["member_coverage"] = [{
+                    "member_id":"fixture-member", "evidence":node.pop("evidence"),
+                }]
+            if (
+                "procedure" in node and "invariant" in node and "severity" in node
+                and "members" not in node
+            ):
+                node["members"] = ["fixture-member"]
+            for child in node.values():
+                prepare(child)
+        elif isinstance(node, list):
+            for child in node:
+                prepare(child)
+
+    prepare(value)
+
     def visit(node):
         if isinstance(node, dict):
             for key, child in node.items():
@@ -2397,7 +2416,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
     active = [{
         "class_id":"class-a", "invariant":"invariant a", "severity":"MAJOR",
         "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
-        "procedure":"inspect it",
+        "procedure":"inspect it", "members":["fixture-member"],
     }]
     coverage = [
         {
@@ -2414,7 +2433,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
         "class_actions":{"class-a":None}, "coverage":coverage,
     }
     invalid_value = wire_value(base)
-    invalid_value["class_outcomes"]["class-a"]["evidence"] = [
+    invalid_value["class_outcomes"]["class-a"]["member_coverage"][0]["evidence"] = [
         {"anchor":"plan:1", "rationale":"first reason"},
         {"anchor":"plan:1", "rationale":"different reason"},
     ]
@@ -2429,7 +2448,7 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
 
         def resume(self, session_ref, prompt, *args, **kwargs):
             assert session_ref == "s"
-            assert "/class_outcomes/class-a/evidence:" in prompt
+            assert "/class_outcomes/class-a/member_coverage/0/evidence:" in prompt
             return Review(text=corrected, session_ref="s", raw=corrected)
 
     def parser(text):
@@ -2453,7 +2472,8 @@ def test_handler_retry_names_keyed_outcome_for_canonical_anchor_issue(tmp_path):
     assert parsed["class_records"] == [{"op":"close", "class_id":"class-a"}]
     assert [row.outcome for row in attempts] == ["validation-invalid", "completed"]
     assert (
-        "/class_outcomes/class-a/evidence: projected anchors must be unique"
+        "/class_outcomes/class-a/member_coverage/0/evidence: anchors must be "
+        "unique within one member"
         in rejected[0]["validation_issue"]
     )
 
@@ -4720,6 +4740,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         "definitions, call sites, and acceptance properties all agree",
         cc.MAJOR, 1, cc.OPEN,
         procedure="inspect definitions, call sites, and acceptance properties",
+        members=("fixture-member",),
     )
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
     state.update(phase="correction", debt=[{
@@ -4827,6 +4848,7 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         cid:cc.TrackedClass(
             cid, invariant, cc.MAJOR, 1, cc.OPEN,
             procedure="inspect every independently anchored site",
+            members=("fixture-member",),
         )
         for cid, invariant in (
             ("debt-class", "the known blocker is repaired"),
@@ -4929,13 +4951,14 @@ def test_public_correction_retries_evidence_free_standalone_close(
     classes = {
         "debt-class":cc.TrackedClass(
             "debt-class", "the known blocker is repaired", cc.MAJOR, 1, cc.OPEN,
-            procedure="inspect the known blocker",
+            procedure="inspect the known blocker", members=("fixture-member",),
         ),
         "category-class":cc.TrackedClass(
             "category-class",
             "definitions, call sites, and acceptance properties all agree",
             cc.MAJOR, 1, cc.OPEN,
             procedure="inspect definitions, call sites, and acceptance properties",
+            members=("fixture-member",),
         ),
     }
     state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
@@ -5058,6 +5081,7 @@ def test_public_correction_retries_subset_closure_with_reported_coordinate_set(
                     "At every trust boundary check receipt IDs, attempt IDs, and "
                     "lineage digests for each coordinate."
                 ),
+                members=tuple(f"coordinate-{index}" for index in range(1, 11)),
             )},
             review_state=state,
         ),
@@ -5077,13 +5101,13 @@ def test_public_correction_retries_subset_closure_with_reported_coordinate_set(
             "class_actions":{class_id:None},
             "concession_challenges":{},
         })
-        citations = value["class_outcomes"][class_id]["evidence"]
-        for index, citation in enumerate(citations):
-            citation["rationale"] = (
-                f"obligation=coordinate {index + 1}; disposition=verified; "
-                "authenticated at its production trust boundary"
-                if complete else "four of ten coordinates are authenticated"
-            )
+        value["class_outcomes"][class_id]["member_coverage"] = [{
+            "member_id":f"coordinate-{index + 1}",
+            "evidence":[{
+                "anchor":anchor,
+                "rationale":"authenticated at its production trust boundary",
+            }],
+        } for index, anchor in enumerate(used)]
         return json.dumps(value)
 
     def run(self, prompt, *args, **kwargs):
@@ -5094,8 +5118,8 @@ def test_public_correction_retries_subset_closure_with_reported_coordinate_set(
     def resume(self, session_ref, prompt, *args, **kwargs):
         assert session_ref == "issue-106-session"
         calls.append(prompt)
-        assert f"/class_outcomes/{class_id}/evidence/0/rationale" in prompt
-        assert "obligation=<specific member>" in prompt
+        assert f"/class_outcomes/{class_id}/member_coverage" in prompt
+        assert "expected every authoritative member exactly once" in prompt
         text = response(complete=True)
         return Review(text=text, session_ref=session_ref, raw=text)
 
@@ -5236,7 +5260,7 @@ def test_concession_history_is_closed_exact_and_survives_review_resets():
 def test_prior_concession_aggregate_accepts_exact_cap_and_rejects_one_over():
     active = [cc.TrackedClass(
         f"class-{index:02d}", f"invariant {index}", cc.MAJOR, 1, cc.CLOSED,
-        procedure="inspect it",
+        procedure="inspect it", members=("fixture-member",),
     ) for index in range(20)]
     rows = [{
         "id":f"D{index:02d}", "finding_id":f"F{index:02d}", "status":"closed",

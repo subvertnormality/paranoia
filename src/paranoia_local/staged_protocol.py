@@ -46,14 +46,6 @@ MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
 MAX_LANE_RESPONSE_CHARS = 240_000
 MAX_DECISION_RESPONSE_CHARS = 1_000_000
 MAX_CONSOLIDATION_CONTEXT_CHARS = 200_000
-_CLOSURE_MEMBER_RATIONALE = re.compile(
-    r"^obligation=(?P<obligation>[^;]+); "
-    r"disposition=(?P<disposition>verified|not_applicable); \S"
-)
-_GENERIC_CLOSURE_OBLIGATIONS = frozenset({
-    "all obligations", "complete invariant", "entire invariant", "everything",
-    "full invariant",
-})
 
 
 def citation_instructions(mode: str, *, plan_contract: bool = False) -> str:
@@ -305,7 +297,11 @@ def _definition(mode: str, *, mechanized: bool | None = None) -> dict[str, Any]:
         "invariant": _string(1_000),
         "severity": _string(32, enum=cc.SEVERITIES),
     }
-    procedure = _object({**common, "procedure": _string(2_000)})
+    procedure = _object({
+        **common,
+        "procedure": _string(2_000),
+        "members": _array(_string(120), maximum=100, minimum=1, unique=True),
+    })
     if mode == cc.PLAN_MODE or mechanized is False:
         return procedure
     pattern = _object({
@@ -359,20 +355,38 @@ def _classification(
 
 
 def _lane_assessment(*, canonical: bool = False) -> dict[str, Any]:
-    return {"anyOf": [
-        _object({
+    satisfied = _object({
+        "class_id": _string(120),
+        "verdict": _string(32, const="satisfied"),
+        "evidence": _evidence(canonical=canonical),
+        "finding_id": {"type": "null"},
+    })
+    alternatives = [satisfied]
+    if not canonical:
+        alternatives.append(_object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(canonical=canonical),
+            "member_coverage": _array(
+                _member_coverage(), maximum=100, minimum=1,
+            ),
             "finding_id": {"type": "null"},
-        }),
+        }))
+    alternatives.append(
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
             "evidence": _evidence(canonical=canonical),
             "finding_id": _string(120),
-        }),
-    ]}
+        })
+    )
+    return {"anyOf": alternatives}
+
+
+def _member_coverage() -> dict[str, Any]:
+    return _object({
+        "member_id": _string(120),
+        "evidence": _evidence(),
+    })
 
 
 def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
@@ -386,19 +400,29 @@ def _class_outcome(*, canonical: bool = False) -> dict[str, Any]:
             "debt_id": _string(120),
         }),
     ]}
-    return {"anyOf": [
-        _object({
+    satisfied = _object({
+        "class_id": _string(120),
+        "verdict": _string(32, const="satisfied"),
+        "evidence": _evidence(canonical=canonical),
+    })
+    alternatives = [satisfied]
+    if not canonical:
+        alternatives.append(_object({
             "class_id": _string(120),
             "verdict": _string(32, const="satisfied"),
-            "evidence": _evidence(canonical=canonical),
-        }),
+            "member_coverage": _array(
+                _member_coverage(), maximum=100, minimum=1,
+            ),
+        }))
+    alternatives.append(
         _object({
             "class_id": _string(120),
             "verdict": _string(32, const="violated"),
             "evidence": _evidence(canonical=canonical),
             "basis": basis,
-        }),
-    ]}
+        })
+    )
+    return {"anyOf": alternatives}
 
 
 def _class_outcome_body(*, canonical: bool = False) -> dict[str, Any]:
@@ -797,11 +821,18 @@ def project_citations(value: dict[str, Any]) -> dict[str, Any]:
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
-            for key, child in node.items():
+            for key, child in list(node.items()):
                 if key in {"evidence", "assessment_evidence"}:
                     node[key] = [citation["anchor"] for citation in child]
                 else:
                     visit(child)
+            if "member_coverage" in node:
+                evidence: list[str] = []
+                for member in node.pop("member_coverage"):
+                    for anchor in member["evidence"]:
+                        if anchor not in evidence:
+                            evidence.append(anchor)
+                node["evidence"] = evidence
         elif isinstance(node, list):
             for child in node:
                 visit(child)
@@ -919,62 +950,84 @@ def _canonical_class_projection_issues(value: dict[str, Any]) -> list[str]:
     return issues
 
 
-def _wire_satisfaction_coverage_issues(
-    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+def _member_coverage_issues(
+    rows: Sequence[tuple[str, dict[str, Any], str]],
+    active_classes: Sequence[dict[str, Any]],
 ) -> list[str]:
-    """Require explicit member-level coverage before an unmechanized satisfaction."""
-    unmechanized = {
-        row["class_id"] for row in active_classes
-        if not row.get("mechanized", False)
-    }
-    rows = value.get("class_outcomes", {})
-    if not isinstance(rows, dict):
-        return []
+    """Validate satisfaction against the server-authoritative member inventory."""
+    classes = {row["class_id"]:row for row in active_classes}
     issues: list[str] = []
-    for class_id, outcome in rows.items():
+    for class_id, outcome, base in rows:
+        cls = classes.get(class_id)
         if (
-            class_id not in unmechanized or not isinstance(outcome, dict)
+            cls is None or cls.get("mechanized", False)
             or outcome.get("verdict") != "satisfied"
         ):
             continue
-        seen: set[str] = set()
-        base = f"/class_outcomes/{_pointer_token(class_id)}/evidence"
-        for index, citation in enumerate(outcome.get("evidence", [])):
-            rationale = citation.get("rationale", "")
-            match = _CLOSURE_MEMBER_RATIONALE.match(rationale)
-            if match is None:
+        expected = list(cls.get("members") or ())
+        coverage = outcome.get("member_coverage")
+        if not expected:
+            issues.append(
+                f"{base}: unmechanized class has no authoritative member inventory; "
+                "replace it with an inventoried definition before satisfaction"
+            )
+            continue
+        if not isinstance(coverage, list):
+            issues.append(
+                f"{base}/member_coverage: required for unmechanized satisfaction; "
+                f"expected exact member ids {expected!r}"
+            )
+            continue
+        got = [row["member_id"] for row in coverage]
+        if len(got) != len(set(got)) or set(got) != set(expected):
+            issues.append(
+                f"{base}/member_coverage: expected every authoritative member exactly "
+                f"once {expected!r}; got {got!r}"
+            )
+        for index, member in enumerate(coverage):
+            anchors = [citation["anchor"] for citation in member["evidence"]]
+            if len(anchors) != len(set(anchors)):
                 issues.append(
-                    f"{base}/{index}/rationale: satisfied unmechanized coverage must "
-                    "start 'obligation=<specific member>; "
-                    "disposition=<verified|not_applicable>; <reason>'"
+                    f"{base}/member_coverage/{index}/evidence: anchors must be unique "
+                    "within one member"
                 )
-                continue
-            obligation = " ".join(match.group("obligation").split()).casefold()
-            if not obligation:
-                issues.append(
-                    f"{base}/{index}/rationale: closure obligation must not be blank"
-                )
-            elif obligation in _GENERIC_CLOSURE_OBLIGATIONS:
-                issues.append(
-                    f"{base}/{index}/rationale: name a specific invariant member, "
-                    f"not generic {obligation!r}"
-                )
-            if obligation in seen:
-                issues.append(
-                    f"{base}/{index}/rationale: duplicate closure obligation "
-                    f"{obligation!r}; emit one evidence row per member"
-                )
-            seen.add(obligation)
     return issues
+
+
+def _wire_decision_member_coverage_issues(
+    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    outcomes = value.get("class_outcomes", {})
+    if not isinstance(outcomes, dict):
+        return []
+    return _member_coverage_issues([
+        (
+            class_id, outcome,
+            f"/class_outcomes/{_pointer_token(class_id)}",
+        )
+        for class_id, outcome in outcomes.items() if isinstance(outcome, dict)
+    ], active_classes)
+
+
+def _wire_lane_member_coverage_issues(
+    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    return _member_coverage_issues([
+        (row["class_id"], row, f"/class_assessments/{index}")
+        for index, row in enumerate(value.get("class_assessments", []))
+    ], active_classes)
 
 
 def decode_lane_with_issues(
     text: str, *, mode: str, lane: str,
+    active_classes: Sequence[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the closed wire shape and retain canonical issues for fan-in."""
     wire = decode(text, lane_schema(mode, lane), max_chars=MAX_LANE_RESPONSE_CHARS)
     canonical = project_citations(wire)
-    return canonical, _schema_issues(
+    return canonical, _wire_lane_member_coverage_issues(
+        wire, active_classes,
+    ) + _schema_issues(
         canonical, lane_schema(mode, lane, canonical=True),
     )
 
@@ -1040,7 +1093,10 @@ def validate_lane_value(value: dict[str, Any], *, lane: str,
 def parse_lane(text: str, *, mode: str, lane: str,
                class_ids: Sequence[str] = (),
                active_classes: Sequence[dict[str, Any]] = ()) -> dict[str, Any]:
-    value = decode_lane(text, mode=mode, lane=lane)
+    value, issues = decode_lane_with_issues(
+        text, mode=mode, lane=lane, active_classes=active_classes,
+    )
+    _raise_semantic_issues(issues)
     return validate_lane_value(
         value, lane=lane, class_ids=class_ids, active_classes=active_classes,
     )
@@ -1068,7 +1124,7 @@ def decode_decision_with_issues(
     )
     wire_pointers = _wire_class_pointers(wire)
     wire_issues = (
-        _wire_satisfaction_coverage_issues(wire, active_classes or ())
+        _wire_decision_member_coverage_issues(wire, active_classes or ())
         if require_closure_coverage else []
     )
     canonical = project_decision_wire(wire)

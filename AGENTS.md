@@ -408,11 +408,11 @@ of the resulting code and tests.
   boundary. Enumerate and inspect every site/property category named there before satisfaction or
   closure, account explicitly for empty or inapplicable categories, and aggregate every surviving
   occurrence into the class's one finding. Mechanized classes retain their server-run predicate.
-  A satisfied model-owned unmechanized class outcome must decompose the invariant's explicit or
-  implicit set into one existing evidence citation per obligation/member, with a machine-readable
-  member and disposition prefix in each rationale. Reject missing, generic, and duplicate member
-  labels before projecting the unchanged flat durable assessment evidence; do not add a model call,
-  provider-schema change, or persistence format.
+  Store a closed list of stable member IDs on every unmechanized class. A satisfied census
+  assessment, correction outcome, or final outcome must provide exactly one separately evidenced
+  row for every server-supplied member ID. Validate exact set equality before deduplicating shared
+  anchors into the flat durable assessment evidence. A legacy class without authoritative members
+  remains unclosable until replaced with an inventoried definition; do not infer members from prose.
   Preserve standalone lifecycle actions, but require an authored evidence-bearing satisfied
   outcome whenever correction closes an otherwise outcome-optional unmechanized class; a bare
   close action never proves the invariant-wide search completed.

@@ -848,7 +848,7 @@ def register_from_records(
         if op == "new":
             allowed = (
                 {"op", "invariant", "severity", "pattern", "pathspec"}
-                if row_mechanized else {"op", "invariant", "severity", "procedure"}
+                if row_mechanized else {"op", "invariant", "severity", "procedure", "members"}
             )
             _exact(row, allowed, "new class record")
             if row.get("severity") not in cc.SEVERITIES:
@@ -859,6 +859,7 @@ def register_from_records(
                 pattern=_bounded(row.get("pattern"), 2000, "pattern") if row_mechanized else None,
                 pathspec=_bounded(row.get("pathspec"), 1000, "pathspec") if row_mechanized else None,
                 procedure=None if row_mechanized else _bounded(row.get("procedure"), 2000, "procedure"),
+                members=() if row_mechanized else _members(row.get("members")),
             ))
         elif op in {"close", "reopen", "reclassify", "replace"}:
             if op in {"close", "reopen"}:
@@ -868,7 +869,7 @@ def register_from_records(
             else:
                 allowed = (
                     {"op", "class_id", "invariant", "severity", "pattern", "pathspec"}
-                    if row_mechanized else {"op", "class_id", "invariant", "severity", "procedure"}
+                    if row_mechanized else {"op", "class_id", "invariant", "severity", "procedure", "members"}
                 )
                 _exact(row, allowed, "class replacement record")
             if op in {"reclassify", "replace"} and row.get("severity") not in cc.SEVERITIES:
@@ -892,6 +893,10 @@ def register_from_records(
                 procedure=(
                     _bounded(row.get("procedure"), 2000, "procedure")
                     if op == "replace" and not row_mechanized else None
+                ),
+                members=(
+                    _members(row.get("members"))
+                    if op == "replace" and not row_mechanized else ()
                 ),
             ))
         else:
@@ -1234,3 +1239,12 @@ def _bounded(value: Any, cap: int, label: str) -> str:
     ):
         raise CensusError(f"{label} must be 1..{cap} characters")
     return value
+
+
+def _members(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 100:
+        raise CensusError("class members must contain 1..100 stable member ids")
+    members = tuple(_bounded(item, 120, "class member id") for item in value)
+    if len(set(members)) != len(members):
+        raise CensusError("class member ids must be unique")
+    return members

@@ -541,6 +541,7 @@ def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
             "class_id": c.class_id, "invariant": c.invariant,
             "severity": c.severity, "status": c.status, "mechanized": c.mechanized,
             "pattern": c.pattern, "pathspec": c.pathspec, "procedure": c.procedure,
+            "members": list(c.members),
         }
         for c in lineage.active()
     ]

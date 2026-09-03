@@ -160,6 +160,7 @@ def lineage_with(*specs: tuple[str, str, str | None]) -> cc.Lineage:
                 invariant, severity,
                 pattern=pattern, pathspec="." if pattern else None,
                 procedure=None if pattern else "read it",
+                members=() if pattern else ("primary-obligation",),
             ),)),
             round_no=1,
         )
@@ -225,6 +226,18 @@ class TestIdentityAndTransitions:
         cc.apply_register(lin, cc.Register(
             transitions=(cc.Transition("REOPEN", cid),)), round_no=3)
         assert lin.classes[cid].blocking
+
+    def test_unmechanized_replacement_installs_new_member_inventory(self) -> None:
+        lin = lineage_with(("old set invariant", cc.MAJOR, None))
+        old = lin.active()[0].class_id
+        minted = cc.apply_register(lin, cc.Register(transitions=(
+            cc.Transition(
+                "REPLACE", old, invariant="new set invariant", severity=cc.MAJOR,
+                procedure="inspect both obligations", members=("left", "right"),
+            ),
+        )), round_no=2)
+        assert lin.classes[old].status == cc.SUPERSEDED
+        assert lin.classes[minted[0]].members == ("left", "right")
 
     def test_a_superseded_source_is_rejected(self) -> None:
         """A superseded class is inert and uncounted against the cap; CLOSED or REOPEN
@@ -549,6 +562,40 @@ class TestLineageState:
         cc.save_lineage(tmp_path, lin)
         again = cc.load_lineage(tmp_path, "test", stamp="s")
         assert again.rounds == 3 and len(again.active()) == 1
+
+    def test_unmechanized_member_inventory_round_trips(self, tmp_path: Path) -> None:
+        lin = lineage_with(("set invariant", cc.MAJOR, None))
+        cc.save_lineage(tmp_path, lin)
+        again = cc.load_lineage(tmp_path, "test", stamp="members")
+        assert again.active()[0].members == ("primary-obligation",)
+
+    def test_legacy_unmechanized_class_is_visibly_uninventoried(self) -> None:
+        lin = cc.Lineage("legacy", classes={
+            "legacy-id":cc.TrackedClass(
+                "legacy-id", "set invariant", cc.MAJOR, 1, cc.OPEN,
+                procedure="inspect it",
+            ),
+        })
+        assert "MISSING — replace before satisfaction" in (
+            cc.render_unmechanized(lin) or ""
+        )
+
+    @pytest.mark.parametrize("members", [[], ["same", "same"], [1], "member"])
+    def test_malformed_persisted_member_inventory_blocks(
+        self, tmp_path: Path, members,
+    ) -> None:
+        folder = cc.lineage_dir(tmp_path)
+        folder.mkdir(parents=True)
+        (folder / "bad.json").write_text(json.dumps({
+            "mode":cc.BRANCH_MODE,
+            "classes":[{
+                "class_id":"bad", "invariant":"set invariant",
+                "severity":cc.MAJOR, "first_round":1, "status":cc.OPEN,
+                "procedure":"inspect it", "members":members,
+            }],
+        }), encoding="utf-8")
+        with pytest.raises(cc.StateUnavailable, match="persisted class members"):
+            cc.load_lineage(tmp_path, "bad", stamp="members")
 
     def test_unparseable_state_blocks_and_is_quarantined(self, tmp_path: Path) -> None:
         d = cc.lineage_dir(tmp_path)

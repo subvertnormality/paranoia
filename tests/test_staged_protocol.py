@@ -22,8 +22,55 @@ from paranoia_local import staged_protocol as sp
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def historical_schema_without_member_inventory(schema):
+    """Project a current schema to the pre-#106 provider wire contract."""
+    value = deepcopy(schema)
+
+    def visit(node):
+        if isinstance(node, dict):
+            alternatives = node.get("anyOf")
+            if isinstance(alternatives, list):
+                node["anyOf"] = [
+                    item for item in alternatives
+                    if "member_coverage" not in item.get("properties", {})
+                ]
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "members" in properties:
+                properties.pop("members")
+                node["required"] = [
+                    item for item in node.get("required", []) if item != "members"
+                ]
+            for child in node.values():
+                visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+
+    visit(value)
+    return value
+
+
 def wire_value(value):
     value = deepcopy(value)
+
+    def prepare(node):
+        if isinstance(node, dict):
+            if node.get("verdict") == "satisfied" and "evidence" in node:
+                node["member_coverage"] = [{
+                    "member_id":"fixture-member", "evidence":node.pop("evidence"),
+                }]
+            if (
+                "procedure" in node and "invariant" in node and "severity" in node
+                and "members" not in node
+            ):
+                node["members"] = ["fixture-member"]
+            for child in node.values():
+                prepare(child)
+        elif isinstance(node, list):
+            for child in node:
+                prepare(child)
+
+    prepare(value)
 
     def visit(node):
         if isinstance(node, dict):
@@ -153,6 +200,7 @@ def active_class(
         "pattern": "BAD" if mechanized else None,
         "pathspec": "*.py" if mechanized else None,
         "procedure": None if mechanized else "inspect the recurring path",
+        "members": [] if mechanized else ["fixture-member"],
     }
 
 
@@ -161,6 +209,7 @@ def lineage_with_active(cls):
         class_id=cls["class_id"], invariant=cls["invariant"],
         severity=cls["severity"], first_round=1, status=cls["status"],
         pattern=cls["pattern"], pathspec=cls["pathspec"], procedure=cls["procedure"],
+        members=tuple(cls["members"]),
     )
     return cc.Lineage(
         lineage_id="protocol-v2-fixture", mode=cc.BRANCH_MODE,
@@ -684,7 +733,7 @@ def test_maximum_keyed_schema_fits_claude_single_argument_transport():
         ))
         Draft202012Validator.check_schema(schema)
         sizes[role] = len(sp.canonical_schema(schema).encode("utf-8"))
-    assert sizes == {"census":15802, "correction":23100, "final":24322}
+    assert sizes == {"census":16120, "correction":24284, "final":25506}
     assert max(sizes.values()) < 32_768
 
 
@@ -808,7 +857,9 @@ def test_live_provider_citation_probe_is_bound_and_replays():
     assert hashlib.sha256(artifact["prompt"].encode()).hexdigest() == artifact[
         "prompt_sha256"
     ]
-    schema = sp.provider_schema(sp.lane_schema(cc.BRANCH_MODE, "behaviour"))
+    schema = historical_schema_without_member_inventory(
+        sp.provider_schema(sp.lane_schema(cc.BRANCH_MODE, "behaviour"))
+    )
     assert hashlib.sha256(sp.canonical_schema(schema).encode()).hexdigest() == artifact[
         "schema_sha256"
     ]
@@ -938,7 +989,7 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
             "evidence":["plan:1", "plan:1"],
         }],
     ))
-    value["class_outcomes"]["class-a"]["evidence"] = [
+    value["class_outcomes"]["class-a"]["member_coverage"][0]["evidence"] = [
         {"anchor":"plan:1", "rationale":"first reason"},
         {"anchor":"plan:1", "rationale":"different reason"},
     ]
@@ -949,7 +1000,8 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
     )
     assert any(
         issue == (
-            "/class_outcomes/class-a/evidence: projected anchors must be unique"
+            "/class_outcomes/class-a/member_coverage/0/evidence: "
+            "anchors must be unique within one member"
         )
         for issue in issues
     )
@@ -957,11 +1009,13 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
 
 
 def test_set_valued_unmechanized_satisfaction_requires_member_level_coverage():
+    members = [f"coordinate-{index}" for index in range(1, 11)]
     active = [active_class() | {
         "invariant":(
             "caller-supplied provenance coordinates are authenticated before use"
         ),
         "procedure":"check all ten coordinates at every trust boundary",
+        "members":members,
     }]
     value = wire_value(decision(
         "final", coverage=coverage(),
@@ -971,22 +1025,21 @@ def test_set_valued_unmechanized_satisfaction_requires_member_level_coverage():
         }],
     ))
     value["class_actions"] = {"class-a":None}
-    value["class_outcomes"]["class-a"]["evidence"][0]["rationale"] = (
-        "four of ten coordinates are authenticated"
-    )
+    value["class_outcomes"]["class-a"]["member_coverage"] = [{
+        "member_id":member,
+        "evidence":[{"anchor":"plan:1", "rationale":"checked coordinate"}],
+    } for member in members[:4]]
     _, issues = sp.decode_decision_with_issues(
         json.dumps(value), mode=cc.PLAN_MODE, role="final",
         active_classes=active,
     )
     assert issues == [
-        "/class_outcomes/class-a/evidence/0/rationale: satisfied unmechanized "
-        "coverage must start 'obligation=<specific member>; "
-        "disposition=<verified|not_applicable>; <reason>'"
+        "/class_outcomes/class-a/member_coverage: expected every authoritative "
+        f"member exactly once {members!r}; got {members[:4]!r}"
     ]
 
 
-@pytest.mark.parametrize("second", ["full invariant", "receipt id"])
-def test_satisfaction_coverage_rejects_generic_and_duplicate_members(second):
+def test_satisfaction_coverage_rejects_duplicate_member_ids():
     active = [active_class()]
     value = wire_value(decision(
         "final", coverage=coverage(),
@@ -996,25 +1049,16 @@ def test_satisfaction_coverage_rejects_generic_and_duplicate_members(second):
         }],
     ))
     value["class_actions"] = {"class-a":None}
-    evidence = value["class_outcomes"]["class-a"]["evidence"]
-    evidence[0]["rationale"] = (
-        "obligation=receipt id; disposition=verified; checked resolver binding"
-    )
-    evidence[1]["rationale"] = (
-        f"obligation={second}; disposition=verified; checked consumer binding"
-    )
+    value["class_outcomes"]["class-a"]["member_coverage"] *= 2
     _, issues = sp.decode_decision_with_issues(
         json.dumps(value), mode=cc.PLAN_MODE, role="final",
         active_classes=active,
     )
-    expected = "name a specific invariant member" if second == "full invariant" else (
-        "duplicate closure obligation 'receipt id'"
-    )
-    assert any(expected in issue for issue in issues)
+    assert any("expected every authoritative member exactly once" in issue for issue in issues)
 
 
-def test_member_level_coverage_projects_unchanged_durable_evidence():
-    active = [active_class()]
+def test_member_level_coverage_allows_shared_anchor_and_deduplicates_projection():
+    active = [active_class() | {"members":["receipt-id", "attempt-id"]}]
     value = wire_value(decision(
         "final", coverage=coverage(),
         class_outcomes=[{
@@ -1023,18 +1067,17 @@ def test_member_level_coverage_projects_unchanged_durable_evidence():
         }],
     ))
     value["class_actions"] = {"class-a":None}
-    evidence = value["class_outcomes"]["class-a"]["evidence"]
-    evidence[0]["rationale"] = (
-        "obligation=receipt id; disposition=verified; checked resolver binding"
-    )
-    evidence[1]["rationale"] = (
-        "obligation=attempt id; disposition=not_applicable; no consumer accepts it"
-    )
+    value["class_outcomes"]["class-a"]["member_coverage"] = [
+        {"member_id":member, "evidence":[{
+            "anchor":"plan:1", "rationale":f"checked {member}",
+        }]}
+        for member in active[0]["members"]
+    ]
     decoded = sp.decode_decision(
         json.dumps(value), mode=cc.PLAN_MODE, role="final",
         active_classes=active,
     )
-    assert decoded["class_outcomes"][0]["evidence"] == ["plan:1", "plan:2"]
+    assert decoded["class_outcomes"][0]["evidence"] == ["plan:1"]
 
 
 @pytest.mark.parametrize("length, valid", [(500, True), (501, False)])
@@ -1621,6 +1664,7 @@ def test_new_class_keeps_independent_severity_and_record_binding():
     assert parsed["class_records"] == [{
         "op": "new", "invariant": "all copies preserve identity",
         "severity": "BLOCKER", "procedure": "inspect every copied identity",
+        "members": ["fixture-member"],
     }]
     assert parsed["debt"][0]["id"] == "D1"
     assert parsed["class_dispositions"][0]["record_index"] == 0
@@ -2503,6 +2547,10 @@ def v1_projection(parsed):
         {key: value for key, value in row.items() if key != "id"}
         for row in projected["debt"]
     ]
+    projected["class_records"] = [
+        {key: value for key, value in row.items() if key != "members"}
+        for row in projected["class_records"]
+    ]
     if "coverage" in parsed:
         projected["coverage"] = parsed["coverage"]
     return projected
@@ -2599,8 +2647,15 @@ def historical_v1_reference(
         if row["finding_id"] is not None:
             assert refs[row["finding_id"]] == class_id
 
+    # Explicit V1/V2 semantic bijection: old procedure definitions had no member
+    # field; the fixture's single obligation becomes the one current member.
+    current_records = deepcopy(obj["class_records"])
+    for row in current_records:
+        if row["op"] in {"new", "replace", "supersede"} and "procedure" in row:
+            row["members"] = ["fixture-member"]
+    obj["class_records"] = current_records
     register = rc.register_from_records(
-        obj["class_records"], mechanized=None if mode == cc.BRANCH_MODE else False,
+        current_records, mechanized=None if mode == cc.BRANCH_MODE else False,
     )
     lineage = cc.Lineage(
         "v1-reference", mode=mode,

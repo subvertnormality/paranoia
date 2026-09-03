@@ -30,6 +30,26 @@ def historical_issue_98_schema(
 ) -> dict:
     """Project the current schema to the exact pre-#98 provider surface."""
     value = json.loads(json.dumps(schema))
+    def project(node):
+        if isinstance(node, dict):
+            alternatives = node.get("anyOf")
+            if isinstance(alternatives, list):
+                node["anyOf"] = [
+                    item for item in alternatives
+                    if "member_coverage" not in item.get("properties", {})
+                ]
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "members" in properties:
+                properties.pop("members")
+                node["required"] = [
+                    item for item in node.get("required", []) if item != "members"
+                ]
+            for child in node.values():
+                project(child)
+        elif isinstance(node, list):
+            for child in node:
+                project(child)
+    project(value)
     if role != "correction":
         return value
     outcomes = value["properties"]["class_outcomes"]

@@ -224,13 +224,17 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(
-        "A satisfied unmechanized outcome's evidence array is the exhaustive closure matrix: emit exactly\n"
-        "one citation per distinct obligation/member in the invariant's explicit or implicit set, and start\n"
-        "each rationale exactly `obligation=<specific member>;\n"
-        "disposition=<verified|not_applicable>; <reason>`. The server rejects missing prefixes, duplicate\n"
-        "member labels, and generic labels such as `full invariant`. Use `not_applicable` only when the cited\n"
-        "artifact evidence establishes why that member has no applicable site. If any occurrence remains,\n"
-        "return `violated` instead of a satisfaction matrix.\n\n",
+        "For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit\n"
+        "`member_coverage` with exactly one row for every stable member ID in that class's server-supplied\n"
+        "`members` list. Bind each member to its own evidence. Different members may cite the same anchor;\n"
+        "the server checks member identity before deriving and deduplicating the flat durable evidence. A\n"
+        "class with an empty legacy member list cannot be satisfied: replace it with a definition containing\n"
+        "the complete stable inventory. If any member remains violated, return `violated` instead.\n\n",
+        "",
+    )
+    prompt = prompt.replace(
+        " Every unmechanized new or replacement definition must enumerate\n"
+        "the complete closed set of stable member IDs governed by its invariant.",
         "",
     )
     prompt = prompt.replace(

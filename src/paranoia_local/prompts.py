@@ -462,7 +462,10 @@ contract; return only its object, without a marker, fence, or prose.
 Cover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded
 repair and is named by at least one finding-status coverage row; non-finding coverage names no
 findings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active
-class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id."""
+class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id.
+For a satisfied unmechanized class, omit flat evidence and emit member_coverage containing every
+server-supplied stable member ID exactly once with its own evidence. A legacy class with no members
+cannot be satisfied; report it violated for replacement with an inventoried definition."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
@@ -475,7 +478,8 @@ from every mapped source; the server deterministically projects that union so co
 discard a co-asserting site already found by a lane.
 Classify each governing finding once: one_off only when its reasoning cannot recur; new_class with a
 complete reusable definition and explicit class severity; or existing_class naming the active
-class. One source may fan out only to distinct existing-class findings for distinct violated
+class. Every unmechanized new-class definition must enumerate the complete closed set of stable
+member IDs governed by its invariant. One source may fan out only to distinct existing-class findings for distinct violated
 assessments that cited it. Consolidate all occurrences of one existing class into one finding.
 
 The server derives census class outcomes exactly from the validated integrity manifest. Do not
@@ -517,13 +521,12 @@ including an explicit statement when a category has no applicable site. If any o
 report all independently evidenced occurrences in the class's single aggregate finding. Do not
 accept a repair merely because it resolves every previously cited site.
 
-A satisfied unmechanized outcome's evidence array is the exhaustive closure matrix: emit exactly
-one citation per distinct obligation/member in the invariant's explicit or implicit set, and start
-each rationale exactly `obligation=<specific member>;
-disposition=<verified|not_applicable>; <reason>`. The server rejects missing prefixes, duplicate
-member labels, and generic labels such as `full invariant`. Use `not_applicable` only when the cited
-artifact evidence establishes why that member has no applicable site. If any occurrence remains,
-return `violated` instead of a satisfaction matrix.
+For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit
+`member_coverage` with exactly one row for every stable member ID in that class's server-supplied
+`members` list. Bind each member to its own evidence. Different members may cite the same anchor;
+the server checks member identity before deriving and deduplicating the flat durable evidence. A
+class with an empty legacy member list cannot be satisfied: replace it with a definition containing
+the complete stable inventory. If any member remains violated, return `violated` instead.
 
 In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
 author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
@@ -534,7 +537,8 @@ longer blocking. Rotating debt, changing evidence, or retaining another blocking
 not satisfy that server-owned gate.
 
 Classify every new governing finding once as one_off, new_class with an explicit definition and
-class severity, or existing_class. For each existing class, exhaustively consolidate every
+class severity, or existing_class. Every unmechanized new or replacement definition must enumerate
+the complete closed set of stable member IDs governed by its invariant. For each existing class, exhaustively consolidate every
 independently evidenced current occurrence into its one governing finding: cite every distinct
 anchor and make the bounded remedy cover each site rather than choosing one representative defect.
 Rephrasing or rotating the same anchor is not another occurrence and does not satisfy a gate.
