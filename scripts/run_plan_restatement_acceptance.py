@@ -222,6 +222,12 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
+    prompt = prompt.replace(
+        "For a satisfied unmechanized class, omit flat evidence and emit member_coverage containing every\n"
+        "server-supplied stable member ID exactly once with its own evidence. A legacy class with no members\n"
+        "cannot be satisfied; report it violated for replacement with an inventoried definition.\n\n",
+        "",
+    )
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(
         "For a satisfied unmechanized assessment or outcome, omit flat `evidence` and emit\n"
@@ -235,6 +241,11 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     prompt = prompt.replace(
         " Every unmechanized new or replacement definition must enumerate\n"
         "the complete closed set of stable member IDs governed by its invariant.",
+        "",
+    )
+    prompt = prompt.replace(
+        " Every unmechanized new-class definition must enumerate the complete closed set of stable\n"
+        "member IDs governed by its invariant.",
         "",
     )
     prompt = prompt.replace(
@@ -278,6 +289,13 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         prior = task.pop("prior_concessions", None)
         if prior not in (None, [], {}):
             raise ValueError("historical replay cannot discard a concession")
+        for row in task.get("active_classes", []):
+            row.pop("members", None)
+        artifact = task.get("artifact")
+        if isinstance(artifact, str):
+            task["artifact"] = artifact.replace(
+                "\n  authoritative members: MISSING — replace before satisfaction", "",
+            )
         compact = task_text.startswith('{"role":"census"')
         task_text = json.dumps(
             task, ensure_ascii=False,
@@ -294,6 +312,28 @@ def _historical_no_concession_invocation(
     value = _invocation(prompt, args, kwargs)
     value["prompt_sha256"] = _sha_text(_historical_no_concession_prompt(prompt))
     schema = deepcopy(value["response_schema"])
+
+    def project_members(node):
+        if isinstance(node, dict):
+            alternatives = node.get("anyOf")
+            if isinstance(alternatives, list):
+                node["anyOf"] = [
+                    item for item in alternatives
+                    if "member_coverage" not in item.get("properties", {})
+                ]
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "members" in properties:
+                properties.pop("members")
+                node["required"] = [
+                    item for item in node.get("required", []) if item != "members"
+                ]
+            for child in node.values():
+                project_members(child)
+        elif isinstance(node, list):
+            for child in node:
+                project_members(child)
+
+    project_members(schema)
     properties = schema.get("properties", {})
     required = schema.get("required", [])
     if "concession_challenges" in properties:
