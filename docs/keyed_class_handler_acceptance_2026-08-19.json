@@ -144,7 +144,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange.",
-      "sha256": "a8bf60085550a51e60e8eb4ecc42a560ce52cb9b9c4e595dae31446cd47a029e"
+      "sha256": "a87fe0c505a984086efd45a6cfac5f29f48fd2c7292ed66b26081107fba59f8f"
     }
   },
   "attempt_ledger": [

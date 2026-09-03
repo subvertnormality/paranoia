@@ -2072,6 +2072,12 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         ),
         prior_concessions=prior_concessions,
     ))
+    expected_schema = acceptance.historical_issue_98_schema(
+        expected_schema, role="correction",
+        outcome_ids=sp.expected_outcome_class_ids(
+            "correction", active_classes=active, durable_debt=debt,
+        ),
+    )
     assert call["schema"] == expected_schema
     decoded = sp.decode_decision(
         response, mode=cc.BRANCH_MODE, role="correction",
