@@ -61,6 +61,13 @@ accept a repair merely because it resolves every previously cited site."""
 ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS = """In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
 author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot
 establish that the invariant-wide search completed."""
+ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS = """A satisfied unmechanized outcome's evidence array is the exhaustive closure matrix: emit exactly
+one citation per distinct obligation/member in the invariant's explicit or implicit set, and start
+each rationale exactly `obligation=<specific member>;
+disposition=<verified|not_applicable>; <reason>`. The server rejects missing prefixes, duplicate
+member labels, and generic labels such as `full invariant`. Use `not_applicable` only when the cited
+artifact evidence establishes why that member has no applicable site. If any occurrence remains,
+return `violated` instead of a satisfaction matrix."""
 
 
 def _sha_bytes(value: bytes) -> str:
@@ -74,6 +81,7 @@ def _sha_text(value: str) -> str:
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS + "\n\n", "")
     owns_class_guidance = (
         "class_outcomes is a closed object permitting exactly these class IDs:" in prompt
@@ -394,6 +402,7 @@ def validate_artifact(
                     "historical response unexpectedly owns a concession challenge"
                 )
             wire["concession_challenges"] = {}
+            kwargs["require_closure_coverage"] = False
             return original_decode(json.dumps(wire, separators=(",", ":")), *args, **kwargs)
 
         def replay_reply(prompt: str) -> Review:

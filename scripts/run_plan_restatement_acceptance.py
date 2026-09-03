@@ -224,6 +224,16 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(
+        "A satisfied unmechanized outcome's evidence array is the exhaustive closure matrix: emit exactly\n"
+        "one citation per distinct obligation/member in the invariant's explicit or implicit set, and start\n"
+        "each rationale exactly `obligation=<specific member>;\n"
+        "disposition=<verified|not_applicable>; <reason>`. The server rejects missing prefixes, duplicate\n"
+        "member labels, and generic labels such as `full invariant`. Use `not_applicable` only when the cited\n"
+        "artifact evidence establishes why that member has no applicable site. If any occurrence remains,\n"
+        "return `violated` instead of a satisfaction matrix.\n\n",
+        "",
+    )
+    prompt = prompt.replace(
         "In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must\n"
         "author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot\n"
         "establish that the invariant-wide search completed.\n\n",
@@ -506,6 +516,7 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
     original_materialize = sp.materialize_decision_value
 
     def replay_decode(text: str, *args, **kwargs):
+        kwargs["require_closure_coverage"] = False
         return original_decode(_pre_concession_response(text), *args, **kwargs)
 
     def replay_materialize(*args, **kwargs):

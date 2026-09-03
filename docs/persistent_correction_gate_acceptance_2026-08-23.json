@@ -45,7 +45,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical.",
-      "sha256": "9ee81f5433d4d2e4d6971b14035946adcca527405f0a63484fada6c1b7911b4d"
+      "sha256": "ce8ee2fba24ca3ab82b3bc42c2643d44686d3de9f31b7273e1bf22efc181f778"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",

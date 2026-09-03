@@ -23,7 +23,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions, broad plan normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; retained provider exchanges remain historical.",
-      "sha256": "62b9a43f5e963b4fc8d9f81f459a3f94a97b8c2cbdaea8fb52ced257c69070a9"
+      "sha256": "087eba5bac14787cc61998d08fe3d8dcda3c738ad03229411c33f2b5679969d5"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge.",
@@ -47,7 +47,7 @@
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "cefb1c67d2823250c7d0d6a12206fbb2c3c2697aa84948a6cc2250bedd98961f"
+      "sha256": "14fbe3ff386d24a67b0617a4368d0f9998c02e36a41e4f90ac9a22037f31d4a2"
     }
   },
   "assertions": [

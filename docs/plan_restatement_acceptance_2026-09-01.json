@@ -11,7 +11,7 @@
     },
     "scripts/run_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
-      "sha256": "2e1495dd0304f0178bc29f77eead8ac1f6bbdfee74f46788cb1da4d27938d211"
+      "sha256": "bf9009b49a2d1e9679706594596bcb6869cdca62d8c1497f1d72b46e23ffe055"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
@@ -23,7 +23,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange.",
-      "sha256": "cc8c7cabd8cab325a27a741684bb66432dbd897e35e1603fdeede0ec0c6ed7af"
+      "sha256": "2d85c4e8bbee3ec47839f700dd6fbcaeab88d9a29c4b5cca1d6d9d680808d1b3"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged.",

@@ -11,7 +11,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance, plan-review-only normative-restatement discovery, and issue #98's invariant-scoped unmechanized follow-up sweep; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained provider exchanges remain historical.",
-      "sha256": "9ee81f5433d4d2e4d6971b14035946adcca527405f0a63484fada6c1b7911b4d"
+      "sha256": "ce8ee2fba24ca3ab82b3bc42c2643d44686d3de9f31b7273e1bf22efc181f778"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",

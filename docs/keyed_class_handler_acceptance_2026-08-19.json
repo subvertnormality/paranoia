@@ -124,7 +124,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged.",
-      "sha256": "6ff5068e1c30c6c9deb9a2bb87a538e87bf14a4440f26f98f45bae7f159624a6"
+      "sha256": "5bdce7aeb9b0a55abae4cc5814556301719a0a5cc005315fe5bed2b5e35720d3"
     },
     "src/paranoia_local/server.py": {
       "scope": "Updates the public future-Claude default description; this retained Codex handler exchange is unchanged.",
