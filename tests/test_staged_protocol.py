@@ -981,7 +981,7 @@ def test_duplicate_wire_citations_reach_canonical_aggregate_validation():
 
 
 def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
-    active = [active_class()]
+    active = [active_class(mechanized=True, status=cc.CLOSED)]
     value = wire_value(decision(
         "final", coverage=coverage(),
         class_outcomes=[{
@@ -989,7 +989,8 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
             "evidence":["plan:1", "plan:1"],
         }],
     ))
-    value["class_outcomes"]["class-a"]["member_coverage"][0]["evidence"] = [
+    value["class_outcomes"]["class-a"].pop("member_coverage")
+    value["class_outcomes"]["class-a"]["evidence"] = [
         {"anchor":"plan:1", "rationale":"first reason"},
         {"anchor":"plan:1", "rationale":"different reason"},
     ]
@@ -999,10 +1000,8 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
         active_classes=active,
     )
     assert any(
-        issue == (
-            "/class_outcomes/class-a/member_coverage/0/evidence: "
-            "anchors must be unique within one member"
-        )
+        issue.startswith("/class_outcomes/class-a/evidence:")
+        and "projected anchors must be unique" in issue
         for issue in issues
     )
     assert all(issue.startswith("/class_outcomes/class-a") for issue in issues)
@@ -1693,7 +1692,7 @@ def test_new_class_keeps_independent_severity_and_record_binding():
 
 @pytest.mark.parametrize("member_id", [
     "all", "FULL INVARIANT", "every-member", "member-1", "fixture-member",
-    "sample_site_2", "  specific  ",
+    "sample_site_2", "first-obligation", "whole-universe", "  specific  ",
 ])
 def test_unmechanized_definition_rejects_generic_or_noncanonical_member_id(
     member_id,

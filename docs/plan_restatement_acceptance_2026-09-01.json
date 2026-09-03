@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds durable authoritative members to future unmechanized classes; retained pre-change provider exchanges remain historical. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical.",
-      "sha256": "4db636087a9ee5e56356ad5765a5f6ad7179cbaacfe6d62c0e32688e44f3207c"
+      "sha256": "e7f80e9ad02b6c93f1d6753ae03922eb370faac46ce14ef6c1815f815773bfdb"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",

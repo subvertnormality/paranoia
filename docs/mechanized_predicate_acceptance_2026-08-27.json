@@ -3,7 +3,7 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds and validates member inventories only for unmechanized classes; it does not alter staged schema validation, mechanized predicate materialization, or retry evidence. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical.",
-      "sha256": "4db636087a9ee5e56356ad5765a5f6ad7179cbaacfe6d62c0e32688e44f3207c"
+      "sha256": "e7f80e9ad02b6c93f1d6753ae03922eb370faac46ce14ef6c1815f815773bfdb"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Issue #95 preserves normalized final-owner state across staged failure rollback. Issue #94 validates raw durable state before class sweep or projection and changes only malformed-state failure rendering; this does not alter staged schema validation, mechanized predicate materialization, or retry evidence. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical.",

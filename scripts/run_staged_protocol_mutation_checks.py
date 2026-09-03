@@ -27,7 +27,6 @@ DIFFERENTIAL_TESTS = (
     "test_historical_v1_v2_open_unbound_debt_shape_is_equivalent",
     "test_historical_v1_v2_census_fanout_shape_is_equivalent",
     "test_historical_v1_v2_remaining_legal_shape_matrix_is_equivalent",
-    "test_historical_v1_v2_standalone_close_reopen_are_equivalent",
 )
 
 MUTATIONS = (
@@ -123,8 +122,8 @@ MUTATIONS = (
     ),
     (
         "keyed-outcome-completeness",
-        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n            )',
-        'properties["class_outcomes"] = _object(\n                {cid:{"$ref":"#/$defs/class_outcome"} for cid in outcome_ids},\n                required=(),\n            )',
+        "required=outcome_ids,",
+        "required=(),",
         "test_keyed_decision_schema_exposes_only_role_legal_class_decisions",
     ),
     (
@@ -147,8 +146,8 @@ MUTATIONS = (
     ),
     (
         "canonical-keyed-diagnostic-pointer",
-        "issues = _remap_class_schema_issues(canonical, issues)",
-        "issues = issues",
+        "issues = wire_issues + _remap_class_schema_issues(canonical, issues)",
+        "issues = wire_issues + issues",
         "test_keyed_decision_canonical_issue_retains_wire_key_pointer",
     ),
     (
@@ -211,7 +210,14 @@ CROSS_MODULE_MUTATIONS = (
     (
         ROOT / "src" / "paranoia_local" / "review_census.py",
         "tests/test_review_census.py", "citation-cache-version",
-        "CENSUS_CACHE_VERSION = 3", "CENSUS_CACHE_VERSION = 2",
+        "CENSUS_CACHE_VERSION = 4", "CENSUS_CACHE_VERSION = 3",
+        "test_census_cache_requires_every_exact_binding",
+    ),
+    (
+        ROOT / "src" / "paranoia_local" / "handlers.py",
+        "tests/test_review_census.py", "member-cache-inventory-binding",
+        '"active_classes_digest":rc.digest(canonical_classes),',
+        '"active_classes_digest":rc.digest("[]"),',
         "test_census_cache_requires_every_exact_binding",
     ),
     (

@@ -55,7 +55,11 @@ GENERIC_MEMBER_TOKENS = frozenset({
     "everything", "member", "members", "obligation", "obligations", "site",
     "sites", "case", "cases", "item", "items", "boundary", "boundaries",
     "class", "classes", "invariant", "invariants", "fixture", "test",
-    "placeholder", "example", "sample", "id",
+    "placeholder", "example", "sample", "id", "universe", "entirety", "total",
+    "aggregate", "global", "universal", "active", "current", "known", "remaining",
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+    "eighth", "ninth", "tenth",
 })
 PER_CLASS_TIMEOUT = 20     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round

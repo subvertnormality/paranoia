@@ -17,7 +17,7 @@
     },
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical.",
-      "sha256": "4db636087a9ee5e56356ad5765a5f6ad7179cbaacfe6d62c0e32688e44f3207c"
+      "sha256": "e7f80e9ad02b6c93f1d6753ae03922eb370faac46ce14ef6c1815f815773bfdb"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",

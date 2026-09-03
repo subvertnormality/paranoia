@@ -47,7 +47,7 @@
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged. Issue #106 tests subset, unknown, duplicate, generic, shared-anchor, and canonical member-coverage boundaries; retained exchanges remain historical.",
-      "sha256": "9f17d03ab50ee8e8cf2f078381be184cfbd1eba4b037ede3dd4b6297719c14ae"
+      "sha256": "7c61f320c42364823e9e2b8f37bd83d0973bdf3ca34b4ff5afbecbbf6cebf57d"
     }
   },
   "assertions": [
