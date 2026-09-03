@@ -547,8 +547,13 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
     if role == "correction":
         expected_task["review_scope"] = "targeted"
     task = json.loads(row["prompts"][0].split("===== TASK INPUT =====\n\n", 1)[1])
-    historical_task = dict(expected_task)
+    historical_task = deepcopy(expected_task)
     historical_task.pop("prior_concessions")
+    for active in historical_task["active_classes"]:
+        active.pop("members", None)
+    historical_task["artifact"] = historical_task["artifact"].replace(
+        "\n  authoritative members: MISSING — replace before satisfaction", "",
+    )
     if task != historical_task:
         raise ValueError("targeted prompt task differs from its seeded production reconstruction")
     outcome_ids = sp.expected_outcome_class_ids(
