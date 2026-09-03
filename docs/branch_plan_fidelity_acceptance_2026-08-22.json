@@ -3,15 +3,15 @@
   "allowed_later_source_diffs": {
     "src/paranoia_local/class_closure.py": {
       "scope": "Shared predicate-budget documentation and immutable-snapshot result reuse for evidence-bound mechanized admission; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "c17316bb34e9777d4b168005ac3abff20530c4c66684a1d8ce33bee2cdf932e4"
+      "sha256": "253134d47127cbb48d22fd7df7278466408baf2c2dd7edc0265ca87eec25dd91"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Operator-facing staged failure taxonomy and plan-only closure-candidate correction, plus closed shared staged-state validation, bounded evidence-bound mechanized-class registration, source-local/aggregate capture claim failure classification, ordered terminal claim-attempt projection, and exact mode/gate inputs to server-authored action guidance through this revision; this does not alter branch plan-contract binding, authority, capture, or propagation. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads the active engine into final settlement only; branch plan-contract capture, digest, and role propagation remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid branch-contract acceptance.",
-      "sha256": "c16f1377b29ef3bd1940c8b5d09242532c1ea44da03f0fe175d97f2da1a58cda"
+      "sha256": "d99e03def7e45b968ea430fa56d51d40f6de22ea6c078a1e9488471c491d9bf7"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance, plan-review-only normative-restatement discovery, and issue #98's invariant-scoped unmechanized follow-up sweep; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained provider exchanges remain historical.",
-      "sha256": "db33695cda5f785a8d2325d368ce64888088a71f1d181ccc47cd78e5877d4b3f"
+      "sha256": "08f7a549c624794153542516fc3f185f7431cbd41bd2cdc63026d2f4017a344a"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",

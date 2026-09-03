@@ -17,7 +17,7 @@
     },
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters.",
-      "sha256": "ee12ad9cc605bff21c8b44d7a1bcd55d67171b54c5f247532bd3fb2207cc256f"
+      "sha256": "141da254bce6de7b1609688a34bf806c15d8284eaea9fa291a44c69a78652414"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
@@ -41,7 +41,7 @@
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange.",
-      "sha256": "14d5d27af16da4549c98a588701d618754448792fac4f292d6820a1442dadd7f"
+      "sha256": "bd14ad62c90da5a6846d7cfa3553db5ff96f7c82a1e743822c5bd6a68fc3a172"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
@@ -49,11 +49,11 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical.",
-      "sha256": "db33695cda5f785a8d2325d368ce64888088a71f1d181ccc47cd78e5877d4b3f"
+      "sha256": "08f7a549c624794153542516fc3f185f7431cbd41bd2cdc63026d2f4017a344a"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",
-      "sha256": "b02867bb8e751fab5637112929b824ab3183dcf79d44b1aace24eb43614a8b8b"
+      "sha256": "78ec40d09feae0b71f0fa9b54845f57034029ecda64c479d5cfeaf3b6e3036e7"
     },
     "src/paranoia_local/server.py": {
       "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",
@@ -73,7 +73,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
-      "sha256": "9bf92f1619d66f3833994f9c5e9a4c27a79110c074489a7d335414155460b424"
+      "sha256": "d60d6cac3ca400d38e2d74e62b679b528081ec71d2e502ca56305d64ecd90521"
     }
   },
   "after_lineage": {
