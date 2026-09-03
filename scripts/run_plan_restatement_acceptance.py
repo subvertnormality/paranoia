@@ -227,7 +227,7 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
         "evidence. A legacy class with no members cannot be satisfied; report it violated for replacement\n"
         "with an inventoried definition.\n\n",
-        "\n",
+        "",
     )
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(

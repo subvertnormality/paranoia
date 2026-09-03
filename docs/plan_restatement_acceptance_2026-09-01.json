@@ -10,8 +10,8 @@
       "sha256": "51935918e8c686dd4fd6572e4931880d7fbef09bc3340f9a51e5c71ea3388a3e"
     },
     "scripts/run_plan_restatement_acceptance.py": {
-      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged.",
-      "sha256": "f5482d0117a3fc650c68bea2f7af523aa14e82062d8dcd6cd147ca73d52dc98e"
+      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged. Issue #106 projects post-record member fields and their integrity-only prompt spacing away only while reconstructing the retained historical exchange.",
+      "sha256": "38259533821dab55f8a1eb1cf4a714c986adfdcf4660ab90b30f1b3eddc8a5f1"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
