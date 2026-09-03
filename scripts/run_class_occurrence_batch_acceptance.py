@@ -460,9 +460,14 @@ def validate_artifact(
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
         if replay_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")
+        replayed_classes = []
+        for row in durable.classes.values():
+            historical = dict(vars(row))
+            historical.pop("members", None)
+            replayed_classes.append(historical)
         replayed_after = json.loads(json.dumps({
             "rounds":durable.rounds, "next_seq":durable.next_seq,
-            "classes":[vars(row) for row in durable.classes.values()],
+            "classes":replayed_classes,
             "review_state":durable.review_state,
         }))
         if replayed_after != json.loads(json.dumps(after)):
