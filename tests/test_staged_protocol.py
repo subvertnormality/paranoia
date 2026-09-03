@@ -1080,6 +1080,27 @@ def test_member_level_coverage_allows_shared_anchor_and_deduplicates_projection(
     assert decoded["class_outcomes"][0]["evidence"] == ["plan:1"]
 
 
+def test_integrity_lane_member_coverage_uses_authoritative_inventory():
+    active = [active_class() | {"members":["left", "right"]}]
+    value = wire_value(lane_value("integrity", assessments=[{
+        "class_id":"class-a", "verdict":"satisfied",
+        "evidence":["plan:1"], "finding_id":None,
+    }]))
+    value["class_assessments"][0]["member_coverage"] = [{
+        "member_id":"left", "evidence":[{
+            "anchor":"plan:1", "rationale":"checked left",
+        }],
+    }]
+    _, issues = sp.decode_lane_with_issues(
+        json.dumps(value), mode=cc.PLAN_MODE, lane="integrity",
+        active_classes=active,
+    )
+    assert issues == [
+        "/class_assessments/0/member_coverage: expected every authoritative member "
+        "exactly once ['left', 'right']; got ['left']"
+    ]
+
+
 @pytest.mark.parametrize("length, valid", [(500, True), (501, False)])
 def test_citation_rationale_bound_applies_to_every_evidence_shape(length, valid):
     rationale = "r" * length
@@ -1668,6 +1689,33 @@ def test_new_class_keeps_independent_severity_and_record_binding():
     }]
     assert parsed["debt"][0]["id"] == "D1"
     assert parsed["class_dispositions"][0]["record_index"] == 0
+
+
+@pytest.mark.parametrize("member_id", ["all", "FULL INVARIANT", "  specific  "])
+def test_unmechanized_definition_rejects_generic_or_noncanonical_member_id(
+    member_id,
+):
+    value = wire_value(decision("census", governing_findings=[finding(
+        source_ids=["domain:F1"],
+        classification={
+            "kind":"new_class", "definition":{
+                "invariant":"each named boundary is checked", "severity":"MAJOR",
+                "procedure":"inspect every named boundary",
+            },
+        },
+    )]))
+    value["governing_findings"][0]["classification"]["definition"]["members"] = [
+        member_id
+    ]
+    settlement = sp.materialize_decision_value(
+            sp.decode_decision(
+                json.dumps(value), mode=cc.PLAN_MODE, role="census",
+            ),
+            mode=cc.PLAN_MODE, role="census", source_ids=["domain:F1"],
+            source_severities={"domain:F1":"MAJOR"},
+    )
+    with pytest.raises(rc.CensusError, match="member ids must"):
+        rc.register_from_records(settlement["class_records"], mechanized=False)
 
 
 def test_branch_supports_pattern_and_procedure_definitions():

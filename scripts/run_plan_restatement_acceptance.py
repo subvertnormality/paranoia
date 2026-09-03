@@ -223,9 +223,10 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     prompt = prompt.replace(
-        "For a satisfied unmechanized class, omit flat evidence and emit member_coverage containing every\n"
-        "server-supplied stable member ID exactly once with its own evidence. A legacy class with no members\n"
-        "cannot be satisfied; report it violated for replacement with an inventoried definition.\n\n",
+        "For a satisfied unmechanized class, omit flat evidence and\n"
+        "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
+        "evidence. A legacy class with no members cannot be satisfied; report it violated for replacement\n"
+        "with an inventoried definition.\n\n",
         "\n",
     )
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")

@@ -430,6 +430,8 @@ def staged_census_instructions(
         CODE_REVIEW_INVESTIGATION + "\n\n" + instructions
         if mode == "branch" else instructions
     )
+    if lane == "integrity":
+        instructions += "\n\n" + STAGED_MEMBER_CENSUS_INSTRUCTIONS
     if mode == "branch" and plan_contract:
         instructions += "\n\n" + BRANCH_PLAN_FIDELITY_INSTRUCTIONS
     if mode == "plan":
@@ -462,10 +464,13 @@ contract; return only its object, without a marker, fence, or prose.
 Cover all nine checklist IDs exactly once. Every finding is one atomic root issue with a bounded
 repair and is named by at least one finding-status coverage row; non-finding coverage names no
 findings. Non-integrity lanes return no class assessments. Integrity assesses every supplied active
-class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id.
-For a satisfied unmechanized class, omit flat evidence and emit member_coverage containing every
-server-supplied stable member ID exactly once with its own evidence. A legacy class with no members
-cannot be satisfied; report it violated for replacement with an inventoried definition."""
+class exactly once. A violation cites one of its lane findings; satisfaction has a null finding_id."""
+
+
+STAGED_MEMBER_CENSUS_INSTRUCTIONS = """For a satisfied unmechanized class, omit flat evidence and
+emit member_coverage containing every server-supplied stable member ID exactly once with its own
+evidence. A legacy class with no members cannot be satisfied; report it violated for replacement
+with an inventoried definition."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new

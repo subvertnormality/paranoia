@@ -49,6 +49,10 @@ UNPROVEN_STATUSES = frozenset({OPEN, OVER_BROAD, MALFORMED, UNCHECKED})
 
 MAX_MATCHES = 200          # output bound; over it the class is `over-broad`
 MAX_ACTIVE_CLASSES = 100   # counted over NON-SUPERSEDED classes only (plan §2.5)
+GENERIC_MEMBER_IDS = frozenset({
+    "all", "all members", "all obligations", "complete invariant",
+    "entire invariant", "everything", "full invariant",
+})
 PER_CLASS_TIMEOUT = 20     # seconds
 ROUND_BUDGET = 60          # seconds, aggregate across all classes in a round
 
@@ -460,7 +464,21 @@ def _persisted_class_members(row: dict[str, Any]) -> tuple[str, ...]:
         raise ValueError("persisted class members must be 1..100 unique 1..120 character strings")
     if row.get("pattern") is not None:
         raise ValueError("persisted mechanized class must not contain members")
+    validate_member_inventory(tuple(value))
     return tuple(value)
+
+
+def validate_member_inventory(members: tuple[str, ...]) -> None:
+    if any(item != " ".join(item.split()) for item in members):
+        raise RegisterError("class member ids must use canonical nonblank spacing")
+    normalized = {" ".join(item.split()).casefold() for item in members}
+    if len(normalized) != len(members):
+        raise RegisterError("class member ids must be unique ignoring case")
+    generic = sorted(normalized & GENERIC_MEMBER_IDS)
+    if generic:
+        raise RegisterError(
+            f"class member ids must identify specific obligations, not {generic!r}"
+        )
 
 
 def _to_json(lineage: Lineage) -> dict[str, Any]:
@@ -596,6 +614,8 @@ def copy_lineage(lineage: Lineage) -> Lineage:
 def _add(lineage: Lineage, invariant: str, severity: str, round_no: int,
          pattern: str | None, pathspec: str | None, procedure: str | None,
          members: tuple[str, ...] = ()) -> str:
+    if members:
+        validate_member_inventory(members)
     cid = mint_id(lineage.lineage_id, lineage.next_seq, invariant)
     lineage.next_seq += 1
     lineage.classes[cid] = TrackedClass(

@@ -1389,6 +1389,7 @@ def _staged_structural_review(
             else:
                 parsed, issues = sp.decode_lane_with_issues(
                     text, mode=mode, lane=lane,
+                    active_classes=active_classes if lane == "integrity" else (),
                 )
         except sp.ProtocolError as exc:
             raise rc.CensusError(str(exc)) from exc

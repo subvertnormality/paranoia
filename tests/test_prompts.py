@@ -122,6 +122,18 @@ class TestRebutInstructions:
 
 
 class TestStagedReviewInstructions:
+    def test_member_inventory_wire_names_are_exact_in_census_and_followup(self) -> None:
+        census = prompts.staged_census_instructions("plan", "integrity")
+        followup = prompts.staged_followup_instructions("plan")
+        for text in (census, followup):
+            assert "member_coverage" in text
+            assert "stable member ID" in text
+            assert "omit flat" in text
+        assert "server-supplied" in followup and "`members` list" in followup
+        assert "member_coverage" not in prompts.staged_census_instructions(
+            "plan", "domain"
+        )
+
     def test_review_roles_require_complete_co_asserting_site_repairs(self) -> None:
         for mode in ("plan", "branch"):
             text = prompts.staged_census_instructions(mode, "domain")

@@ -27,7 +27,7 @@ MAX_CONSOLIDATION_PROMPT_CHARS = 1_000_000
 MAX_REJECTED_PAYLOAD_CHARS = 12_000
 MAX_ENGINE_FAILURE_MESSAGE_CHARS = 4_000
 PHASES = frozenset({"census", "correction", "final", "clear"})
-CENSUS_CACHE_VERSION = 3
+CENSUS_CACHE_VERSION = 4
 PERSISTENCE_REBUT_ROUNDS = 3
 PERSISTENCE_CORRECTION_LIMIT = 6
 REOPEN_CORRECTION_LIMIT = 3
@@ -1247,4 +1247,8 @@ def _members(value: Any) -> tuple[str, ...]:
     members = tuple(_bounded(item, 120, "class member id") for item in value)
     if len(set(members)) != len(members):
         raise CensusError("class member ids must be unique")
+    try:
+        cc.validate_member_inventory(members)
+    except cc.RegisterError as exc:
+        raise CensusError(str(exc)) from exc
     return members

@@ -418,7 +418,7 @@ def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
     tracked = cc.TrackedClass(
         "class-a", "the reviewed artifact remains coherent", cc.MAJOR, 1,
         cc.OPEN if initial_phase == "correction" else cc.CLOSED,
-        procedure="inspect the artifact", members=("fixture-member",),
+        procedure="inspect the artifact", members=("left-member", "right-member"),
     )
     cc.save_lineage(state_root, cc.Lineage(
         lineage_id, rounds=1, mode=mode, classes={"class-a":tracked},
@@ -439,7 +439,18 @@ def test_public_handlers_enforce_final_owner_and_durable_phase_contract(
     }
     if initial_phase == "final":
         decision_value["coverage"] = coverage
-    decision = wire(decision_value)
+    decision_wire = wire_value(decision_value)
+    decision_wire["class_outcomes"]["class-a"]["member_coverage"] = [
+        {
+            "member_id":member_id,
+            "evidence":[{
+                "anchor":anchor,
+                "rationale":f"{member_id} is proven at the shared coordinate",
+            }],
+        }
+        for member_id in ("left-member", "right-member")
+    ]
+    decision = json.dumps(decision_wire)
 
     calls = []
     engine_class = (
@@ -1839,7 +1850,7 @@ def test_census_cache_requires_every_exact_binding():
         active_classes=[], existing_debt=[], engine_name="codex", model="model",
         effort="high", web_search=False, plan_lines=3, lane_prompts=lane_prompts,
     )
-    assert binding["version"] == 3
+    assert binding["version"] == 4
     state = {"census_cache":{**binding, "manifests":manifests}}
 
     def validate(text, lane_name):
@@ -1874,6 +1885,29 @@ def test_census_cache_requires_every_exact_binding():
     assert handlers._cached_census_manifests(
         state, binding=changed_contract, lanes=lanes, validate=validate,
     ) is None
+
+    inventoried = [{
+        "class_id":"class-a", "invariant":"both members hold", "severity":"MAJOR",
+        "status":cc.OPEN, "mechanized":False, "pattern":None, "pathspec":None,
+        "procedure":"inspect both", "members":["left", "right"],
+    }]
+    member_binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=inventoried, existing_debt=[], engine_name="codex",
+        model="model", effort="high", web_search=False, plan_lines=3,
+        lane_prompts=lane_prompts,
+    )
+    changed_members = deepcopy(inventoried)
+    changed_members[0]["members"] = ["left", "right", "third"]
+    changed_member_binding = handlers._census_cache_binding(
+        mode=cc.PLAN_MODE, snapshot="snapshot", stakes="stakes", body="body",
+        active_classes=changed_members, existing_debt=[], engine_name="codex",
+        model="model", effort="high", web_search=False, plan_lines=3,
+        lane_prompts=lane_prompts,
+    )
+    assert member_binding["active_classes_digest"] != (
+        changed_member_binding["active_classes_digest"]
+    )
 
 
 def test_assessment_evidence_uses_the_shared_anchor_resolver(tmp_path):
@@ -2991,7 +3025,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
         lineage,
         cc.Register(new_classes=(cc.NewClass(
             "class outcomes preserve integrity evidence", "MAJOR",
-            procedure="inspect consolidation",
+            procedure="inspect consolidation", members=("fixture-member",),
         ),)),
         round_no=0,
     )[0]
