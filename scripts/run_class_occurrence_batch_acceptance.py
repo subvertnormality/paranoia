@@ -124,6 +124,8 @@ def _historical_no_concession_prompt(prompt: str) -> str:
             raise ValueError(
                 f"historical replay cannot discard a concession: {prior!r}"
             )
+        for row in task.get("active_classes", []):
+            row.pop("members", None)
         prompt = head + found + json.dumps(task, ensure_ascii=False)
     return prompt
 

@@ -1,7 +1,7 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
-    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed later-diff validation plus exact projection of issues #94, #98, and #106 additions while replaying the unchanged historical provider payload.", "sha256": "784711b00089e667778e2d083857fa3bbd77de83030d4e8d181d37f38a52a760"},
+    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed later-diff validation plus exact projection of issues #94, #98, and #106 additions while replaying the unchanged historical provider payload.", "sha256": "196ddac46521188bd51b23213d3f9d2956f56278df7a8dfafc32687d5604ccde"},
     "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
     "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
     "src/paranoia_local/engines.py": {"scope": "Updates the future Claude default and minimum CLI; branch class-occurrence aggregation and the retained Codex provider exchange are unchanged.", "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"},
