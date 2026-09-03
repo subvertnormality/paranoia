@@ -754,19 +754,19 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
 @pytest.mark.parametrize(("mode", "phase", "prompt_sha256", "schema_sha256", "next_phase"), [
         (
             cc.PLAN_MODE, "final",
-            "6fa8d4f118af602df6f5a24daeaf9e4208393970cb7326c94c035e67566dce61",
+            "94f7f7966391ecad3af2705b56e34363d668dc0b6244f2635e72230dcf54310c",
         "9e146bdb946689594b3094b309d2328b5bb1dff7b800d5a4280a300feb79a6a6",
         "clear",
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "1b7ef344b85384d1f54a9de06e5a5709c73cec0b869ab53cb094d56085d21279",
+            "2e5bc12f06beedec213b98edc40afb2231dd70bfb4038535972f75ddf743bfab",
         "25cf6c0dee523a7167ac079d970d3284ea26716f05dde4ee4d028613d8ff81f6",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "30b37a474b918be904f0400f598bdd9aa290d293ea9e00cf4610101f18613f64",
+            "fd9e4747f5c7c4a817ef64777b6a6749e52496355ef3e1b806c9d74263c4597c",
         "0d8038c01ac5e37b2a1d367ca6af18055660e70639317f1512a1f6918ec8c3b1",
         "clear",
     ),
@@ -2135,9 +2135,14 @@ def wire_value(value):
                 if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
-                            "anchor":item, "rationale":"fixture evidence",
+                            "anchor":item,
+                            "rationale":(
+                                f"obligation=fixture member {index}; "
+                                "disposition=verified; "
+                                "fixture evidence"
+                            ),
                         }
-                        for item in child
+                        for index, item in enumerate(child)
                     ]
                 else:
                     visit(child)
@@ -5025,6 +5030,93 @@ def test_public_correction_retries_evidence_free_standalone_close(
             "evidence":anchors, "finding_id":None,
         },
     ]
+
+
+def test_public_correction_retries_subset_closure_with_reported_coordinate_set(
+    repo, tmp_path, monkeypatch,
+):
+    lineage_id = "issue-106-coordinate-coverage"
+    class_id = "e1b85ba4"
+    anchors = [f"plan:{line}" for line in range(1, 11)]
+    state = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
+    state.update(phase="correction", last_round=1, debt=[{
+        "id":"D1", "finding_id":"old", "status":"open", "severity":cc.MAJOR,
+        "summary":"some provenance coordinates bypass authority",
+        "evidence":anchors[:4], "remedy":"authenticate every coordinate",
+        "source_ids":[], "class_ids":[class_id], "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(
+        cc.default_state_root(),
+        cc.Lineage(
+            lineage_id, mode=cc.PLAN_MODE, rounds=1, next_seq=2,
+            classes={class_id:cc.TrackedClass(
+                class_id,
+                "Caller-supplied governed provenance coordinates must be "
+                "authenticated before they affect any transformation or evidence.",
+                cc.MAJOR, 1, cc.OPEN,
+                procedure=(
+                    "At every trust boundary check receipt IDs, attempt IDs, and "
+                    "lineage digests for each coordinate."
+                ),
+            )},
+            review_state=state,
+        ),
+    )
+    calls: list[str] = []
+
+    def response(*, complete: bool) -> str:
+        used = anchors if complete else anchors[:4]
+        value = wire_value({
+            "role":"correction", "governing_findings":[],
+            "debt_outcomes":[{
+                "debt_id":"D1", "status":"closed", "evidence":used,
+            }],
+            "class_outcomes":{class_id:{
+                "verdict":"satisfied", "evidence":used,
+            }},
+            "class_actions":{class_id:None},
+            "concession_challenges":{},
+        })
+        citations = value["class_outcomes"][class_id]["evidence"]
+        for index, citation in enumerate(citations):
+            citation["rationale"] = (
+                f"obligation=coordinate {index + 1}; disposition=verified; "
+                "authenticated at its production trust boundary"
+                if complete else "four of ten coordinates are authenticated"
+            )
+        return json.dumps(value)
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        text = response(complete=False)
+        return Review(text=text, session_ref="issue-106-session", raw=text)
+
+    def resume(self, session_ref, prompt, *args, **kwargs):
+        assert session_ref == "issue-106-session"
+        calls.append(prompt)
+        assert f"/class_outcomes/{class_id}/evidence/0/rationale" in prompt
+        assert "obligation=<specific member>" in prompt
+        text = response(complete=True)
+        return Review(text=text, session_ref=session_ref, raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
+    result = handlers.critique_plan(
+        {
+            "repo_path":str(repo), "plan_text":"\n".join(anchors),
+            "lineage":lineage_id, "round":2, "stakes":"trusted local tool",
+            "claim_verification":False,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+        now=lambda:"ISSUE106",
+    )
+
+    assert len(calls) == 2
+    assert "STRUCTURAL-PHASE: final" in result
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="after", mode=cc.PLAN_MODE,
+    )
+    assert durable.classes[class_id].status == cc.CLOSED
 
 
 def test_plan_active_class_view_is_phase_correct_and_branch_view_is_unchanged():

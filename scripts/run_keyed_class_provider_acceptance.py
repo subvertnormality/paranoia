@@ -223,6 +223,10 @@ def validate_artifact(artifact: dict) -> None:
                     text, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
                     prior_concessions=prior_concessions,
+                    # This retained provider record predates the issue-106
+                    # member-level satisfaction rationale contract. It proves
+                    # structured transport capability, not current semantics.
+                    require_closure_coverage=False,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,

@@ -46,6 +46,14 @@ MAX_CENSUS_FINDINGS = MAX_CENSUS_SOURCES + MAX_ACTIVE_CLASSES
 MAX_LANE_RESPONSE_CHARS = 240_000
 MAX_DECISION_RESPONSE_CHARS = 1_000_000
 MAX_CONSOLIDATION_CONTEXT_CHARS = 200_000
+_CLOSURE_MEMBER_RATIONALE = re.compile(
+    r"^obligation=(?P<obligation>[^;]+); "
+    r"disposition=(?P<disposition>verified|not_applicable); \S"
+)
+_GENERIC_CLOSURE_OBLIGATIONS = frozenset({
+    "all obligations", "complete invariant", "entire invariant", "everything",
+    "full invariant",
+})
 
 
 def citation_instructions(mode: str, *, plan_contract: bool = False) -> str:
@@ -911,6 +919,55 @@ def _canonical_class_projection_issues(value: dict[str, Any]) -> list[str]:
     return issues
 
 
+def _wire_satisfaction_coverage_issues(
+    value: dict[str, Any], active_classes: Sequence[dict[str, Any]],
+) -> list[str]:
+    """Require explicit member-level coverage before an unmechanized satisfaction."""
+    unmechanized = {
+        row["class_id"] for row in active_classes
+        if not row.get("mechanized", False)
+    }
+    rows = value.get("class_outcomes", {})
+    if not isinstance(rows, dict):
+        return []
+    issues: list[str] = []
+    for class_id, outcome in rows.items():
+        if (
+            class_id not in unmechanized or not isinstance(outcome, dict)
+            or outcome.get("verdict") != "satisfied"
+        ):
+            continue
+        seen: set[str] = set()
+        base = f"/class_outcomes/{_pointer_token(class_id)}/evidence"
+        for index, citation in enumerate(outcome.get("evidence", [])):
+            rationale = citation.get("rationale", "")
+            match = _CLOSURE_MEMBER_RATIONALE.match(rationale)
+            if match is None:
+                issues.append(
+                    f"{base}/{index}/rationale: satisfied unmechanized coverage must "
+                    "start 'obligation=<specific member>; "
+                    "disposition=<verified|not_applicable>; <reason>'"
+                )
+                continue
+            obligation = " ".join(match.group("obligation").split()).casefold()
+            if not obligation:
+                issues.append(
+                    f"{base}/{index}/rationale: closure obligation must not be blank"
+                )
+            elif obligation in _GENERIC_CLOSURE_OBLIGATIONS:
+                issues.append(
+                    f"{base}/{index}/rationale: name a specific invariant member, "
+                    f"not generic {obligation!r}"
+                )
+            if obligation in seen:
+                issues.append(
+                    f"{base}/{index}/rationale: duplicate closure obligation "
+                    f"{obligation!r}; emit one evidence row per member"
+                )
+            seen.add(obligation)
+    return issues
+
+
 def decode_lane_with_issues(
     text: str, *, mode: str, lane: str,
 ) -> tuple[dict[str, Any], list[str]]:
@@ -994,6 +1051,7 @@ def decode_decision_with_issues(
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> tuple[dict[str, Any], list[str]]:
     """Decode the decision wire shape and retain canonical issues for fan-in."""
     outcome_ids = expected_outcome_class_ids(
@@ -1009,6 +1067,10 @@ def decode_decision_with_issues(
         max_chars=MAX_DECISION_RESPONSE_CHARS,
     )
     wire_pointers = _wire_class_pointers(wire)
+    wire_issues = (
+        _wire_satisfaction_coverage_issues(wire, active_classes or ())
+        if require_closure_coverage else []
+    )
     canonical = project_decision_wire(wire)
     issues = _schema_issues(
         canonical,
@@ -1019,7 +1081,7 @@ def decode_decision_with_issues(
         ),
     )
     canonical["_wire_class_pointers"] = wire_pointers
-    issues = _remap_class_schema_issues(canonical, issues)
+    issues = wire_issues + _remap_class_schema_issues(canonical, issues)
     issues.extend(_canonical_class_projection_issues(canonical))
     return canonical, issues
 
@@ -1029,12 +1091,14 @@ def decode_decision(
     active_classes: Sequence[dict[str, Any]] | None = None,
     durable_debt: Sequence[dict[str, Any]] = (),
     prior_concessions: dict[str, dict[str, Any]] | None = None,
+    require_closure_coverage: bool = True,
 ) -> dict[str, Any]:
     """Decode and structurally validate a decision before semantic layers run."""
     value, issues = decode_decision_with_issues(
         text, mode=mode, role=role, active_classes=active_classes,
         durable_debt=durable_debt,
         prior_concessions=prior_concessions,
+        require_closure_coverage=require_closure_coverage,
     )
     _raise_semantic_issues(issues)
     return value

@@ -31,9 +31,14 @@ def wire_value(value):
                 if key in {"evidence", "assessment_evidence"}:
                     node[key] = [
                         item if isinstance(item, dict) else {
-                            "anchor":item, "rationale":"fixture evidence",
+                            "anchor":item,
+                            "rationale":(
+                                f"obligation=fixture member {index}; "
+                                "disposition=verified; "
+                                "fixture evidence"
+                            ),
                         }
-                        for item in child
+                        for index, item in enumerate(child)
                     ]
                 else:
                     visit(child)
@@ -740,6 +745,7 @@ def test_keyed_provider_acceptance_replays_exact_schemas_and_responses():
                     text, mode=cc.BRANCH_MODE, role=role,
                     active_classes=classes, durable_debt=durable_debt,
                     prior_concessions=prior_concessions,
+                    require_closure_coverage=False,
                 )
                 sp.materialize_decision_value(
                     decoded, mode=cc.BRANCH_MODE, role=role,
@@ -948,6 +954,87 @@ def test_keyed_decision_canonical_issue_retains_wire_key_pointer():
         for issue in issues
     )
     assert all(issue.startswith("/class_outcomes/class-a") for issue in issues)
+
+
+def test_set_valued_unmechanized_satisfaction_requires_member_level_coverage():
+    active = [active_class() | {
+        "invariant":(
+            "caller-supplied provenance coordinates are authenticated before use"
+        ),
+        "procedure":"check all ten coordinates at every trust boundary",
+    }]
+    value = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1"],
+        }],
+    ))
+    value["class_actions"] = {"class-a":None}
+    value["class_outcomes"]["class-a"]["evidence"][0]["rationale"] = (
+        "four of ten coordinates are authenticated"
+    )
+    _, issues = sp.decode_decision_with_issues(
+        json.dumps(value), mode=cc.PLAN_MODE, role="final",
+        active_classes=active,
+    )
+    assert issues == [
+        "/class_outcomes/class-a/evidence/0/rationale: satisfied unmechanized "
+        "coverage must start 'obligation=<specific member>; "
+        "disposition=<verified|not_applicable>; <reason>'"
+    ]
+
+
+@pytest.mark.parametrize("second", ["full invariant", "receipt id"])
+def test_satisfaction_coverage_rejects_generic_and_duplicate_members(second):
+    active = [active_class()]
+    value = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1", "plan:2"],
+        }],
+    ))
+    value["class_actions"] = {"class-a":None}
+    evidence = value["class_outcomes"]["class-a"]["evidence"]
+    evidence[0]["rationale"] = (
+        "obligation=receipt id; disposition=verified; checked resolver binding"
+    )
+    evidence[1]["rationale"] = (
+        f"obligation={second}; disposition=verified; checked consumer binding"
+    )
+    _, issues = sp.decode_decision_with_issues(
+        json.dumps(value), mode=cc.PLAN_MODE, role="final",
+        active_classes=active,
+    )
+    expected = "name a specific invariant member" if second == "full invariant" else (
+        "duplicate closure obligation 'receipt id'"
+    )
+    assert any(expected in issue for issue in issues)
+
+
+def test_member_level_coverage_projects_unchanged_durable_evidence():
+    active = [active_class()]
+    value = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1", "plan:2"],
+        }],
+    ))
+    value["class_actions"] = {"class-a":None}
+    evidence = value["class_outcomes"]["class-a"]["evidence"]
+    evidence[0]["rationale"] = (
+        "obligation=receipt id; disposition=verified; checked resolver binding"
+    )
+    evidence[1]["rationale"] = (
+        "obligation=attempt id; disposition=not_applicable; no consumer accepts it"
+    )
+    decoded = sp.decode_decision(
+        json.dumps(value), mode=cc.PLAN_MODE, role="final",
+        active_classes=active,
+    )
+    assert decoded["class_outcomes"][0]["evidence"] == ["plan:1", "plan:2"]
 
 
 @pytest.mark.parametrize("length, valid", [(500, True), (501, False)])

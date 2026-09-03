@@ -124,7 +124,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged.",
-      "sha256": "b05d13c1ed39bae1b81a7f2113502cc9150f04b8963acdfab42f12073ce918ac"
+      "sha256": "6ff5068e1c30c6c9deb9a2bb87a538e87bf14a4440f26f98f45bae7f159624a6"
     },
     "src/paranoia_local/server.py": {
       "scope": "Updates the public future-Claude default description; this retained Codex handler exchange is unchanged.",
@@ -132,11 +132,11 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged.",
-      "sha256": "c9387a16acdf2908d0b06fd4932a5b389714683c07dbef6d267980fda9819e46"
+      "sha256": "cd581323c8efa77ddf7bc3c1c8ff93d93ff61541f9c04cd78efa2ad2beb4e71a"
     },
     "tests/test_review_census.py": {
       "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange.",
-      "sha256": "4b40d708aa2a172dd1b53f2f75ba2806565c8f3951ce61a68dd3abbb955e77bc"
+      "sha256": "ef6034ff3edf2996e84f51fae02b213eb9c44fc55e1484ec3095994403e31290"
     }
   },
   "attempt_ledger": [

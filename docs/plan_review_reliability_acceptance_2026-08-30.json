@@ -3,11 +3,11 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Debt-targeted rebut settlement, arbitration failure taxonomy, the plan normative-restatement review contract, and its complete-package authoritative public-handler replay boundary. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "225e3cd2e1b3b083d31f45bf94f055a7bae0d2f925305c3f5d70862011cf6387"
+      "sha256": "6005b1e4abe59c428f9d7c4e8ce95f23636f09b5068200db911015a48cf8ad07"
     },
     "README.md": {
       "scope": "Public bound-rebut settlement, plan normative-restatement review, and its retained census, targeted-correction, cold-final, complete-package authoritative replay acceptance documentation. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line coverage belongs to test allowances. Issue #95 documents that a pending final is discharged only by its owning engine.",
-      "sha256": "f6361772d6c17f8b0ed3e351e121888089ee5b727b06c0dc9d06835742e3cb06"
+      "sha256": "53fc6bdc26a9a25e64625897d28d29edf5e05f5102a1a49e5c845984970098ba"
     },
     "docs/tool-reference.md": {
       "scope": "Public bound-rebut semantics plus arbitration-only caller-framing failure taxonomy.",
@@ -23,7 +23,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Bound-rebut structured instructions, broad plan normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; retained provider exchanges remain historical.",
-      "sha256": "0dee00ce1c390b8aacd8c4302652e2d57d847dd20d71e8102b1387b583246ce3"
+      "sha256": "62b9a43f5e963b4fc8d9f81f459a3f94a97b8c2cbdaea8fb52ced257c69070a9"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Debt-targeted rebut settlement and exact trailer debt guidance. Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge.",
@@ -31,7 +31,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds separately tested exact concession-challenge schema and semantics; retained historical provider exchanges are unchanged.",
-      "sha256": "cad7519a423d37e5ca7b6d86f5347d2351181b1ed6a14870069f71fdf76c7e54"
+      "sha256": "684c28325151bd69abecce6b1c56fdf08a85e542f56f2b3be01094189103672e"
     },
     "tests/test_plan_claims.py": {
       "scope": "Regression proving a changed validation source is rejected by the exact later-diff boundary.",
@@ -43,11 +43,11 @@
     },
     "tests/test_review_census.py": {
       "scope": "Plan-phase active-class projection, debt-targeted rebut settlement, and plan-final prompt digest regressions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated cross-engine final-gate and legacy-migration regressions.",
-      "sha256": "e85c2a6fb50a20758d634fcca79c54f4a6d81ecad985a01501be152dc0b3cbf9"
+      "sha256": "dc65d811c4d8e0453eb500e7573e8edfcb91b46cf3d7c9c17186673e07753077"
     },
     "tests/test_staged_protocol.py": {
       "scope": "Issue #95 threads the deterministic engine name through pure settlement fixtures and preserves historical V1/V2 materialization equivalence; retained provider exchanges are unchanged.",
-      "sha256": "b23b92bf458642bd3066020072713fa3ec8da09be449a64e7dcdc1ebd7536800"
+      "sha256": "cefb1c67d2823250c7d0d6a12206fbb2c3c2697aa84948a6cc2250bedd98961f"
     }
   },
   "assertions": [

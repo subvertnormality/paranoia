@@ -512,10 +512,14 @@ For every supplied unmechanized active class that this role assesses, treat the 
 procedure as the primary search boundary, not the current finding, debt wording, known anchors, or
 claimed patch. Enumerate every distinct site or property category named by that invariant or
 procedure and inspect the complete reviewed artifact for each one before returning `satisfied` or
-closing the class. The assessment evidence rationales must account for every named category,
-including an explicit statement when a category has no applicable site. If any occurrence remains,
-report all independently evidenced occurrences in the class's single aggregate finding. Do not
-accept a repair merely because it resolves every previously cited site.
+closing the class. A satisfied unmechanized outcome's evidence array is the exhaustive closure
+matrix: emit exactly one citation per distinct obligation/member in the invariant's explicit or
+implicit set, and start each rationale exactly `obligation=<specific member>;
+disposition=<verified|not_applicable>; <reason>`. The server rejects missing prefixes, duplicate
+member labels, and generic labels such as `full invariant`. Use `not_applicable` only when the cited
+artifact evidence establishes why that member has no applicable site. Do not accept a repair merely
+because it resolves every previously cited site. If any occurrence remains, return `violated`
+instead and report all independently evidenced occurrences in the class's single aggregate finding.
 
 In correction, a standalone `close` for an otherwise outcome-optional unmechanized class must
 author that class's `satisfied` outcome and evidence; an evidence-free lifecycle action cannot

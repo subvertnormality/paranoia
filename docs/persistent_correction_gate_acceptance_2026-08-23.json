@@ -9,7 +9,7 @@
   "allowed_later_source_diffs": {
     "AGENTS.md": {
       "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates.",
-      "sha256": "0bda176d381f30f12b26978dff5d1d805d2486c79e6e7bb10851bb6a24a9f518"
+      "sha256": "3a97c98c794489315ccf3199f7f0b31288ed8406f958ce0a20dc456f0d3b5397"
     },
     "CLAUDE.md": {
       "scope": "Issue #95 mirrors the canonical engine-owned final-regression instruction; it does not change the retained correction-gate provider exchange or control counters.",
@@ -45,7 +45,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical.",
-      "sha256": "2ee91cc15a13a9fc3b73ab093f43dd460429663f918fbf72a76f4583c66294d9"
+      "sha256": "9ee81f5433d4d2e4d6971b14035946adcca527405f0a63484fada6c1b7911b4d"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters.",
@@ -57,7 +57,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged.",
-      "sha256": "f244d3418d57e2f003505ee2b374f461105092d7fb91de3d5327c358926eb103"
+      "sha256": "8fba5231f7de0b014fda02bb2f3a06e32a5e31256c67564a7df64b3f1e99f96f"
     },
     "tests/test_plan_claims.py": {
       "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange.",
@@ -69,7 +69,7 @@
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions.",
-      "sha256": "fa63f6042bd308e49eac25bfdb4a6ed18d07936681df3018fc2c391a29e96f0c"
+      "sha256": "8df30473e7010cf981040ed7e27d0caec433e5bc9e8dc96287ae49a0bba94806"
     }
   },
   "after_lineage": {

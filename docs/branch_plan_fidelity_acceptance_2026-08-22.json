@@ -11,7 +11,7 @@
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Shared co-asserting-site guidance, plan-review-only normative-restatement discovery, and issue #98's invariant-scoped unmechanized follow-up sweep; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained provider exchanges remain historical.",
-      "sha256": "2ee91cc15a13a9fc3b73ab093f43dd460429663f918fbf72a76f4583c66294d9"
+      "sha256": "9ee81f5433d4d2e4d6971b14035946adcca527405f0a63484fada6c1b7911b4d"
     },
     "src/paranoia_local/server.py": {
       "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",
@@ -19,7 +19,7 @@
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding.",
-      "sha256": "ae308affa14b6969e7db5fc94ac7f3c257012c321d98b68b20b837ff6c31fded"
+      "sha256": "cb50cf54615863426d775640b85410803dfb43b0cbbd74b904f081b5c6978209"
     },
     "tests/test_branch_plan_fidelity.py": {
       "scope": "Extends the two-line captured-path public census-lane regression with invalid-anchor rejection, same-session repair without server-authored out-of-range examples, exact frozen contract and bound, snapshot/cache identity, rejected-payload telemetry, and audit retention. It also adds the 5,260-line public plan-backed branch manifest-only consolidation, correction, and final lifecycle for exact anchor rejection, same-session repair, frozen authority resending where required, audit retention, settlement, and durable reload, plus an isolated malformed review-state fail-closed expectation; this does not alter branch plan-contract binding, authority, capture, or propagation.",
