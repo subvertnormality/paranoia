@@ -158,13 +158,16 @@ def fingerprint(text: str) -> str:
 # ── register parsing ──────────────────────────────────────────────────────────
 
 _NEW_MECHANIZED = {"CLASS", "SEVERITY", "PATTERN", "PATHSPEC"}
-_NEW_UNMECHANIZED = {"CLASS", "SEVERITY", "PROCEDURE"}
+_NEW_UNMECHANIZED_LEGACY = {"CLASS", "SEVERITY", "PROCEDURE"}
+_NEW_UNMECHANIZED = _NEW_UNMECHANIZED_LEGACY | {"MEMBERS"}
 _KNOWN_KEYS = _NEW_MECHANIZED | _NEW_UNMECHANIZED | {
     "CLOSED", "REOPEN", "RECLASSIFY", "SUPERSEDE", "BY", "WITH-PATTERN", "WITH-PROCEDURE",
 }
 
 
-def parse_register(text: str, *, allow_mechanized: bool = True) -> Register:
+def parse_register(
+    text: str, *, allow_mechanized: bool = True, require_members: bool = False,
+) -> Register:
     """Parse the terminal `=== CLASS REGISTER ===` block.
 
     Strict in the manner of `arbitration.parse_*`, because this is the one
@@ -200,9 +203,9 @@ def parse_register(text: str, *, allow_mechanized: bool = True) -> Register:
         if "CLOSED" in keys or "REOPEN" in keys or "RECLASSIFY" in keys:
             transitions.append(_simple_transition(fields, keys))
         elif "SUPERSEDE" in keys:
-            transitions.append(_supersede(fields, keys))
+            transitions.append(_supersede(fields, keys, require_members=require_members))
         elif "CLASS" in keys:
-            new_classes.append(_new_class(fields, keys))
+            new_classes.append(_new_class(fields, keys, require_members=require_members))
         else:
             raise RegisterError(f"unrecognised record: {sorted(keys)}")
     return Register(tuple(new_classes), tuple(transitions))
@@ -258,16 +261,26 @@ def _severity(raw: str) -> str:
     return raw
 
 
-def _new_class(fields: dict[str, str], keys: set[str]) -> NewClass:
+def _new_class(
+    fields: dict[str, str], keys: set[str], *, require_members: bool,
+) -> NewClass:
     invariant, severity = _require(fields, "CLASS"), _severity(_require(fields, "SEVERITY"))
     if keys == _NEW_MECHANIZED:
         pathspec = _require(fields, "PATHSPEC")
         _reject_pathspec_magic(pathspec)
         return NewClass(invariant, severity, pattern=_require(fields, "PATTERN"), pathspec=pathspec)
-    if keys == _NEW_UNMECHANIZED:
-        return NewClass(invariant, severity, procedure=_require(fields, "PROCEDURE"))
+    if keys == _NEW_UNMECHANIZED or keys == _NEW_UNMECHANIZED_LEGACY:
+        if require_members and keys != _NEW_UNMECHANIZED:
+            raise RegisterError(
+                "a new unmechanized class needs PROCEDURE+MEMBERS"
+            )
+        return NewClass(
+            invariant, severity, procedure=_require(fields, "PROCEDURE"),
+            members=_member_field(fields) if "MEMBERS" in keys else (),
+        )
     raise RegisterError(
-        "a new class needs CLASS+SEVERITY plus either PATTERN+PATHSPEC or PROCEDURE, "
+        "a new class needs CLASS+SEVERITY plus either PATTERN+PATHSPEC or "
+        "PROCEDURE+MEMBERS, "
         f"got {sorted(keys)}"
     )
 
@@ -286,7 +299,9 @@ def _simple_transition(fields: dict[str, str], keys: set[str]) -> Transition:
     return Transition("RECLASSIFY", parts[0], severity=_severity(parts[1]))
 
 
-def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
+def _supersede(
+    fields: dict[str, str], keys: set[str], *, require_members: bool,
+) -> Transition:
     old = _require(fields, "SUPERSEDE")
     if keys == {"SUPERSEDE", "BY"}:
         return Transition("SUPERSEDE", old, target=_require(fields, "BY"))
@@ -297,15 +312,37 @@ def _supersede(fields: dict[str, str], keys: set[str]) -> Transition:
             "SUPERSEDE", old, pattern=_require(fields, "WITH-PATTERN"),
             pathspec=pathspec, invariant=fields.get("CLASS") or None,
         )
-    if keys <= {"SUPERSEDE", "WITH-PROCEDURE", "CLASS"} and "WITH-PROCEDURE" in keys:
+    if (
+        keys <= {"SUPERSEDE", "WITH-PROCEDURE", "MEMBERS", "CLASS"}
+        and "WITH-PROCEDURE" in keys
+    ):
+        if require_members and "MEMBERS" not in keys:
+            raise RegisterError("WITH-PROCEDURE requires MEMBERS")
         return Transition(
             "SUPERSEDE", old, procedure=_require(fields, "WITH-PROCEDURE"),
             invariant=fields.get("CLASS") or None,
+            members=_member_field(fields) if "MEMBERS" in keys else (),
         )
     raise RegisterError(
-        "SUPERSEDE takes BY, or WITH-PATTERN+PATHSPEC, or WITH-PROCEDURE — "
+        "SUPERSEDE takes BY, or WITH-PATTERN+PATHSPEC, or "
+        "WITH-PROCEDURE+MEMBERS — "
         f"got {sorted(keys)}"
     )
+
+
+def _member_field(fields: dict[str, str]) -> tuple[str, ...]:
+    raw = _require(fields, "MEMBERS")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RegisterError("MEMBERS must be a JSON array of stable member ids") from exc
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise RegisterError("MEMBERS must be a JSON array of stable member ids")
+    members = tuple(value)
+    if not members:
+        raise RegisterError("MEMBERS must contain at least one stable member id")
+    validate_member_inventory(members)
+    return members
 
 
 def _reject_pathspec_magic(pathspec: str) -> None:
@@ -477,6 +514,10 @@ def _persisted_class_members(row: dict[str, Any]) -> tuple[str, ...]:
 
 
 def validate_member_inventory(members: tuple[str, ...]) -> None:
+    if not 1 <= len(members) <= 100:
+        raise RegisterError("class members must contain 1..100 stable member ids")
+    if any(not 1 <= len(item) <= 120 for item in members):
+        raise RegisterError("class member ids must contain 1..120 characters")
     if any(item != " ".join(item.split()) for item in members):
         raise RegisterError("class member ids must use canonical nonblank spacing")
     normalized = {" ".join(item.split()).casefold() for item in members}

@@ -207,6 +207,7 @@ class TestRegisterHandling:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with(
             "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
         cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
@@ -240,6 +241,7 @@ class TestRegisterHandling:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with(
             "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
         cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id
@@ -284,6 +286,7 @@ class TestFailurePaths:
         commit(repo, {"a.py": "x = 1\n"}, "c")
         run_round(repo, FakeEngine(review_with(
             "CLASS: a semantic invariant\nSEVERITY: MAJOR\nPROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )), tmp_path, round=1)
         lin_id = _only_lineage(tmp_path)
         cid = cc.load_lineage(state_root(tmp_path), lin_id, stamp="s").active()[0].class_id

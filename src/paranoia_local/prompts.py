@@ -598,6 +598,7 @@ PATHSPEC: <git pathspec bounding the search, or . for the whole tree>
 
 For an invariant no regex can express, replace PATTERN and PATHSPEC with:
 PROCEDURE: <what a reviewer must do to find every violation>
+MEMBERS: ["<stable id for each specific obligation in the class>"]
 
 State changes against classes already shown to you, each its own record:
 CLOSED: <class-id>                 (unmechanized only — you judge it genuinely closed)
@@ -613,6 +614,7 @@ CLASS: <restated invariant>        (optional)
    — or —
 SUPERSEDE: <old-id>
 WITH-PROCEDURE: <procedure>        (the invariant turned out to be inexpressible)
+MEMBERS: ["<stable id for each specific obligation in the replacement>"]
 CLASS: <restated invariant>        (optional)
 
 Rules: one field per line; SEVERITY here is the class's ONLY severity; a pathspec may not
@@ -648,6 +650,7 @@ lines. If you registered no class and changed no state, the whole body is `NONE`
 CLASS: <the invariant, one line, stated WITHOUT reference to any particular section>
 SEVERITY: FATAL|MAJOR|MINOR|OUT-OF-SCOPE
 PROCEDURE: <what a reviewer must do to find every violation of it in this plan>
+MEMBERS: ["<stable id for each specific obligation in the class>"]
 
 State changes against classes already shown to you, each its own record:
 CLOSED: <class-id>                 (you judge it genuinely closed)
@@ -658,6 +661,7 @@ BY: <existing-class-id>            (must be a different, live class)
    — or —
 SUPERSEDE: <old-id>
 WITH-PROCEDURE: <procedure>        (the procedure turned out to be unusable)
+MEMBERS: ["<stable id for each specific obligation in the replacement>"]
 CLASS: <restated invariant>        (optional)
 
 Rules: one field per line; SEVERITY here is the class's ONLY severity; an unknown class

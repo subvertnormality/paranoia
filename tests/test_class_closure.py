@@ -71,9 +71,34 @@ class TestRegisterParsing:
             "=== CLASS REGISTER ===\n"
             "CLASS: one\nSEVERITY: MAJOR\nPATTERN: a\nPATHSPEC: src\n\n"
             "CLASS: two\nSEVERITY: MINOR\nPROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )
         assert [c.invariant for c in reg.new_classes] == ["one", "two"]
         assert reg.new_classes[0].mechanized and not reg.new_classes[1].mechanized
+        assert reg.new_classes[1].members == ("reviewed-caller",)
+
+    def test_unmechanized_registration_requires_specific_members(self) -> None:
+        with pytest.raises(cc.RegisterError, match="PROCEDURE\\+MEMBERS"):
+            cc.parse_register(
+                "=== CLASS REGISTER ===\n"
+                "CLASS: a\nSEVERITY: MAJOR\nPROCEDURE: inspect it\n",
+                require_members=True,
+            )
+
+    @pytest.mark.parametrize("members", [
+        [f"member-{index}" for index in range(101)],
+        ["x" * 121],
+    ])
+    def test_text_member_inventory_obeys_the_durable_loader_bounds(
+        self, members: list[str]
+    ) -> None:
+        with pytest.raises(cc.RegisterError, match=r"1\.\.100|1\.\.120"):
+            cc.parse_register(
+                "=== CLASS REGISTER ===\n"
+                "CLASS: a\nSEVERITY: MAJOR\nPROCEDURE: inspect it\n"
+                f"MEMBERS: {json.dumps(members)}\n",
+                require_members=True,
+            )
 
     def test_duplicate_field_within_a_record_is_rejected(self) -> None:
         with pytest.raises(cc.RegisterError, match="duplicate register key"):
@@ -121,7 +146,8 @@ class TestNothingOutsideTheRegisterIsParsed:
 
     def test_a_prose_severity_tag_disagreeing_with_the_register_is_not_an_error(self) -> None:
         text = ("## What doesn't work\n[MAJOR] something\n\n=== CLASS REGISTER ===\n"
-                "CLASS: a\nSEVERITY: MINOR\nPROCEDURE: p\n")
+                "CLASS: a\nSEVERITY: MINOR\nPROCEDURE: p\n"
+                'MEMBERS: ["reviewed-path"]\n')
         assert cc.parse_register(text).new_classes[0].severity == cc.MINOR
 
 
@@ -142,9 +168,12 @@ class TestSupersessionGrammar:
 
     def test_with_procedure_is_available(self) -> None:
         reg = cc.parse_register(
-            "=== CLASS REGISTER ===\nSUPERSEDE: abc12345\nWITH-PROCEDURE: read every caller\n"
+            "=== CLASS REGISTER ===\nSUPERSEDE: abc12345\n"
+            "WITH-PROCEDURE: read every caller\n"
+            'MEMBERS: ["reviewed-caller"]\n'
         )
         assert reg.transitions[0].procedure == "read every caller"
+        assert reg.transitions[0].members == ("reviewed-caller",)
 
 
 # ── state transitions ─────────────────────────────────────────────────────────
@@ -226,6 +255,18 @@ class TestIdentityAndTransitions:
         cc.apply_register(lin, cc.Register(
             transitions=(cc.Transition("REOPEN", cid),)), round_no=3)
         assert lin.classes[cid].blocking
+
+    def test_legacy_uninventoried_class_remains_replayable_in_the_pure_engine(self) -> None:
+        lin = cc.Lineage("legacy", classes={
+            "legacy-a":cc.TrackedClass(
+                "legacy-a", "inspect every route", cc.MAJOR, 1, cc.OPEN,
+                procedure="inspect routes",
+            ),
+        })
+        cc.apply_register(lin, cc.Register(
+            transitions=(cc.Transition("CLOSED", "legacy-a"),)
+        ), round_no=2)
+        assert lin.classes["legacy-a"].status == cc.CLOSED
 
     def test_unmechanized_replacement_installs_new_member_inventory(self) -> None:
         lin = lineage_with(("old set invariant", cc.MAJOR, None))
@@ -318,7 +359,10 @@ class TestCapBoundary:
         lin = self._full()
         victim = lin.active()[0].class_id
         minted = cc.apply_register(lin, cc.Register(transitions=(
-            cc.Transition("SUPERSEDE", victim, procedure="read every caller"),)), round_no=2)
+            cc.Transition(
+                "SUPERSEDE", victim, procedure="read every caller",
+                members=("reviewed-caller",),
+            ),)), round_no=2)
         assert not lin.classes[minted[0]].mechanized
 
 

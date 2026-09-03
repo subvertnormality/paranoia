@@ -1185,6 +1185,9 @@ def _is_legacy_claim_only_phase(
         and not has_blocking_debt
         and not lineage.blocking()
         and not unbound_blocking
+        and not any(
+            not item.mechanized and not item.members for item in lineage.active()
+        )
         and not any(state.get(key) for key in (
             "staged_failure", "validation_debt", "format_debt",
             "unbound_class_ids", "unbound_classes",
@@ -1249,6 +1252,30 @@ def _staged_structural_review(
             lineage.review_state = deepcopy(state)
             if getattr(closure, "prepared_lineage", None) is not None:
                 closure.prepared_lineage.review_state = deepcopy(state)
+        legacy_memberless = [
+            item.class_id for item in lineage.active()
+            if not item.mechanized and not item.members
+        ]
+        memberless_clear_bypass = state.get("phase") == "clear"
+        memberless_claim_only_bypass = (
+            state.get("phase") == "correction"
+            and not state.get("debt") and not lineage.debt
+            and state.get("snapshot_digest") == snapshot
+            and not any(state.get(key) for key in (
+                "staged_failure", "validation_debt", "format_debt",
+                "unbound_class_ids", "unbound_classes",
+            ))
+        )
+        if legacy_memberless and (
+            memberless_clear_bypass or memberless_claim_only_bypass
+        ):
+            retained_history = [
+                deepcopy(row) for row in state.get("debt", [])
+                if isinstance(row, dict) and "concession" in row
+            ]
+            rc.set_phase(state, "census")
+            state["debt"] = retained_history
+            state.pop("census_cache", None)
     except rc.CensusError as exc:
         raw_phase = (
             lineage.review_state.get("phase")
@@ -4794,6 +4821,12 @@ def rebut(
                 )
                 review = replace(review, text=rendered)
                 if disposition == "CONCEDE":
+                    tracked = lineage.classes[class_id]
+                    if not tracked.members:
+                        raise cc.RegisterError(
+                            "bound rebut requires an inventoried replacement before "
+                            "legacy unmechanized closure"
+                        )
                     draft = cc.copy_lineage(lineage)
                     draft.review_state = rc.settle_rebut_concession(
                         draft.review_state, debt_id=debt_id, class_id=class_id,
@@ -5095,7 +5128,44 @@ class _ClosureRound:
     def _attempt(self, text: str) -> tuple[list[str], str]:
         """Apply `text`'s register to a draft, and adopt it only if the whole thing holds."""
         assert self.lineage is not None
-        register = cc.parse_register(text, allow_mechanized=self.allow_mechanized)
+        register = cc.parse_register(
+            text, allow_mechanized=self.allow_mechanized, require_members=True,
+        )
+        for transition in register.transitions:
+            if transition.kind == "RECLASSIFY":
+                tracked = self.lineage.classes.get(transition.class_id)
+                severity = transition.severity
+                if (
+                    tracked is not None
+                    and not tracked.mechanized
+                    and not tracked.members
+                    and tracked.severity in cc.BLOCKING_SEVERITIES
+                    and severity not in cc.BLOCKING_SEVERITIES
+                ):
+                    raise cc.RegisterError(
+                        "RECLASSIFY cannot make legacy class "
+                        f"{transition.class_id} nonblocking before an inventoried "
+                        "replacement is installed"
+                    )
+            if transition.kind == "CLOSED":
+                tracked = self.lineage.classes.get(transition.class_id)
+                if tracked is not None and not tracked.mechanized and not tracked.members:
+                    raise cc.RegisterError(
+                        "CLOSED requires an inventoried replacement for legacy class "
+                        f"{transition.class_id}"
+                    )
+            if transition.kind == "SUPERSEDE" and transition.target is not None:
+                source = self.lineage.classes.get(transition.class_id)
+                if source is not None and not source.mechanized and not source.members:
+                    raise cc.RegisterError(
+                        "SUPERSEDE BY requires an inventoried replacement for legacy "
+                        f"class {transition.class_id}"
+                    )
+                target = self.lineage.classes.get(transition.target)
+                if target is not None and not target.mechanized and not target.members:
+                    raise cc.RegisterError(
+                        "SUPERSEDE BY requires an inventoried unmechanized target"
+                    )
         draft = cc.copy_lineage(self.lineage)
         minted = cc.apply_register(draft, register, round_no=self.round_no)
         self.lineage.classes = draft.classes
