@@ -123,16 +123,16 @@
       "sha256": "5719751ce50cf1c4888549ce223d9d04b4ab49ad5967b9a496c90193cf9974db"
     },
     "src/paranoia_local/engines.py": {
-      "scope": "Updates the future Claude default and minimum CLI; this retained Codex handler exchange is unchanged.",
-      "sha256": "232e2052f618e2c68d53c325878804dcc075489edae8e6fad7a0009240c689e9"
+      "scope": "Updates the active Codex reviewer and attester defaults to GPT-6-Astra; this retained Codex handler exchange remains historical and unchanged.",
+      "sha256": "923f55e6cd94722fedd45e4e8c9d267af28563ab4549b6fc809352ddfaae98ad"
     },
     "src/paranoia_local/prompts.py": {
       "scope": "Issue #98 changes future unmechanized correction/final search instructions; this retained provider exchange and its exact historical prompt remain unchanged. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
       "sha256": "3edc93c5a0d81ec4c7ea0209da8b2a316738803571b70b17bb3fcee3f04f07bb"
     },
     "src/paranoia_local/server.py": {
-      "scope": "Updates the public future-Claude default description; this retained Codex handler exchange is unchanged.",
-      "sha256": "1721d36eb6dc93c9cbb11713152f8d0cb0310bc6da87ff5fcca5e29ee9fa06f9"
+      "scope": "Updates the public Codex default-model description to GPT-6-Astra; this retained Codex handler exchange remains unchanged.",
+      "sha256": "d53a704602b76d3aa920bb23da24da58dcf94cb1a0abe0da84b8deaa644e3924"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Carries future unmechanized member inventories through canonical class records; this retained historical provider exchange and settlement remain unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",

@@ -32,7 +32,7 @@ _COMMON = {
     },
     "model": {
         "type": "string",
-        "description": "Override the reviewer model (default: the engine's strongest — gpt-5.6-sol / claude-fable-5-1).",
+        "description": "Override the reviewer model (default: the engine's strongest — gpt-6-astra / claude-fable-5-1).",
     },
     "effort": {
         "type": "string",

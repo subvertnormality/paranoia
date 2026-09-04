@@ -42,8 +42,12 @@ class TestFactory:
             engines.get_engine("gemini")
 
     def test_default_models(self) -> None:
-        assert "gpt-5.6" in engines.get_engine("codex").default_model
+        assert engines.get_engine("codex").default_model == "gpt-6-astra"
         assert engines.get_engine("claude").default_model == "claude-fable-5-1"
+
+    def test_arbitration_attester_uses_codex_default_generation(self) -> None:
+        assert engines.ATTESTER_ENGINE == "codex"
+        assert engines.ATTESTER_MODEL == "gpt-6-astra"
 
 
 @pytest.mark.parametrize(

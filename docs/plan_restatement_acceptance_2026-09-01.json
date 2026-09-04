@@ -14,8 +14,8 @@
       "sha256": "db649632b67b81fb2141f48bc4d1d584137df2f0b6549f31d10e7c97c381f7c4"
     },
     "src/paranoia_local/engines.py": {
-      "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
-      "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
+      "scope": "Updates the active Codex reviewer and attester defaults to GPT-6-Astra; the retained plan-review provider exchanges remain bound to their historical Sol model identity.",
+      "sha256": "38bade9651b85720f106084b3b61937592aeec6e0c07a3856ea2dfeeaaa5e316"
     },
     "src/paranoia_local/class_closure.py": {
       "scope": "Adds durable authoritative members to future unmechanized classes; retained pre-change provider exchanges remain historical. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses. Issue #108 gives an absent pre-inventory unmechanized row one deterministic indivisible member only on authoritative runtime load; historical replay remains unmigrated.",
@@ -34,8 +34,8 @@
       "sha256": "e4be1b22d60be2754afe18e12be87ce873d440242ebe3ea602aa64002bceae18"
     },
     "src/paranoia_local/server.py": {
-      "scope": "Issue #94 documents the new structured concession-challenge field; retained provider exchanges are unchanged.",
-      "sha256": "e111b5d87058bee98fae5c1ee8d5e2bd4bd47e3a3dc000fe12905552b633a1db"
+      "scope": "Updates the public Codex default-model description to GPT-6-Astra; retained provider exchanges are unchanged.",
+      "sha256": "d75c453eb7a2f678dca75ff6b80b82da4bbe6b8e59c7182cfd29b4581ba7b8c3"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Issue #94 adds exact concession-challenge schema and semantics outside normative-restatement discovery. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",

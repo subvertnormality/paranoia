@@ -36,8 +36,8 @@
       "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"
     },
     "src/paranoia_local/engines.py": {
-      "scope": "Factors existing subprocess-result finalization into a reusable production step; correction-gate settlement and the retained provider exchange are unchanged.",
-      "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
+      "scope": "Updates the active Codex reviewer and attester defaults to GPT-6-Astra; correction-gate settlement and the retained provider exchange remain historical and unchanged.",
+      "sha256": "38bade9651b85720f106084b3b61937592aeec6e0c07a3856ea2dfeeaaa5e316"
     },
     "src/paranoia_local/handlers.py": {
       "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
@@ -56,8 +56,8 @@
       "sha256": "3ff00dd11571df62e7e8a85418b867e00fb082f4152f71162b312467af7ab41d"
     },
     "src/paranoia_local/server.py": {
-      "scope": "Requires exact debt identity for bound rebut; the retained correction-gate exchange is unchanged.",
-      "sha256": "a896bb81d25f03b406500556287482ca9df18af1c7329903429ee8fd911ac114"
+      "scope": "Updates the public Codex default-model description to GPT-6-Astra; the retained correction-gate exchange remains unchanged.",
+      "sha256": "f7e95c60a65a5b21024b9acef6378347e607121bb3f83be04c0d2b454002a51e"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Preserves the complete census source-evidence union and validates fresh aggregate correction evidence; the retained gate response has no fresh existing-class finding, so its lifecycle settlement is unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",

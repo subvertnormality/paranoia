@@ -374,11 +374,11 @@ def _negative(
     attester_prompt = prompts.compose(instructions["ATTEST_INSTRUCTIONS"], attester_body)
     if not shared._attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
-        rejection=ah._caller_advocacy_rejection(diagnostic),
-        execution=shared._external_execution(
-            engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL,
-        ),
-    ):
+            rejection=ah._caller_advocacy_rejection(diagnostic),
+            execution=shared._external_execution(
+                engines.ATTESTER_ENGINE, shared._HISTORICAL_ATTESTER_MODEL,
+            ),
+        ):
         raise ValueError("negative acceptance attester attempt does not replay")
     reason_bridge = (
         "stakes is not the cleaner's to rewrite"
