@@ -411,10 +411,12 @@ of the resulting code and tests.
   Store a closed list of stable member IDs on every unmechanized class. A satisfied census
   assessment, correction outcome, or final outcome must provide exactly one separately evidenced
   row for every server-supplied member ID. Validate exact set equality before deduplicating shared
-  anchors into the flat durable assessment evidence. A legacy class without authoritative members
-  remains loadable but forces broad census from every staged phase, including same-snapshot clear
-  and claim-only migration, and stays unclosable until replaced with an inventoried definition;
-  do not infer members from prose. Retained text registration requires the same closed inventory.
+  anchors into the flat durable assessment evidence. At authoritative runtime load, project a
+  pre-inventory unmechanized class whose stored row lacks `members` to one deterministic
+  `legacy-class-<sha256(class-id)>` compatibility member representing its whole historical
+  invariant as one indivisible obligation; do not claim to reconstruct an unknown internal set.
+  Direct historical artifact reconstruction retains the original memberless state. Retained text
+  registration still requires a closed explicit inventory for every new or replacement class.
   Preserve standalone lifecycle actions, but require an authored evidence-bearing satisfied
   outcome whenever correction closes an otherwise outcome-optional unmechanized class; a bare
   close action never proves the invariant-wide search completed.

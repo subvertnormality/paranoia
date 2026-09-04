@@ -72,6 +72,14 @@ ISSUE_106_DEFINITION_INSTRUCTIONS = (
     "the complete closed set of stable member IDs governed by its invariant."
 )
 
+ISSUE_108_LEGACY_MEMBER_INSTRUCTIONS = (
+    "For a satisfied unmechanized class, omit flat evidence and\n"
+    "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
+    "evidence. A server-supplied `legacy-class-<sha256>` member represents one pre-inventory class as\n"
+    "one indivisible historical obligation; assess that whole invariant normally rather than inventing\n"
+    "an internal member set that was never recorded."
+)
+
 
 def _sha_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
@@ -85,6 +93,7 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS + "\n\n", "")
+    prompt = prompt.replace(ISSUE_108_LEGACY_MEMBER_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(ISSUE_106_DEFINITION_INSTRUCTIONS, "")
     prompt = prompt.replace(ISSUE_98_EVIDENCED_CLOSE_INSTRUCTIONS + "\n\n", "")
     owns_class_guidance = (
@@ -128,6 +137,10 @@ def _historical_no_concession_prompt(prompt: str) -> str:
             row.pop("members", None)
         task["artifact"] = task["artifact"].replace(
             "\n  authoritative members: MISSING — replace before satisfaction", "",
+        )
+        task["artifact"] = re.sub(
+            r"\n  authoritative members: legacy-class-[0-9a-f]{64}",
+            "", task["artifact"],
         )
         prompt = head + found + json.dumps(task, ensure_ascii=False)
     return prompt
@@ -407,6 +420,12 @@ def validate_artifact(
         original_resume = engines.CodexEngine.resume
         original_decode = sp.decode_decision_with_issues
         original_render_unmechanized = cc.render_unmechanized
+        original_from_json = cc._from_json
+
+        def historical_from_json(lineage_id, raw, **kwargs):
+            return original_from_json(
+                lineage_id, raw, migrate_legacy_members=False,
+            )
 
         def historical_render_unmechanized(lineage):
             rendered = original_render_unmechanized(lineage)
@@ -448,23 +467,28 @@ def validate_artifact(
         engines.CodexEngine.resume = replay_resume
         sp.decode_decision_with_issues = replay_decode
         cc.render_unmechanized = historical_render_unmechanized
+        cc._from_json = historical_from_json
         try:
             replay_result = handlers.critique_branch(
                 _arguments(repo), engine=engines.CodexEngine(), log_dir=temp / "logs",
                 now=lambda:"REPLAY",
-            )
-            durable = cc.load_lineage(
-                state_root, artifact["lineage_id"], stamp="REPLAYED", mode=cc.BRANCH_MODE,
             )
         finally:
             engines.CodexEngine.run = original_run
             engines.CodexEngine.resume = original_resume
             sp.decode_decision_with_issues = original_decode
             cc.render_unmechanized = original_render_unmechanized
+            cc._from_json = original_from_json
             if prior_root is None:
                 os.environ.pop(cc.STATE_ROOT_ENV, None)
             else:
                 os.environ[cc.STATE_ROOT_ENV] = prior_root
+        durable = cc.load_lineage(
+            state_root, artifact["lineage_id"], stamp="REPLAYED", mode=cc.BRANCH_MODE,
+        )
+        migrated = durable.classes[CLASS_ID].members
+        if migrated != (cc._legacy_member_id(CLASS_ID),):
+            raise ValueError("authoritative post-replay load did not migrate legacy members")
         if [
             _historical_no_concession_prompt(prompt) for prompt in replay_prompts
         ] != [row["prompt_text"] for row in calls]:

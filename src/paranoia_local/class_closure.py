@@ -448,7 +448,7 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
         return Lineage(lineage_id, mode=mode)
     try:
         raw = json.loads(state_path.read_text(encoding="utf-8"))
-        lineage = _from_json(lineage_id, raw)
+        lineage = _from_json(lineage_id, raw, migrate_legacy_members=True)
     except Exception as exc:  # noqa: BLE001 — any unreadable state blocks, none is repaired silently
         dest = lineage_dir(root) / f"{lineage_id}.corrupt-{stamp}.json"
         try:
@@ -468,7 +468,9 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
     return lineage
 
 
-def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
+def _from_json(
+    lineage_id: str, raw: dict[str, Any], *, migrate_legacy_members: bool = False,
+) -> Lineage:
     return Lineage(
         lineage_id=lineage_id,
         # Absent means branch: every lineage that existed before plan mode was one, so
@@ -482,7 +484,9 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
                 first_round=int(c["first_round"]), status=c["status"],
                 pattern=c.get("pattern"), pathspec=c.get("pathspec"),
                 procedure=c.get("procedure"), superseded_by=c.get("superseded_by"),
-                members=_persisted_class_members(c),
+                members=_persisted_class_members(
+                    c, migrate_legacy_members=migrate_legacy_members,
+                ),
                 detail=c.get("detail"), matches=tuple(c.get("matches", ())),
             )
             for c in raw.get("classes", [])
@@ -496,9 +500,21 @@ def _from_json(lineage_id: str, raw: dict[str, Any]) -> Lineage:
     )
 
 
-def _persisted_class_members(row: dict[str, Any]) -> tuple[str, ...]:
-    """Validate the new closed field while admitting pre-inventory lineages."""
+def _legacy_member_id(class_id: str) -> str:
+    """Represent one pre-inventory class as one indivisible compatibility member."""
+    encoded = class_id.encode("utf-8", errors="surrogatepass")
+    return f"legacy-class-{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _persisted_class_members(
+    row: dict[str, Any], *, migrate_legacy_members: bool = False,
+) -> tuple[str, ...]:
+    """Validate current inventory or project an absent legacy field at runtime load."""
     if "members" not in row:
+        if migrate_legacy_members and row.get("pattern") is None:
+            members = (_legacy_member_id(row["class_id"]),)
+            validate_member_inventory(members)
+            return members
         return ()
     value = row["members"]
     if (

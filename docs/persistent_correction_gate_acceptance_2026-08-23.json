@@ -8,24 +8,24 @@
   "legacy_unowned_final": true,
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "c0e8eb2718c7b51037b2696cf42cf257e5e41cf9d1b68ed1f07699914e686c58"
+      "scope": "Documents class-occurrence, rebut settlement, arbitration failure taxonomy, the plan-only normative-restatement audit, and its complete-package authoritative public-handler replay boundary while leaving the retained correction-gate run, control state, and source binding unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable lifecycle coverage belongs to test allowances. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
+      "sha256": "e4cb4ce801675b0a88a1ca02898a3bfc31e28770d8e7e658f1ad0ec2b5cc5053"
     },
     "CLAUDE.md": {
       "scope": "Issue #95 mirrors the canonical engine-owned final-regression instruction; it does not change the retained correction-gate provider exchange or control counters.",
       "sha256": "6c3bdb29cc65f351cf9c6eb40a9a429f3802d85d34bde37d1adaa34c316d76b7"
     },
     "src/paranoia_local/class_closure.py": {
-      "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "cd195fe7eec05c459936aec67e3198a45a72580061a09f7cec5c05653474f874"
+      "scope": "Adds durable member inventories only to unmechanized class definitions and legacy loading; it does not alter the retained correction-gate provider exchange or control counters. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
+      "sha256": "84c890786e8bb1ebeea6f2a1338fbef5e1de59d6afd45a828537dc839a1606e8"
     },
     "docs/how-it-works.md": {
       "scope": "Documents debt-targeted rebut settlement and arbitration-only failure taxonomy without changing the retained correction-gate provider exchange.",
       "sha256": "a21a7292e89d463481b53da67bf80b0ec30faea487e826f7813fb04590463ed1"
     },
     "scripts/run_persistent_correction_gate_acceptance.py": {
-      "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record.",
-      "sha256": "7eab4842b7868c6119d70b11516b7f8c9758503c0d56012f2c315dc2acdd2f98"
+      "scope": "Adds this closed exact later-source allowance validation; it does not rewrite or rerun the historical provider record. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
+      "sha256": "435e89443b1c53ce1250ab530d163c0fff3bbb20a15ef9dd0221926cf0d00e37"
     },
     "src/paranoia_local/arbitrate_handler.py": {
       "scope": "Arbitration-only caller-framing failure taxonomy; plan correction-gate lifecycle and retained provider exchange are unchanged.",
@@ -40,16 +40,16 @@
       "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "4371e7e7659e2dfd1a3c9c98a4317743959907db8844c528dbc222f30de9d436"
+      "scope": "Adds claim-history failure rendering and telemetry outside the correction-gate transition exercised by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through settlement so a foreign clean final cannot discharge the retained gate; correction-gate counters and provider exchange remain unchanged. Issue #94 validates raw lineage state before class sweep or projection and affects only malformed-state handling, not this valid correction-gate exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
+      "sha256": "0cdbfde093acd09405bcfb070aead706ac493474da811906f96b65e599f8e694"
     },
     "src/paranoia_local/plan_claims.py": {
       "scope": "Preserves terminal claim-audit history with exact-plan authority; it does not alter correction-gate counters or class lifecycle settlement.",
       "sha256": "e18452b6891a5b1a9027977f544893809f43110d13b1de3b0665e131c796573d"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "1016a4896493b0dfe017ddfe1847d0b3f448c1239f408213729436948aa81697"
+      "scope": "Adds shared co-asserting-site guidance, plan-only broad normative-restatement discovery, and issue #98's future invariant-scoped unmechanized correction/final sweep; the retained provider prompt remains historical. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
+      "sha256": "878872b32580ee6f58de3558d8677072e35096d98b01442553de1c74ca702d2b"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Initializes missing active correction-control rows while preserving existing counters and rejecting stale inactive rows. Issue #95 adds the closed engine owner of a pending final, conservative legacy migration, and owner-gated discharge without changing correction counters. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
@@ -64,16 +64,16 @@
       "sha256": "d09146b13f00391a7e4763df397ac5c8c0c855f851a9144ad59e9f7b34d2406e"
     },
     "tests/test_plan_claims.py": {
-      "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange. Issue #106 adds deterministic public-handler coverage proving both legacy same-snapshot clear and claim-only states re-enter census and remain durably blocked on provider failure; the retained provider result remains historical and unchanged.",
-      "sha256": "b327c5daa5a27c65e3f1d8220d73c2f1b585b02b2c944042c39824479b78bbdd"
+      "scope": "Adds claim-history and current acceptance regressions outside the historical correction-gate provider exchange. Issue #108 replaces the former forced-census/provider-failure behavior with deterministic singleton migration and covers same-snapshot clear, claim-only, and public census/correction/final satisfaction; the retained correction-gate provider result remains historical and unchanged.",
+      "sha256": "39baf6cb62f865284913e2fb95c6ebdffef5c747a359c6c416f3e8e51b2d473b"
     },
     "tests/test_plan_class_closure.py": {
-      "scope": "Updates current text-register fixtures with stable member inventories and proves legacy uninventoried CLOSED, blocking-to-advisory RECLASSIFY, and SUPERSEDE-BY-advisory attempts reject atomically; retained historical provider exchanges remain unchanged.",
-      "sha256": "7e0f793a4192a44a586cac7fbf4b058db311fb71599c0b7e70559b79ba7086c7"
+      "scope": "Updates current text-register fixtures with stable member inventories. Issue #108 reverses the former legacy transition refusals: authoritative absent-key runtime loads receive a deterministic singleton and may close, reclassify, or supersede through ordinary validated transitions; retained historical provider exchanges remain unchanged.",
+      "sha256": "1d4692f115870a94758cb3d321c42507936cd6efdb7f744fe21052efa13eaa53"
     },
     "tests/test_handlers.py": {
-      "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, proves every server-authored plan citation example resolves at bounds 1, 3, and 5,260, and adds public empty-plan preflight coverage. Issue #106 proves bound CONCEDE refuses legacy uninventoried closure without mutating durable state; historical provider results remain unchanged.",
-      "sha256": "5e9a6489eb7fcaccb2603b9b1619650d62b3285481f4ef435090409bb9f03239"
+      "scope": "Replaces reset-only rebut tests with exact settlement and HOLD non-mutation coverage. Issue #91 additionally adds bounded plan-anchor retry-context examples including zero and short bounds, proves every server-authored plan citation example resolves at bounds 1, 3, and 5,260, and adds public empty-plan preflight coverage. Issue #108 replaces the former bound-CONCEDE refusal with an authoritative-load singleton and verifies evidenced concession closes and persists it; historical provider results remain unchanged.",
+      "sha256": "0f994702832474f03a65b61e6912b66c5800f42f2f22accbeeea1dcfdd29d6bf"
     },
     "tests/test_review_census.py": {
       "scope": "Adds claim-history structural-preflight regressions, missing-active versus stale-inactive correction-control validation, public aggregate-occurrence batching and retry coverage, plan-phase active-class projection, debt-targeted rebut settlement, and plan-restatement prompt coverage while retaining the historical correction-gate assertions. Issue #91 additionally adds a helper-level staged-call anchor-retry regression, a 5,260-line public plan consolidation recovery with retry/rejected-payload telemetry, audit, settlement, and durable evidence, and extends the public plan correction/final lifecycle with the same exact malformed-anchor diagnostic and repaired durable closure. Issue #95 adds isolated owner, foreign-review, discovery, and legacy-migration lifecycle regressions. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",

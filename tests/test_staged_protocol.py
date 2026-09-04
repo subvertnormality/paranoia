@@ -1038,6 +1038,33 @@ def test_set_valued_unmechanized_satisfaction_requires_member_level_coverage():
     ]
 
 
+def test_issue_108_legacy_singleton_is_ordinary_satisfaction_coverage():
+    member = cc._legacy_member_id("6e2d77fa")
+    active = [active_class() | {"members":[member]}]
+    value = wire_value(decision(
+        "final", coverage=coverage(),
+        class_outcomes=[{
+            "class_id":"class-a", "verdict":"satisfied",
+            "evidence":["plan:1"],
+        }],
+    ))
+    value["class_actions"] = {"class-a":None}
+    value["class_outcomes"]["class-a"]["member_coverage"] = [{
+        "member_id":member,
+        "evidence":[{
+            "anchor":"plan:1",
+            "rationale":"the whole historical invariant was assessed",
+        }],
+    }]
+
+    decoded = sp.decode_decision(
+        json.dumps(value), mode=cc.PLAN_MODE, role="final",
+        active_classes=active,
+    )
+
+    assert decoded["class_outcomes"][0]["evidence"] == ["plan:1"]
+
+
 def test_satisfaction_coverage_rejects_duplicate_member_ids():
     active = [active_class()]
     value = wire_value(decision(

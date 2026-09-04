@@ -231,7 +231,7 @@ class TestAdvisoryClassesNeverBlock:
                         round_no=2)
         assert "CONVERGENCE: NOT-BLOCKED" in out
 
-    def test_a_legacy_uninventoried_class_cannot_be_reclassified_nonblocking(
+    def test_a_legacy_member_migration_can_be_reclassified_nonblocking(
         self, tmp_path: Path
     ) -> None:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
@@ -242,18 +242,17 @@ class TestAdvisoryClassesNeverBlock:
         lineage.classes[cid] = replace(lineage.classes[cid], members=())
         cc.save_lineage(cc.default_state_root(), lineage)
 
-        attempted = review_with(f"RECLASSIFY: {cid} MINOR")
-        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        out = run_round(FakeEngine(review_with(f"RECLASSIFY: {cid} MINOR")), tmp_path,
+                        round_no=2)
         durable = cc.load_lineage(
             cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
         )
 
-        assert "cannot make legacy class" in out
-        assert "CONVERGENCE: BLOCKED" in out
-        assert durable.classes[cid].severity == cc.FATAL
-        assert durable.classes[cid].members == ()
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+        assert durable.classes[cid].severity == cc.MINOR
+        assert durable.classes[cid].members == (cc._legacy_member_id(cid),)
 
-    def test_a_legacy_uninventoried_class_cannot_be_closed(
+    def test_a_legacy_member_migration_can_be_closed(
         self, tmp_path: Path
     ) -> None:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
@@ -264,17 +263,16 @@ class TestAdvisoryClassesNeverBlock:
         lineage.classes[cid] = replace(lineage.classes[cid], members=())
         cc.save_lineage(cc.default_state_root(), lineage)
 
-        attempted = review_with(f"CLOSED: {cid}")
-        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        out = run_round(FakeEngine(review_with(f"CLOSED: {cid}")), tmp_path, round_no=2)
         durable = cc.load_lineage(
             cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
         )
 
-        assert "CLOSED requires an inventoried replacement" in out
-        assert "CONVERGENCE: BLOCKED" in out
-        assert durable.classes[cid].status == cc.OPEN
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+        assert durable.classes[cid].status == cc.CLOSED
+        assert durable.classes[cid].members == (cc._legacy_member_id(cid),)
 
-    def test_a_legacy_uninventoried_blocker_cannot_supersede_to_advisory_target(
+    def test_a_legacy_member_migration_can_supersede_to_advisory_target(
         self, tmp_path: Path
     ) -> None:
         run_round(FakeEngine(review_with(PROCEDURE_CLASS)), tmp_path, round_no=1)
@@ -293,15 +291,19 @@ class TestAdvisoryClassesNeverBlock:
         )[0]
         cc.save_lineage(cc.default_state_root(), lineage)
 
-        attempted = review_with(f"SUPERSEDE: {source_id}\nBY: {target_id}")
-        out = run_round(FakeEngine(attempted, attempted), tmp_path, round_no=2)
+        out = run_round(
+            FakeEngine(review_with(f"SUPERSEDE: {source_id}\nBY: {target_id}")),
+            tmp_path, round_no=2,
+        )
         durable = cc.load_lineage(
             cc.default_state_root(), "proj-1-plan", stamp="T0003", mode=cc.PLAN_MODE,
         )
 
-        assert "requires an inventoried replacement for legacy class" in out
-        assert "CONVERGENCE: BLOCKED" in out
-        assert durable.classes[source_id].status == cc.OPEN
+        assert "CONVERGENCE: NOT-BLOCKED" in out
+        assert durable.classes[source_id].status == cc.SUPERSEDED
+        assert durable.classes[source_id].members == (
+            cc._legacy_member_id(source_id),
+        )
         assert durable.classes[target_id].severity == cc.MINOR
 
 

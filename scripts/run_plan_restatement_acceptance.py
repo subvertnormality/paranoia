@@ -225,6 +225,14 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     prompt = prompt.replace(
         "For a satisfied unmechanized class, omit flat evidence and\n"
         "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
+        "evidence. A server-supplied `legacy-class-<sha256>` member represents one pre-inventory class as\n"
+        "one indivisible historical obligation; assess that whole invariant normally rather than inventing\n"
+        "an internal member set that was never recorded.\n\n",
+        "",
+    )
+    prompt = prompt.replace(
+        "For a satisfied unmechanized class, omit flat evidence and\n"
+        "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
         "evidence. A legacy class with no members cannot be satisfied; report it violated for replacement\n"
         "with an inventoried definition.\n\n",
         "",
@@ -296,6 +304,10 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         if isinstance(artifact, str):
             task["artifact"] = artifact.replace(
                 "\n  authoritative members: MISSING — replace before satisfaction", "",
+            )
+            task["artifact"] = re.sub(
+                r"\n  authoritative members: legacy-class-[0-9a-f]{64}",
+                "", task["artifact"],
             )
         compact = task_text.startswith('{"role":"census"')
         task_text = json.dumps(
@@ -538,7 +550,9 @@ def _reconstruct_prompts(row: dict, roles: list[str]) -> list[str]:
 
     role = roles[0]
     if role == "final":
-        lineage = cc._from_json(FINAL_LINEAGE, row["initial_lineage"])
+        lineage = cc._from_json(
+            FINAL_LINEAGE, row["initial_lineage"], migrate_legacy_members=False,
+        )
         debt = [item for item in lineage.review_state["debt"] if item["status"] == "open"]
     else:
         classes, debt = _targeted_components()
@@ -709,7 +723,9 @@ def _reconstruct_retained_successor(
     with tempfile.TemporaryDirectory(prefix="plan-restatement-successor-") as raw_root:
         state_root = Path(raw_root) / "state"
         log_dir = Path(raw_root) / "logs"
-        cc.save_lineage(state_root, cc._from_json(row["lineage"], initial))
+        cc.save_lineage(state_root, cc._from_json(
+            row["lineage"], initial, migrate_legacy_members=False,
+        ))
         os.environ[cc.STATE_ROOT_ENV] = str(state_root)
         source_tree = _git("rev-parse", f"{revision}^{{tree}}")
         orientation.resolve_head = lambda repo: revision
@@ -1086,6 +1102,7 @@ def main() -> int:
         targeted_initial = cc._from_json(
             TARGETED_LINEAGE,
             json.loads((run_root / "targeted-initial.json").read_text(encoding="utf-8")),
+            migrate_legacy_members=False,
         )
         targeted[3] = _reconstruct_retained_successor(
             initial=cc._to_json(targeted_initial),

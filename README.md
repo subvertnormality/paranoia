@@ -318,10 +318,12 @@ to use their server-run violation predicates.
 Every unmechanized class stores a closed list of stable member IDs. A satisfied census assessment,
 correction outcome, or final outcome must provide exactly one separately evidenced row for every
 server-supplied member ID; the server checks exact set equality before deriving and deduplicating
-the existing flat durable evidence list. Different members may share an anchor. Legacy classes
-without an inventory remain loadable, but every staged phase—including same-snapshot clear and
-claim-only migration—re-enters broad census until an inventoried replacement is settled. The
-retained text register also requires `MEMBERS` for new and replacement unmechanized classes.
+the existing flat durable evidence list. Different members may share an anchor. On ordinary runtime
+load, a pre-inventory unmechanized class with no stored `members` field receives one deterministic
+`legacy-class-<sha256(class-id)>` compatibility member. That singleton preserves the historical
+whole-class evidence granularity; it does not pretend to recover an internal member set that was
+never stored. Historical artifact replay remains unmigrated. The retained text register still
+requires `MEMBERS` for new and replacement unmechanized classes.
 An otherwise standalone correction `close` must carry an authored `satisfied` class outcome and
 evidence; the server rejects a bare close through the existing bounded validation retry.
 A fresh aggregate finding closes the class's narrower prior open debt after incorporating every

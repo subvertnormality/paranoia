@@ -20,6 +20,7 @@ from paranoia_local import (
     plan_claims as pc,
     prompts,
     review_census as rc,
+    staged_protocol as sp,
 )
 from paranoia_local.engines import Review
 
@@ -3399,7 +3400,7 @@ def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
 
 
 @pytest.mark.parametrize("starting_phase", ["clear", "correction"])
-def test_same_snapshot_clear_and_claim_only_cannot_bypass_legacy_member_replacement(
+def test_same_snapshot_legacy_member_migrates_without_missing_inventory_debt(
     repo: Path, tmp_path: Path, monkeypatch, starting_phase: str,
 ) -> None:
     lineage_id = f"legacy-memberless-{starting_phase}-phase"
@@ -3459,13 +3460,217 @@ def test_same_snapshot_clear_and_claim_only_cannot_bypass_legacy_member_replacem
         cc.default_state_root(), lineage_id, stamp="T6", mode=cc.PLAN_MODE,
     )
 
-    assert calls, "legacy memberless authority must enter broad census"
-    # Provider failure preserves rejection atomicity; the next attempt detects the
-    # same legacy authority and re-enters census again rather than persisting a guess.
-    assert durable.review_state["phase"] == starting_phase
-    assert durable.classes["legacy-a"].members == ()
-    assert "STRUCTURAL STATE MIGRATED" not in result
-    assert "CONVERGENCE: BLOCKED" in result
+    assert durable.review_state["phase"] == "clear"
+    member = cc._legacy_member_id("legacy-a")
+    assert durable.classes["legacy-a"].members == (member,)
+    assert "authoritative member inventory is missing" not in result
+    assert all("authoritative members: MISSING" not in prompt for prompt in calls)
+    assert all(member in prompt for prompt in calls)
+    if starting_phase == "correction":
+        assert calls == []
+
+
+def test_issue_108_public_correction_closes_a_migrated_legacy_member(
+    repo: Path, tmp_path: Path, monkeypatch,
+) -> None:
+    lineage_id = "issue-108-public-correction"
+    class_id = "6e2d77fa"
+    stakes = "trusted local plan; incorrect structural clearance is high impact"
+    parent = handlers.orientation.resolve_head(repo)
+    snapshot = handlers.orientation.wrap_commit(
+        repo, handlers.orientation.snapshot_tree(repo, parent), parent,
+    )
+    state = rc.normalize_state(None, stakes=stakes, snapshot=rc.digest(f"one line\0{snapshot}"))
+    state.update(phase="correction", last_round=1, debt=[{
+        "id":"D1", "finding_id":"legacy-finding", "status":"open",
+        "severity":cc.MAJOR, "summary":"the historical invariant remains open",
+        "evidence":["plan:1"], "remedy":"assess the whole historical invariant",
+        "source_ids":[], "class_ids":[class_id], "first_round":1, "last_round":1,
+    }])
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={class_id:cc.TrackedClass(
+            class_id, "the historical review contract is coherent", cc.MAJOR, 1,
+            cc.OPEN, procedure="inspect the whole historical invariant",
+        )},
+        review_state=state,
+    ))
+    member = (
+        "legacy-class-"
+        + hashlib.sha256(class_id.encode("utf-8", errors="surrogatepass")).hexdigest()
+    )
+    response = json.dumps({
+        "role":"correction",
+        "governing_findings":[],
+        "debt_outcomes":[
+            {
+                "debt_id":"D1",
+                "status":"closed",
+                "evidence":[{
+                    "anchor":"plan:1", "rationale":"the obligation is satisfied",
+                }],
+            },
+        ],
+        "concession_challenges":{},
+        "class_outcomes":{
+            class_id:{
+                "verdict":"satisfied",
+                "member_coverage":[{
+                    "member_id":member,
+                    "evidence":[{
+                        "anchor":"plan:1",
+                        "rationale":"the whole historical invariant is satisfied",
+                    }],
+                }],
+            },
+        },
+        "class_actions":{class_id:None},
+    })
+    calls: list[str] = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        return Review(text=response, session_ref="issue-108", raw=response)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "resume",
+        lambda self, session_ref, prompt, *args, **kwargs: run(
+            self, prompt, *args, **kwargs,
+        ),
+    )
+    monkeypatch.setattr(handlers.orientation, "snapshot_tree", lambda *args: "tree")
+    monkeypatch.setattr(handlers.orientation, "wrap_commit", lambda *args: snapshot)
+
+    result = handlers.critique_plan(
+        {
+            "plan_text":"one line", "repo_path":str(repo), "lineage":lineage_id,
+            "round":2, "stakes":stakes, "claim_verification":False,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda:"T2",
+    )
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="reload", mode=cc.PLAN_MODE,
+    )
+
+    assert len(calls) == 1
+    assert member in calls[0]
+    assert durable.classes[class_id].members == (member,)
+    assert durable.classes[class_id].status == cc.CLOSED
+    assert durable.review_state["debt"][0]["status"] == "closed"
+    assert durable.review_state["phase"] == "final"
+    assert "STRUCTURAL-PHASE: final" in result
+
+
+@pytest.mark.parametrize("starting_phase", ["census", "final"])
+def test_issue_108_public_census_and_final_satisfy_a_migrated_legacy_member(
+    repo: Path, tmp_path: Path, monkeypatch, starting_phase: str,
+) -> None:
+    lineage_id = f"issue-108-public-{starting_phase}"
+    class_id = "e0014f84"
+    stakes = "trusted local plan; incorrect structural clearance is high impact"
+    plan_text = "one line"
+    parent = handlers.orientation.resolve_head(repo)
+    snapshot = handlers.orientation.wrap_commit(
+        repo, handlers.orientation.snapshot_tree(repo, parent), parent,
+    )
+    state = rc.normalize_state(
+        None, stakes=stakes, snapshot=rc.digest(f"{plan_text}\0{snapshot}"),
+    )
+    state.update(phase=starting_phase, last_round=1, debt=[])
+    if starting_phase == "final":
+        state["final_engine"] = "codex"
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1,
+        classes={class_id:cc.TrackedClass(
+            class_id, "the historical review contract is coherent", cc.MAJOR, 1,
+            cc.OPEN if starting_phase == "census" else cc.CLOSED,
+            procedure="inspect the whole historical invariant",
+        )},
+        review_state=state,
+    ))
+    member = (
+        "legacy-class-"
+        + hashlib.sha256(class_id.encode("utf-8", errors="surrogatepass")).hexdigest()
+    )
+    citation = [{
+        "anchor":"plan:1", "rationale":"the whole historical invariant is satisfied",
+    }]
+    coverage = [{
+        "id":item, "status":"covered", "summary":"checked",
+        "evidence":citation, "finding_ids":[],
+    } for item in sp.CHECKLIST]
+    calls: list[str] = []
+
+    def run(self, prompt, *args, **kwargs):
+        calls.append(prompt)
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane_name = next(
+                row.split()[-1] for row in prompt.splitlines()
+                if row.startswith("ROLE: census lane")
+            )
+            assessments = []
+            if lane_name == "integrity":
+                assessments = [{
+                    "class_id":class_id, "verdict":"satisfied",
+                    "finding_id":None,
+                    "member_coverage":[{
+                        "member_id":member, "evidence":citation,
+                    }],
+                }]
+            response = {
+                "lane":lane_name, "coverage":coverage,
+                "findings":[], "class_assessments":assessments,
+            }
+        elif prompts.STAGED_CONSOLIDATION_INSTRUCTIONS.splitlines()[0] in prompt:
+            response = {
+                "role":"census", "governing_findings":[], "debt_outcomes":[],
+                "concession_challenges":{}, "class_actions":{class_id:None},
+            }
+        else:
+            assert '"role": "final"' in prompt
+            response = {
+                "role":"final", "governing_findings":[], "debt_outcomes":[],
+                "concession_challenges":{},
+                "class_outcomes":{
+                    class_id:{
+                        "verdict":"satisfied",
+                        "member_coverage":[{
+                            "member_id":member, "evidence":citation,
+                        }],
+                    },
+                },
+                "class_actions":{class_id:None}, "coverage":coverage,
+            }
+        text = json.dumps(response)
+        return Review(text=text, session_ref="issue-108", raw=text)
+
+    monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
+    monkeypatch.setattr(
+        handlers.eng.CodexEngine, "resume",
+        lambda self, session_ref, prompt, *args, **kwargs: run(
+            self, prompt, *args, **kwargs,
+        ),
+    )
+    monkeypatch.setattr(handlers.orientation, "snapshot_tree", lambda *args: "tree")
+    monkeypatch.setattr(handlers.orientation, "wrap_commit", lambda *args: snapshot)
+
+    result = handlers.critique_plan(
+        {
+            "plan_text":plan_text, "repo_path":str(repo), "lineage":lineage_id,
+            "round":2, "stakes":stakes, "claim_verification":False,
+        },
+        engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda:"T2",
+    )
+    durable = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="reload", mode=cc.PLAN_MODE,
+    )
+
+    assert calls and all(member in prompt for prompt in calls)
+    assert durable.classes[class_id].members == (member,)
+    assert durable.classes[class_id].status == cc.CLOSED
+    assert durable.review_state["phase"] == "clear"
+    assert f"STRUCTURAL-PHASE: {durable.review_state['phase']}" in result
 
 
 def test_ambiguous_intermediate_claim_save_retains_lineage_latch(
