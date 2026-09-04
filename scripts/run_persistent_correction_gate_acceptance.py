@@ -211,7 +211,9 @@ def _fixture_lineage(
 
 def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> dict:
     """Recompute the complete accepted plan transition from retained canonical rows."""
-    lineage = cc._from_json(LINEAGE, deepcopy(before))
+    lineage = cc._from_json(
+        LINEAGE, deepcopy(before), migrate_legacy_members=False,
+    )
     state = deepcopy(lineage.review_state)
     prior_control = rc.normalize_correction_control(state, lineage.active())
     register = rc.register_from_records(settlement["class_records"], mechanized=False)
@@ -269,7 +271,9 @@ def _replay_successful_lineage(before: dict, settlement: dict, audit: dict) -> d
 
 
 def _successful_trailer(before: dict, after: dict, settlement: dict, audit: dict) -> str:
-    lineage = cc._from_json(LINEAGE, deepcopy(after))
+    lineage = cc._from_json(
+        LINEAGE, deepcopy(after), migrate_legacy_members=False,
+    )
     prior_ids = {row["class_id"] for row in before["classes"]}
     minted = [row.class_id for row in lineage.classes.values() if row.class_id not in prior_ids]
     minted_by_record = rc.minted_record_ids(settlement["class_records"], minted)
@@ -319,7 +323,9 @@ def _replay_terminal_lineage(before: dict, audit: dict) -> tuple[dict, str]:
     session = rc.validated_session_ref(terminal.get("session_ref"))
     if session is not None:
         state["correction_control"]["classes"][CLASS_ID]["last_session_ref"] = session
-    lineage = cc._from_json(LINEAGE, deepcopy(expected))
+    lineage = cc._from_json(
+        LINEAGE, deepcopy(expected), migrate_legacy_members=False,
+    )
     status = f"staged rejected (validation): {rc.trailer_diagnostic(message)}"
     trailer = "\n".join((
         cc.render_trailer(lineage, register_status=status, include_verdict=False),

@@ -469,8 +469,9 @@ class exactly once. A violation cites one of its lane findings; satisfaction has
 
 STAGED_MEMBER_CENSUS_INSTRUCTIONS = """For a satisfied unmechanized class, omit flat evidence and
 emit member_coverage containing every server-supplied stable member ID exactly once with its own
-evidence. A legacy class with no members cannot be satisfied; report it violated for replacement
-with an inventoried definition."""
+evidence. A server-supplied `legacy-class-<sha256>` member represents one pre-inventory class as
+one indivisible historical obligation; assess that whole invariant normally rather than inventing
+an internal member set that was never recorded."""
 
 
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new

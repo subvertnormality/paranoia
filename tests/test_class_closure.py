@@ -6,6 +6,7 @@ re-opens one of them fails with the history attached.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from dataclasses import replace
@@ -613,6 +614,99 @@ class TestLineageState:
         again = cc.load_lineage(tmp_path, "test", stamp="members")
         assert again.active()[0].members == ("primary-obligation",)
 
+    def assert_issue_108_reported_lineage_topology_migrates_deterministically(
+        self, tmp_path: Path,
+    ) -> None:
+        fixture_path = (
+            Path(__file__).parent / "fixtures" / "legacy_memberless_lineage_108.json"
+        )
+        fixture_bytes = fixture_path.read_bytes()
+        assert hashlib.sha256(fixture_bytes).hexdigest() == (
+            "1701e775a02c663d12d30e781a9d9b64f9959f97e5f01477c86227870e25c7bf"
+        )
+        fixture = json.loads(fixture_bytes)
+        rows = fixture["classes"]
+        expected_ids = [
+            "3419b562", "6e2d77fa", "e0014f84", "382c97c1", "df5e23bb",
+            "d3019684", "ea2281d8", "36c2404a", "be170bcd", "9af50cf5",
+            "ed61287d", "e1b85ba4", "c04b1462", "61f23c9a", "c8ad5e2b",
+            "4b591ba0", "b0ccd46a", "4ccf2343",
+        ]
+        assert fixture == {
+            "schema_version":1,
+            "source_issue":"subvertnormality/paranoia#108",
+            "source_lineage":"parallax~3~CENSUS-EVIDENCE-ACQUISITION",
+            "source_round":44,
+            "source_log":"20260904T155824-critique_branch-f21d6e07.json",
+            "classes":rows,
+        }
+        assert [row["class_id"] for row in rows] == expected_ids
+        assert len(rows) == 18
+        assert sum(row["status"] == cc.OPEN for row in rows) == 16
+        assert sum(row["status"] == cc.SUPERSEDED for row in rows) == 2
+        assert not any(row["mechanized"] or row["members_present"] for row in rows)
+
+        raw = {
+            "mode":cc.BRANCH_MODE,
+            "classes":[{
+                "class_id":row["class_id"],
+                "invariant":f"sanitized invariant {row['class_id']}",
+                "severity":cc.MAJOR,
+                "first_round":1,
+                "status":row["status"],
+                "procedure":"inspect the whole historical invariant",
+            } for row in rows],
+        }
+        historical = cc._from_json("issue-108", raw)
+        assert all(not item.members for item in historical.classes.values())
+
+        folder = cc.lineage_dir(tmp_path)
+        folder.mkdir(parents=True)
+        (folder / "issue-108.json").write_text(
+            json.dumps(raw), encoding="utf-8",
+        )
+        migrated = cc.load_lineage(tmp_path, "issue-108", stamp="load")
+        expected_members = {
+            class_id:(
+                "legacy-class-"
+                + hashlib.sha256(
+                    class_id.encode("utf-8", errors="surrogatepass"),
+                ).hexdigest()
+            ,)
+            for class_id in expected_ids
+        }
+        assert all(
+            len(member[0]) == 77
+            and member[0].startswith("legacy-class-")
+            and member[0][13:] == member[0][13:].lower()
+            and set(member[0][13:]) <= set("0123456789abcdef")
+            for member in expected_members.values()
+        )
+        assert {
+            class_id:item.members for class_id, item in migrated.classes.items()
+        } == expected_members
+        assert all(item.members for item in migrated.active() if not item.mechanized)
+
+        cc.save_lineage(tmp_path, migrated)
+        reloaded = cc.load_lineage(tmp_path, "issue-108", stamp="reload")
+        assert cc._to_json(reloaded) == cc._to_json(migrated)
+
+    def test_legacy_mechanized_class_does_not_gain_a_member(self, tmp_path: Path) -> None:
+        folder = cc.lineage_dir(tmp_path)
+        folder.mkdir(parents=True)
+        (folder / "mechanized.json").write_text(json.dumps({
+            "mode":cc.BRANCH_MODE,
+            "classes":[{
+                "class_id":"legacy-mechanized", "invariant":"bad call",
+                "severity":cc.MAJOR, "first_round":1, "status":cc.OPEN,
+                "pattern":"BAD", "pathspec":".",
+            }],
+        }), encoding="utf-8")
+
+        loaded = cc.load_lineage(tmp_path, "mechanized", stamp="load")
+
+        assert loaded.classes["legacy-mechanized"].members == ()
+
     def test_legacy_unmechanized_class_is_visibly_uninventoried(self) -> None:
         lin = cc.Lineage("legacy", classes={
             "legacy-id":cc.TrackedClass(
@@ -681,6 +775,14 @@ class TestLineageState:
         state = json.loads((cc.lineage_dir(tmp_path) / "test.json").read_text())
         assert state["rounds"] == 9
         assert not list(cc.lineage_dir(tmp_path).glob("*.tmp")), "no temp file may survive"
+
+
+def test_issue_108_reported_lineage_topology_migrates_deterministically(
+    tmp_path: Path,
+) -> None:
+    TestLineageState().assert_issue_108_reported_lineage_topology_migrates_deterministically(
+        tmp_path,
+    )
 
 
 # ── the trailer ───────────────────────────────────────────────────────────────

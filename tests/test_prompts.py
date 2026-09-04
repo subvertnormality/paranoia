@@ -140,6 +140,12 @@ class TestStagedReviewInstructions:
             "plan", "domain"
         )
 
+    def test_issue_108_legacy_member_is_assessed_not_reported_missing(self) -> None:
+        text = prompts.STAGED_MEMBER_CENSUS_INSTRUCTIONS
+        assert "legacy-class-<sha256>" in text
+        assert "one indivisible historical obligation" in text
+        assert "cannot be satisfied" not in text
+
     def test_review_roles_require_complete_co_asserting_site_repairs(self) -> None:
         for mode in ("plan", "branch"):
             text = prompts.staged_census_instructions(mode, "domain")

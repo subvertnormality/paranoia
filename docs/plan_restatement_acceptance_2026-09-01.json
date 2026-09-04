@@ -2,32 +2,32 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "db6a8da1e0db2cdd7f2f16fa1bef261772d6b39b11e06b1bbec0b3d8b1f57b1a"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses. Issue #108 documents deterministic runtime compatibility inventory; historical provider results remain unchanged.",
+      "sha256": "be5e2650c71060e40666defb20f5154ec7353eabe1abe7a50a2f32d218c6831e"
     },
     "README.md": {
-      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "55589ed333afefd9bbde244fa34de695233b84383f30f63fc73476ba1da93e4d"
+      "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents that only the owning engine discharges a pending final. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses. Issue #108 documents deterministic runtime compatibility inventory; historical provider results remain unchanged.",
+      "sha256": "aaa3f8042c03cd440ca4ff3ebdcf1fed7bd46990b76419c91114811220ab470b"
     },
     "scripts/run_plan_restatement_acceptance.py": {
-      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged. Issue #106 projects post-record member fields and their integrity-only prompt spacing away only while reconstructing the retained historical exchange.",
-      "sha256": "38259533821dab55f8a1eb1cf4a714c986adfdcf4660ab90b30f1b3eddc8a5f1"
+      "scope": "Acceptance-only replay support, structural validator correction, and exact projection of issue #98's later unmechanized-class prompt addition; retained provider exchanges are unchanged. Issue #106 projects post-record member fields and their integrity-only prompt spacing away only while reconstructing the retained historical exchange. Issue #108 explicitly disables runtime compatibility migration during historical reconstruction.",
+      "sha256": "db649632b67b81fb2141f48bc4d1d584137df2f0b6549f31d10e7c97c381f7c4"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Production subprocess-result finalization was factored into a pure reusable step so retained raw stdout and process status traverse the same failure semantics during replay.",
       "sha256": "95836e3d287f701e6bb3f5c3540d236605a15408829bf083458cd8f3b1bb9e60"
     },
     "src/paranoia_local/class_closure.py": {
-      "scope": "Adds durable authoritative members to future unmechanized classes; retained pre-change provider exchanges remain historical. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "cd195fe7eec05c459936aec67e3198a45a72580061a09f7cec5c05653474f874"
+      "scope": "Adds durable authoritative members to future unmechanized classes; retained pre-change provider exchanges remain historical. Issue #106 adds durable authoritative member inventories and semantic-token validation that rejects generic aliases; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses. Issue #108 gives an absent pre-inventory unmechanized row one deterministic indivisible member only on authoritative runtime load; historical replay remains unmigrated.",
+      "sha256": "84c890786e8bb1ebeea6f2a1338fbef5e1de59d6afd45a828537dc839a1606e8"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "9b2e6aa7da44607255dd0d9294b6dcbb4d32efc6c571f71bc26ecdb7f6a45675"
+      "scope": "Issue #91 rejects zero-line plan files before provider or lineage work; plan and plan-backed branch census lanes and correction/final retries receive the exact plan bound and coordinate-repair guidance; every server-authored plan citation example is in bounds while the malformed provider anchor remains only in the validation diagnostic; plan-backed consolidation receives bound-only manifest guidance; contract-free branch retries and initial prompts remain unchanged. Issue #95 threads engine identity through final settlement and bound rebut. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement. Issue #108 removes the obsolete forced-census workaround after authoritative runtime migration; retained exchanges remain historical.",
+      "sha256": "ca51ee968c7f2dee6ddc8f091e8053f3e3e1c84de6acf666dcd08ef1b8e4644a"
     },
     "src/paranoia_local/prompts.py": {
-      "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged.",
-      "sha256": "4afa03e6fe4aed81ef6a277f4394377620d0eab86950154a4d6df5d3b1f3d966"
+      "scope": "Issue #94 adds concession-challenge instructions and issue #98 changes future unmechanized correction/final search instructions outside the retained historical normative-restatement exchange. Issue #106 adds exact members and member_coverage/member_id/evidence instructions for future staged roles. Issue #108 instructs future reviews to assess the deterministic compatibility singleton normally; retained exchanges remain historical.",
+      "sha256": "8d5dec33b6012c5758761d584271a0cb6cb1cf361683b7944d756084248020d4"
     },
     "src/paranoia_local/review_census.py": {
       "scope": "Issue #95 adds closed final-engine ownership, conservative legacy migration, and owner-gated final discharge; normative-restatement discovery, prompts, and retained provider exchanges are unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
@@ -46,8 +46,8 @@
       "sha256": "27f07b45e0641e321ad52794a797aa41bae2951b131a487c8b69459e12bd1015"
     },
     "tests/test_prompts.py": {
-      "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments; retained exchanges remain historical.",
-      "sha256": "963b238f60e9a6f505e37ffc601e8b492c2e9ca40a285e0ec9cd80638ce9fb97"
+      "scope": "Issue #98 adds isolated assertions for the future invariant-scoped unmechanized correction/final instructions; retained provider exchanges are unchanged. Issue #106 byte-checks the exact members and member_coverage/member_id/evidence prompt fragments. Issue #108 tests the future compatibility-singleton instruction; retained exchanges remain historical.",
+      "sha256": "7cc35b13de8f32072eb03638a264e6dcd7510cccf038ee37a7021c1dad39d033"
     },
     "tests/test_plan_restatement_acceptance.py": {
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged.",

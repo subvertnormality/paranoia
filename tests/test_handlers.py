@@ -372,7 +372,7 @@ class TestRebut:
                 "lineage":"only-lineage",
             }, engine=FakeEngine(), log_dir=tmp_path, now=fixed_clock)
 
-    def test_bound_rebut_cannot_concede_a_legacy_uninventoried_class(
+    def test_bound_rebut_can_concede_a_migrated_legacy_member(
         self, repo: Path, tmp_path: Path, monkeypatch,
     ) -> None:
         monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
@@ -394,20 +394,28 @@ class TestRebut:
             )}, review_state=state,
         ))
         path = tmp_path / "state" / "lineages" / "legacy-bound-rebut.json"
-        before = path.read_bytes()
         eng = FakeEngine(json.dumps({
             "disposition":"CONCEDE", "reason":"Withdraw it.",
             "evidence":[{"anchor":"plan:1", "rationale":"current obligation"}],
         }))
 
-        with pytest.raises(ValueError, match="inventoried replacement"):
-            handlers.rebut({
-                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
-                "lineage":"legacy-bound-rebut", "class_id":"class-a",
-                "debt_id":"D1", "lineage_mode":"plan",
-            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        result = handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+            "lineage":"legacy-bound-rebut", "class_id":"class-a",
+            "debt_id":"D1", "lineage_mode":"plan",
+        }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        durable = cc.load_lineage(
+            cc.default_state_root(), "legacy-bound-rebut", stamp="reload",
+            mode=cc.PLAN_MODE,
+        )
 
-        assert path.read_bytes() == before
+        assert result.startswith("CONCEDE: Withdraw it.")
+        assert durable.classes["class-a"].status == cc.CLOSED
+        assert durable.classes["class-a"].members == (
+            cc._legacy_member_id("class-a"),
+        )
+        assert durable.review_state["debt"][0]["status"] == "closed"
+        assert path.exists()
 
     def test_bound_rebut_hold_is_audit_only(
         self, repo: Path, tmp_path: Path, monkeypatch,
