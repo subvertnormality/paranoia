@@ -11,8 +11,9 @@ schemas are authoritative.
 - Requirements: Python 3.11+, Git 2.36+
 - Engines: `codex`, `claude`
 - Minimum evidence-profile CLIs: Codex 0.144.6; Claude Code 2.1.251
-- Default models: `gpt-5.6-sol`; `claude-fable-5-1`
+- Default models: `gpt-6-astra`; `claude-fable-5-1`
 - Arbitration cleaner: `claude-opus-5`
+- Arbitration attester: `gpt-6-astra`
 - Tools: `critique_branch`, `critique_plan`, `query`, `rebut`, `arbitrate`
 
 ## Host/reviewer invariant

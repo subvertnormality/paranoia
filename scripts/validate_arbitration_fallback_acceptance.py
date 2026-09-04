@@ -55,6 +55,7 @@ _PROMPT_NAMES = (
 _HISTORICAL_DEFAULT_MODELS = {
     "codex":"gpt-5.6-sol", "claude":"claude-fable-5",
 }
+_HISTORICAL_ATTESTER_MODEL = "gpt-5.6-sol"
 _HISTORICAL_MIN_VERSIONS = {
     "codex":(0, 144, 6), "claude":(2, 1, 197),
 }
@@ -272,7 +273,9 @@ def _cleaning_and_attestation_bound(
     return _attempt_bound(
         attester_record, prompt=attester_prompt, reply=audit["attestation"],
         rejection=expected_rejection,
-        execution=_external_execution(engines.ATTESTER_ENGINE, engines.ATTESTER_MODEL),
+        execution=_external_execution(
+            engines.ATTESTER_ENGINE, _HISTORICAL_ATTESTER_MODEL,
+        ),
     )
 
 

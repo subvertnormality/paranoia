@@ -14,8 +14,8 @@
       "sha256": "878872b32580ee6f58de3558d8677072e35096d98b01442553de1c74ca702d2b"
     },
     "src/paranoia_local/server.py": {
-      "scope": "The public rebut schema now requires an exact debt target for bound settlement; this does not alter branch plan-contract binding, authority, capture, or propagation.",
-      "sha256": "a896bb81d25f03b406500556287482ca9df18af1c7329903429ee8fd911ac114"
+      "scope": "Updates the public Codex default-model description to GPT-6-Astra; this does not alter branch plan-contract binding, authority, capture, or propagation.",
+      "sha256": "f7e95c60a65a5b21024b9acef6378347e607121bb3f83be04c0d2b454002a51e"
     },
     "src/paranoia_local/staged_protocol.py": {
       "scope": "Server-authored class-action guidance and correction-only aggregate-occurrence reconciliation changed; this does not alter branch plan-contract binding, authority, capture, or propagation, and the retained fidelity routes do not contain a fresh existing-class correction finding. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",

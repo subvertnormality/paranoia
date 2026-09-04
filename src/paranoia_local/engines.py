@@ -316,7 +316,7 @@ class Engine(ABC):
 
 class CodexEngine(Engine):
     name = "codex"
-    default_model = "gpt-5.6-sol"
+    default_model = "gpt-6-astra"
     binary = "codex"
 
     def _evidence_flags(self, *, resumed: bool = False) -> list[str]:
@@ -627,7 +627,7 @@ _ENGINES: dict[str, type[Engine]] = {
 CLEANER_ENGINE = "claude"
 CLEANER_MODEL = "claude-opus-5"
 ATTESTER_ENGINE = "codex"
-ATTESTER_MODEL = "gpt-5.6-sol"
+ATTESTER_MODEL = "gpt-6-astra"
 
 
 def get_engine(name: str, *, text_only: bool = False) -> Engine:
