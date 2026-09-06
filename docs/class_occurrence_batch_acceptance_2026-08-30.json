@@ -60,6 +60,10 @@
     "tests/test_review_census.py": {
       "sha256": "5fd3c23dd2748a67a1448dfafc02dc683c1aa01192a7bc2305f52ddac59fe73a",
       "scope": "Adds isolated concession-history, malformed-state, lifecycle, invariant-sweep, and issue #106 exact-member closure regressions; the retained branch occurrence exchange is unchanged. Issue #106 additionally tests active-inventory decoding, cache invalidation, shared-anchor correction/final settlement, durable reload, and legacy-empty refusal. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issues #111/#112 add recovered-rejection and one-call evidence-projection regressions without rewriting the retained exchange. Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, bounded combined claim-audit correction, typed census execution extraction, explicit withdrawal of the unqualified empty-census experiment, fail-closed discovery session validation, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/evidence.py": {
+      "sha256": "8590ecf4555a79235b8233343e1aea5059916132df28508a51a6d62ac647003c",
+      "scope": "Shared arbitration evidence reads distinguish unavailable Git data from invalid declarations; propagate operational errors to terminal admission without changing snapshot/path grounding."
     }
   },
   "version": 1,

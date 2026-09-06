@@ -2,7 +2,7 @@
   "acceptance_kind": "plan-normative-restatement-public-handler-v2",
   "allowed_later_source_diffs": {
     "AGENTS.md": {
-      "sha256": "727773e74c29791a5973fd49bd83ad1242a09fd6730a9e208c9868c1c448e38e",
+      "sha256": "0752ed60ec0ea893f23445876d6cf5c4938219dc76ece0596c69ca208fa28ee2",
       "scope": "Acceptance-only replay support and structural validator correction; production plan-review prompts and handler behavior are unchanged. Issue #91 additionally documents strict bounded plan-anchor retry grammar and manifest-only consolidation; executable 5,260-line lifecycle coverage belongs to test allowances, not this documentation diff. Issue #95 documents engine-owned final-regression gates. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses. Issue #108 documents deterministic runtime compatibility inventory; historical provider results remain unchanged. Issues #111/#112 document recovered-rejection visibility and correction evidence projection without changing retained restatement exchanges. Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, bounded combined claim-audit correction, typed census execution extraction, explicit withdrawal of the unqualified empty-census experiment, fail-closed discovery session validation, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them. Additional later-source allowance: strict arbitration evidence admission, initial literal citation guidance and documentation/tests. Historical live outcomes remain bound to their original source; this does not establish acceptance of the new admission boundary."
     },
     "README.md": {
@@ -76,6 +76,10 @@
     "src/paranoia_local/arbitration.py": {
       "sha256": "4a87199a6d8e08bc21ff344df9f14ff4d7062654a643c23faaa7d883eb6971e7",
       "scope": " Additional later-source allowance: strict arbitration evidence admission, initial literal citation guidance and documentation/tests. Historical live outcomes remain bound to their original source; this does not establish acceptance of the new admission boundary."
+    },
+    "src/paranoia_local/evidence.py": {
+      "sha256": "8590ecf4555a79235b8233343e1aea5059916132df28508a51a6d62ac647003c",
+      "scope": "Shared arbitration evidence reads distinguish unavailable Git data from invalid declarations; propagate operational errors to terminal admission without changing snapshot/path grounding."
     }
   },
   "claims": {

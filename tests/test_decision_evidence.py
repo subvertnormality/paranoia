@@ -202,3 +202,82 @@ def test_unexpected_resolution_failure_retains_reply_and_peer_without_retry(
     assert [a["raw"] for a in attempts] == replies
     assert "fixture Git read unavailable" in attempts[-1]["rejection"]
     assert all(not Path(c["cwd"]).exists() for c in scripted.calls if c["cwd"] is not None)
+
+
+@pytest.mark.parametrize("after_format_rejection", [False, True])
+@pytest.mark.parametrize("read", ["revision", "paths", "links", "symlink", "type", "blob"])
+def test_git_adapter_failure_is_terminal_and_retained(
+    repo, tmp_path, monkeypatch, after_format_rejection, read,
+):
+    import subprocess
+    import threading
+    from paranoia_local import evidence
+
+    (repo / "alias.py").symlink_to("app.py")
+    commit_all(repo, "inert symlink marker")
+    local = threading.local()
+    real_invoke = evidence.inert_git.invoke
+    faults = []
+    def invoke(cwd, args, **kwargs):
+        armed = getattr(local, "armed", False)
+        matches = {
+            "revision": args[0] == "rev-parse" and "--quiet" in args,
+            "paths": args[0] == "ls-tree" and "--name-only" in args,
+            "links": args[0] == "ls-tree" and "--name-only" not in args,
+            "symlink": args[0] == "show" and args[-1].endswith(":alias.py"),
+            "type": args[:2] == ["cat-file", "-t"] and args[-1].endswith(":app.py"),
+            "blob": args[0] == "show" and args[-1].endswith(":app.py"),
+        }
+        if armed and matches[read]:
+            faults.append(tuple(args))
+            return subprocess.CompletedProcess(args, 128, b"", b"fixture adapter unavailable")
+        return real_invoke(cwd, args, **kwargs)
+    monkeypatch.setattr(evidence.inert_git, "invoke", invoke)
+    scripted = Agent(lambda e, r: "opt-decimal",
+                     extra={("claude", 1): {"decisive": "README.md:1"}})
+    replies = []
+    def provider(**kwargs):
+        text = scripted(**kwargs)
+        if kwargs["engine_name"] == "codex" and kwargs["cwd"] is not None:
+            if after_format_rejection and not replies:
+                text = "AUTHORITY: duplicate\n" + text
+            else:
+                local.armed = True
+            replies.append(text)
+        return text
+    report = run(repo, provider, tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "decision evidence admission failed" in report
+    assert faults
+    failed = audit(report)["failed_round"]["deciders"]
+    assert failed["claude"]["selected"] == "opt-decimal"
+    attempts = failed["codex"]["attempts"]
+    assert len(attempts) == len(replies) == (2 if after_format_rejection else 1)
+    assert [a["raw"] for a in attempts] == replies
+    assert "fixture adapter unavailable" in attempts[-1]["rejection"]
+    assert all(not Path(c["cwd"]).exists() for c in scripted.calls if c["cwd"] is not None)
+
+
+@pytest.mark.parametrize("method", ["paths", "for_commit", "oid"])
+def test_resolver_does_not_cache_operational_failure(repo, monkeypatch, method):
+    import subprocess
+    from paranoia_local import evidence
+    resolver = admission(repo).links
+    snapshot = resolver._snapshot
+    real = evidence.inert_git.invoke
+    unavailable = True
+    def invoke(cwd, args, **kwargs):
+        if unavailable:
+            return subprocess.CompletedProcess(args, 128, b"", b"temporarily unavailable")
+        return real(cwd, args, **kwargs)
+    monkeypatch.setattr(evidence.inert_git, "invoke", invoke)
+    with pytest.raises(RuntimeError, match="temporarily unavailable"):
+        getattr(resolver, method)(snapshot)
+    unavailable = False
+    result = getattr(resolver, method)(snapshot)
+    if method == "paths":
+        assert "app.py" in result
+    elif method == "oid":
+        assert result == snapshot
+    else:
+        assert result == {}

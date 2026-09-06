@@ -142,10 +142,9 @@ def _symlink_target(repo: Path, commit: str, path: str) -> str:
     `" real.py "` and `real.py` tracked, a stripped target resolves the citation to
     the wrong file — the decider reads one and substantiation checks the other.
     """
-    r = inert_git.invoke(repo, ["show", f"{commit}:{path}"])
-    if r.returncode != 0:
-        return ""
-    return r.stdout.decode("utf-8", errors="surrogateescape")
+    return inert_git.run(repo, ["show", f"{commit}:{path}"]).decode(
+        "utf-8", errors="surrogateescape",
+    )
 
 
 def _resolve_link(path: str, target: str) -> str | None:
@@ -265,12 +264,22 @@ def _blob(repo: Path, commit: str, path: str) -> bytes | None:
     """
     spec = f"{commit}:{path}"
     t = inert_git.invoke(repo, ["cat-file", "-t", spec])
-    if t.returncode != 0 or t.stdout.decode().strip() != "blob":
+    if t.returncode != 0:
+        # A missing declaration is not an unavailable object. Only a successful
+        # independent tree read can establish absence; keep the original failure
+        # when the tree itself cannot be read.
+        detail = t.stderr.decode("utf-8", errors="replace").strip()
+        failure = RuntimeError(f"git cat-file -t {spec} failed: {detail}")
+        try:
+            absent = path not in tree_paths(repo, commit)
+        except RuntimeError:
+            raise failure from None
+        if absent:
+            return None
+        raise failure
+    if t.stdout.decode().strip() != "blob":
         return None
-    r = inert_git.invoke(repo, ["show", spec])
-    if r.returncode != 0:
-        return None
-    return r.stdout
+    return inert_git.run(repo, ["show", spec])
 
 
 def _lf_lines(data: bytes) -> list[bytes]:
@@ -313,23 +322,25 @@ class LinkResolver:
                 self._repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
             )
             out = r.stdout.decode("utf-8", errors="replace").strip()
-            self._oids[rev] = out if r.returncode == 0 and out else None
+            # Quiet rev-parse uses 1 with no diagnostic for an unknown supplied
+            # revision. The established snapshot itself must remain readable.
+            if r.returncode == 1 and not r.stderr and rev != self._snapshot:
+                self._oids[rev] = None
+            elif r.returncode != 0 or not out:
+                detail = r.stderr.decode("utf-8", errors="replace").strip()
+                raise RuntimeError(f"git rev-parse {rev} failed: {detail}")
+            else:
+                self._oids[rev] = out
         return self._oids[rev]
 
     def paths(self, commit: str) -> frozenset[str]:
         if commit not in self._paths:
-            try:
-                self._paths[commit] = tree_paths(self._repo, commit)
-            except RuntimeError:
-                self._paths[commit] = frozenset()
+            self._paths[commit] = tree_paths(self._repo, commit)
         return self._paths[commit]
 
     def for_commit(self, commit: str) -> dict[str, str]:
         if commit not in self._links:
-            try:
-                self._links[commit] = symlink_map(self._repo, commit)
-            except RuntimeError:
-                self._links[commit] = {}
+            self._links[commit] = symlink_map(self._repo, commit)
         return self._links[commit]
 
 

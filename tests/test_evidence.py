@@ -37,12 +37,11 @@ def test_missing_promised_blob_does_not_run_repository_transport(
     git(["config", "protocol.ext.allow", "always"], repo)
     git(["config", "remote.origin.url", f"ext::{helper}"], repo)
 
-    resolved = evidence.resolve_citation(
-        repo, Citation("app.py", 1), snapshot=commit,
-        links=evidence.LinkResolver(repo, commit), context=1,
-    )
-
-    assert resolved is None
+    with pytest.raises(RuntimeError, match="cat-file"):
+        evidence.resolve_citation(
+            repo, Citation("app.py", 1), snapshot=commit,
+            links=evidence.LinkResolver(repo, commit), context=1,
+        )
     assert not marker.exists()
 
 
@@ -487,7 +486,9 @@ def test_link_resolver_caches_per_commit(repo: Path):
     commit = snapshot(repo)
     resolver = evidence.LinkResolver(repo, commit, {"x": "y"})
     assert resolver.for_commit(commit) == {"x": "y"}
-    assert resolver.for_commit("deadbeef") == {}  # unreachable commit degrades to empty
+    with pytest.raises(RuntimeError, match="ls-tree"):
+        resolver.for_commit("deadbeef")
+    assert "deadbeef" not in resolver._links
 
 
 def test_equivalent_historical_commit_spellings_are_all_rejected(repo: Path):

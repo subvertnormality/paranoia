@@ -169,6 +169,10 @@
     "src/paranoia_local/arbitration.py": {
       "sha256": "4a87199a6d8e08bc21ff344df9f14ff4d7062654a643c23faaa7d883eb6971e7",
       "scope": " Additional later-source allowance: strict arbitration evidence admission, initial literal citation guidance and documentation/tests. Historical live outcomes remain bound to their original source; this does not establish acceptance of the new admission boundary."
+    },
+    "src/paranoia_local/evidence.py": {
+      "sha256": "8590ecf4555a79235b8233343e1aea5059916132df28508a51a6d62ac647003c",
+      "scope": "Shared arbitration evidence reads distinguish unavailable Git data from invalid declarations; propagate operational errors to terminal admission without changing snapshot/path grounding."
     }
   },
   "attempt_ledger": [
