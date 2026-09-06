@@ -4707,3 +4707,87 @@ def test_persistent_403_provenance_survives_claim_state_reload(tmp_path: Path) -
     assert evidence["location"] == "Server capture unavailable"
     assert "HTTP Error 403" in evidence["quote"]
     assert "browser-compatible retry attempted" in evidence["quote"]
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_audit_reports_independent_suffix_rows_and_coverage(partial):
+    bad = _claim(proposition="The whole Python 3.11 was released in October 2022.")
+    payload = {"claims": [_claim(), _claim(), bad, {"kind": "wrong"}],
+               "coverage": {"prior_dispositions": None, "prior_assessments": None}}
+    with pytest.raises(pc.AuditError) as caught:
+        pc.parse_audit(pc.AUDIT_MARKER + "\n" + json.dumps(payload) + "\nSources: x",
+                       PLAN, allow_partial=partial)
+    reason = caught.value.reason
+    for expected in ("unexpected text after", "claim 1: duplicate", "claim 2:",
+                     "whole", "claim 3:", "/coverage/prior_dispositions",
+                     "/coverage/prior_assessments"):
+        assert expected in reason
+    assert len(reason) <= pc.DIAGNOSTIC_CHARS
+
+
+def test_combined_diagnostics_preserve_row_only_partial_boundary():
+    text = _audit(_claim(), _claim(proposition="Whole Python was released."))
+    audit = pc.parse_audit(text, PLAN, allow_partial=True)
+    assert len(audit.claims) == 1 and audit.issues
+    state = pc.reconcile({}, audit, lineage_id="partial", round_no=1, plan_text=PLAN)
+    assert pc.is_blocked(state)
+    with pytest.raises(pc.AuditError):
+        pc.parse_audit(text, PLAN)
+    for raw in ("{", "[]", '{"claims":null,"coverage":{}}',
+                '{"claims":[],"coverage":null}'):
+        with pytest.raises(pc.AuditError):
+            pc.parse_audit(pc.AUDIT_MARKER + "\n" + raw, PLAN, allow_partial=True)
+    huge = _audit(*[_claim(proposition="Whole Python was released.") for _ in range(100)])
+    with pytest.raises(pc.AuditError) as caught:
+        pc.parse_audit(huge, PLAN)
+    assert len(caught.value.reason) <= pc.DIAGNOSTIC_CHARS
+
+
+@pytest.mark.parametrize("repaired", [True, False])
+def test_issue_114_combined_error_single_correction_lifecycle(tmp_path, monkeypatch, repaired):
+    source = _source()
+    widened = _audit(_claim(proposition="The whole Python 3.11 was released in October 2022."))
+    initial = widened + "\nSources: https://www.python.org/"
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [{
+        "claim_index": 0, "evidence_index": 0, "usable": True,
+        "location": source["location"], "passage": source["quote"],
+    }]})
+    attestation = '=== EVIDENCE ATTESTATION JSON ===\n' + json.dumps({"attestations": [{
+        "claim_index": 0, "evidence_index": 0, "publisher_authority": True,
+        "authority_reason": "official release owner", "passage_entailment": True,
+        "entailment_reason": "the release date is stated",
+    }]})
+    engine = _RoleScript({
+        "evidence-discovery": [initial, _audit(_claim()) if repaired else widened],
+        "evidence-binding": [binding], "evidence-text": [attestation],
+    })
+    captures = []
+    def capture(candidates, **kwargs):
+        rows = list(candidates)
+        captures.extend(rows)
+        return [external_sources.Capture(c, c.url, 200, "text/html",
+                "a" * 64, "b" * 64, source["quote"]) for c in rows]
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture)
+    ledger = []
+    adapter = handlers._CapturedClaimEngine(
+        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
+        prior_state=pc.empty_state(), frozen_ids=frozenset(), attempt_ledger=ledger,
+    )
+    try:
+        result = adapter.run("audit", tmp_path, "m", "high", True)
+    finally:
+        adapter.close()
+    correction = engine.calls[1][1]
+    assert "unexpected text after" in correction and "whole" in correction
+    assert pc._universal_scope_instruction() in correction
+    assert "every reported error" in correction
+    assert ledger[0]["outcome"] == "validation-invalid"
+    assert "unexpected text after" in ledger[0]["validation_issue"]
+    assert "whole" in ledger[0]["validation_issue"]
+    if repaired:
+        assert not result.error and len(captures) == 1
+        assert [role for role, _ in engine.calls] == [
+            "evidence-discovery", "evidence-discovery", "evidence-binding", "evidence-text"]
+    else:
+        assert result.error and not captures
+        assert len(engine.calls) == 2

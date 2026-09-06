@@ -491,3 +491,23 @@ not publish secrets or a complete private audit log.
 ## License
 
 MIT © 2026 Andrew Hillel
+
+### Claim audit and review benchmark work
+
+The [claim audit and benchmark plan](docs/claim-audit-benchmark-plan.md) defines the issue 114 correction and a paired five-mode live pilot. It preserves the single correction and strict claim scope validation. Benchmark findings describe the measured corpus, not guaranteed performance on other reviews.
+
+Run the pilot from a committed candidate with the same Python environment and provider
+CLI versions for both revisions:
+
+```sh
+python scripts/benchmark_review_modes.py --freeze --baseline /path/to/baseline --candidate /path/to/candidate --output /tmp/review-pilot
+python scripts/benchmark_review_modes.py --run --output /tmp/review-pilot
+python scripts/score_review_modes.py /tmp/review-pilot
+```
+
+The manifest freezes inputs, a separate scoring oracle, revisions, models, and trial order.
+Rebut setup pauses for an exact finding quotation and implementer qualification using
+`score_review_modes.py --qualify`; rerun the same `--run` command afterward. Completed
+trials are retained, never automatically retried. Use `--category` with an exact result
+quotation and reason to record an adjudication. Reported dispatch time includes rebut
+setup but excludes human qualification delay. Unscored and failed slots remain visible.

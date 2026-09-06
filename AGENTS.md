@@ -629,3 +629,5 @@ server-owned audit projection.
 Bind bounded attempt-channel digests and exact retained response evidence to the acceptance
 artifact's committed Git blob during replay; generation runs the same semantic validator before
 that immutable envelope exists.
+
+For claim-audit corrections, report independent safely detectable format, row, and coverage errors together within the existing bounded retry diagnostic. Keep suffix errors fatal in partial mode and retain the universal-scope guard. Live benchmark fixtures must be isolated from their scoring oracle; record failed trials and distinguish operational failure from defect detection.

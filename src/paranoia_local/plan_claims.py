@@ -354,8 +354,7 @@ def parse_audit(
     remainder = tail[end:].strip()
     if remainder == "```":
         remainder = ""
-    if remainder:
-        raise AuditError("unexpected text after claim audit JSON", text)
+    fatal = ["unexpected text after claim audit JSON"] if remainder else []
     if not isinstance(value, dict) or set(value) != {"claims", "coverage"}:
         raise AuditError("audit must be an object with exactly claims and coverage", text)
     claims, coverage = value["claims"], value["coverage"]
@@ -380,24 +379,39 @@ def parse_audit(
             )
         except ValueError as exc:
             reason = f"claim {index}: {exc}"
-            if not allow_partial:
-                raise AuditError(reason, text) from exc
-            issues.append(f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}")
+            issues.append(
+                f"{reason} [/claims/{index}]" if not allow_partial else
+                f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}"
+            )
             continue
         identity = (claim["anchor"], claim["proposition"])
         if identity in seen:
             reason = f"claim {index}: duplicate anchor and proposition"
-            if not allow_partial:
-                raise AuditError(reason, text)
-            issues.append(f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}")
+            issues.append(
+                f"{reason} [/claims/{index}]" if not allow_partial else
+                f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}"
+            )
             continue
         seen.add(identity)
         validated.append(claim)
-    for field in ("prior_dispositions", "prior_assessments"):
+    coverage_rows = {}
+    for field, validate in (
+        ("prior_dispositions", _validate_dispositions),
+        ("prior_assessments", _validate_assessments),
+    ):
         if field not in coverage:
-            raise AuditError(f"coverage.{field} is required", text)
-    dispositions = _validate_dispositions(coverage["prior_dispositions"], text)
-    assessments = _validate_assessments(coverage["prior_assessments"], text)
+            fatal.append(f"coverage.{field} is required [/coverage/{field}]")
+            continue
+        try:
+            coverage_rows[field] = validate(coverage[field], text)
+        except AuditError as exc:
+            fatal.append(f"{exc.reason} [/coverage/{field}]")
+    # A decodable object can have independent wire and semantic defects. Give the
+    # one correction both, without accepting a suffix or a partial full audit.
+    if fatal or (issues and not allow_partial):
+        raise AuditError("\n".join(fatal + issues)[:DIAGNOSTIC_CHARS], text)
+    dispositions = coverage_rows["prior_dispositions"]
+    assessments = coverage_rows["prior_assessments"]
     return Audit(
         tuple(validated), deepcopy(coverage), dispositions, assessments, tuple(issues),
         hashlib.sha256(text.encode("utf-8", "replace")).hexdigest(),
@@ -1589,8 +1603,10 @@ Rejected payload sha256: {error.raw_sha256}
 Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 {AUDIT_MARKER} marker followed by one JSON object and nothing else. Every claim uses the
 literal kind `fact`, `design_principle`, or `behavior` and the literal scope `external`.
-Never write a pseudo-enum. Preserve valid source packets, fix the structural error, and do
-not weaken evidence requirements.
+Never write a pseudo-enum. Preserve valid source packets and fix every reported error; do
+not weaken evidence requirements. Put sources only in the evidence JSON, never in a Sources
+footer or other trailing prose.
+{_universal_scope_instruction()}
 Do not invoke MCP tools, paranoia-local, plugins, other agents, or nested reviewers.
 Repository state, code paths, internal history, implementation conformance, and internal
 function bridges are mechanically out of scope for this register; omit them because the
