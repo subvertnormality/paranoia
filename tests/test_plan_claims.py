@@ -4791,3 +4791,28 @@ def test_issue_114_combined_error_single_correction_lifecycle(tmp_path, monkeypa
     else:
         assert result.error and not captures
         assert len(engine.calls) == 2
+
+
+def test_issue_114_terminal_public_failure_preserves_prior_claim_debt(tmp_path, monkeypatch):
+    prior = pc.reconcile(
+        {}, pc.parse_audit(_audit(_claim(verdict="unverified", evidence=[])), PLAN),
+        lineage_id="prior-114", round_no=1, plan_text=PLAN,
+    )
+    widened = _audit(_claim(proposition="The whole Python 3.11 was released in October 2022."))
+    engine = _RoleScript({"evidence-discovery": [widened + "\nSources: x", widened]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers.external_sources, "capture_all",
+                        lambda *a, **k: pytest.fail("invalid discovery reached capture"))
+    ledger = []
+    state, status = handlers._verify_plan_claims(
+        PLAN, prior, lineage_id="prior-114", round_no=2, stakes="trusted local tool",
+        engine=engine, repo=_repo(tmp_path), model="m", effort="high",
+        plan_repo_path=None, on_progress=None, attempt_ledger=ledger,
+    )
+    assert pc.is_blocked(state)
+    assert state["claims"] == prior["claims"]
+    assert "unexpected text after" in state["debt"]["reason"]
+    assert "whole" in state["debt"]["reason"]
+    assert [row["role"] for row in ledger] == [
+        "claim-discovery", "claim-discovery-validation-retry"]
+    assert all(row["outcome"] == "validation-invalid" for row in ledger)

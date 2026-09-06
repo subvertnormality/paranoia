@@ -496,7 +496,7 @@ MIT © 2026 Andrew Hillel
 
 The [claim audit and benchmark plan](docs/claim-audit-benchmark-plan.md) defines the issue 114 correction and a paired five-mode live pilot. It preserves the single correction and strict claim scope validation. Benchmark findings describe the measured corpus, not guaranteed performance on other reviews.
 
-Run the pilot from a committed candidate with the same Python environment and provider
+Run the Linux/WSL pilot from a committed candidate with the same Python environment and provider
 CLI versions for both revisions:
 
 ```sh
@@ -511,3 +511,8 @@ Rebut setup pauses for an exact finding quotation and implementer qualification 
 trials are retained, never automatically retried. Use `--category` with an exact result
 quotation and reason to record an adjudication. Reported dispatch time includes rebut
 setup but excludes human qualification delay. Unscored and failed slots remain visible.
+
+The [five-mode pilot report](docs/five-mode-benchmark-2026-09-06.md) records the measured
+results and limitations. The [issue 114 live acceptance record](docs/issue_114_live_acceptance_2026-09-06.json)
+retains source-bound evidence of a real combined-error correction. Neither record claims
+guaranteed performance or closes the broader evaluation work in issue 49.

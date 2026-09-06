@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Frozen, source-paired live review pilot. See docs/claim-audit-benchmark-plan.md.
 
+Linux/WSL pilot runner (uses POSIX file locking).
 Run --freeze first, --run for independent trials, qualify rebut setup in the
 worksheet, then --run again. No answer key is passed to worker processes.
 """
@@ -320,7 +321,9 @@ def worker(spec_path):
             return
         if qualification["setup_sha256"] != sha(setup_path.read_bytes()):
             raise ValueError("qualification does not bind setup")
-        if git(repo, "rev-parse", "HEAD") != setup["snapshot"] or setup["provider"] != case["provider"]:
+        if (git(repo, "rev-parse", "HEAD") != setup["snapshot"]
+                or git(repo, "status", "--porcelain")
+                or setup["provider"] != case["provider"]):
             raise ValueError("setup binding changed")
         if case["repair"]:
             (repo / "app.py").write_text(case["repair"])
@@ -386,6 +389,9 @@ def run(args):
         path = Path(source["path"])
         if git(path, "rev-parse", "HEAD") != source["revision"]:
             raise ValueError("source revision changed")
+        inventory = {str(p.relative_to(path)) for p in (path / "src/paranoia_local").glob("*.py")}
+        if inventory != set(source["files"]):
+            raise ValueError("source inventory changed")
         for name, digest in source["files"].items():
             if sha((path / name).read_bytes()) != digest:
                 raise ValueError("source bytes changed")
@@ -426,6 +432,8 @@ def main():
     parser.add_argument("--worker", type=Path)
     parser.add_argument("--counter", type=Path, help="Reuse an existing admission counter without resetting it")
     args = parser.parse_args()
+    if os.name != "posix":
+        parser.error("the pilot runner requires Linux/WSL POSIX file locking")
     os.environ.update(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
     if args.worker:
         worker(args.worker)

@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import multiprocessing
+import os
 import sys
 from types import SimpleNamespace
 
@@ -18,6 +19,7 @@ def _reserve(counter, queue):
         queue.put("refused")
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Linux/WSL pilot uses POSIX file locking")
 def test_shared_final_admission_slot(tmp_path):
     counter = tmp_path / "counter"
     counter.write_text("319")
@@ -33,6 +35,7 @@ def test_shared_final_admission_slot(tmp_path):
     assert counter.read_text() == "320"
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Linux/WSL pilot uses POSIX file locking")
 def test_denied_observed_invocation_never_reaches_provider(tmp_path):
     calls = []
     class Engine:
@@ -145,6 +148,7 @@ def test_worker_carries_authentic_setup_through_prescribed_rebut(tmp_path, monke
         return ("CONCEDE" if repaired else "HOLD") + ": app.py:3"
     monkeypatch.setattr(server, "dispatch", dispatch)
     bench.worker(tmp_path / "input.json")
+
     assert json.loads((tmp_path / "status.json").read_text())["status"] == "setup_pending"
     scoring.qualify(tmp_path, "app.py:3 returns 1 for n=2 instead of 3.", "matches arithmetic oracle")
     bench.worker(tmp_path / "input.json")
@@ -174,6 +178,7 @@ def test_rejected_setup_never_launches_rebut(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("revision", ["9bd9b89", "HEAD"])
+@pytest.mark.skipif(os.name != "posix", reason="Linux/WSL pilot uses POSIX file locking")
 def test_observer_works_with_each_real_source_revision(tmp_path, revision):
     import io
     import subprocess
@@ -228,3 +233,97 @@ def test_plan_fixture_has_actual_scheduler_target(tmp_path, monkeypatch, variant
         return "fixture checked"
     monkeypatch.setattr(server, "dispatch", dispatch)
     bench.worker(tmp_path / "input.json")
+
+
+@pytest.mark.parametrize("severity", ["FATAL", "BLOCKER", "MAJOR"])
+def test_scorer_uses_canonical_blocking_severities(tmp_path, severity):
+    bench.dump(tmp_path / "input.json", {"input": {"mode": "critique_branch"}})
+    bench.dump(tmp_path / "status.json", {"status": "completed", "outputs": [{"result": "app.py:3 is wrong"}]})
+    directory = tmp_path / "state/lineages"
+    directory.mkdir(parents=True)
+    bench.dump(directory / "case.json", {"review_state": {
+        "phase": "correction", "debt": [{"status": "open", "severity": severity}]}})
+    scoring.adjudicate(tmp_path, "defect", "app.py:3 is wrong", "matches oracle")
+
+
+def test_structural_clear_is_not_full_plan_clear(tmp_path):
+    bench.dump(tmp_path / "input.json", {"input": {"mode": "critique_plan"}})
+    text = "STRUCTURAL-CONVERGENCE: NOT-BLOCKED\nCONVERGENCE: BLOCKED"
+    bench.dump(tmp_path / "status.json", {"status": "completed", "outputs": [{"result": text}]})
+    directory = tmp_path / "state/lineages"
+    directory.mkdir(parents=True)
+    bench.dump(directory / "case.json", {"review_state": {"phase": "clear"},
+                                       "claim_state": {"claims": {"c": {"verdict": "refuted"}}}})
+    with pytest.raises(ValueError, match="pending"):
+        scoring.adjudicate(tmp_path, "clear", text, "must not credit structural-only result")
+
+
+def test_finding_adjudication_binds_exact_audit(tmp_path):
+    directory = tmp_path / "logs"
+    directory.mkdir()
+    audit = {"staged_settlement": {"findings": [
+        {"id": "f", "severity": "MAJOR", "summary": "wrong formula", "evidence": ["app.py:3"]}]}}
+    path = directory / "audit.json"
+    bench.dump(path, audit)
+    key = scoring.findings(tmp_path)[0]["key"]
+    scoring.annotate_finding(tmp_path, key, "true_defect", "matches seeded formula failure")
+    assert scoring.findings(tmp_path)[0]["classification"] == "true_defect"
+    audit["changed"] = True
+    bench.dump(path, audit)
+    with pytest.raises(ValueError, match="bind"):
+        scoring.findings(tmp_path)
+
+
+def test_report_retains_unstarted_and_interrupted_slots(tmp_path):
+    manifest = _manifest()
+    for index, trial in enumerate(manifest["order"]):
+        trial["id"] = f"t{index:03}"
+        directory = tmp_path / trial["id"]
+        directory.mkdir()
+        bench.dump(directory / "status.json",
+                   {"status": "incomplete_interrupted" if index == 0 else "unstarted"})
+    bench.dump(tmp_path / "manifest.json", manifest)
+    (tmp_path / "manifest.sha256").write_text(bench.sha((tmp_path / "manifest.json").read_bytes()))
+    scoring.report(tmp_path)
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert len(report["trials"]) == 40
+    assert report["trials"][0]["status"] == "incomplete_interrupted"
+    assert all(row["category"] == "unscored" for row in report["trials"])
+
+
+def test_rebut_worker_rejects_ordinary_uncommitted_edit(tmp_path, monkeypatch):
+    from paranoia_local import server, class_closure as cc
+    root = Path(__file__).resolve().parents[1]
+    case = next(c for c in bench.corpus()[0] if c["mode"] == "rebut")
+    bench.dump(tmp_path / "input.json", {"input": case, "source": {"path": str(root)},
+                                       "models": bench.MODELS, "counter": str(tmp_path / "counter")})
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "original"))
+    monkeypatch.setattr(bench, "install_observer", lambda *a: None)
+    calls = []
+    def dispatch(mode, arguments, **kwargs):
+        calls.append(mode)
+        return "app.py:3 returns 0 instead of 1 at n=1. session_ref=`session`"
+    monkeypatch.setattr(server, "dispatch", dispatch)
+    bench.worker(tmp_path / "input.json")
+    scoring.qualify(tmp_path, "app.py:3 returns 0 instead of 1 at n=1.", "matches the intended defect")
+    (tmp_path / "repository/app.py").write_text("ordinary edit\n")
+    with pytest.raises(ValueError, match="binding changed"):
+        bench.worker(tmp_path / "input.json")
+    assert calls == ["query"]
+
+
+def test_new_source_module_invalidates_frozen_inventory(tmp_path, monkeypatch):
+    manifest = _manifest()
+    source = tmp_path / "source"
+    package = source / "src/paranoia_local"
+    package.mkdir(parents=True)
+    (package / "a.py").write_text("a=1\n")
+    for row in manifest["sources"].values():
+        row.update(path=str(source), files={"src/paranoia_local/a.py": bench.sha("a=1\n")})
+    manifest.update(cli_versions={}, harness_sha256=bench.sha(Path(bench.__file__).read_bytes()))
+    bench.dump(tmp_path / "manifest.json", manifest)
+    (tmp_path / "manifest.sha256").write_text(bench.sha((tmp_path / "manifest.json").read_bytes()))
+    (package / "b.py").write_text("b=2\n")
+    monkeypatch.setattr(bench, "git", lambda *a: "a" * 40)
+    with pytest.raises(ValueError, match="inventory"):
+        bench.run(SimpleNamespace(output=tmp_path))

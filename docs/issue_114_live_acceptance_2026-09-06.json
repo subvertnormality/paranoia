@@ -1,0 +1,135 @@
+{
+  "kind": "issue-114-real-Claude-single-correction",
+  "date": "2026-09-06",
+  "scope": "Natural provider replies, not fault injection. These runs demonstrate the concrete repair path, not guaranteed future provider compliance.",
+  "source_files": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "fcbbd3ce04ce6dfe05eadcf98c2a15fbc779b9551ba257c3cb73c67828b95a5d",
+    "src/paranoia_local/arbitration.py": "6b9adf82707e5cb30f2bb7761eb8d333d1f8092d194ccd892a187909cdb0b0df",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+    "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/handlers.py": "b2681d927d55c5af8ff27d0b445f349d834a34d0997a1ee0883648472c0d20f6",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+    "src/paranoia_local/prompts.py": "a103e7f48e6b6815e638d411af9dd60a2f10edd049400f0b22f5ee5ce9eba5f5",
+    "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+    "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+    "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+    "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "models": {
+    "codex": "gpt-6-astra",
+    "claude": "claude-fable-5-1"
+  },
+  "cli_versions": {
+    "codex": "codex-cli 0.153.3",
+    "claude": "2.1.258 (Claude Code)"
+  },
+  "manifest_sha256": "93f32ac7d41b81953f8f42ed513874b5469622d2a30e41f7b5ac97cb8a4e2695",
+  "baseline": {
+    "trial": "t026",
+    "revision": "9bd9b893ef7d21903aa704eb31176206eb9abe74",
+    "provider": "claude",
+    "fixture_sha256": "296ed74135aa79439de156d6272e2e072632f6b96ceab9387086ba213a668d80",
+    "audit_sha256": "b76e061000e58b53419b4bfc4ef6b88d010e78768a7cf42e31c2021ec79a9983",
+    "audit_local_path": "/tmp/paranoia-five-mode-pilot-v2-20260906/t026/logs/20260906T144516-critique_plan-ed78ab0e.json",
+    "claim_status": "validation-invalid",
+    "claim_audit_failed": true,
+    "claim_verdicts": [],
+    "structural_phase": "clear",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "outcome": "validation-invalid",
+        "duration_ms": 30398,
+        "requested_timeout_sec": 900,
+        "raw_sha256": "ec0e9db9792c61ab2667e00b1f7c97a43e206c71b32ac563f93bcec1e7899db5",
+        "response_sha256": "e29b08ea37fc1574dc3a411fff2218f53629ca1e533fca698e6a47c934be190e",
+        "validation_issue": "unexpected text after claim audit JSON"
+      },
+      {
+        "role": "claim-discovery-validation-retry",
+        "outcome": "validation-invalid",
+        "duration_ms": 11451,
+        "requested_timeout_sec": 900,
+        "raw_sha256": "909474589e0a303a9e27269f1b93f036e5721b70f9d5ac3dde1c0a123fcfa01a",
+        "response_sha256": "172e8039347b12e3761745ca29e788df69d127d1fba4ac52d09e57ebb20aa6fc",
+        "validation_issue": "claim 0: proposition introduces universal quantifier(s) absent from the verbatim plan wording: each, whole"
+      }
+    ],
+    "capture_provenance_sha256": [],
+    "cold_attestation_sha256": []
+  },
+  "candidate_diagnosis_of_exact_baseline_initial_reply": "unexpected text after claim audit JSON\nclaim 0: proposition introduces universal quantifier(s) absent from the verbatim plan wording: each, whole [/claims/0]",
+  "candidate": {
+    "trial": "t006",
+    "revision": "9f25e79f76455bf801f7f1c722657d35865b4b9c",
+    "provider": "claude",
+    "fixture_sha256": "296ed74135aa79439de156d6272e2e072632f6b96ceab9387086ba213a668d80",
+    "audit_sha256": "44294c36bc2f834620c19e4a89144f953002cbffa327ab8c84675fac94622afc",
+    "audit_local_path": "/tmp/paranoia-five-mode-pilot-v2-20260906/t006/logs/20260906T143410-critique_plan-c79f6b1e.json",
+    "claim_status": "parsed 1 new + 0 targeted retained + 0 frozen",
+    "claim_audit_failed": false,
+    "claim_verdicts": [
+      "supported"
+    ],
+    "structural_phase": "clear",
+    "attempts": [
+      {
+        "role": "claim-discovery",
+        "outcome": "validation-invalid",
+        "duration_ms": 20807,
+        "requested_timeout_sec": 900,
+        "raw_sha256": "39cb358c54352edb93b37bd51b3a6885c95dde8141fe66d9500d63ba8cc9eeca",
+        "response_sha256": "0023fa030b37ffbeb0755eccddbf2a0a2a87f55baf6e80d08495806eb84b9d04",
+        "validation_issue": "unexpected text after claim audit JSON\nclaim 0: proposition introduces universal quantifier(s) absent from the verbatim plan wording: each, whole [/claims/0]"
+      },
+      {
+        "role": "claim-discovery-validation-retry",
+        "outcome": "completed",
+        "duration_ms": 9689,
+        "requested_timeout_sec": 900,
+        "raw_sha256": "848f602a778e277a2b9c5a5f2c7dadf2520d2adf2f3765afe28697f0344c5d56",
+        "response_sha256": "8189c5b6ad63bcbe02a18154025f6ec613c6ebdec735633bb9903d66332c69d5",
+        "validation_issue": null
+      },
+      {
+        "role": "claim-binding",
+        "outcome": "completed",
+        "duration_ms": 5349,
+        "requested_timeout_sec": 300,
+        "raw_sha256": "d2e643fac9deb324cc2e39485ba20414c403a57ff7249cc5b57632d6f49187a2",
+        "response_sha256": "07327c86badb61b030c87cee7ff567149c7aea649370a047928f4afcef3e7520",
+        "validation_issue": null
+      },
+      {
+        "role": "claim-attestation",
+        "outcome": "completed",
+        "duration_ms": 6626,
+        "requested_timeout_sec": 300,
+        "raw_sha256": "6c2cb1da0e4763c0927a33a8f8c767ef760b7c3a2b650621ddeee4a53a0a90e1",
+        "response_sha256": "d2b2a458adc431cdf514d3296cd675288942109dc01b2e174e07c25b2037f22c",
+        "validation_issue": null
+      }
+    ],
+    "capture_provenance_sha256": [
+      "7ebcaf9c040d47d877658d9d981532a57ce2144e52ba0961bd93f81b4d4f0239"
+    ],
+    "cold_attestation_sha256": [
+      "3ff641ae33d7dbf03fb50e0235bcb6604eb77b204b803e1119de206cb422bd72"
+    ]
+  }
+}
