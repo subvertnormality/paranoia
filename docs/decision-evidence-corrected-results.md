@@ -16,6 +16,6 @@ The rerun followed CODE-review fixes for operational admission failure retention
 
 All 1,966 tests passed on the corrected source. The final repeat killed all 33 owned protocol mutants and passed seven historical equivalence groups; the receipt binds the unchanged owned source dependencies explicitly. The regression tests exercise correction, retained I/O failures, post-run source drift, worker failure, unknown timing, exact two-round workspace coverage and byte-exact retained audit copies.
 
-The machine-readable validation receipt, both complete campaign reports/manifests and all sixteen byte-exact native arbitration audits are retained. Raw provider envelopes and immutable replay worktrees remain at the recorded local paths. Paranoia CODE correction and cold final remain pending before delivery.
+The machine-readable validation receipt, both complete campaign reports/manifests and all sixteen byte-exact native arbitration audits are retained. Raw provider envelopes and immutable replay worktrees remain at the recorded local paths. At that source, CODE correction and cold final were pending. See the later [final-source results](decision-evidence-final-results.md).
 
 Native batching remains withheld under its separate failed gate. Issue #49's blinded effectiveness study and issue #50's wider architecture work remain open.

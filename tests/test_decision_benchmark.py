@@ -125,7 +125,7 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
 
 def test_retained_live_records_bind_exact_native_audit_bytes():
     receipt = json.loads((SCRIPTS.parent / "docs/decision_evidence_validation_2026-09-06.json").read_text())
-    for live in (receipt["live"], receipt["corrected_live"]):
+    for live in (receipt["live"], receipt["corrected_live"], receipt["final_live"]):
         for kind in ("manifest", "report"):
             path = SCRIPTS.parent / live[kind + "_path"]
             assert bench.shared.sha(path.read_bytes()) == live[kind + "_sha256"]
@@ -135,6 +135,27 @@ def test_retained_live_records_bind_exact_native_audit_bytes():
             assert bench.shared.sha(raw) == binding["sha256"] == row["audit_sha256"]
             audit = json.loads(raw)
             assert (audit["outcome"], audit["selected"]) == (row["outcome"], row["selected"])
+
+    replay = receipt["final_live"]["reporting_replay"]
+    raw = (SCRIPTS.parent / replay["reproduced_report_path"]).read_bytes()
+    assert bench.shared.sha(raw) == replay["reproduced_report_sha256"]
+    assert replay["original_intermediate_report_preserved"] is False
+    failed = json.loads(raw)
+    accepted = json.loads((SCRIPTS.parent / receipt["final_live"]["report_path"]).read_text())
+    assert failed["qualified"] is False
+    assert all("No such file or directory: 'codex'" in row["failure"] for row in failed["rows"])
+    for before, after in zip(failed["rows"], accepted["rows"], strict=True):
+        for key in ("index", "attempts", "output", "elapsed_ms", "audit_sha256"):
+            assert before[key] == after[key]
+        # Successful qualification adds the derived global sequence binding.
+        # Every originally captured workspace field must remain unchanged.
+        workspace = json.loads(json.dumps(after["workspaces"]))
+        for observation in workspace["provider_attempts"]:
+            sequence = observation.pop("attempt_sequence")
+            attempt = next(a for a in after["attempts"] if a["sequence"] == sequence)
+            assert attempt["role"] == "evidence-repository"
+            assert attempt["engine"] == observation["provider"]
+        assert before["workspaces"] == workspace
 
 
 def recorded_campaign(tmp_path, monkeypatch, *, two_rounds=False):
