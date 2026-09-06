@@ -1,0 +1,299 @@
+{
+  "kind": "full-merge-code-validation-v1",
+  "date": "2026-09-06",
+  "base": "9bd9b893ef7d21903aa704eb31176206eb9abe74",
+  "reviewed_head": "275564af7c841a5c0492aa3a56dba2b27d213540",
+  "reviewed_git_tree": "1b01d0d0cd9d39d4eef40e55fb85794434059826",
+  "scope": "Complete main-to-HEAD implementation diff, including issue 114, earlier architecture/runtime changes, census extraction and benchmark authority repairs and fail-closed discovery session validation.",
+  "contract": {
+    "path": "/tmp/paranoia-full-merge-contract-20260906.md",
+    "sha256": "2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b",
+    "source_contracts": {
+      "docs/review-architecture-performance-plan.md": "549ea1c4eb7323bb1f6614d818c002f026191553aba478cb86f89689876df722",
+      "docs/claim-audit-benchmark-plan.md": "d2389ee82675edddc6dbda75759806104b7e6c22c0d94fa315ec472542b01b35",
+      "docs/census-execution-plan.md": "ab156f41c967acee6ca171698ce6bdb35b308b1f0ca7e29bd70e18a158cb40c9"
+    }
+  },
+  "reviews": [
+    {
+      "round": 1,
+      "audit_path": "/tmp/paranoia-full-merge-review-logs/20260906T173458-critique_branch-b73f4925.json",
+      "audit_sha256": "8a94aa599abaa1eaa179670525288794d51e9aa0afd50ada49641bfb1d59c504",
+      "head": "c40e5179a904a77a26f9d1d5c6ad9e303c1c281d",
+      "snapshot": "92efe8685701ff87042002f173787de60a75010975911653d8d69ffbfef9cc11",
+      "engine": "codex",
+      "model": "gpt-6-astra",
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] The benchmark can credit failed query/rebut responses and resume failed setup queries because recognizable retained text can pass qualification and scoring without successful execution. (repository/src/paranoia_local/engines.py:258-291, repository/src/paranoia_local/handlers.py:2017-2034, repository/scripts/score_review_modes.py:19-29, repository/scripts/score_review_modes.py:31-76, repository/scripts/benchmark_review_modes.py:306-335, repository/scripts/benchmark_review_modes.py:369-372, repository/scripts/score_review_modes.py:155-191, repository/tests/test_review_modes_benchmark.py:80-119, plan:270-295)\n- [MINOR] Both benchmark campaigns can import ordinary source edits in later workers while retaining original frozen revision labels. This weakens reproducibility; the manifests do not establish that historical trials were affected. (repository/scripts/benchmark_review_modes.py:388-423, repository/scripts/benchmark_review_modes.py:264-271, repository/scripts/run_empty_census_acceptance.py:116-145, repository/scripts/run_empty_census_acceptance.py:29-40, repository/tests/test_review_modes_benchmark.py:315-329, repository/tests/test_empty_census_acceptance.py:143-176, plan:185-194, plan:230-235, repository/scripts/benchmark_review_modes.py:388-416, repository/scripts/run_empty_census_acceptance.py:117-145, repository/scripts/run_empty_census_acceptance.py:29-41, repository/scripts/score_review_modes.py:130-133, repository/README.md:508-513, plan:230-236)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nThe accepted settlement followed 1 earlier rejected staged payload. None of the rejected payloads' class or debt operations were applied; only the final accepted payload settled.\n\nValidation diagnostics:\n\n    /coverage/4/evidence/1: out-of-range repository anchor 'repository/src/paranoia_local/runner.py:107-140'\n\n## Improvements\n\n- [MAJOR] Bind setup qualification, rebut admission, and semantic scoring to the corresponding audit's successful execution outcome and exact output/session. Reject failed or unavailable outcomes regardless of retained prose. Add nonzero-exit and in-band-error regressions containing otherwise creditable query/rebut text, retaining their costs as non-success results.\n- [MINOR] Use shared revision, complete inventory, and file-hash validation immediately before each worker imports the selected checkout in both harnesses. Recheck frozen harness bytes before later launches. Refuse mismatches before provider admission, retain affected slots as incomplete, and preserve completed historical trials. Add regressions that edit source or harness bytes during an earlier trial and verify refusal of the next affected launch.",
+      "trailer": "LINEAGE: paranoia-full-merge-20260906 (rounds recorded: 1)\nPLAN-DIGEST: 2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b\nCLASS-REGISTER: staged census parsed \u2014 NONE; 1 earlier rejected payload discarded; none of their operations applied; validation: /coverage/4/evidence/1: out-of-range repository anchor 'repository/src/paranoia_local/runner.py:107-140'\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED \u2014 staged structural debt remains open.\nSTAGED-ATTEMPTS: total=5 validation-retries=1 validation-invalid=1 execution-failed=0",
+      "attempts": [
+        {
+          "role": "census-behaviour",
+          "sequence": 1,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 466353,
+          "requested_timeout_sec": 1800,
+          "raw_sha256": "72187662f7ab0ce66946ae4d83a01abf7fab6a2fb935e96f4c1dbf9746ddf9de",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        },
+        {
+          "role": "census-execution",
+          "sequence": 2,
+          "outcome": "validation-invalid",
+          "returncode": 0,
+          "duration_ms": 400551,
+          "requested_timeout_sec": 1800,
+          "raw_sha256": "786d76c14b49652ef31e753a53dd9b2080f8d75e1549ffce8b46cea0c19e09f7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": "/coverage/4/evidence/1: out-of-range repository anchor 'repository/src/paranoia_local/runner.py:107-140'",
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        },
+        {
+          "role": "census-integrity",
+          "sequence": 3,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 396181,
+          "requested_timeout_sec": 1800,
+          "raw_sha256": "0b49021ffd5b67880f87c9131c6408fa223ed270239142b20bf01fd99eed39eb",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        },
+        {
+          "role": "census-execution-validation-retry",
+          "sequence": 4,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 64150,
+          "requested_timeout_sec": 600,
+          "raw_sha256": "0caf60d8df4455e55b4ef51fde684ec55bbdd2ab02dc61e67e5e341116e1e271",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        },
+        {
+          "role": "consolidation",
+          "sequence": 5,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 60431,
+          "requested_timeout_sec": 1200,
+          "raw_sha256": "e12e88d1baeb7c422814fda691d955274e5ad0810bbc0da6e898382cd18bf925",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "audit_path": "/tmp/paranoia-full-merge-review-logs/20260906T175320-critique_branch-7d71ed0b.json",
+      "audit_sha256": "4623a9b42b0ceeada9c92fd0b44336d2bc5a3b4cbad05b43f9ceb50e2579c180",
+      "head": "576db12786e079583607e20a3168f756db89b988",
+      "snapshot": "eb84e15fd034e72c0d9fa87b759e32010a02a30eec428bf901617dd3cbddd6af",
+      "engine": "codex",
+      "model": "gpt-6-astra",
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+      "trailer": "LINEAGE: paranoia-full-merge-20260906 (rounds recorded: 2)\nPLAN-DIGEST: 2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b\nCLASS-REGISTER: staged correction parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED \u2014 cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "attempts": [
+        {
+          "role": "correction",
+          "sequence": 1,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 113401,
+          "requested_timeout_sec": 2400,
+          "raw_sha256": "bf92089bad3526173e2bd054250099e14c1e6d8134617a6d6bfb80f91eb10456",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "audit_path": "/tmp/paranoia-full-merge-review-logs/20260906T180135-critique_branch-496ad205.json",
+      "audit_sha256": "9ba203500976e7a00277cfe4f81a6a35d052cde19526f5194b290a796e0a1852",
+      "head": "576db12786e079583607e20a3168f756db89b988",
+      "snapshot": "eb84e15fd034e72c0d9fa87b759e32010a02a30eec428bf901617dd3cbddd6af",
+      "engine": "codex",
+      "model": "gpt-6-astra",
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] Sessionless discovery can clear external claims without capture or cold attestation. With returncode=0, error=false, a valid supported-claim audit, and session_ref=None, either discovery exit returns directly to reconciliation. A clean structural result can then emit NOT-BLOCKED using provider-authored evidence alone. This defect predates the diff but remains in the production lifecycle explicitly covered by the frozen contract. (repository/src/paranoia_local/handlers.py:3323-3332, repository/src/paranoia_local/handlers.py:3344-3358, repository/src/paranoia_local/engines.py:618-624, repository/src/paranoia_local/handlers.py:3148-3192, repository/src/paranoia_local/handlers.py:3259-3267, repository/src/paranoia_local/plan_claims.py:535-550, repository/src/paranoia_local/plan_claims.py:1115-1122, repository/tests/test_plan_claims.py:4746-4793, plan:302-304)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Make both sessionless discovery exits return an explicit failed Review with retained attempt diagnostics and prior debt. Extend the named lifecycle tests with valid initial and corrected replies lacking a session, and verify through the public plan handler that neither can settle supported claims or emit NOT-BLOCKED. Preserve the discovery parser's existing role; no extra model call or persistence mechanism is needed.",
+      "trailer": "LINEAGE: paranoia-full-merge-20260906 (rounds recorded: 3)\nPLAN-DIGEST: 2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b\nCLASS-REGISTER: staged final parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED \u2014 staged structural debt remains open.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "attempts": [
+        {
+          "role": "final",
+          "sequence": 1,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 439893,
+          "requested_timeout_sec": 2400,
+          "raw_sha256": "75cf49eb0dcd718ea75b5198f9777ef7f2821fd1316035815343a710bf148a26",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "audit_path": "/tmp/paranoia-full-merge-review-logs/20260906T181709-critique_branch-25b66680.json",
+      "audit_sha256": "319984d782ba9a7223b1759bdafc378b2e698bfa6888f8494fac6a2a9e5c5dc3",
+      "head": "275564af7c841a5c0492aa3a56dba2b27d213540",
+      "snapshot": "4e1f56d2b5dd01bfae5c8a50818477f8fad10257ff09cb74c4caf4e6bb8c96fc",
+      "engine": "codex",
+      "model": "gpt-6-astra",
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nThe accepted settlement followed 1 earlier rejected staged payload. None of the rejected payloads' class or debt operations were applied; only the final accepted payload settled.\n\nValidation diagnostics:\n\n    /debt_outcomes/0/evidence/4: out-of-range repository anchor 'repository/tests/test_plan_claims.py:4821-4915'\n\n## Improvements\n\nNothing notable.",
+      "trailer": "LINEAGE: paranoia-full-merge-20260906 (rounds recorded: 4)\nPLAN-DIGEST: 2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b\nCLASS-REGISTER: staged correction parsed \u2014 NONE; 1 earlier rejected payload discarded; none of their operations applied; validation: /debt_outcomes/0/evidence/4: out-of-range repository anchor 'repository/tests/test_plan_claims.py:4821-4915'\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED \u2014 cold final regression is required.\nSTAGED-ATTEMPTS: total=2 validation-retries=1 validation-invalid=1 execution-failed=0",
+      "attempts": [
+        {
+          "role": "correction",
+          "sequence": 1,
+          "outcome": "validation-invalid",
+          "returncode": 0,
+          "duration_ms": 96031,
+          "requested_timeout_sec": 2400,
+          "raw_sha256": "2aed2e8a1101435fe2c13bd8a5c6c3e32cc30db5cdcc922ad9e7a26a3435ef4b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": "/debt_outcomes/0/evidence/4: out-of-range repository anchor 'repository/tests/test_plan_claims.py:4821-4915'",
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        },
+        {
+          "role": "correction-validation-retry",
+          "sequence": 2,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 22010,
+          "requested_timeout_sec": 600,
+          "raw_sha256": "d92efb7d5893296d6c38582f388301ab06f7e000a05504327139769c9dc6e20a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        }
+      ]
+    },
+    {
+      "round": 5,
+      "audit_path": "/tmp/paranoia-full-merge-review-logs/20260906T182453-critique_branch-edad903e.json",
+      "audit_sha256": "293b3acf86bdb11ba2b538773eb91ed8a68bb572225c9952dc54d404d82cbe28",
+      "head": "275564af7c841a5c0492aa3a56dba2b27d213540",
+      "snapshot": "4e1f56d2b5dd01bfae5c8a50818477f8fad10257ff09cb74c4caf4e6bb8c96fc",
+      "engine": "codex",
+      "model": "gpt-6-astra",
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+      "trailer": "LINEAGE: paranoia-full-merge-20260906 (rounds recorded: 5)\nPLAN-DIGEST: 2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b\nCLASS-REGISTER: staged final parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: clear\nSTRUCTURAL-DEBT: 0 blocking open\nCONVERGENCE: NOT-BLOCKED \u2014 staged structural debt is clear.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "attempts": [
+        {
+          "role": "final",
+          "sequence": 1,
+          "outcome": "completed",
+          "returncode": 0,
+          "duration_ms": 423159,
+          "requested_timeout_sec": 2400,
+          "raw_sha256": "940fb27861141275bef55daf6465aa4a4bd3dac7bb3ae9bccd348345e70e4ac9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "validation_issue": null,
+          "validation_pointer": null,
+          "rejected_reply_sha256": null
+        }
+      ]
+    }
+  ],
+  "durable_state_sha256": "06c6e30c06027aa3751dfbe49f6ba845b69feb4a56d8a82bb8fa079eb6b20da0",
+  "durable_review_state": {
+    "version": 1,
+    "stakes_digest": "9400013f7377db60743c203bcdc6da7774599660f85b23e1962d9afe61b13432",
+    "stakes": "One trusted local operator and OS run the MCP server and signed-in reviewer CLIs. Repository, plan, provider and fetched bytes are untrusted static data; reviewers do not execute repository-selected code. Ordinary edits invalidate affected snapshot evidence and block/retry. Hundreds of files, tens to low hundreds of claims, three concurrent census lanes and sequential settlement; evidence useful within minutes. Existing CLI provider network and public HTTP capture boundaries. False clearance, authority errors and wrong evidence binding have high impact; recoverable blocking is acceptable. Exclude hostile same-user races, compromised OS, multi-tenancy, deliberately corrupted-state recovery and formal or universal performance guarantees.",
+    "phase": "clear",
+    "snapshot_digest": "4e1f56d2b5dd01bfae5c8a50818477f8fad10257ff09cb74c4caf4e6bb8c96fc",
+    "debt": [
+      {
+        "id": "D1",
+        "finding_id": "G1",
+        "status": "closed",
+        "severity": "MAJOR",
+        "summary": "The benchmark can credit failed query/rebut responses and resume failed setup queries because recognizable retained text can pass qualification and scoring without successful execution.",
+        "evidence": [
+          "repository/scripts/benchmark_review_modes.py:290-324",
+          "repository/scripts/benchmark_review_modes.py:370-409",
+          "repository/scripts/score_review_modes.py:20-55",
+          "repository/scripts/score_review_modes.py:168-193",
+          "repository/tests/test_review_modes_benchmark.py:358-453"
+        ],
+        "remedy": "Bind setup qualification, rebut admission, and semantic scoring to the corresponding audit's successful execution outcome and exact output/session. Reject failed or unavailable outcomes regardless of retained prose. Add nonzero-exit and in-band-error regressions containing otherwise creditable query/rebut text, retaining their costs as non-success results.",
+        "source_ids": [
+          "behaviour:B1"
+        ],
+        "class_ids": [],
+        "first_round": 1,
+        "last_round": 2
+      },
+      {
+        "id": "D2",
+        "finding_id": "F1",
+        "status": "closed",
+        "severity": "MAJOR",
+        "summary": "Sessionless discovery can clear external claims without capture or cold attestation. With returncode=0, error=false, a valid supported-claim audit, and session_ref=None, either discovery exit returns directly to reconciliation. A clean structural result can then emit NOT-BLOCKED using provider-authored evidence alone. This defect predates the diff but remains in the production lifecycle explicitly covered by the frozen contract.",
+        "evidence": [
+          "repository/src/paranoia_local/handlers.py:3328-3366",
+          "repository/src/paranoia_local/handlers.py:3528-3545",
+          "repository/src/paranoia_local/handlers.py:3145-3198",
+          "repository/src/paranoia_local/handlers.py:1961-1973",
+          "repository/tests/test_plan_claims.py:4821-4913"
+        ],
+        "remedy": "Make both sessionless discovery exits return an explicit failed Review with retained attempt diagnostics and prior debt. Extend the named lifecycle tests with valid initial and corrected replies lacking a session, and verify through the public plan handler that neither can settle supported claims or emit NOT-BLOCKED. Preserve the discovery parser's existing role; no extra model call or persistence mechanism is needed.",
+        "source_ids": [],
+        "class_ids": [],
+        "first_round": 3,
+        "last_round": 4
+      }
+    ],
+    "correction_control": {
+      "version": 1,
+      "classes": {}
+    },
+    "last_round": 5
+  },
+  "validation": {
+    "full_suite": {
+      "source_revision": "275564af7c841a5c0492aa3a56dba2b27d213540",
+      "result": "1913 passed in 120.06s",
+      "log": "/tmp/paranoia-session-gate-full-tests-isolated.txt",
+      "sha256": "652288de72b97ad87e6ad185dd665d74eebe2e7a786145e366f3714c0c60b6c1"
+    },
+    "mutations": {
+      "result": "All 33 owned Protocol v2 mutants were killed.",
+      "log": "/tmp/paranoia-session-gate-mutations.txt",
+      "sha256": "ac742c026f4f293f319cc7b784a2827704d299558b2b3606d75bae362db4eea0",
+      "scope": "Executed again on the reviewed head, including the changed handler; all 33 isolated mutants were killed and the seven historical V1/V2 differential groups passed."
+    },
+    "environment_retry": "An earlier full-suite invocation inherited global Git signing and failed 57 fixture commits. The recorded passing run isolates Git global/system configuration per process without changing user settings.",
+    "session_gate_regression": "The public-handler test reproduced false clearance before the fix. Eight provider/initial-or-retry/prior-debt cases now fail closed, preserve diagnostics and block combined clearance; existing capture/binding/attestation success coverage also passes.",
+    "historical_pilot_revalidation": "All 40 original trial categories, correctness and costs remain unchanged after enforcing native execution evidence. Zero provider calls; original records retained."
+  },
+  "merge_readiness": "Paranoia CODE correction closed the benchmark execution blocker and the later sessionless discovery blocker; independent cold final completed with no blocking debt.",
+  "receipt_boundary": "This is a documentation-only receipt added after the reviewed head. It does not claim its own Git snapshot was provider-reviewed or change the reviewed implementation.",
+  "limits": "High confidence in merge readiness under the frozen trusted-local operating model, not a guarantee of general speedup, population review quality or future LLM maintenance performance."
+}
