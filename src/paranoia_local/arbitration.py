@@ -420,8 +420,8 @@ def _normalize_path(path: str) -> str:
     spelling. Not rewriting does: the path must be a literal entry in the cited
     commit's tree (enforced downstream by the object-type check in
     `evidence._blob`), so a citation either names exactly one real tracked file or it
-    drops. A model that writes `./f.py` gets a dropped citation, which costs one
-    `UNRESOLVED` — the cheap, self-announcing outcome.
+    does not resolve. Live decider admission offers the existing bounded correction
+    before accepting such a declaration; final substantiation still rejects it.
     """
     if path.startswith("repository/"):
         path = path[len("repository/"):]
@@ -776,7 +776,10 @@ def _trailer_values(text: str) -> dict[str, str]:
     return found
 
 
-def parse_verdict(text: str, presentation: Presentation) -> Vote:
+def parse_verdict(
+    text: str, presentation: Presentation, *,
+    evidence_validator: Callable[[Mapping[str, str]], None] | None = None,
+) -> Vote:
     """Parse one decider's reply, or raise.
 
     `SELECTED` must be an exact member of the labels issued to THIS decider. A
@@ -788,6 +791,9 @@ def parse_verdict(text: str, presentation: Presentation) -> Vote:
     missing = [f for f in TRAILER_FIELDS if f not in values]
     if missing:
         raise ArbitrationError(f"reply is missing trailer field(s): {', '.join(missing)}")
+
+    if evidence_validator is not None:
+        evidence_validator(values)
 
     # Full-string match, not the first token: `SELECTED: <label> (the safe one)`
     # must fail rather than quietly discarding the trailing commentary, which could

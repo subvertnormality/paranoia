@@ -1,0 +1,141 @@
+{
+  "manifest_sha256": "e82f2720d82c43a76a0b4ba2800bd447e6b1355650b1824fe099bb97b89d978b",
+  "rows": [
+    {
+      "index": 0,
+      "case": "f496421303d3",
+      "version": "baseline",
+      "qualified": true,
+      "outcome": "CONVERGED",
+      "selected": "inclusive",
+      "elapsed_ms": 55694,
+      "workspaces": {
+        "rows": [
+          {
+            "provider": "claude",
+            "cwd": "/tmp/paranoia-evidence-u1c1otd1/evidence",
+            "root": "/tmp/paranoia-evidence-u1c1otd1/evidence",
+            "snapshot": "2f36113b3bd0a8e214e46f97c77ec6c67b36f921",
+            "fingerprint": "ebda95d92f92e0f8584b1088f4161e5b8199082b269c8b092e1fc32c27301f0c",
+            "cleaned_up": true
+          },
+          {
+            "provider": "codex",
+            "cwd": "/tmp/paranoia-evidence-bgznkxba/launch",
+            "root": "/tmp/paranoia-evidence-bgznkxba/evidence",
+            "snapshot": "2f36113b3bd0a8e214e46f97c77ec6c67b36f921",
+            "fingerprint": "ebda95d92f92e0f8584b1088f4161e5b8199082b269c8b092e1fc32c27301f0c",
+            "cleaned_up": true
+          }
+        ],
+        "batch_invocations": 0
+      },
+      "audit": "/tmp/paranoia-native-batch-live-20260906/trial-0/logs/20260906T192704-arbitrate-370c8304.json",
+      "audit_sha256": "2ccbd813286f0ebba4162852a03d33900c5cc984ad1a449043357976ce92af13",
+      "report_sha256": "463f37d64210a1e2a8af19b579cc1cec2cac489fff99a735b51ce53f02b96165"
+    },
+    {
+      "index": 1,
+      "case": "f496421303d3",
+      "version": "candidate",
+      "qualified": false,
+      "outcome": "UNRESOLVED",
+      "selected": null,
+      "elapsed_ms": 59386,
+      "workspaces": {
+        "rows": [
+          {
+            "provider": "codex",
+            "cwd": "/tmp/paranoia-evidence-66m6ut8b/launch",
+            "root": "/tmp/paranoia-evidence-66m6ut8b/evidence",
+            "snapshot": "2f36113b3bd0a8e214e46f97c77ec6c67b36f921",
+            "fingerprint": "ebda95d92f92e0f8584b1088f4161e5b8199082b269c8b092e1fc32c27301f0c",
+            "cleaned_up": true
+          },
+          {
+            "provider": "claude",
+            "cwd": "/tmp/paranoia-evidence-rzovijd1/evidence",
+            "root": "/tmp/paranoia-evidence-rzovijd1/evidence",
+            "snapshot": "2f36113b3bd0a8e214e46f97c77ec6c67b36f921",
+            "fingerprint": "ebda95d92f92e0f8584b1088f4161e5b8199082b269c8b092e1fc32c27301f0c",
+            "cleaned_up": true
+          }
+        ],
+        "batch_invocations": 2
+      },
+      "audit": "/tmp/paranoia-native-batch-live-20260906/trial-1/logs/20260906T192804-arbitrate-8b0b8888.json",
+      "audit_sha256": "7101af12dee5c5c2663576152360ca9673cb6a2e02e8336fef9dfded2cfd4c23",
+      "report_sha256": "d3031212e306b9c31ef97f98a521dfd6fe5a6f46900a9e8cbd568a1242f03708"
+    },
+    {
+      "index": 2,
+      "case": "7d0bbefd2a3c",
+      "version": "candidate",
+      "qualified": false,
+      "outcome": "UNRESOLVED",
+      "selected": null,
+      "elapsed_ms": 83619,
+      "workspaces": {
+        "rows": [
+          {
+            "provider": "codex",
+            "cwd": "/tmp/paranoia-evidence-ifkv3eeo/launch",
+            "root": "/tmp/paranoia-evidence-ifkv3eeo/evidence",
+            "snapshot": "ec468f58e93d07524a740bd5089674cbddeef742",
+            "fingerprint": "31b701b8126b5070e93eb7feb4599b91fe348b54ab4010eb8522ebdba034ec02",
+            "cleaned_up": true
+          },
+          {
+            "provider": "claude",
+            "cwd": "/tmp/paranoia-evidence-zpin1c03/evidence",
+            "root": "/tmp/paranoia-evidence-zpin1c03/evidence",
+            "snapshot": "ec468f58e93d07524a740bd5089674cbddeef742",
+            "fingerprint": "31b701b8126b5070e93eb7feb4599b91fe348b54ab4010eb8522ebdba034ec02",
+            "cleaned_up": true
+          }
+        ],
+        "batch_invocations": 2
+      },
+      "audit": "/tmp/paranoia-native-batch-live-20260906/trial-2/logs/20260906T192929-arbitrate-8ecd9744.json",
+      "audit_sha256": "7fae44c1be1f082dfb3c9bfd353377eed30ad07bd319b5b02f3d90726850ed1e",
+      "report_sha256": "68e2cf0ba7eb002ecf95f7b6f095958b42b2192bd6e6a7ba2edfd4c48342f007"
+    },
+    {
+      "index": 3,
+      "case": "7d0bbefd2a3c",
+      "version": "baseline",
+      "qualified": false,
+      "outcome": "UNRESOLVED",
+      "selected": null,
+      "elapsed_ms": 64072,
+      "workspaces": {
+        "rows": [
+          {
+            "provider": "codex",
+            "cwd": "/tmp/paranoia-evidence-dngdld11/launch",
+            "root": "/tmp/paranoia-evidence-dngdld11/evidence",
+            "snapshot": "ec468f58e93d07524a740bd5089674cbddeef742",
+            "fingerprint": "31b701b8126b5070e93eb7feb4599b91fe348b54ab4010eb8522ebdba034ec02",
+            "cleaned_up": true
+          },
+          {
+            "provider": "claude",
+            "cwd": "/tmp/paranoia-evidence-jpy1lvgt/evidence",
+            "root": "/tmp/paranoia-evidence-jpy1lvgt/evidence",
+            "snapshot": "ec468f58e93d07524a740bd5089674cbddeef742",
+            "fingerprint": "31b701b8126b5070e93eb7feb4599b91fe348b54ab4010eb8522ebdba034ec02",
+            "cleaned_up": true
+          }
+        ],
+        "batch_invocations": 0
+      },
+      "audit": "/tmp/paranoia-native-batch-live-20260906/trial-3/logs/20260906T193035-arbitrate-3caa9eee.json",
+      "audit_sha256": "cb7d1ef73e0d42ad7e40a6e85540ae15b870552ed2633b4b2645b0a6c0eff284",
+      "report_sha256": "d7b71109053d9899a38b158143ff121fc48cb74c8558194fb1c2b0771fbdf1ce"
+    }
+  ],
+  "paired_equivalence": false,
+  "calls": 16,
+  "qualified": false,
+  "limits": "Four live integration dispatches, not a population speed or quality study."
+}

@@ -662,3 +662,5 @@ rewrites original adjudications. These checks belong to the shared benchmark bou
 not a new production-review state or persistence mechanism.
 
 Require a resumable session before either initial or corrected discovery may leave the captured-claim adapter. A sessionless successful process reply is locally invalid metadata, never a captured audit. Preserve its actual return code, native channels, ordered discovery attempts and prior claim history as blocking audit debt; do not add a model call or accept provider-authored evidence. Cover both provider routes through the public plan handler, including clean structural settlement.
+
+For arbitration decision-evidence admission, validate declared repository references before accepting a decider Cast, using the existing exact snapshot resolver and the existing single format/evidence correction allowance. Preserve NONE and final independent substantiation. Never repair absolute paths by rewriting them, silently drop malformed declared references, add an execution retry, or weaken carried-evidence grounding. The native batching experiment remains withheld pending its own acceptance.

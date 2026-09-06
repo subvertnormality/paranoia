@@ -532,3 +532,7 @@ unavailable execution while retaining costs and original score records. See the
 [merge benchmark validation](docs/merge_benchmark_validation_2026-09-06.json).
 
 Verified-plan discovery requires a resumable provider session on both the initial reply and its existing correction. A sessionless reply remains audit-failure debt even if its prose claims support; no provider-authored evidence can bypass server capture and cold attestation. The failure retains native process channels and ordered attempt diagnostics. Retry the review without weakening the claim.
+
+### Decision evidence admission experiment
+
+The next architecture experiment validates arbitration repository citations while the existing bounded correction opportunity is available. It preserves exact snapshot resolution and independent final substantiation. The implementation and live convergence comparison must pass the [acceptance contract](docs/decision-evidence-admission-plan.md) before delivery. Native snapshot batching remains withheld after its live acceptance campaign; measured setup gains alone do not establish delivery readiness.

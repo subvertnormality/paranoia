@@ -1561,13 +1561,16 @@ def test_later_carried_region_failure_keeps_earlier_bytes(
     def read_region(repo_, region):
         nonlocal reads
         reads += 1
-        # Substantiation and union derivation resolve both anchors before the two
-        # round-two transport reads.
-        if reads == 6:
+        # Inject only at the named transport boundary, independent of admission reads.
+        if reads == 2:
             raise RuntimeError("second carried region failed")
         return real_read(repo_, region)
 
-    monkeypatch.setattr(ah.evidence, "read_region", read_region)
+    real_union = ah._read_union
+    def read_union(*args, **kwargs):
+        monkeypatch.setattr(ah.evidence, "read_region", read_region)
+        return real_union(*args, **kwargs)
+    monkeypatch.setattr(ah, "_read_union", read_union)
     report = run(repo, agent, tmp_path, clean=False)
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
@@ -3046,15 +3049,24 @@ def test_two_spellings_of_one_commit_do_not_manufacture_novelty(repo: Path, tmp_
             ("claude", 1): {"decisive": f"{head[:12]}@app.py:4"},
         },
     )
-    report = run(repo, agent, tmp_path)
+    def actual_snapshot(**kwargs):
+        text = agent(**kwargs)
+        cwd = kwargs["cwd"]
+        if cwd is not None:
+            manifest = Path(cwd) / ("EVIDENCE_MANIFEST.json" if kwargs["engine_name"] == "codex" else "MANIFEST.json")
+            snapshot = json.loads(manifest.read_text())["snapshot"]
+            length = 7 if kwargs["engine_name"] == "codex" else 12
+            text = text.replace(head[:length] + "@", snapshot[:length] + "@")
+        return text
+    report = run(repo, actual_snapshot, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
     assert trailer_field(report, "ROUNDS") == "1"
     assert "withheld" in report
 
 
 def test_wrapper_and_parent_citations_do_not_manufacture_novelty(repo: Path, tmp_path: Path):
-    """The normal shape of the round-3 blocker, end to end: one vendor cites bare,
-    the other cites HEAD@, same unchanged file. Round 2 must be withheld."""
+    """A parent is outside the inert snapshot. Repeated parent declarations fail
+    admission without manufacturing novelty or spending a reconciliation round."""
     head = git(["rev-parse", "HEAD"], repo).strip()
     picks = {("codex", 1): "opt-float", ("claude", 1): "opt-decimal"}
     agent = Agent(
@@ -3065,9 +3077,11 @@ def test_wrapper_and_parent_citations_do_not_manufacture_novelty(repo: Path, tmp
         },
     )
     report = run(repo, agent, tmp_path)
-    assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
-    assert trailer_field(report, "ROUNDS") == "1"
-    assert "withheld" in report
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "reply remained invalid after one correction" in report
+    assert not any("CODE REGIONS RELEVANT" in c["body"] for c in agent.calls)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert len(record["failed_round"]["deciders"]["claude"]["attempts"]) == 2
 
 
 def test_a_commit_landing_during_the_snapshot_fails(repo: Path, tmp_path: Path, monkeypatch):

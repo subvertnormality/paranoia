@@ -15,6 +15,7 @@ itself read.
 
 from __future__ import annotations
 
+from .decision_evidence import DecisionEvidence
 from . import telemetry
 
 import hashlib
@@ -2777,6 +2778,7 @@ def _fan_out(
                     f"workspace setup failed before provider invocation: "
                     f"{type(exc).__name__}: {exc}", attempts,
                 ) from exc
+            admission = DecisionEvidence(repo, snapshot)
             attempt_body = body
             for attempt in range(2):
                 current = attempts[-1]
@@ -2813,7 +2815,7 @@ def _fan_out(
                         f"initial attempt failed: {type(exc).__name__}: {exc}", attempts,
                     ) from exc
                 try:
-                    vote = arb.parse_verdict(text, presentation)
+                    vote = admission.parse_reply(text, presentation)
                 except ArbitrationError as exc:
                     attempts[-1] = DeciderAttempt(
                         attempt_body, text, str(exc),

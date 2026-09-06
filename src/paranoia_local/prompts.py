@@ -343,7 +343,7 @@ DECISION-RELEVANCE: N/A
 DECISIVE-CITATION: <path>:<line> or SOURCE:<packet-id>
 CITATIONS: NONE
 
-These six lines must be the LAST thing in your reply, each appearing exactly once, and none of these field names may appear anywhere earlier in it. Write your reasoning as prose; do not restate or preview the format. A duplicated or early field line fails the whole reply, because a parser that preferred one occurrence would silently discard the other — including a blocking risk or the citation your vote actually rests on.
+These ten lines must be the LAST thing in your reply, each appearing exactly once, and none of these field names may appear anywhere earlier in it. Write your reasoning as prose; do not restate or preview the format. A duplicated or early field line fails the whole reply, because a parser that preferred one occurrence would silently discard the other — including a blocking risk or the citation your vote actually rests on.
 
 Field rules — these are parsed mechanically, so exact form matters:
 
@@ -353,7 +353,7 @@ Field rules — these are parsed mechanically, so exact form matters:
 - NEW-OPTION — `NONE`, or one line describing an unlisted option you judge STRICTLY BETTER than the one you selected. Use it only when you mean it: it ends the adjudication and returns the decision to the operator for reframing.
 - CONSTRAINT — one line, a verifiable fact about the system, not a preference and not a restatement of your choice.
 - PUBLISHER-AUTHORITY, PASSAGE-ENTAILMENT, and DECISION-RELEVANCE — for a repository citation, all three must be exactly `N/A`. For `SOURCE:<packet-id>`, each must be `YES — <specific reason>` or `NO — <specific reason>`. Judge whether the publisher governs the exact proposition, whether the captured passage entails it, and whether it materially bears on the option comparison under the stated stakes. A researcher label is not authority.
-- DECISIVE-CITATION — exactly one `<path>:<line>` in the materialized snapshot or `SOURCE:<packet-id>` for the evidence your selection actually turns on. Historical blobs and symlink referents are not present in the inert workspace and cannot substantiate a vote. A source reference is valid only for a captured packet shown in the task, and then CONSTRAINT must copy that packet's atomic proposition exactly. `NONE` means the decision cannot be reported as settled.
+- DECISIVE-CITATION — exactly one literal repository-relative `<path>:<positive-line>` in the materialized snapshot or `SOURCE:<packet-id>` for the evidence your selection actually turns on. The path is relative to the repository root, optionally prefixed by `repository/`, never an absolute temporary-workspace path; do not add `./` or normalize a path onto another file. Historical blobs and symlink referents are not present in the inert workspace and cannot substantiate a vote. A source reference is valid only for a captured packet shown in the task, and then CONSTRAINT must copy that packet's atomic proposition exactly. `NONE` means the decision cannot be reported as settled.
 - CITATIONS — up to three further `<path>:<line>` for supporting evidence, or `NONE`. Supporting only; they do not substantiate."""
 
 
