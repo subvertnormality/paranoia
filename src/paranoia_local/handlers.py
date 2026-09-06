@@ -30,7 +30,7 @@ from typing import Any, Callable, Mapping, Sequence
 from . import arbitration, class_closure as cc
 from . import engines as eng, external_sources, inert_git, inert_tree
 from . import logs, orientation, plan_claims as pc, prompts, review_census as rc
-from . import staged_protocol as sp
+from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions
 from .config import load_repo_config, resolve
 from .engines import Engine, Review
@@ -1245,6 +1245,44 @@ def _is_legacy_claim_only_phase(
     )
 
 
+def _validate_census_lane(
+    text: str, lane: str, *, mode: str, cwd: Path, plan_lines: int | None,
+    active_classes: list[dict[str, Any]], canonical: bool = False,
+) -> dict[str, Any]:
+    try:
+        if canonical:
+            parsed = sp.decode_canonical_lane(text, mode=mode, lane=lane)
+            issues: list[str] = []
+        else:
+            parsed, issues = sp.decode_lane_with_issues(
+                text, mode=mode, lane=lane,
+                active_classes=active_classes if lane == "integrity" else (),
+            )
+    except sp.ProtocolError as exc:
+        raise rc.CensusError(str(exc)) from exc
+    try:
+        sp.validate_lane_value(
+            parsed, lane=lane,
+            active_classes=active_classes if lane == "integrity" else (),
+        )
+    except sp.ProtocolError as exc:
+        issues.extend(str(exc).splitlines())
+    trusted_roots = None
+    repository_alias = cwd / "repository"
+    if mode == cc.PLAN_MODE and repository_alias.is_symlink():
+        trusted_roots = {"repository": repository_alias.resolve(strict=True)}
+    elif mode == cc.BRANCH_MODE:
+        trusted_roots = {"repository": cwd.resolve(strict=True)}
+    try:
+        rc.resolve_anchors(
+            parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
+        )
+    except rc.CensusError as exc:
+        issues.extend(str(exc).splitlines())
+    _raise_staged_validation_issues(issues)
+    return parsed
+
+
 def _staged_structural_review(
     *, engine: Engine, cwd: Path, model: str, effort: str, mode: str, body: str,
     closure: "_ClosureRound", stakes: str, snapshot: str, round_no: int,
@@ -1438,42 +1476,6 @@ def _staged_structural_review(
             sequence_value += 1
             return sequence_value
 
-    def validate_lane(
-        text: str, lane: str, *, canonical: bool = False,
-    ) -> dict[str, Any]:
-        try:
-            if canonical:
-                parsed = sp.decode_canonical_lane(text, mode=mode, lane=lane)
-                issues: list[str] = []
-            else:
-                parsed, issues = sp.decode_lane_with_issues(
-                    text, mode=mode, lane=lane,
-                    active_classes=active_classes if lane == "integrity" else (),
-                )
-        except sp.ProtocolError as exc:
-            raise rc.CensusError(str(exc)) from exc
-        try:
-            sp.validate_lane_value(
-                parsed, lane=lane,
-                active_classes=active_classes if lane == "integrity" else (),
-            )
-        except sp.ProtocolError as exc:
-            issues.extend(str(exc).splitlines())
-        trusted_roots = None
-        repository_alias = cwd / "repository"
-        if mode == cc.PLAN_MODE and repository_alias.is_symlink():
-            trusted_roots = {"repository": repository_alias.resolve(strict=True)}
-        elif mode == cc.BRANCH_MODE:
-            trusted_roots = {"repository": cwd.resolve(strict=True)}
-        try:
-            rc.resolve_anchors(
-                parsed, root=cwd, plan_lines=plan_lines, trusted_roots=trusted_roots,
-            )
-        except rc.CensusError as exc:
-            issues.extend(str(exc).splitlines())
-        _raise_staged_validation_issues(issues)
-        return parsed
-
     def validate_settlement(
         text: str, *, source_ids: list[str], assessment_ids: list[str],
         source_severities: dict[str, str] | None = None,
@@ -1610,12 +1612,7 @@ def _staged_structural_review(
             lane_prompts=lane_prompts,
         )
 
-        def run_lane(
-            lane: str,
-        ) -> tuple[
-            str, Review, dict[str, Any], list[rc.Attempt], list[dict[str, Any]],
-            dict[str, list[str]],
-        ]:
+        def run_lane(lane: str) -> census.LaneResult:
             prompt = lane_prompts[lane]
             prompt_issue = _staged_prompt_issue(prompt, "staged lane prompt")
             if prompt_issue is not None:
@@ -1629,7 +1626,10 @@ def _staged_structural_review(
                 on_progress=on_progress,
                 web_search=web_search,
                 response_schema=sp.provider_schema(sp.lane_schema(mode, lane)),
-                parser=lambda text: validate_lane(text, lane), next_sequence=next_sequence,
+                parser=lambda text: _validate_census_lane(
+                    text, lane, mode=mode, cwd=cwd, plan_lines=plan_lines,
+                    active_classes=active_classes,
+                ), next_sequence=next_sequence,
                 retry_context=(
                     "\n\n".join(filter(None, (
                         branch_contract_section,
@@ -1638,79 +1638,26 @@ def _staged_structural_review(
                     else branch_contract_section
                 ),
             )
-            renamed = {f["id"]: f"{lane}:{f['id']}" for f in parsed["findings"]}
-            for finding in parsed["findings"]:
-                finding["id"] = renamed[finding["id"]]
-            for coverage in parsed["coverage"]:
-                coverage["finding_ids"] = [renamed[fid] for fid in coverage["finding_ids"]]
-            for assessment in parsed["class_assessments"]:
-                if assessment["finding_id"] is not None:
-                    assessment["finding_id"] = renamed[assessment["finding_id"]]
-            return (
-                lane, result, parsed, lane_attempts, lane_rejected,
+            return census.namespace_lane(
+                lane, parsed, lane_attempts, lane_rejected,
                 sp.received_lane_member_ids(result.text, mode=mode, lane=lane),
             )
 
         manifests = _cached_census_manifests(
             state, binding=cache_binding, lanes=lanes,
             active_classes=active_classes,
-            validate=lambda text, lane: validate_lane(
-                text, lane, canonical=True,
+            validate=lambda text, lane: _validate_census_lane(
+                text, lane, canonical=True, mode=mode, cwd=cwd,
+                plan_lines=plan_lines, active_classes=active_classes,
             ),
         )
         received_member_coverage: dict[str, list[str]] = {}
         if manifests is None:
-            lane_rows = []
-            lane_errors: list[tuple[str, rc.CensusError]] = []
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                pending = {telemetry.submit(pool, run_lane, lane): lane for lane in lanes}
-                for future in as_completed(pending):
-                    try:
-                        lane_rows.append(future.result())
-                    except rc.CensusError as error:
-                        lane_errors.append((pending[future], error))
-            lane_rows.sort(key=lambda row: lanes.index(row[0]))
-            if lane_errors:
-                lane_errors.sort(key=lambda row: lanes.index(row[0]))
-                all_attempts = [a for row in lane_rows for a in row[3]]
-                all_attempts.extend(
-                    a for _, error in lane_errors for a in getattr(error, "attempts", [])
-                )
-                all_attempts.sort(key=lambda item: item.sequence or 0)
-                failed_rejected = [
-                    (lanes.index(lane_name), position, payload)
-                    for lane_name, error in lane_errors
-                    for position, payload in enumerate(
-                        getattr(error, "rejected_payloads", [])
-                    )
-                ]
-                successful_rejected = [
-                    (lanes.index(row[0]), position, payload)
-                    for row in lane_rows
-                    for position, payload in enumerate(row[4])
-                ]
-                failed_rejected.extend(successful_rejected)
-                failed_rejected.sort(key=lambda row: (
-                    row[2].get("sequence") is None,
-                    row[2].get("sequence") or 0,
-                    row[0], row[1],
-                ))
-                first_error = lane_errors[0][1]
-                first_error.attempts = all_attempts  # type: ignore[attr-defined]
-                first_error.rejected_payloads = [  # type: ignore[attr-defined]
-                    payload for _, _, payload in failed_rejected
-                ]
-                first_error.manifests = [  # type: ignore[attr-defined]
-                    row[2] for row in lane_rows
-                ]
-                raise first_error
-            for _, _, _, lane_attempts, lane_rejected, _ in lane_rows:
-                attempts.extend(lane_attempts)
-                rejected_payloads.extend(lane_rejected)
-            manifests = [row[2] for row in lane_rows]
-            received_member_coverage = next(
-                row[5] for row in lane_rows if row[0] == "integrity"
-            )
+            completed = census.collect(lanes, run_lane)
+            attempts.extend(completed.attempts)
+            rejected_payloads.extend(completed.rejected_payloads)
+            manifests = completed.manifests
+            received_member_coverage = completed.member_coverage
         else:
             received_member_coverage = deepcopy(
                 state["census_cache"]["member_coverage"]
@@ -1718,23 +1665,7 @@ def _staged_structural_review(
             if on_progress is not None:
                 on_progress("reusing validated census lanes after settlement rejection")
         closure.staged_manifests = manifests
-        source_ids = [f["id"] for m in manifests for f in m["findings"]]
-        source_severities = {f["id"]: f["severity"] for m in manifests for f in m["findings"]}
-        source_evidence = {
-            f["id"]: list(f["evidence"])
-            for m in manifests for f in m["findings"]
-        }
-        assessment_ids = [a["class_id"] for m in manifests for a in m["class_assessments"]]
-        assessment_verdicts = {
-            a["class_id"]: a["verdict"] for m in manifests for a in m["class_assessments"]
-        }
-        assessment_findings = {
-            a["class_id"]: a["finding_id"] for m in manifests for a in m["class_assessments"]
-        }
-        assessment_evidence = {
-            a["class_id"]: list(a["evidence"])
-            for m in manifests for a in m["class_assessments"]
-        }
+        sources = census.CensusSources.capture(manifests)
         consolidation_body = json.dumps({
             "role": "census", "stakes": stakes, "manifests": manifests,
             "active_classes": active_classes,
@@ -1769,12 +1700,7 @@ def _staged_structural_review(
                 )),
                 next_sequence=next_sequence,
                 parser=lambda text: validate_settlement(
-                    text, source_ids=source_ids, source_severities=source_severities,
-                    source_evidence=source_evidence,
-                    assessment_ids=assessment_ids,
-                    assessment_verdicts=assessment_verdicts,
-                    assessment_findings=assessment_findings,
-                    assessment_evidence=assessment_evidence,
+                    text, **sources.arguments(),
                     known_debt=[
                         d["id"] for d in state.get("debt", []) if d.get("status") == "open"
                     ],

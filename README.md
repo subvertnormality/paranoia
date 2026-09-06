@@ -516,3 +516,8 @@ The [five-mode pilot report](docs/five-mode-benchmark-2026-09-06.md) records the
 results and limitations. The [issue 114 live acceptance record](docs/issue_114_live_acceptance_2026-09-06.json)
 retains source-bound evidence of a real combined-error correction. Neither record claims
 guaranteed performance or closes the broader evaluation work in issue 49.
+
+The next bounded architecture/performance change is specified in
+[the census execution plan](docs/census-execution-plan.md): retain all substantive
+review lanes and mechanically settle only a fully validated empty census without
+historical structural obligations. This is planned work, not a delivered speed claim.

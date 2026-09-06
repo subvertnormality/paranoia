@@ -631,3 +631,9 @@ artifact's committed Git blob during replay; generation runs the same semantic v
 that immutable envelope exists.
 
 For claim-audit corrections, report independent safely detectable format, row, and coverage errors together within the existing bounded retry diagnostic. Keep suffix errors fatal in partial mode and retain the universal-scope guard. Live benchmark fixtures must be isolated from their scoring oracle; record failed trials and distinguish operational failure from defect detection.
+
+For the follow-on census execution change, use docs/census-execution-plan.md as the
+bounded contract. Preserve all three substantive lanes; only an obligation-free, fully
+validated empty census may replace manifest-only model consolidation with canonical
+server settlement. Keep scheduling/aggregation separate from validation and persistence.
+This narrowly supersedes the earlier delivery scope restriction on model-call reduction.
