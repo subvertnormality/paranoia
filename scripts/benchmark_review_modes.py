@@ -170,9 +170,7 @@ def freeze(args):
         path = path.resolve()
         if git(path, "status", "--porcelain", "--untracked-files=no"):
             raise ValueError(f"{name} must be committed before freeze")
-        sources[name] = {"path": str(path), "revision": git(path, "rev-parse", "HEAD"),
-                         "files": {str(p.relative_to(path)): sha(p.read_bytes())
-                                   for p in sorted((path / "src/paranoia_local").glob("*.py"))}}
+        sources[name] = source_record(path)
     versions = {}
     for provider in MODELS:
         versions[provider] = subprocess.run([provider, "--version"], check=True,
@@ -262,17 +260,61 @@ def install_observer(engines, directory, counter):
 CURRENT_STAGE = ["review"]
 
 
+def production_files(path):
+    """The complete Python package inventory, including nested modules."""
+    return {p.relative_to(path).as_posix(): p
+            for p in (path / "src/paranoia_local").rglob("*.py")}
+
+
+def source_record(path):
+    path = Path(path).resolve()
+    record = {"path": str(path), "revision": git(path, "rev-parse", "HEAD"),
+              "files": {name: sha(p.read_bytes())
+                        for name, p in sorted(production_files(path).items())}}
+    validate_source(record)
+    return record
+
+
 def validate_source(source):
-    """Bind each worker import to the frozen revision and complete package inventory."""
+    """Bind frozen bytes and complete import inventory to the named committed tree."""
     path = Path(source["path"])
     if git(path, "rev-parse", "HEAD") != source["revision"]:
         raise ValueError("source revision changed")
-    inventory = {str(p.relative_to(path)) for p in (path / "src/paranoia_local").glob("*.py")}
-    if inventory != set(source["files"]):
+    inventory = production_files(path)
+    if set(inventory) != set(source["files"]):
         raise ValueError("source inventory changed")
-    for name, digest in source["files"].items():
-        if sha((path / name).read_bytes()) != digest:
+    raw = subprocess.run(
+        ["git", "ls-tree", "-rz", "--full-tree", source["revision"], "--",
+         "src/paranoia_local"], cwd=path, check=True, capture_output=True).stdout
+    committed = {}
+    for row in raw.split(b"\0"):
+        if not row:
+            continue
+        metadata, name = row.split(b"\t", 1)
+        name = os.fsdecode(name)
+        if not name.endswith(".py"):
+            continue
+        mode, kind, oid = metadata.decode("ascii").split()
+        if kind != "blob" or mode not in {"100644", "100755"}:
+            raise ValueError("source module is not a regular committed file")
+        committed[name] = oid
+    if set(committed) != set(inventory):
+        raise ValueError("source inventory differs from committed revision")
+    for name, file in inventory.items():
+        if file.is_symlink() or not file.is_file():
+            raise ValueError("source module is not a regular file")
+        data = file.read_bytes()
+        if sha(data) != source["files"][name]:
             raise ValueError("source bytes changed")
+        oid = committed[name]
+        algorithm = {40: "sha1", 64: "sha256"}.get(len(oid))
+        if algorithm is None:
+            raise ValueError("unsupported committed source object format")
+        digest = hashlib.new(algorithm)
+        digest.update(f"blob {len(data)}\0".encode("ascii"))
+        digest.update(data)
+        if digest.hexdigest() != oid:
+            raise ValueError("source bytes differ from committed revision")
 
 
 def validate_harness(bindings):

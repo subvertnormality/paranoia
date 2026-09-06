@@ -161,10 +161,11 @@ def test_retained_live_records_bind_exact_native_audit_bytes():
 def recorded_campaign(tmp_path, monkeypatch, *, two_rounds=False):
     root = tmp_path / "report-campaign"
     root.mkdir()
-    trials = [{"case": {"id": case}, "version": v, "repetition": r}
+    trials = [{"case": {"id": case}, "version": v, "repetition": r, "padding_files": 0}
               for case in ("first", "second") for r in range(2)
               for v in ("baseline", "candidate")]
-    manifest = {"trials": trials, "sources": {"baseline": {}, "candidate": {}},
+    manifest = {"trials": trials, "expected_baseline": "fixture", "large_padding": 0,
+                "sources": {"baseline": {}, "candidate": {}},
                 "oracle": {"first": "right", "second": "right"}, "starting_calls": 0, "prior_campaign": None}
     sequence = 0
     for index, trial in enumerate(trials):

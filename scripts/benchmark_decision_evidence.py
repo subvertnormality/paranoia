@@ -18,7 +18,18 @@ CALL_LIMIT = 128
 BASELINE = '33394cb4b465e414a315d152b079599880771de1'
 
 
-def freeze(root, baseline, candidate, prior_report=None):
+def padding_files(count):
+    """Outcome-independent distinct inert files for the frozen large workload."""
+    if type(count) is not int or count not in (0, 3000):
+        raise ValueError("padding must be zero or exactly 3000 files")
+    return {f"_benchmark_padding/{n:05}.txt":
+            f"Distinct inert workload file {n:05}.\n" for n in range(count)}
+
+
+def freeze(root, baseline, candidate, prior_report=None, *,
+           expected_baseline=None, large_padding=0):
+    expected_baseline = BASELINE if expected_baseline is None else expected_baseline
+    padding = padding_files(large_padding)
     root.mkdir(parents=True, exist_ok=False)
     prior = None
     starting_calls = 0
@@ -32,7 +43,7 @@ def freeze(root, baseline, candidate, prior_report=None):
             raise ValueError("prior campaign has no complete bounded call ledger")
         prior = {"path": str(prior_report), "sha256": shared.sha(raw), "calls": starting_calls}
     sources = {"baseline": source_record(baseline), "candidate": source_record(candidate)}
-    if sources["baseline"]["revision"] != BASELINE:
+    if sources["baseline"]["revision"] != expected_baseline:
         raise ValueError("wrong baseline")
     cases, oracle = shared.corpus()
     cases = [case for case in cases if case["mode"] == "arbitrate"]
@@ -40,17 +51,20 @@ def freeze(root, baseline, candidate, prior_report=None):
                 for name in ["codex", "claude"]}
     trials = []
     for n, case in enumerate(cases):
-        fixture = root / f"fixture-{n}"
-        fixture.mkdir()
-        shared.git(fixture, "init", "-q", "-b", "main")
-        shared.git(fixture, "config", "user.name", "snapshot acceptance")
-        shared.git(fixture, "config", "user.email", "fixture@example.test")
-        for name, body in case["files"].items():
-            (fixture / name).write_text(body)
-        shared.git(fixture, "add", ".")
-        shared.git(fixture, "-c", "commit.gpgsign=false", "commit", "-qm", "Frozen contract")
-        snapshot = shared.git(fixture, "rev-parse", "HEAD")
         for repetition in range(2):
+            fixture = root / f"fixture-{n}-{repetition}"
+            fixture.mkdir()
+            shared.git(fixture, "init", "-q", "-b", "main")
+            shared.git(fixture, "config", "user.name", "snapshot acceptance")
+            shared.git(fixture, "config", "user.email", "fixture@example.test")
+            files = {**case["files"], **(padding if repetition else {})}
+            for name, body in files.items():
+                target = fixture / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(body)
+            shared.git(fixture, "add", ".")
+            shared.git(fixture, "-c", "commit.gpgsign=false", "commit", "-qm", "Frozen contract")
+            snapshot = shared.git(fixture, "rev-parse", "HEAD")
             versions_in_pair = (["baseline", "candidate"] if (n + repetition) % 2 == 0
                                 else ["candidate", "baseline"])
             for version in versions_in_pair:
@@ -58,10 +72,12 @@ def freeze(root, baseline, candidate, prior_report=None):
                 directory.mkdir()
                 shared.git(root, "clone", "-q", "--no-hardlinks", str(fixture), str(directory / "repository"))
                 trials.append({"version": version, "case": case, "snapshot": snapshot,
-                               "repetition": repetition})
+                               "repetition": repetition,
+                               "padding_files": large_padding if repetition else 0})
     harness = {str(Path(p).resolve()): shared.sha(Path(p).read_bytes())
                for p in [__file__, shared.__file__]}
-    manifest = {"schema": 2, "sources": sources, "models": shared.MODELS,
+    manifest = {"schema": 3, "sources": sources, "models": shared.MODELS,
+                "expected_baseline": expected_baseline, "large_padding": large_padding,
                 "starting_calls": starting_calls, "prior_campaign": prior,
                 "versions": versions, "trials": trials, "harness": harness,
                 "oracle": {case["id"]: oracle[case["id"]]["expected"] for case in cases},
@@ -77,8 +93,34 @@ def load(root, digest=None):
     if shared.sha(raw) != expected:
         raise ValueError("manifest changed")
     manifest = json.loads(raw)
-    if manifest["schema"] != 2 or manifest["call_limit"] != CALL_LIMIT or len(manifest["trials"]) != 8:
+    if manifest["schema"] != 3 or manifest["call_limit"] != CALL_LIMIT or len(manifest["trials"]) != 8:
         raise ValueError("invalid live campaign")
+    expected_baseline = manifest.get("expected_baseline")
+    if (not isinstance(expected_baseline, str) or len(expected_baseline) not in (40, 64)
+            or any(c not in "0123456789abcdef" for c in expected_baseline)
+            or manifest["sources"]["baseline"]["revision"] != expected_baseline):
+        raise ValueError("wrong frozen baseline")
+    padding_files(manifest.get("large_padding"))
+    cases, oracle = shared.corpus()
+    cases = [case for case in cases if case["mode"] == "arbitrate"]
+    expected_trials = []
+    for n, case in enumerate(cases):
+        for repetition in range(2):
+            pair = (["baseline", "candidate"] if (n + repetition) % 2 == 0
+                    else ["candidate", "baseline"])
+            for version in pair:
+                expected_trials.append((case, repetition, version,
+                                        manifest["large_padding"] if repetition else 0))
+    for row, (case, repetition, version, padding) in zip(manifest["trials"], expected_trials):
+        if (row["case"] != case or type(row["repetition"]) is not int
+                or row["repetition"] != repetition or row["version"] != version
+                or type(row.get("padding_files")) is not int or row["padding_files"] != padding):
+            raise ValueError("frozen workload or schedule mismatch")
+    for i in range(0, len(manifest["trials"]), 2):
+        if manifest["trials"][i]["snapshot"] != manifest["trials"][i + 1]["snapshot"]:
+            raise ValueError("paired workload snapshots differ")
+    if manifest["oracle"] != {c["id"]: oracle[c["id"]]["expected"] for c in cases}:
+        raise ValueError("frozen oracle mismatch")
     start = manifest.get("starting_calls")
     prior = manifest.get("prior_campaign")
     if type(start) is not int or not 0 <= start <= CALL_LIMIT:
@@ -106,12 +148,7 @@ def preflight(root, manifest, index):
 
 
 def source_record(path):
-    path = Path(path).resolve()
-    row = {"path": str(path), "revision": shared.git(path, "rev-parse", "HEAD"),
-           "files": {str(p.relative_to(path)): shared.sha(p.read_bytes())
-                     for p in sorted((path / "src/paranoia_local").glob("*.py"))}}
-    shared.validate_source(row)
-    return row
+    return shared.source_record(path)
 
 
 def rows_digest(rows):
@@ -358,7 +395,8 @@ def report(root):
         if type(elapsed) is not int or elapsed < 0:
             elapsed = None
         row = {"index": index, "case": trial["case"]["id"], "version": trial["version"],
-               "repetition": trial["repetition"], "qualified": False, "bound": False,
+               "repetition": trial["repetition"], "padding_files": trial["padding_files"],
+               "qualified": False, "bound": False,
                "attempts": list(records.attempts), "elapsed_ms": elapsed,
                "output": output, "workspaces": trees, "worker_markers": records.markers,
                "collection_errors": list(records.errors),
@@ -430,8 +468,19 @@ def report(root):
     qualified = (paired and ledger_ok and all(r["bound"] for r in rows)
                  and not any(r.get("false_convergence") for r in rows)
                  and counts["candidate"]["correct"] == 4
-                 and counts["candidate"]["unresolved_or_failed"] <= counts["baseline"]["unresolved_or_failed"])
-    result = {"manifest_sha256": digest, "rows": rows, "paired_equivalence": paired,
+                 and counts["baseline"]["correct"] == 4)
+    pairs = []
+    for case in manifest["oracle"]:
+        for repetition in range(2):
+            pair = [r for r in rows if r["case"] == case and r["repetition"] == repetition]
+            pairs.append({"case": case, "repetition": repetition,
+                          "padding_files": pair[0]["padding_files"],
+                          "versions": {r["version"]: {
+                              "elapsed_ms": r["elapsed_ms"], "provider_calls": len(r["attempts"]),
+                              "qualified": r["qualified"]} for r in pair}})
+    result = {"pairs": pairs, "expected_baseline": manifest["expected_baseline"],
+              "large_padding": manifest["large_padding"],
+              "manifest_sha256": digest, "rows": rows, "paired_equivalence": paired,
               "calls": calls, "cumulative_calls": cumulative_calls,
               "prior_campaign": manifest["prior_campaign"],
               "ledger_complete": ledger_ok, "summary": counts, "qualified": qualified,
@@ -451,9 +500,12 @@ def main():
     parser.add_argument("--index", type=int)
     parser.add_argument("--digest")
     parser.add_argument("--prior-report", type=Path)
+    parser.add_argument("--expected-baseline")
+    parser.add_argument("--large-padding", type=int, default=0, choices=[0, 3000])
     args = parser.parse_args()
     if args.freeze:
-        freeze(args.freeze.resolve(), args.baseline, args.candidate, args.prior_report)
+        freeze(args.freeze.resolve(), args.baseline, args.candidate, args.prior_report,
+               expected_baseline=args.expected_baseline, large_padding=args.large_padding)
     elif args.run:
         run(args.run.resolve())
     elif args.report:

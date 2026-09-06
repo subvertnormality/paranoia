@@ -3716,3 +3716,52 @@ def test_attester_checks_verbatim_context_advocacy_and_hint_fidelity(repo: Path,
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
     assert "[context]" not in seen["body"] and "[hints]" in seen["body"]
     assert "=== CONTEXT (NOT cleaned" in seen["body"]
+
+
+@pytest.mark.parametrize("one_failure", [False, True])
+def test_native_batch_arbitration_workspace_and_sibling_accounting(
+    repo, tmp_path, monkeypatch, one_failure,
+):
+    from threading import Lock
+    from paranoia_local import git_objects
+    expected = (repo / "app.py").read_bytes()
+    acquisitions, observed = [], []
+    lock = Lock()
+    real_batch = git_objects.read_batch
+
+    def acquire(repo, requests):
+        with lock:
+            index = len(acquisitions)
+            acquisitions.append(len(requests))
+        if one_failure and index == 0:
+            raise RuntimeError("one workspace acquisition failed")
+        return real_batch(repo, requests)
+
+    class Observing(Agent):
+        def __call__(self, **kw):
+            if kw["cwd"] is not None:
+                root = (kw["cwd"] / "repository").resolve()
+                assert (root / "app.py").read_bytes() == expected
+                assert (root / "app.py").stat().st_mode & 0o777 == 0o444
+                observed.append((kw["engine_name"], root))
+            return super().__call__(**kw)
+
+    monkeypatch.setattr(git_objects, "read_batch", acquire)
+    agent = Observing(lambda e, r: "opt-float")
+    report = run(repo, agent, tmp_path)
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert len(acquisitions) == 2
+    assert len([c for c in agent.calls if c["cwd"] is None]) == 2
+    assert all(not root.exists() for _, root in observed)
+    if one_failure:
+        assert trailer_field(report, "ARBITRATION") == "FAILED"
+        assert len(observed) == 1
+        serialized = json.dumps(record)
+        assert "setup-failed" in serialized and "one workspace acquisition failed" in serialized
+        assert observed[0][0] in serialized
+        assert record["cleaning"] == "attested"
+        assert len(record["phase_attempts"]) == 2
+    else:
+        assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+        assert {name for name, _ in observed} == {"codex", "claude"}
+        assert len({root for _, root in observed}) == 2

@@ -64,6 +64,10 @@
     "src/paranoia_local/evidence.py": {
       "sha256": "20202007e06e39c91b982a1b6cf42368384a7ea59ac9ca8bb0cdef5e2c0c78d3",
       "scope": "Shared arbitration evidence reads distinguish unavailable Git data from invalid declarations; propagate operational errors to terminal admission without changing snapshot/path grounding."
+    },
+    "src/paranoia_local/inert_tree.py": {
+      "sha256": "c175b30642c4d9a4a6668ead8473a659c1d067ba31fa72c3c42ef9ffd2925917",
+      "scope": " Current snapshot batching requalification preserves this historical receipt; later changes add bounded native object reads, committed-source benchmark guards, regression coverage, and documentation without retroactively attributing new behavior to the old run."
     }
   },
   "version": 1,

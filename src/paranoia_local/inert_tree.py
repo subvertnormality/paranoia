@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -12,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterator
 
-from . import inert_git
+from . import inert_git, git_objects
 
 
 @dataclass(frozen=True)
@@ -37,16 +36,6 @@ class EvidenceWorkspace:
         return self.tree.root if engine_name == "claude" else self.launch
 
 
-def _git_oid(data: bytes, oid_length: int) -> str:
-    algorithm = "sha1" if oid_length == 40 else "sha256" if oid_length == 64 else None
-    if algorithm is None:
-        raise RuntimeError(f"unsupported Git object id length: {oid_length}")
-    digest = hashlib.new(algorithm)
-    digest.update(f"blob {len(data)}\0".encode())
-    digest.update(data)
-    return digest.hexdigest()
-
-
 def _safe_path(raw: bytes) -> Path:
     text = raw.decode("utf-8", errors="surrogateescape")
     pure = PurePosixPath(text)
@@ -55,32 +44,38 @@ def _safe_path(raw: bytes) -> Path:
     return Path(*pure.parts)
 
 
-def _entries(repo: Path, snapshot: str) -> list[tuple[str, str, str, bytes]]:
-    output = inert_git.run(repo, ["ls-tree", "-rz", "--full-tree", snapshot])
-    entries: list[tuple[str, str, str, bytes]] = []
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: str
+    kind: str
+    oid: str
+    raw_path: bytes
+    size: int | None
+
+
+def _entries(repo: Path, snapshot: str) -> list[TreeEntry]:
+    output = inert_git.run(repo, ["ls-tree", "-rlz", "--full-tree", snapshot])
+    entries: list[TreeEntry] = []
     for record in output.split(b"\0"):
         if not record:
             continue
         meta, sep, path = record.partition(b"\t")
         fields = meta.decode("ascii").split()
-        if not sep or len(fields) != 3:
+        if not sep or len(fields) != 4:
             raise RuntimeError("malformed git ls-tree record")
-        mode, kind, oid = fields
-        if len(oid) not in (40, 64) or any(c not in "0123456789abcdef" for c in oid):
-            raise RuntimeError(f"invalid object id in ls-tree output: {oid!r}")
+        mode, kind, oid, raw_size = fields
+        git_objects.validate_oid(oid)
         _safe_path(path)
-        entries.append((mode, kind, oid, path))
+        if kind == "blob":
+            if not raw_size.isascii() or not raw_size.isdecimal():
+                raise RuntimeError(f"invalid blob size for {oid}")
+            size = int(raw_size)
+        elif raw_size == "-":
+            size = None
+        else:
+            raise RuntimeError(f"invalid non-blob size for {oid}")
+        entries.append(TreeEntry(mode, kind, oid, path, size))
     return entries
-
-
-def _blob(repo: Path, oid: str) -> bytes:
-    kind = inert_git.text(repo, ["cat-file", "-t", oid]).strip()
-    if kind != "blob":
-        raise RuntimeError(f"expected blob {oid}, got {kind or 'no type'}")
-    data = inert_git.run(repo, ["cat-file", "blob", oid])
-    if _git_oid(data, len(oid)) != oid:
-        raise RuntimeError(f"blob digest mismatch for {oid}")
-    return data
 
 
 def materialize(repo: Path, snapshot: str, root: Path) -> MaterializedTree:
@@ -89,12 +84,18 @@ def materialize(repo: Path, snapshot: str, root: Path) -> MaterializedTree:
     repository = root / "repository"
     repository.mkdir()
     manifest_rows: list[dict[str, str | int]] = []
-    for mode, kind, oid, raw_path in _entries(repo, snapshot):
+    entries = _entries(repo, snapshot)
+    blobs = git_objects.read_blobs(
+        repo, (git_objects.BlobRequest(entry.oid, entry.size)
+               for entry in entries if entry.kind == "blob" and entry.size is not None),
+    )
+    for entry in entries:
+        mode, kind, oid, raw_path = entry.mode, entry.kind, entry.oid, entry.raw_path
         relative = _safe_path(raw_path)
         target = repository / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         if kind == "blob":
-            data = _blob(repo, oid)
+            data = next(blobs)
             if mode == "120000":
                 rendered = b"PARANOIA INERT SYMLINK TARGET\n" + data
                 record_kind = "symlink"

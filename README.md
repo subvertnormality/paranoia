@@ -536,3 +536,7 @@ Verified-plan discovery requires a resumable provider session on both the initia
 ### Decision evidence admission experiment
 
 Arbitration validates declared repository citations while the existing bounded correction opportunity is available, preserving exact snapshot resolution and independent final substantiation. A typed admission boundary separates repairable declarations from terminal evidence-read failures. The [final-source comparison](docs/decision-evidence-final-results.md) passed its live correctness and binding gate, but measured no latency improvement; the [acceptance contract](docs/decision-evidence-admission-plan.md) also requires CODE convergence before delivery. Native snapshot batching remains withheld after its live acceptance campaign; measured setup gains alone do not establish delivery readiness.
+
+Native snapshot batching is being requalified against the current citation-admission implementation under a [new bounded contract](docs/snapshot-batching-requalification-plan.md). The previous failed campaign remains historical; acceptance will compare unchanged arithmetic decisions on small and 3,000-file repositories and report setup savings separately from whole-call timings.
+
+The [native reader architecture](docs/native-snapshot-batching.md) separates bounded object acquisition from inert filesystem rendering. Benchmark source admission checks actual module bytes against the named committed Git tree before freeze, including nested modules, rather than treating a captured dirty-file hash as committed source.
