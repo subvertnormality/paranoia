@@ -499,6 +499,17 @@ of the resulting code and tests.
 
 ## Delivery discipline
 
+For the architecture/performance delivery, follow the frozen obligations in
+`docs/review-architecture-performance-plan.md`. Separate behavior-preserving
+extraction from the explicitly tested class-only final and checkpoint transitions.
+Keep the canonical class engine and atomic persistence authoritative. Historical
+run failures are regression inputs, not claims about the current loaded version.
+Performance acceptance must report actual total wall time and source identity;
+never sum concurrent attempt durations as wall time or claim universal improvement.
+After PLAN review, keep real convergence on CODE and test plan handlers with
+deterministic providers. Do not extend the scope to fewer reviewers, weaker final
+coverage, new persistence mechanisms or unbound external evidence.
+
 Arbitration deciders operate only on separate inert materializations of the pinned snapshot and
 its bounded snapshot-derived history. Ref movement during snapshot construction fails before
 spend; movement after that boundary is audit provenance (`REFS-MOVED: yes`), not grounds to discard

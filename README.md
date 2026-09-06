@@ -458,6 +458,12 @@ one-shot settings described above.
 
 ## Development
 
+The proposed architecture/performance work is specified in
+[the implementation plan](docs/review-architecture-performance-plan.md).
+Its acceptance distinguishes deterministic avoided calls and bounded teardown from
+provider-quality claims; it does not promise faster or more accurate reviews on
+every repository. Existing review guarantees remain in force during this work.
+
 ```bash
 pip install -e '.[dev]'
 python -m pytest
