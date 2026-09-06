@@ -125,15 +125,16 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
 
 def test_retained_live_records_bind_exact_native_audit_bytes():
     receipt = json.loads((SCRIPTS.parent / "docs/decision_evidence_validation_2026-09-06.json").read_text())
-    for kind, name in [("manifest", "decision_evidence_live_manifest_2026-09-06.json"),
-                       ("report", "decision_evidence_live_results_2026-09-06.json")]:
-        assert bench.shared.sha((SCRIPTS.parent / "docs" / name).read_bytes()) == receipt["live"][kind + "_sha256"]
-    report = json.loads((SCRIPTS.parent / "docs/decision_evidence_live_results_2026-09-06.json").read_text())
-    for binding, row in zip(receipt["live"]["audits"], report["rows"], strict=True):
-        raw = (SCRIPTS.parent / binding["path"]).read_bytes()
-        assert bench.shared.sha(raw) == binding["sha256"] == row["audit_sha256"]
-        audit = json.loads(raw)
-        assert (audit["outcome"], audit["selected"]) == (row["outcome"], row["selected"])
+    for live in (receipt["live"], receipt["corrected_live"]):
+        for kind in ("manifest", "report"):
+            path = SCRIPTS.parent / live[kind + "_path"]
+            assert bench.shared.sha(path.read_bytes()) == live[kind + "_sha256"]
+        report = json.loads((SCRIPTS.parent / live["report_path"]).read_text())
+        for binding, row in zip(live["audits"], report["rows"], strict=True):
+            raw = (SCRIPTS.parent / binding["path"]).read_bytes()
+            assert bench.shared.sha(raw) == binding["sha256"] == row["audit_sha256"]
+            audit = json.loads(raw)
+            assert (audit["outcome"], audit["selected"]) == (row["outcome"], row["selected"])
 
 
 def recorded_campaign(tmp_path, monkeypatch, *, two_rounds=False):

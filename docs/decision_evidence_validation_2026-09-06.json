@@ -63,18 +63,105 @@
         "path": "docs/decision_evidence_audits_2026-09-06/trial-7.json",
         "sha256": "c03b00b32a599f7151ea176175ca6adf57db4d110d3f1685a334baaedd127cc7"
       }
-    ]
+    ],
+    "manifest_path": "docs/decision_evidence_live_manifest_2026-09-06.json",
+    "report_path": "docs/decision_evidence_live_results_2026-09-06.json"
   },
   "plan_review": {
     "lineage": "paranoia-decision-evidence-plan",
     "round": 3,
     "convergence": "NOT-BLOCKED"
   },
-  "code_review": "pending; this receipt does not authorize delivery",
+  "code_review": {
+    "lineage": "paranoia-decision-evidence-code",
+    "status": "pending correction",
+    "reviewed_head": "83342232d80f0b2aed8eab103b72fed4d63b4d8f",
+    "round_1_report": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] All eight archived campaign audits fail their published SHA-256 bindings because copying added a terminal newline. (repository/docs/decision_evidence_validation_2026-09-06.json:25-65, repository/docs/decision_evidence_audits_2026-09-06/trial-0.json:194, repository/scripts/benchmark_decision_evidence.py:310-316, repository/docs/decision-evidence-results.md:17, plan:20-21, repository/docs/decision_evidence_validation_2026-09-06.json:21-63, repository/docs/decision_evidence_audits_2026-09-06/trial-1.json:194, repository/docs/decision_evidence_audits_2026-09-06/trial-2.json:192, repository/docs/decision_evidence_audits_2026-09-06/trial-3.json:194, repository/docs/decision_evidence_audits_2026-09-06/trial-4.json:194, repository/docs/decision_evidence_audits_2026-09-06/trial-5.json:194, repository/docs/decision_evidence_audits_2026-09-06/trial-6.json:194, repository/docs/decision_evidence_audits_2026-09-06/trial-7.json:194)\n- [MAJOR] Operational citation-resolution failures erase the failed decider's completed attempt history, including an earlier rejected reply when correction admission fails. [classes: 81bd9413] (repository/src/paranoia_local/decision_evidence.py:56-60, repository/src/paranoia_local/inert_git.py:55-69, repository/src/paranoia_local/arbitrate_handler.py:2817-2828, repository/src/paranoia_local/arbitrate_handler.py:2879-2887, repository/tests/test_decision_evidence.py:111-136, plan:12-13, repository/src/paranoia_local/arbitrate_handler.py:2817-2825, repository/tests/test_arbitrate_handler.py:1561-1577, repository/AGENTS.md:522-528, repository/src/paranoia_local/arbitrate_handler.py:2879-2888, repository/tests/test_decision_evidence.py:112-135)\n- [MAJOR] Campaign invalidation suppresses recorded work and can report misleading zero-cost totals despite retained execution records. [classes: 6464aa45] (repository/scripts/benchmark_decision_evidence.py:269-280, repository/scripts/benchmark_decision_evidence.py:300-318, repository/scripts/benchmark_decision_evidence.py:325-331, repository/tests/test_decision_benchmark.py:77-123, plan:20-21, repository/scripts/benchmark_decision_evidence.py:269-281, repository/scripts/benchmark_decision_evidence.py:310-331)\n- [MAJOR] The campaign gate can qualify a two-round dispatch with a missing workspace observation, leaving that workspace's final fingerprint and cleanup unverified. [classes: 81e2d7e9] (repository/scripts/benchmark_decision_evidence.py:148-156, repository/scripts/benchmark_decision_evidence.py:290-307, repository/tests/test_decision_benchmark.py:39-56, plan:20-21)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Restore all eight archived audits from the original files byte-for-byte, preserving the existing campaign hashes. Check every retained copy against its receipt digest before delivery. No provider rerun or digest redefinition is needed.\n- [MAJOR] Record each completed provider reply and its lifecycle before admission. Wrap operational admission exceptions in DeciderAttemptFailure carrying accumulated attempts, keeping them terminal without another provider retry. Add public-handler cases for initial and corrected resolver failures that verify current and prior replies, completed sibling retention, and cleanup.\n- [MAJOR] Collect available attempt, result, timing, and workspace records independently of qualification checks. Preserve invalidated records as explicitly unqualified observations with their failure reasons, and represent unavailable timing as unknown. Add report-level tests for post-run source drift, failed-worker markers, and missing workspace observations.\n- [MAJOR] Require exact coverage between observed attempt roots and unique complete workspace rows, checking provider and snapshot bindings in both directions. Add a report-level two-round case that removes one workspace row while retaining its provider attempts and requires qualification to fail.\n\n---\n_paranoia-local \u00b7 engine=codex \u00b7 session_ref=`01a07841-1ad6-7463-a819-3d189804d4f7` \u2014 to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nLINEAGE: paranoia-decision-evidence-code (rounds recorded: 1)\nPLAN-DIGEST: d2d82a9f5511afc65b2a4d01240543e5a91d0f26f5a640a8af0b34bf7834a911\nCLASS-REGISTER: staged census parsed \u2014 NEW 81bd9413, NEW 6464aa45, NEW 81e2d7e9\nCLASS-CLOSURE: 3 open, 0 closed, 0 surviving matches, 0 exempt, 3 unmechanized\n  6464aa45 Campaign reporting must retain all available execution observations independently of qualification success, label invalidated observations unqualified, and distinguish unavailable timing from measured zero. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  81bd9413 For initial and corrected decider replies, an operational evidence-admission failure must preserve the completed reply, all earlier attempts, completed sibling records, and cleanup observations while terminating without another declaration retry. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\n  81e2d7e9 Campaign qualification requires exact coverage between observed attempt roots and unique complete workspace observations, with matching provider and snapshot bindings in both directions. (unmechanized: awaiting reviewer CLOSED or RECLASSIFY)\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 4 blocking open\nCONVERGENCE: BLOCKED \u2014 staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0"
+  },
   "unexecuted_predecessor": {
     "path": "/tmp/paranoia-decision-evidence-live-20260906",
     "manifest_sha256": "616b05fe70256a365cd2185afcfca32ec8cfebf2737ef96a02615432eeae5056",
     "provider_calls": 0,
     "reason": "Test-only fixes committed before execution; no trials were selected or rerun."
+  },
+  "corrected_live": {
+    "candidate_revision": "6084ab8b9c506f39774b21f2075c23d551790248",
+    "manifest_path": "docs/decision_evidence_corrected_manifest_2026-09-06.json",
+    "report_path": "docs/decision_evidence_corrected_results_2026-09-06.json",
+    "manifest_sha256": "4a290747fb3c536db15edd17b8f077376c4f929009b69c176125fc4dc4501f93",
+    "report_sha256": "fbd72db59b4ce52b6660bf590246f3c3e54b77d65cb34530dd0d96175f3ec4d0",
+    "audits": [
+      {
+        "trial": 0,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-0.json",
+        "sha256": "ebb5a541676cbfafcb1b2f51678fe706a784cf131c9b372238e64089c24dc796"
+      },
+      {
+        "trial": 1,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-1.json",
+        "sha256": "fdfb91395b18233ad333c8e06c44c847f85addf39d3db444f61060a469e5dd2a"
+      },
+      {
+        "trial": 2,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-2.json",
+        "sha256": "fcdc7a7592986b7b04fc8257abe898e3238ec605934b2b4f0fa8f19041713304"
+      },
+      {
+        "trial": 3,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-3.json",
+        "sha256": "de61db2d7b2f40ea9b8afe54ffc8e6acbba4b2e54411913653a2754e661ae013"
+      },
+      {
+        "trial": 4,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-4.json",
+        "sha256": "f01851fcfe983ad0c51e4acb4ff7d617b04e466d95a11b7d4c04adf20bc6a5bd"
+      },
+      {
+        "trial": 5,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-5.json",
+        "sha256": "686a1cf8290c3e00ab2ed7c847859fbe061a604ce2a2f2340d26ea928f1221ac"
+      },
+      {
+        "trial": 6,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-6.json",
+        "sha256": "be87d1a26ce07c731cb2587a5d5b3115e79e60ef4403ebfba1070f828c4a2f1f"
+      },
+      {
+        "trial": 7,
+        "path": "docs/decision_evidence_corrected_audits_2026-09-06/trial-7.json",
+        "sha256": "62040ed008ef5568ee2ccb1823c752f8c1dc332b0845c25f52686d90a53e7e99"
+      }
+    ],
+    "gate_passed": true,
+    "campaign_provider_calls": 32,
+    "cumulative_provider_calls": 64
+  },
+  "corrected_tests": {
+    "source_revision": "6084ab8b9c506f39774b21f2075c23d551790248",
+    "command": "PYTHONPATH=src GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null python -m pytest -q",
+    "passed": 1966,
+    "exit_code": 0,
+    "output_sha256": "edf25610911bf7dab9257a03be27d53a760ee11c1d86d6061eb3ed48c1781302",
+    "output": "........................................................................ [  3%]\n........................................................................ [  7%]\n........................................................................ [ 10%]\n........................................................................ [ 14%]\n........................................................................ [ 18%]\n........................................................................ [ 21%]\n........................................................................ [ 25%]\n........................................................................ [ 29%]\n........................................................................ [ 32%]\n........................................................................ [ 36%]\n........................................................................ [ 40%]\n........................................................................ [ 43%]\n........................................................................ [ 47%]\n........................................................................ [ 51%]\n........................................................................ [ 54%]\n........................................................................ [ 58%]\n........................................................................ [ 62%]\n........................................................................ [ 65%]\n........................................................................ [ 69%]\n........................................................................ [ 73%]\n........................................................................ [ 76%]\n........................................................................ [ 80%]\n........................................................................ [ 84%]\n........................................................................ [ 87%]\n........................................................................ [ 91%]\n........................................................................ [ 95%]\n........................................................................ [ 98%]\n......................                                                   [100%]\n1966 passed in 184.14s (0:03:04)\n"
+  },
+  "mutation_checks_final": {
+    "source_revision": "83342232d80f0b2aed8eab103b72fed4d63b4d8f",
+    "command": "python scripts/run_staged_protocol_mutation_checks.py",
+    "owned_mutants_killed": 33,
+    "historical_equivalence_groups": 7,
+    "exit_code": 0,
+    "output_sha256": "ac742c026f4f293f319cc7b784a2827704d299558b2b3606d75bae362db4eea0",
+    "output": "Historical V1/V2 differential gate passed for 7 role/shape groups.\nKILLED coverage-binding by test_lane_dynamic_completeness_and_binding\nKILLED severity-floor by test_source_severity_cannot_be_downgraded\nKILLED literal-pathspec by test_branch_schema_rejects_git_pathspec_magic_for_new_and_replacement_classes\nKILLED debt-completeness by test_class_and_debt_outcome_completeness_are_independent_controls\nKILLED mechanized-replacement by test_closed_mechanized_class_cannot_be_replaced_by_manual_procedure\nKILLED standalone-action by test_satisfied_open_class_preserves_compatible_standalone_action\nKILLED derived-close by test_satisfied_open_unmechanized_class_derives_close\nKILLED advisory-class-debt by test_census_existing_advisory_violation_still_mints_debt\nKILLED census-schema-exclusion by test_census_schema_rejects_authored_class_outcomes\nKILLED mechanized-lane-compatibility by test_integrity_lane_rejects_satisfied_unproven_mechanized_class\nKILLED census-governing-cardinality by test_census_violated_class_requires_one_matching_governing_finding\nKILLED census-verdict-projection by test_census_derives_exact_verdict_evidence_and_basis\nKILLED census-evidence-projection by test_census_derives_exact_verdict_evidence_and_basis\nKILLED integrity-assessment-completeness by test_integrity_lane_requires_every_active_class_assessment\nKILLED duplicate-class-key-detection by test_duplicate_class_decision_keys_reject_before_projection\nKILLED keyed-outcome-completeness by test_keyed_decision_schema_exposes_only_role_legal_class_decisions\nKILLED mechanized-action-specialization by test_keyed_decision_schema_exposes_only_role_legal_class_decisions\nKILLED decision-encounter-order by test_keyed_decision_projection_preserves_encounter_order\nKILLED keyed-action-diagnostic-pointer by test_keyed_decision_semantic_issue_retains_late_wire_key_pointer\nKILLED canonical-keyed-diagnostic-pointer by test_keyed_decision_canonical_issue_retains_wire_key_pointer\nKILLED null-action-slot-pointer by test_census_closed_violation_derives_only_unmechanized_reopen\nKILLED fallback-action-pointer by test_keyed_decision_semantic_issue_retains_late_wire_key_pointer\nKILLED derived-correction-violation by test_correction_projects_non_debt_assessment_evidence_into_finding\nKILLED exact-empty-active-targets by test_exact_empty_active_set_cannot_target_an_existing_class\nKILLED unmechanized-to-mechanized-replacement by test_unmechanized_class_can_be_replaced_by_a_mechanized_successor\nKILLED citation-closed-wire-shape by test_citation_rationale_bound_applies_to_every_evidence_shape\nKILLED citation-exact-projection by test_wire_citations_are_closed_and_project_exactly_to_canonical_anchors\nKILLED canonical-citation-uniqueness by test_duplicate_wire_citations_reach_canonical_aggregate_validation\nKILLED canonical-cache-shape by test_census_cache_requires_every_exact_binding\nKILLED citation-cache-version by test_census_cache_requires_every_exact_binding\nKILLED member-cache-inventory-binding by test_census_cache_requires_every_exact_binding\nKILLED received-member-cache-equality by test_census_cache_requires_every_exact_binding\nKILLED assessment-anchor-walk by test_assessment_evidence_uses_the_shared_anchor_resolver\nAll 33 owned Protocol v2 mutants were killed.\n",
+    "unchanged_owned_source_sha256": {
+      "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+      "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+      "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+      "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+      "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+      "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+      "scripts/run_staged_protocol_mutation_checks.py": "a2ee50daa236345bdf1bc3cef2b9f5cb619e205f604eff928981870826de48c8",
+      "tests/test_staged_protocol.py": "499c0153f3c95d5917bcb323eb649b348bf87b0055c02fe44850c2c6d020e163"
+    },
+    "scope": "The listed owned staged protocol, class/handler/engine dependencies, prompts, tests and mutation harness are byte-identical in the corrected candidate. Later changes affect arbitration failure retention and benchmark reporting."
   }
 }
