@@ -321,12 +321,20 @@ def materialize(value, **kwargs):
     )
 
 
+def assert_accepts(call, *args, **kwargs):
+    """Positive protocol fixtures must be accepted, not merely fail somewhere."""
+    try:
+        return call(*args, **kwargs)
+    except sp.ProtocolError as exc:
+        raise AssertionError(f"valid protocol fixture was rejected: {exc}") from exc
+
+
 def test_wire_citations_are_closed_and_project_exactly_to_canonical_anchors():
     value = wire_value(lane_value())
     value["coverage"][0]["evidence"] = [{
         "anchor": "plan:1-2", "rationale": "the two lines establish the claim",
     }]
-    decoded = sp.decode_lane(
+    decoded = assert_accepts(sp.decode_lane,
         json.dumps(value), mode=cc.PLAN_MODE, lane="domain",
     )
     assert decoded["coverage"][0]["evidence"] == ["plan:1-2"]
@@ -1849,7 +1857,7 @@ def test_satisfied_open_unmechanized_class_derives_close():
             "class_id": "class-a", "verdict": "satisfied", "evidence": ["plan:1"],
         }],
     )
-    parsed = materialize(value, active_classes=[active_class()])
+    parsed = assert_accepts(materialize,value, active_classes=[active_class()])
     assert parsed["class_records"] == [{"op": "close", "class_id": "class-a"}]
 
 
@@ -1877,7 +1885,7 @@ def test_satisfied_open_class_preserves_compatible_standalone_action(action):
         }],
         class_actions=[action],
     )
-    parsed = materialize(
+    parsed = assert_accepts(materialize,
         value, active_classes=[active_class()], durable_debt=[durable_debt()],
     )
     assert parsed["class_records"][0]["op"] == action["kind"]
@@ -2120,7 +2128,7 @@ def test_unmechanized_class_can_be_replaced_by_a_mechanized_successor():
             },
         }],
     )
-    parsed = materialize(value, mode=cc.BRANCH_MODE, active_classes=[cls])
+    parsed = assert_accepts(materialize,value, mode=cc.BRANCH_MODE, active_classes=[cls])
     lineage = lineage_with_active(cls)
     minted = cc.apply_register(
         lineage, rc.register_from_records(parsed["class_records"], mechanized=None),
@@ -2166,7 +2174,7 @@ def test_census_derives_exact_verdict_evidence_and_basis():
         source_ids=["integrity:F1"],
         classification={"kind": "existing_class", "class_id": "class-a"},
     )])
-    parsed = materialize(
+    parsed = assert_accepts(materialize,
         value, source_ids=["integrity:F1"],
         source_severities={"integrity:F1": "MAJOR"},
         assessment_verdicts={"class-a": "violated"},
@@ -3068,7 +3076,7 @@ def test_correction_projects_non_debt_assessment_evidence_into_finding():
             "assessment_evidence":["plan:2"],
         },
     )
-    parsed = materialize(
+    parsed = assert_accepts(materialize,
         decision("correction", governing_findings=[current]),
         active_classes=[active_class(severity="MINOR")],
     )

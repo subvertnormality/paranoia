@@ -278,8 +278,9 @@ so an accepted empty retry cannot erase evidence that an earlier nonempty payloa
 
 Persistent correction control stores `reset_round`, `reopen_count`, and
 `last_session_ref`. A load-bearing `CORRECTION-GATE` is projected from
-`correction_gates` into the exact `rendered_trailer`; only an exact
-validation-invalid terminal retry may recover a previously sessionless gate.
+`correction_gates` into the exact `rendered_trailer`; a fully validated
+architecture checkpoint atomically replaces current session authority without a
+formatting retry. Invalid output retains its one validation repair attempt.
 
 A failed staged structural review begins `# STAGED REVIEW FAILED` and states
 whether failure occurred before settlement or after unconfirmed persistence. It

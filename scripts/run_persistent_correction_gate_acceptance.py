@@ -560,11 +560,11 @@ def validate_artifact(
     surfaces = {
         "docs/how-it-works.md": (
             "reset_round", "reopen_count", "last_session_ref", "CORRECTION-GATE",
-            "correction_gates", "rendered_trailer", "validation-invalid terminal retry",
+            "correction_gates", "rendered_trailer", "architecture checkpoint",
         ),
         "AGENTS.md": (
             "reset_round", "reopen_count", "last_session_ref",
-            "exact validation-invalid terminal retry",
+            "architecture checkpoint",
         ),
         "README.md": (
             "lineage", "class_id", "debt_id", "lineage_mode",

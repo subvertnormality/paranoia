@@ -166,7 +166,7 @@ MUTATIONS = (
         "derived-correction-violation",
         "if cid not in authored_classes:",
         "if False:",
-        "test_correction_derives_non_debt_class_outcome_with_distinct_evidence",
+        "test_correction_projects_non_debt_assessment_evidence_into_finding",
     ),
     (
         "exact-empty-active-targets",
@@ -251,7 +251,7 @@ def assertion_kill(returncode: int, report: str) -> bool:
         returncode == 1 and bool(cases) and bool(failures)
         and not list(root.iter("error")) and not list(root.iter("skipped"))
         and all(
-            "AssertionError" in (failure.get("message", "") + (failure.text or ""))
+            failure.get("message", "").startswith("AssertionError")
             or "DID NOT RAISE" in failure.get("message", "")
             for failure in failures
         )
@@ -338,14 +338,14 @@ def main() -> int:
             )
             line = original[:original.index(before)].count("\n") + 1
             if baseline.returncode != 0 or not baseline_hits:
-                failures.append(f"{name}: selected baseline failed or source was not exercised")
+                failures.append(f"{name}: selected baseline failed or source was not exercised\n{baseline.stdout[-1500:]}")
                 continue
             completed, report, hits = exercise(package_root, target, test, test_name)
             changed_lines = set(range(line, line + len(after.splitlines())))
             if not changed_lines & hits:
                 failures.append(f"{name}: intended mutation was not exercised")
             elif not assertion_kill(completed.returncode, report):
-                failures.append(f"{name}: survived or failed outside an expected test assertion")
+                failures.append(f"{name}: survived or failed outside an expected test assertion\n{completed.stdout[-1500:]}")
             else:
                 print(f"KILLED {name} by {test_name}")
     if failures:

@@ -93,6 +93,12 @@ def _sha_text(value: str) -> str:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
+    # Exact inverse of the read-only capability wording change; this replay still
+    # proves only the retained historical provider prompt, never current live use.
+    prompt = prompt.replace(
+        "You are read-only. Do not write, edit, or execute repository tests or scripts. Read the tests and reason about them; the caller owns execution. Use only the inspection tools actually exposed to your role. In Read/Grep/Glob-only roles, do not attempt Bash, Python, Git commands or package runners. A denied execution attempt is not acceptance evidence; distinguish inspected test code from an observed test result.",
+        "You are read-only. Do not write, edit, or run the whole test suite — it is slow and that gate belongs to the caller, not the reviewer. Read the tests and reason about them. If confirming one specific behaviour genuinely requires execution, run only the single targeted test the finding turns on.",
+    )
     prompt = prompt.replace(ISSUE_98_INVARIANT_SWEEP_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(ISSUE_106_MEMBER_COVERAGE_INSTRUCTIONS + "\n\n", "")
     prompt = prompt.replace(ISSUE_108_LEGACY_MEMBER_INSTRUCTIONS + "\n\n", "")
