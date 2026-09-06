@@ -68,8 +68,8 @@ MUTATIONS = (
     ),
     (
         "derived-close",
-        'if action is None or action["kind"] == "reclassify":\n                derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,',
-        'if False:\n                derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,',
+        'derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,\n                ))',
+        'pass',
         "test_satisfied_open_unmechanized_class_derives_close",
     ),
     (
@@ -251,7 +251,7 @@ def assertion_kill(returncode: int, report: str) -> bool:
         returncode == 1 and bool(cases) and bool(failures)
         and not list(root.iter("error")) and not list(root.iter("skipped"))
         and all(
-            failure.get("message", "").startswith("AssertionError")
+            failure.get("message", "").startswith(("AssertionError", "assert "))
             or "DID NOT RAISE" in failure.get("message", "")
             for failure in failures
         )
