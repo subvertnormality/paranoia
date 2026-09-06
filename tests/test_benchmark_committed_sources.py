@@ -116,3 +116,76 @@ def test_live_freeze_binds_explicit_baseline_large_workloads_and_pair_order(
             live.load(root)
     assert (root / "counter").read_text() == "0"
     assert not list(root.glob("trial-*/attempts.jsonl"))
+
+
+@pytest.mark.parametrize("version", ["baseline", "candidate"])
+@pytest.mark.parametrize("entry", ["benchmark_review_modes", "benchmark_snapshot_materialization",
+                                    "benchmark_decision_evidence"])
+def test_source_only_boundary_ignores_same_tick_stale_production_bytecode(
+    repo, tmp_path, version, entry,
+):
+    import os
+    import py_compile
+    import subprocess
+    package = repo / "src/paranoia_local"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    source = package / "sample.py"
+    source.write_text("value = 1\n")
+    commit_all(repo, "committed source")
+    tick = 1700000000
+    source.write_text("value = 2\n")
+    os.utime(source, (tick, tick))
+    # Explicit destination models a preexisting adjacent timestamp cache even
+    # though the parent test process already uses the benchmark cache policy.
+    cache = package / "__pycache__" / f"sample.{sys.implementation.cache_tag}.pyc"
+    cache.parent.mkdir()
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    source.write_text("value = 1\n")
+    os.utime(source, (tick, tick))
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    script = ("import sys; sys.path.insert(0, " + repr(str(scripts)) + "); "
+              + "import " + entry + " as entry; "
+              + "shared = getattr(entry, 'shared', entry); "
+              + "sources = {" + repr(version) + ": shared.source_record(" + repr(str(repo)) + ")}; "
+              + "sys.path.insert(0, " + repr(str(repo / "src")) + "); "
+              + "from paranoia_local import sample; assert sample.value == 1; "
+              + "assert sys.dont_write_bytecode; "
+              + "from pathlib import Path; assert not list(Path(sys.pycache_prefix).rglob('*.pyc'))")
+    subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
+    # The negative control proves this was a usable stale cache, not merely a
+    # cache-shaped file which ordinary Python would also ignore.
+    control = ("import sys; sys.path.insert(0, " + repr(str(repo / "src")) + "); "
+               + "from paranoia_local import sample; assert sample.value == 2")
+    environment = dict(os.environ)
+    environment.pop("PYTHONPYCACHEPREFIX", None)
+    subprocess.run([sys.executable, "-c", control], env=environment,
+                   check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("entry", ["benchmark_snapshot_materialization",
+                                    "benchmark_decision_evidence"])
+def test_entry_bootstrap_ignores_stale_imported_harness_bytecode(tmp_path, entry):
+    import os
+    import py_compile
+    import subprocess
+    import shutil
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    for name in [entry + ".py", "benchmark_review_modes.py", "benchmark_bootstrap.py"]:
+        shutil.copyfile(scripts / name, tmp_path / name)
+    source = tmp_path / "benchmark_review_modes.py"
+    original = source.read_bytes()
+    mutated = original.replace(b"gpt-6-astra", b"bad-cache!!", 1)
+    assert len(mutated) == len(original) and mutated != original
+    source.write_bytes(mutated)
+    tick = 1700000000
+    os.utime(source, (tick, tick))
+    cache = tmp_path / "__pycache__" / f"benchmark_review_modes.{sys.implementation.cache_tag}.pyc"
+    cache.parent.mkdir()
+    py_compile.compile(str(source), cfile=str(cache), doraise=True)
+    source.write_bytes(original)
+    os.utime(source, (tick, tick))
+    script = ("import sys; sys.path.insert(0, " + repr(str(tmp_path)) + "); "
+              + "import " + entry + " as entry; "
+              + "assert entry.shared.MODELS['codex'] == 'gpt-6-astra'")
+    subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)

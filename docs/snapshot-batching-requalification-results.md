@@ -3,6 +3,8 @@
 Qualification candidate: 687e7bd0b420f784dc1757bfe5458e8148cc4d01. Baseline: 684898c5a8f35f57917ea77662a9aad9b8b05f19.
 The [immutable contract](snapshot-batching-requalification-plan.md) owns the release gate. CODE convergence is a separate mandatory merge gate; this report does not authorize delivery by itself.
 
+CODE round 1 identified three acceptance gaps: public-handler fixtures checked only an ordinary file, successful process stderr was not archived, and timestamp-valid stale bytecode could override checked source bytes. The original observations below are unchanged. Omitted stderr is unknown, not presumed empty; there is no evidence that stale bytecode affected these runs. This initial campaign cannot qualify delivery after those findings.
+
 ## Measured setup and cleanup
 
 All 40 slots completed with identical evidence renderings. Five alternating pairs per fixture used isolated imports of the frozen committed sources. Fingerprinting ran outside the setup/cleanup timer.

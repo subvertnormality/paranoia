@@ -105,7 +105,8 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
     def execute(self, argv, prompt, cwd, *args, **kwargs):
         label = scripted._label_for(prompt, "opt-decimal")
         text = decider_reply(label)
-        return engines.Review(text=text, raw=text, session_ref="fixture", returncode=0)
+        return engines.Review(text=text, raw=text, session_ref="fixture", returncode=0,
+                              stderr="successful process diagnostic\n")
     monkeypatch.setattr(engines.Engine, "_execute", execute)
     def dispatch(spec_path):
         spec = json.loads(spec_path.read_text())
@@ -121,6 +122,11 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
     assert {a["role"] for a in attempts} == {"evidence-repository"}
     assert all(bench.verify_workspace(r, trees["provider_attempts"]) for r in trees["rows"])
     assert trees["source"] == source and trees["manifest_sha256"] == "frozen"
+    for attempt in attempts:
+        bench.shared.validate_channels(directory, attempt)
+        channel = attempt["process_channels"]["stderr"]
+        assert (directory / channel["file"]).read_bytes() == b"successful process diagnostic\n"
+
 
 
 def test_retained_live_records_bind_exact_native_audit_bytes():
@@ -189,6 +195,12 @@ def recorded_campaign(tmp_path, monkeypatch, *, two_rounds=False):
             "elapsed_ms": 100, "result": "ARBITRATION: CONVERGED\nSELECTED: right"})
         bench.shared.dump(directory / "logs/audit.json", {
             "tool": "arbitrate", "outcome": "CONVERGED", "selected": "right", "snapshot": "snapshot"})
+        from types import SimpleNamespace
+        for attempt in attempts:
+            attempt["raw_sha256"] = bench.shared.sha("")
+            attempt["process_channels"] = bench.shared.retain_channels(
+                directory, attempt["sequence"],
+                SimpleNamespace(raw="", stderr="", failure_detail=""))
         (directory / "attempts.jsonl").write_text("".join(json.dumps(a) + "\n" for a in attempts))
     (root / "counter").write_text(str(sequence))
     monkeypatch.setattr(bench, "load", lambda *a: (manifest, "frozen"))
@@ -254,3 +266,42 @@ def test_report_budget_continues_prior_calls(tmp_path, monkeypatch):
     (root / "counter").write_text("48")
     result = bench.report(root)
     assert result["calls"] == 16 and result["cumulative_calls"] == 48 and result["ledger_complete"]
+
+
+@pytest.mark.parametrize("mutation", ["missing_stderr", "changed_stderr", "missing_detail", "stdout_binding"])
+def test_report_rejects_missing_or_changed_process_channels_without_losing_cost(
+    tmp_path, monkeypatch, mutation,
+):
+    root = recorded_campaign(tmp_path, monkeypatch)
+    directory = root / "trial-0"
+    path = directory / "attempts.jsonl"
+    attempts = [json.loads(line) for line in path.read_text().splitlines()]
+    channels = attempts[0]["process_channels"]
+    if mutation == "missing_stderr":
+        (directory / channels["stderr"]["file"]).unlink()
+    elif mutation == "changed_stderr":
+        (directory / channels["stderr"]["file"]).write_bytes(b"changed")
+    elif mutation == "missing_detail":
+        del channels["failure_detail"]
+    else:
+        attempts[0]["raw_sha256"] = "wrong"
+    path.write_text("".join(json.dumps(a) + "\n" for a in attempts))
+    result = bench.report(root)
+    assert not result["qualified"] and not result["rows"][0]["qualified"]
+    assert result["calls"] == 16 and result["ledger_complete"]
+    assert len(result["rows"][0]["attempts"]) == 2
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_process_channel_retention_preserves_empty_and_nonempty_channels(tmp_path, failed):
+    from paranoia_local.engines import Review
+    review = Review(text="reply", raw="raw provider output\n", returncode=1 if failed else 0,
+                    error=failed, stderr="process diagnostic\n", failure_detail="detail" if failed else None)
+    row = {"sequence": 1, "raw_sha256": bench.shared.sha(review.raw),
+           "process_channels": bench.shared.retain_channels(tmp_path, 1, review)}
+    bench.shared.validate_channels(tmp_path, row)
+    for name, text in [("stdout", review.raw), ("stderr", review.stderr),
+                       ("failure_detail", review.failure_detail or "")]:
+        retained = row["process_channels"][name]
+        assert (tmp_path / retained["file"]).read_bytes() == text.encode("utf-8", "surrogatepass")
+        assert retained["bytes"] == len(text.encode("utf-8", "surrogatepass"))

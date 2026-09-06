@@ -12,6 +12,10 @@ import subprocess
 import sys
 from threading import Lock
 
+import runpy
+BOOTSTRAP_PATH = Path(__file__).with_name("benchmark_bootstrap.py")
+runpy.run_path(str(BOOTSTRAP_PATH))
+
 import benchmark_review_modes as shared
 
 CALL_LIMIT = 128
@@ -75,7 +79,7 @@ def freeze(root, baseline, candidate, prior_report=None, *,
                                "repetition": repetition,
                                "padding_files": large_padding if repetition else 0})
     harness = {str(Path(p).resolve()): shared.sha(Path(p).read_bytes())
-               for p in [__file__, shared.__file__]}
+               for p in [__file__, shared.__file__, BOOTSTRAP_PATH]}
     manifest = {"schema": 3, "sources": sources, "models": shared.MODELS,
                 "expected_baseline": expected_baseline, "large_padding": large_padding,
                 "starting_calls": starting_calls, "prior_campaign": prior,
@@ -262,8 +266,9 @@ def collect_trial(directory):
                 if not isinstance(value, dict):
                     raise ValueError("expected an attempt object")
                 attempts.append(value)
+                shared.validate_channels(directory, value)
             except Exception as exc:
-                errors.append(f"attempts.jsonl line {number}: {type(exc).__name__}")
+                errors.append(f"attempts.jsonl line {number}: {type(exc).__name__}: {str(exc)[:300]}")
     except Exception as exc:
         errors.append(f"attempts.jsonl: {type(exc).__name__}: {str(exc)[:300]}")
     output = read(directory / "review-1.json")

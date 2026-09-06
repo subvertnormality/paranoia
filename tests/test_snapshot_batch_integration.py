@@ -11,12 +11,15 @@ from paranoia_local import engines, git_objects, handlers, prompts, server, stag
 def test_public_verified_plan_observes_batch_workspace_and_retains_earlier_call(
     repo, tmp_path, monkeypatch, provider, failure,
 ):
-    expected = (repo / "app.py").read_bytes()
+    from tests.snapshot_fixture import populate, assert_complete
+    populate(repo)
+    source_repos = []
     calls, workspaces, batches = [], [], []
     real_batch = git_objects.read_batch
 
     def acquire(repo, requests):
         batches.append(len(requests))
+        source_repos.append(repo)
         if failure:
             raise RuntimeError("fixture acquisition failure")
         return real_batch(repo, requests)
@@ -33,9 +36,7 @@ def test_public_verified_plan_observes_batch_workspace_and_retains_earlier_call(
         else:
             assert self.role == engines.ROLE_REPOSITORY
             root = (cwd / "repository").resolve()
-            assert (root / "app.py").read_bytes() == expected
-            assert (root / "app.py").stat().st_mode & 0o777 == 0o444
-            assert not (root / "app.py").is_symlink()
+            assert_complete(source_repos[0], root.parent)
             workspaces.append(root)
             if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
                 lane = next(x.split()[-1] for x in prompt.splitlines()

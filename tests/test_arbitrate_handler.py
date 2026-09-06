@@ -3724,7 +3724,9 @@ def test_native_batch_arbitration_workspace_and_sibling_accounting(
 ):
     from threading import Lock
     from paranoia_local import git_objects
-    expected = (repo / "app.py").read_bytes()
+    from tests.snapshot_fixture import populate, assert_complete
+    populate(repo)
+    source_repos = []
     acquisitions, observed = [], []
     lock = Lock()
     real_batch = git_objects.read_batch
@@ -3733,6 +3735,7 @@ def test_native_batch_arbitration_workspace_and_sibling_accounting(
         with lock:
             index = len(acquisitions)
             acquisitions.append(len(requests))
+            source_repos.append(repo)
         if one_failure and index == 0:
             raise RuntimeError("one workspace acquisition failed")
         return real_batch(repo, requests)
@@ -3741,8 +3744,7 @@ def test_native_batch_arbitration_workspace_and_sibling_accounting(
         def __call__(self, **kw):
             if kw["cwd"] is not None:
                 root = (kw["cwd"] / "repository").resolve()
-                assert (root / "app.py").read_bytes() == expected
-                assert (root / "app.py").stat().st_mode & 0o777 == 0o444
+                assert_complete(source_repos[0], root.parent)
                 observed.append((kw["engine_name"], root))
             return super().__call__(**kw)
 

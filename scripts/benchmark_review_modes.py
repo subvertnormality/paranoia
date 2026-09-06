@@ -19,6 +19,10 @@ import sys
 import threading
 import time
 
+import runpy
+BOOTSTRAP_PATH = Path(__file__).with_name("benchmark_bootstrap.py")
+runpy.run_path(str(BOOTSTRAP_PATH))
+
 MODELS = {"codex": "gpt-6-astra", "claude": "claude-fable-5-1"}
 STAKES = ("One trusted operator and OS, static untrusted repository and plan data; "
           "no hostile local race or repository code execution. A tiny local function "
@@ -187,6 +191,7 @@ def freeze(args):
                 "cases": cases, "oracle": oracle, "order": order,
                 "payload_hashes": {c["id"]: sha(json.dumps(c, sort_keys=True)) for c in cases},
                 "harness_sha256": sha(Path(__file__).read_bytes()),
+                "bootstrap_sha256": sha(BOOTSTRAP_PATH.read_bytes()),
                 "counter_path": str(args.counter.resolve() if args.counter else root / "calls.txt")}
     validate_manifest(manifest)
     dump(root / "manifest.json", manifest)
@@ -200,6 +205,35 @@ def freeze(args):
         path.mkdir()
         dump(path / "status.json", {"status": "unstarted", **trial})
     print(f"Frozen {len(order)} trials at {root}", flush=True)
+
+def retain_channels(directory, sequence, review):
+    """Retain exact text channels with a total UTF-8/surrogatepass encoding."""
+    channels = {}
+    for name, text in (("stdout", review.raw or ""), ("stderr", review.stderr or ""),
+                       ("failure_detail", review.failure_detail or "")):
+        raw = text.encode("utf-8", errors="surrogatepass")
+        filename = f"provider-{sequence}.txt" if name == "stdout" else f"provider-{sequence}-{name}.bin"
+        (directory / filename).write_bytes(raw)
+        channels[name] = {"file": filename, "sha256": sha(raw), "bytes": len(raw)}
+    return channels
+
+
+def validate_channels(directory, attempt):
+    channels = attempt.get("process_channels")
+    if not isinstance(channels, dict) or set(channels) != {"stdout", "stderr", "failure_detail"}:
+        raise ValueError("missing complete provider process channels")
+    for name, row in channels.items():
+        sequence = attempt["sequence"]
+        expected = f"provider-{sequence}.txt" if name == "stdout" else f"provider-{sequence}-{name}.bin"
+        if (not isinstance(row, dict) or set(row) != {"file", "sha256", "bytes"}
+                or row["file"] != expected or type(row["bytes"]) is not int):
+            raise ValueError("invalid provider process channel binding")
+        raw = (directory / expected).read_bytes()
+        if len(raw) != row["bytes"] or sha(raw) != row["sha256"]:
+            raise ValueError("provider process channel changed")
+    if channels["stdout"]["sha256"] != attempt.get("raw_sha256"):
+        raise ValueError("stdout channel does not bind the observed provider reply")
+
 
 def install_observer(engines, directory, counter):
     from paranoia_local import runner as provider_runner
@@ -229,7 +263,7 @@ def install_observer(engines, directory, counter):
                 try:
                     review = original(*args, **kwargs)
                     raw = review.raw or ""
-                    (directory / f"provider-{sequence}.txt").write_text(raw, errors="backslashreplace")
+                    row["process_channels"] = retain_channels(directory, sequence, review)
                     row.update(error=review.error, returncode=review.returncode,
                                session_ref=review.session_ref, raw_sha256=sha(raw),
                                provider_duration_ms=review.provider_duration_ms)
@@ -497,7 +531,8 @@ def run(args):
         raise ValueError("manifest changed since freeze")
     manifest = json.loads(raw)
     validate_manifest(manifest)
-    harness = {str(Path(__file__).resolve()): manifest["harness_sha256"]}
+    harness = {str(Path(__file__).resolve()): manifest["harness_sha256"],
+               str(BOOTSTRAP_PATH.resolve()): manifest["bootstrap_sha256"]}
     validate_harness(harness)
     for provider, version in manifest["cli_versions"].items():
         actual = subprocess.run([provider, "--version"], check=True, capture_output=True,

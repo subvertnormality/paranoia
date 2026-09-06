@@ -12,6 +12,10 @@ import subprocess
 import sys
 import time
 
+import runpy
+BOOTSTRAP_PATH = Path(__file__).with_name("benchmark_bootstrap.py")
+runpy.run_path(str(BOOTSTRAP_PATH))
+
 import benchmark_review_modes as shared
 
 BASELINE = "684898c5a8f35f57917ea77662a9aad9b8b05f19"
@@ -58,7 +62,7 @@ def freeze(root, baseline, candidate):
         shared.git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "Frozen fixture")
         fixtures[str(count)] = {"path": str(repo), "snapshot": shared.git(repo, "rev-parse", "HEAD")}
     harness = {str(Path(p).resolve()): shared.sha(Path(p).read_bytes())
-               for p in (__file__, shared.__file__)}
+               for p in (__file__, shared.__file__, BOOTSTRAP_PATH)}
     manifest = {"schema": 1, "sources": sources, "fixtures": fixtures,
                 "harness": harness, "order": order(fixtures), "repetitions": REPETITIONS}
     shared.dump(root / "manifest.json", manifest)

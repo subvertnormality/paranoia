@@ -135,5 +135,11 @@
     "Provider roles, calls, models, effort, and quality gates are unchanged.",
     "Local trials started after no active test workload was observed; other task work was paused during timings. Live timings share a workstation with unrelated activity and include symmetric evidence observers.",
     "Earlier withheld batching results remain unchanged; this card does not close issues 49 or 50."
+  ],
+  "release_gate_passed": false,
+  "post_review_limitations": [
+    "CODE round 1 found incomplete full-snapshot public-handler acceptance.",
+    "Successful stderr was omitted; omitted channels are unknown, not inferred empty.",
+    "Source-byte checks did not exclude timestamp-valid stale bytecode. No evidence establishes that the retained campaign executed stale code."
   ]
 }
