@@ -115,9 +115,7 @@ def load(root):
 
 def run(root):
     manifest = load(root)
-    for name, digest in manifest["harness"].items():
-        if pilot.sha(Path(name).read_bytes()) != digest:
-            raise ValueError("harness changed")
+    pilot.validate_harness(manifest["harness"])
     for row in manifest["sources"].values():
         if source(Path(row["path"])) != row:
             raise ValueError("source changed")
@@ -137,6 +135,12 @@ def run(root):
             continue
         # Recheck at launch: an ordinary edit during an earlier trial must also block.
         _check_worker_input(root, manifest, trial)
+        try:
+            pilot.validate_harness(manifest["harness"])
+            pilot.validate_source(manifest["sources"][trial["version"]])
+        except (OSError, ValueError) as exc:
+            pilot.dump(directory / "status.json", {"status": "incomplete_binding_changed", "error": str(exc)})
+            continue
         pilot.dump(directory / "status.json", {"status": "running"})
         with (directory / "worker.txt").open("w") as handle:
             result = subprocess.run(

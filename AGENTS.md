@@ -650,3 +650,13 @@ manifest. Reject changed provider, model, fixture, source, counter or extra fiel
 any worker launch, and recheck the selected input at its launch after earlier trials.
 Preserve original trial records; a targeted fix to the harness is not a rerun of historical
 provider acceptance or a retroactive change to the reviewed snapshot.
+
+For both benchmark launchers, the shared worker must validate the frozen source revision,
+complete package inventory and hashes before import. Recheck frozen harness bytes and
+selected source immediately before subsequent launches; record mismatched slots as
+incomplete and retain completed trials. Setup qualification, rebut admission and query/rebut
+semantic scoring require the corresponding native audit's exact output/session/provider
+and successful execution, including zero return code and no in-band error. Report replay
+revalidates execution instead of trusting a stored semantic score, retains costs, and never
+rewrites original adjudications. These checks belong to the shared benchmark boundary,
+not a new production-review state or persistence mechanism.

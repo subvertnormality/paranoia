@@ -261,9 +261,73 @@ def install_observer(engines, directory, counter):
 
 CURRENT_STAGE = ["review"]
 
+
+def validate_source(source):
+    """Bind each worker import to the frozen revision and complete package inventory."""
+    path = Path(source["path"])
+    if git(path, "rev-parse", "HEAD") != source["revision"]:
+        raise ValueError("source revision changed")
+    inventory = {str(p.relative_to(path)) for p in (path / "src/paranoia_local").glob("*.py")}
+    if inventory != set(source["files"]):
+        raise ValueError("source inventory changed")
+    for name, digest in source["files"].items():
+        if sha((path / name).read_bytes()) != digest:
+            raise ValueError("source bytes changed")
+
+
+def validate_harness(bindings):
+    for name, digest in bindings.items():
+        if sha(Path(name).read_bytes()) != digest:
+            raise ValueError("harness changed since freeze")
+
+
+class ExecutionEvidenceError(ValueError):
+    def __init__(self, message, category="unscored"):
+        super().__init__(message)
+        self.category = category
+
+
+def require_successful_review(directory, mode, result, *, session=None, provider=None):
+    """Require exact native output and successful execution for plain query/rebut."""
+    from types import SimpleNamespace
+    from paranoia_local.engines import Review
+    from paranoia_local.handlers import _footer
+
+    matches = []
+    for path in (directory / "logs").glob("*.json"):
+        try:
+            audit = json.loads(path.read_text())
+        except (OSError, ValueError) as exc:
+            raise ExecutionEvidenceError("execution audit unavailable") from exc
+        if not isinstance(audit, dict) or audit.get("tool") != mode:
+            continue
+        if (type(audit.get("error")) is not bool or type(audit.get("returncode")) is not int
+                or not isinstance(audit.get("text"), str)
+                or not isinstance(audit.get("engine"), str)
+                or (audit.get("session_ref") is not None
+                    and not isinstance(audit["session_ref"], str))):
+            continue
+        if session is not None and audit.get("session_ref") != session:
+            continue
+        if provider is not None and audit["engine"] != provider:
+            continue
+        review = Review(text=audit["text"], session_ref=audit.get("session_ref"), raw="",
+                        error=audit["error"], returncode=audit["returncode"])
+        if _footer(review, SimpleNamespace(name=audit["engine"])) == result:
+            matches.append(audit)
+    if len(matches) != 1:
+        raise ExecutionEvidenceError("missing or ambiguous exact execution audit")
+    audit = matches[0]
+    if audit["error"] or audit["returncode"] != 0:
+        raise ExecutionEvidenceError("failed execution cannot receive semantic credit",
+                                     "operational_failure")
+    return audit
+
+
 def worker(spec_path):
     spec = json.loads(spec_path.read_text())
     directory = spec_path.parent
+    validate_source(spec["source"])
     source = Path(spec["source"]["path"])
     sys.path.insert(0, str(source / "src"))
     from paranoia_local import server, engines, class_closure as cc
@@ -312,6 +376,13 @@ def worker(spec_path):
             dump(setup_path, {"result": result, "session": sessions[-1] if sessions else None,
                               "provider": case["provider"], "snapshot": git(repo, "rev-parse", "HEAD"),
                               "elapsed_ms": outputs[-1]["elapsed_ms"]})
+            try:
+                require_successful_review(directory, "query", result,
+                                          session=sessions[-1] if sessions else None,
+                                          provider=case["provider"])
+            except ExecutionEvidenceError as exc:
+                dump(directory / "status.json", {"status": "setup_unusable", "error": str(exc)})
+                return
             dump(directory / "status.json", {"status": "setup_pending"})
             return
         setup = json.loads(setup_path.read_text())
@@ -321,6 +392,12 @@ def worker(spec_path):
             return
         if qualification["setup_sha256"] != sha(setup_path.read_bytes()):
             raise ValueError("qualification does not bind setup")
+        try:
+            require_successful_review(directory, "query", setup["result"],
+                                      session=setup["session"], provider=setup["provider"])
+        except ExecutionEvidenceError as exc:
+            dump(directory / "status.json", {"status": "setup_unusable", "error": str(exc)})
+            return
         if (git(repo, "rev-parse", "HEAD") != setup["snapshot"]
                 or git(repo, "status", "--porcelain")
                 or setup["provider"] != case["provider"]):
@@ -378,23 +455,15 @@ def run(args):
         raise ValueError("manifest changed since freeze")
     manifest = json.loads(raw)
     validate_manifest(manifest)
-    if manifest["harness_sha256"] != sha(Path(__file__).read_bytes()):
-        raise ValueError("harness changed since freeze")
+    harness = {str(Path(__file__).resolve()): manifest["harness_sha256"]}
+    validate_harness(harness)
     for provider, version in manifest["cli_versions"].items():
         actual = subprocess.run([provider, "--version"], check=True, capture_output=True,
                                 text=True).stdout.strip()
         if actual != version:
             raise ValueError("provider CLI changed")
     for source in manifest["sources"].values():
-        path = Path(source["path"])
-        if git(path, "rev-parse", "HEAD") != source["revision"]:
-            raise ValueError("source revision changed")
-        inventory = {str(p.relative_to(path)) for p in (path / "src/paranoia_local").glob("*.py")}
-        if inventory != set(source["files"]):
-            raise ValueError("source inventory changed")
-        for name, digest in source["files"].items():
-            if sha((path / name).read_bytes()) != digest:
-                raise ValueError("source bytes changed")
+        validate_source(source)
     def execute(trial):
         directory = root / trial["id"]
         status = json.loads((directory / "status.json").read_text())["status"]
@@ -404,6 +473,12 @@ def run(args):
             return
         if int(Path(manifest.get("counter_path", str(root / "calls.txt"))).read_text()) >= 320:
             dump(directory / "status.json", {"status": "incomplete_call_limit"})
+            return
+        try:
+            validate_harness(harness)
+            validate_source(manifest["sources"][trial["version"]])
+        except (OSError, ValueError) as exc:
+            dump(directory / "status.json", {"status": "incomplete_binding_changed", "error": str(exc)})
             return
         case = next(c for c in manifest["cases"] if c["id"] == trial["case"])
         dump(directory / "input.json", {"input": case, "models": manifest["models"],

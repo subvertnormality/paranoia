@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 import statistics
 import sys
-from benchmark_review_modes import sha, dump, validate_manifest
+from benchmark_review_modes import (sha, dump, validate_manifest, require_successful_review,
+                                    ExecutionEvidenceError)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from paranoia_local.class_closure import BLOCKING_SEVERITIES
 
@@ -23,6 +24,9 @@ def qualify(directory, quote, reason, accepted=True):
                      or not setup.get("snapshot") or not quote or quote not in setup["result"]
                      or "app.py" not in quote or not reason.strip()):
         raise ValueError("unqualified exact finding/session/snapshot")
+    if accepted:
+        require_successful_review(directory, "query", setup["result"],
+                                  session=setup["session"], provider=setup["provider"])
     dump(directory / "qualification.json", {
         "accepted": accepted, "quote": quote, "reason": reason,
         "setup_sha256": sha(path.read_bytes()), "adjudicator": "implementer",
@@ -42,6 +46,13 @@ def adjudicate(directory, category, quote, reason):
                "arbitrate": {"inclusive", "exclusive"}}
     if category not in allowed[mode] | {"wrong_answer", "operational_failure", "unresolved", "unscored"}:
         raise ValueError("category does not belong to mode")
+    if category not in {"operational_failure", "unresolved", "unscored"} and mode in {"query", "rebut"}:
+        require_successful_review(directory, mode, text)
+        setup_path = directory / "setup.json"
+        if mode == "rebut" and setup_path.exists():
+            setup = json.loads(setup_path.read_text())
+            require_successful_review(directory, "query", setup["result"],
+                                      session=setup["session"], provider=setup["provider"])
     if category in allowed[mode]:
         if "[paranoia-local error]" in text or "STATE-UNAVAILABLE" in text or "AUDIT-FAILED" in text:
             raise ValueError("failed review cannot receive semantic credit")
@@ -153,6 +164,19 @@ def report(root):
             cost["calls"] += 1
             cost["provider_call_elapsed_ms"] += attempt["elapsed_ms"]
         expected = manifest["oracle"][trial["case"]]["expected"]
+        mode = manifest["oracle"][trial["case"]]["mode"]
+        try:
+            if mode in {"query", "rebut"} and score["category"] not in {
+                "operational_failure", "unresolved", "unscored",
+            }:
+                require_successful_review(directory, mode, text)
+            if mode == "rebut" and setup_path.exists():
+                setup = json.loads(setup_path.read_text())
+                require_successful_review(directory, "query", setup["result"],
+                                          session=setup["session"], provider=setup["provider"])
+        except ExecutionEvidenceError as exc:
+            score = {**score, "submitted_category": score["category"], "category": exc.category,
+                     "execution_rejection": str(exc)}
         category = score["category"]
         rows.append({**trial, "mode": manifest["oracle"][trial["case"]]["mode"],
                      "status": status["status"], "expected": expected, **score,

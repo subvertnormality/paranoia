@@ -522,3 +522,11 @@ and diagnostic aggregation from validation and settlement. Its proposed empty-ce
 shortcut was tested and withheld under the frozen acceptance gate; current census calls
 still include model consolidation. See the [experiment report](docs/empty-census-benchmark-2026-09-06.md)
 for all retained results and the limits of the observed timing gains.
+
+Benchmark workers verify the frozen revision, complete Python package inventory and file
+hashes immediately before importing the selected source. Both launchers recheck frozen
+harness bytes and selected source before later launches; mismatches leave affected trials
+incomplete. Query/rebut credit and setup qualification require an exact native result with
+a successful execution audit. Report replay rejects stored text-only credit for failed or
+unavailable execution while retaining costs and original score records. See the
+[merge benchmark validation](docs/merge_benchmark_validation_2026-09-06.json).

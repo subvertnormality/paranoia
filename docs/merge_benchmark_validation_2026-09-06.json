@@ -1,0 +1,52 @@
+{
+  "kind": "benchmark-merge-fix-validation-v1",
+  "date": "2026-09-06",
+  "full_code_review_base": "9bd9b893ef7d21903aa704eb31176206eb9abe74",
+  "full_code_review_head": "c40e5179a904a77a26f9d1d5c6ad9e303c1c281d",
+  "contract_sha256": "2d4ddcc967ff06e0548c81cde6a664d1b13d1d69d065e57659e00a08c65a917b",
+  "findings": "One MAJOR execution-credit/setup gate and one MINOR delayed source/harness binding gap; repaired together at shared benchmark boundaries. Production package bytes are unchanged.",
+  "source_sha256": {
+    "scripts/benchmark_review_modes.py": "9d122cf623ab4a2cbe9d941ecff981d3f2bef75867935e64205189d4eee32888",
+    "scripts/score_review_modes.py": "21830a5fc873fd12bfac44929332d69351fe70be7843d04051faeb785216d506",
+    "scripts/run_empty_census_acceptance.py": "1efbdff48be381bc9921eabe539e837cd29cfe51830564e651fe3d0d1f3a00c8",
+    "tests/test_review_modes_benchmark.py": "ada964af7a9aeb5193f8c034a845f85927222e0c60429f99f43b44548848faba"
+  },
+  "focused_tests": {
+    "result": "59 passed in 2.91s",
+    "log_path": "/tmp/paranoia-merge-benchmark-fix-tests.txt",
+    "sha256": "a2f4f61cf034fc3bde20fc5c37fa667ceeca11778496cc7796e6147f7b0c4377"
+  },
+  "historical_revalidation": {
+    "provider_calls": 0,
+    "trial_count": 40,
+    "original_report_path": "/tmp/paranoia-five-mode-pilot-v2-20260906/report.json",
+    "original_report_sha256": "bf344781f7c7c26433ade77bea6359b0de25b42f665f22dbfc5937ccb79d21f5",
+    "revalidated_report_path": "/tmp/paranoia-five-mode-merge-revalidation-20260906.json",
+    "revalidated_report_sha256": "19fe562be38b9dcc6a1da35c76a0a19e09690ad3c4c653d74d7bcce28dc882c3",
+    "summary": {
+      "baseline": {
+        "trials": 20,
+        "correct": 19,
+        "scorable": 19,
+        "operational_failures": 1,
+        "unresolved_or_unscored": 0,
+        "false_clears": 0,
+        "false_positives": 0,
+        "calls": 74
+      },
+      "candidate": {
+        "trials": 20,
+        "correct": 19,
+        "scorable": 19,
+        "operational_failures": 0,
+        "unresolved_or_unscored": 1,
+        "false_clears": 0,
+        "false_positives": 0,
+        "calls": 77
+      }
+    },
+    "changed_categories_or_costs": [],
+    "original_records_modified": false
+  },
+  "scope_limit": "Historical benchmark outcomes are unchanged by the stronger execution check. This does not prove absence of historical source edits; no such edits were identified. No new performance or quality population claim is made. Paranoia CODE correction/final remain required before merge."
+}
