@@ -1,6 +1,6 @@
 # Final-source decision evidence results, 6 September 2026
 
-The full eight-dispatch campaign on candidate cbdd3a1 passed its frozen live gate. Candidate correctness was 4/4 versus baseline 4/4. Candidate unresolved/failure count was 0 versus baseline 0. Provider calls were 16 and 16, respectively. False convergence was absent: True. All source, exact expected workspace, paired workspace, per-attempt and cleanup bindings passed: True.
+The full eight-dispatch campaign on candidate cbdd3a1 passed its frozen live gate. Candidate correctness was 4/4 versus baseline 4/4. Candidate unresolved/failure count was 0 versus baseline 0. Provider calls were 16 and 16, respectively. Neither version falsely converged. All source, exact expected workspace, paired workspace, per-attempt and cleanup bindings passed.
 
 | Contract / pair | Baseline | Candidate |
 | --- | ---: | ---: |
@@ -16,7 +16,7 @@ Both earlier full campaigns remain unchanged: [initial source](decision-evidence
 
 The first report-only process lacked the signed-in CLI directory in PATH and conservatively marked all trials unqualified. The reporter overwrote its default output during revalidation; the original intermediate report was not preserved. Its observed diagnostic is retained, and a separate failure report is explicitly labelled as a reproduction from the unchanged observations under the original PATH. Restoring the same execution environment allowed the exact frozen harness to revalidate all eight unchanged trials, with no provider reruns, source or fixture changes, or gate relaxation. The qualified report and diagnostic reproduction bind identical attempts, outputs, timings, workspace observations and audit digests; successful qualification additionally derives global attempt-sequence bindings. A regression check proves raw-observation identity and checks those derived bindings.
 
-The final source passed all 1,985 tests. The 33 owned protocol mutants and seven historical equivalence groups remain bound to unchanged owned dependencies. CODE rounds 1–4 found and closed four defect classes; the cold final remains pending before delivery. The machine-readable receipt retains every round, all three complete live reports/manifests, and 24 byte-exact native audits. Earlier failed findings and campaigns have not been erased or relabelled.
+The final source passed all 1,985 tests. The 33 owned protocol mutants and seven historical equivalence groups remain bound to unchanged owned dependencies. CODE rounds 1–4 found and closed four defect classes. The round-5 cold final on eeb0d47 returned CONVERGENCE: NOT-BLOCKED with zero blocking debt and all four classes closed. The machine-readable receipt retains every round, all three complete live reports/manifests, and 24 byte-exact native audits. Earlier failed findings and campaigns have not been erased or relabelled.
 
 The runtime adds a typed decision-evidence admission boundary and an explicit initial citation grammar. Repairable declarations share the existing single format/evidence correction; required Git read failures terminate with provider replies retained. Successful tree metadata distinguishes missing submodule targets from unavailable required blobs. No new provider role, retry allowance, evidence normalization, submodule fetch or weakened final grounding was introduced.
 
