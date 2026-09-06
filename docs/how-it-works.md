@@ -271,6 +271,11 @@ as `staged rejected (validation)`, and reserve exhaustion as
 `staged blocked (deadline)`. These labels also appear in `CLASS-REGISTER`, so a
 transient provider failure cannot be mistaken for repeated structural rejection.
 
+If a validation-invalid payload is repaired in-session, the successful `CLASS-REGISTER` line still
+reports the rejected payload count, states that none of its operations applied, and includes the
+bounded first validation issue. The review's `Gaps` section carries bounded validation diagnostics,
+so an accepted empty retry cannot erase evidence that an earlier nonempty payload was discarded.
+
 Persistent correction control stores `reset_round`, `reopen_count`, and
 `last_session_ref`. A load-bearing `CORRECTION-GATE` is projected from
 `correction_gates` into the exact `rendered_trailer`; only an exact

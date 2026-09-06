@@ -119,8 +119,8 @@
       "sha256": "84c890786e8bb1ebeea6f2a1338fbef5e1de59d6afd45a828537dc839a1606e8"
     },
     "src/paranoia_local/handlers.py": {
-      "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged.",
-      "sha256": "5719751ce50cf1c4888549ce223d9d04b4ab49ad5967b9a496c90193cf9974db"
+      "scope": "Moves stakes-driven reopening and every class sweep/projection after raw structural-state validation, with a failure-only malformed-state class surface; it does not alter this retained valid same-stakes provider exchange. Issue #106 passes active member inventories into fresh/retried integrity decoding and tests shared-anchor correction/final durable settlement; retained exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 adds deterministic absent-key runtime compatibility migration while retained provider exchanges and unrelated acceptance behavior remain unchanged. Issues #111/#112 add recovered-rejection rendering and deterministic evidence projection for future corrections; this retained exchange remains unchanged.",
+      "sha256": "455ef4f6b0e0da98f5871424afd87cc849464dffc238fdb078eb5e5d6c0a3c9b"
     },
     "src/paranoia_local/engines.py": {
       "scope": "Updates the active Codex reviewer and attester defaults to GPT-6-Astra; this retained Codex handler exchange remains historical and unchanged.",
@@ -135,16 +135,16 @@
       "sha256": "d53a704602b76d3aa920bb23da24da58dcf94cb1a0abe0da84b8deaa644e3924"
     },
     "src/paranoia_local/review_census.py": {
-      "scope": "Carries future unmechanized member inventories through canonical class records; this retained historical provider exchange and settlement remain unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical.",
-      "sha256": "2437d3aa6a244ab3c45e5ce10345dec652fafec283e5c332acc24766ec4e12e7"
+      "scope": "Carries future unmechanized member inventories through canonical class records; this retained historical provider exchange and settlement remain unchanged. Issue #106 projects durable members and binds them into the version-4 census cache identity; retained exchanges remain historical. Issue #111 renders bounded recovered-rejection diagnostics without changing this retained exchange.",
+      "sha256": "bbf79ed572632ede519de10486e1a0149dd2a13453153199bf7662c48e894176"
     },
     "src/paranoia_local/staged_protocol.py": {
-      "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical.",
-      "sha256": "1e1601e4754ba44778d067516197bc90b90a8bebf208c70228df91d26c962b93"
+      "scope": "Issue #98 permits evidence-bearing optional correction outcomes and rejects evidence-free close actions; this retained exchange has no standalone close and its settlement remains unchanged. Issue #106 adds member-coverage wire validation and identity-first canonical evidence projection; retained exchanges remain historical. Issue #112 projects redundant occurrence evidence for future correction findings; this retained exchange is unchanged.",
+      "sha256": "630df255e98645af2837000a37629327f0c98e93652a4b434ad566a4b7ad8733"
     },
     "tests/test_review_census.py": {
-      "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical.",
-      "sha256": "c709c6bb9c633822b2469ca278ba3ccf3c51f91d6b0bf2a69124fd93e809cd01"
+      "scope": "Adds deterministic source-bound replay plus issue #94 and issue #98 regressions without changing this retained provider exchange. Issue #106 tests fresh/retry/cache inputs plus shared-anchor correction/final settlement and durable reload; retained exchanges remain historical. Issues #111/#112 add recovered-rejection and one-call evidence-projection lifecycle regressions without rewriting the historical exchange.",
+      "sha256": "a6d4c81a28fe5697bba9eeb7b0858e62cc38c615e06bf8db58835ffdbf02bd1a"
     }
   },
   "attempt_ledger": [

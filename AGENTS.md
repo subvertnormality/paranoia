@@ -429,11 +429,12 @@ of the resulting code and tests.
   non-reproducible process stderr and wall-clock observations from the proof.
   For each existing class, aggregate every independently anchored current occurrence into its one
   governing finding and bounded all-site remedy; keep the one-finding/outcome settlement shape.
-  Before predecessor debt can close, require the fresh governing finding to contain every
-  current-occurrence anchor independently authored in its matching violated class outcome; report
-  omissions at provider-owned JSON Pointers through the bounded retry.
-  Apply the same containment rule to a non-debt-bound correction occurrence before deriving its
-  violated outcome from `classification.assessment_evidence`.
+  Before predecessor debt can close, deterministically extend the fresh governing finding with
+  every current-occurrence anchor independently authored in its matching violated class outcome,
+  preserving authored order and recording the extension in staged audit data. Apply the same
+  projection to a non-debt-bound correction occurrence before deriving its violated outcome from
+  `classification.assessment_evidence`. Resolve every projected anchor normally; never normalize
+  an unresolvable, out-of-bounds, or snapshot-invalid citation into validity.
   A fresh aggregate finding must close every prior open debt bound to that class after including
   every still-reachable predecessor occurrence; never retain narrower and aggregate blockers side by side.
   After any correction settlement, at most one open debt may remain bound to an active class.
