@@ -2,7 +2,7 @@
   "acceptance_kind": "arbitration-context-steering-rejected",
   "allowed_later_source_diffs": {
     "src/paranoia_local/arbitrate_handler.py": {
-      "sha256": "7285986b47c6721595ad3c233c758ca57b9cdd19dcacf1ff818ec2234da0459e",
+      "sha256": "eb10b4c306a453a21aaaf7abcdde8cf725a64959dd3d5482f362607b3440422d",
       "scope": " Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
     },
     "src/paranoia_local/engines.py": {

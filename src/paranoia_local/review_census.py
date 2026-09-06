@@ -253,11 +253,13 @@ def attempt_trailer(attempts: Sequence[Attempt] | Sequence[dict[str, Any]]) -> s
     retries = sum(str(row.get("role", "")).endswith("-validation-retry") for row in rows)
     invalid = sum(row.get("outcome") == "validation-invalid" for row in rows)
     execution_failed = sum(
-        row.get("outcome") not in {"completed", "validation-invalid"} for row in rows
+        row.get("outcome") not in {"completed", "validation-invalid", "checkpoint"} for row in rows
     )
     return (
         f"STAGED-ATTEMPTS: total={len(rows)} validation-retries={retries} "
         f"validation-invalid={invalid} execution-failed={execution_failed}"
+        + (f" checkpoints={sum(row.get('outcome') == 'checkpoint' for row in rows)}"
+           if any(row.get("outcome") == "checkpoint" for row in rows) else "")
     )
 
 

@@ -2,7 +2,7 @@
   "acceptance_kind": "arbitration-consequence-not-advocacy",
   "allowed_later_source_diffs": {
     "src/paranoia_local/arbitrate_handler.py": {
-      "sha256": "315febef68818bec473b04b12cbd912c6983e109a42919aee6954d6eaf2ace81",
+      "sha256": "4d445e377bc6540fa4165b73fbfd03a2c8d8e30c0346832ab39b86b3576282fb",
       "scope": "Classifies and field-binds terminal caller-owned advocacy while preserving original fallback, cleaner fidelity rejection, and the retained successful provider exchange. Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
     },
     "src/paranoia_local/arbitration.py": {

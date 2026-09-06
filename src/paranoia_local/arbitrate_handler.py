@@ -1349,7 +1349,7 @@ def _arbitrate(
         ), deciders=deciders, seed=seed)
         with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
             futures = {
-                engine.name: telemetry.submit(pool, 
+                engine.name: telemetry.submit(pool,
                     researcher,
                     engine=engine,
                     model=models.get(engine.name) or engine.default_model,

@@ -199,6 +199,10 @@ def test_public_checkpoint_to_bound_rebut(
     handler = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
     result = handler(args, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
     assert "ARCHITECTURE-CHECKPOINT: required" in result
+    assert "execution-failed=0 checkpoints=1" in result
+    audit = next(json.loads(p.read_text()) for p in (tmp_path / "logs").glob("*.json")
+                 if json.loads(p.read_text()).get("tool") == f"critique_{mode}")
+    assert audit["error"] is False and audit["returncode"] == 0
     assert calls == (["run", "resume"] if repair_first else ["run"])
     state = cc.load_lineage(state_root, "architecture", stamp="checkpoint", mode=mode)
     assert state.review_state["last_round"] == 6
@@ -438,3 +442,97 @@ def test_cancellation_cleans_up_process_group(tmp_path, monkeypatch, run):
     with pytest.raises(KeyboardInterrupt):
         run([sys.executable, "-c", "import time; time.sleep(60)"], "", tmp_path, timeout=60)
     assert time.monotonic() - started < 4
+
+
+@pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+@pytest.mark.parametrize("phase", ["correction", "final"])
+@pytest.mark.parametrize("severity", ["MINOR", "OUT-OF-SCOPE"])
+def test_public_advisory_debt_preserves_class_only_final_owner(
+    tmp_path, monkeypatch, repo, repo_with_branch, mode, phase, severity,
+):
+    state_root, args, anchor = _seed(
+        tmp_path, monkeypatch, mode, repo if mode == cc.PLAN_MODE else repo_with_branch,
+    )
+    if phase == "final":
+        seeded = cc.load_lineage(state_root, "architecture", stamp="seed", mode=mode)
+        seeded.review_state["debt"][0]["severity"] = severity
+        rc.set_phase(seeded.review_state, "final", final_engine="codex")
+        cc.save_lineage(state_root, seeded)
+    calls = []
+    def run(self, prompt, *args, **kwargs):
+        role = kwargs["response_schema"]["properties"]["role"]["const"]
+        calls.append((self.name, role))
+        value = json.loads(_decision(role, anchor, ["class-a"]))
+        if role == "correction":
+            value["governing_findings"] = [{
+                "id":"advisory", "severity":severity, "summary":"an advisory finding remains",
+                "evidence":_citation(anchor), "remedy":"inspect this advisory occurrence",
+                "classification":{"kind":"existing_class", "class_id":"class-a"},
+            }]
+            basis = {"kind":"new_finding", "finding_id":"advisory"}
+        else:
+            current = cc.load_lineage(state_root, "architecture", stamp="current", mode=mode, pending_owned=True)
+            debt_id = next(row["id"] for row in current.review_state["debt"] if row["status"] == "open")
+            value["debt_outcomes"] = [{"debt_id":debt_id, "status":"open",
+                                       "reason":"advisory finding remains", "evidence":_citation(anchor)}]
+            basis = {"kind":"carried_debt", "debt_id":debt_id}
+        value["class_outcomes"]["class-a"] = {
+            "verdict":"violated", "evidence":_citation(anchor), "basis":basis,
+        }
+        text = json.dumps(value)
+        return engines.Review(text=text, raw=text, session_ref="advisory-session")
+    monkeypatch.setattr(engines.CodexEngine, "run", run)
+    monkeypatch.setattr(engines.ClaudeEngine, "run", run)
+    engine = engines.CodexEngine() if phase == "correction" else engines.ClaudeEngine()
+    handler = handlers.critique_plan if mode == cc.PLAN_MODE else handlers.critique_branch
+    result = handler(args, engine=engine, log_dir=tmp_path / "logs")
+    assert "CONVERGENCE: BLOCKED" in result
+    after = cc.load_lineage(state_root, "architecture", stamp="after", mode=mode)
+    assert after.review_state["last_round"] == 2
+    assert after.review_state["phase"] == "final"
+    assert after.review_state["final_engine"] == "codex"
+    assert after.blocking()
+    assert all(row["severity"] == severity for row in after.review_state["debt"] if row["status"] == "open")
+    assert calls == [(engine.name, phase)]
+
+    if phase == "correction":
+        args["round"] += 1
+        result = handler(args, engine=engines.ClaudeEngine(), log_dir=tmp_path / "logs")
+        assert "CONVERGENCE: BLOCKED" in result
+        after = cc.load_lineage(state_root, "architecture", stamp="foreign", mode=mode)
+        assert after.review_state["last_round"] == 3
+        assert after.review_state["phase"] == "final"
+        assert after.review_state["final_engine"] == "codex"
+        assert calls[-1] == ("claude", "final")
+
+
+@pytest.mark.parametrize("name", [
+    "run_class_occurrence_batch_acceptance.py",
+    "run_persistent_correction_gate_acceptance.py",
+])
+def test_acceptance_scripts_import_in_isolated_direct_execution(tmp_path, name):
+    import subprocess
+    path = Path(__file__).resolve().parents[1] / "scripts" / name
+    command = f"import runpy; runpy.run_path({str(path)!r}, run_name='acceptance_import_smoke')"
+    result = subprocess.run([sys.executable, "-I", "-c", command], cwd=tmp_path,
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("engine", [engines.CodexEngine(), engines.ClaudeEngine()])
+def test_schema_trace_hashes_exact_nonascii_provider_representation(tmp_path, engine):
+    schema = {"type":"object", "description":"日本語 — café", "properties":{}}
+    observed = []
+    def execute(argv, *args):
+        if engine.name == "codex":
+            observed.append(Path(argv[argv.index("--output-schema") + 1]).read_bytes())
+            stdout = '{"type":"item.completed","item":{"type":"agent_message","text":"{}"}}'
+        else:
+            observed.append(argv[argv.index("--json-schema") + 1].encode("utf-8"))
+            stdout = '{"type":"result","result":"{}","structured_output":{}}'
+        return runner.RunResult(0, stdout, "")
+    with telemetry.recording("query", tmp_path):
+        engine.run("p", tmp_path, "m", "high", False, response_schema=schema, runner=execute)
+    import hashlib
+    data = json.loads(next(tmp_path.glob("*-run-*.json")).read_text())
+    assert data["attempts"][0]["schema_sha256"] == hashlib.sha256(observed[0]).hexdigest()

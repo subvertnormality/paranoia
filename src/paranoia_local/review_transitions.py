@@ -43,7 +43,7 @@ def incoming(facts: ReviewFacts) -> PhaseDecision:
     phase, owner = facts.phase, facts.final_engine
     if phase == "census" and facts.unbound_marker and facts.blocking_debt:
         return PhaseDecision("correction", None, "actionable-debt")
-    if phase != "census" and facts.unbound_classes and not facts.blocking_debt:
+    if phase != "census" and facts.blocking_classes and not facts.blocking_debt:
         if phase == "final" and owner:
             return PhaseDecision("final", owner, "owned-class-closure")
         return PhaseDecision("census", None, "unowned-class-closure")
@@ -68,12 +68,10 @@ def after_classes(
     """Reconcile canonical class results with finding results after a valid settlement."""
     if facts.blocking_debt:
         return PhaseDecision("correction", None, "blocking-findings")
-    if facts.unbound_classes:
+    if facts.blocking_classes:
         if reviewed_phase == "correction":
             return PhaseDecision("final", engine, "class-only-cold-final")
         if reviewed_phase == "final" and prior_owner:
             return PhaseDecision("final", prior_owner, "class-only-final-still-open")
         return PhaseDecision("census", None, "class-closure-needs-census")
-    if facts.blocking_classes:
-        return PhaseDecision("correction", None, "class-bound-advisory-debt")
     return PhaseDecision(facts.phase, facts.final_engine, "settled-phase")

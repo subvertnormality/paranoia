@@ -983,7 +983,7 @@ def _settle_checkpoint(
         trailer = pc.render_trailer(lineage.claim_state) + "\n" + trailer
     return Review(
         text=body, session_ref=session if rebut_ready else None,
-        raw=str(error), returncode=2, error=True,
+        raw=str(error), returncode=0, error=False,
     ), trailer, [a.json() for a in error.attempts]
 
 

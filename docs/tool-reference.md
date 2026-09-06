@@ -319,20 +319,21 @@ Changing `--log-dir` does not move or reset lineage state.
 
 ### Neutral ballot example
 
-Use comparable factual options and a shared decision criterion. This is a writing template, not an API payload:
+Use comparable factual options and a shared decision criterion. Example request arguments (replace the repository path):
 
 ```json
 {
+  "repo_path": "/absolute/path/to/repository",
+  "stakes": "One trusted local operator and OS; repository bytes are data, no repository execution or hostile local race. Configuration should become visible within one minute. Recoverable blocking is acceptable; exclude multitenancy and compromised OS.",
   "decision": "Choose the cache lifetime for configuration reads.",
   "options": [
-    {"id": "A", "description": "Reload configuration on every request."},
-    {"id": "B", "description": "Reload configuration once per minute."}
+    {"id": "A", "statement": "Reload configuration on every request."},
+    {"id": "B", "statement": "Reload configuration once per minute."}
   ],
   "context": "One process; configuration changes at most hourly. Assess freshness, failure recovery and request latency."
 }
 ```
 
-Adapt these field names to the tool's option schema. State any measured costs
-with evidence. Avoid labels such as “safe solution” or “reckless workaround”.
+State any measured costs with evidence. Avoid labels such as “safe solution” or “reckless workaround”.
 Cleaning makes the smallest faithful edits, preserves substantive asymmetry and
 leaves neutral wording unchanged; independent fidelity and advocacy checks remain.

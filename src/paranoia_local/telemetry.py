@@ -71,7 +71,7 @@ def observe(call: Callable, **settings):
         row = {
             **settings, "prompt_sha256":digest(settings.pop("prompt")),
             "schema_sha256":(
-                digest(json.dumps(settings["schema"], sort_keys=True, separators=(",", ":")))
+                digest(json.dumps(settings["schema"], ensure_ascii=False, sort_keys=True, separators=(",", ":")))
                 if settings.get("schema") is not None else None
             ),
         }
