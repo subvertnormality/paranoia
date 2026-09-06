@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a07904-2807-7811-98ea-6abfa0b29c88"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"FIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE"}}
+{"type":"turn.completed","usage":{"input_tokens":16556,"cached_input_tokens":12160,"cache_write_input_tokens":0,"output_tokens":67,"reasoning_output_tokens":0}}

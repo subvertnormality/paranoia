@@ -1,0 +1,17 @@
+{
+  "candidate_revision": "9dc080171da3b9868450d742c2be10320241c6af",
+  "command": "/home/andy/tools/paranoia-local/.venv/bin/python -m pytest -q",
+  "environment": {
+    "PYTHONPATH": "src",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_SYSTEM": "/dev/null"
+  },
+  "returncode": 1,
+  "elapsed_seconds": 212.72642157017253,
+  "raw_output": "/tmp/paranoia-batch-full-tests-v2.txt",
+  "summary": [
+    "FAILED tests/test_review_modes_benchmark.py::test_campaign_refuses_later_launch_after_binding_drift[source-five-mode]",
+    "FAILED tests/test_review_modes_benchmark.py::test_campaign_refuses_later_launch_after_binding_drift[harness-five-mode]",
+    "5 failed, 2068 passed in 211.97s (0:03:31)"
+  ]
+}

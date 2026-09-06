@@ -35,8 +35,8 @@ removed at exit and no existing cache is modified.
 
 benchmark_snapshot_materialization.py freezes five alternating pairs for the
 current baseline repository and 100/1,000/3,000-file fixtures. Setup plus cleanup
-is timed separately from independent rendering fingerprints. Run timed trials
-without concurrent tests or provider work.
+is timed separately from independent rendering fingerprints. Pause other tests and provider work under this task’s control during timings;
+record ambient workstation activity and preserve all fixed trial slots.
 
 benchmark_decision_evidence.py retains the existing review worker, actual-call
 ledger, native audit checks, and bijective provider-workspace observations.
@@ -64,4 +64,4 @@ a deliberate retention mutant, unusual paths, pinned ordinary edits, inert modes
 missing promised objects, public-handler workspace use, sibling-call accounting,
 dirty-source rejection, and frozen workload binding.
 
-The [initial retained results](snapshot-batching-requalification-results.md) reported passing numeric and live decision gates, but CODE review found incomplete successful-stderr custody and a stale-bytecode admission gap. They remain historical observations and do not qualify delivery. Corrected requalification and CODE convergence are required.
+The [corrected results](snapshot-batching-corrected-results.md) pass the fixed numeric and live integration gates after those CODE acceptance gaps were addressed. The initial campaign remains historical with its limitations. CODE cold-final clearance is a separate mandatory merge gate. Shared-workstation timings and the small live sample do not establish a general speedup.

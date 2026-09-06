@@ -1,0 +1,597 @@
+{
+  "schema": 1,
+  "campaign": "corrected requalification",
+  "candidate_revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+  "baseline_revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+  "plan_path": "docs/snapshot-batching-requalification-plan.md",
+  "plan_sha256": "f94aa838c51b0c3b4fc4460320afb9e43813ff33646d7393a964f6691467c74c",
+  "artifacts": {
+    "docs/snapshot_batch_corrected_local_results_2026-09-07.json": {
+      "sha256": "42eecae777a1da70f45f8a159dc5960b6c686a600d4446c88fc3222d3ca6a541",
+      "origin": "/tmp/paranoia-batch-local-20260907-v2/report-attempt-1.json"
+    },
+    "docs/snapshot_batch_corrected_local_manifest_2026-09-07.json": {
+      "sha256": "20afe400691725180abf4be14a260a64bb262ce20131575267114598cc74ed1c",
+      "origin": "/tmp/paranoia-batch-local-20260907-v2/manifest.json"
+    },
+    "docs/snapshot_batch_corrected_environment_2026-09-07.json": {
+      "sha256": "0c8af7a998359af5b1b348d988b5e36c7d97ee3d257c583bb8da2ebdbe353305",
+      "origin": "/tmp/paranoia-batch-local-20260907-v2/environment.json"
+    },
+    "docs/snapshot_batch_corrected_live_results_2026-09-07.json": {
+      "sha256": "ba62916b50a50cb4707412f17c12b63609a445622bde2f462ec50ea5ee9ab916",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/report-attempt-1.json"
+    },
+    "docs/snapshot_batch_corrected_live_manifest_2026-09-07.json": {
+      "sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/manifest.json"
+    },
+    "docs/snapshot_batch_corrected_report_replay_2026-09-07.json": {
+      "sha256": "ba62916b50a50cb4707412f17c12b63609a445622bde2f462ec50ea5ee9ab916",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/report-source-entry-validation.json"
+    },
+    "docs/snapshot_batch_corrected_full_tests_2026-09-07.json": {
+      "sha256": "b5254b04807a564fda68ed15dfd4d1a8744f0993b48d953e0e91afc0d9125c64",
+      "origin": "/tmp/paranoia-batch-full-tests-v3.json"
+    },
+    "docs/snapshot_batch_corrected_full_tests_2026-09-07.txt": {
+      "sha256": "0341c81143e8dc8009e14747e195253cb13ba1e2afce8004838ee2c80c3adde0",
+      "origin": "/tmp/paranoia-batch-full-tests-v3.txt"
+    },
+    "docs/snapshot_batch_intermediate_test_failure_2026-09-07.json": {
+      "sha256": "9398dab4765f3913e736b414eb1ff5ff4eb8e86e4a2f52c425b6f42182b93b5a",
+      "origin": "/tmp/paranoia-batch-full-tests-v2.json"
+    },
+    "docs/snapshot_batch_intermediate_test_failure_2026-09-07.txt": {
+      "sha256": "c440fc980eae4949773f9c8c3050e0b4c692f697a95fa3da5b07c7b45ce0cc84",
+      "origin": "/tmp/paranoia-batch-full-tests-v2.txt"
+    },
+    "docs/snapshot_batch_code_round1_2026-09-06.txt": {
+      "sha256": "f6dc335013b568cc86a93d85095ac7e194fe45caaa0dc4425b8b14a6f8905007",
+      "origin": "/tmp/paranoia-batch-requalification-code-round1.txt"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-0.json": {
+      "sha256": "fcf5103cbb086d33d04f8e8a3e310216f759cfcb987e161be1cfe65a1652c323",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/logs/20260907T001140-arbitrate-8b9cfe1d.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-33.txt": {
+      "sha256": "121f9ee0099f16f7ccc3e993efed645ce11d5e8d87db223b54a4627a550efdb4",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-33.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-33-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-33-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-33-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-33-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-34.txt": {
+      "sha256": "f132efe6669f6107ca622c061b10632ca069ece18174afcb9f7f270e77cf26ba",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-34.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-34-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-34-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-34-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-34-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-35.txt": {
+      "sha256": "af6439ba95bcdc8fc9b19d5e2efdbca0724777d941f47867c953c2e610fc1a64",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-35.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-35-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-35-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-35-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-35-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-36.txt": {
+      "sha256": "9cd541b60acd23e509258c6caf537736ceafb772786e46ed1bf1f63b8803dda6",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-36.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-36-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-36-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-0/provider-36-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-0/provider-36-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-1.json": {
+      "sha256": "17674a255944176bce4586ec3a5f0ca0d4f2487c2f86d0126a7652f8d9b3b4a1",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/logs/20260907T001240-arbitrate-be1a987e.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-37.txt": {
+      "sha256": "b6dd6b2eca7272de69e79f64aafcc6c2ea3078357b564b1ca3d415412ddecb96",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-37.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-37-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-37-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-37-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-37-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-38.txt": {
+      "sha256": "bf3013a648f0a7d120c65afbc4e7140544582ab1ed15a59322a66193066ff2ac",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-38.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-38-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-38-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-38-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-38-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-39.txt": {
+      "sha256": "2bf43cb6f5655e8eff3e94c44b3c64b743e27dea12d068da2442fae601e1b993",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-39.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-39-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-39-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-39-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-39-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-40.txt": {
+      "sha256": "a38e9e97665e1f3ea6e9a6db046fe1898d4de4898f8acf93cb3d6e20c57b3e59",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-40.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-40-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-40-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-1/provider-40-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-1/provider-40-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-2.json": {
+      "sha256": "73a8fa39e399cc8189ce69c18129018476bb5e6c3facb849740a5985bae2fe18",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/logs/20260907T001406-arbitrate-de7be21d.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-41.txt": {
+      "sha256": "030b166c7481fca077023bd308b5a3dcd7aa754f5a5187fddf77eee100fbae54",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-41.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-41-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-41-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-41-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-41-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-42.txt": {
+      "sha256": "466f3e400bdff4685b1a154de00b36fe46ce4b60d8c0998756901949c8491d87",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-42.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-42-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-42-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-42-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-42-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-43.txt": {
+      "sha256": "0506045c36ffe2b9407206c06e8a8841281ae4c8c9c1401035c588fa3e609d2f",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-43.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-43-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-43-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-43-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-43-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-44.txt": {
+      "sha256": "f29f6194a56bc43273f4679856766c9ff2f0954d600cf5b49a4233e94e1a9a70",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-44.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-44-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-44-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-2/provider-44-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-2/provider-44-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-3.json": {
+      "sha256": "3dda2e626f91faffc0e8be76f245d813ea03bb58292a50bc9ffce731b8952652",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/logs/20260907T001555-arbitrate-3be7203e.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-45.txt": {
+      "sha256": "ef1db7babe2c6499462bc6263bfb49086d1709cf764e530e55045574f0b40308",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-45.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-45-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-45-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-45-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-45-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-46.txt": {
+      "sha256": "a0bd47fe0576a443e0c7e4febead377de87907d4bd4fd1bbbd74af64627646fd",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-46.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-46-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-46-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-46-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-46-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-47.txt": {
+      "sha256": "fc502b5ab9c1f280e83437be3bf8a01338a116d15969bf4fc2558bf368fed9c8",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-47.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-47-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-47-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-47-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-47-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-48.txt": {
+      "sha256": "53bde8983acd271a8bcd37a94beb30ab628fb70839db6e45f00af2a0024bd39d",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-48.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-48-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-48-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-3/provider-48-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-3/provider-48-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-4.json": {
+      "sha256": "1d99f387ddb9cb23655705f50c54207ac7b20714b5b122a6db4bb2bceeab45a0",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/logs/20260907T001707-arbitrate-e20c2346.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-49.txt": {
+      "sha256": "bc9b07b9b80751cb752b89b7622318ab809cd6e519ad2e3cc91b5d3866d4a178",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-49.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-49-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-49-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-49-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-49-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-50.txt": {
+      "sha256": "4c537f6caf8392f66613e01be6ef58ba0f3153fb0900b41792e86f28a3f3195c",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-50.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-50-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-50-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-50-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-50-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-51.txt": {
+      "sha256": "fe7a7f82ac88597d17aee43c23a6e662003369c981b42437531a1ed6ce5141a0",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-51.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-51-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-51-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-51-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-51-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-52.txt": {
+      "sha256": "9a8522500d53f0eedf46ad94637fc07fe29a50e21a42670120c2a67e1c732db8",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-52.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-52-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-52-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-4/provider-52-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-4/provider-52-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-5.json": {
+      "sha256": "f75a88b5089c8ae2b222a31b67427825d69a4bc979442501e19239a8a08e3ae9",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/logs/20260907T001811-arbitrate-12228d87.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-53.txt": {
+      "sha256": "a33fd34d5314c11afd809b7dc2a62dad0c0a6c43b7c2a97f30a4f49932ac74fd",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-53.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-53-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-53-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-53-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-53-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-54.txt": {
+      "sha256": "01346e185290f1fe74c84ce5b74df73097b004658aecbead2f2e0e5a7738570b",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-54.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-54-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-54-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-54-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-54-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-55.txt": {
+      "sha256": "45f28152ca333e13b8918d4294e6f1280734a693904541ccfd1e5073d9b197ba",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-55.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-55-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-55-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-55-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-55-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-56.txt": {
+      "sha256": "0dfc277718cf03aa6dee55a046dfe809d40fe2aa8a370266290a156287b23286",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-56.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-56-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-56-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-5/provider-56-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-5/provider-56-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-6.json": {
+      "sha256": "c3cdc0da81e1b9c1640aa2df4178ba18de2220d4b8fa7dda539803dd9b2392e6",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/logs/20260907T001956-arbitrate-f90f2b07.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-57.txt": {
+      "sha256": "737160e4d7628c39f48a00d82cd9f2ed9b78bbb1b96a8084b1525db8f4bc69cb",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-57.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-57-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-57-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-57-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-57-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-58.txt": {
+      "sha256": "14a29893a125aa108c523830e4eee43a93b4dafb1dd0f4969547aff9955bad31",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-58.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-58-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-58-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-58-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-58-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-59.txt": {
+      "sha256": "5c1782d3c80b07b98d9fa4f1a9d23c06f8d101a5251dc412a36fbd12d21d0255",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-59.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-59-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-59-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-59-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-59-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-60.txt": {
+      "sha256": "7bb773e10aa8683e5cae37059194b98bfdf5c00bbd53f0874fe8cbfb6b98b57f",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-60.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-60-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-60-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-6/provider-60-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-6/provider-60-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_audits_2026-09-07/trial-7.json": {
+      "sha256": "dc108c29f32fa317880f524369b2609754aec7a354167e8edc29fc181ece92bf",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/logs/20260907T002127-arbitrate-a9cb10ca.json"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-61.txt": {
+      "sha256": "a4de2e1b712b7e90aaadde131feb066641eacc2ce67d3962f1c0cad6a734dc27",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-61.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-61-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-61-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-61-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-61-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-62.txt": {
+      "sha256": "4ad007b2819adc4908fa95257c4adb3bf4eed73fd7a17337cb51c226dc232f38",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-62.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-62-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-62-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-62-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-62-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-63.txt": {
+      "sha256": "3b5cd8e3ea228aaa1f4fd0e9fc2b09d4ceca914745c5921e1df43cd0f9e41c27",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-63.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-63-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-63-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-63-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-63-failure_detail.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-64.txt": {
+      "sha256": "16cf6d292d11bd016a792bb761ced40a5bb6f2079513c07255fd87a2b1187e8d",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-64.txt"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-64-stderr.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-64-stderr.bin"
+    },
+    "docs/snapshot_batch_corrected_channels_2026-09-07/trial-7/provider-64-failure_detail.bin": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "/tmp/paranoia-batch-live-20260907-v2/trial-7/provider-64-failure_detail.bin"
+    },
+    "docs/snapshot_batch_requalification_2026-09-06.json": {
+      "sha256": "fafa0b2311fe57adeff7aaf2146fcfebc8c92294793ede18c8fad74c3de68ec8",
+      "origin": "retained earlier card observation"
+    },
+    "docs/snapshot_batch_mutations_2026-09-06.txt": {
+      "sha256": "ac742c026f4f293f319cc7b784a2827704d299558b2b3606d75bae362db4eea0",
+      "origin": "retained earlier card observation"
+    }
+  },
+  "production_source_sha256": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+    "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+    "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+    "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+    "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+    "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+    "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+    "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+    "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+    "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+    "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "module_inventory": {
+    "src/paranoia_local/inert_tree.py": {
+      "baseline": {
+        "lines": 171,
+        "functions": 8,
+        "classes": 2
+      },
+      "candidate": {
+        "lines": 172,
+        "functions": 6,
+        "classes": 3
+      }
+    },
+    "src/paranoia_local/git_objects.py": {
+      "baseline": null,
+      "candidate": {
+        "lines": 103,
+        "functions": 7,
+        "classes": 1
+      }
+    }
+  },
+  "local_gate_passed": true,
+  "live_gate_passed": true,
+  "all_live_dispatches_correct": true,
+  "actual_calls": 32,
+  "cumulative_calls": 64,
+  "current_card_call_limit": 128,
+  "full_tests_passed": 2083,
+  "protocol_mutants_killed": 33,
+  "mutation_source_revision": "687e7bd0b420f784dc1757bfe5458e8148cc4d01",
+  "mutation_production_source_identical": true,
+  "code_convergence": "separate mandatory merge gate",
+  "process_channels": {
+    "count": 96,
+    "encoding": "UTF-8 with surrogatepass",
+    "separate_stdout_stderr_failure_detail": true,
+    "explicit_empty_channels": true
+  },
+  "historical_campaign": {
+    "receipt": "docs/snapshot_batch_requalification_2026-09-06.json",
+    "calls": 32,
+    "qualifies_delivery": false,
+    "limitations": [
+      "CODE round 1 found incomplete full-snapshot public-handler acceptance.",
+      "Successful stderr was omitted; omitted channels are unknown, not inferred empty.",
+      "Source-byte checks did not exclude timestamp-valid stale bytecode. No evidence establishes that the retained campaign executed stale code."
+    ]
+  },
+  "report_custody": {
+    "first_local_report_retained": true,
+    "first_live_report_retained": true,
+    "source_entry_replay_byte_identical": true,
+    "replay_provider_calls": 0,
+    "native_audits_byte_exact": true,
+    "all_process_channels_byte_exact": true
+  },
+  "measurement_conditions": {
+    "condition": "Shared workstation; unrelated test activity permitted and observed at endpoints only. No Paranoia tests or provider reviews run concurrently. Fixed trial schedule and gates unchanged.",
+    "before": {
+      "cpu_count": 24,
+      "load_average": [
+        6.87,
+        6.69,
+        6.1
+      ],
+      "active_other_test_processes": 1,
+      "other_test_cpu_percent_sum": 7.9
+    },
+    "after": {
+      "cpu_count": 24,
+      "load_average": [
+        5.62,
+        6.3,
+        6.02
+      ],
+      "active_other_test_processes": 1,
+      "other_test_cpu_percent_sum": 5.0
+    }
+  },
+  "limits": [
+    "Fixed numeric and correctness gates unchanged. Shared-workstation conditions are recorded, not claimed to be isolated.",
+    "Setup improvement applies to verified-plan and arbitration inert materialization, not branch checkout, ordinary query, or rebut.",
+    "Eight corrected integration dispatches are not a population speed or blinded quality study.",
+    "Reviewer roles, nominal calls, model settings, and evidence semantics are unchanged.",
+    "Historical CODE findings and the intermediate failing test run are retained; their limitations are not erased.",
+    "Issues 49 and 50 remain open."
+  ]
+}

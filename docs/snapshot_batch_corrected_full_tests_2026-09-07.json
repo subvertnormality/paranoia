@@ -1,0 +1,17 @@
+{
+  "candidate_revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+  "command": "/home/andy/tools/paranoia-local/.venv/bin/python -m pytest -q",
+  "environment": {
+    "PYTHONPATH": "src",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_SYSTEM": "/dev/null"
+  },
+  "returncode": 0,
+  "elapsed_seconds": 152.70742791099474,
+  "raw_output": "/tmp/paranoia-batch-full-tests-v3.txt",
+  "summary": [
+    "........................................................................ [ 96%]",
+    "...................................................................      [100%]",
+    "2083 passed in 151.99s (0:02:31)"
+  ]
+}

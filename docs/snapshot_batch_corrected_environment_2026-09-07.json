@@ -1,0 +1,23 @@
+{
+  "condition": "Shared workstation; unrelated test activity permitted and observed at endpoints only. No Paranoia tests or provider reviews run concurrently. Fixed trial schedule and gates unchanged.",
+  "before": {
+    "cpu_count": 24,
+    "load_average": [
+      6.87,
+      6.69,
+      6.1
+    ],
+    "active_other_test_processes": 1,
+    "other_test_cpu_percent_sum": 7.9
+  },
+  "after": {
+    "cpu_count": 24,
+    "load_average": [
+      5.62,
+      6.3,
+      6.02
+    ],
+    "active_other_test_processes": 1,
+    "other_test_cpu_percent_sum": 5.0
+  }
+}

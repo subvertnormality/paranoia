@@ -1,0 +1,3286 @@
+{
+  "pairs": [
+    {
+      "case": "f496421303d3",
+      "repetition": 0,
+      "padding_files": 0,
+      "versions": {
+        "baseline": {
+          "elapsed_ms": 54826,
+          "provider_calls": 4,
+          "qualified": true
+        },
+        "candidate": {
+          "elapsed_ms": 57071,
+          "provider_calls": 4,
+          "qualified": true
+        }
+      }
+    },
+    {
+      "case": "f496421303d3",
+      "repetition": 1,
+      "padding_files": 3000,
+      "versions": {
+        "candidate": {
+          "elapsed_ms": 83792,
+          "provider_calls": 4,
+          "qualified": true
+        },
+        "baseline": {
+          "elapsed_ms": 107418,
+          "provider_calls": 4,
+          "qualified": true
+        }
+      }
+    },
+    {
+      "case": "7d0bbefd2a3c",
+      "repetition": 0,
+      "padding_files": 0,
+      "versions": {
+        "candidate": {
+          "elapsed_ms": 65714,
+          "provider_calls": 4,
+          "qualified": true
+        },
+        "baseline": {
+          "elapsed_ms": 60693,
+          "provider_calls": 4,
+          "qualified": true
+        }
+      }
+    },
+    {
+      "case": "7d0bbefd2a3c",
+      "repetition": 1,
+      "padding_files": 3000,
+      "versions": {
+        "baseline": {
+          "elapsed_ms": 101732,
+          "provider_calls": 4,
+          "qualified": true
+        },
+        "candidate": {
+          "elapsed_ms": 88283,
+          "provider_calls": 4,
+          "qualified": true
+        }
+      }
+    }
+  ],
+  "expected_baseline": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+  "large_padding": 3000,
+  "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0",
+  "rows": [
+    {
+      "index": 0,
+      "case": "f496421303d3",
+      "version": "baseline",
+      "repetition": 0,
+      "padding_files": 0,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 33,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-33.txt",
+              "sha256": "121f9ee0099f16f7ccc3e993efed645ce11d5e8d87db223b54a4627a550efdb4",
+              "bytes": 2303
+            },
+            "stderr": {
+              "file": "provider-33-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-33-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "84a4653a-7c35-4da0-9bd5-9008e5f476e3",
+          "raw_sha256": "121f9ee0099f16f7ccc3e993efed645ce11d5e8d87db223b54a4627a550efdb4",
+          "provider_duration_ms": 3383,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8390,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8390,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8390,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8390
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8390,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17660475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17838675
+            }
+          ],
+          "elapsed_ms": 4836
+        },
+        {
+          "sequence": 34,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-34.txt",
+              "sha256": "f132efe6669f6107ca622c061b10632ca069ece18174afcb9f7f270e77cf26ba",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-34-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-34-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078fd-2912-7322-9b05-d5caba352300",
+          "raw_sha256": "f132efe6669f6107ca622c061b10632ca069ece18174afcb9f7f270e77cf26ba",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16745,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 8569
+        },
+        {
+          "sequence": 35,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "fb335dcb1b761beebefe37ab2cc0fa0092e9c8a9d5922817f723478cab5cd9d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-35.txt",
+              "sha256": "af6439ba95bcdc8fc9b19d5e2efdbca0724777d941f47867c953c2e610fc1a64",
+              "bytes": 3587
+            },
+            "stderr": {
+              "file": "provider-35-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-35-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "391e352e-2d9b-4abb-a711-3f5c16646cb6",
+          "raw_sha256": "af6439ba95bcdc8fc9b19d5e2efdbca0724777d941f47867c953c2e610fc1a64",
+          "provider_duration_ms": 16897,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 114,
+                "cache_creation_input_tokens": 6917,
+                "cache_read_input_tokens": 20094,
+                "output_tokens": 1152,
+                "output_tokens_details": {
+                  "thinking_tokens": 25
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 6917,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 656,
+                    "cache_read_input_tokens": 8803,
+                    "cache_creation_input_tokens": 914,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 914
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2513,
+                  "outputTokens": 14,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.0025830000000000002,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 114,
+                  "outputTokens": 1152,
+                  "cacheReadInputTokens": 20094,
+                  "cacheCreationInputTokens": 6917,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.2021035,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 25,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.2046865
+            }
+          ],
+          "elapsed_ms": 18802
+        },
+        {
+          "sequence": 36,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "5ed32a3c4e1e1c1c5e98647b461fc772bfa20c9ab2e149ab90c76c6081eb5475",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-36.txt",
+              "sha256": "9cd541b60acd23e509258c6caf537736ceafb772786e46ed1bf1f63b8803dda6",
+              "bytes": 9342
+            },
+            "stderr": {
+              "file": "provider-36-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-36-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078fd-47ce-7fe0-8f74-00181c1945c6",
+          "raw_sha256": "9cd541b60acd23e509258c6caf537736ceafb772786e46ed1bf1f63b8803dda6",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 77290,
+                "cached_input_tokens": 70784,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 872,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 41087
+        }
+      ],
+      "elapsed_ms": 54826,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 54826,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The contract requires the sum of integers 0 through n inclusive, which equals n(n+1)/2, not n(n-1)/2.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-edce38a84fcb2b21`\u2192inclusive, `OPTION-f8d64156c8a03abc`\u2192exclusive\n\n### codex \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 through n inclusive for caller-enforced integer inputs 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-610b092554fa26a0`\u2192inclusive, `OPTION-bd7d3449dfbeaf3d`\u2192exclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: fb9fbc19c581f7e0f4c2f099558ed5d3277bc618\nORDER-SEED: f496421303d3\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-0/logs/20260907T001140-arbitrate-8b9cfe1d.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-0pncdq4o/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "expected": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider": "codex",
+            "after": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-00kk1cfk/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "expected": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider": "claude",
+            "after": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-00kk1cfk/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider_attempt": 1,
+            "attempt_sequence": 35
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-0pncdq4o/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider_attempt": 1,
+            "attempt_sequence": 36
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-current-baseline",
+          "revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 0,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "inclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-0/logs/20260907T001140-arbitrate-8b9cfe1d.json",
+      "audit_sha256": "fcf5103cbb086d33d04f8e8a3e310216f759cfcb987e161be1cfe65a1652c323",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "4a43bd433b0a3fb4223165c93458898f7268d881d05510478c9fa90432fd7b57"
+    },
+    {
+      "index": 1,
+      "case": "f496421303d3",
+      "version": "candidate",
+      "repetition": 0,
+      "padding_files": 0,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 37,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-37.txt",
+              "sha256": "b6dd6b2eca7272de69e79f64aafcc6c2ea3078357b564b1ca3d415412ddecb96",
+              "bytes": 2321
+            },
+            "stderr": {
+              "file": "provider-37-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-37-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "835eb25b-3060-4ac9-a5a8-7e10b1f73e58",
+          "raw_sha256": "b6dd6b2eca7272de69e79f64aafcc6c2ea3078357b564b1ca3d415412ddecb96",
+          "provider_duration_ms": 3192,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8391,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8391,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8391,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8391
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8391,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17662474999999997,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17840674999999998
+            }
+          ],
+          "elapsed_ms": 4709
+        },
+        {
+          "sequence": 38,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-38.txt",
+              "sha256": "bf3013a648f0a7d120c65afbc4e7140544582ab1ed15a59322a66193066ff2ac",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-38-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-38-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078fe-05e8-7e71-a280-fa83d5211cbb",
+          "raw_sha256": "bf3013a648f0a7d120c65afbc4e7140544582ab1ed15a59322a66193066ff2ac",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16747,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 7794
+        },
+        {
+          "sequence": 39,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "fb335dcb1b761beebefe37ab2cc0fa0092e9c8a9d5922817f723478cab5cd9d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-39.txt",
+              "sha256": "2bf43cb6f5655e8eff3e94c44b3c64b743e27dea12d068da2442fae601e1b993",
+              "bytes": 3281
+            },
+            "stderr": {
+              "file": "provider-39-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-39-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "75bcf304-dad2-4da4-9ff4-c6092272655c",
+          "raw_sha256": "2bf43cb6f5655e8eff3e94c44b3c64b743e27dea12d068da2442fae601e1b993",
+          "provider_duration_ms": 16309,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 114,
+                "cache_creation_input_tokens": 6920,
+                "cache_read_input_tokens": 20094,
+                "output_tokens": 1024,
+                "output_tokens_details": {
+                  "thinking_tokens": 13
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 6920,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 527,
+                    "cache_read_input_tokens": 8802,
+                    "cache_creation_input_tokens": 918,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 918
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2513,
+                  "outputTokens": 12,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002573,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 114,
+                  "outputTokens": 1024,
+                  "cacheReadInputTokens": 20094,
+                  "cacheCreationInputTokens": 6920,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.1957635,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 13,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.1983365
+            }
+          ],
+          "elapsed_ms": 17673
+        },
+        {
+          "sequence": 40,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "5ed32a3c4e1e1c1c5e98647b461fc772bfa20c9ab2e149ab90c76c6081eb5475",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-40.txt",
+              "sha256": "a38e9e97665e1f3ea6e9a6db046fe1898d4de4898f8acf93cb3d6e20c57b3e59",
+              "bytes": 7707
+            },
+            "stderr": {
+              "file": "provider-40-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-40-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078fe-237c-79e3-bb0b-ed1063b9a822",
+          "raw_sha256": "a38e9e97665e1f3ea6e9a6db046fe1898d4de4898f8acf93cb3d6e20c57b3e59",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 87726,
+                "cached_input_tokens": 81536,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 854,
+                "reasoning_output_tokens": 27
+              }
+            }
+          ],
+          "elapsed_ms": 44143
+        }
+      ],
+      "elapsed_ms": 57071,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 57071,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The contract requires the inclusive sum 0..n, which equals n(n+1)/2; n(n-1)/2 returns 0 for n=1 where 1 is required.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-edce38a84fcb2b21`\u2192inclusive, `OPTION-f8d64156c8a03abc`\u2192exclusive\n\n### codex \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must return the sum of integers from 0 through n inclusive for integer n from 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-610b092554fa26a0`\u2192inclusive, `OPTION-bd7d3449dfbeaf3d`\u2192exclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: fb9fbc19c581f7e0f4c2f099558ed5d3277bc618\nORDER-SEED: f496421303d3\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-1/logs/20260907T001240-arbitrate-be1a987e.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-0aiero7y/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "expected": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider": "codex",
+            "after": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-t5pgeuxn/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "expected": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider": "claude",
+            "after": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-t5pgeuxn/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider_attempt": 1,
+            "attempt_sequence": 39
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-0aiero7y/evidence",
+            "snapshot": "fb9fbc19c581f7e0f4c2f099558ed5d3277bc618",
+            "before": "bc5849dd8ac77ccfb7d8888d662eabbfe2aafa6650aaeea2affb5c9bb557b4cf",
+            "provider_attempt": 1,
+            "attempt_sequence": 40
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-benchmark-candidate-v3",
+          "revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 1,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "inclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-1/logs/20260907T001240-arbitrate-be1a987e.json",
+      "audit_sha256": "17674a255944176bce4586ec3a5f0ca0d4f2487c2f86d0126a7652f8d9b3b4a1",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "6cd2a8aa3b27cd063a327f7e46b09dc33fbc27ac0e24a42b212e73151bd4db52"
+    },
+    {
+      "index": 2,
+      "case": "f496421303d3",
+      "version": "candidate",
+      "repetition": 1,
+      "padding_files": 3000,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 41,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-41.txt",
+              "sha256": "030b166c7481fca077023bd308b5a3dcd7aa754f5a5187fddf77eee100fbae54",
+              "bytes": 2303
+            },
+            "stderr": {
+              "file": "provider-41-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-41-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "a1007ae5-0cfc-43c6-9fc5-f41fa00df701",
+          "raw_sha256": "030b166c7481fca077023bd308b5a3dcd7aa754f5a5187fddf77eee100fbae54",
+          "provider_duration_ms": 5247,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8209,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8209,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8209,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8209
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8209,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17298475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17476675
+            }
+          ],
+          "elapsed_ms": 6765
+        },
+        {
+          "sequence": 42,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-42.txt",
+              "sha256": "466f3e400bdff4685b1a154de00b36fe46ce4b60d8c0998756901949c8491d87",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-42-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-42-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078ff-0b67-7de1-9e6b-3986d9ddc319",
+          "raw_sha256": "466f3e400bdff4685b1a154de00b36fe46ce4b60d8c0998756901949c8491d87",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16558,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 6171
+        },
+        {
+          "sequence": 43,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "fb335dcb1b761beebefe37ab2cc0fa0092e9c8a9d5922817f723478cab5cd9d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-43.txt",
+              "sha256": "0506045c36ffe2b9407206c06e8a8841281ae4c8c9c1401035c588fa3e609d2f",
+              "bytes": 3455
+            },
+            "stderr": {
+              "file": "provider-43-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-43-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "cff7957b-61de-4dbf-aeb3-7095cf8420c4",
+          "raw_sha256": "0506045c36ffe2b9407206c06e8a8841281ae4c8c9c1401035c588fa3e609d2f",
+          "provider_duration_ms": 33850,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 170,
+                "cache_creation_input_tokens": 10763,
+                "cache_read_input_tokens": 34983,
+                "output_tokens": 1567,
+                "output_tokens_details": {
+                  "thinking_tokens": 25
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 10763,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 639,
+                    "cache_read_input_tokens": 13092,
+                    "cache_creation_input_tokens": 471,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 471
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2513,
+                  "outputTokens": 11,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002568,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 170,
+                  "outputTokens": 1567,
+                  "cacheReadInputTokens": 34983,
+                  "cacheCreationInputTokens": 10763,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.30405575,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 25,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.30662375
+            }
+          ],
+          "elapsed_ms": 35293
+        },
+        {
+          "sequence": 44,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "5ed32a3c4e1e1c1c5e98647b461fc772bfa20c9ab2e149ab90c76c6081eb5475",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-44.txt",
+              "sha256": "f29f6194a56bc43273f4679856766c9ff2f0954d600cf5b49a4233e94e1a9a70",
+              "bytes": 261575
+            },
+            "stderr": {
+              "file": "provider-44-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-44-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a078ff-4cf2-7fb1-9e85-aa94a6a82db5",
+          "raw_sha256": "f29f6194a56bc43273f4679856766c9ff2f0954d600cf5b49a4233e94e1a9a70",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 112269,
+                "cached_input_tokens": 96128,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1097,
+                "reasoning_output_tokens": 16
+              }
+            }
+          ],
+          "elapsed_ms": 53843
+        }
+      ],
+      "elapsed_ms": 83792,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 83792,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: CONTRACT.md requires the sum of integers 0 through n inclusive, which equals n*(n+1)//2 and not n*(n-1)//2 for any n in 1..1000.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-edce38a84fcb2b21`\u2192inclusive, `OPTION-f8d64156c8a03abc`\u2192exclusive\n\n### codex \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 through n inclusive for caller-enforced integer inputs 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-610b092554fa26a0`\u2192inclusive, `OPTION-bd7d3449dfbeaf3d`\u2192exclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 8e9e37efe311e7fe8f011256c74fbcca8d66e7a4\nORDER-SEED: f496421303d3\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-2/logs/20260907T001406-arbitrate-de7be21d.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-5igr86d0/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "expected": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider": "claude",
+            "after": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-4bq4h7cc/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "expected": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider": "codex",
+            "after": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-5igr86d0/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider_attempt": 1,
+            "attempt_sequence": 43
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-4bq4h7cc/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider_attempt": 1,
+            "attempt_sequence": 44
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-benchmark-candidate-v3",
+          "revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 2,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "inclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-2/logs/20260907T001406-arbitrate-de7be21d.json",
+      "audit_sha256": "73a8fa39e399cc8189ce69c18129018476bb5e6c3facb849740a5985bae2fe18",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "de467fd5e083bf3d9f0592d7254e11e9c0db3a941783039ce1073c2e42939501"
+    },
+    {
+      "index": 3,
+      "case": "f496421303d3",
+      "version": "baseline",
+      "repetition": 1,
+      "padding_files": 3000,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 45,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-45.txt",
+              "sha256": "ef1db7babe2c6499462bc6263bfb49086d1709cf764e530e55045574f0b40308",
+              "bytes": 2303
+            },
+            "stderr": {
+              "file": "provider-45-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-45-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "de7b834b-fa4e-481f-a4e2-14b761099c77",
+          "raw_sha256": "ef1db7babe2c6499462bc6263bfb49086d1709cf764e530e55045574f0b40308",
+          "provider_duration_ms": 5699,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8209,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8209,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8209,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8209
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8209,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17298475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17476675
+            }
+          ],
+          "elapsed_ms": 7224
+        },
+        {
+          "sequence": 46,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-46.txt",
+              "sha256": "a0bd47fe0576a443e0c7e4febead377de87907d4bd4fd1bbbd74af64627646fd",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-46-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-46-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07900-65a0-7a51-b489-a45c7acaf055",
+          "raw_sha256": "a0bd47fe0576a443e0c7e4febead377de87907d4bd4fd1bbbd74af64627646fd",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16558,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 7602
+        },
+        {
+          "sequence": 47,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "fb335dcb1b761beebefe37ab2cc0fa0092e9c8a9d5922817f723478cab5cd9d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-47.txt",
+              "sha256": "fc502b5ab9c1f280e83437be3bf8a01338a116d15969bf4fc2558bf368fed9c8",
+              "bytes": 3789
+            },
+            "stderr": {
+              "file": "provider-47-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-47-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "e4528ce0-ece9-4ff5-807f-f1171ca2b5d2",
+          "raw_sha256": "fc502b5ab9c1f280e83437be3bf8a01338a116d15969bf4fc2558bf368fed9c8",
+          "provider_duration_ms": 47898,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 338,
+                "cache_creation_input_tokens": 13869,
+                "cache_read_input_tokens": 79273,
+                "output_tokens": 3483,
+                "output_tokens_details": {
+                  "thinking_tokens": 585
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 13869,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 795,
+                    "cache_read_input_tokens": 15817,
+                    "cache_creation_input_tokens": 852,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 852
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2513,
+                  "outputTokens": 11,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002568,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 338,
+                  "outputTokens": 3483,
+                  "cacheReadInputTokens": 79273,
+                  "cacheCreationInputTokens": 13869,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.47472825,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 585,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.47729625000000003
+            }
+          ],
+          "elapsed_ms": 50619
+        },
+        {
+          "sequence": 48,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "5ed32a3c4e1e1c1c5e98647b461fc772bfa20c9ab2e149ab90c76c6081eb5475",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-48.txt",
+              "sha256": "53bde8983acd271a8bcd37a94beb30ab628fb70839db6e45f00af2a0024bd39d",
+              "bytes": 254339
+            },
+            "stderr": {
+              "file": "provider-48-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-48-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07900-d557-7c10-aab1-723d67eadcd6",
+          "raw_sha256": "53bde8983acd271a8bcd37a94beb30ab628fb70839db6e45f00af2a0024bd39d",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 119921,
+                "cached_input_tokens": 93056,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 961,
+                "reasoning_output_tokens": 36
+              }
+            }
+          ],
+          "elapsed_ms": 58949
+        }
+      ],
+      "elapsed_ms": 107418,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 107418,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The contract defines total(n) as the sum of integers 0 through n inclusive, which equals n(n+1)/2, and n(n-1)/2 undercounts by n for every n >= 1.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-edce38a84fcb2b21`\u2192inclusive, `OPTION-f8d64156c8a03abc`\u2192exclusive\n\n### codex \u2192 `inclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must return the inclusive sum from 0 through n for integer n from 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-610b092554fa26a0`\u2192inclusive, `OPTION-bd7d3449dfbeaf3d`\u2192exclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected inclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: inclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 8e9e37efe311e7fe8f011256c74fbcca8d66e7a4\nORDER-SEED: f496421303d3\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-3/logs/20260907T001555-arbitrate-3be7203e.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-ehbuztkb/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "expected": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider": "codex",
+            "after": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-oa14rrcl/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "expected": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider": "claude",
+            "after": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-oa14rrcl/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider_attempt": 1,
+            "attempt_sequence": 47
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-ehbuztkb/evidence",
+            "snapshot": "8e9e37efe311e7fe8f011256c74fbcca8d66e7a4",
+            "before": "bc980b47260c75240a7a2ff6c4905c6e13c5dff502ae463453d2599cb28fb393",
+            "provider_attempt": 1,
+            "attempt_sequence": 48
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-current-baseline",
+          "revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 3,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "inclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-3/logs/20260907T001555-arbitrate-3be7203e.json",
+      "audit_sha256": "3dda2e626f91faffc0e8be76f245d813ea03bb58292a50bc9ffce731b8952652",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "c2aee0658e1889556b372377f0be7e3c1b19a0182d2cb8f959385eb1be8ff310"
+    },
+    {
+      "index": 4,
+      "case": "7d0bbefd2a3c",
+      "version": "candidate",
+      "repetition": 0,
+      "padding_files": 0,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 49,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-49.txt",
+              "sha256": "bc9b07b9b80751cb752b89b7622318ab809cd6e519ad2e3cc91b5d3866d4a178",
+              "bytes": 2304
+            },
+            "stderr": {
+              "file": "provider-49-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-49-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "b3bd61ad-8965-4add-bf45-4139eedcd4a0",
+          "raw_sha256": "bc9b07b9b80751cb752b89b7622318ab809cd6e519ad2e3cc91b5d3866d4a178",
+          "provider_duration_ms": 3932,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8392,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8392,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8392,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8392
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 14,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001787,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8392,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17664475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17843175
+            }
+          ],
+          "elapsed_ms": 11201
+        },
+        {
+          "sequence": 50,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-50.txt",
+              "sha256": "4c537f6caf8392f66613e01be6ef58ba0f3153fb0900b41792e86f28a3f3195c",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-50-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-50-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07902-1436-7f62-b7eb-13dfbd86b692",
+          "raw_sha256": "4c537f6caf8392f66613e01be6ef58ba0f3153fb0900b41792e86f28a3f3195c",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16747,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 7206
+        },
+        {
+          "sequence": 51,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "64bdb96ae0b2db78710536f3ade61b4210b8e2df35d2c1c9466e52f0a8fd192c",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-51.txt",
+              "sha256": "fe7a7f82ac88597d17aee43c23a6e662003369c981b42437531a1ed6ce5141a0",
+              "bytes": 3217
+            },
+            "stderr": {
+              "file": "provider-51-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-51-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "467d8b31-8ff4-46f7-bdcd-e892e07fd28f",
+          "raw_sha256": "fe7a7f82ac88597d17aee43c23a6e662003369c981b42437531a1ed6ce5141a0",
+          "provider_duration_ms": 18173,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 114,
+                "cache_creation_input_tokens": 6889,
+                "cache_read_input_tokens": 20095,
+                "output_tokens": 1015,
+                "output_tokens_details": {
+                  "thinking_tokens": 23
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 6889,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 518,
+                    "cache_read_input_tokens": 8804,
+                    "cache_creation_input_tokens": 885,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 885
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2510,
+                  "outputTokens": 11,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002565,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 114,
+                  "outputTokens": 1015,
+                  "cacheReadInputTokens": 20095,
+                  "cacheCreationInputTokens": 6889,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.19469375,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 23,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.19725875000000004
+            }
+          ],
+          "elapsed_ms": 20552
+        },
+        {
+          "sequence": 52,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "14f2ea4e57f14248c0375dee17d7f97638d4ad5d913ae9f9b17169c364f9c6d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-52.txt",
+              "sha256": "9a8522500d53f0eedf46ad94637fc07fe29a50e21a42670120c2a67e1c732db8",
+              "bytes": 8552
+            },
+            "stderr": {
+              "file": "provider-52-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-52-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07902-303a-75e0-95a7-d684712a9606",
+          "raw_sha256": "9a8522500d53f0eedf46ad94637fc07fe29a50e21a42670120c2a67e1c732db8",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 76514,
+                "cached_input_tokens": 61824,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 764,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 45871
+        }
+      ],
+      "elapsed_ms": 65714,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 65714,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The contract defines total(n) as the sum of integers from 0 up to but excluding n, which is n(n-1)/2, not the inclusive n(n+1)/2.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-76fc718fbfe8ab12`\u2192inclusive, `OPTION-f2ad78e029714f83`\u2192exclusive\n\n### codex \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 up to but excluding n for caller-enforced integers 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-5ba34a3c021e28a1`\u2192exclusive, `OPTION-9dac10c109540555`\u2192inclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 9e13a3f6479520614b79d01c986e91222ac2600b\nORDER-SEED: 7d0bbefd2a3c\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-4/logs/20260907T001707-arbitrate-e20c2346.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-u73053hr/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "expected": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider": "codex",
+            "after": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-ek4a8f81/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "expected": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider": "claude",
+            "after": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-ek4a8f81/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider_attempt": 1,
+            "attempt_sequence": 51
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-u73053hr/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider_attempt": 1,
+            "attempt_sequence": 52
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-benchmark-candidate-v3",
+          "revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 4,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "exclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-4/logs/20260907T001707-arbitrate-e20c2346.json",
+      "audit_sha256": "1d99f387ddb9cb23655705f50c54207ac7b20714b5b122a6db4bb2bceeab45a0",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "58a1ca1f5fecf522fb8979a22597675109f8c027b30e1a99323c761f4e63a368"
+    },
+    {
+      "index": 5,
+      "case": "7d0bbefd2a3c",
+      "version": "baseline",
+      "repetition": 0,
+      "padding_files": 0,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 53,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-53.txt",
+              "sha256": "a33fd34d5314c11afd809b7dc2a62dad0c0a6c43b7c2a97f30a4f49932ac74fd",
+              "bytes": 2313
+            },
+            "stderr": {
+              "file": "provider-53-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-53-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "b68891ae-4b6a-4003-861e-baa9ff72141f",
+          "raw_sha256": "a33fd34d5314c11afd809b7dc2a62dad0c0a6c43b7c2a97f30a4f49932ac74fd",
+          "provider_duration_ms": 3575,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8389,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8389,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8389,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8389
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8389,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17658475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17836675000000002
+            }
+          ],
+          "elapsed_ms": 6579
+        },
+        {
+          "sequence": 54,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-54.txt",
+              "sha256": "01346e185290f1fe74c84ce5b74df73097b004658aecbead2f2e0e5a7738570b",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-54-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-54-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07903-0d3b-7d73-b62b-8264e70e6a7b",
+          "raw_sha256": "01346e185290f1fe74c84ce5b74df73097b004658aecbead2f2e0e5a7738570b",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16560,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 7429
+        },
+        {
+          "sequence": 55,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "64bdb96ae0b2db78710536f3ade61b4210b8e2df35d2c1c9466e52f0a8fd192c",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-55.txt",
+              "sha256": "45f28152ca333e13b8918d4294e6f1280734a693904541ccfd1e5073d9b197ba",
+              "bytes": 3759
+            },
+            "stderr": {
+              "file": "provider-55-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-55-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "18a068a6-5e45-4a2d-9b4e-4eb132aeeb17",
+          "raw_sha256": "45f28152ca333e13b8918d4294e6f1280734a693904541ccfd1e5073d9b197ba",
+          "provider_duration_ms": 17911,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 114,
+                "cache_creation_input_tokens": 6895,
+                "cache_read_input_tokens": 20101,
+                "output_tokens": 1206,
+                "output_tokens_details": {
+                  "thinking_tokens": 23
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 6895,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 703,
+                    "cache_read_input_tokens": 8810,
+                    "cache_creation_input_tokens": 885,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 885
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2510,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002575,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 114,
+                  "outputTokens": 1206,
+                  "cacheReadInputTokens": 20101,
+                  "cacheCreationInputTokens": 6895,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.20436525,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 23,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.20694025
+            }
+          ],
+          "elapsed_ms": 20265
+        },
+        {
+          "sequence": 56,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "14f2ea4e57f14248c0375dee17d7f97638d4ad5d913ae9f9b17169c364f9c6d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-56.txt",
+              "sha256": "0dfc277718cf03aa6dee55a046dfe809d40fe2aa8a370266290a156287b23286",
+              "bytes": 8184
+            },
+            "stderr": {
+              "file": "provider-56-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-56-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07903-2cb0-7672-bd2c-3dc588fc63ce",
+          "raw_sha256": "0dfc277718cf03aa6dee55a046dfe809d40fe2aa8a370266290a156287b23286",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 88951,
+                "cached_input_tokens": 82432,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 810,
+                "reasoning_output_tokens": 14
+              }
+            }
+          ],
+          "elapsed_ms": 45869
+        }
+      ],
+      "elapsed_ms": 60693,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 60693,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: The contract defines total(n) as the sum of integers from 0 up to but excluding n, which equals n(n-1)/2, not n(n+1)/2.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-76fc718fbfe8ab12`\u2192inclusive, `OPTION-f2ad78e029714f83`\u2192exclusive\n\n### codex \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 up to but excluding n, for caller-enforced integer inputs 0 through 1000 inclusive.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-5ba34a3c021e28a1`\u2192exclusive, `OPTION-9dac10c109540555`\u2192inclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 9e13a3f6479520614b79d01c986e91222ac2600b\nORDER-SEED: 7d0bbefd2a3c\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-5/logs/20260907T001811-arbitrate-12228d87.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-j_fjrr8s/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "expected": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider": "codex",
+            "after": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-kyfgmubo/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "expected": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider": "claude",
+            "after": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-kyfgmubo/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider_attempt": 1,
+            "attempt_sequence": 55
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-j_fjrr8s/evidence",
+            "snapshot": "9e13a3f6479520614b79d01c986e91222ac2600b",
+            "before": "adb363f4256826468f8740c5a2d098eb9bc7f649162ae7ca58eca91b02b33882",
+            "provider_attempt": 1,
+            "attempt_sequence": 56
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-current-baseline",
+          "revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 5,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "exclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-5/logs/20260907T001811-arbitrate-12228d87.json",
+      "audit_sha256": "f75a88b5089c8ae2b222a31b67427825d69a4bc979442501e19239a8a08e3ae9",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "9237d353665012cb23e06ca3ccdba02f6ac6882588343a211e3f4e1a02a8314b"
+    },
+    {
+      "index": 6,
+      "case": "7d0bbefd2a3c",
+      "version": "baseline",
+      "repetition": 1,
+      "padding_files": 3000,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 57,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-57.txt",
+              "sha256": "737160e4d7628c39f48a00d82cd9f2ed9b78bbb1b96a8084b1525db8f4bc69cb",
+              "bytes": 2312
+            },
+            "stderr": {
+              "file": "provider-57-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-57-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "6e443528-e9b2-4d6e-bff1-8c5190f4b570",
+          "raw_sha256": "737160e4d7628c39f48a00d82cd9f2ed9b78bbb1b96a8084b1525db8f4bc69cb",
+          "provider_duration_ms": 3372,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8389,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8389,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8389,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8389
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8389,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17658475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17836675000000002
+            }
+          ],
+          "elapsed_ms": 5344
+        },
+        {
+          "sequence": 58,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-58.txt",
+              "sha256": "14a29893a125aa108c523830e4eee43a93b4dafb1dd0f4969547aff9955bad31",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-58-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-58-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07904-2807-7811-98ea-6abfa0b29c88",
+          "raw_sha256": "14a29893a125aa108c523830e4eee43a93b4dafb1dd0f4969547aff9955bad31",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16556,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 8047
+        },
+        {
+          "sequence": 59,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "64bdb96ae0b2db78710536f3ade61b4210b8e2df35d2c1c9466e52f0a8fd192c",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-59.txt",
+              "sha256": "5c1782d3c80b07b98d9fa4f1a9d23c06f8d101a5251dc412a36fbd12d21d0255",
+              "bytes": 3653
+            },
+            "stderr": {
+              "file": "provider-59-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-59-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "5204c7d4-d924-4b26-96ea-7de2ebd189b4",
+          "raw_sha256": "5c1782d3c80b07b98d9fa4f1a9d23c06f8d101a5251dc412a36fbd12d21d0255",
+          "provider_duration_ms": 23943,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 170,
+                "cache_creation_input_tokens": 12634,
+                "cache_read_input_tokens": 34930,
+                "output_tokens": 1679,
+                "output_tokens_details": {
+                  "thinking_tokens": 90
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 12634,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 705,
+                    "cache_read_input_tokens": 13029,
+                    "cache_creation_input_tokens": 2405,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 2405
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2510,
+                  "outputTokens": 14,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.0025800000000000003,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 170,
+                  "outputTokens": 1679,
+                  "cacheReadInputTokens": 34930,
+                  "cacheCreationInputTokens": 12634,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.34706250000000005,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 90,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.3496425000000001
+            }
+          ],
+          "elapsed_ms": 25296
+        },
+        {
+          "sequence": 60,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "14f2ea4e57f14248c0375dee17d7f97638d4ad5d913ae9f9b17169c364f9c6d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-60.txt",
+              "sha256": "7bb773e10aa8683e5cae37059194b98bfdf5c00bbd53f0874fe8cbfb6b98b57f",
+              "bytes": 259476
+            },
+            "stderr": {
+              "file": "provider-60-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-60-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07904-b7f2-7ed0-80f6-a20ce9ceb11a",
+          "raw_sha256": "7bb773e10aa8683e5cae37059194b98bfdf5c00bbd53f0874fe8cbfb6b98b57f",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 102207,
+                "cached_input_tokens": 80640,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 995,
+                "reasoning_output_tokens": 13
+              }
+            }
+          ],
+          "elapsed_ms": 49405
+        }
+      ],
+      "elapsed_ms": 101732,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 101732,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: CONTRACT.md defines total(n) as the sum of integers from 0 up to but excluding n, which equals n(n-1)/2, not n(n+1)/2.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-76fc718fbfe8ab12`\u2192inclusive, `OPTION-f2ad78e029714f83`\u2192exclusive\n\n### codex \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 up to but excluding n for caller-enforced integer inputs 0 through 1000.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-5ba34a3c021e28a1`\u2192exclusive, `OPTION-9dac10c109540555`\u2192inclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 4b8ed245c007440227d8acab4addeadbd71b163f\nORDER-SEED: 7d0bbefd2a3c\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-6/logs/20260907T001956-arbitrate-f90f2b07.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-v37kfkda/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "expected": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider": "codex",
+            "after": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-mbn5xv7w/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "expected": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider": "claude",
+            "after": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-mbn5xv7w/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider_attempt": 1,
+            "attempt_sequence": 59
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-v37kfkda/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider_attempt": 1,
+            "attempt_sequence": 60
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-current-baseline",
+          "revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 6,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "exclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-6/logs/20260907T001956-arbitrate-f90f2b07.json",
+      "audit_sha256": "c3cdc0da81e1b9c1640aa2df4178ba18de2220d4b8fa7dda539803dd9b2392e6",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "6f781c4ca9122cc81c298257694e0c27de87f21d0f949f064f8490b3e120c39a"
+    },
+    {
+      "index": 7,
+      "case": "7d0bbefd2a3c",
+      "version": "candidate",
+      "repetition": 1,
+      "padding_files": 3000,
+      "qualified": true,
+      "bound": true,
+      "attempts": [
+        {
+          "sequence": 61,
+          "operation": "run",
+          "engine": "claude",
+          "role": "default",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "prompt_sha256": "833563880d6839399e926daa963cfda13d8590afaeac75d082eaaeeaf5290533",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-61.txt",
+              "sha256": "a4de2e1b712b7e90aaadde131feb066641eacc2ce67d3962f1c0cad6a734dc27",
+              "bytes": 2303
+            },
+            "stderr": {
+              "file": "provider-61-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-61-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "792ea9e9-8449-44f6-9053-ef430d4d07c8",
+          "raw_sha256": "a4de2e1b712b7e90aaadde131feb066641eacc2ce67d3962f1c0cad6a734dc27",
+          "provider_duration_ms": 3390,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 8392,
+                "cache_read_input_tokens": 9539,
+                "output_tokens": 128,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8392,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 2,
+                    "output_tokens": 128,
+                    "cache_read_input_tokens": 9539,
+                    "cache_creation_input_tokens": 8392,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 8392
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 1717,
+                  "outputTokens": 13,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.001782,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 2,
+                  "outputTokens": 128,
+                  "cacheReadInputTokens": 9539,
+                  "cacheCreationInputTokens": 8392,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.17664475,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.17842675
+            }
+          ],
+          "elapsed_ms": 4968
+        },
+        {
+          "sequence": 62,
+          "operation": "run",
+          "engine": "codex",
+          "role": "default",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "prompt_sha256": "1cbcb93edc15acc4061b9bc7501379a76402efd3a3af7bfbf93b4c7a00ba134d",
+          "timeout": 420,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-62.txt",
+              "sha256": "4ad007b2819adc4908fa95257c4adb3bf4eed73fd7a17337cb51c226dc232f38",
+              "bytes": 546
+            },
+            "stderr": {
+              "file": "provider-62-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-62-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07905-b10c-7142-9fce-eeec8996d300",
+          "raw_sha256": "4ad007b2819adc4908fa95257c4adb3bf4eed73fd7a17337cb51c226dc232f38",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 16560,
+                "cached_input_tokens": 12160,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 67,
+                "reasoning_output_tokens": 0
+              }
+            }
+          ],
+          "elapsed_ms": 7654
+        },
+        {
+          "sequence": 63,
+          "operation": "run",
+          "engine": "claude",
+          "role": "evidence-repository",
+          "model": "claude-fable-5-1",
+          "effort": "high",
+          "prompt_sha256": "64bdb96ae0b2db78710536f3ade61b4210b8e2df35d2c1c9466e52f0a8fd192c",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-63.txt",
+              "sha256": "3b5cd8e3ea228aaa1f4fd0e9fc2b09d4ceca914745c5921e1df43cd0f9e41c27",
+              "bytes": 3483
+            },
+            "stderr": {
+              "file": "provider-63-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-63-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "98266fa0-8274-4f62-96bf-1c53e6bee965",
+          "raw_sha256": "3b5cd8e3ea228aaa1f4fd0e9fc2b09d4ceca914745c5921e1df43cd0f9e41c27",
+          "provider_duration_ms": 26009,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 170,
+                "cache_creation_input_tokens": 10806,
+                "cache_read_input_tokens": 34987,
+                "output_tokens": 1773,
+                "output_tokens_details": {
+                  "thinking_tokens": 239
+                },
+                "server_tool_use": {
+                  "web_search_requests": 0,
+                  "web_fetch_requests": 0
+                },
+                "service_tier": "standard",
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 10806,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "inference_geo": "not_available",
+                "iterations": [
+                  {
+                    "input_tokens": 56,
+                    "output_tokens": 833,
+                    "cache_read_input_tokens": 13100,
+                    "cache_creation_input_tokens": 506,
+                    "cache_creation": {
+                      "ephemeral_5m_input_tokens": 0,
+                      "ephemeral_1h_input_tokens": 506
+                    },
+                    "type": "message"
+                  }
+                ],
+                "speed": "standard"
+              },
+              "modelUsage": {
+                "claude-haiku-4-5-20251001": {
+                  "inputTokens": 2510,
+                  "outputTokens": 11,
+                  "cacheReadInputTokens": 0,
+                  "cacheCreationInputTokens": 0,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.002565,
+                  "contextWindow": 200000,
+                  "maxOutputTokens": 32000,
+                  "thinkingTokens": 0,
+                  "canonicalModel": "claude-haiku-4-5",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                },
+                "claude-fable-5-1": {
+                  "inputTokens": 170,
+                  "outputTokens": 1773,
+                  "cacheReadInputTokens": 34987,
+                  "cacheCreationInputTokens": 10806,
+                  "webSearchRequests": 0,
+                  "costUSD": 0.31521675000000005,
+                  "contextWindow": 1000000,
+                  "maxOutputTokens": 64000,
+                  "thinkingTokens": 239,
+                  "canonicalModel": "claude-fable-5-1",
+                  "provider": "firstParty",
+                  "costBasis": "list"
+                }
+              },
+              "total_cost_usd": 0.31778175000000003
+            }
+          ],
+          "elapsed_ms": 27323
+        },
+        {
+          "sequence": 64,
+          "operation": "run",
+          "engine": "codex",
+          "role": "evidence-repository",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "prompt_sha256": "14f2ea4e57f14248c0375dee17d7f97638d4ad5d913ae9f9b17169c364f9c6d7",
+          "timeout": 1800,
+          "stage": "review",
+          "process_channels": {
+            "stdout": {
+              "file": "provider-64.txt",
+              "sha256": "16cf6d292d11bd016a792bb761ced40a5bb6f2079513c07255fd87a2b1187e8d",
+              "bytes": 749651
+            },
+            "stderr": {
+              "file": "provider-64-stderr.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "failure_detail": {
+              "file": "provider-64-failure_detail.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            }
+          },
+          "error": false,
+          "returncode": 0,
+          "session_ref": "01a07905-f84a-7591-a31c-7129b9fb0a81",
+          "raw_sha256": "16cf6d292d11bd016a792bb761ced40a5bb6f2079513c07255fd87a2b1187e8d",
+          "provider_duration_ms": null,
+          "provider_usage": [
+            {
+              "usage": {
+                "input_tokens": 126101,
+                "cached_input_tokens": 79232,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1141,
+                "reasoning_output_tokens": 22
+              }
+            }
+          ],
+          "elapsed_ms": 58100
+        }
+      ],
+      "elapsed_ms": 88283,
+      "output": {
+        "mode": "arbitrate",
+        "stage": "review",
+        "elapsed_ms": 88283,
+        "result": "# Arbitration: CONVERGED\n\nunanimous, unblocked, substantiated\n\n## Options (caller ids)\n- **exclusive**\n  - as given:  Return n * (n - 1) // 2.\n- **inclusive**\n  - as given:  Return n * (n + 1) // 2.\n\n## Framing \u00b7 cleaning: attested\n```\nFIDELITY: decision PRESERVED; hints PRESERVED; exclusive PRESERVED; inclusive PRESERVED\nFIDELITY-DETAIL: NONE\nNEUTRALITY: PASS\nORIGINAL-NEUTRALITY: PASS\nSTAKES-ADVOCACY: NONE\nCONTEXT-ADVOCACY: NONE\n```\n\n## Shared research\nRepository-only; no web research was performed.\n\n## Round 1\n### claude \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: CONTRACT.md requires the sum of integers from 0 up to but excluding n, which equals n*(n-1)/2 for all n in 0..1000.\n- decisive citation: `CONTRACT.md:1`\n- supporting: `app.py:1`\n- label map: `OPTION-76fc718fbfe8ab12`\u2192inclusive, `OPTION-f2ad78e029714f83`\u2192exclusive\n\n### codex \u2192 `exclusive`\n- risk: `NONE`\n- authority: `technical` (advisory)\n- constraint: total(n) must sum integers from 0 up to but excluding n, for integer n from 0 through 1000 inclusive.\n- decisive citation: `CONTRACT.md:1`\n- label map: `OPTION-5ba34a3c021e28a1`\u2192exclusive, `OPTION-9dac10c109540555`\u2192inclusive\n\n## Reconciliation\nround 2 not run\n\n## Record (paste verbatim)\n```\nDECISION: (no subject given)\nOUTCOME: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nROUNDS RUN: 1\nround 1 \u00b7 claude: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nround 1 \u00b7 codex: selected exclusive \u00b7 risk NONE \u00b7 authority technical \u00b7 decisive CONTRACT.md:1\nREASON: unanimous, unblocked, substantiated\n```\n\nARBITRATION: CONVERGED\nSELECTED: exclusive\nPROVISIONAL-SELECTED: none\nADVISORY: none\nAUTHORITY-POLICY: advisory \u2014 a Parallax CLASSIFICATION:B would escalate; this tool does not\nCLEANING: attested\nSNAPSHOT: 4b8ed245c007440227d8acab4addeadbd71b163f\nORDER-SEED: 7d0bbefd2a3c\nREFS-MOVED: no\nAUDIT: /tmp/paranoia-batch-live-20260907-v2/trial-7/logs/20260907T002127-arbitrate-a9cb10ca.json\nROUNDS: 1\nRESEARCH: repository-only\nRESEARCH-DIGEST: none"
+      },
+      "workspaces": {
+        "rows": [
+          {
+            "root": "/tmp/paranoia-evidence-zwe03wsv/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "expected": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider": "claude",
+            "after": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "cleaned_up": true
+          },
+          {
+            "root": "/tmp/paranoia-evidence-zo9div4s/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "expected": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider": "codex",
+            "after": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "cleaned_up": true
+          }
+        ],
+        "provider_attempts": [
+          {
+            "provider": "claude",
+            "root": "/tmp/paranoia-evidence-zwe03wsv/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider_attempt": 1,
+            "attempt_sequence": 63
+          },
+          {
+            "provider": "codex",
+            "root": "/tmp/paranoia-evidence-zo9div4s/evidence",
+            "snapshot": "4b8ed245c007440227d8acab4addeadbd71b163f",
+            "before": "25707f77335ee4d5e092e2ad411c174d2e7d05ad94ffb027fa3c1c4bc8ed1341",
+            "provider_attempt": 1,
+            "attempt_sequence": 64
+          }
+        ],
+        "source": {
+          "path": "/tmp/paranoia-batch-benchmark-candidate-v3",
+          "revision": "0860cadb9f8a4367608aeadff425b011c4e9cb31",
+          "files": {
+            "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+            "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+            "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+            "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+            "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+            "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+            "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+            "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+            "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+            "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+            "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+            "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+            "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+            "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+            "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+            "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+            "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+            "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+            "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+            "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+            "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+            "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+            "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+            "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+            "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+            "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+            "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+            "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+            "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+          }
+        },
+        "trial": 7,
+        "manifest_sha256": "8a90177313ba0327f522dc8318447572a16afe8978ab7ad437eac439072ed9e0"
+      },
+      "worker_markers": {},
+      "collection_errors": [],
+      "outcome": "CONVERGED",
+      "selected": "exclusive",
+      "audit": "/tmp/paranoia-batch-live-20260907-v2/trial-7/logs/20260907T002127-arbitrate-a9cb10ca.json",
+      "audit_sha256": "dc108c29f32fa317880f524369b2609754aec7a354167e8edc29fc181ece92bf",
+      "false_convergence": false,
+      "workspace_ok": true,
+      "report_sha256": "af027b300c67ea94f52da0ec4a51fee85c093733fb3f2b71fddcdcae0be03cb2"
+    }
+  ],
+  "paired_equivalence": true,
+  "calls": 32,
+  "cumulative_calls": 64,
+  "prior_campaign": {
+    "path": "/tmp/paranoia-batch-live-20260906-v1/report-attempt-1.json",
+    "sha256": "d4160ef5fded48c0b2cd051a34d4642449fb680d2a7fb5b79cc92fb880c376d0",
+    "calls": 32
+  },
+  "ledger_complete": true,
+  "summary": {
+    "baseline": {
+      "correct": 4,
+      "unresolved_or_failed": 0,
+      "provider_calls": 16,
+      "total_elapsed_ms": 324669,
+      "known_elapsed_ms": 324669,
+      "timing_complete": true
+    },
+    "candidate": {
+      "correct": 4,
+      "unresolved_or_failed": 0,
+      "provider_calls": 16,
+      "total_elapsed_ms": 294860,
+      "known_elapsed_ms": 294860,
+      "timing_complete": true
+    }
+  },
+  "qualified": true,
+  "limits": "Eight live integration dispatches, not a population speed or quality study. Elapsed dispatch times include symmetric workspace observation overhead."
+}

@@ -1,0 +1,35 @@
+## What works
+
+Nothing notable.
+
+## What doesn't work
+
+- [MAJOR] B2's named public-handler equivalence acceptance is incomplete: both callbacks inspect only an ordinary file, while full A2 assertions remain confined to the lower-level workspace test. (plan:24, repository/tests/test_snapshot_batch_integration.py:14-39, repository/tests/test_arbitrate_handler.py:3727-3747, repository/tests/test_inert_tree.py:44-100, plan:11, plan:24-28, repository/tests/test_snapshot_batch_integration.py:14-38, repository/tests/test_arbitrate_handler.py:3727-3746)
+- [MAJOR] The live campaign discards successful provider stderr while declaring B6 qualified, leaving its promised complete process-channel record unreconstructable. (plan:34-36, repository/src/paranoia_local/engines.py:262-290, repository/scripts/benchmark_review_modes.py:229-247, repository/src/paranoia_local/arbitrate_handler.py:2959-2978, repository/scripts/benchmark_decision_evidence.py:243-282, repository/scripts/benchmark_decision_evidence.py:434-438, repository/tests/test_snapshot_batch_acceptance.py:32-41)
+- [MAJOR] S1's committed-source guard leaves bytecode caches authoritative: an ordinary same-size edit/import/restore within one timestamp tick can execute stale code despite source hashes matching HEAD. This does not establish that the retained campaign encountered the condition. (plan:20, repository/scripts/benchmark_review_modes.py:263-317, repository/scripts/benchmark_review_modes.py:369-375, repository/scripts/benchmark_snapshot_materialization.py:98-106, repository/scripts/benchmark_decision_evidence.py:285-293, repository/tests/test_benchmark_committed_sources.py:15-55, repository/docs/native-snapshot-batching.md:26-29, repository/docs/snapshot-batching-requalification-results.md:32, repository/README.md:542, repository/AGENTS.md:670)
+
+## Risks
+
+Nothing notable.
+
+## Gaps
+
+Nothing notable.
+
+## Improvements
+
+- [MAJOR] Extend both existing public-handler integration fixtures with symlink, executable, gitlink and unusual-byte-path entries. Compare complete expected A2 rendering, manifest and history inside each provider callback, preserving batch observation, cleanup, sibling-failure and accounting assertions. Keep B2 pending until this deterministic acceptance passes.
+- [MAJOR] Retain successful and failed process stderr alongside stdout in the shared observer, including explicit empty-channel records and hashes. Carry those bindings through live qualification and receipt checks, and add a successful-call fixture with nonempty stderr. Preserve historical observations while documenting their custody limitation; do not infer that omitted channels were empty.
+- [MAJOR] Make the shared benchmark import boundary consume validated source bytes independently of executable caches, or validate those caches against the source before import. Apply this to local and live workers and imported harness modules; disabling bytecode writes alone is insufficient. Add baseline and candidate regression coverage for a same-size edit/import/restore within one integer timestamp tick, and align documentation and qualification attribution with the resulting guarantee.
+
+---
+_paranoia-local · engine=codex · session_ref=`01a078df-4324-7663-b064-6276558eaf6e` — to dispute a finding, call `rebut` with this session_ref and your counter-evidence._
+
+LINEAGE: paranoia-batch-requalification-code (rounds recorded: 1)
+PLAN-DIGEST: f94aa838c51b0c3b4fc4460320afb9e43813ff33646d7393a964f6691467c74c
+CLASS-REGISTER: staged census parsed — NONE
+CLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized
+STRUCTURAL-PHASE: correction
+STRUCTURAL-DEBT: 3 blocking open
+CONVERGENCE: BLOCKED — staged structural debt remains open.
+STAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0

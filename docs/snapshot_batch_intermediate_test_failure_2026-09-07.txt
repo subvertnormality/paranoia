@@ -1,0 +1,282 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+...................................................FF................... [ 41%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 52%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+.................................................................F...... [ 90%]
+...........F.F.......................................................... [ 93%]
+........................................................................ [ 97%]
+.........................................................                [100%]
+=================================== FAILURES ===================================
+_ test_process_channel_retention_preserves_empty_and_nonempty_channels[False] __
+
+tmp_path = PosixPath('/tmp/pytest-of-andy/pytest-923/test_process_channel_retention0')
+failed = False
+
+    @pytest.mark.parametrize("failed", [False, True])
+    def test_process_channel_retention_preserves_empty_and_nonempty_channels(tmp_path, failed):
+        from paranoia_local.engines import Review
+>       review = Review(text="reply", raw="raw provider output\n", returncode=1 if failed else 0,
+                        error=failed, stderr="process diagnostic\n", failure_detail="detail" if failed else None)
+E       TypeError: Review.__init__() missing 1 required positional argument: 'session_ref'
+
+tests/test_decision_benchmark.py:298: TypeError
+__ test_process_channel_retention_preserves_empty_and_nonempty_channels[True] __
+
+tmp_path = PosixPath('/tmp/pytest-of-andy/pytest-923/test_process_channel_retention1')
+failed = True
+
+    @pytest.mark.parametrize("failed", [False, True])
+    def test_process_channel_retention_preserves_empty_and_nonempty_channels(tmp_path, failed):
+        from paranoia_local.engines import Review
+>       review = Review(text="reply", raw="raw provider output\n", returncode=1 if failed else 0,
+                        error=failed, stderr="process diagnostic\n", failure_detail="detail" if failed else None)
+E       TypeError: Review.__init__() missing 1 required positional argument: 'session_ref'
+
+tests/test_decision_benchmark.py:298: TypeError
+_____________ test_new_source_module_invalidates_frozen_inventory ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-andy/pytest-923/test_new_source_module_invalid0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x751c7945c9d0>
+
+    def test_new_source_module_invalidates_frozen_inventory(tmp_path, monkeypatch):
+        manifest = _manifest()
+        source = tmp_path / "source"
+        package = source / "src/paranoia_local"
+        package.mkdir(parents=True)
+        (package / "a.py").write_text("a=1\n")
+        for row in manifest["sources"].values():
+            row.update(path=str(source), files={"src/paranoia_local/a.py": bench.sha("a=1\n")})
+        manifest.update(cli_versions={}, harness_sha256=bench.sha(Path(bench.__file__).read_bytes()))
+        bench.dump(tmp_path / "manifest.json", manifest)
+        (tmp_path / "manifest.sha256").write_text(bench.sha((tmp_path / "manifest.json").read_bytes()))
+        (package / "b.py").write_text("b=2\n")
+        monkeypatch.setattr(bench, "git", lambda *a: "a" * 40)
+        with pytest.raises(ValueError, match="inventory"):
+>           bench.run(SimpleNamespace(output=tmp_path))
+
+tests/test_review_modes_benchmark.py:355: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = namespace(output=PosixPath('/tmp/pytest-of-andy/pytest-923/test_new_source_module_invalid0'))
+
+    def run(args):
+        root = args.output.resolve()
+        raw = (root / "manifest.json").read_bytes()
+        if sha(raw) != (root / "manifest.sha256").read_text():
+            raise ValueError("manifest changed since freeze")
+        manifest = json.loads(raw)
+        validate_manifest(manifest)
+        harness = {str(Path(__file__).resolve()): manifest["harness_sha256"],
+>                  str(BOOTSTRAP_PATH.resolve()): manifest["bootstrap_sha256"]}
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'bootstrap_sha256'
+
+scripts/benchmark_review_modes.py:535: KeyError
+___ test_campaign_refuses_later_launch_after_binding_drift[source-five-mode] ___
+
+repo = PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la0/proj')
+tmp_path = PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x751c79522010>
+adapter = 'five-mode', changed = 'source'
+
+    @pytest.mark.parametrize("adapter", ["five-mode", "empty-census"])
+    @pytest.mark.parametrize("changed", ["source", "harness"])
+    def test_campaign_refuses_later_launch_after_binding_drift(
+        repo, tmp_path, monkeypatch, adapter, changed,
+    ):
+        from tests.conftest import commit_all
+        if adapter == "empty-census":
+            from scripts import run_empty_census_acceptance as launcher
+            common = launcher.pilot
+        else:
+            launcher = common = bench
+        package = repo / "src/paranoia_local"
+        package.mkdir(parents=True)
+        module = package / "__init__.py"
+        module.write_text("")
+        commit_all(repo, "campaign source")
+        driver = tmp_path / "driver.py"
+        driver.write_text("# frozen launcher")
+        monkeypatch.setattr(launcher, "__file__", str(driver))
+        root = tmp_path / "campaign"
+        monkeypatch.setattr(common.subprocess, "check_output", lambda *a, **k: "fixture CLI\n")
+        real_run = common.subprocess.run
+        launches = []
+    
+        def launch(command, **kwargs):
+            if command[0] != sys.executable:
+                return real_run(command, **kwargs)
+            directory = Path(command[-1]).parent
+            launches.append(directory.name)
+            common.dump(directory / "status.json", {"status": "completed"})
+            (module if changed == "source" else driver).write_text("# edited during earlier trial")
+            return SimpleNamespace(returncode=0)
+    
+        if adapter == "empty-census":
+            launcher.freeze(root, repo, repo)
+        else:
+            root.mkdir()
+            manifest = _manifest()
+            manifest.update(sources={v: _source_record(repo) for v in ("baseline", "candidate")},
+                            models=bench.MODELS, cli_versions={}, harness_sha256=bench.sha(driver.read_bytes()),
+                            counter_path=str(root / "calls.txt"))
+            for index, trial in enumerate(manifest["order"]):
+                trial["id"] = f"t{index+1:03}"
+                (root / trial["id"]).mkdir()
+                common.dump(root / trial["id"] / "status.json", {"status": "unstarted"})
+            common.dump(root / "manifest.json", manifest)
+            (root / "manifest.sha256").write_text(common.sha((root / "manifest.json").read_bytes()))
+            (root / "calls.txt").write_text("0")
+    
+            class OrderedPool:
+                def __init__(self, **kwargs):
+                    pass
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    pass
+                def map(self, function, rows):
+                    return map(function, rows)
+            monkeypatch.setattr(common, "ThreadPoolExecutor", OrderedPool)
+        monkeypatch.setattr(common.subprocess, "run", launch)
+        if adapter == "empty-census":
+            launcher.run(root)
+        else:
+>           launcher.run(SimpleNamespace(output=root))
+
+tests/test_review_modes_benchmark.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = namespace(output=PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la0/campaign'))
+
+    def run(args):
+        root = args.output.resolve()
+        raw = (root / "manifest.json").read_bytes()
+        if sha(raw) != (root / "manifest.sha256").read_text():
+            raise ValueError("manifest changed since freeze")
+        manifest = json.loads(raw)
+        validate_manifest(manifest)
+        harness = {str(Path(__file__).resolve()): manifest["harness_sha256"],
+>                  str(BOOTSTRAP_PATH.resolve()): manifest["bootstrap_sha256"]}
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'bootstrap_sha256'
+
+scripts/benchmark_review_modes.py:535: KeyError
+__ test_campaign_refuses_later_launch_after_binding_drift[harness-five-mode] ___
+
+repo = PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la2/proj')
+tmp_path = PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x751c79521c10>
+adapter = 'five-mode', changed = 'harness'
+
+    @pytest.mark.parametrize("adapter", ["five-mode", "empty-census"])
+    @pytest.mark.parametrize("changed", ["source", "harness"])
+    def test_campaign_refuses_later_launch_after_binding_drift(
+        repo, tmp_path, monkeypatch, adapter, changed,
+    ):
+        from tests.conftest import commit_all
+        if adapter == "empty-census":
+            from scripts import run_empty_census_acceptance as launcher
+            common = launcher.pilot
+        else:
+            launcher = common = bench
+        package = repo / "src/paranoia_local"
+        package.mkdir(parents=True)
+        module = package / "__init__.py"
+        module.write_text("")
+        commit_all(repo, "campaign source")
+        driver = tmp_path / "driver.py"
+        driver.write_text("# frozen launcher")
+        monkeypatch.setattr(launcher, "__file__", str(driver))
+        root = tmp_path / "campaign"
+        monkeypatch.setattr(common.subprocess, "check_output", lambda *a, **k: "fixture CLI\n")
+        real_run = common.subprocess.run
+        launches = []
+    
+        def launch(command, **kwargs):
+            if command[0] != sys.executable:
+                return real_run(command, **kwargs)
+            directory = Path(command[-1]).parent
+            launches.append(directory.name)
+            common.dump(directory / "status.json", {"status": "completed"})
+            (module if changed == "source" else driver).write_text("# edited during earlier trial")
+            return SimpleNamespace(returncode=0)
+    
+        if adapter == "empty-census":
+            launcher.freeze(root, repo, repo)
+        else:
+            root.mkdir()
+            manifest = _manifest()
+            manifest.update(sources={v: _source_record(repo) for v in ("baseline", "candidate")},
+                            models=bench.MODELS, cli_versions={}, harness_sha256=bench.sha(driver.read_bytes()),
+                            counter_path=str(root / "calls.txt"))
+            for index, trial in enumerate(manifest["order"]):
+                trial["id"] = f"t{index+1:03}"
+                (root / trial["id"]).mkdir()
+                common.dump(root / trial["id"] / "status.json", {"status": "unstarted"})
+            common.dump(root / "manifest.json", manifest)
+            (root / "manifest.sha256").write_text(common.sha((root / "manifest.json").read_bytes()))
+            (root / "calls.txt").write_text("0")
+    
+            class OrderedPool:
+                def __init__(self, **kwargs):
+                    pass
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    pass
+                def map(self, function, rows):
+                    return map(function, rows)
+            monkeypatch.setattr(common, "ThreadPoolExecutor", OrderedPool)
+        monkeypatch.setattr(common.subprocess, "run", launch)
+        if adapter == "empty-census":
+            launcher.run(root)
+        else:
+>           launcher.run(SimpleNamespace(output=root))
+
+tests/test_review_modes_benchmark.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = namespace(output=PosixPath('/tmp/pytest-of-andy/pytest-923/test_campaign_refuses_later_la2/campaign'))
+
+    def run(args):
+        root = args.output.resolve()
+        raw = (root / "manifest.json").read_bytes()
+        if sha(raw) != (root / "manifest.sha256").read_text():
+            raise ValueError("manifest changed since freeze")
+        manifest = json.loads(raw)
+        validate_manifest(manifest)
+        harness = {str(Path(__file__).resolve()): manifest["harness_sha256"],
+>                  str(BOOTSTRAP_PATH.resolve()): manifest["bootstrap_sha256"]}
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'bootstrap_sha256'
+
+scripts/benchmark_review_modes.py:535: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_decision_benchmark.py::test_process_channel_retention_preserves_empty_and_nonempty_channels[False]
+FAILED tests/test_decision_benchmark.py::test_process_channel_retention_preserves_empty_and_nonempty_channels[True]
+FAILED tests/test_review_modes_benchmark.py::test_new_source_module_invalidates_frozen_inventory
+FAILED tests/test_review_modes_benchmark.py::test_campaign_refuses_later_launch_after_binding_drift[source-five-mode]
+FAILED tests/test_review_modes_benchmark.py::test_campaign_refuses_later_launch_after_binding_drift[harness-five-mode]
+5 failed, 2068 passed in 211.97s (0:03:31)
