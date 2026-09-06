@@ -5,6 +5,10 @@ import json
 from pathlib import Path
 import statistics
 import sys
+import runpy
+BOOTSTRAP_PATH = Path(__file__).with_name("benchmark_bootstrap.py")
+runpy.run_path(str(BOOTSTRAP_PATH))
+
 from benchmark_review_modes import (sha, dump, validate_manifest, require_successful_review,
                                     ExecutionEvidenceError)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))

@@ -8,6 +8,10 @@ from pathlib import Path
 import subprocess
 import sys
 
+import runpy
+BOOTSTRAP_PATH = Path(__file__).with_name("benchmark_bootstrap.py")
+runpy.run_path(str(BOOTSTRAP_PATH))
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts import benchmark_review_modes as pilot
 
@@ -18,11 +22,7 @@ def source(path):
     path = path.resolve()
     if pilot.git(path, "status", "--porcelain", "--untracked-files=no"):
         raise ValueError("freeze requires committed sources")
-    return {
-        "path": str(path), "revision": pilot.git(path, "rev-parse", "HEAD"),
-        "files": {str(p.relative_to(path)): pilot.sha(p.read_bytes())
-                  for p in sorted((path / "src/paranoia_local").glob("*.py"))},
-    }
+    return pilot.source_record(path)
 
 
 
@@ -86,7 +86,7 @@ def freeze(root, baseline, candidate, counter=None):
         "order": order, "maximum_calls": MAX_CALLS,
         "counter_path": str(counter), "admissions_at_freeze": prior_admissions,
         "harness": {str(p): pilot.sha(p.read_bytes()) for p in (
-            Path(__file__).resolve(), Path(pilot.__file__).resolve(),
+            Path(__file__).resolve(), Path(pilot.__file__).resolve(), BOOTSTRAP_PATH.resolve(),
         )},
         "cli_versions": {
             name: subprocess.check_output([name, "--version"], text=True).strip()

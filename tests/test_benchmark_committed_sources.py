@@ -10,9 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import benchmark_review_modes as shared
 import benchmark_snapshot_materialization as local
 import benchmark_decision_evidence as live
+from scripts import run_empty_census_acceptance as empty
 
 
-@pytest.mark.parametrize("launcher", ["local", "live", "modes"])
+@pytest.mark.parametrize("launcher", ["local", "live", "modes", "empty"])
 @pytest.mark.parametrize("version", ["baseline", "candidate"])
 @pytest.mark.parametrize("mutation", ["modified", "missing", "extra", "nested", "staged"])
 def test_freeze_rejects_preexisting_dirty_modules_without_launch(
@@ -50,7 +51,7 @@ def test_freeze_rejects_preexisting_dirty_modules_without_launch(
         if launcher == "modes":
             shared.freeze(SimpleNamespace(output=output, **sources, counter=None))
         else:
-            {"local": local, "live": live}[launcher].freeze(output, **sources)
+            {"local": local, "live": live, "empty": empty}[launcher].freeze(output, **sources)
     assert not (output / "manifest.json").exists()
     assert not list(output.glob("trial-*"))
 
