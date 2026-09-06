@@ -172,6 +172,17 @@ def test_consequence_acceptance_rejects_every_binding_mutation(
             return body + b"# drift\n" if path.name == "arbitration.py" else body
 
         monkeypatch.setattr(Path, "read_bytes", changed_read)
+
+        # Later-source allowances bind Git's actual diff as well as the read.
+        # Simulate an ordinary edit consistently across both filesystem views.
+        original_invoke = validator.inert_git.invoke
+        def changed_invoke(repo, args, **kwargs):
+            result = original_invoke(repo, args, **kwargs)
+            if args[0] == "diff" and args[-1] == "src/paranoia_local/arbitration.py":
+                result = copy.deepcopy(result)
+                result.stdout += b"# drift\\n"
+            return result
+        monkeypatch.setattr(validator.inert_git, "invoke", changed_invoke)
         sync = False
     elif mutation == "cleaner-model":
         target = negative

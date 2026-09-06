@@ -93,6 +93,14 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
                         (bench.shared, "install_observer"), (bench.shared, "admit"),
                         (engines.Engine, "run"), (engines.Engine, "resume")]:
         monkeypatch.setattr(owner, name, getattr(owner, name))
+    # Earlier replay tests restore inherited methods as subclass attributes.
+    # Fresh benchmark workers have no such aliases; remove only identical aliases
+    # so the base Engine observer is exercised in the same shape as a fresh import.
+    for cls in (engines.CodexEngine, engines.ClaudeEngine):
+        for operation in ("run", "resume"):
+            if operation in cls.__dict__:
+                assert cls.__dict__[operation] is getattr(engines.Engine, operation)
+                monkeypatch.delattr(cls, operation)
     scripted = Agent(lambda e, r: "opt-decimal")
     def execute(self, argv, prompt, cwd, *args, **kwargs):
         label = scripted._label_for(prompt, "opt-decimal")

@@ -145,6 +145,7 @@ def test_acceptance_runner_accepts_only_the_validator_routes(
 def test_fallback_acceptance_rejects_unbound_delivery_claims(mutation: str):
     audit = copy.deepcopy(_audit())
     artifact = json.loads(ARTIFACT.read_text())
+    instructions = validator._historical_prompt_instructions(ROOT, artifact["source_commit"])
     if mutation == "candidate":
         audit["cleaned"]["sha256"] = "0" * 64
         assert not validator._cleaned_digest_bound(audit["cleaned"])
@@ -156,18 +157,18 @@ def test_fallback_acceptance_rejects_unbound_delivery_claims(mutation: str):
         assert not validator._cleaning_and_attestation_bound(audit, fallback=True)
     elif mutation == "decider":
         audit["rounds"][0]["codex"]["attempts"][0]["body"] = "cleaned candidate"
-        assert validator._decider_transcripts(audit) is None
+        assert validator._decider_transcripts(audit, instruction_set=instructions) is None
     elif mutation == "vote":
         audit["rounds"][0]["codex"]["selected"] = "opt-causing-card"
-        assert validator._decider_transcripts(audit) is None
+        assert validator._decider_transcripts(audit, instruction_set=instructions) is None
     elif mutation == "snapshot":
         artifact["snapshot_binding"]["tree"] = "0" * 40
-        votes = validator._decider_transcripts(audit)
+        votes = validator._decider_transcripts(audit, instruction_set=instructions)
         assert votes is not None
         assert not validator._snapshot_and_outcome_bound(ROOT, artifact, audit, votes)
     elif mutation == "outcome":
         audit["outcome"] = "BLOCKED"
-        votes = validator._decider_transcripts(audit)
+        votes = validator._decider_transcripts(audit, instruction_set=instructions)
         assert votes is not None
         assert not validator._snapshot_and_outcome_bound(ROOT, artifact, audit, votes)
     elif mutation == "fallback_route":
