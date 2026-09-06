@@ -281,3 +281,41 @@ def test_resolver_does_not_cache_operational_failure(repo, monkeypatch, method):
         assert result == snapshot
     else:
         assert result == {}
+
+
+@pytest.mark.parametrize("field", ["DECISIVE-CITATION", "CITATIONS"])
+@pytest.mark.parametrize("repair", [True, False])
+def test_absent_gitlink_is_repairable_without_following_target(
+    repo, tmp_path, field, repair,
+):
+    (repo / "module").mkdir()
+    git(["update-index", "--add", "--cacheinfo", "160000," + "a" * 40 + ",module"], repo)
+    git(["commit", "-qm", "absent submodule target"], repo)
+    boundary = admission(repo)
+    for name in ["DECISIVE-CITATION", "CITATIONS"]:
+        declarations = {"DECISIVE-CITATION": "NONE", "CITATIONS": "NONE"}
+        declarations[name] = "module:1"
+        with pytest.raises(arb.ArbitrationError, match=name):
+            boundary.validate_declarations(declarations)
+    scripted = Agent(lambda e, r: "opt-decimal")
+    replies = []
+    def provider(**kwargs):
+        text = scripted(**kwargs)
+        if kwargs["engine_name"] == "codex" and kwargs["cwd"] is not None:
+            if not replies or not repair:
+                original = "app.py:4" if field == "DECISIVE-CITATION" else "NONE"
+                text = text.replace(f"{field}: {original}", f"{field}: module:1")
+            replies.append(text)
+        return text
+    report = run(repo, provider, tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == ("CONVERGED" if repair else "FAILED")
+    assert len(replies) == 2
+    record = audit(report)
+    deciders = record["rounds"][0] if repair else record["failed_round"]["deciders"]
+    assert deciders["claude"]["selected"] == "opt-decimal"
+    attempts = deciders["codex"]["attempts"]
+    assert [a["raw"] for a in attempts] == replies
+    assert field in attempts[0]["rejection"]
+    assert "decision evidence admission failed" not in attempts[0]["rejection"]
+    assert bool(attempts[1]["rejection"]) == (not repair)
+    assert all(not Path(c["cwd"]).exists() for c in scripted.calls if c["cwd"] is not None)

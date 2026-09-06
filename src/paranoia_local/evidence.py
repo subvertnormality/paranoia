@@ -271,10 +271,20 @@ def _blob(repo: Path, commit: str, path: str) -> bytes | None:
         detail = t.stderr.decode("utf-8", errors="replace").strip()
         failure = RuntimeError(f"git cat-file -t {spec} failed: {detail}")
         try:
-            absent = path not in tree_paths(repo, commit)
+            entries = _git(
+                ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path],
+                repo, raw=True,
+            )
         except RuntimeError:
             raise failure from None
-        if absent:
+        # Tree metadata is authoritative even when a gitlink's target commit
+        # is not in this object database. Do not fetch or follow that target.
+        required_blob = any(
+            name == path and meta.split()[1:2] == ["blob"]
+            for row in entries.split("\0") if row
+            for meta, _, name in [row.partition("\t")]
+        )
+        if not required_blob:
             return None
         raise failure
     if t.stdout.decode().strip() != "blob":
