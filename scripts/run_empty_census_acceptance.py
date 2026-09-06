@@ -25,15 +25,32 @@ def source(path):
     }
 
 
-def freeze(root, baseline, candidate):
+def freeze(root, baseline, candidate, counter=None):
     sources = {"baseline": source(baseline), "candidate": source(candidate)}
+    counter = counter.resolve() if counter else root / "calls.txt"
+    prior_admissions = int(counter.read_text()) if counter.exists() else 0
     cases = []
     for provider in pilot.MODELS:
         for defect in (False, True):
             case = {
-                "id": pilot.sha(f"empty-census-{provider}-{defect}")[:12],
+                "id": pilot.sha(f"empty-census-v2-{provider}-{defect}")[:12],
                 "provider": provider, "mode": "critique_branch",
-                "files": {"CONTRACT.md": pilot.CONTRACT, "app.py": pilot.BAD if defect else pilot.GOOD},
+                "files": {
+                    "CONTRACT.md": pilot.CONTRACT,
+                    # The reused worker appends one newline to branch app.py.
+                    "app.py": (pilot.BAD if defect else pilot.GOOD.replace(
+                        "n * (n + 1)", "(n * n + n)",
+                    )).rstrip("\n"),
+                    "test_app.py": (
+                        "from app import total\n\n"
+                        "def test_total():\n"
+                        "    for n in range(1001):\n"
+                        "        assert total(n) == sum(range(n + 1)), n\n\n"
+                        "if __name__ == \"__main__\":\n"
+                        "    test_total()\n"
+                    ),
+                    "README.md": "Run the contract regression with python test_app.py.\n",
+                },
                 "plan_text": None, "repair": None,
             }
             cases.append((case, defect))
@@ -47,10 +64,11 @@ def freeze(root, baseline, candidate):
                     "version": version, "repetition": repetition,
                 })
     manifest = {
-        "schema": "empty-census-acceptance-v1", "sources": sources, "models": pilot.MODELS,
+        "schema": "empty-census-acceptance-v2", "sources": sources, "models": pilot.MODELS,
         "stakes": pilot.STAKES, "cases": [row for row, _ in cases],
         "oracle": {row["id"]: ("defect" if defect else "clear") for row, defect in cases},
         "order": order, "maximum_calls": MAX_CALLS,
+        "counter_path": str(counter), "admissions_at_freeze": prior_admissions,
         "harness": {str(p): pilot.sha(p.read_bytes()) for p in (
             Path(__file__).resolve(), Path(pilot.__file__).resolve(),
         )},
@@ -62,7 +80,8 @@ def freeze(root, baseline, candidate):
     root.mkdir(parents=True, exist_ok=False)
     pilot.dump(root / "manifest.json", manifest)
     (root / "manifest.sha256").write_text(pilot.sha((root / "manifest.json").read_bytes()))
-    (root / "calls.txt").write_text("0")
+    if not counter.exists():
+        counter.write_text("0")
     for trial in order:
         directory = root / trial["id"]
         directory.mkdir()
@@ -70,7 +89,7 @@ def freeze(root, baseline, candidate):
         case = next(row for row in manifest["cases"] if row["id"] == trial["case"])
         pilot.dump(directory / "input.json", {
             "input": case, "models": manifest["models"],
-            "source": sources[trial["version"]], "counter": str(root / "calls.txt"),
+            "source": sources[trial["version"]], "counter": str(counter),
         })
     print(f"Frozen {len(order)} trials; maximum {MAX_CALLS} provider admissions", flush=True)
 
@@ -98,7 +117,7 @@ def run(root):
         directory = root / trial["id"]
         if json.loads((directory / "status.json").read_text())["status"] != "unstarted":
             continue
-        if int((root / "calls.txt").read_text()) >= MAX_CALLS:
+        if int(Path(manifest.get("counter_path", str(root / "calls.txt"))).read_text()) >= MAX_CALLS:
             pilot.dump(directory / "status.json", {"status": "incomplete_call_limit"})
             continue
         pilot.dump(directory / "status.json", {"status": "running"})
@@ -163,7 +182,7 @@ def report(root):
         })
     result = {
         "manifest_sha256": pilot.sha((root / "manifest.json").read_bytes()),
-        "admissions": int((root / "calls.txt").read_text()), "trials": rows,
+        "admissions": int(Path(manifest.get("counter_path", str(root / "calls.txt"))).read_text()), "trials": rows,
         "qualified": len(rows) == 12 and all(row["qualified"] for row in rows),
     }
     pilot.dump(root / "report.json", result)
@@ -179,6 +198,7 @@ def main():
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--worker", type=Path)
+    parser.add_argument("--counter", type=Path, help="Reuse the campaign counter without resetting admissions")
     args = parser.parse_args()
     if os.name != "posix":
         raise SystemExit("This acceptance runner requires Linux/WSL.")
@@ -187,7 +207,7 @@ def main():
         pilot.admit = lambda path, maximum=MAX_CALLS: original(path, MAX_CALLS)
         pilot.worker(args.worker.resolve())
     elif args.freeze:
-        freeze(args.output.resolve(), args.baseline, args.candidate)
+        freeze(args.output.resolve(), args.baseline, args.candidate, args.counter)
     elif args.run:
         run(args.output.resolve())
     elif args.report:

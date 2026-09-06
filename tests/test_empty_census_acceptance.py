@@ -27,6 +27,35 @@ def test_freeze_has_exact_balanced_inventory_and_incomplete_report_blocks(
             rows = [r for r in manifest["order"] if r["case"] in ids]
             assert len(rows) == count
             assert sum(r["version"] == "baseline" for r in rows) == count // 2
+    # Exercise the actual worker's fixture construction with provider calls replaced
+    # only in this harness test; live acceptance never uses this replacement.
+    from paranoia_local import server
+    monkeypatch.setattr(server, "dispatch", lambda *args, **kwargs: "CONVERGENCE: NOT-BLOCKED")
+    monkeypatch.setattr(acceptance.pilot, "install_observer", lambda *args: None)
+    saved_path = list(sys.path)
+    try:
+        for case in manifest["cases"]:
+            trial = next(row for row in manifest["order"] if row["case"] == case["id"])
+            directory = root / trial["id"]
+            acceptance.pilot.worker(directory / "input.json")
+            fixture = directory / "repository"
+            code = (fixture / "app.py").read_text()
+            assert code.endswith("\n") and not code.endswith("\n\n")
+            assert acceptance.pilot.git(fixture, "diff", "--check", "main", "HEAD") == ""
+            assert acceptance.pilot.git(fixture, "diff", "main", "HEAD", "--", "app.py")
+            result = acceptance.subprocess.run(
+                [sys.executable, "test_app.py"], cwd=fixture, capture_output=True,
+            )
+            assert result.returncode == (1 if manifest["oracle"][case["id"]] == "defect" else 0)
+    finally:
+        sys.path[:] = saved_path
+    # A corrected experiment shares admissions rather than obtaining a fresh budget.
+    (root / "calls.txt").write_text("46")
+    corrected = tmp_path / "corrected"
+    acceptance.freeze(corrected, repo, repo, root / "calls.txt")
+    assert (root / "calls.txt").read_text() == "46"
+    assert acceptance.load(corrected)["admissions_at_freeze"] == 46
+    assert acceptance.load(corrected)["counter_path"] == str(root / "calls.txt")
     acceptance.report(root)
     assert json.loads((root / "report.json").read_text())["qualified"] is False
     (root / "manifest.json").write_text("{}")
