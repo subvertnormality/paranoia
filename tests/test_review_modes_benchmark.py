@@ -123,3 +123,108 @@ def test_census_is_not_scored_as_clear(tmp_path):
     bench.dump(state / "case.json", {"review_state": {"phase": "final"}})
     with pytest.raises(ValueError, match="pending"):
         scoring.adjudicate(tmp_path, "clear", "pending final", "not completed")
+
+
+@pytest.mark.parametrize("repaired", [True, False])
+def test_worker_carries_authentic_setup_through_prescribed_rebut(tmp_path, monkeypatch, repaired):
+    from paranoia_local import server, class_closure as cc
+    root = Path(__file__).resolve().parents[1]
+    case = next(c for c in bench.corpus()[0] if c["mode"] == "rebut" and bool(c["repair"]) == repaired)
+    bench.dump(tmp_path / "input.json", {"input": case, "source": {"path": str(root)},
+                                       "models": bench.MODELS, "counter": str(tmp_path / "counter")})
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "original"))
+    monkeypatch.setattr(bench, "install_observer", lambda *a: None)
+    calls = []
+    def dispatch(mode, arguments, **kwargs):
+        code = (Path(arguments["repo_path"]) / "app.py").read_text()
+        calls.append((mode, arguments, code))
+        if mode == "query":
+            assert code == bench.BAD
+            return "app.py:3 returns 1 for n=2 instead of 3.\nsession_ref=`session`"
+        assert mode == "rebut" and arguments["session_ref"] == "session"
+        return ("CONCEDE" if repaired else "HOLD") + ": app.py:3"
+    monkeypatch.setattr(server, "dispatch", dispatch)
+    bench.worker(tmp_path / "input.json")
+    assert json.loads((tmp_path / "status.json").read_text())["status"] == "setup_pending"
+    scoring.qualify(tmp_path, "app.py:3 returns 1 for n=2 instead of 3.", "matches arithmetic oracle")
+    bench.worker(tmp_path / "input.json")
+    assert [c[0] for c in calls] == ["query", "rebut"]
+    assert calls[-1][2] == (bench.GOOD if repaired else bench.BAD)
+    assert json.loads((tmp_path / "status.json").read_text())["status"] == "completed"
+
+
+def test_rejected_setup_never_launches_rebut(tmp_path, monkeypatch):
+    from paranoia_local import server, class_closure as cc
+    root = Path(__file__).resolve().parents[1]
+    case = next(c for c in bench.corpus()[0] if c["mode"] == "rebut")
+    bench.dump(tmp_path / "input.json", {"input": case, "source": {"path": str(root)},
+                                       "models": bench.MODELS, "counter": str(tmp_path / "counter")})
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "original"))
+    monkeypatch.setattr(bench, "install_observer", lambda *a: None)
+    calls = []
+    def dispatch(mode, arguments, **kwargs):
+        calls.append(mode)
+        return "No relevant finding. session_ref=`session`"
+    monkeypatch.setattr(server, "dispatch", dispatch)
+    bench.worker(tmp_path / "input.json")
+    scoring.qualify(tmp_path, "", "intended finding was absent", False)
+    bench.worker(tmp_path / "input.json")
+    assert calls == ["query"]
+    assert json.loads((tmp_path / "status.json").read_text())["status"] == "setup_unusable"
+
+
+@pytest.mark.parametrize("revision", ["9bd9b89", "HEAD"])
+def test_observer_works_with_each_real_source_revision(tmp_path, revision):
+    import io
+    import subprocess
+    import tarfile
+    root = Path(__file__).resolve().parents[1]
+    archive = subprocess.run(["git", "archive", revision, "src/paranoia_local"],
+                             cwd=root, check=True, capture_output=True).stdout
+    source = tmp_path / "source"
+    source.mkdir()
+    with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
+        bundle.extractall(source, filter="data")
+    counter = tmp_path / "counter"
+    counter.write_text("0")
+    script = """
+import sys, json
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+from paranoia_local import engines, runner
+import benchmark_review_modes as bench
+directory=Path(sys.argv[3])
+engine=engines.get_engine('codex')
+engine.build_argv=lambda *a: []
+engine.build_resume_argv=lambda *a: []
+engine._execute=lambda *a: engines.Review(text='ok',session_ref='s',raw='{}')
+bench.install_observer(engines,directory,directory/'counter')
+assert not engine.run('p',directory,'m','high',False).error
+assert not engine.resume('s','p',directory,'m','high',False).error
+rows=[json.loads(l) for l in (directory/'attempts.jsonl').read_text().splitlines()]
+assert len(rows)==2
+assert all(r['timeout']==runner.DEFAULT_TIMEOUT_SEC for r in rows)
+"""
+    subprocess.run([sys.executable, "-c", script, str(root / "scripts"),
+                    str(source / "src"), str(tmp_path)], check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("variant", [0, 1])
+def test_plan_fixture_has_actual_scheduler_target(tmp_path, monkeypatch, variant):
+    from paranoia_local import server, class_closure as cc
+    root = Path(__file__).resolve().parents[1]
+    case = [c for c in bench.corpus()[0] if c["mode"] == "critique_plan"][variant]
+    bench.dump(tmp_path / "input.json", {"input": case, "source": {"path": str(root)},
+                                       "models": bench.MODELS, "counter": str(tmp_path / "counter")})
+    monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "original"))
+    monkeypatch.setattr(bench, "install_observer", lambda *a: None)
+    def dispatch(mode, arguments, **kwargs):
+        repo = Path(arguments["repo_path"])
+        assert mode == "critique_plan" and arguments["web_search"]
+        assert "TestTotal" in (repo / "tests/test_app.py").read_text()
+        assert "--dist=loadscope" in (repo / "pytest.ini").read_text()
+        assert "pytest-xdist" in (repo / "requirements-dev.txt").read_text()
+        return "fixture checked"
+    monkeypatch.setattr(server, "dispatch", dispatch)
+    bench.worker(tmp_path / "input.json")

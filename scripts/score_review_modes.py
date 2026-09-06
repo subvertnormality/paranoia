@@ -55,7 +55,7 @@ def adjudicate(directory, category, quote, reason):
                                          "CONVERGENCE: NOT-BLOCKED" not in text):
                 raise ValueError("pending review is not clear")
             if category == "defect" and not (
-                any(d.get("status") == "open" and d.get("severity") in {"MAJOR", "CRITICAL"}
+                any(d.get("status") == "open" and d.get("severity") in {"MAJOR", "CRITICAL", "BLOCKER"}
                     for d in review.get("debt", [])) or
                 any(c.get("verdict") == "refuted" for c in state.get("claim_state", {}).get("claims", {}).values())
             ):

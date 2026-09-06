@@ -87,6 +87,35 @@ def corpus():
                         "Return the sum of integers from 0 up to but excluding n. "
                         "The caller enforces the input domain.\n")
                 row["files"]["app.py"] = "# Implementation is to be selected.\n"
+            if mode == "critique_plan":
+                row["files"].update({
+                    "tests/test_app.py": "from app import total\n\nclass TestTotal:\n"
+                        "    def test_zero(self):\n        assert total(0) == 0\n"
+                        "    def test_two(self):\n        assert total(2) == 3\n",
+                    "pytest.ini": "[pytest]\npythonpath = .\naddopts = -n 2 --dist=loadscope\n",
+                    "requirements-dev.txt": "pytest\npytest-xdist\n",
+                    "app.py": GOOD,
+                })
+                grouping = "test class" if variant == 0 else "containing file"
+                row["files"]["CONTRACT.md"] = CONTRACT + (
+                    "The test runner must group test methods by their " + grouping +
+                    "; review pytest.ini against that scheduling requirement.\n")
+                row["plan_text"] = (
+                    "# Scheduling configuration review\n\n"
+                    "## Existing repository setup\n"
+                    "tests/test_app.py contains TestTotal; pytest.ini already selects "
+                    "-n 2 --dist=loadscope and requirements-dev.txt declares pytest-xdist.\n\n"
+                    "## External premise\n" + claim + "\n\n"
+                    "## Proposed decision\nRetain the existing pytest.ini scheduler setting "
+                    "to meet CONTRACT.md's grouping requirement for TestTotal methods. "
+                    "This is approval of existing configuration; no runtime-code or dependency "
+                    "change is proposed.\n\n"
+                    "## Acceptance\nThe reviewer must compare the exact scheduler premise with "
+                    "the official pytest-xdist distribution documentation at "
+                    "https://pytest-xdist.readthedocs.io/en/stable/distribution.html. "
+                    "A mismatch blocks configuration approval. A matching documented grouping "
+                    "satisfies this review-only decision; no future implementation artifact "
+                    "is required to accept it.\n")
             rows.append(row)
             oracle[identifier] = {
                 "mode": mode,
@@ -158,11 +187,15 @@ def freeze(args):
                 "cli_versions": versions, "python": sys.version, "stakes": STAKES,
                 "cases": cases, "oracle": oracle, "order": order,
                 "payload_hashes": {c["id"]: sha(json.dumps(c, sort_keys=True)) for c in cases},
-                "harness_sha256": sha(Path(__file__).read_bytes())}
+                "harness_sha256": sha(Path(__file__).read_bytes()),
+                "counter_path": str(args.counter.resolve() if args.counter else root / "calls.txt")}
     validate_manifest(manifest)
     dump(root / "manifest.json", manifest)
     (root / "manifest.sha256").write_text(sha((root / "manifest.json").read_bytes()))
-    (root / "calls.txt").write_text("0")
+    if args.counter:
+        int(args.counter.read_text())  # existing shared admission count, never reset
+    else:
+        (root / "calls.txt").write_text("0")
     for trial in order:
         path = root / trial["id"]
         path.mkdir()
@@ -170,6 +203,8 @@ def freeze(args):
     print(f"Frozen {len(order)} trials at {root}", flush=True)
 
 def install_observer(engines, directory, counter):
+    from paranoia_local import runner as provider_runner
+    default_timeout = provider_runner.DEFAULT_TIMEOUT_SEC
     lock = threading.Lock()
     for operation in ("run", "resume"):
         original = getattr(engines.Engine, operation)
@@ -190,7 +225,7 @@ def install_observer(engines, directory, counter):
                 row = {"sequence": sequence, "operation": operation, "engine": engine.name,
                        "role": engine.role, "model": values["model"], "effort": values["effort"],
                        "prompt_sha256": sha(values["prompt"]),
-                       "timeout": values.get("timeout") or engines.DEFAULT_TIMEOUT_SEC, "stage": CURRENT_STAGE[0]}
+                       "timeout": values.get("timeout") or default_timeout, "stage": CURRENT_STAGE[0]}
                 started = time.perf_counter()
                 try:
                     review = original(*args, **kwargs)
@@ -241,7 +276,9 @@ def worker(spec_path):
         git(repo, "config", "user.name", "review fixture")
         git(repo, "config", "user.email", "fixture@example.test")
         for name, text in case["files"].items():
-            (repo / name).write_text(text)
+            target = repo / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text)
         if case["mode"] in {"critique_branch", "rebut"}:
             (repo / "app.py").write_text(GOOD if case["mode"] == "critique_branch" else BAD)
         git(repo, "add", ".")
@@ -359,13 +396,13 @@ def run(args):
             status == "setup_pending" and (directory / "qualification.json").exists()
         ):
             return
-        if int((root / "calls.txt").read_text()) >= 320:
+        if int(Path(manifest.get("counter_path", str(root / "calls.txt"))).read_text()) >= 320:
             dump(directory / "status.json", {"status": "incomplete_call_limit"})
             return
         case = next(c for c in manifest["cases"] if c["id"] == trial["case"])
         dump(directory / "input.json", {"input": case, "models": manifest["models"],
                                        "source": manifest["sources"][trial["version"]],
-                                       "counter": str(root / "calls.txt")})
+                                       "counter": manifest.get("counter_path", str(root / "calls.txt"))})
         dump(directory / "status.json", {"status": "running"})
         with (directory / "worker.txt").open("a") as handle:
             result = subprocess.run([sys.executable, str(Path(__file__).resolve()),
@@ -387,6 +424,7 @@ def main():
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--worker", type=Path)
+    parser.add_argument("--counter", type=Path, help="Reuse an existing admission counter without resetting it")
     args = parser.parse_args()
     os.environ.update(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
     if args.worker:

@@ -121,3 +121,12 @@ Production _CapturedClaimEngine coverage must show a correctly repaired packet r
 capture, binding, and cold attestation once, while an unrepaired correction cannot capture
 or clear prior debt. Deterministic benchmark checks cover manifest rejection, per-mode
 outcome categories, admission boundaries, handoff gates, and incomplete result slots.
+
+B5. Follow the production terminal phase: a debt-free cold census may itself settle clear;
+do not force another review after durable clearance. Invoke the cold final only when the
+production state schedules it. Clean credit still requires durable clearance.
+If a harness defect or an inadequate fixture invalidates a pilot, preserve its records,
+mark affected slots unscored/incomplete, and freeze a revised paired pilot before new spend.
+Carry the existing shared admission counter forward. This is a diagnosed harness/corpus
+repair, not an automatic retry of product or provider failures. Ground plan fixtures in
+the actual test class, dependency declaration and scheduler configuration under review.
