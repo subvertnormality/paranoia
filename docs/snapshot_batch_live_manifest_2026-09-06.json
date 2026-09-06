@@ -1,0 +1,233 @@
+{
+  "schema": 3,
+  "sources": {
+    "baseline": {
+      "path": "/tmp/paranoia-batch-current-baseline",
+      "revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+      "files": {
+        "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+        "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+        "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+        "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+        "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+        "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+        "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+        "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+        "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+        "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+        "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+        "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+        "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+        "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+        "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+        "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+        "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+        "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+        "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+        "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+        "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+        "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+        "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+        "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+        "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+        "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+        "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+        "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+      }
+    },
+    "candidate": {
+      "path": "/tmp/paranoia-batch-benchmark-candidate-v1",
+      "revision": "687e7bd0b420f784dc1757bfe5458e8148cc4d01",
+      "files": {
+        "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+        "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+        "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+        "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+        "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+        "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+        "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+        "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+        "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+        "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+        "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+        "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+        "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+        "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+        "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+        "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+        "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+        "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+        "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+        "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+        "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+        "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+        "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+        "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+        "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+        "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+        "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+        "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+        "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+      }
+    }
+  },
+  "models": {
+    "codex": "gpt-6-astra",
+    "claude": "claude-fable-5-1"
+  },
+  "expected_baseline": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+  "large_padding": 3000,
+  "starting_calls": 0,
+  "prior_campaign": null,
+  "versions": {
+    "codex": "codex-cli 0.153.3",
+    "claude": "2.1.258 (Claude Code)"
+  },
+  "trials": [
+    {
+      "version": "baseline",
+      "case": {
+        "id": "f496421303d3",
+        "mode": "arbitrate",
+        "provider": "codex",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000, inclusive. Return the sum of the integers from 0 through n, inclusive. The caller enforces the input domain. Additional validation is not required.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "1c461a84f9594dd962feeeabbcc3afb08b6f48c4",
+      "repetition": 0,
+      "padding_files": 0
+    },
+    {
+      "version": "candidate",
+      "case": {
+        "id": "f496421303d3",
+        "mode": "arbitrate",
+        "provider": "codex",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000, inclusive. Return the sum of the integers from 0 through n, inclusive. The caller enforces the input domain. Additional validation is not required.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "1c461a84f9594dd962feeeabbcc3afb08b6f48c4",
+      "repetition": 0,
+      "padding_files": 0
+    },
+    {
+      "version": "candidate",
+      "case": {
+        "id": "f496421303d3",
+        "mode": "arbitrate",
+        "provider": "codex",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000, inclusive. Return the sum of the integers from 0 through n, inclusive. The caller enforces the input domain. Additional validation is not required.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "5cd11e8b92f084982edeb10099789f89fd36cc61",
+      "repetition": 1,
+      "padding_files": 3000
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "id": "f496421303d3",
+        "mode": "arbitrate",
+        "provider": "codex",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000, inclusive. Return the sum of the integers from 0 through n, inclusive. The caller enforces the input domain. Additional validation is not required.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "5cd11e8b92f084982edeb10099789f89fd36cc61",
+      "repetition": 1,
+      "padding_files": 3000
+    },
+    {
+      "version": "candidate",
+      "case": {
+        "id": "7d0bbefd2a3c",
+        "mode": "arbitrate",
+        "provider": "claude",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000 inclusive. Return the sum of integers from 0 up to but excluding n. The caller enforces the input domain.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "2fda834a108668f7fab4a0055da9d2fbbfeb320e",
+      "repetition": 0,
+      "padding_files": 0
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "id": "7d0bbefd2a3c",
+        "mode": "arbitrate",
+        "provider": "claude",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000 inclusive. Return the sum of integers from 0 up to but excluding n. The caller enforces the input domain.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "2fda834a108668f7fab4a0055da9d2fbbfeb320e",
+      "repetition": 0,
+      "padding_files": 0
+    },
+    {
+      "version": "baseline",
+      "case": {
+        "id": "7d0bbefd2a3c",
+        "mode": "arbitrate",
+        "provider": "claude",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000 inclusive. Return the sum of integers from 0 up to but excluding n. The caller enforces the input domain.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "c7bf416e3a6c3cb3e3fd3cea6bc5d608f913b824",
+      "repetition": 1,
+      "padding_files": 3000
+    },
+    {
+      "version": "candidate",
+      "case": {
+        "id": "7d0bbefd2a3c",
+        "mode": "arbitrate",
+        "provider": "claude",
+        "files": {
+          "CONTRACT.md": "total(n) accepts an integer n from 0 through 1000 inclusive. Return the sum of integers from 0 up to but excluding n. The caller enforces the input domain.\n",
+          "app.py": "# Implementation is to be selected.\n"
+        },
+        "plan_text": null,
+        "repair": null
+      },
+      "snapshot": "c7bf416e3a6c3cb3e3fd3cea6bc5d608f913b824",
+      "repetition": 1,
+      "padding_files": 3000
+    }
+  ],
+  "harness": {
+    "/tmp/paranoia-batch-requalification/scripts/benchmark_decision_evidence.py": "6a9f28d39a39a81bba214f19228e9a9965ccdba0b81a44634c652910c3c8a870",
+    "/tmp/paranoia-batch-requalification/scripts/benchmark_review_modes.py": "f6b3731d2d3899407123aed26cc191ecf1ca3af46c005fcd73b89d9d1187a43f"
+  },
+  "oracle": {
+    "f496421303d3": "inclusive",
+    "7d0bbefd2a3c": "exclusive"
+  },
+  "call_limit": 128
+}

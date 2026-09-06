@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "candidate_revision": "687e7bd0b420f784dc1757bfe5458e8148cc4d01",
+  "baseline_revision": "684898c5a8f35f57917ea77662a9aad9b8b05f19",
+  "plan_path": "docs/snapshot-batching-requalification-plan.md",
+  "plan_sha256": "f94aa838c51b0c3b4fc4460320afb9e43813ff33646d7393a964f6691467c74c",
+  "artifacts": {
+    "docs/snapshot_batch_local_results_2026-09-06.json": {
+      "sha256": "031978797bd926a73e915d58c0465561fbbac8440b1d15242911532ae4420b7d",
+      "origin": "/tmp/paranoia-batch-local-20260906-v1/report-attempt-1.json"
+    },
+    "docs/snapshot_batch_local_manifest_2026-09-06.json": {
+      "sha256": "96af26e97b94b22a900fb9aeb97467bffc619d7226fbed8ead176b9541ae500c",
+      "origin": "/tmp/paranoia-batch-local-20260906-v1/manifest.json"
+    },
+    "docs/snapshot_batch_live_results_2026-09-06.json": {
+      "sha256": "d4160ef5fded48c0b2cd051a34d4642449fb680d2a7fb5b79cc92fb880c376d0",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/report-attempt-1.json"
+    },
+    "docs/snapshot_batch_live_manifest_2026-09-06.json": {
+      "sha256": "a16d0da2df928a5f0dff60cf61923383b567c0bd9d669ac7dbc7220e14a2e937",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/manifest.json"
+    },
+    "docs/snapshot_batch_full_tests_2026-09-06.json": {
+      "sha256": "e3537e06274d2c8abdafb9d714780982bc5cedfa75750ef798a1b487fd7de3db",
+      "origin": "/tmp/paranoia-batch-full-tests-v1.json"
+    },
+    "docs/snapshot_batch_mutations_2026-09-06.txt": {
+      "sha256": "ac742c026f4f293f319cc7b784a2827704d299558b2b3606d75bae362db4eea0",
+      "origin": "/tmp/paranoia-batch-mutations-v1.txt"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-0.json": {
+      "sha256": "63168abe0b0dfe8d27778ef7a428bcd6b056da688920f0c70a575a4b6337ad9f",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-0/logs/20260906T231501-arbitrate-556f62b2.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-1.json": {
+      "sha256": "0dac2f748f596b7ece0babcb8b16a8db7ca19f7180d021773fb4c1d740530dce",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-1/logs/20260906T231556-arbitrate-509257a3.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-2.json": {
+      "sha256": "dedea606b6db9727ebc99a21026f427e68dd1893f202b251b835ffa1653e9b6a",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-2/logs/20260906T231723-arbitrate-e2ef904a.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-3.json": {
+      "sha256": "19fff9d722d58723c6ab56cbfd8fd82b324066c29092af2ade4f87d95e70e7f0",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-3/logs/20260906T231843-arbitrate-3ff44348.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-4.json": {
+      "sha256": "f81bc5d69d229b5f7db1e29d86c1b2bfc5f9fe10c2f69e3fa85ca25ee5a9ddca",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-4/logs/20260906T231939-arbitrate-065f6ad8.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-5.json": {
+      "sha256": "853dcc04fed4c6002de86a819392c61f77075dded4d63c89f8d885bd549b7378",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-5/logs/20260906T232036-arbitrate-ae56e00c.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-6.json": {
+      "sha256": "dcb281eb8148f32d2af1592bc37b7c46f62919dedc632c37719f05a6fd972bcc",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-6/logs/20260906T232209-arbitrate-8de31941.json"
+    },
+    "docs/snapshot_batch_audits_2026-09-06/trial-7.json": {
+      "sha256": "b522ed386364222d4acdb82428be7da3506e968e7ee10f6cebc7bd6a77395e27",
+      "origin": "/tmp/paranoia-batch-live-20260906-v1/trial-7/logs/20260906T232338-arbitrate-5359509e.json"
+    }
+  },
+  "production_source_sha256": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+    "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+    "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+    "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+    "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+    "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+    "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+    "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+    "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+    "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+    "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "module_inventory": {
+    "src/paranoia_local/inert_tree.py": {
+      "baseline": {
+        "lines": 171,
+        "functions": 8,
+        "classes": 2
+      },
+      "candidate": {
+        "lines": 172,
+        "functions": 6,
+        "classes": 3
+      }
+    },
+    "src/paranoia_local/git_objects.py": {
+      "baseline": null,
+      "candidate": {
+        "lines": 103,
+        "functions": 7,
+        "classes": 1
+      }
+    }
+  },
+  "local_gate_passed": true,
+  "live_gate_passed": true,
+  "all_live_dispatches_correct": true,
+  "actual_calls": 32,
+  "current_card_call_limit": 128,
+  "full_tests_passed": 2058,
+  "protocol_mutants_killed": 33,
+  "code_convergence": "separate mandatory merge gate",
+  "report_custody": {
+    "first_local_report_retained": true,
+    "first_live_report_retained": true,
+    "replay_required": false,
+    "native_audits_byte_exact": true
+  },
+  "limits": [
+    "Setup and cleanup improvement applies to inert repository materialization in verified-plan and arbitration paths.",
+    "Eight integration dispatches do not establish a population latency or review-quality gain.",
+    "Provider roles, calls, models, effort, and quality gates are unchanged.",
+    "Local trials started after no active test workload was observed; other task work was paused during timings. Live timings share a workstation with unrelated activity and include symmetric evidence observers.",
+    "Earlier withheld batching results remain unchanged; this card does not close issues 49 or 50."
+  ]
+}

@@ -54,4 +54,4 @@ a deliberate retention mutant, unusual paths, pinned ordinary edits, inert modes
 missing promised objects, public-handler workspace use, sibling-call accounting,
 dirty-source rejection, and frozen workload binding.
 
-Qualification is pending; no speedup or completed delivery is claimed yet.
+The [retained results](snapshot-batching-requalification-results.md) pass the setup and live integration gates. CODE convergence remains a separate mandatory merge gate. The measured whole-call result is approximately flat.

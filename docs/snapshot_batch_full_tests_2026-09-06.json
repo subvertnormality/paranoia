@@ -1,0 +1,9 @@
+{
+  "candidate_revision": "687e7bd0b420f784dc1757bfe5458e8148cc4d01",
+  "command": "env PYTHONPATH=src GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null /home/andy/tools/paranoia-local/.venv/bin/python -m pytest -q",
+  "returncode": 0,
+  "passed": 2058,
+  "elapsed_seconds": 220.97,
+  "summary": "2058 passed in 220.97s (0:03:40)",
+  "provenance": "Observed complete exec session 48088 output; test summary receipt, not a claimed raw stdout archive."
+}
