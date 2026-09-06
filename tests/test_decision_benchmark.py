@@ -295,7 +295,7 @@ def test_report_rejects_missing_or_changed_process_channels_without_losing_cost(
 @pytest.mark.parametrize("failed", [False, True])
 def test_process_channel_retention_preserves_empty_and_nonempty_channels(tmp_path, failed):
     from paranoia_local.engines import Review
-    review = Review(text="reply", raw="raw provider output\n", returncode=1 if failed else 0,
+    review = Review(text="reply", raw="raw provider output\n", session_ref="fixture", returncode=1 if failed else 0,
                     error=failed, stderr="process diagnostic\n", failure_detail="detail" if failed else None)
     row = {"sequence": 1, "raw_sha256": bench.shared.sha(review.raw),
            "process_channels": bench.shared.retain_channels(tmp_path, 1, review)}

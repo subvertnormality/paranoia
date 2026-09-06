@@ -346,7 +346,8 @@ def test_new_source_module_invalidates_frozen_inventory(tmp_path, monkeypatch):
     (package / "a.py").write_text("a=1\n")
     for row in manifest["sources"].values():
         row.update(path=str(source), files={"src/paranoia_local/a.py": bench.sha("a=1\n")})
-    manifest.update(cli_versions={}, harness_sha256=bench.sha(Path(bench.__file__).read_bytes()))
+    manifest.update(cli_versions={}, harness_sha256=bench.sha(Path(bench.__file__).read_bytes()),
+                    bootstrap_sha256=bench.sha(bench.BOOTSTRAP_PATH.read_bytes()))
     bench.dump(tmp_path / "manifest.json", manifest)
     (tmp_path / "manifest.sha256").write_text(bench.sha((tmp_path / "manifest.json").read_bytes()))
     (package / "b.py").write_text("b=2\n")
@@ -515,6 +516,7 @@ def test_campaign_refuses_later_launch_after_binding_drift(
         manifest = _manifest()
         manifest.update(sources={v: _source_record(repo) for v in ("baseline", "candidate")},
                         models=bench.MODELS, cli_versions={}, harness_sha256=bench.sha(driver.read_bytes()),
+                        bootstrap_sha256=bench.sha(bench.BOOTSTRAP_PATH.read_bytes()),
                         counter_path=str(root / "calls.txt"))
         for index, trial in enumerate(manifest["order"]):
             trial["id"] = f"t{index+1:03}"
