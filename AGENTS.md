@@ -637,3 +637,10 @@ bounded contract. Preserve all three substantive lanes; only an obligation-free,
 validated empty census may replace manifest-only model consolidation with canonical
 server settlement. Keep scheduling/aggregation separate from validation and persistence.
 This narrowly supersedes the earlier delivery scope restriction on model-call reduction.
+
+The empty-census optimization in docs/census-execution-plan.md was withheld under A7/B3
+after both experiments failed the required Claude candidate-path qualification. The current
+branch retains only the typed execution extraction and measurement harness. Preserve model
+consolidation for every census. The original plan remains immutable historical acceptance
+authority; docs/empty-census-benchmark-2026-09-06.md records the explicit deferral. Do not
+re-enable the experimental path or claim its live timings describe the delivered extraction.

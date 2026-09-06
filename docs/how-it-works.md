@@ -29,8 +29,8 @@ that default is deliberate.
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
 
-1. **Census:** three independent cold lanes inspect the complete artifact.
-   [Conditional consolidation](census-execution.md) settles their validated findings.
+1. **Census:** three independent cold lanes inspect the complete artifact. A
+   separate call consolidates their validated findings into durable debt.
 2. **Correction:** later rounds target open debt, claimed fixes, and their
    transitive effects.
 3. **Final:** after debt closes, one fresh whole-artifact regression must pass.
@@ -247,8 +247,7 @@ Audit logs are diagnostic, not a recovery protocol.
 
 ## Usage and failure behavior
 
-- A tracked census uses three concurrent calls, followed by model consolidation unless
-  it meets the [empty-census eligibility rule](census-execution.md).
+- A tracked census normally uses three concurrent calls plus consolidation.
 - Correction and final use one main call; each staged role can receive one
   bounded same-session validation correction.
 - Keyed correction schemas include one required slot per active class because
@@ -331,3 +330,5 @@ Reproduce the deterministic call comparison with
 Its fixed lifecycle fixtures prove avoided calls and preserved outcomes, not
 real-provider latency or general review precision/recall. Repeated paired live
 quality trials remain tracked in GitHub issue #49.
+
+The typed census execution boundary and the withheld empty-census experiment are documented in [census execution](census-execution.md).

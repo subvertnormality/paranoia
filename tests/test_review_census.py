@@ -828,8 +828,6 @@ def test_census_does_not_invoke_closure_candidate_classifier(
         reopened_class_ids = ()
         correction_gates = []
         prepared_lineage = cc.copy_lineage(lineage)
-        empty_census_incoming = None
-        server_consolidation = False
         _settled = False
         round_no = 1
 
@@ -4283,12 +4281,6 @@ def test_consolidation_prompt_ceiling_is_noncacheable_structured_validation(
     closure = handlers._PlanClassClosure(
         "consolidation-preflight", round_no=1, state_root=tmp_path, stamp="T",
     )
-    # Closed history retains provider consolidation even with empty fresh lanes.
-    prior = rc.normalize_state(None, stakes="s", snapshot="prior")
-    prior["debt"] = [_unit_debt("old", status="closed")]
-    cc.save_lineage(tmp_path, cc.Lineage(
-        "consolidation-preflight", mode=cc.PLAN_MODE, review_state=prior,
-    ))
     closure.prepare()
 
     class Engine:
@@ -4496,7 +4488,7 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
         "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo), "lineage":"structural-only",
         "round":1, "claim_verification":False, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert len(calls) == 3
+    assert len(calls) == 4
     assert "## What works" in out
     assert "STRUCTURAL-PHASE: clear" in out
     (repo / "app.py").write_text("changed = True\n")
@@ -4504,7 +4496,7 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
         "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo), "lineage":"structural-only",
         "round":2, "claim_verification":False, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert len(calls) == 6
+    assert len(calls) == 8
     assert "STRUCTURAL-PHASE: clear" in out
 
 
@@ -5712,11 +5704,6 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         "repo_path":str(repo_with_branch), "base_ref":"main", "head_ref":"feature",
         "lineage":"cached-census-branch", "stakes":"trusted local tool",
     }
-    prior = rc.normalize_state(None, stakes="trusted local tool", snapshot="prior")
-    prior["debt"] = [_unit_debt("old", status="closed")]
-    cc.save_lineage(cc.default_state_root(), cc.Lineage(
-        "cached-census-branch", mode=cc.BRANCH_MODE, review_state=prior,
-    ))
     first = handlers.critique_branch(
         {**args, "round":1}, engine=handlers.eng.CodexEngine(),
         log_dir=tmp_path / "logs", now=lambda: "C1",
@@ -5910,8 +5897,8 @@ def test_branch_codex_runs_the_staged_census_path(
         "stakes": "trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B1")
 
-    assert len(calls) == 3
-    assert web_flags == [True] * 3
+    assert len(calls) == 4
+    assert web_flags == [True] * 4
     assert sum(prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in call for call in calls) == 3
     assert all("Follow the blast radius" in call for call in calls[:3])
     assert "STRUCTURAL-PHASE: clear" in result

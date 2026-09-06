@@ -517,7 +517,8 @@ results and limitations. The [issue 114 live acceptance record](docs/issue_114_l
 retains source-bound evidence of a real combined-error correction. Neither record claims
 guaranteed performance or closes the broader evaluation work in issue 49.
 
-The next bounded architecture/performance change is specified in
-[the census execution plan](docs/census-execution-plan.md): retain all substantive
-review lanes and mechanically settle only a fully validated empty census without
-historical structural obligations. Implementation acceptance is in progress; no live speed claim is made yet.
+The [census execution refactor](docs/census-execution.md) separates typed lane execution
+and diagnostic aggregation from validation and settlement. Its proposed empty-census
+shortcut was tested and withheld under the frozen acceptance gate; current census calls
+still include model consolidation. See the [experiment report](docs/empty-census-benchmark-2026-09-06.md)
+for all retained results and the limits of the observed timing gains.
