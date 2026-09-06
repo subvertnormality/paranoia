@@ -530,3 +530,5 @@ incomplete. Query/rebut credit and setup qualification require an exact native r
 a successful execution audit. Report replay rejects stored text-only credit for failed or
 unavailable execution while retaining costs and original score records. See the
 [merge benchmark validation](docs/merge_benchmark_validation_2026-09-06.json).
+
+Verified-plan discovery requires a resumable provider session on both the initial reply and its existing correction. A sessionless reply remains audit-failure debt even if its prose claims support; no provider-authored evidence can bypass server capture and cold attestation. The failure retains native process channels and ordered attempt diagnostics. Retry the review without weakening the claim.

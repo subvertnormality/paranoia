@@ -3151,6 +3151,11 @@ def _verify_plan_claims(
             review.evidence_phase if isinstance(review, _EvidencePhaseReview) else None
         )
         phase_attempts: list[dict[str, Any]] = []
+        if validation_invalid and captured_engine is not None and attempt_ledger:
+            phase_attempts = [
+                row for row in attempt_ledger
+                if str(row.get("role", "")).startswith("claim-discovery")
+            ]
         if evidence_phase in {"binding", "attestation"} and attempt_ledger:
             prefix = f"claim-{'attestation' if evidence_phase == 'attestation' else 'binding'}"
             candidates = [
@@ -3328,7 +3333,8 @@ class _CapturedClaimEngine:
             "claim-discovery", discoverer, first,
             requested_timeout_sec=discovery_kwargs["timeout"],
         )
-        if first.error or not first.session_ref:
+        first = self._require_discovery_session(first)
+        if first.error:
             return first
         raw_parts = [first.raw]
         try:
@@ -3354,7 +3360,8 @@ class _CapturedClaimEngine:
                 requested_timeout_sec=discovery_kwargs["timeout"],
             )
             raw_parts.append(corrected.raw)
-            if corrected.error or not corrected.session_ref:
+            corrected = self._require_discovery_session(corrected)
+            if corrected.error:
                 return corrected
             try:
                 discovery = self._parse_discovery(corrected.text)
@@ -3517,6 +3524,24 @@ class _CapturedClaimEngine:
             returncode=124, error=True,
         )
         return _evidence_phase_review(review, phase) if phase else review
+
+    def _require_discovery_session(self, review: Review) -> Review:
+        """Reject unusable discovery metadata before any audit can leave the adapter."""
+        if review.error or review.session_ref:
+            return review
+        detail = (
+            "claim discovery returned no resumable session; server capture, binding "
+            "and cold attestation cannot proceed. Retry the review; provider-authored "
+            "evidence has not been accepted."
+        )
+        self._mark_last_validation_invalid(detail, review, "/session_ref")
+        return _ValidationReview(
+            text=review.text, session_ref=review.session_ref, raw=review.raw,
+            returncode=review.returncode, error=True, usage=review.usage,
+            duration_ms=review.duration_ms, failure_detail=review.failure_detail,
+            stderr=review.stderr, provider_duration_ms=review.provider_duration_ms,
+            validation_detail=detail,
+        )
 
     def _parse_discovery(self, text: str) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""

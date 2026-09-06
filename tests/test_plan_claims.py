@@ -4816,3 +4816,98 @@ def test_issue_114_terminal_public_failure_preserves_prior_claim_debt(tmp_path, 
     assert [row["role"] for row in ledger] == [
         "claim-discovery", "claim-discovery-validation-retry"]
     assert all(row["outcome"] == "validation-invalid" for row in ledger)
+
+
+@pytest.mark.parametrize("correction", [False, True])
+@pytest.mark.parametrize("prior_debt", [False, True])
+@pytest.mark.parametrize("provider", ["CodexEngine", "ClaudeEngine"])
+def test_issue_114_sessionless_discovery_public_lifecycle(
+    repo, tmp_path, monkeypatch, correction, prior_debt, provider,
+):
+    """A supported-looking discovery reply cannot become governing evidence."""
+    lineage_id = "sessionless-discovery"
+    prior = pc.reconcile(
+        {}, pc.parse_audit(_audit(_claim(verdict="unverified", evidence=[])), PLAN),
+        lineage_id=lineage_id, round_no=1, plan_text=PLAN,
+    ) if prior_debt else pc.empty_state()
+    if prior_debt:
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            lineage_id, mode=cc.PLAN_MODE, rounds=1, claim_state=prior,
+        ))
+    missing = Review(
+        text=_audit(_claim()), session_ref=None, raw="native discovery envelope",
+        returncode=0, error=False, usage={"input_tokens": 17}, duration_ms=23,
+        failure_detail="native detail", stderr="native stderr", provider_duration_ms=19,
+    )
+    replies = ([Review(text="invalid audit", session_ref="initial", raw="first envelope")]
+               if correction else []) + [missing]
+    discovery_calls = []
+
+    def scripted(self, *args, **kwargs):
+        if self.role == handlers.eng.ROLE_DISCOVERY:
+            discovery_calls.append(kwargs["timeout"])
+            return replies.pop(0)
+        assert self.role == handlers.eng.ROLE_REPOSITORY, "uncaptured discovery reached binding"
+        prompt = args[0]
+        if prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane = next(x.split()[-1] for x in prompt.splitlines()
+                        if x.startswith("ROLE: census lane"))
+            text = json.dumps({
+                "lane": lane, "coverage": [
+                    {"id": key, "status": "covered", "summary": "checked",
+                     "evidence": [{"anchor": "repository/README.md:1",
+                                   "rationale": "fixture coverage"}], "finding_ids": []}
+                    for key in sp.CHECKLIST
+                ], "findings": [], "class_assessments": [],
+            })
+        else:
+            text = json.dumps({
+                "role": "census", "governing_findings": [], "debt_outcomes": [],
+                "class_actions": {}, "concession_challenges": {},
+            })
+        return Review(text=text, session_ref="structural", raw=text)
+
+    engine_type = getattr(handlers.eng, provider)
+    monkeypatch.setattr(engine_type, "run", scripted)
+    monkeypatch.setattr(engine_type, "resume", scripted)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.external_sources, "capture_all",
+                        lambda *a, **k: pytest.fail("sessionless discovery reached capture"))
+    result = handlers.critique_plan(
+        {"plan_text": PLAN, "repo_path": str(repo), "lineage": lineage_id,
+         "round": 2 if prior_debt else 1, "stakes": "trusted local tool"},
+        engine=engine_type(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    state = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    ).claim_state
+    assert pc.is_blocked(state)
+    assert state["claims"] == prior["claims"]
+    assert "CLAIM-CLOSURE: AUDIT-FAILED" in result
+    assert "\nCONVERGENCE: BLOCKED" in result
+    assert "\nCONVERGENCE: NOT-BLOCKED" not in result
+    assert discovery_calls == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC] * (2 if correction else 1)
+    debt = state["debt"]
+    assert "resumable session" in debt["reason"]
+    assert debt["returncode"] == 0
+    for field, value in [("rejected_excerpt", missing.raw),
+                         ("failure_detail", missing.failure_detail), ("stderr", missing.stderr)]:
+        assert debt[field] == value
+    rows = debt["attempts"]
+    assert len(rows) == (2 if correction else 1)
+    assert [row["role"] for row in rows] == (
+        ["claim-discovery", "claim-discovery-validation-retry"] if correction
+        else ["claim-discovery"])
+    last = rows[-1]
+    assert last["outcome"] == "validation-invalid"
+    assert "resumable session" in last["validation_issue"]
+    assert last["returncode"] == 0 and last["duration_ms"] == 23
+    assert last["provider_duration_ms"] == 19 and last["usage"] == missing.usage
+    for key, value in [("raw", missing.raw), ("failure_detail", missing.failure_detail),
+                       ("stderr", missing.stderr)]:
+        assert last[key + "_sha256"] == hashlib.sha256(value.encode()).hexdigest()
+        assert last[key + "_excerpt"] == value
+    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    assert audit["claim_audit_failed"] is True
+    assert audit["claim_counts"] is None

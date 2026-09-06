@@ -660,3 +660,5 @@ and successful execution, including zero return code and no in-band error. Repor
 revalidates execution instead of trusting a stored semantic score, retains costs, and never
 rewrites original adjudications. These checks belong to the shared benchmark boundary,
 not a new production-review state or persistence mechanism.
+
+Require a resumable session before either initial or corrected discovery may leave the captured-claim adapter. A sessionless successful process reply is locally invalid metadata, never a captured audit. Preserve its actual return code, native channels, ordered discovery attempts and prior claim history as blocking audit debt; do not add a model call or accept provider-authored evidence. Cover both provider routes through the public plan handler, including clean structural settlement.
