@@ -644,3 +644,9 @@ branch retains only the typed execution extraction and measurement harness. Pres
 consolidation for every census. The original plan remains immutable historical acceptance
 authority; docs/empty-census-benchmark-2026-09-06.md records the explicit deferral. Do not
 re-enable the experimental path or claim its live timings describe the delivered extraction.
+
+For the acceptance harness, derive the complete worker specification from the verified
+manifest. Reject changed provider, model, fixture, source, counter or extra fields before
+any worker launch, and recheck the selected input at its launch after earlier trials.
+Preserve original trial records; a targeted fix to the harness is not a rerun of historical
+provider acceptance or a retroactive change to the reviewed snapshot.

@@ -25,6 +25,22 @@ def source(path):
     }
 
 
+
+def _worker_spec(manifest, trial):
+    return {
+        "input": next(row for row in manifest["cases"] if row["id"] == trial["case"]),
+        "models": manifest["models"],
+        "source": manifest["sources"][trial["version"]],
+        "counter": manifest["counter_path"],
+    }
+
+
+def _check_worker_input(root, manifest, trial):
+    supplied = json.loads((root / trial["id"] / "input.json").read_text())
+    if supplied != _worker_spec(manifest, trial):
+        raise ValueError(f"trial input changed: {trial['id']}")
+
+
 def freeze(root, baseline, candidate, counter=None):
     sources = {"baseline": source(baseline), "candidate": source(candidate)}
     counter = counter.resolve() if counter else root / "calls.txt"
@@ -86,11 +102,7 @@ def freeze(root, baseline, candidate, counter=None):
         directory = root / trial["id"]
         directory.mkdir()
         pilot.dump(directory / "status.json", {"status": "unstarted"})
-        case = next(row for row in manifest["cases"] if row["id"] == trial["case"])
-        pilot.dump(directory / "input.json", {
-            "input": case, "models": manifest["models"],
-            "source": sources[trial["version"]], "counter": str(counter),
-        })
+        pilot.dump(directory / "input.json", _worker_spec(manifest, trial))
     print(f"Frozen {len(order)} trials; maximum {MAX_CALLS} provider admissions", flush=True)
 
 
@@ -112,6 +124,9 @@ def run(root):
     for name, version in manifest["cli_versions"].items():
         if subprocess.check_output([name, "--version"], text=True).strip() != version:
             raise ValueError("CLI changed")
+    # Reject pre-existing edits anywhere before the campaign spends a provider call.
+    for trial in manifest["order"]:
+        _check_worker_input(root, manifest, trial)
     # Sequential pairs avoid cross-trial contention; each census still has three lanes.
     for trial in manifest["order"]:
         directory = root / trial["id"]
@@ -120,6 +135,8 @@ def run(root):
         if int(Path(manifest.get("counter_path", str(root / "calls.txt"))).read_text()) >= MAX_CALLS:
             pilot.dump(directory / "status.json", {"status": "incomplete_call_limit"})
             continue
+        # Recheck at launch: an ordinary edit during an earlier trial must also block.
+        _check_worker_input(root, manifest, trial)
         pilot.dump(directory / "status.json", {"status": "running"})
         with (directory / "worker.txt").open("w") as handle:
             result = subprocess.run(

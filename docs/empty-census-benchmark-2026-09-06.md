@@ -74,8 +74,15 @@ repaired lanes, provenance, local rejection, persistence ambiguity and provider/
 canonical comparison. Those tests and implementation remain available in the experimental
 commit; they are not silently represented as tests of a delivered shortcut.
 
-The delivered extraction is revalidated separately by the full regression suite and a
-CODE review against the exact plan. It keeps validation, settlement and persistence in
+The delivered extraction passed 1,877 full-suite tests, all 33 existing mutation checks,
+and CODE review against the exact plan with zero blocking findings. Two MINOR findings
+(a stale README sentence and unbound mutable worker input files) were fixed afterward.
+Nine focused harness tests pass, and all 24 original input specifications were checked
+against their manifests with no mismatch. Product package bytes are unchanged; the minor
+fixes have targeted deterministic validation but no fresh provider review. The
+[validation record](census_extraction_validation_2026-09-06.json) binds exact source,
+review snapshot, plan, logs, findings and these limits.
+The extraction keeps validation, settlement and persistence in
 their existing authorities. The main coordinator shrinks from 748 to 636 lines, and
 the inclusive AST branch proxy from 154 to 106 (31.2% lower). Its new coordinator
 functions are at most 28 lines. This is one bounded issue-50 step, not a complete parser

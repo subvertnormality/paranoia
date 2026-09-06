@@ -1,0 +1,166 @@
+{
+  "schema": "census-extraction-validation-v1",
+  "date": "2026-09-06",
+  "scope": "Typed census extraction only; the unqualified empty-census shortcut is withdrawn.",
+  "reviewed_base": "9336ce3b64efbcfa6119fd11fd913a5b91e761be",
+  "reviewed_head": "23f7e5430ad790b778d76f20eceba27b550cc899",
+  "reviewed_structural_snapshot": "c9e4a9b4b111bb76751d4cb0eb2607a94fe4ae1bd103d3f47afc5bde5633286d",
+  "plan_sha256": "ab156f41c967acee6ca171698ce6bdb35b308b1f0ca7e29bd70e18a158cb40c9",
+  "source_sha256": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "fcbbd3ce04ce6dfe05eadcf98c2a15fbc779b9551ba257c3cb73c67828b95a5d",
+    "src/paranoia_local/arbitration.py": "6b9adf82707e5cb30f2bb7761eb8d333d1f8092d194ccd892a187909cdb0b0df",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+    "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+    "src/paranoia_local/evidence.py": "661f204c8a5521f67a7c5a3485fe11cd775db7f555a8b8b739628e9fdff7f0a3",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/handlers.py": "3a80a9fff096ca3537ce7a43a331ff2e1e2db76bc3be24609396e2c47725f1bc",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "2a3177781bc6fbd484dbe4cf3998293175558b2908fd9d2bdf20126e0f96f3b5",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+    "src/paranoia_local/prompts.py": "a103e7f48e6b6815e638d411af9dd60a2f10edd049400f0b22f5ee5ce9eba5f5",
+    "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+    "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+    "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+    "src/paranoia_local/staged_protocol.py": "6565898aea207022520374109f97f220bb5a8a171740e24eae8c0490dd51c37a",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "checks": [
+    {
+      "log_path": "/tmp/paranoia-census-extraction-final-tests.txt",
+      "sha256": "1836eda4497977479fe632c1f0c0550002186dde1754b84e43c0d0b663af1049",
+      "result": "1877 passed in 197.14s"
+    },
+    {
+      "log_path": "/tmp/paranoia-census-extraction-final-mutations.txt",
+      "sha256": "ac742c026f4f293f319cc7b784a2827704d299558b2b3606d75bae362db4eea0",
+      "result": "All 33 owned Protocol v2 mutants were killed."
+    },
+    {
+      "log_path": "/tmp/paranoia-census-benchmark-binding-tests.txt",
+      "sha256": "a1e171ea44c24af3abff4b0d949ab489913c3a7593297a2df416f6e1a1d90fab",
+      "result": "9 passed in 1.69s"
+    }
+  ],
+  "code_review": {
+    "audit_path": "/tmp/paranoia-census-code-logs/20260906T171031-critique_branch-b5da66c2.json",
+    "audit_sha256": "78782f0674dd1ef1bd375ce6bfc64005d103edf95c8f6e03723895805d7673c2",
+    "state_sha256": "f4c46502ff29ba63931c18c3b5033c3a9b93b5ccd32bc1dc405b55824992561b",
+    "engine": "codex",
+    "model": "gpt-6-astra",
+    "effort": "high",
+    "browsing": false,
+    "returned_verdict": "LINEAGE: paranoia-census-code-20260906 (rounds recorded: 1)\nPLAN-DIGEST: ab156f41c967acee6ca171698ce6bdb35b308b1f0ca7e29bd70e18a158cb40c9\nCLASS-REGISTER: staged census parsed \u2014 NEW bd1f8ecc\nCLASS-CLOSURE: 1 open, 0 closed, 0 surviving matches, 0 exempt, 1 unmechanized\nSTRUCTURAL-PHASE: clear\nSTRUCTURAL-DEBT: 0 blocking open\nCONVERGENCE: NOT-BLOCKED \u2014 staged structural debt is clear.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "findings": [
+      {
+        "id": "G1",
+        "severity": "MINOR",
+        "summary": "README still advertises the withdrawn empty-census shortcut, misleading operators about provider calls and settlement provenance.",
+        "evidence": [
+          "repository/README.md:269-270",
+          "repository/README.md:520-524",
+          "repository/docs/census-execution.md:3-12",
+          "repository/src/paranoia_local/handlers.py:1688-1714",
+          "repository/README.md:270-271",
+          "repository/README.md:519-524",
+          "repository/docs/census-execution.md:4-12",
+          "repository/AGENTS.md:640-646",
+          "repository/src/paranoia_local/handlers.py:1675-1714",
+          "repository/src/paranoia_local/handlers.py:1668-1714",
+          "plan:136-139"
+        ],
+        "remedy": "Correct README's tracked-review census entry to describe three validated lanes followed by model consolidation. Retain the architecture link and historical withdrawal notes, and refresh existing acceptance allowances that bind the changed README bytes."
+      },
+      {
+        "id": "G2",
+        "severity": "MINOR",
+        "summary": "The benchmark can execute edited trial inputs while attributing results to the original frozen case, weakening reproducibility. This does not establish that recorded experiments were altered.",
+        "evidence": [
+          "repository/scripts/run_empty_census_acceptance.py:85-93",
+          "repository/scripts/run_empty_census_acceptance.py:104-128",
+          "repository/scripts/benchmark_review_modes.py:265-293",
+          "repository/scripts/run_empty_census_acceptance.py:152-181",
+          "repository/tests/test_empty_census_acceptance.py:59-63",
+          "plan:78-85"
+        ],
+        "remedy": "Derive each worker specification from the verified manifest at launch, or compare its complete contents before provider admission. Add a focused regression showing that changes to provider, model, fixture, source, or counter cannot execute under the original frozen labels."
+      }
+    ],
+    "attempts": [
+      {
+        "role": "census-behaviour",
+        "sequence": 1,
+        "outcome": "completed",
+        "returncode": 0,
+        "duration_ms": 335571,
+        "requested_timeout_sec": 1800,
+        "raw_sha256": "8ac1328720b68ccf36062bd49af486e4ff777a8d5e61f19fd7d7b30447258c4c",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "role": "census-execution",
+        "sequence": 2,
+        "outcome": "completed",
+        "returncode": 0,
+        "duration_ms": 271658,
+        "requested_timeout_sec": 1800,
+        "raw_sha256": "dcc67fef8fde39faaa9b6273cf4b2c134af86fda16aaed472f22eae424833568",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "role": "census-integrity",
+        "sequence": 3,
+        "outcome": "completed",
+        "returncode": 0,
+        "duration_ms": 307005,
+        "requested_timeout_sec": 1800,
+        "raw_sha256": "13a73cc6f5f6249dfa3d258d21457d5214c47caf4a2bfdf685a8a7e63df4e5b0",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "role": "consolidation",
+        "sequence": 4,
+        "outcome": "completed",
+        "returncode": 0,
+        "duration_ms": 46114,
+        "requested_timeout_sec": 1200,
+        "raw_sha256": "a956d7596889aace26739ad56980ee72809d042995947fa79277981f1191314f",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "post_review_fixes": [
+    {
+      "finding": "README advertised withdrawn shortcut",
+      "resolution": "Tracked-review entry now states three lanes followed by model consolidation; source-diff allowances refreshed."
+    },
+    {
+      "finding": "Mutable per-trial worker specifications were not checked against the manifest",
+      "resolution": "One manifest-derived specification owns freeze and verification. Every input is checked before any worker launch and each input is rechecked at its own launch. Six altered-field cases, unchanged dispatch and an edit between trials are exercised through run()."
+    }
+  ],
+  "post_review_validation": {
+    "full_suite_source_revision": "23f7e5430ad790b778d76f20eceba27b550cc899",
+    "product_bytes_unchanged_since_review": true,
+    "targeted_test_file_sha256": "b31d9595c037c9b2955348e423c37e68b5d4b46d22ce1e71e64ff4ae9d3bce12",
+    "benchmark_script_sha256": "ff84ef6f5002c5dc2ff7ec7691594f41232e4053c8b7e2e57e0220c0cd020124",
+    "retained_trial_input_comparison": "All 24 complete specifications equal their original manifests; no recorded-input alteration was found.",
+    "fresh_provider_review_of_minor_fixes": false,
+    "review_state_note": "The retained audit/state describes the reviewed snapshot and contains one open advisory class, zero blocking structural debt. It was not rewritten or represented as a resettlement after the targeted minor fixes."
+  },
+  "limits": "No delivered speedup claim. No broad convergence or independent human quality evaluation; no issue closure, PR, merge or installation. The CODE review here covers changes since 9336ce3, not the earlier checkpoint whose CODE review was deferred."
+}

@@ -80,3 +80,97 @@ def test_worker_admission_refuses_the_97th_call_without_reset(tmp_path, monkeypa
     finally:
         acceptance.pilot.admit = original
     assert counter.read_text() == "96"
+
+
+@pytest.mark.parametrize("field", ["provider", "model", "fixture", "source", "counter", "extra"])
+def test_run_rejects_edited_trial_spec_before_any_worker_launch(
+    repo, tmp_path, monkeypatch, field,
+):
+    from types import SimpleNamespace
+
+    package = repo / "src/paranoia_local"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    commit_all(repo, "frozen worker-spec source")
+    monkeypatch.setattr(
+        acceptance.subprocess, "check_output", lambda *args, **kwargs: "fixture CLI\n",
+    )
+    root = tmp_path / "acceptance"
+    acceptance.freeze(root, repo, repo)
+    manifest = acceptance.load(root)
+    # Editing the last trial must block before even the first worker can launch.
+    path = root / manifest["order"][-1]["id"] / "input.json"
+    original = path.read_text()
+    spec = json.loads(original)
+    if field == "provider":
+        spec["input"]["provider"] = "altered"
+    elif field == "model":
+        spec["models"]["codex"] = "altered"
+    elif field == "fixture":
+        spec["input"]["files"]["app.py"] = "altered"
+    elif field == "source":
+        spec["source"]["path"] = str(tmp_path / "other-source")
+    elif field == "counter":
+        spec["counter"] = str(tmp_path / "fresh-counter.txt")
+    else:
+        spec["unexpected"] = "altered"
+    path.write_text(json.dumps(spec))
+    launches = []
+    real_run = acceptance.subprocess.run
+
+    def launch(command, **kwargs):
+        if command[0] != sys.executable:
+            return real_run(command, **kwargs)
+        from pathlib import Path
+        worker_input = Path(command[-1])
+        launches.append(json.loads(worker_input.read_text()))
+        (worker_input.parent / "status.json").write_text('{"status":"completed"}')
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(acceptance.subprocess, "run", launch)
+    with pytest.raises(ValueError, match="trial input changed: t012"):
+        acceptance.run(root)
+    assert launches == []
+    assert (root / "calls.txt").read_text() == "0"
+    assert all(json.loads((root / row["id"] / "status.json").read_text())["status"] == "unstarted"
+               for row in manifest["order"])
+    # The unchanged path really dispatches all frozen specifications.
+    path.write_text(original)
+    acceptance.run(root)
+    assert launches == [acceptance._worker_spec(manifest, row) for row in manifest["order"]]
+
+
+def test_run_rechecks_worker_spec_after_an_earlier_trial(repo, tmp_path, monkeypatch):
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    package = repo / "src/paranoia_local"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    commit_all(repo, "frozen launch-recheck source")
+    monkeypatch.setattr(
+        acceptance.subprocess, "check_output", lambda *args, **kwargs: "fixture CLI\n",
+    )
+    root = tmp_path / "acceptance"
+    acceptance.freeze(root, repo, repo)
+    launches = []
+    real_run = acceptance.subprocess.run
+
+    def launch(command, **kwargs):
+        if command[0] != sys.executable:
+            return real_run(command, **kwargs)
+        worker_input = Path(command[-1])
+        launches.append(worker_input.parent.name)
+        (worker_input.parent / "status.json").write_text('{"status":"completed"}')
+        next_input = root / "t002/input.json"
+        spec = json.loads(next_input.read_text())
+        spec["input"]["provider"] = "edited-during-first-trial"
+        next_input.write_text(json.dumps(spec))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(acceptance.subprocess, "run", launch)
+    with pytest.raises(ValueError, match="trial input changed: t002"):
+        acceptance.run(root)
+    assert launches == ["t001"]
+    assert json.loads((root / "t002/status.json").read_text())["status"] == "unstarted"
+    assert (root / "calls.txt").read_text() == "0"
