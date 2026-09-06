@@ -1339,6 +1339,22 @@ def materialize_decision_value(
     )
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
+    derived_evidence_extensions: list[dict[str, Any]] = []
+
+    def extend_finding_evidence(
+        finding_index: int, *, class_id: str, anchors: Sequence[str],
+        source_pointer: str,
+    ) -> None:
+        """Project redundant authored occurrence evidence into its governing finding."""
+        finding = findings[finding_index]
+        missing = [anchor for anchor in anchors if anchor not in finding["evidence"]]
+        if not missing:
+            return
+        finding["evidence"].extend(missing)
+        derived_evidence_extensions.append({
+            "finding_id": finding["id"], "class_id": class_id,
+            "source_pointer": source_pointer, "anchors": missing,
+        })
 
     source_rows: list[dict[str, Any]] = []
     governing_by_source: dict[str, list[str]] = {}
@@ -1519,18 +1535,10 @@ def materialize_decision_value(
                             "non-debt-bound class occurrence"
                         )
                         continue
-                    finding_evidence = findings[finding_index]["evidence"]
-                    missing = [
-                        anchor for anchor in evidence
-                        if anchor not in finding_evidence
-                    ]
-                    if missing:
-                        issues.append(
-                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
-                            f"finding for class {cid!r} must include every "
-                            "current-occurrence anchor authored in "
-                            f"{pointer}/assessment_evidence; missing {missing}"
-                        )
+                    extend_finding_evidence(
+                        finding_index, class_id=cid, anchors=evidence,
+                        source_pointer=f"{pointer}/assessment_evidence",
+                    )
                     outcomes[cid] = {
                         "class_id": cid, "verdict": "violated",
                         "evidence": list(evidence),
@@ -1550,19 +1558,12 @@ def materialize_decision_value(
                         f"naming {finding_id!r}"
                     )
                 else:
-                    finding_evidence = findings[finding_index]["evidence"]
-                    missing = [
-                        anchor for anchor in outcome["evidence"]
-                        if anchor not in finding_evidence
-                    ]
-                    if missing:
-                        issues.append(
-                            f"{pointer.rsplit('/', 1)[0]}/evidence: fresh aggregate "
-                            f"finding for class {cid!r} must include every "
-                            "current-occurrence anchor authored in "
-                            f"{outcome_pointers.get(cid, '/class_outcomes')}/evidence; "
-                            f"missing {missing}"
-                        )
+                    extend_finding_evidence(
+                        finding_index, class_id=cid, anchors=outcome["evidence"],
+                        source_pointer=(
+                            f"{outcome_pointers.get(cid, '/class_outcomes')}/evidence"
+                        ),
+                    )
                 for debt_id, debt in open_debt.items():
                     if cid not in debt.get("class_ids", []):
                         continue
@@ -1860,6 +1861,8 @@ def materialize_decision_value(
         result["coverage"] = value["coverage"]
     if finding_id_renames:
         result["_finding_id_renames"] = finding_id_renames
+    if derived_evidence_extensions:
+        result["_derived_evidence_extensions"] = derived_evidence_extensions
     return result
 
 

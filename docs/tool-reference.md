@@ -262,17 +262,18 @@ An outcome-optional unmechanized class may still use a standalone correction `cl
 an authored `satisfied` outcome and evidence; a bare close is validation-invalid.
 A fresh aggregate finding must close the class's prior open debt after incorporating every
 still-reachable predecessor occurrence, so one class does not accumulate duplicate blockers.
-Before that transition, the correction materializer requires the finding to contain every
-current-occurrence anchor independently authored in its matching violated class outcome and reports
-an omission at the governing finding's evidence pointer through the bounded validation retry.
-Non-debt-bound correction findings pass the same check against their authored
-`classification.assessment_evidence` before the server derives a violated class outcome.
+Before that transition, the correction materializer copies every current-occurrence anchor
+independently authored in the matching violated class outcome into the aggregate finding, in
+authored order, and records the extension in the staged audit. Non-debt-bound correction findings
+receive the same projection from authored `classification.assessment_evidence` before the server
+derives a violated class outcome. Projected anchors remain subject to normal resolution and bounds
+validation.
 The canonical correction validator also rejects any resulting state with multiple open debts bound
 to one active class.
 
 | Trailer field | Meaning |
 |---|---|
-| `CLASS-REGISTER` | Class operations applied in this settlement |
+| `CLASS-REGISTER` | Class operations applied in this settlement, plus any earlier validation-rejected payload count, discarded-operation warning, and bounded first diagnostic |
 | `CLASS-CLOSURE` | Durable open/closed class status |
 | `STRUCTURAL-PHASE` | `census`, `correction`, `final`, or `clear` |
 | `STRUCTURAL-DEBT` | Blocking governing findings |

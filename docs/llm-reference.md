@@ -285,6 +285,11 @@ Tracked fields can include `CLASS-REGISTER`, `CLASS-CLOSURE`,
 `STRUCTURAL-CONVERGENCE`, `CONVERGENCE`, `STRUCTURAL-ERROR`, and
 `STRUCTURAL-PENDING`.
 
+After a recovered validation retry, `CLASS-REGISTER` distinguishes the accepted settlement from
+earlier discarded payloads and shows a bounded first validation issue. The review `Gaps` section
+retains bounded diagnostics. No class or debt operation from a rejected payload is partially
+applied.
+
 Failure rule: `# STAGED REVIEW FAILED` has no durable clean structural verdict.
 Never infer success from absent findings. `STATE-UNAVAILABLE` is blocking.
 

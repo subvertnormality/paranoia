@@ -3061,26 +3061,13 @@ def test_historical_v1_v2_branch_transition_shapes_are_equivalent(
     )
 
 
-def test_correction_rejects_non_debt_assessment_evidence_missing_from_finding():
+def test_correction_projects_non_debt_assessment_evidence_into_finding():
     current = finding(
         "G5", "MINOR", classification={
             "kind":"existing_class", "class_id":"class-a",
             "assessment_evidence":["plan:2"],
         },
     )
-    with pytest.raises(
-        sp.ProtocolError,
-        match=(
-            r"/governing_findings/0/evidence: fresh aggregate finding.*"
-            r"/classification/assessment_evidence; missing \['plan:2'\]"
-        ),
-    ):
-        materialize(
-            decision("correction", governing_findings=[current]),
-            active_classes=[active_class(severity="MINOR")],
-        )
-
-    current["evidence"] = ["plan:1", "plan:2"]
     parsed = materialize(
         decision("correction", governing_findings=[current]),
         active_classes=[active_class(severity="MINOR")],
@@ -3095,6 +3082,13 @@ def test_correction_rejects_non_debt_assessment_evidence_missing_from_finding():
     }]
     assert parsed["class_dispositions"] == [{
         "finding_id":"G5", "kind":"existing_class", "class_id":"class-a",
+    }]
+    assert parsed["_derived_evidence_extensions"] == [{
+        "finding_id":"G5", "class_id":"class-a",
+        "source_pointer":(
+            "/governing_findings/0/classification/assessment_evidence"
+        ),
+        "anchors":["plan:2"],
     }]
 
 
@@ -3138,7 +3132,7 @@ def test_debt_bound_fresh_finding_requires_exact_new_finding_basis():
     }
 
 
-def test_fresh_existing_class_finding_cannot_drop_authored_occurrence_anchor():
+def test_fresh_existing_class_finding_derives_authored_occurrence_anchor():
     current = finding(
         "G5", classification={"kind":"existing_class", "class_id":"class-a"},
     )
@@ -3153,14 +3147,74 @@ def test_fresh_existing_class_finding_cannot_drop_authored_occurrence_anchor():
             "basis":{"kind":"new_finding", "finding_id":"G5"},
         }],
     )
-    with pytest.raises(
-        sp.ProtocolError,
-        match=(
-            r"/governing_findings/0/evidence: fresh aggregate finding.*"
-            r"/class_outcomes/class-a/evidence; missing \['plan:2'\]"
+    parsed = materialize(
+        raw, active_classes=[active_class()], durable_debt=[durable_debt()],
+    )
+    assert parsed["findings"][0]["evidence"] == ["plan:1", "plan:2"]
+    assert parsed["debt"][0]["evidence"] == ["plan:1", "plan:2"]
+    assert parsed["_derived_evidence_extensions"] == [{
+        "finding_id":"G5", "class_id":"class-a",
+        "source_pointer":"/class_outcomes/class-a/evidence",
+        "anchors":["plan:2"],
+    }]
+
+
+def test_issue_111_112_one_missing_anchor_preserves_all_sixteen_actions(tmp_path):
+    classes = []
+    debts = []
+    findings = []
+    outcomes = []
+    debt_outcomes = []
+    actions = []
+    reported_anchor = (
+        "repository/scripts/verify_census_evidence_acquisition.py:4226-4241"
+    )
+    for index in range(16):
+        class_id = f"class-{index:02d}"
+        finding_id = f"G{index:02d}"
+        debt_id = f"D{index:02d}"
+        anchor = reported_anchor if index == 0 else f"plan:{index + 1}"
+        classes.append(active_class(class_id))
+        debts.append(durable_debt(
+            debt_id, cid=class_id, finding_id=f"old-{index:02d}",
+        ))
+        current = finding(
+            finding_id, classification={
+                "kind":"existing_class", "class_id":class_id,
+            },
+        )
+        current["evidence"] = ["plan:1"] if index == 0 else [anchor]
+        findings.append(current)
+        outcomes.append({
+            "class_id":class_id, "verdict":"violated", "evidence":[anchor],
+            "basis":{"kind":"new_finding", "finding_id":finding_id},
+        })
+        debt_outcomes.append({
+            "debt_id":debt_id, "status":"closed", "evidence":["plan:1"],
+        })
+        actions.append({
+            "kind":"reclassify", "class_id":class_id, "severity":"MAJOR",
+        })
+
+    parsed = materialize(
+        decision(
+            "correction", governing_findings=findings,
+            class_outcomes=outcomes, debt_outcomes=debt_outcomes,
+            class_actions=actions,
         ),
-    ):
-        materialize(raw, active_classes=[active_class()], durable_debt=[durable_debt()])
+        active_classes=classes, durable_debt=debts,
+    )
+
+    assert len(parsed["class_records"]) == 16
+    assert len(parsed["debt"]) == 16
+    assert parsed["findings"][0]["evidence"] == ["plan:1", reported_anchor]
+    assert parsed["_derived_evidence_extensions"] == [{
+        "finding_id":"G00", "class_id":"class-00",
+        "source_pointer":"/class_outcomes/class-00/evidence",
+        "anchors":[reported_anchor],
+    }]
+    with pytest.raises(rc.CensusError, match="unresolvable repository anchor"):
+        rc.resolve_anchors(parsed, root=tmp_path, plan_lines=20)
 
 
 def test_fresh_aggregate_finding_must_supersede_prior_class_debt():

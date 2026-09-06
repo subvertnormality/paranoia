@@ -328,12 +328,18 @@ An otherwise standalone correction `close` must carry an authored `satisfied` cl
 evidence; the server rejects a bare close through the existing bounded validation retry.
 A fresh aggregate finding closes the class's narrower prior open debt after incorporating every
 still-reachable predecessor occurrence, preventing duplicate blockers for one class.
-The correction materializer cross-checks the fresh finding against its matching violated class
-outcome and rejects it if any independently authored current-occurrence anchor is missing from the
-aggregate finding; the retry identifies the provider-owned evidence pointer.
-The same check runs before a non-debt-bound correction finding can derive its violated outcome from
-`classification.assessment_evidence`.
+The correction materializer projects every independently authored current-occurrence anchor from
+the matching violated class outcome into its fresh aggregate finding, preserving authored order and
+recording the derived extension in the staged audit. The same projection runs before a
+non-debt-bound correction finding derives its violated outcome from
+`classification.assessment_evidence`. Every projected anchor still passes the normal snapshot and
+bounds validation; derivation cannot make an invalid citation valid.
 Correction settlement rejects any prospective state with more than one open debt for an active class.
+When a same-session validation retry succeeds, `CLASS-REGISTER` reports how many earlier payloads
+were discarded, states that none of their operations applied, and includes a bounded first
+validation diagnostic. The five-section review repeats bounded diagnostics under `Gaps`; `NONE`
+therefore means only that the accepted payload contained no class action, not that no earlier work
+was rejected.
 
 Broad plan census and final roles also inspect proactively for one normative contract stated as
 authoritative in multiple operative locations, even before the copies visibly disagree. They ask

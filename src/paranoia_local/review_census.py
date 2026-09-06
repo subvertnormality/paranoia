@@ -1095,7 +1095,10 @@ def trailer(
     return "\n".join(lines)
 
 
-def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = None) -> str:
+def render_review(
+    settlement: dict[str, Any], state: dict[str, Any] | None = None, *,
+    rejected_payloads: Sequence[Mapping[str, Any]] = (),
+) -> str:
     """Restore the stable human response while JSON remains in Review.raw/audit state."""
     findings = list(settlement.get("findings", []))
     if state is not None:
@@ -1128,11 +1131,30 @@ def render_review(settlement: dict[str, Any], state: dict[str, Any] | None = Non
         f"- [{f['severity']}] {f.get('remedy') or f.get('reason') or 'Resolve the cited debt.'}"
         for f in findings
     ]
+    gaps = "Nothing notable."
+    if rejected_payloads:
+        count = len(rejected_payloads)
+        gaps = (
+            f"The accepted settlement followed {count} earlier rejected staged "
+            f"payload{'s' if count != 1 else ''}. None of the rejected payloads' "
+            "class or debt operations were applied; only the final accepted payload "
+            "settled."
+        )
+        diagnostics = [
+            row.get("validation_issue") for row in rejected_payloads
+            if isinstance(row.get("validation_issue"), str)
+        ]
+        if diagnostics:
+            rendered = "\n\n".join(
+                rendered_diagnostic(bounded_diagnostic(issue, 1_600))
+                for issue in diagnostics[:3]
+            )
+            gaps += f"\n\nValidation diagnostics:\n\n{rendered}"
     return "\n\n".join((
         "## What works\n\nNothing notable.",
         "## What doesn't work\n\n" + rows(findings),
         "## Risks\n\nNothing notable.",
-        "## Gaps\n\nNothing notable.",
+        "## Gaps\n\n" + gaps,
         "## Improvements\n\n" + ("\n".join(improvements) if improvements else "Nothing notable."),
     ))
 

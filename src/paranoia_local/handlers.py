@@ -1935,6 +1935,9 @@ def _staged_structural_review(
         row.get("sequence") is None, row.get("sequence") or 0,
     ))
     closure.rejected_payloads = deepcopy(rejected_payloads)
+    register_status = _register_status_with_rejected_payloads(
+        register_status, rejected_payloads,
+    )
     try:
         cc.save_lineage(closure.state_root, lineage)
     except cc.StateUnavailable as exc:
@@ -1959,7 +1962,9 @@ def _staged_structural_review(
     closure._settled = True
     closure.register_status = register_status
     closure.staged_settlement = settlement
-    review = replace(review, text=rc.render_review(settlement, state))
+    review = replace(review, text=rc.render_review(
+        settlement, state, rejected_payloads=rejected_payloads,
+    ))
     trailer = _staged_success_trailer(
         lineage=lineage, state=state, mode=mode,
         register_status=closure.register_status, minted=minted, attempts=attempts,
@@ -2022,6 +2027,27 @@ def _staged_success_trailer(
         pc.render_trailer(lineage.claim_state), class_trailer, structural_trailer,
         rc.attempt_trailer(attempts), combined,
     ))
+
+
+def _register_status_with_rejected_payloads(
+    status: str, rejected_payloads: Sequence[Mapping[str, Any]],
+) -> str:
+    """Make a recovered validation rejection visible on the primary trailer line."""
+    if not rejected_payloads:
+        return status
+    count = len(rejected_payloads)
+    suffix = (
+        f"{count} earlier rejected payload{'s' if count != 1 else ''} discarded; "
+        "none of their operations applied"
+    )
+    first_issue = next((
+        row.get("validation_issue") for row in rejected_payloads
+        if isinstance(row.get("validation_issue"), str)
+    ), None)
+    if first_issue is not None:
+        issue = rc.bounded_diagnostic(first_issue, 800)
+        suffix += f"; validation: {rc.trailer_diagnostic(issue)}"
+    return f"{status}; {suffix}"
 
 
 def _default_clock() -> str:

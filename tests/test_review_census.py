@@ -3148,6 +3148,11 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
     assert "staged_failure" not in settled.review_state
     assert "STAGED-ATTEMPTS: total=5 validation-retries=1 " \
            "validation-invalid=1 execution-failed=0" in result
+    assert "CLASS-REGISTER: staged census parsed — CLOSE" in result
+    assert "1 earlier rejected payload discarded; none of their operations applied" in result
+    assert "its integrity assessment verdict is 'satisfied', so reclassify" in result
+    assert "## Gaps\n\nThe accepted settlement followed 1 earlier rejected staged payload" in result
+    assert "None of the rejected payloads' class or debt operations were applied" in result
 
 
 def test_terminal_correction_validation_retains_extracted_replies(tmp_path):
@@ -4860,12 +4865,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         return Review(text=text, session_ref="aggregate-session", raw=text)
 
     def resume(self, session_ref, prompt, *args, **kwargs):
-        assert session_ref == "aggregate-session"
-        calls.append(prompt)
-        assert "/governing_findings/0/evidence" in prompt
-        assert anchors[1] in prompt
-        text = wire(response_value(complete=True))
-        return Review(text=text, session_ref=session_ref, raw=text)
+        pytest.fail("server-owned evidence projection must not spend a retry")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
     monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
@@ -4883,7 +4883,7 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
         now=lambda:"AGG",
     )
 
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert "exhaustively consolidate every" in calls[0]
     assert "trace every site" in calls[0]
     assert "class invariant and" in calls[0]
@@ -4905,10 +4905,16 @@ def test_public_correction_batches_all_current_occurrences_for_one_class(
     assert fresh["remedy"] == "repair both independently anchored sites together"
     audit = json.loads(next((tmp_path / "logs").glob("AGG-critique_*-*.json")).read_text())
     assert audit["staged_settlement"]["findings"][0]["evidence"] == anchors
+    assert audit["staged_settlement"]["_derived_evidence_extensions"] == [{
+        "finding_id":"aggregate", "class_id":"class-0",
+        "source_pointer":"/class_outcomes/class-0/evidence",
+        "anchors":[anchors[1]],
+    }]
+    assert audit["rejected_payloads"] == []
 
 
 @pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
-def test_public_correction_retries_non_debt_assessment_evidence_omission(
+def test_public_correction_projects_non_debt_assessment_evidence_omission(
     repo_with_branch, tmp_path, monkeypatch, mode,
 ):
     lineage_id = f"derived-occurrence-{mode}"
@@ -4972,12 +4978,7 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         return Review(text=text, session_ref="derived-session", raw=text)
 
     def resume(self, session_ref, prompt, *args, **kwargs):
-        assert session_ref == "derived-session"
-        calls.append(prompt)
-        assert "/governing_findings/0/evidence" in prompt
-        assert "/classification/assessment_evidence" in prompt
-        text = wire(response_value(complete=True))
-        return Review(text=text, session_ref=session_ref, raw=text)
+        pytest.fail("server-owned evidence projection must not spend a retry")
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
     monkeypatch.setattr(handlers.eng.CodexEngine, "resume", resume)
@@ -4995,7 +4996,7 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         now=lambda:"DERIVED",
     )
 
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert "STRUCTURAL-PHASE: correction" in result
     durable = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="after", mode=mode,
@@ -5005,6 +5006,17 @@ def test_public_correction_retries_non_debt_assessment_evidence_omission(
         if row["status"] == "open" and row["class_ids"] == ["fresh-class"]
     )
     assert fresh["evidence"] == anchors
+    audit = json.loads(next(
+        (tmp_path / "logs").glob("DERIVED-critique_*-*.json")
+    ).read_text())
+    assert audit["staged_settlement"]["_derived_evidence_extensions"] == [{
+        "finding_id":"fresh", "class_id":"fresh-class",
+        "source_pointer":(
+            "/governing_findings/0/classification/assessment_evidence"
+        ),
+        "anchors":[anchors[1]],
+    }]
+    assert audit["rejected_payloads"] == []
     if mode == cc.PLAN_MODE:
         assert durable.review_state["plan_line_count"] == 3
     else:
